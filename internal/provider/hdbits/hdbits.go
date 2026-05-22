@@ -29,6 +29,9 @@ import (
 	"subflux/internal/provider/dlcache"
 )
 
+const settingPasskey = "passkey"
+const settingUsername = "username"
+
 // --- Constants and factory ---
 
 // hdbitsConfig holds tuning parameters for the HDBits provider.
@@ -68,7 +71,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	if ps.Username == "" || ps.Passkey == "" {
 		return nil, errors.New("hdbits: username and passkey required")
 	}
-	slog.Debug("hdbits provider initialized", "username", ps.Username)
+	slog.Debug("hdbits provider initialized", settingUsername, ps.Username)
 	return &Provider{
 		client:       provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		username:     ps.Username,
@@ -153,7 +156,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		})
 	}
 
-	_ = g.Wait() //nolint:errcheck // errors are non-fatal (logged inside goroutines)
+	_ = g.Wait()
 
 	slog.Info("hdbits search complete", "results", len(results), "media", req.MediaLabel())
 	return results, nil
@@ -201,7 +204,7 @@ func (p *Provider) buildLookup(req *api.SearchRequest) (params map[string]any, c
 			return nil, ""
 		}
 		return map[string]any{
-			"username": p.username, "passkey": p.passkey,
+			settingUsername: p.username, settingPasskey: p.passkey,
 			"tvdb": map[string]any{"id": req.TvdbID, "season": req.Season},
 		}, fmt.Sprintf("torrents:tvdb:%d:s%d", req.TvdbID, req.Season)
 	}
@@ -214,7 +217,7 @@ func (p *Provider) buildLookup(req *api.SearchRequest) (params map[string]any, c
 		return nil, ""
 	}
 	return map[string]any{
-		"username": p.username, "passkey": p.passkey,
+		settingUsername: p.username, settingPasskey: p.passkey,
 		"imdb": map[string]any{"id": imdbNum},
 	}, "torrents:imdb:" + req.ImdbID
 }
@@ -271,7 +274,7 @@ func (p *Provider) fetchOrCached(ctx context.Context, subID string) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	data, _ := v.([]byte) //nolint:errcheck // singleflight guarantees []byte on nil error
+	data, _ := v.([]byte)
 	return data, nil
 }
 
@@ -283,7 +286,7 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	// encoding costs nothing and matches the pattern used elsewhere.
 	q := url.Values{}
 	q.Set("id", subID)
-	q.Set("passkey", p.passkey)
+	q.Set(settingPasskey, p.passkey)
 	dlURL := "https://hdbits.org/getdox.php?" + q.Encode()
 
 	slog.Debug("hdbits downloading subtitle", "subtitle_id", subID)
@@ -366,7 +369,7 @@ func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *a
 	slog.Debug("hdbits fetching subtitles for torrent", "torrent_id", torrentID)
 
 	params := map[string]any{
-		"username": p.username, "passkey": p.passkey,
+		settingUsername: p.username, settingPasskey: p.passkey,
 		"torrent_id": torrentID,
 	}
 	body, err := json.Marshal(params)

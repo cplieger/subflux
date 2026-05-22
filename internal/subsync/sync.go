@@ -170,7 +170,7 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 	// Strategies set their own ctx-cancellation handling internally;
 	// errgroup's Wait collects them all (no error returns are emitted
 	// by these strategies — they signal failure via Confidence=0).
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	// Filter out zero-confidence results.
 	live := candidates[:0]

@@ -25,7 +25,7 @@ func (tg *typedGroup[T]) Do(key string, fn func() (T, error)) (val T, shared boo
 		var zero T
 		return zero, shared, err
 	}
-	val, _ = v.(T) //nolint:errcheck // v is always T when err==nil (singleflight stores fn() result)
+	val, _ = v.(T)
 	return val, shared, nil
 }
 
@@ -119,7 +119,7 @@ func (c *Cache[T]) GetOrFetchCtx(ctx context.Context, key string, fn func(contex
 			var zero T
 			return zero, res.Err
 		}
-		val, _ := res.Val.(T) //nolint:errcheck // Val is always T when Err==nil
+		val, _ := res.Val.(T)
 		return val, nil
 	}
 }

@@ -225,7 +225,7 @@ func runItemSearch(ctx context.Context, engine api.SearchEngine, sc api.Scorer,
 			return nil
 		})
 	}
-	g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 	if len(allResults) == 0 {
 		fmt.Println("  No results found.")
 		fmt.Println()

@@ -131,7 +131,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 			return nil
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	var results []api.Subtitle
 	attempted, failed := 0, 0

@@ -63,7 +63,7 @@ type HTTPStatusError struct {
 	Code int
 }
 
-var _ api.Transient = (*HTTPStatusError)(nil) //nolint:errcheck // compile-time interface assertion
+var _ api.Transient = (*HTTPStatusError)(nil)
 
 func (e *HTTPStatusError) Error() string { return fmt.Sprintf("HTTP %d", e.Code) }
 
@@ -207,7 +207,7 @@ const drainBytes = 4096
 // DrainClose reads remaining bytes (up to drainBytes) from rc before closing it.
 // This allows HTTP/1.1 connection reuse by the transport pool.
 func DrainClose(rc io.ReadCloser) {
-	io.Copy(io.Discard, io.LimitReader(rc, drainBytes)) //nolint:errcheck // best-effort drain
+	_, _ = io.Copy(io.Discard, io.LimitReader(rc, drainBytes))
 	rc.Close()
 }
 

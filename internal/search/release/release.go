@@ -85,9 +85,9 @@ var SourceFamily = map[string]string{
 	NormHDTV:     "tv",
 	NormSDTV:     "tv",
 	NormDVD:      "dvd",
-	NormCam:      "cam",
-	NormTelesync: "cam",
-	NormTelecine: "cam",
+	NormCam:      NormCam,
+	NormTelesync: NormCam,
+	NormTelecine: NormCam,
 	NormHDRip:    "hdrip",
 }
 

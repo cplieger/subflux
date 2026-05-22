@@ -6,11 +6,11 @@ func vadAllpass(in []int16, stride, n int, coef int16, state *int16, out []int16
 	st := int32(*state) << 16
 	for i := range n {
 		tmp32 := st + int32(coef)*int32(in[i*stride])
-		out[i] = int16(tmp32 >> 16)
+		out[i] = int16(tmp32 >> 16) //nolint:gosec // G115: fixed-point DSP
 		st = (int32(in[i*stride]) << 14) - int32(coef)*int32(out[i])
 		st *= 2
 	}
-	*state = int16(st >> 16)
+	*state = int16(st >> 16) //nolint:gosec // G115: fixed-point DSP
 }
 
 const (
@@ -42,7 +42,7 @@ func vadHP(in []int16, n int, state, out []int16) {
 		tmp32 -= int32(hpPole[1]) * int32(state[2])
 		tmp32 -= int32(hpPole[2]) * int32(state[3])
 		state[3] = state[2]
-		state[2] = int16(tmp32 >> 14)
+		state[2] = int16(tmp32 >> 14) //nolint:gosec // G115: fixed-point DSP
 		out[i] = state[2]
 	}
 }
@@ -52,7 +52,7 @@ func vadLogEnergy(data []int16, n int, offset int16) (logE, totalE int16) {
 	var energy uint32
 	var rshifts int
 	for i := range n {
-		sq := uint32(int32(data[i]) * int32(data[i]))
+		sq := uint32(int32(data[i]) * int32(data[i])) //nolint:gosec // G115: fixed-point DSP arithmetic
 		if energy > 0xFFFFFFFF-sq {
 			energy >>= 1
 			energy += sq >> 1
@@ -88,7 +88,7 @@ func vadLogEnergy(data []int16, n int, offset int16) (logE, totalE int16) {
 		if rshifts >= 0 {
 			totalE = vadMinEnergy + 1
 		} else {
-			totalE = int16(energy >> uint(-rshifts))
+			totalE = int16(energy >> uint(-rshifts)) //nolint:gosec // G115: fixed-point DSP arithmetic
 		}
 	}
 	return logE, totalE

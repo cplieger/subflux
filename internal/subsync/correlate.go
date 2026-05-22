@@ -52,7 +52,7 @@ func crossCorrelateEdges(ctx context.Context, a, b []float64) correlationResult 
 func correlateFloat(ctx context.Context, fa, fb []float64) correlationResult {
 	n := fft.NextPow2(len(fa) + len(fb) - 1)
 
-	ws := fft.WorkspacePool.Get().(*fft.Workspace) //nolint:errcheck // pool always returns *Workspace from New
+	ws, _ := fft.WorkspacePool.Get().(*fft.Workspace)
 	ws.Ensure(n)
 
 	// Fill workspace buffers with zero-padded signal data.

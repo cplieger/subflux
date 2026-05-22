@@ -14,7 +14,6 @@
 // without taking the codegen tool. Coverage is partial: the test catches
 // add/remove drift definitively and reorder drift when the test author
 // supplies an expected-field list.
-
 package testsupport
 
 import (
@@ -145,7 +144,7 @@ func Aligned(columns string, sample any, scanFn func(row interface{ Scan(...any)
 	// so any non-nil error indicates a panic recovered upstream or a
 	// programmer error in scanFn itself. The test will see the empty
 	// args slice and fail the count check.
-	_ = scanFn(rec) //nolint:errcheck // intentional; see comment above
+	_ = scanFn(rec)
 	fields := make([]string, len(rec.Args))
 	for i, arg := range rec.Args {
 		fields[i] = FieldNameAt(sample, arg)

@@ -26,7 +26,7 @@ func doSingleflight[T any](ctx context.Context, c *Client, key string, fn func(c
 			var zero T
 			return zero, res.Err
 		}
-		return res.Val.(T), nil //nolint:errcheck // safe: fn returns T, DoChan preserves it
+		return res.Val.(T), nil //nolint:errcheck // singleflight guarantees T on nil error
 	}
 }
 

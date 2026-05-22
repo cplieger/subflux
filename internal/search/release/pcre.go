@@ -6,7 +6,6 @@
 // This file implements a Pattern type that compiles the RE2-compatible
 // core of a PCRE regex and validates lookaround assertions programmatically
 // after each match.
-
 package release
 
 import (

@@ -22,6 +22,11 @@ import (
 	"subflux/internal/server/events"
 )
 
+const (
+	tsUnknown      = "unknown"
+	tsIdentityCast = "(v) => v as unknown"
+)
+
 // EnumDef defines a named string enum with its valid values.
 type EnumDef struct{ Values []string }
 
@@ -179,7 +184,7 @@ func tsType(t reflect.Type) string {
 		}
 	}
 	if t == reflect.TypeFor[json.RawMessage]() {
-		return "unknown"
+		return tsUnknown
 	}
 	if t == reflect.TypeFor[time.Time]() {
 		return "string"
@@ -198,11 +203,11 @@ func tsType(t reflect.Type) string {
 	case reflect.Map:
 		return "Record<string, " + tsType(t.Elem()) + ">"
 	case reflect.Interface:
-		return "unknown"
+		return tsUnknown
 	case reflect.Struct:
-		return "unknown"
+		return tsUnknown
 	}
-	return "unknown"
+	return tsUnknown
 }
 
 func tsEnumName(goName string) string {
@@ -353,10 +358,10 @@ func elemDecoderExpr(t reflect.Type) string {
 		return "(v) => { if (typeof v !== \"boolean\") throw new TypeError(\"expected boolean\"); return v as boolean; }"
 	}
 	if t.Kind() == reflect.Interface {
-		return "(v) => v as unknown"
+		return tsIdentityCast
 	}
 	if isRawMessage(t) {
-		return "(v) => v as unknown"
+		return tsIdentityCast
 	}
 	if t.Kind() == reflect.Map {
 		return "(v) => asObject(v)"
@@ -364,7 +369,7 @@ func elemDecoderExpr(t reflect.Type) string {
 	if t.Name() != "" && isEnum(t) {
 		return decoderName(t.Name())
 	}
-	return "(v) => v as unknown"
+	return tsIdentityCast
 }
 
 // generateTypes writes types.gen.ts.
@@ -724,21 +729,21 @@ func main() {
 
 	var typesBuf strings.Builder
 	generateTypes(&typesBuf)
-	if err := os.WriteFile(filepath.Join(outDir, "types.gen.ts"), []byte(typesBuf.String()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "types.gen.ts"), []byte(typesBuf.String()), 0o644); err != nil { //nolint:gosec // G306: generated source file, not secrets
 		fmt.Fprintf(os.Stderr, "write types.gen.ts: %v\n", err)
 		os.Exit(1)
 	}
 
 	var decodersBuf strings.Builder
 	generateDecoders(&decodersBuf)
-	if err := os.WriteFile(filepath.Join(outDir, "decoders.gen.ts"), []byte(decodersBuf.String()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "decoders.gen.ts"), []byte(decodersBuf.String()), 0o644); err != nil { //nolint:gosec // G306: generated source file, not secrets
 		fmt.Fprintf(os.Stderr, "write decoders.gen.ts: %v\n", err)
 		os.Exit(1)
 	}
 
 	var registryBuf strings.Builder
 	generateRegistry(&registryBuf)
-	if err := os.WriteFile(filepath.Join(outDir, "registry.gen.ts"), []byte(registryBuf.String()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "registry.gen.ts"), []byte(registryBuf.String()), 0o644); err != nil { //nolint:gosec // G306: generated source file, not secrets
 		fmt.Fprintf(os.Stderr, "write registry.gen.ts: %v\n", err)
 		os.Exit(1)
 	}

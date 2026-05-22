@@ -20,6 +20,8 @@ import (
 	"subflux/internal/ssrf"
 )
 
+const sourceSeriessub = "seriessub"
+
 // Compile-time assertion that Provider implements api.Provider.
 var _ api.Provider = (*Provider)(nil)
 
@@ -208,7 +210,7 @@ func classifyBadRequest(body []byte) (io.ReadCloser, error) {
 
 // filterSubtitleEntries converts raw BetaSeries subtitle entries into Subtitle
 // values. Filters by requested languages (mapping BetaSeries vo/vf codes to
-// ISO 639-1) and skips the "seriessub" source (dead links). Pure function.
+// ISO 639-1) and skips the sourceSeriessub source (dead links). Pure function.
 func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, episode int) []api.Subtitle {
 	var results []api.Subtitle
 	for _, sub := range entries {
@@ -217,7 +219,7 @@ func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, 
 			continue
 		}
 		// Skip seriessub source (dead links).
-		if sub.Source == "seriessub" {
+		if sub.Source == sourceSeriessub {
 			continue
 		}
 

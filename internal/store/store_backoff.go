@@ -103,6 +103,7 @@ func (d *DB) GetBackoffItems(ctx context.Context) ([]api.BackoffEntry, error) {
 // GetBackoffByPrefix returns backoff entries for media IDs matching a prefix.
 // Used to show next retry times in the coverage UI.
 func (d *DB) GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error) {
+	//nolint:gosec // G202: Columns is a compile-time constant
 	baseQuery := `SELECT ` + backoffScanner.Columns + `
 		FROM search_attempts WHERE media_type = ? AND provider != ''`
 	args := make([]any, 1, 2)

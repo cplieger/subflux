@@ -108,7 +108,7 @@ func (a *AuthDB) GetUserByOIDCSub(ctx context.Context, sub string) (*api.User, e
 // ListUsers returns all users ordered by username.
 func (a *AuthDB) ListUsers(ctx context.Context) ([]api.User, error) {
 	rows, err := a.db.QueryContext(ctx,
-		`SELECT `+userScanner.Columns+` FROM auth_users ORDER BY username`)
+		`SELECT `+userScanner.Columns+` FROM auth_users ORDER BY username`) //nolint:gosec // G202: compile-time columns
 	if err != nil {
 		return nil, err
 	}

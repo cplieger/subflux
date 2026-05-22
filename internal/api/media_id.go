@@ -89,7 +89,7 @@ func BuildEpisodeID(tvdbID int, imdbID string, season, episode int) string {
 func appendPadded2(b []byte, n int) []byte {
 	switch {
 	case n < 10:
-		b = append(b, '0', byte('0'+n))
+		b = append(b, '0', byte('0'+n)) //nolint:gosec // G115: n is 0-9, fits in byte
 	case n < 100:
 		b = append(b, byte('0'+n/10), byte('0'+n%10))
 	default:

@@ -113,7 +113,7 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 	}
 	tmp32 := int32(alpha+1)*int32(v.meanVal[ch]) +
 		int32(32767-alpha)*int32(currentMedian) + 16384
-	v.meanVal[ch] = int16(tmp32 >> 15)
+	v.meanVal[ch] = int16(tmp32 >> 15) //nolint:gosec // G115: fixed-point DSP
 
 	return v.meanVal[ch]
 }

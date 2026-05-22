@@ -41,7 +41,7 @@ func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64,
 
 	hash := uint64(size)
 
-	bufp := hashBufPool.Get().(*[]byte) //nolint:errcheck // pool always returns *[]byte from New
+	bufp, _ := hashBufPool.Get().(*[]byte)
 	buf := *bufp
 	defer hashBufPool.Put(bufp)
 

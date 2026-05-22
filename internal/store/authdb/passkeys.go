@@ -66,7 +66,7 @@ func (a *AuthDB) CreatePasskey(ctx context.Context, cred *api.PasskeyCredential)
 // GetPasskeysByUserID returns all passkeys for a user, ordered by creation date.
 func (a *AuthDB) GetPasskeysByUserID(ctx context.Context, userID int64) ([]api.PasskeyCredential, error) {
 	rows, err := a.db.QueryContext(ctx,
-		`SELECT `+passkeyScanner.Columns+` FROM auth_passkeys WHERE user_id = ? ORDER BY created_at`,
+		`SELECT `+passkeyScanner.Columns+` FROM auth_passkeys WHERE user_id = ? ORDER BY created_at`, //nolint:gosec // G202: compile-time columns
 		userID)
 	if err != nil {
 		return nil, err

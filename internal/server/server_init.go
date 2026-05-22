@@ -132,7 +132,7 @@ func (s *Server) initHandlers() {
 // initManualHandler constructs the manualops.Handler with the server's dependencies.
 func (s *Server) initManualHandler() *manualops.Handler {
 	return manualops.NewHandler(manualops.HandlerDeps{
-		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) }, //nolint:errcheck // compile-time assertion guarantees this
+		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) }, //nolint:errcheck // compile-time interface guarantee
 		Activity: &serveradapter.ActivityAdapter{A: s.activity},
 		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
 		Events:   &serveradapter.ManualEventAdapter{E: s.events},

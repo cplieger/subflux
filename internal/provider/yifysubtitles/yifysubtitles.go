@@ -21,6 +21,8 @@ import (
 	"subflux/internal/ssrf"
 )
 
+const langBrazilianPT = "Brazilian Portuguese"
+
 // Compile-time assertion that Provider implements api.Provider.
 var _ api.Provider = (*Provider)(nil)
 
@@ -254,7 +256,7 @@ func extractDownloadLink(html string) string {
 // yifyLangOverrides contains provider-specific name→code mappings that
 // differ from the canonical LangRegistry reverse mapping.
 var yifyLangOverrides = map[string]string{
-	"Brazilian Portuguese": "pb",
+	langBrazilianPT: "pb",
 }
 
 func yifyLangToISO(name string) string {

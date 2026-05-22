@@ -18,6 +18,12 @@ import (
 )
 
 const (
+	codecASS     = "ass"
+	codecMovText = "mov_text"
+	codecSSA     = "ssa"
+)
+
+const (
 	// langUndefined is the ISO 639-2 code for undefined language,
 	// used to skip tracks without a language.
 	langUndefined = "und"
@@ -151,7 +157,7 @@ func (p *Provider) isIgnoredCodec(codec string) bool {
 	filters := []codecFilter{
 		{&p.ignorePGS, []string{"pgs"}},
 		{&p.ignoreVobSub, []string{"vobsub"}},
-		{&p.ignoreASS, []string{"ass", "ssa"}},
+		{&p.ignoreASS, []string{codecASS, codecSSA}},
 	}
 	for _, f := range filters {
 		if !*f.enabled {
@@ -226,17 +232,17 @@ func normalizeCodecName(codec string) string {
 
 var ffprobeCodecMap = map[string]string{
 	"subrip":            "srt",
-	"ass":               "ass",
-	"ssa":               "ssa",
+	codecASS:               codecASS,
+	codecSSA:               codecSSA,
 	"webvtt":            "webvtt",
-	"mov_text":          "mov_text",
+	codecMovText:          codecMovText,
 	"hdmv_pgs_subtitle": "pgs",
 	"dvd_subtitle":      "vobsub",
 	"dvb_subtitle":      "dvbsub",
 	"dvb_teletext":      "teletext",
 	"eia_608":           "cea608",
 	"ttml":              "ttml",
-	"text":              "mov_text",
+	"text":              codecMovText,
 }
 
 // --- ProviderDirect (implements search.TrackDetector via DetectTracks) ---

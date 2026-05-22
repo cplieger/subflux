@@ -4,8 +4,8 @@ package opensubtitles
 
 // Language mapping between ISO 639-1 and OpenSubtitles.com codes.
 var (
-	langToOS   = map[string]string{"pt": "pt-PT", "pb": "pt-BR", "zh": "zh-CN"}
-	langFromOS = map[string]string{"pt-PT": "pt", "pt-BR": "pb", "zh-CN": "zh", "ea": "es"}
+	langToOS   = map[string]string{"pt": "pt-PT", "pb": langPtBR, "zh": "zh-CN"}
+	langFromOS = map[string]string{"pt-PT": "pt", langPtBR: "pb", "zh-CN": "zh", "ea": "es"}
 )
 
 func toOSLang(lang string) string {

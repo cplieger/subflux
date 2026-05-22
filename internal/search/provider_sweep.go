@@ -169,7 +169,7 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 		})
 	}
 
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	// Log timed-out providers.
 	if to := (searchOutcome{providers: provResults}).timedOut(); len(to) > 0 {

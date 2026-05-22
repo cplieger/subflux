@@ -112,7 +112,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 			return nil
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	var results []api.Subtitle
 	var lastErr error
@@ -217,10 +217,10 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *api.Sea
 			// Rate-limit and auth errors won't resolve by trying another
 			// title; surface them immediately so the scan engine can pause
 			// or re-auth instead of burning the remaining alternatives.
-			if _, isRL := errors.AsType[*api.RateLimitError](err); isRL { //nolint:errcheck // only need the bool
+			if _, isRL := errors.AsType[*api.RateLimitError](err); isRL {
 				return 0, fmt.Errorf("subsource search alt title: %w", err)
 			}
-			if _, isAuth := errors.AsType[*api.AuthError](err); isAuth { //nolint:errcheck // only need the bool
+			if _, isAuth := errors.AsType[*api.AuthError](err); isAuth {
 				return 0, fmt.Errorf("subsource search alt title: %w", err)
 			}
 			continue

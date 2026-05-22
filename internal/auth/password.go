@@ -114,6 +114,6 @@ func parsePHC(encoded string) (phcParams, error) {
 		return phcParams{}, fmt.Errorf("auth: decode key: %w", err)
 	}
 
-	p.keyLen = uint32(len(p.key))
+	p.keyLen = uint32(len(p.key)) //nolint:gosec // G115: key length bounded by argon2 params
 	return p, nil
 }

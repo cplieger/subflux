@@ -82,7 +82,7 @@ func ProbeDuration(ctx context.Context, path string) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ffprobe",
+	cmd := exec.CommandContext(ctx, "ffprobe", //nolint:gosec // G204: args from validated config
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-print_format", "json",

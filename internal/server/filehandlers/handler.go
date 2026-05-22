@@ -111,7 +111,7 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		if row.Path != "" {
 			if err := ls.Cfg.ValidatePath(ctx, row.Path); err == nil {
-				if fi, statErr := os.Stat(row.Path); statErr == nil {
+				if fi, statErr := os.Stat(row.Path); statErr == nil { //nolint:gosec // G703: path validated by ValidatePath above
 					e.Size = fi.Size()
 				}
 			}
@@ -314,7 +314,7 @@ func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.Media
 		return
 	}
 	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
+		if _, err := os.Stat(p); err == nil { //nolint:gosec // G703: paths from validated config
 			return
 		}
 	}

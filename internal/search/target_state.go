@@ -134,7 +134,7 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 		states[i].allowedProvs = allowed
 
 		needsSearch, isUpgrade, currentScore := decideTargetAction(
-			existing, searchCfg, ctx, e, mediaType, mediaID, lang,
+			ctx, existing, searchCfg, e, mediaType, mediaID, lang,
 			t.Variant, label, upgradeCutoff, req.ForceUpgrade)
 
 		states[i].needsSearch = needsSearch
@@ -149,8 +149,8 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 
 // decideTargetAction determines whether a target needs searching and whether
 // it's an upgrade. This is a pure decision function extracted for testability.
-func decideTargetAction(existing *existingSubs, searchCfg *api.SearchConfig,
-	ctx context.Context, e *Engine, mediaType api.MediaType, mediaID, lang string,
+func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *api.SearchConfig,
+	e *Engine, mediaType api.MediaType, mediaID, lang string,
 	variant api.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool) (needsSearch, isUpgrade bool, currentScore int) {
 
 	if !existing.hasSubtitle(lang, variant) {

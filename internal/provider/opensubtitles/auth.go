@@ -14,6 +14,12 @@ import (
 	"subflux/internal/ssrf"
 )
 
+const (
+	settingUsername = "username"
+	hostOpenSubs   = "opensubtitles.com"
+	langPtBR       = "pt-BR"
+)
+
 // --- Authentication ---
 
 // ensureToken refreshes the API token if expired or missing. Uses singleflight
@@ -38,7 +44,7 @@ func (p *Provider) ensureToken(ctx context.Context) error {
 
 		slog.Debug("opensubtitles logging in")
 		loginPayload, marshalErr := json.Marshal(map[string]string{
-			"username": p.username, string(settingPassword): p.password,
+			settingUsername: p.username, string(settingPassword): p.password,
 		})
 		if marshalErr != nil {
 			return nil, fmt.Errorf("marshal login: %w", marshalErr)
@@ -107,7 +113,7 @@ func isValidServerHost(host string) bool {
 		return false
 	}
 	h := strings.ToLower(strings.TrimSuffix(host, "."))
-	return h == "opensubtitles.com" || strings.HasSuffix(h, ".opensubtitles.com")
+	return h == hostOpenSubs || strings.HasSuffix(h, ".opensubtitles.com")
 }
 
 // --- Rate Limiting ---

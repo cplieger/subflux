@@ -6,24 +6,24 @@ package vad
 // Precondition: std > 0 (enforced by vadMinStd clamp in model update).
 func vadGaussProb(input, mean, std int16) (prob int32, delta int16) {
 	tmp32 := int32(131072) + int32(std>>1)
-	invStd := int16(tmp32 / int32(std))                  // Q10
+	invStd := int16(tmp32 / int32(std))                  //nolint:gosec // G115: fixed-point DSP, Q10
 	tmp16 := invStd >> 2                                 // Q8
-	invStd2 := int16((int32(tmp16) * int32(tmp16)) >> 2) // Q14
+	invStd2 := int16((int32(tmp16) * int32(tmp16)) >> 2) //nolint:gosec // G115: fixed-point DSP, Q14
 	xQ7 := input << 3
 	d := xQ7 - mean                                  // Q7
-	delta = int16((int32(invStd2) * int32(d)) >> 10) // Q11
+	delta = int16((int32(invStd2) * int32(d)) >> 10) //nolint:gosec // G115: fixed-point DSP, Q11
 	expArg := (int32(delta) * int32(d)) >> 9         // Q10
 
 	const kCompVar = 22005 // Maximum allowed exponent argument (prevents underflow).
 	const kLog2Exp = 5909  // log2(e) in Q12, used for exp(-x) approximation.
 	var expVal int16
 	if expArg < kCompVar {
-		t := int16((int64(kLog2Exp) * int64(expArg)) >> 12)
+		t := int16((int64(kLog2Exp) * int64(expArg)) >> 12) //nolint:gosec // G115: fixed-point DSP arithmetic
 		t = -t
 		expVal = 0x0400 | (t & 0x03FF)
 		t = ^t
 		t >>= 10
-		t += 1
+		t++
 		if t >= 0 && t < 16 {
 			expVal >>= uint(t)
 		} else {
@@ -92,14 +92,14 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 			// Conditional probabilities for model update (Q14: 16384 = 1.0).
 			h0 := int16(h0test >> 12)
 			if h0 > 0 {
-				ngprvec[ch] = int16((nProb[0] & ^int32(0xFFF)) << 2 / int32(h0))
+				ngprvec[ch] = int16((nProb[0] & ^int32(0xFFF)) << 2 / int32(h0)) //nolint:gosec // G115: fixed-point DSP
 				ngprvec[ch+vadNumCh] = 16384 - ngprvec[ch]
 			} else {
 				ngprvec[ch] = 16384 // All probability on Gaussian 0.
 			}
 			h1 := int16(h1test >> 12)
 			if h1 > 0 {
-				sgprvec[ch] = int16((sProb[0] & ^int32(0xFFF)) << 2 / int32(h1))
+				sgprvec[ch] = int16((sProb[0] & ^int32(0xFFF)) << 2 / int32(h1)) //nolint:gosec // G115: fixed-point DSP
 				sgprvec[ch+vadNumCh] = 16384 - sgprvec[ch]
 			}
 		}
@@ -131,13 +131,13 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 				// Update noise mean if non-speech.
 				nmk2 := nmk
 				if vadflag == 0 {
-					delt := int16((int32(ngprvec[g]) * int32(deltaN[g])) >> 11)
-					nmk2 = nmk + int16((int32(delt)*int32(v.noiseUpdate))>>22)
+					delt := int16((int32(ngprvec[g]) * int32(deltaN[g])) >> 11) //nolint:gosec // G115: fixed-point DSP
+					nmk2 = nmk + int16((int32(delt)*int32(v.noiseUpdate))>>22) //nolint:gosec // G115: fixed-point DSP
 				}
 
 				// Long-term noise correction.
 				ndelt := (featureMin << 4) - nGlobalQ8
-				nmk3 := nmk2 + int16((int32(ndelt)*backEta)>>9)
+				nmk3 := nmk2 + int16((int32(ndelt)*backEta)>>9) //nolint:gosec // G115: fixed-point DSP
 
 				lo := int16((k + 5) << 7)
 				if nmk3 < lo {
@@ -151,8 +151,8 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 
 				if vadflag != 0 {
 					// Update speech mean.
-					delt := int16((int32(sgprvec[g]) * int32(deltaS[g])) >> 11)
-					tmp := int16((int32(delt) * int32(v.speechUpdate)) >> 21)
+					delt := int16((int32(sgprvec[g]) * int32(deltaS[g])) >> 11) //nolint:gosec // G115: fixed-point DSP
+					tmp := int16((int32(delt) * int32(v.speechUpdate)) >> 21) //nolint:gosec // G115: fixed-point DSP
 					smk2 := smk + ((tmp + 1) >> 1)
 					mx := maxspe + 640
 					if smk2 < minMean[k] {
@@ -172,9 +172,9 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 					tmp1 = int32(tmpQ) * tmp2
 					tmp2 = tmp1 >> 4
 					if tmp2 > 0 {
-						tmp = int16(tmp2 / int32(ssk*10))
+						tmp = int16(tmp2 / int32(ssk*10)) //nolint:gosec // G115: fixed-point DSP
 					} else {
-						tmp = -int16(-tmp2 / int32(ssk*10))
+						tmp = -int16(-tmp2 / int32(ssk*10)) //nolint:gosec // G115: fixed-point DSP
 					}
 					tmp += 128
 					ssk += tmp >> 8
@@ -191,9 +191,9 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 					tmp2 := int32(tmpQ) * tmp1
 					tmp1 = tmp2 >> 14
 					if tmp1 > 0 {
-						tmp = int16(tmp1 / int32(nsk))
+						tmp = int16(tmp1 / int32(nsk)) //nolint:gosec // G115: fixed-point DSP
 					} else {
-						tmp = -int16(-tmp1 / int32(nsk))
+						tmp = -int16(-tmp1 / int32(nsk)) //nolint:gosec // G115: fixed-point DSP
 					}
 					tmp += 32
 					nsk += tmp >> 6
@@ -214,8 +214,8 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 			diff := int16(sGlob>>9) - int16(nGlob>>9)
 			if diff < minDiff[ch] {
 				gap := minDiff[ch] - diff
-				sShift := int16((13 * int32(gap)) >> 2)
-				nShift := int16((3 * int32(gap)) >> 2)
+				sShift := int16((13 * int32(gap)) >> 2) //nolint:gosec // G115: fixed-point DSP
+				nShift := int16((3 * int32(gap)) >> 2) //nolint:gosec // G115: fixed-point DSP
 				for k := range vadNumGauss {
 					v.speechMeans[ch+k*vadNumCh] += sShift
 					v.noiseMeans[ch+k*vadNumCh] -= nShift

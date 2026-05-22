@@ -7,6 +7,8 @@ import (
 	"unicode/utf8"
 )
 
+const ellipsis = "..."
+
 // Anchor represents language-independent features extracted from a subtitle cue.
 type Anchor struct {
 	Punctuation string
@@ -28,7 +30,7 @@ func stripSubTags(text string) string {
 }
 
 // ExtractAnchors extracts language-independent features from cue text.
-func ExtractAnchors(text string) anchor {
+func ExtractAnchors(text string) Anchor {
 	return extractAnchors(text)
 }
 
@@ -95,7 +97,7 @@ func terminalPunctuation(trimmed string) string {
 		return ""
 	}
 	if strings.HasSuffix(trimmed, "…") {
-		return "..."
+		return ellipsis
 	}
 	last := trimmed[len(trimmed)-1]
 	switch last {
@@ -104,8 +106,8 @@ func terminalPunctuation(trimmed string) string {
 	case '!':
 		return "!"
 	case '.':
-		if strings.HasSuffix(trimmed, "...") {
-			return "..."
+		if strings.HasSuffix(trimmed, ellipsis) {
+			return ellipsis
 		}
 		return "."
 	}

@@ -18,7 +18,7 @@ import (
 	"os"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register sqlite3 database/sql driver
 
 	"subflux/internal/api"
 	"subflux/internal/store/txutil"

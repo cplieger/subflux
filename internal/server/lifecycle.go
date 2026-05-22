@@ -132,14 +132,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	if !s.ready.Load() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(map[string]string{ //nolint:errcheck // best-effort response write
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "unready",
 			"reason": "starting up or shutting down",
 		})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"}) //nolint:errcheck // best-effort response write
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // asyncActionResponse is the typed 202 Accepted response for async actions.

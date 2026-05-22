@@ -9,6 +9,8 @@ import (
 	"subflux/internal/auth"
 )
 
+const jsonKeyError = "error"
+
 // --- Request middleware ---
 //
 // Every middleware has signature `func(http.HandlerFunc) http.HandlerFunc`
@@ -140,7 +142,7 @@ func (s *Server) requireRecentReauth(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil || sess == nil ||
 			sess.ReauthAt == nil || time.Since(*sess.ReauthAt) > auth.CeremonyTimeout {
 			api.WriteJSONStatus(w, http.StatusForbidden, map[string]any{
-				"error":           "reauthentication required",
+				jsonKeyError:           "reauthentication required",
 				"reauth_required": true,
 			})
 			return

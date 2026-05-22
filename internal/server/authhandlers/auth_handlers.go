@@ -44,7 +44,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		auth.VerifyPassword(req.Password, auth.DummyHash()) //nolint:errcheck // timing equalization
+		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
@@ -53,7 +53,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.Enabled {
-		auth.VerifyPassword(req.Password, auth.DummyHash()) //nolint:errcheck // timing equalization
+		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))

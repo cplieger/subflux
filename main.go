@@ -152,32 +152,32 @@ func handleCLI(cmd string) (code int, handled bool) {
 		}
 	}
 	switch cmd {
-	case "search":
+	case cmdSearch:
 		return runCLISearch(), true
-	case "status":
+	case cmdStatus:
 		return runCLIRemote("/api/state/stats"), true
-	case "state":
+	case cmdState:
 		return runCLIState(), true
-	case "backoff":
+	case cmdBackoff:
 		return runCLIRemote("/api/backoff"), true
-	case "locks":
+	case cmdLocks:
 		return runCLIRemote("/api/locks"), true
-	case "providers":
+	case cmdProviders:
 		return runCLIRemote("/api/providers"), true
-	case "unlock":
+	case cmdUnlock:
 		return runCLIUnlock(), true
-	case "scan":
+	case cmdScan:
 		return runCLIAction("/api/scan", "scan started"), true
-	case "timeouts":
+	case cmdTimeouts:
 		return runCLIRemote("/api/providers/timeout"), true
-	case "timeouts-reset":
+	case cmdTimeoutsReset:
 		return runCLIAction("/api/providers/timeout/reset",
 			"provider timeouts reset, all providers re-enabled"), true
-	case "score":
+	case cmdScore:
 		return runCLIScore(), true
-	case "reset-password":
+	case cmdResetPassword:
 		return runCLIResetPassword(), true
-	case "generate-api-key":
+	case cmdGenerateAPIKey:
 		return runCLIGenerateAPIKey(), true
 	default:
 		return 0, false

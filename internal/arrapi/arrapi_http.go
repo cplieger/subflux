@@ -12,7 +12,7 @@ import (
 )
 
 // Compile-time assertion: *StatusError satisfies api.Transient.
-var _ api.Transient = (*StatusError)(nil) //nolint:errcheck // compile-time interface assertion
+var _ api.Transient = (*StatusError)(nil)
 
 // StatusError represents a non-OK HTTP response from an arr API.
 // Callers can use errors.As to inspect the status code and distinguish

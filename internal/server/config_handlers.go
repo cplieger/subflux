@@ -90,7 +90,7 @@ func (s *Server) handleDismissAlert(w http.ResponseWriter, r *http.Request) {
 // --- Activity API handlers ---
 
 // handleGetActivity returns the most recent activity entries.
-func (s *Server) handleGetActivity(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 	s.activity.PruneCompleted(activity.DefaultPruneAge)
 
 	src := s.activity.Entries()

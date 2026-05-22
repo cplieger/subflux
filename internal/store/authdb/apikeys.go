@@ -66,7 +66,7 @@ func (a *AuthDB) GetAPIKeyByHash(ctx context.Context, hash string) (*api.Key, er
 // date descending (newest first).
 func (a *AuthDB) ListAPIKeysByUserID(ctx context.Context, userID int64) ([]api.Key, error) {
 	rows, err := a.db.QueryContext(ctx,
-		`SELECT `+apiKeyScanner.Columns+` FROM auth_api_keys WHERE user_id = ? ORDER BY created_at DESC`,
+		`SELECT `+apiKeyScanner.Columns+` FROM auth_api_keys WHERE user_id = ? ORDER BY created_at DESC`, //nolint:gosec // G202: Columns is a compile-time constant
 		userID)
 	if err != nil {
 		return nil, err

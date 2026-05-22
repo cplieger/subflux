@@ -172,7 +172,7 @@ func perCueOffsets(ctx context.Context, refSpans []TimeSpan, incorrect []Cue) []
 		})
 	}
 
-	_ = g.Wait() //nolint:errcheck // context cancellation is the only error; partial results are valid
+	_ = g.Wait()
 	return offsets
 }
 

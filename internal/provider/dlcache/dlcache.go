@@ -88,7 +88,7 @@ func (dc *DownloadCache) evictOldest() {
 	if len(dc.h) == 0 {
 		return
 	}
-	oldest, _ := heap.Pop(&dc.h).(*entry) //nolint:errcheck // heap only contains *entry
+	oldest, _ := heap.Pop(&dc.h).(*entry)
 	delete(dc.cache, oldest.key)
 }
 
@@ -107,7 +107,7 @@ func (h entryHeap) Len() int           { return len(h) }
 func (h entryHeap) Less(i, j int) bool { return h[i].used.Before(h[j].used) }
 func (h entryHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i]; h[i].index = i; h[j].index = j }
 func (h *entryHeap) Push(x any) {
-	e, _ := x.(*entry) //nolint:errcheck // heap only contains *entry
+	e, _ := x.(*entry)
 	e.index = len(*h)
 	*h = append(*h, e)
 }

@@ -111,7 +111,7 @@ func postProcessSection() api.SchemaSection {
 			},
 			{
 				Key: "audio_sync_fallback", Label: "Audio Sync Fallback", Type: fieldBool,
-				Default:  "false",
+				Default:  defaultFalse,
 				Requires: "sync_subtitles=true",
 				Help: "Fall back to audio-based sync when no embedded reference " +
 					"subtitle is available or reference sync fails. " +
@@ -119,7 +119,7 @@ func postProcessSection() api.SchemaSection {
 			},
 			{
 				Key: "strip_hi", Label: "Strip HI", Type: fieldBool,
-				Default: "false",
+				Default: defaultFalse,
 				Help:    "Remove hearing-impaired annotations: [sounds], (music), speaker labels",
 			},
 			{

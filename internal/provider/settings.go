@@ -9,6 +9,8 @@ import (
 	"subflux/internal/api"
 )
 
+const valTrue = "true"
+
 // SettingKey is a typed constant for provider setting keys, preventing typos
 // and enabling IDE navigation.
 type SettingKey string
@@ -51,7 +53,7 @@ func SettingBool(settings map[string]any, key SettingKey, def bool) bool {
 	case bool:
 		return b
 	case string:
-		if b == "true" {
+		if b == valTrue {
 			return true
 		}
 		if b == "false" {

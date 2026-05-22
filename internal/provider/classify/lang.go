@@ -2,9 +2,11 @@ package classify
 
 import "strings"
 
+const langEng = "eng"
+
 // alpha3to2 maps ISO 639-3/639-2 codes to ISO 639-1 codes.
 var alpha3to2 = map[string]string{
-	"eng": "en", "fre": "fr", "fra": "fr", "ger": "de", "deu": "de",
+	langEng: "en", "fre": "fr", "fra": "fr", "ger": "de", "deu": "de",
 	"spa": "es", "ita": "it", "por": "pt", "rus": "ru", "jpn": "ja",
 	"chi": "zh", "zho": "zh", "kor": "ko", "ara": "ar", "hin": "hi",
 	"tha": "th", "vie": "vi", "pol": "pl", "nld": "nl", "dut": "nl",

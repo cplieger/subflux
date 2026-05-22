@@ -156,7 +156,7 @@ func (m *Mapper) getParsedMapping(ctx context.Context) (*animeList, error) {
 	if err != nil {
 		return nil, err
 	}
-	list, _ := v.(*animeList) //nolint:errcheck // singleflight guarantees *animeList on nil error
+	list, _ := v.(*animeList)
 	return list, nil
 }
 

@@ -42,7 +42,7 @@ const (
 // Factory creates an AnimeTosho provider from settings.
 func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	ps := provider.FromMap(settings)
-	anidbKey, _ := ps.Custom[string(provider.KeyAniDBClientKey)].(string) //nolint:errcheck // zero-value "" is valid fallback
+	anidbKey, _ := ps.Custom[string(provider.KeyAniDBClientKey)].(string)
 	if anidbKey == "" {
 		slog.Debug("animetosho: no anidb_client_key, episode ID resolution disabled")
 	}
@@ -192,7 +192,7 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 			return nil
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // errors are non-fatal (logged above)
+	_ = g.Wait()
 
 	// Collect and deduplicate results in original order.
 	var out []api.Subtitle

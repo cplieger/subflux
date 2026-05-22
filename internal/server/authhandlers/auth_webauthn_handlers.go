@@ -73,7 +73,7 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 
 	ctx := r.Context()
 
-	userFinder := func(rawID, userHandle []byte) (webauthn.User, error) {
+	userFinder := func(_, userHandle []byte) (webauthn.User, error) {
 		userID, _ := binary.Varint(userHandle)
 		if userID == 0 {
 			return nil, errors.New("invalid user handle")

@@ -105,14 +105,14 @@ var pcmBufPool = sync.Pool{
 // readPCMSamples reads int16 little-endian PCM samples from r up to maxSamples.
 func readPCMSamples(r io.Reader, maxSamples int) []int16 {
 	samples := make([]int16, 0, maxSamples)
-	bufp := pcmBufPool.Get().(*[]byte) //nolint:errcheck // pool always returns *[]byte from New
+	bufp, _ := pcmBufPool.Get().(*[]byte)
 	buf := *bufp
 	defer pcmBufPool.Put(bufp)
 	for len(samples) < maxSamples {
 		n, readErr := r.Read(buf)
 		for i := 0; i+1 < n; i += 2 {
 			raw := binary.LittleEndian.Uint16(buf[i : i+2])
-			samples = append(samples, int16(raw))
+			samples = append(samples, int16(raw)) //nolint:gosec // G115: PCM sample reinterpretation
 			if len(samples) >= maxSamples {
 				break
 			}

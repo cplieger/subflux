@@ -36,7 +36,7 @@ func New(ctx context.Context, db *sql.DB) (*AuthDB, error) {
 
 // Close closes prepared statements. The underlying *sql.DB is NOT closed
 // because it is shared with the parent store.
-func (a *AuthDB) Close(ctx context.Context) error {
+func (a *AuthDB) Close(_ context.Context) error {
 	if a.stmtGetAPIKeyByHash != nil {
 		a.stmtGetAPIKeyByHash.Close()
 	}
@@ -50,12 +50,12 @@ func (a *AuthDB) Close(ctx context.Context) error {
 func (a *AuthDB) prepareStatements(ctx context.Context) error {
 	var err error
 	a.stmtGetAPIKeyByHash, err = a.db.PrepareContext(ctx,
-		`SELECT `+apiKeyScanner.Columns+` FROM auth_api_keys WHERE key_hash = ?`)
+		`SELECT `+apiKeyScanner.Columns+` FROM auth_api_keys WHERE key_hash = ?`) //nolint:gosec // G202: Columns is a compile-time constant
 	if err != nil {
 		return err
 	}
 	a.stmtGetSessionByHash, err = a.db.PrepareContext(ctx,
-		`SELECT `+sessionScanner.Columns+` FROM auth_sessions WHERE token_hash = ?`)
+		`SELECT `+sessionScanner.Columns+` FROM auth_sessions WHERE token_hash = ?`) //nolint:gosec // G202: Columns is a compile-time constant
 	if err != nil {
 		return err
 	}

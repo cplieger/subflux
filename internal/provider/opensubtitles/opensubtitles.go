@@ -142,7 +142,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 			return nil // never fail the group; collect all results
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // errors are non-fatal; collected per-scheme above
+	_ = g.Wait()
 
 	// Merge and dedup (single-threaded after collection).
 	seen := make(map[string]bool)

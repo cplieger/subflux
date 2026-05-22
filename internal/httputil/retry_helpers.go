@@ -22,7 +22,7 @@ func JitteredBackoff(backoff time.Duration) time.Duration {
 		return backoff
 	}
 	half := int64(backoff) / 2
-	jitter := rand.Int64N(half + 1)
+	jitter := rand.Int64N(half + 1) //nolint:gosec // G404: jitter, not crypto
 	return time.Duration(half + jitter)
 }
 

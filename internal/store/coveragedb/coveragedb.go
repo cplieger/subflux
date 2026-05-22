@@ -35,7 +35,7 @@ func New(ctx context.Context, db *sql.DB) (*CoverageDB, error) {
 
 // Close closes prepared statements. The underlying *sql.DB is NOT closed
 // because it is shared with the parent store.
-func (d *CoverageDB) Close(ctx context.Context) {
+func (d *CoverageDB) Close(_ context.Context) {
 	if d.stmtLoadSubFiles != nil {
 		d.stmtLoadSubFiles.Close()
 	}

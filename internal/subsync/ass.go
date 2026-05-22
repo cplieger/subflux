@@ -16,25 +16,30 @@ import (
 	"subflux/internal/subsync/ffmpeg"
 )
 
+const (
+	tagOpEd    = "op_ed"
+	tagKaraoke = "karaoke"
+)
+
 // styleRule defines a single non-dialogue classification pattern with its category.
 type styleRule struct {
-	Category string // "op_ed", "karaoke", "signs", "typesetting", "song"
+	Category string // tagOpEd, tagKaraoke, "signs", "typesetting", "song"
 	Pattern  string // regex fragment
 }
 
 // nonDialogueRules is the data-driven table of non-dialogue style classification
 // patterns. Each rule is individually documentable and testable.
 var nonDialogueRules = []styleRule{
-	{"op_ed", `\bop[a-z\d]*\b`},
-	{"op_ed", `\bed[a-z\d]*\b`},
-	{"op_ed", `\bopening\b`},
-	{"op_ed", `\bending\b`},
-	{"karaoke", `romaji|romanji|kanji`},
-	{"karaoke", `karaoke|\bkara\b|lyric`},
+	{tagOpEd, `\bop[a-z\d]*\b`},
+	{tagOpEd, `\bed[a-z\d]*\b`},
+	{tagOpEd, `\bopening\b`},
+	{tagOpEd, `\bending\b`},
+	{tagKaraoke, `romaji|romanji|kanji`},
+	{tagKaraoke, `karaoke|\bkara\b|lyric`},
 	{"signs", `sign|\btitle|credit|\bnote\b|\bcaption\b`},
 	{"typesetting", `typeset|\bts\b`},
 	{"song", `song|\binsert\b`},
-	{"karaoke", `furigana`},
+	{tagKaraoke, `furigana`},
 }
 
 // reNonDialogueStyle matches ASS style names that indicate non-dialogue
@@ -156,7 +161,7 @@ func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	cmd := exec.CommandContext(ctx, "ffmpeg",  //nolint:gosec // G204: args from validated config
 		"-i", "file:"+videoPath,
 		"-map", fmt.Sprintf("0:%d", streamIndex),
 		"-c:s", "copy",

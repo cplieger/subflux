@@ -41,7 +41,7 @@ func (d *DB) deleteAttemptsByLanguage(ctx context.Context, values []string) erro
 	}
 	clause, args := placeholders(values)
 	res, err := d.db.ExecContext(ctx,
-		`DELETE FROM search_attempts WHERE language IN (`+clause+`)`, args...)
+		`DELETE FROM search_attempts WHERE language IN (`+clause+`)`, args...) //nolint:gosec // G202: placeholders() generates safe ? markers
 	if err != nil {
 		return fmt.Errorf("delete attempts by language in %v: %w", values, err)
 	}
@@ -59,7 +59,7 @@ func (d *DB) deleteAttemptsByProvider(ctx context.Context, values []api.Provider
 	}
 	clause, args := placeholders(values)
 	res, err := d.db.ExecContext(ctx,
-		`DELETE FROM search_attempts WHERE provider IN (`+clause+`)`, args...)
+		`DELETE FROM search_attempts WHERE provider IN (`+clause+`)`, args...) //nolint:gosec // G202: placeholders() generates safe ? markers
 	if err != nil {
 		return fmt.Errorf("delete attempts by provider in %v: %w", values, err)
 	}

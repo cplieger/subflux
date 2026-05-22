@@ -32,6 +32,32 @@ import (
 	"subflux/internal/provider"
 )
 
+const (
+	modError      = "error"
+	modTimeout    = "timeout"
+	modRateLimit  = "rate_limit"
+	modAuthError  = "auth_error"
+	modEmpty      = "empty"
+	modSeasonPack = "season_pack"
+
+	keyMode            = "mode"
+	keyDelayMs         = "delay_ms"
+	keyResultCount     = "result_count"
+	keyScoreBase       = "score_base"
+	keyLanguages       = "languages"
+	keyHearingImpaired = "hearing_impaired"
+	keyForced          = "forced"
+	keyErrorMessage    = "error_message"
+	keyDownloadError   = "download_error"
+	keySubtitleContent = "subtitle_content"
+	keyFlakyRate       = "flaky_rate"
+
+	fieldBool = "bool"
+	fieldText = "text"
+	keyIncludeHash = "include_hash"
+	valFalse  = "false"
+)
+
 const providerName = api.ProviderNameMock
 
 // Factory creates a mock provider from config settings.
@@ -59,7 +85,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	}
 
 	// Parse language filter.
-	if v := provider.SettingString(settings, "languages"); v != "" {
+	if v := provider.SettingString(settings, keyLanguages); v != "" {
 		for l := range strings.SplitSeq(v, ",") {
 			l = strings.TrimSpace(l)
 			if l != "" {
@@ -99,18 +125,18 @@ func (p *mockProvider) Search(ctx context.Context, req *api.SearchRequest) ([]ap
 	}
 
 	switch p.mode {
-	case "error":
+	case modError:
 		return nil, fmt.Errorf("mock provider error: %s", p.effectiveErrMsg())
-	case "timeout":
+	case modTimeout:
 		return nil, context.DeadlineExceeded
-	case "rate_limit":
+	case modRateLimit:
 		return nil, &api.RateLimitError{Msg: "mock rate limit: " + p.effectiveErrMsg()}
-	case "auth_error":
+	case modAuthError:
 		return nil, &api.AuthError{Msg: "mock auth error: " + p.effectiveErrMsg()}
-	case "empty":
+	case modEmpty:
 		return nil, nil
 	case "flaky":
-		if rand.Float64() < p.flakyRate {
+		if rand.Float64() < p.flakyRate { //nolint:gosec // G404: test mock, not crypto
 			return nil, fmt.Errorf("mock flaky error: %s", p.effectiveErrMsg())
 		}
 		return p.generateResults(req), nil
@@ -124,7 +150,7 @@ func (p *mockProvider) Search(ctx context.Context, req *api.SearchRequest) ([]ap
 		case <-t.C:
 		}
 		return p.generateResults(req), nil
-	case "season_pack":
+	case modSeasonPack:
 		return p.generateSeasonPackResults(req), nil
 	default: // "static"
 		return p.generateResults(req), nil
@@ -268,30 +294,30 @@ Timestamp: %s
 // Schema returns the UI schema fields for the mock provider settings page.
 func Schema() []api.ProviderSchemaField {
 	return []api.ProviderSchemaField{
-		{Key: "mode", Label: "Mode", Type: "text",
+		{Key: keyMode, Label: "Mode", Type: fieldText,
 			Default: "static",
 			Help:    "static, error, timeout, rate_limit, auth_error, empty, slow, flaky, season_pack"},
-		{Key: "delay_ms", Label: "Delay (ms)", Type: "text",
+		{Key: keyDelayMs, Label: "Delay (ms)", Type: fieldText,
 			Default: "0", Help: "Artificial latency per call"},
-		{Key: "result_count", Label: "Result Count", Type: "text",
+		{Key: keyResultCount, Label: "Result Count", Type: fieldText,
 			Default: "3", Help: "Number of results in static mode"},
-		{Key: "score_base", Label: "Base Score", Type: "text",
+		{Key: keyScoreBase, Label: "Base Score", Type: fieldText,
 			Default: "50", Help: "Starting score (decrements by 5 per result)"},
-		{Key: "languages", Label: "Languages", Type: "text",
+		{Key: keyLanguages, Label: "Languages", Type: fieldText,
 			Help: "Comma-separated language codes to return results for (empty = all)"},
-		{Key: "include_hash", Label: "Include Hash Match", Type: "bool",
-			Default: "false", Help: "First result uses hash matching"},
-		{Key: "hearing_impaired", Label: "Hearing Impaired", Type: "bool",
-			Default: "false", Help: "Flag results as HI"},
-		{Key: "forced", Label: "Forced", Type: "bool",
-			Default: "false", Help: "Flag results as forced"},
-		{Key: "error_message", Label: "Error Message", Type: "text",
+		{Key: keyIncludeHash, Label: "Include Hash Match", Type: fieldBool,
+			Default: valFalse, Help: "First result uses hash matching"},
+		{Key: keyHearingImpaired, Label: "Hearing Impaired", Type: fieldBool,
+			Default: valFalse, Help: "Flag results as HI"},
+		{Key: keyForced, Label: "Forced", Type: fieldBool,
+			Default: valFalse, Help: "Flag results as forced"},
+		{Key: keyErrorMessage, Label: "Error Message", Type: fieldText,
 			Help: "Custom error message for error modes"},
-		{Key: "download_error", Label: "Download Error", Type: "text",
+		{Key: keyDownloadError, Label: "Download Error", Type: fieldText,
 			Help: "If set, Download() returns this error"},
-		{Key: "subtitle_content", Label: "Subtitle Content", Type: "text",
+		{Key: keySubtitleContent, Label: "Subtitle Content", Type: fieldText,
 			Help: "Custom SRT content for downloads (default: auto-generated)"},
-		{Key: "flaky_rate", Label: "Flaky Rate", Type: "text",
+		{Key: keyFlakyRate, Label: "Flaky Rate", Type: fieldText,
 			Default: "0.5", Help: "Failure probability for flaky mode (0.0-1.0)"},
 	}
 }

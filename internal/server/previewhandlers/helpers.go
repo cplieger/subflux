@@ -9,6 +9,11 @@ import (
 	"sync"
 )
 
+const (
+	errMediaNotFound = "media file not found on server"
+	styleFanart     = "fanart"
+)
+
 // buildVideoArgs constructs ffmpeg arguments for streaming 360p fMP4.
 func buildVideoArgs(path string, startSec float64) []string {
 	args := []string{"-hide_banner", "-loglevel", "error"}
@@ -57,7 +62,7 @@ type ffmpegErrorRule struct {
 
 // ffmpegErrorTable is the data-driven classification table for ffmpeg errors.
 var ffmpegErrorTable = []ffmpegErrorRule{
-	{"No such file", "media file not found on server"},
+	{"No such file", errMediaNotFound},
 	{"Permission denied", "media file not accessible"},
 	{"Invalid data found", "media file is corrupted or unsupported format"},
 	{"Connection refused", "cannot reach media server"},
@@ -85,7 +90,7 @@ func classifyFFmpegError(stderr string) error {
 // posterCoverURL builds the Sonarr/Radarr media cover URL.
 func posterCoverURL(arrURL string, id int, style string) string {
 	coverType := "poster-250.jpg"
-	if style == "fanart" {
+	if style == styleFanart {
 		coverType = "fanart-360.jpg"
 	}
 	return fmt.Sprintf("%s/api/v3/mediacover/%d/%s",

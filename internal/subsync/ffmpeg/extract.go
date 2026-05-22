@@ -21,7 +21,7 @@ func ExtractRawSubtitle(ctx context.Context, videoPath string, streamIndex int) 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	cmd := exec.CommandContext(ctx, "ffmpeg", //nolint:gosec // G204: args from validated config
 		"-i", "file:"+videoPath,
 		"-map", fmt.Sprintf("0:%d", streamIndex),
 		"-f", CodecSRT,

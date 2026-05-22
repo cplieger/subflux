@@ -42,7 +42,7 @@ func (d *DB) DeleteStateByPaths(ctx context.Context, videoPaths []string) (api.C
 		keys = append(keys, batchKeys...)
 
 		if _, err := tx.ExecContext(ctx,
-			"DELETE FROM subtitle_state WHERE video_path IN ("+inClause+")",
+			"DELETE FROM subtitle_state WHERE video_path IN ("+inClause+")", //nolint:gosec // G202: inClause is safe ? placeholders
 			args...); err != nil {
 			return api.CleanupResult{}, fmt.Errorf("delete state: %w", err)
 		}
@@ -89,7 +89,7 @@ func collectAffectedState(ctx context.Context, tx *sql.Tx,
 	var subPaths []string
 	var keys []MediaKey
 	rows, err := tx.QueryContext(ctx,
-		"SELECT path, media_type, media_id, language FROM subtitle_state"+
+		"SELECT path, media_type, media_id, language FROM subtitle_state"+ //nolint:gosec // G202: inClause is safe ? placeholders
 			" WHERE video_path IN ("+inClause+") AND path != ''", args...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("query paths: %w", err)

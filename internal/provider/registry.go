@@ -179,7 +179,7 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api
 			return nil // never return error; preserve partial success
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	// Collect successful providers and errors separately.
 	var result []api.Provider

@@ -136,7 +136,7 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 			p.deps.PollCache.Set(ctx, api.PollKeySonarr, time.Now().UTC())
 		}
 		g.Go(func() error {
-			sonarrCount.Store(int32(p.pollSonarr(gCtx, ls)))
+			sonarrCount.Store(int32(p.pollSonarr(gCtx, ls))) //nolint:gosec // G115: poll count fits int32
 			return nil
 		})
 	}
@@ -145,7 +145,7 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 			p.deps.PollCache.Set(ctx, api.PollKeyRadarr, time.Now().UTC())
 		}
 		g.Go(func() error {
-			radarrCount.Store(int32(p.pollRadarr(gCtx, ls)))
+			radarrCount.Store(int32(p.pollRadarr(gCtx, ls))) //nolint:gosec // G115: poll count fits int32
 			return nil
 		})
 	}

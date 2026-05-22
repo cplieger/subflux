@@ -340,7 +340,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 			return nil
 		})
 	}
-	_ = g.Wait() //nolint:errcheck // goroutines always return nil
+	_ = g.Wait()
 
 	for _, lr := range langResults {
 		result.Searched += lr.searched

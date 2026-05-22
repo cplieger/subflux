@@ -159,11 +159,8 @@ func (d *DB) prepareStatements(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	d.stmtGetBackoffItems, err = d.db.PrepareContext(ctx, `
-		SELECT `+backoffScanner.Columns+`
-		FROM search_attempts
-		WHERE provider != ''
-		ORDER BY next_retry ASC`)
+	d.stmtGetBackoffItems, err = d.db.PrepareContext(ctx,
+		`SELECT `+backoffScanner.Columns+` FROM search_attempts WHERE provider != '' ORDER BY next_retry ASC`) //nolint:gosec // G202: compile-time columns
 	if err != nil {
 		return err
 	}

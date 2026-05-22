@@ -7,6 +7,11 @@ import (
 	"subflux/internal/config/defaults"
 )
 
+const (
+	defaultFalse = "false"
+	showWhenOIDC = "oidc_enabled=true"
+)
+
 func arrFields(name, defaultURL string) []api.SchemaField {
 	return []api.SchemaField{
 		{
@@ -68,39 +73,39 @@ func authSection() api.SchemaSection {
 		Type:  fieldFields,
 		Fields: []api.SchemaField{
 			{Key: "basic_enabled", Label: "Password Login", Type: fieldBool, Default: defaultTrue},
-			{Key: "oidc_enabled", Label: "OIDC Login", Type: fieldBool, Default: "false"},
+			{Key: "oidc_enabled", Label: "OIDC Login", Type: fieldBool, Default: defaultFalse},
 			{
 				Key:         "oidc.issuer_url",
 				Label:       "OIDC Issuer URL",
 				Type:        fieldText,
-				ShowWhen:    "oidc_enabled=true",
+				ShowWhen:    showWhenOIDC,
 				Placeholder: "https://authentik.example.com/application/o/subflux/",
 			},
 			{
 				Key:      "oidc.client_id",
 				Label:    "OIDC Client ID",
 				Type:     fieldText,
-				ShowWhen: "oidc_enabled=true",
+				ShowWhen: showWhenOIDC,
 			},
 			{
 				Key:      "oidc.client_secret",
 				Label:    "OIDC Client Secret",
 				Type:     fieldSecret,
-				ShowWhen: "oidc_enabled=true",
+				ShowWhen: showWhenOIDC,
 			},
 			{
 				Key:         "oidc.redirect_uri",
 				Label:       "OIDC Redirect URI",
 				Type:        fieldText,
-				ShowWhen:    "oidc_enabled=true",
+				ShowWhen:    showWhenOIDC,
 				Placeholder: "https://subflux.example.com/api/auth/oidc/callback",
 			},
 			{
 				Key:      "oidc_auto_redirect",
 				Label:    "Auto-redirect to OIDC",
 				Type:     fieldBool,
-				Default:  "false",
-				ShowWhen: "oidc_enabled=true",
+				Default:  defaultFalse,
+				ShowWhen: showWhenOIDC,
 			},
 			{
 				Key:     "session_idle_timeout",

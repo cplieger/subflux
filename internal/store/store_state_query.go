@@ -111,7 +111,7 @@ func (d *DB) GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry,
 		"provider", q.Provider, "search", q.Search,
 		"limit", q.Limit, "offset", q.Offset)
 
-	query := `SELECT ` + stateScanner.Columns + ` FROM subtitle_state WHERE 1=1`
+	query := `SELECT ` + stateScanner.Columns + ` FROM subtitle_state WHERE 1=1` //nolint:gosec // G202: compile-time columns
 	var args []any
 	if q.MediaType != "" {
 		query += " AND media_type = ?"
