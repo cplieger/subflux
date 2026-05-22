@@ -1,0 +1,240 @@
+1
+00:00:01,000 --> 00:00:04,000
+This is the first subtitle line.
+
+2
+00:00:06,500 --> 00:00:09,000
+The second line appears here.
+
+3
+00:00:12,000 --> 00:00:15,500
+A third line with more dialogue.
+
+4
+00:00:18,000 --> 00:00:21,000
+Fourth subtitle entry follows.
+
+5
+00:00:24,500 --> 00:00:27,000
+Fifth line of the conversation.
+
+6
+00:00:30,000 --> 00:00:33,500
+Sixth entry in the sequence.
+
+7
+00:00:36,000 --> 00:00:39,000
+Seventh subtitle appears now.
+
+8
+00:00:42,500 --> 00:00:45,000
+Eighth line of dialogue here.
+
+9
+00:00:48,000 --> 00:00:51,500
+Ninth subtitle in the file.
+
+10
+00:00:54,000 --> 00:00:57,000
+Tenth and final subtitle line.
+
+11
+00:01:00,500 --> 00:01:03,000
+Eleventh line continues on.
+
+12
+00:01:06,000 --> 00:01:09,500
+Twelfth subtitle entry here.
+
+13
+00:01:12,000 --> 00:01:15,000
+Thirteenth line of dialogue.
+
+14
+00:01:18,500 --> 00:01:21,000
+Fourteenth subtitle follows.
+
+15
+00:01:24,000 --> 00:01:27,500
+Fifteenth line appears now.
+
+16
+00:01:30,000 --> 00:01:33,000
+Sixteenth entry in sequence.
+
+17
+00:01:36,500 --> 00:01:39,000
+Seventeenth subtitle here.
+
+18
+00:01:42,000 --> 00:01:45,500
+Eighteenth line of dialogue.
+
+19
+00:01:48,000 --> 00:01:51,000
+Nineteenth subtitle entry.
+
+20
+00:01:54,500 --> 00:01:57,000
+Twentieth line continues.
+
+21
+00:02:00,000 --> 00:02:03,500
+Twenty-first subtitle here.
+
+22
+00:02:06,000 --> 00:02:09,000
+Twenty-second line follows.
+
+23
+00:02:12,500 --> 00:02:15,000
+Twenty-third entry now.
+
+24
+00:02:18,000 --> 00:02:21,500
+Twenty-fourth subtitle line.
+
+25
+00:02:24,000 --> 00:02:27,000
+Twenty-fifth and counting.
+
+26
+00:02:30,500 --> 00:02:33,000
+Twenty-sixth line here.
+
+27
+00:02:36,000 --> 00:02:39,500
+Twenty-seventh subtitle.
+
+28
+00:02:42,000 --> 00:02:45,000
+Twenty-eighth dialogue line.
+
+29
+00:02:48,500 --> 00:02:51,000
+Twenty-ninth entry follows.
+
+30
+00:02:54,000 --> 00:02:57,500
+Thirtieth subtitle line.
+
+31
+00:03:00,000 --> 00:03:03,000
+Thirty-first continues on.
+
+32
+00:03:06,500 --> 00:03:09,000
+Thirty-second line here.
+
+33
+00:03:12,000 --> 00:03:15,500
+Thirty-third subtitle now.
+
+34
+00:03:18,000 --> 00:03:21,000
+Thirty-fourth dialogue line.
+
+35
+00:03:24,500 --> 00:03:27,000
+Thirty-fifth entry follows.
+
+36
+00:03:30,000 --> 00:03:33,500
+Thirty-sixth subtitle here.
+
+37
+00:03:36,000 --> 00:03:39,000
+Thirty-seventh line now.
+
+38
+00:03:42,500 --> 00:03:45,000
+Thirty-eighth dialogue.
+
+39
+00:03:48,000 --> 00:03:51,500
+Thirty-ninth subtitle line.
+
+40
+00:03:54,000 --> 00:03:57,000
+Fortieth and final entry.
+
+41
+00:04:00,500 --> 00:04:03,000
+Forty-first line continues.
+
+42
+00:04:06,000 --> 00:04:09,500
+Forty-second subtitle here.
+
+43
+00:04:12,000 --> 00:04:15,000
+Forty-third dialogue line.
+
+44
+00:04:18,500 --> 00:04:21,000
+Forty-fourth entry follows.
+
+45
+00:04:24,000 --> 00:04:27,500
+Forty-fifth subtitle now.
+
+46
+00:04:30,000 --> 00:04:33,000
+Forty-sixth line here.
+
+47
+00:04:36,500 --> 00:04:39,000
+Forty-seventh dialogue.
+
+48
+00:04:42,000 --> 00:04:45,500
+Forty-eighth subtitle line.
+
+49
+00:04:48,000 --> 00:04:51,000
+Forty-ninth entry follows.
+
+50
+00:04:54,500 --> 00:04:57,000
+Fiftieth and last subtitle.
+
+51
+00:05:00,000 --> 00:05:03,500
+Fifty-first line continues.
+
+52
+00:05:06,000 --> 00:05:09,000
+Fifty-second subtitle here.
+
+53
+00:05:12,500 --> 00:05:15,000
+Fifty-third dialogue line.
+
+54
+00:05:18,000 --> 00:05:21,500
+Fifty-fourth entry follows.
+
+55
+00:05:24,000 --> 00:05:27,000
+Fifty-fifth subtitle now.
+
+56
+00:05:30,500 --> 00:05:33,000
+Fifty-sixth line here.
+
+57
+00:05:36,000 --> 00:05:39,500
+Fifty-seventh dialogue.
+
+58
+00:05:42,000 --> 00:05:45,000
+Fifty-eighth subtitle line.
+
+59
+00:05:48,500 --> 00:05:51,000
+Fifty-ninth entry follows.
+
+60
+00:05:54,000 --> 00:05:57,500
+Sixtieth and final subtitle.
+

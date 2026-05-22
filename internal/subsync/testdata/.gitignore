@@ -1,0 +1,3 @@
+# Cross-language alignment test files (copyrighted subtitle content).
+# Download manually for local testing; tests skip if absent.
+30rock_*.srt
