@@ -101,3 +101,6 @@ linters:
       - path: cli_specs\.go
         linters:
           - goconst
+      - path: cmd/
+        linters:
+          - goconst
