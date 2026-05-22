@@ -1,0 +1,39 @@
+
+/* ================================================================
+   User menu popover
+   ================================================================ */
+
+[id="userMenuPopup"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--sp-3) 0
+}
+
+.um-user {
+  padding: var(--sp-4) var(--sp-6);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text);
+  border-block-end: 1px solid var(--border)
+}
+
+.um-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: var(--sp-4) var(--sp-6);
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  height: auto;
+  justify-content: flex-start;
+
+  &:hover { background: var(--ghost-hover); color: var(--text) }
+}
+
+.um-icon { display: flex; align-items: center; flex-shrink: 0 }

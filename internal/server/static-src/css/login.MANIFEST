@@ -1,0 +1,16 @@
+# subflux/internal/server/static/login.css bundle manifest
+# Files concatenated in declared order by lib/shell/build-css.sh.
+#
+# Login shares the full design-token set with style.css via
+# _shared-tokens.css; only layout, forms, wizard, and a11y rules are
+# login-specific. The login bundle gains a few unused app tokens
+# (--shimmer-x, --raised, --ok, --info, --shadow), which cost nothing
+# at runtime and keep the two bundles in sync automatically when
+# tokens change.
+login-00-header.css
+_shared-tokens.css
+login-01-base.css
+login-02-layout.css
+login-03-forms.css
+login-04-wizard.css
+login-05-mobile-a11y.css

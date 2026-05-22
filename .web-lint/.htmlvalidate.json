@@ -1,0 +1,16 @@
+{
+  "extends": ["html-validate:recommended", "html-validate:document"],
+  "rules": {
+    "no-inline-style": "error",
+    "no-trailing-whitespace": "error",
+    "no-style-tag": "error",
+    "tel-non-breaking": "error",
+    "valid-id": "error",
+    "class-pattern": ["error", { "pattern": "kebabcase" }],
+    "id-pattern": ["error", { "pattern": ["camelcase", "kebabcase"] }],
+    "heading-level": "error",
+    "no-implicit-close": "error",
+    "require-sri": "off",
+    "input-missing-label": "error"
+  }
+}

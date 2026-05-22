@@ -1,0 +1,4 @@
+node_modules/
+subflux
+subsync
+*.log

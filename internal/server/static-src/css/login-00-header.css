@@ -1,0 +1,4 @@
+/* Subflux — login page styles. Shares design tokens with style.css via
+   _shared-tokens.css; this file holds only login-specific layout, forms,
+   and wizard rules. Theme color-scheme comes from <meta name="color-scheme">
+   in login.html (login does not call theme.ts). */

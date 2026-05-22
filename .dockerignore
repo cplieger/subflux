@@ -1,0 +1,11 @@
+internal/subsync/testdata/
+dev-compose.yaml
+dev-config/
+dev-config.local.yaml
+dev-run.sh
+.web-lint/
+cmd/
+*.md
+compose.yaml
+*_test.go
+**/*_test.go

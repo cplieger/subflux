@@ -1,0 +1,24 @@
+# subflux/internal/server/static/style.css bundle manifest
+# Files concatenated in declared order by lib/shell/build-css.sh.
+#
+# _shared-tokens.css holds the design system (custom properties, @property
+# definitions, [data-theme] color-scheme selectors). It is included by both
+# MANIFEST and login.MANIFEST so both pages stay visually consistent without
+# manual sync. Naming convention: MANIFEST -> style.css, <name>.MANIFEST ->
+# <name>.css (matches lib/shell/build-css.sh + validate-local.sh).
+00-header.css
+_shared-tokens.css
+02-base.css
+03-components.css
+04-layout.css
+05-card.css
+06-table.css
+07-dialogs.css
+08-popover.css
+09-search.css
+10-config.css
+11-files.css
+12-sync.css
+13-a11y.css
+14-user-menu.css
+15-security.css

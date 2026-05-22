@@ -1,0 +1,34 @@
+
+/* ================================================================
+   15. Mobile: touch-friendly sizes (matching main UI 2.75rem / 44px)
+   ================================================================ */
+
+@media (pointer: coarse) {
+  .auth-card button,
+  .auth-card input:where(:not([type="checkbox"])),
+  .wiz-field :is(input, select),
+  .wiz-lang-select,
+  .wiz-lang-variant,
+  .wiz-media-input,
+  .wizard-nav button { height: 2.75rem }
+
+  .auth-card button { padding: var(--sp-3) var(--sp-5) }
+  .auth-card .wiz-lang-remove { width: 2.5rem; height: 2.5rem }
+
+  .wiz-toggle input + span { width: 3rem; height: 1.75rem }
+  .wiz-toggle input + span::before { width: 1.375rem; height: 1.375rem }
+  .wiz-toggle input:checked + span::before { translate: 1.25rem }
+}
+
+/* ================================================================
+   16. Reduced motion
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* stylelint-disable declaration-no-important, time-min-milliseconds -- a11y */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important
+  }
+  /* stylelint-enable declaration-no-important, time-min-milliseconds */
+}

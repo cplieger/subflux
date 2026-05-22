@@ -1,0 +1,25 @@
+
+/* ================================================================
+   1. Reset & base
+   ================================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+html { text-size-adjust: 100% }
+
+body {
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6)
+}
+
+::placeholder { opacity: 1; color: var(--muted) }
+::selection { background: var(--accent-dim); color: var(--text) }

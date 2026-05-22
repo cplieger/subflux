@@ -1,0 +1,78 @@
+
+/* ================================================================
+   0. Custom properties
+   ================================================================ */
+
+@property --shimmer-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 200%
+}
+
+[data-theme="dark"] { color-scheme: dark }
+[data-theme="light"] { color-scheme: light }
+
+:root {
+  interpolate-size: allow-keywords;
+  accent-color: light-dark(oklch(55% 0.16 32deg), oklch(69.86% 0.1368 32.3deg));
+
+  /* Easing vocabulary (4 named easings; no bare ease/ease-in-out) */
+  --ease-micro: cubic-bezier(0.2, 0, 0, 1);
+  --dur-micro: 0.1s;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --dur-standard: 0.2s;
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --dur-enter: 0.25s;
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-exit: 0.15s;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Type scale */
+  --text-xs: 0.72rem;
+  --text-sm: 0.8rem;
+  --text-base: 0.875rem;
+  --text-lg: 1.1rem;
+  --text-xl: clamp(1.15rem, 3vw, 1.5rem);
+
+  /* Spacing */
+  --sp-1: 0.125rem;
+  --sp-2: 0.25rem;
+  --sp-3: 0.375rem;
+  --sp-4: 0.5rem;
+  --sp-5: 0.75rem;
+  --sp-6: 1rem;
+
+  /* Icons */
+  --icon: 0.875rem;
+
+  /* Radii */
+  --radius: 0.75rem;
+  --radius-sm: 0.375rem;
+
+  /* Theme colors (light, dark) */
+  --bg: light-dark(oklch(97% 0.005 32deg), oklch(16% 0.015 32deg));
+  --surface: light-dark(oklch(100% 0 0deg), oklch(22% 0.015 32deg));
+  --raised: light-dark(oklch(96% 0.005 32deg), oklch(25% 0.015 32deg));
+  --border: light-dark(oklch(88% 0.005 32deg), oklch(30% 0.01 32deg));
+  --text: light-dark(oklch(20% 0.02 32deg), oklch(91% 0.01 32deg));
+  --text-2: light-dark(oklch(40% 0.01 32deg), oklch(76% 0.01 32deg));
+  --muted: light-dark(oklch(55% 0.01 32deg), oklch(62% 0.01 32deg));
+  --accent: light-dark(oklch(55% 0.16 32deg), oklch(69.86% 0.1368 32.3deg));
+  --accent-dim: light-dark(oklch(55% 0.16 32deg / 8%), oklch(69.86% 0.1368 32.3deg / 12%));
+  --accent-hover: light-dark(oklch(48% 0.18 32deg), oklch(78% 0.12 32deg));
+  --ok: light-dark(oklch(55% 0.14 168deg), oklch(65% 0.14 168.26deg));
+  --ok-dim: light-dark(oklch(55% 0.14 168deg / 8%), oklch(65% 0.14 168.26deg / 10%));
+  --warn: light-dark(oklch(60% 0.16 85deg), oklch(82% 0.14 85deg));
+  --warn-dim: light-dark(oklch(60% 0.16 85deg / 8%), oklch(82% 0.14 85deg / 10%));
+  --err: light-dark(oklch(50% 0.2 25deg), oklch(58% 0.18 25deg));
+  --err-dim: light-dark(oklch(50% 0.2 25deg / 8%), oklch(58% 0.18 25deg / 10%));
+  --info: light-dark(oklch(52% 0.15 263deg), oklch(66.34% 0.1356 262.89deg));
+  --input-bg: light-dark(oklch(98% 0.003 32deg), oklch(20% 0.015 32deg));
+  --input-border: light-dark(oklch(88% 0.005 32deg), oklch(28% 0.01 32deg));
+  --ghost: light-dark(oklch(93% 0.003 32deg), oklch(30% 0.01 32deg));
+  --ghost-hover: light-dark(oklch(88% 0.005 32deg), oklch(33% 0.01 32deg));
+  --shadow-color: light-dark(oklch(0% 0 0deg / 8%), oklch(0% 0 0deg / 30%));
+  --shadow:
+    0 1px 3px light-dark(oklch(0% 0 0deg / 6%), oklch(0% 0 0deg / 20%)),
+    0 0.25rem 1.5rem var(--shadow-color)
+}

@@ -1,0 +1,45 @@
+
+/* ================================================================
+   2. Auth page layout
+   ================================================================ */
+
+.auth-page {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center
+}
+
+.auth-page[hidden] { display: none }
+.auth-page-wide { max-width: 42rem }
+
+.auth-card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow:
+    0 1px 3px var(--shadow-color),
+    0 0.25rem 1.5rem var(--shadow-color)
+}
+
+/* Wizard card: flex column so nav sticks to bottom, animated height */
+.auth-card-wide {
+  display: flex;
+  flex-direction: column;
+  min-height: 22rem;
+  interpolate-size: allow-keywords;
+  transition: height 0.5s var(--ease)
+}
+
+.auth-card :is(h1, h2) {
+  font-size: var(--text-xl); font-weight: 700; color: var(--accent);
+  letter-spacing: -0.02em; text-align: center; margin-block-end: var(--sp-6)
+}
+
+.auth-card p {
+  text-align: center; color: var(--text-2);
+  font-size: var(--text-sm); margin-block-end: var(--sp-6)
+}

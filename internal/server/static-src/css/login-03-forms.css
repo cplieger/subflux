@@ -1,0 +1,71 @@
+
+/* ================================================================
+   3. Form elements
+   ================================================================ */
+
+.auth-card form { display: flex; flex-direction: column; gap: var(--sp-3) }
+
+.auth-card :where(label:not(.wiz-toggle)) {
+  font-size: var(--text-sm); font-weight: 500; color: var(--text-2)
+}
+
+.auth-card input:where(:not([type="checkbox"])) {
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 1.75rem; color: var(--text); font: inherit;
+  transition: border-color var(--dur-micro); width: 100%
+}
+
+.auth-card :where(input:not([type="checkbox"])):focus { outline: none; border-color: var(--accent) }
+.auth-card :where(input):user-invalid { border-color: var(--err); background: var(--err-dim) }
+.auth-card button[type="submit"] { margin-block-start: var(--sp-4) }
+
+/* ================================================================
+   4. Buttons
+   ================================================================ */
+
+.auth-card button {
+  background: var(--accent); color: oklch(100% 0 0deg); border: none;
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-5);
+  height: 1.75rem; font: inherit; font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sp-2); transition: background var(--dur-micro), translate 0.08s; width: 100%
+}
+
+.auth-card :where(button):hover { background: var(--accent-hover) }
+.auth-card :where(button):active { translate: 0 1px }
+.auth-card :where(button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.auth-card :where(button):disabled { opacity: 0.45; cursor: not-allowed }
+
+.auth-alt-btn { background: var(--ghost); color: var(--text-2); width: 100% }
+.auth-alt-btn:hover { background: var(--ghost-hover); color: var(--text) }
+.auth-alt-btn[hidden] { display: none }
+
+/* ================================================================
+   5. Divider / Error / Hints
+   ================================================================ */
+
+.auth-divider {
+  display: flex; align-items: center; gap: var(--sp-4);
+  margin-block: var(--sp-5); color: var(--muted); font-size: var(--text-xs)
+}
+
+.auth-divider[hidden] { display: none }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border) }
+
+.auth-error {
+  background: var(--err-dim); color: var(--err); border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-4); font-size: var(--text-sm);
+  margin-block-end: var(--sp-4); text-align: center
+}
+
+.auth-error[hidden] { display: none }
+
+.auth-error[data-level="warn"] { background: var(--warn-dim); color: var(--warn) }
+
+.auth-hint {
+  color: var(--muted); font-size: var(--text-xs);
+  text-align: center; margin-block: var(--sp-4) 0
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "timezone": "Europe/Paris",
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Auto-merge minor, patch, digest, pin",
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates require manual approval",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["major-update"]
+    },
+    {
+      "description": "Group Go dependency updates",
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies"
+    },
+    {
+      "description": "tsgo: follow beta dist-tag (all versions are 7.0.0-dev prerelease)",
+      "matchPackageNames": ["@typescript/native-preview"],
+      "followTag": "beta",
+      "ignoreUnstable": false
+    },
+    {
+      "description": "Group npm dev-deps weekly",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "npm dev dependencies",
+      "schedule": ["before 6am on monday"],
+      "automerge": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Dockerfile ARG versions with renovate comments",
+      "managerFilePatterns": ["/Dockerfile$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>[^\\s]+)(\\s+versioning=(?<versioning>[a-z-]+))?(\\s+currentValue=(?<currentValue>[^\\s]+))?\\nARG\\s+\\w+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "FFmpeg version (n-prefixed tags)",
+      "managerFilePatterns": ["/Dockerfile$/"],
+      "matchStrings": ["ARG\\s+FFMPEG_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "FFmpeg/FFmpeg",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^n(?<version>\\d+\\.\\d+(?:\\.\\d+)?)$",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "golangci-lint version in workflows",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.yaml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>[^\\s]+)(\\s+versioning=(?<versioning>[a-z-]+))?\\s*\\n\\s*VERSION=(?<currentValue>\\S+)"
+      ]
+    }
+  ]
+}

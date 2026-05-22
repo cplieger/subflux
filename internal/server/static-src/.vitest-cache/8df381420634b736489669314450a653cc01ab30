@@ -1,0 +1,38 @@
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/fast-check/lib/fast-check.js", {"importedNames":["default"]});
+// Strict global defaults for fast-check property-based tests.
+//
+// Loaded via vitest's `setupFiles` so every property test inherits the
+// same bar without per-file boilerplate. Settings prioritize bug
+// detection over speed; CI runs sequentially and these tests are
+// pure-function focused, so the wall-time cost is acceptable.
+//
+// Tuning:
+// - numRuns: 1000 (10x fast-check's default 100). Buys deeper coverage
+//   of the input space at ~10x runtime per property; for typical
+//   per-property runtime <100ms this still keeps each property under
+//   1s on modern hardware.
+// - verbose: VeryVerbose. When a property fails, fast-check prints the
+//   full shrunken counter-example plus the path it took. Necessary for
+//   debugging; harmless on success (only prints on failure).
+// - interruptAfterTimeLimit: 10s safety bound. Without it, an
+//   accidentally pathological generator could hang vitest indefinitely.
+// - markInterruptAsFailure: true. Treats an interrupted property as a
+//   failed test, surfacing it in CI rather than silently passing.
+// - endOnFailure: false. Always shrink to the minimal counter-example;
+//   the few extra ms after the first failure are worth it for the
+//   debugging payoff.
+// - No fixed seed: randomness across runs is the value. CI flakes from
+//   newly-discovered counter-examples are bug reports, not test
+//   infrastructure failures.
+
+__vite_ssr_import_0__.default.configureGlobal({
+	numRuns: 1e3,
+	verbose: __vite_ssr_import_0__.default.VerbosityLevel.VeryVerbose,
+	endOnFailure: false,
+	interruptAfterTimeLimit: 1e4,
+	markInterruptAsFailure: true
+});
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBMEJBOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7QUFFQSw4QkFBRyxnQkFBZ0I7Q0FDakIsU0FBUztDQUNULFNBQVMsOEJBQUcsZUFBZTtDQUMzQixjQUFjO0NBQ2QseUJBQXlCO0NBQ3pCLHdCQUF3QjtBQUMxQixDQUFDIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJmYy1zdHJpY3Qtc2V0dXAudHMiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gU3RyaWN0IGdsb2JhbCBkZWZhdWx0cyBmb3IgZmFzdC1jaGVjayBwcm9wZXJ0eS1iYXNlZCB0ZXN0cy5cbi8vXG4vLyBMb2FkZWQgdmlhIHZpdGVzdCdzIGBzZXR1cEZpbGVzYCBzbyBldmVyeSBwcm9wZXJ0eSB0ZXN0IGluaGVyaXRzIHRoZVxuLy8gc2FtZSBiYXIgd2l0aG91dCBwZXItZmlsZSBib2lsZXJwbGF0ZS4gU2V0dGluZ3MgcHJpb3JpdGl6ZSBidWdcbi8vIGRldGVjdGlvbiBvdmVyIHNwZWVkOyBDSSBydW5zIHNlcXVlbnRpYWxseSBhbmQgdGhlc2UgdGVzdHMgYXJlXG4vLyBwdXJlLWZ1bmN0aW9uIGZvY3VzZWQsIHNvIHRoZSB3YWxsLXRpbWUgY29zdCBpcyBhY2NlcHRhYmxlLlxuLy9cbi8vIFR1bmluZzpcbi8vIC0gbnVtUnVuczogMTAwMCAoMTB4IGZhc3QtY2hlY2sncyBkZWZhdWx0IDEwMCkuIEJ1eXMgZGVlcGVyIGNvdmVyYWdlXG4vLyAgIG9mIHRoZSBpbnB1dCBzcGFjZSBhdCB+MTB4IHJ1bnRpbWUgcGVyIHByb3BlcnR5OyBmb3IgdHlwaWNhbFxuLy8gICBwZXItcHJvcGVydHkgcnVudGltZSA8MTAwbXMgdGhpcyBzdGlsbCBrZWVwcyBlYWNoIHByb3BlcnR5IHVuZGVyXG4vLyAgIDFzIG9uIG1vZGVybiBoYXJkd2FyZS5cbi8vIC0gdmVyYm9zZTogVmVyeVZlcmJvc2UuIFdoZW4gYSBwcm9wZXJ0eSBmYWlscywgZmFzdC1jaGVjayBwcmludHMgdGhlXG4vLyAgIGZ1bGwgc2hydW5rZW4gY291bnRlci1leGFtcGxlIHBsdXMgdGhlIHBhdGggaXQgdG9vay4gTmVjZXNzYXJ5IGZvclxuLy8gICBkZWJ1Z2dpbmc7IGhhcm1sZXNzIG9uIHN1Y2Nlc3MgKG9ubHkgcHJpbnRzIG9uIGZhaWx1cmUpLlxuLy8gLSBpbnRlcnJ1cHRBZnRlclRpbWVMaW1pdDogMTBzIHNhZmV0eSBib3VuZC4gV2l0aG91dCBpdCwgYW5cbi8vICAgYWNjaWRlbnRhbGx5IHBhdGhvbG9naWNhbCBnZW5lcmF0b3IgY291bGQgaGFuZyB2aXRlc3QgaW5kZWZpbml0ZWx5LlxuLy8gLSBtYXJrSW50ZXJydXB0QXNGYWlsdXJlOiB0cnVlLiBUcmVhdHMgYW4gaW50ZXJydXB0ZWQgcHJvcGVydHkgYXMgYVxuLy8gICBmYWlsZWQgdGVzdCwgc3VyZmFjaW5nIGl0IGluIENJIHJhdGhlciB0aGFuIHNpbGVudGx5IHBhc3NpbmcuXG4vLyAtIGVuZE9uRmFpbHVyZTogZmFsc2UuIEFsd2F5cyBzaHJpbmsgdG8gdGhlIG1pbmltYWwgY291bnRlci1leGFtcGxlO1xuLy8gICB0aGUgZmV3IGV4dHJhIG1zIGFmdGVyIHRoZSBmaXJzdCBmYWlsdXJlIGFyZSB3b3J0aCBpdCBmb3IgdGhlXG4vLyAgIGRlYnVnZ2luZyBwYXlvZmYuXG4vLyAtIE5vIGZpeGVkIHNlZWQ6IHJhbmRvbW5lc3MgYWNyb3NzIHJ1bnMgaXMgdGhlIHZhbHVlLiBDSSBmbGFrZXMgZnJvbVxuLy8gICBuZXdseS1kaXNjb3ZlcmVkIGNvdW50ZXItZXhhbXBsZXMgYXJlIGJ1ZyByZXBvcnRzLCBub3QgdGVzdFxuLy8gICBpbmZyYXN0cnVjdHVyZSBmYWlsdXJlcy5cblxuaW1wb3J0IGZjIGZyb20gXCJmYXN0LWNoZWNrXCI7XG5cbmZjLmNvbmZpZ3VyZUdsb2JhbCh7XG4gIG51bVJ1bnM6IDEwMDAsXG4gIHZlcmJvc2U6IGZjLlZlcmJvc2l0eUxldmVsLlZlcnlWZXJib3NlLFxuICBlbmRPbkZhaWx1cmU6IGZhbHNlLFxuICBpbnRlcnJ1cHRBZnRlclRpbWVMaW1pdDogMTAwMDAsXG4gIG1hcmtJbnRlcnJ1cHRBc0ZhaWx1cmU6IHRydWUsXG59KTtcbiJdLCJmaWxlIjoiL2ZjLXN0cmljdC1zZXR1cC50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi93b3Jrc3BhY2UvaG9tZWxhYi9hcHBzL3N1YmZsdXgvaW50ZXJuYWwvc2VydmVyL3N0YXRpYy1zcmMvZmMtc3RyaWN0LXNldHVwLnRzIiwiL2ZjLXN0cmljdC1zZXR1cC50cyIsWyI0Il0sIi9ub2RlX21vZHVsZXMvZmFzdC1jaGVjay9saWIvZmFzdC1jaGVjay5qcyJd

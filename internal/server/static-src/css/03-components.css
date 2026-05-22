@@ -1,0 +1,314 @@
+
+/* ================================================================
+   2. Shared components
+   ================================================================ */
+
+/* --- Icons --- */
+.icon {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  background: currentcolor;
+  mask: center / contain no-repeat;
+  vertical-align: -0.125em;
+  flex-shrink: 0
+}
+
+.icon-warning { mask-image: url("icons/warning.svg") }
+.icon-moon { mask-image: url("icons/moon.svg") }
+.icon-sun { mask-image: url("icons/sun.svg") }
+.icon-arrow-left { mask-image: url("icons/chevron.svg"); rotate: 90deg }
+.icon-external { mask-image: url("icons/external.svg") }
+.icon-excluded { mask-image: url("icons/excluded.svg") }
+.icon-history { mask-image: url("icons/history.svg") }
+.icon-check { mask-image: url("icons/check.svg") }
+.icon-close { mask-image: url("icons/close.svg") }
+.icon-dot { mask-image: url("icons/dot.svg") }
+.icon-eye { mask-image: url("icons/eye.svg") }
+.icon-eye-off { mask-image: url("icons/eye-off.svg") }
+.icon-settings { mask-image: url("icons/settings.svg") }
+.icon-sync { mask-image: url("icons/sync.svg") }
+.icon-search { mask-image: url("icons/search.svg") }
+.icon-download { mask-image: url("icons/download.svg") }
+.icon-hourglass { mask-image: url("icons/hourglass.svg") }
+.icon-play { mask-image: url("icons/play.svg") }
+.icon-pause { mask-image: url("icons/pause.svg") }
+.icon-file { mask-image: url("icons/file.svg") }
+.icon-trash { mask-image: url("icons/trash.svg") }
+.icon-user { mask-image: url("icons/user.svg") }
+.icon-chevron-up { mask-image: url("icons/chevron-bold.svg"); rotate: 180deg }
+.icon-chevron-down { mask-image: url("icons/chevron-bold.svg") }
+
+/* --- Badge (data-status drives color) --- */
+.badge {
+  padding: var(--sp-2) var(--sp-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  min-width: 5.1rem;
+  text-align: center;
+  flex-shrink: 0;
+  transition: background 0.4s, color 0.4s;
+
+  /* Default: muted */
+  background: var(--raised);
+  color: var(--muted)
+}
+
+/* Action buttons in tables share badge sizing */
+td[data-col="actions"] button {
+  padding: var(--sp-2) var(--sp-5);
+  font-size: var(--text-xs);
+  height: 1.75rem
+}
+
+.badge[data-status="ok"] { background: var(--ok-dim); color: var(--ok) }
+.badge[data-status="partial"] { background: var(--warn-dim); color: var(--warn) }
+.badge[data-status="warn"] { background: var(--warn-dim); color: var(--warn) }
+.badge[data-status="err"] { background: var(--err-dim); color: var(--err) }
+.badge[data-status="manual"] { background: var(--warn); color: oklch(0% 0 0deg); min-width: auto }
+
+.badge-split {
+  padding: 0;
+  overflow: hidden;
+  gap: 0;
+  justify-content: stretch;
+  min-width: 5.3125rem
+}
+
+.badge-lang {
+  padding: var(--sp-2) var(--sp-4);
+  background: color-mix(in oklch, currentcolor 15%, transparent)
+}
+
+.badge-detail {
+  padding: var(--sp-2) var(--sp-4);
+  flex: 1;
+  text-align: center
+}
+
+/* --- Spinner --- */
+.spinner {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  border: 2px solid color-mix(in oklch, currentcolor 30%, transparent);
+  border-block-start-color: currentcolor;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: spin 0.6s linear infinite
+}
+
+@keyframes spin { to { rotate: 360deg } }
+
+/* --- Skeleton --- */
+.skeleton {
+  height: 1rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--raised) 25%, var(--border) 50%, var(--raised) 75%);
+  background-size: 200% 100%;
+  background-position-x: var(--shimmer-x);
+  animation: shimmer 1.5s infinite linear
+}
+
+@keyframes shimmer { 0% { --shimmer-x: 200% } 100% { --shimmer-x: -200% } }
+
+.skeleton-row {
+  display: flex;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border-block-end: 1px solid var(--border);
+
+  & .skeleton { flex: 1; height: 1.75rem }
+}
+
+[popover] .skeleton-row { border-block-end: none }
+
+/* --- Toggle switch --- */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+
+  & input { opacity: 0; width: 0; height: 0; position: absolute }
+
+  & input + span {
+    position: relative;
+    display: inline-block;
+    width: 2.25rem;
+    height: 1.25rem;
+    background: var(--border);
+    border-radius: 0.625rem;
+    transition: background var(--dur-standard);
+    flex-shrink: 0;
+
+    &::before {
+      content: '';
+      position: absolute;
+      width: 1rem;
+      height: 1rem;
+      inset-inline-start: 0.125rem;
+      inset-block-end: 0.125rem;
+      background: oklch(100% 0 0deg);
+      border-radius: 50%;
+      transition: translate var(--dur-standard)
+    }
+  }
+
+  & input:checked + span {
+    background: var(--accent);
+    &::before { translate: 1rem }
+  }
+}
+
+/* Mobile: scale up toggle switch for touch */
+@container card (width < 700px) {
+  .toggle input + span {
+    width: 3rem;
+    height: 1.75rem;
+    border-radius: 0.875rem
+  }
+
+  .toggle input + span::before {
+    width: 1.375rem;
+    height: 1.375rem;
+    inset-block-end: 0.1875rem;
+    inset-inline-start: 0.1875rem
+  }
+
+  .toggle input:checked + span::before { translate: 1.25rem }
+}
+
+/* --- Empty state --- */
+.empty {
+  text-align: center;
+  padding: var(--sp-6);
+  color: var(--muted);
+  font-size: var(--text-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4)
+}
+
+.empty[data-status="err"] { color: var(--err) }
+
+/* Utility: muted text color */
+.muted { color: var(--muted) }
+
+/* Utility: single-line text truncation with ellipsis */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+/* --- Close button (square icon-only) --- */
+.close-btn {
+  padding: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  aspect-ratio: 1;
+  display: inline-grid;
+  place-items: center
+}
+
+/* --- Toast stack --- */
+.toast-stack {
+  position: fixed;
+  inset-block-end: max(var(--sp-6), env(safe-area-inset-bottom, var(--sp-6)));
+  inset-inline-end: max(var(--sp-6), env(safe-area-inset-right, var(--sp-6)));
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--sp-2);
+  z-index: 1000;
+  pointer-events: none
+}
+
+.toast {
+  position: relative;
+  overflow: hidden;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: toast-in 0.3s var(--ease);
+
+  /* Default: info */
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border)
+}
+
+.toast[data-level="ok"] { background: var(--ok); color: oklch(100% 0 0deg); border: none }
+.toast[data-level="err"] { background: var(--err); color: oklch(100% 0 0deg); border: none }
+
+.toast-progress {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  height: 2px;
+  background: oklch(100% 0 0deg / 40%);
+  animation: toast-progress linear forwards
+}
+
+.toast-exit { animation: toast-out 0.3s var(--ease) forwards }
+
+@keyframes toast-in {
+  from { opacity: 0; translate: 0 1rem; scale: 0.95 }
+  to { opacity: 1; translate: 0; scale: 1 }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; translate: 0; scale: 1 }
+  to { opacity: 0; translate: 1rem 0; scale: 0.95 }
+}
+
+@keyframes toast-progress {
+  from { width: 100% }
+  to { width: 0 }
+}
+
+/* --- Tooltip (anchor-positioned) --- */
+:where(:not(button, a))[data-tip] { cursor: help }
+
+.tooltip {
+  position: fixed;
+  z-index: 500;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3) 0.6rem;
+  font-size: var(--text-xs);
+  max-width: 17.5rem;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  translate: 0 2px;
+  pointer-events: none;
+  transition: opacity var(--dur-micro), translate var(--dur-micro);
+  position-anchor: --tip-anchor;
+  inset: auto;
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: --tip-above, block-start span-inline-end;
+  margin-block-start: var(--sp-3);
+
+  &.show { opacity: 1; translate: 0 }
+}
+
+@position-try --tip-above {
+  /* stylelint-disable-next-line at-rule-descriptor-no-unknown */
+  position-area: block-start span-inline-end;
+  margin-block: 0 var(--sp-3)
+}

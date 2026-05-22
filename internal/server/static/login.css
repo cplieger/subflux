@@ -1,0 +1,513 @@
+/* Subflux — login page styles. Shares design tokens with style.css via
+   _shared-tokens.css; this file holds only login-specific layout, forms,
+   and wizard rules. Theme color-scheme comes from <meta name="color-scheme">
+   in login.html (login does not call theme.ts). */
+
+/* ================================================================
+   0. Custom properties
+   ================================================================ */
+
+@property --shimmer-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 200%
+}
+
+[data-theme="dark"] { color-scheme: dark }
+[data-theme="light"] { color-scheme: light }
+
+:root {
+  interpolate-size: allow-keywords;
+  accent-color: light-dark(oklch(55% 0.16 32deg), oklch(69.86% 0.1368 32.3deg));
+
+  /* Easing vocabulary (4 named easings; no bare ease/ease-in-out) */
+  --ease-micro: cubic-bezier(0.2, 0, 0, 1);
+  --dur-micro: 0.1s;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --dur-standard: 0.2s;
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --dur-enter: 0.25s;
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-exit: 0.15s;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Type scale */
+  --text-xs: 0.72rem;
+  --text-sm: 0.8rem;
+  --text-base: 0.875rem;
+  --text-lg: 1.1rem;
+  --text-xl: clamp(1.15rem, 3vw, 1.5rem);
+
+  /* Spacing */
+  --sp-1: 0.125rem;
+  --sp-2: 0.25rem;
+  --sp-3: 0.375rem;
+  --sp-4: 0.5rem;
+  --sp-5: 0.75rem;
+  --sp-6: 1rem;
+
+  /* Icons */
+  --icon: 0.875rem;
+
+  /* Radii */
+  --radius: 0.75rem;
+  --radius-sm: 0.375rem;
+
+  /* Theme colors (light, dark) */
+  --bg: light-dark(oklch(97% 0.005 32deg), oklch(16% 0.015 32deg));
+  --surface: light-dark(oklch(100% 0 0deg), oklch(22% 0.015 32deg));
+  --raised: light-dark(oklch(96% 0.005 32deg), oklch(25% 0.015 32deg));
+  --border: light-dark(oklch(88% 0.005 32deg), oklch(30% 0.01 32deg));
+  --text: light-dark(oklch(20% 0.02 32deg), oklch(91% 0.01 32deg));
+  --text-2: light-dark(oklch(40% 0.01 32deg), oklch(76% 0.01 32deg));
+  --muted: light-dark(oklch(55% 0.01 32deg), oklch(62% 0.01 32deg));
+  --accent: light-dark(oklch(55% 0.16 32deg), oklch(69.86% 0.1368 32.3deg));
+  --accent-dim: light-dark(oklch(55% 0.16 32deg / 8%), oklch(69.86% 0.1368 32.3deg / 12%));
+  --accent-hover: light-dark(oklch(48% 0.18 32deg), oklch(78% 0.12 32deg));
+  --ok: light-dark(oklch(55% 0.14 168deg), oklch(65% 0.14 168.26deg));
+  --ok-dim: light-dark(oklch(55% 0.14 168deg / 8%), oklch(65% 0.14 168.26deg / 10%));
+  --warn: light-dark(oklch(60% 0.16 85deg), oklch(82% 0.14 85deg));
+  --warn-dim: light-dark(oklch(60% 0.16 85deg / 8%), oklch(82% 0.14 85deg / 10%));
+  --err: light-dark(oklch(50% 0.2 25deg), oklch(58% 0.18 25deg));
+  --err-dim: light-dark(oklch(50% 0.2 25deg / 8%), oklch(58% 0.18 25deg / 10%));
+  --info: light-dark(oklch(52% 0.15 263deg), oklch(66.34% 0.1356 262.89deg));
+  --input-bg: light-dark(oklch(98% 0.003 32deg), oklch(20% 0.015 32deg));
+  --input-border: light-dark(oklch(88% 0.005 32deg), oklch(28% 0.01 32deg));
+  --ghost: light-dark(oklch(93% 0.003 32deg), oklch(30% 0.01 32deg));
+  --ghost-hover: light-dark(oklch(88% 0.005 32deg), oklch(33% 0.01 32deg));
+  --shadow-color: light-dark(oklch(0% 0 0deg / 8%), oklch(0% 0 0deg / 30%));
+  --shadow:
+    0 1px 3px light-dark(oklch(0% 0 0deg / 6%), oklch(0% 0 0deg / 20%)),
+    0 0.25rem 1.5rem var(--shadow-color)
+}
+
+/* ================================================================
+   1. Reset & base
+   ================================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+html { text-size-adjust: 100% }
+
+body {
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6)
+}
+
+::placeholder { opacity: 1; color: var(--muted) }
+::selection { background: var(--accent-dim); color: var(--text) }
+
+/* ================================================================
+   2. Auth page layout
+   ================================================================ */
+
+.auth-page {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center
+}
+
+.auth-page[hidden] { display: none }
+.auth-page-wide { max-width: 42rem }
+
+.auth-card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow:
+    0 1px 3px var(--shadow-color),
+    0 0.25rem 1.5rem var(--shadow-color)
+}
+
+/* Wizard card: flex column so nav sticks to bottom, animated height */
+.auth-card-wide {
+  display: flex;
+  flex-direction: column;
+  min-height: 22rem;
+  interpolate-size: allow-keywords;
+  transition: height 0.5s var(--ease)
+}
+
+.auth-card :is(h1, h2) {
+  font-size: var(--text-xl); font-weight: 700; color: var(--accent);
+  letter-spacing: -0.02em; text-align: center; margin-block-end: var(--sp-6)
+}
+
+.auth-card p {
+  text-align: center; color: var(--text-2);
+  font-size: var(--text-sm); margin-block-end: var(--sp-6)
+}
+
+/* ================================================================
+   3. Form elements
+   ================================================================ */
+
+.auth-card form { display: flex; flex-direction: column; gap: var(--sp-3) }
+
+.auth-card :where(label:not(.wiz-toggle)) {
+  font-size: var(--text-sm); font-weight: 500; color: var(--text-2)
+}
+
+.auth-card input:where(:not([type="checkbox"])) {
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 1.75rem; color: var(--text); font: inherit;
+  transition: border-color var(--dur-micro); width: 100%
+}
+
+.auth-card :where(input:not([type="checkbox"])):focus { outline: none; border-color: var(--accent) }
+.auth-card :where(input):user-invalid { border-color: var(--err); background: var(--err-dim) }
+.auth-card button[type="submit"] { margin-block-start: var(--sp-4) }
+
+/* ================================================================
+   4. Buttons
+   ================================================================ */
+
+.auth-card button {
+  background: var(--accent); color: oklch(100% 0 0deg); border: none;
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-5);
+  height: 1.75rem; font: inherit; font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sp-2); transition: background var(--dur-micro), translate 0.08s; width: 100%
+}
+
+.auth-card :where(button):hover { background: var(--accent-hover) }
+.auth-card :where(button):active { translate: 0 1px }
+.auth-card :where(button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.auth-card :where(button):disabled { opacity: 0.45; cursor: not-allowed }
+
+.auth-alt-btn { background: var(--ghost); color: var(--text-2); width: 100% }
+.auth-alt-btn:hover { background: var(--ghost-hover); color: var(--text) }
+.auth-alt-btn[hidden] { display: none }
+
+/* ================================================================
+   5. Divider / Error / Hints
+   ================================================================ */
+
+.auth-divider {
+  display: flex; align-items: center; gap: var(--sp-4);
+  margin-block: var(--sp-5); color: var(--muted); font-size: var(--text-xs)
+}
+
+.auth-divider[hidden] { display: none }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border) }
+
+.auth-error {
+  background: var(--err-dim); color: var(--err); border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-4); font-size: var(--text-sm);
+  margin-block-end: var(--sp-4); text-align: center
+}
+
+.auth-error[hidden] { display: none }
+
+.auth-error[data-level="warn"] { background: var(--warn-dim); color: var(--warn) }
+
+.auth-hint {
+  color: var(--muted); font-size: var(--text-xs);
+  text-align: center; margin-block: var(--sp-4) 0
+}
+
+/* ================================================================
+   6. Wizard title (outside card, coral)
+   ================================================================ */
+
+.wizard-title {
+  font-size: var(--text-xl); font-weight: 700; color: var(--accent);
+  letter-spacing: -0.02em; text-align: center; margin-block-end: var(--sp-6)
+}
+
+/* ================================================================
+   7. Wizard section heading (h3 size, white)
+   ================================================================ */
+
+.wizard-section-title {
+  font-size: var(--text-lg); font-weight: 600;
+  color: var(--text); margin-block-end: var(--sp-5)
+}
+
+/* Adaptive title row: title + toggle inline */
+.wiz-adaptive-header {
+  display: flex; align-items: center; gap: var(--sp-4);
+  margin-block: var(--sp-5) var(--sp-4)
+}
+
+.wiz-adaptive-header > span {
+  font-size: var(--text-sm); font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: var(--sp-2); flex: 1
+}
+
+.wizard-section {
+  flex: 1;
+  transition: opacity var(--dur-exit) var(--ease-exit)
+}
+
+.wizard-section.fade-out { opacity: 0 }
+
+.wizard-section.fade-in {
+  animation: wiz-fade-in var(--dur-standard) var(--ease-enter)
+}
+
+@keyframes wiz-fade-in {
+  from { opacity: 0; translate: 0 4px }
+  to { opacity: 1; translate: 0 }
+}
+
+/* ================================================================
+   8. Toggle (before field for specificity)
+   ================================================================ */
+
+.wiz-toggle {
+  display: inline-flex; align-items: center; gap: var(--sp-3);
+  font-size: var(--text-sm); color: var(--muted); cursor: pointer; line-height: 1
+}
+
+.wiz-toggle input { opacity: 0; width: 0; height: 0; position: absolute }
+
+.wiz-toggle input + span {
+  position: relative; display: inline-block; width: 2.25rem; height: 1.25rem;
+  background: var(--border); border-radius: 0.625rem;
+  transition: background var(--dur-standard); flex-shrink: 0
+}
+
+.wiz-toggle input + span::before {
+  content: ''; position: absolute; width: 1rem; height: 1rem;
+  inset-inline-start: 0.125rem; inset-block-end: 0.125rem;
+  background: oklch(100% 0 0deg); border-radius: 50%; transition: translate var(--dur-standard)
+}
+
+.wiz-toggle input:checked + span { background: var(--accent) }
+.wiz-toggle input:checked + span::before { translate: 1rem }
+.wiz-toggle input:disabled + span { opacity: 0.4; cursor: not-allowed }
+
+/* ================================================================
+   9. Fields (matching main UI cfg-field)
+   ================================================================ */
+
+.wiz-field {
+  display: flex; align-items: center; gap: var(--sp-4); margin-block-end: var(--sp-4)
+}
+
+.wiz-field label:not(.wiz-toggle) {
+  min-width: 7rem; font-size: var(--text-sm); font-weight: 500;
+  color: var(--text-2); display: flex; align-items: center; gap: var(--sp-2)
+}
+
+.wiz-field:has(> .wiz-toggle) label:not(.wiz-toggle) { flex: 1 }
+
+.wiz-field :is(input, select) {
+  flex: 1; background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 1.75rem; color: var(--text); font: inherit
+}
+
+.wiz-field :is(input, select):focus { outline: none; border-color: var(--accent) }
+.wiz-field .wiz-toggle { margin-inline-start: auto; flex-shrink: 0 }
+
+/* Secret field masking (no type=password outside forms, avoids Chrome DOM warnings) */
+.wiz-masked {
+  -webkit-text-security: disc;
+  font-family: text-security-disc, Verdana, sans-serif
+}
+
+/* ================================================================
+   10. Info tooltip
+   ================================================================ */
+
+.wiz-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1rem; height: 1rem; border-radius: 50%;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 0.6rem; font-weight: 700;
+  cursor: help; flex-shrink: 0; position: relative; line-height: 1
+}
+
+.wiz-info::before {
+  content: attr(data-tip); position: absolute;
+  inset-block-end: calc(100% + 0.375rem); inset-inline-start: 50%; translate: -50%;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--sp-3) 0.6rem; font-size: var(--text-xs); font-weight: 400;
+  max-width: 15rem; width: max-content;
+  box-shadow: 0 0.25rem 1rem var(--shadow-color);
+  opacity: 0; pointer-events: none; transition: opacity var(--dur-micro);
+  white-space: normal; text-align: start; z-index: 10
+}
+
+.wiz-info:hover::before, .wiz-info:focus::before { opacity: 1 }
+
+/* ================================================================
+   11. Arr subsection
+   ================================================================ */
+/* stylelint-disable no-descending-specificity -- scoped selectors don't conflict */
+
+.wiz-arr-group {
+  margin-block-end: var(--sp-5); padding-block-end: var(--sp-5);
+  border-block-end: 1px solid var(--border)
+}
+
+.wiz-arr-group:last-of-type { border-block-end: none; margin-block-end: 0; padding-block-end: 0 }
+.wiz-arr-header { display: flex; align-items: center; gap: var(--sp-3); margin-block-end: var(--sp-4) }
+.wiz-arr-header span { font-size: var(--text-sm); font-weight: 600; color: var(--text) }
+
+/* ================================================================
+   12. Provider cards
+   ================================================================ */
+
+.wiz-prov-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  margin-block-end: var(--sp-4); overflow: hidden; transition: border-color var(--dur-micro)
+}
+
+.wiz-prov-card.open { border-color: var(--accent) }
+
+.wiz-prov-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5); background: var(--input-bg)
+}
+
+.wiz-prov-name { font-size: var(--text-sm); font-weight: 600; color: var(--text) }
+
+.wiz-prov-body { padding: var(--sp-4) var(--sp-5); border-block-start: 1px solid var(--border) }
+.wiz-prov-body[hidden] { display: none }
+
+/* ================================================================
+   13. Language & media root rows
+   ================================================================ */
+
+.wiz-lang-section-title {
+  font-size: var(--text-sm); font-weight: 600; color: var(--text);
+  margin-block-end: var(--sp-3); display: flex; align-items: center; gap: var(--sp-2)
+}
+
+.wiz-lang-row { display: flex; align-items: center; gap: var(--sp-3); margin-block-end: var(--sp-3) }
+
+.wiz-lang-select {
+  width: 10rem; flex-shrink: 0;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 2rem; color: var(--text); font: inherit
+}
+
+.wiz-lang-select:focus { outline: none; border-color: var(--accent) }
+
+.wiz-lang-variant {
+  width: 6rem; flex-shrink: 0;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 2rem; color: var(--text); font: inherit
+}
+
+.wiz-lang-variant:focus { outline: none; border-color: var(--accent) }
+
+.wiz-lang-arrow { color: var(--muted); font-size: var(--text-sm); flex-shrink: 0 }
+
+/* Remove button: fixed square, override .auth-card button width */
+.auth-card .wiz-lang-remove {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer;
+  font-size: var(--text-base); line-height: 1;
+  width: 1.75rem; height: 1.75rem; flex-shrink: 0;
+  padding: 0; min-width: 0
+}
+
+.auth-card .wiz-lang-remove:hover { background: var(--ghost-hover); color: var(--text) }
+
+/* Media root input: fill available space */
+.wiz-media-input {
+  flex: 1; min-width: 0;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  height: 1.75rem; color: var(--text); font: inherit
+}
+
+.wiz-media-input:focus { outline: none; border-color: var(--accent) }
+
+.wiz-lang-add {
+  background: var(--ghost); color: var(--text-2); border: none;
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4);
+  font: inherit; font-size: var(--text-sm); cursor: pointer;
+  margin-block-start: var(--sp-3)
+}
+
+.wiz-lang-add:hover { background: var(--ghost-hover); color: var(--text) }
+/* stylelint-enable no-descending-specificity */
+
+/* ================================================================
+   14. Wizard navigation (back · dots · next)
+   ================================================================ */
+
+.wizard-nav {
+  display: flex; align-items: center; gap: var(--sp-4);
+  margin-block-start: auto; padding-block-start: var(--sp-5);
+  border-block-start: 1px solid var(--border)
+}
+
+.wizard-nav button { width: auto; min-width: 5rem; height: 1.75rem }
+.wizard-nav button[hidden] { display: none }
+
+/* Back always rendered for centering; invisible on first step */
+.wizard-nav .wizard-back {
+  background: var(--ghost); color: var(--text-2); visibility: visible
+}
+
+.wizard-nav .wizard-back:hover { background: var(--ghost-hover); color: var(--text) }
+.wizard-nav .wizard-back[aria-disabled="true"] { visibility: hidden }
+
+.wizard-progress { display: flex; gap: var(--sp-2); justify-content: center; flex: 1 }
+
+.wizard-dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: var(--border); transition: background var(--dur-standard)
+}
+
+.wizard-dot.active { background: var(--accent) }
+.wizard-dot.done { background: var(--muted) }
+
+/* ================================================================
+   15. Mobile: touch-friendly sizes (matching main UI 2.75rem / 44px)
+   ================================================================ */
+
+@media (pointer: coarse) {
+  .auth-card button,
+  .auth-card input:where(:not([type="checkbox"])),
+  .wiz-field :is(input, select),
+  .wiz-lang-select,
+  .wiz-lang-variant,
+  .wiz-media-input,
+  .wizard-nav button { height: 2.75rem }
+
+  .auth-card button { padding: var(--sp-3) var(--sp-5) }
+  .auth-card .wiz-lang-remove { width: 2.5rem; height: 2.5rem }
+
+  .wiz-toggle input + span { width: 3rem; height: 1.75rem }
+  .wiz-toggle input + span::before { width: 1.375rem; height: 1.375rem }
+  .wiz-toggle input:checked + span::before { translate: 1.25rem }
+}
+
+/* ================================================================
+   16. Reduced motion
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* stylelint-disable declaration-no-important, time-min-milliseconds -- a11y */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important
+  }
+  /* stylelint-enable declaration-no-important, time-min-milliseconds */
+}

@@ -1,0 +1,27 @@
+/* Subflux — design system, mobile-first, container queries only */
+
+@layer tokens, reset, components, layout, pages, a11y;
+
+@property --bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(97% 0.005 32deg);
+}
+
+@property --surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(100% 0 0deg);
+}
+
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(55% 0.16 32deg);
+}
+
+@property --text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(20% 0.02 32deg);
+}

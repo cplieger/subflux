@@ -1,0 +1,60 @@
+{
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+
+  "checkers": ["typescript"],
+  "tsconfigFile": "tsconfig.json",
+  "typescriptChecker": {
+    "prioritizePerformanceOverAccuracy": false
+  },
+
+  "mutate": [
+    "utils.ts",
+    "bus.ts",
+    "store.ts"
+  ],
+
+  "testFiles": ["**/*.test.ts"],
+
+  "mutator": {
+    "excludedMutations": ["StringLiteral"]
+  },
+
+  "ignorePatterns": [
+    "node_modules",
+    "reports",
+    "coverage",
+    "*.test.ts",
+    "*.d.ts",
+    "../static"
+  ],
+
+  "ignoreStatic": true,
+
+  "reporters": ["html", "progress", "clear-text"],
+  "clearTextReporter": {
+    "allowColor": true,
+    "logTests": true,
+    "maxTestsToLog": 5,
+    "skipFull": false
+  },
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+
+  "timeoutMS": 10000,
+  "timeoutFactor": 2,
+  "dryRunTimeoutMinutes": 2,
+  "concurrency": 4,
+  "disableBail": false,
+  "cleanTempDir": "always",
+  "logLevel": "warn"
+}

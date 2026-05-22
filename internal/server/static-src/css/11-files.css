@@ -1,0 +1,43 @@
+
+/* ================================================================
+   10. Files table
+   ================================================================ */
+
+.files-table td:last-child { text-align: end }
+
+/* Files table mobile: single row, evenly distributed */
+.files-table :where(tbody) tr {
+  grid-template-columns: 1fr 1.2fr 1.2fr 1fr auto;
+  grid-template-rows: auto
+}
+
+/* Offset: hidden on mobile */
+.files-table td[data-col="offset"] { display: none }
+
+/* Actions: always last column */
+.files-table td[data-col="actions"] { grid-column: -1 }
+
+/* Files table desktop */
+@container card (width >= 700px) {
+  .files-table :where(thead) { display: table-header-group }
+
+  .files-table :where(tbody) tr {
+    display: table-row;
+    padding: 0
+  }
+
+  .files-table :where(tbody) td {
+    display: table-cell;
+    padding: var(--sp-4)
+  }
+
+  .files-table td[data-col="offset"] { display: table-cell }
+  .files-table td:last-child { text-align: end }
+}
+
+.btn-delete {
+  background: var(--err-dim);
+  color: var(--err);
+
+  &:hover { background: var(--err); color: oklch(100% 0 0deg) }
+}

@@ -1,0 +1,15 @@
+# 2026/05/14 15:00:23.630338 [TestIntPow_property_matches_repeated_multiplication] [rapid] draw base: 10
+# 2026/05/14 15:00:23.630368 [TestIntPow_property_matches_repeated_multiplication] [rapid] draw exp: 20
+# 2026/05/14 15:00:23.630382 [TestIntPow_property_matches_repeated_multiplication] intPow(10, 20) = 1e+19, want 1e+20
+# 
+v0.4.8#16100360708508356727
+0x0
+0x0
+0x1f2b5a0e61c3a6
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1f2b5a0e61c3a6
+0x0

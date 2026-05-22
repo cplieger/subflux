@@ -1,0 +1,143 @@
+// Runtime decode helpers — primitives used by generated decoders in
+// ./wire/decoders.gen.ts and by any opt-in hand-rolled decoder.
+//
+// The wire-format decoders themselves are generated from Go structs at
+// build time (see ../../cmd/wire-codegen). Edit the Go side and re-run
+// `go run ./cmd/wire-codegen` to update; never hand-edit the generated
+// files. This module is the only hand-authored part of the wire
+// validation system.
+
+/** A decoder is a pure function that returns T or throws on shape mismatch. */
+export type Decoder<T> = (v: unknown) => T;
+
+function fail(path: string, msg: string): never {
+  throw new TypeError(`${path}: ${msg}`);
+}
+
+function typeName(v: unknown): string {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "array";
+  return typeof v;
+}
+
+/** Asserts v is a plain object (not array, not null). Returns the typed map. */
+export function asObject(v: unknown, path = "$"): Record<string, unknown> {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) {
+    fail(path, `expected object, got ${typeName(v)}`);
+  }
+  return v as Record<string, unknown>;
+}
+
+/** Asserts v is an array; returns it. */
+export function asArray(v: unknown, path = "$"): unknown[] {
+  if (!Array.isArray(v)) {
+    fail(path, `expected array, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Required string field; throws if absent or not a string. */
+export function reqStr(o: Record<string, unknown>, key: string, path = "$"): string {
+  const v = o[key];
+  if (typeof v !== "string") {
+    fail(`${path}.${key}`, `expected string, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Required finite number field. NaN and Infinity are rejected. */
+export function reqNum(o: Record<string, unknown>, key: string, path = "$"): number {
+  const v = o[key];
+  if (typeof v !== "number" || !Number.isFinite(v)) {
+    fail(`${path}.${key}`, `expected number, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Required boolean field. */
+export function reqBool(o: Record<string, unknown>, key: string, path = "$"): boolean {
+  const v = o[key];
+  if (typeof v !== "boolean") {
+    fail(`${path}.${key}`, `expected boolean, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Optional string: undefined if key absent, otherwise must be a string. */
+export function optStr(o: Record<string, unknown>, key: string, path = "$"): string | undefined {
+  const v = o[key];
+  if (v === undefined) return undefined;
+  if (typeof v !== "string") {
+    fail(`${path}.${key}`, `expected string or undefined, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Optional finite number. */
+export function optNum(o: Record<string, unknown>, key: string, path = "$"): number | undefined {
+  const v = o[key];
+  if (v === undefined) return undefined;
+  if (typeof v !== "number" || !Number.isFinite(v)) {
+    fail(`${path}.${key}`, `expected number or undefined, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Optional boolean. */
+export function optBool(o: Record<string, unknown>, key: string, path = "$"): boolean | undefined {
+  const v = o[key];
+  if (v === undefined) return undefined;
+  if (typeof v !== "boolean") {
+    fail(`${path}.${key}`, `expected boolean or undefined, got ${typeName(v)}`);
+  }
+  return v;
+}
+
+/** Required string with a fixed enum membership check. */
+export function reqOneOf<T extends string>(
+  o: Record<string, unknown>,
+  key: string,
+  vals: readonly T[],
+  path = "$",
+): T {
+  const v = o[key];
+  if (typeof v !== "string" || !(vals as readonly string[]).includes(v)) {
+    fail(`${path}.${key}`, `expected one of ${vals.join("|")}, got ${JSON.stringify(v)}`);
+  }
+  return v as T;
+}
+
+/** Decodes an array of T using the given per-element decoder. The
+ *  per-element path is the parent path + "[i]" so error messages
+ *  locate the offending entry. */
+export function decodeArray<T>(v: unknown, decode: Decoder<T>, path = "$"): T[] {
+  const arr = asArray(v, path);
+  return arr.map((el, i) => {
+    try {
+      return decode(el);
+    } catch (e) {
+      if (e instanceof TypeError) {
+        throw new TypeError(`${path}[${String(i)}]: ${e.message}`);
+      }
+      throw e;
+    }
+  });
+}
+
+/** Decodes a Record<string, T> by iterating own keys and applying
+ *  decode to each value. Error messages include the key. */
+export function decodeRecord<T>(v: unknown, decode: Decoder<T>, path = "$"): Record<string, T> {
+  const o = asObject(v, path);
+  const out: Record<string, T> = {};
+  for (const [k, val] of Object.entries(o)) {
+    try {
+      out[k] = decode(val);
+    } catch (e) {
+      if (e instanceof TypeError) {
+        throw new TypeError(`${path}.${k}: ${e.message}`);
+      }
+      throw e;
+    }
+  }
+  return out;
+}

@@ -1,0 +1,55 @@
+
+/* ================================================================
+   4. Card & controls
+   ================================================================ */
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: clamp(var(--sp-5), 2vw, 1.25rem);
+  container-type: inline-size;
+  container-name: card;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 18.75rem;
+  isolation: isolate
+}
+
+.card-head {
+  display: flex;
+  flex-direction: column;
+  margin-block-end: var(--sp-5);
+  gap: var(--sp-4);
+
+  &[hidden] { display: none }
+
+  & h2 { font-size: var(--text-lg); font-weight: 500; color: var(--text-2); text-wrap: balance }
+
+  & [data-nav], & .detail-nav { align-self: start }
+
+  /* Breadcrumb + title on same line */
+  &:has([data-nav], .detail-nav) {
+    flex-flow: row wrap;
+    align-items: center
+  }
+}
+
+.controls {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: center;
+  flex-wrap: wrap;
+
+  & input[type="search"] { width: clamp(10rem, 30cqi, 14rem) }
+}
+
+/* Desktop: card header becomes a row */
+@container card (width >= 700px) {
+  .card-head {
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: space-between
+  }
+
+  .card-head h2 { flex: 1 }
+}
