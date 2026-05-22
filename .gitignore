@@ -1,4 +1,6 @@
 node_modules/
 subflux
 subsync
-*.log
+*.logdev-run.sh
+cmd/api-tester/
+
