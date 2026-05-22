@@ -3,7 +3,7 @@ services:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
-    user: "1000:1000"
+    user: "1000:1000"  # match your host user
 
     environment:
       TZ: "Europe/Paris"
@@ -12,5 +12,5 @@ services:
       - "8374:8374"
 
     volumes:
-      - "/path/to/config:/config"
+      - "/opt/appdata/subflux:/config"
       - "/path/to/media:/media"
