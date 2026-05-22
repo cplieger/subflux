@@ -1,0 +1,16 @@
+services:
+  subflux:
+    image: ghcr.io/cplieger/subflux:latest
+    container_name: subflux
+    restart: unless-stopped
+    user: "1000:1000"
+
+    environment:
+      TZ: "Europe/Paris"
+
+    ports:
+      - "8374:8374"
+
+    volumes:
+      - "/path/to/config:/config"
+      - "/path/to/media:/media"
