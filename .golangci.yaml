@@ -97,3 +97,7 @@ linters:
       - path: internal/subsync/
         linters:
           - gocyclo
+      # Subcommand names in CLI specs — structural repetition, not extractable
+      - path: cli_specs\.go
+        linters:
+          - goconst
