@@ -1,4 +1,5 @@
 node_modules/
+.vitest-cache/
 /subflux
 /subsync
 *.log
