@@ -8,3 +8,10 @@ cmd/api-tester/
 
 internal/server/static/style.css
 internal/server/static/login.css
+
+# Ad-hoc puppeteer smoke / repro tests live alongside the scaffolding
+# in internal/server/static-src/puppeteer/ but are never committed;
+# only README.md in that directory is tracked.
+internal/server/static-src/puppeteer/*.cjs
+internal/server/static-src/puppeteer/*.mjs
+internal/server/static-src/puppeteer/*.js
