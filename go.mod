@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/go-webauthn/webauthn v0.17.4
-	github.com/nwaples/rardecode/v2 v2.2.2
+	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/pquerna/otp v1.5.0
 	github.com/ulikunitz/xz v0.5.15
 	go.yaml.in/yaml/v3 v3.0.4
