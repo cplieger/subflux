@@ -2,8 +2,8 @@
 
 import * as notify from './notify.js';
 import { el, text, option, icon, dialog, closeDialog, onBackdropClose, patch } from './dom.js';
-import { apiGet } from './api-client.js';
 import { audioSyncAction, saveManualOffsetAction } from './sync-actions.js';
+import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from './actions/index.js';
 import { langName } from './utils.js';
 import { DEFAULT_VARIANT } from './constants.js';
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from './sync-timecode.js';
@@ -42,6 +42,18 @@ let syncState: SyncState = {
   previewStart: 0, previewBuffered: false,
   blobUrl: ''
 };
+
+// Drain any in-flight ffmpeg stream + revoke blob URL on page unload.
+// Browsers handle this naturally on real navigation; the registration
+// adds deterministic teardown for tests + soft-navigation cases.
+registerCleanup(() => {
+  if (syncState.status === 'preview' && syncState.ffmpegAbort) {
+    syncState.ffmpegAbort.abort();
+  }
+  if (syncState.blobUrl) {
+    try { URL.revokeObjectURL(syncState.blobUrl); } catch { /* ignore */ }
+  }
+});
 
 // Whether openSyncDialog pushed a history entry that closeSyncDialog
 // needs to pop (vs. direct URL navigation where no entry was pushed).
@@ -273,6 +285,10 @@ function closeSyncDialog(): void {
     URL.revokeObjectURL(syncState.blobUrl);
     syncState.blobUrl = '';
   }
+  // Stop hold-repeat timers in the timecode widget so a pending tick
+  // can't fire on the detached element after the dialog closes.
+  const tc = document.getElementById('sync-offset-val') as TimecodeInput | null;
+  tc?.dispose?.();
   // Clean up video before closing.
   const video = syncDlg.querySelector('video');
   if (video) {
@@ -366,6 +382,21 @@ interface PreviewStartResponse {
   start_seconds: number;
 }
 
+/** Find the dialogue-dense start point for the preview window. retryNetwork
+ *  recovers from transient blips during the analyze step. error: false
+ *  because the caller falls back to startSec=0 silently. */
+const previewStartAction = apiAction<string, PreviewStartResponse>({
+  name: "preview.start",
+  request: (subtitlePath) => ({
+    method: "GET",
+    path: `/api/preview/start?subtitle=${encodeURIComponent(subtitlePath)}`,
+  }),
+  dedupe: (subtitlePath) => `preview.start:${subtitlePath}`,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: false,
+});
+
 async function toggleVideoPreview(container: HTMLElement): Promise<void> {
   if (syncState.status === 'preview') {
     if (syncState.ffmpegAbort) {
@@ -392,7 +423,7 @@ async function toggleVideoPreview(container: HTMLElement): Promise<void> {
 
   // Find dialogue-dense start point.
   let startSec = 0;
-  const r = await apiGet<PreviewStartResponse>(`/api/preview/start?subtitle=${encodeURIComponent(syncState.subtitlePath)}`);
+  const r = await previewStartAction.dispatch(syncState.subtitlePath);
   if (r) startSec = r.start_seconds || 0;
 
   syncState.previewStart = startSec;

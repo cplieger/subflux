@@ -2,6 +2,7 @@
 
 import { apiGet, apiPost, apiPostRaw } from './api-client.js';
 import type { ApiResult } from './api-client.js';
+import { registerCleanup } from './actions/index.js';
 import { $, show, showPage, showError, hideError } from './dom-core.js';
 import { startConfigWizard } from './wizard.js';
 import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from './webauthn-utils.js';
@@ -37,8 +38,21 @@ interface WebAuthnOptions {
 
 let pendingToken = '';
 let conditionalAbort: AbortController | null = null;
+let conditionalRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let webauthnSessionToken = '';
 let conditionalUIAttempts = 0;
+
+// Drain in-flight conditional WebAuthn ceremony + clear any pending retry
+// timer on page unload. Without this, a retry fires into a torn-down DOM
+// after a failed conditional UI attempt + slow navigation.
+registerCleanup(() => {
+  conditionalAbort?.abort();
+  conditionalAbort = null;
+  if (conditionalRetryTimer !== null) {
+    clearTimeout(conditionalRetryTimer);
+    conditionalRetryTimer = null;
+  }
+});
 
 // --- Initialization ---
 
@@ -123,7 +137,7 @@ async function startConditionalUI(): Promise<void> {
     conditionalUIAttempts++;
     if (conditionalUIAttempts >= 3) return;
     const delay = Math.min(1000 * 2 ** conditionalUIAttempts, 30_000);
-    setTimeout(startConditionalUI, delay);
+    conditionalRetryTimer = setTimeout(startConditionalUI, delay);
   }
 }
 
@@ -222,7 +236,7 @@ function wireLoginForm(resumeSetup: boolean): void {
     const username = (formData.get('username') as string) || '';
     const password = (formData.get('password') as string) || '';
     const btn = $('loginBtn') as HTMLButtonElement | null;
-    if (btn) btn.disabled = true;
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
     try {
       const res = await apiPostRaw<LoginResponse>('/api/auth/login', { username, password });
       if (!res.ok) {
@@ -244,7 +258,7 @@ function wireLoginForm(resumeSetup: boolean): void {
       }
       if (resumeSetup) { await startConfigWizard(); return; }
       window.location.href = data['redirect'] || '/';
-    } finally { if (btn) btn.disabled = false; }
+    } finally { if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); } }
   });
 }
 

@@ -3,6 +3,7 @@
 import * as store from './store.js';
 import { $, el, text, icon, patch, errDiv, input, select, insertNavButton } from './dom.js';
 import { apiGetTyped } from './api-client.js';
+import { registerCleanup } from './actions/index.js';
 import { decodeSeriesItem, decodeMovieItem } from './wire/decoders.gen.js';
 import { decodeArray } from './validators.js';
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from './utils.js';
@@ -16,14 +17,25 @@ import type { CoverageTarget, CoverageItem } from './api-types.js';
 
 const COV_PAGE_SIZE = 50;
 
-/** Fetch series and movies coverage, merge with _type discriminant, and store. */
+// Per-fetch AbortController so rapid view switches abort the previous
+// in-flight coverage load instead of patching stale DOM. Registered with
+// the framework so beforeunload also aborts it.
+let coverageAbort: AbortController | null = null;
+registerCleanup(() => { coverageAbort?.abort(); coverageAbort = null; });
+
+/** Fetch series and movies coverage, merge with _type discriminant, and store.
+ *  Aborts any prior in-flight fetch — only the latest call wins. */
 export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
+  coverageAbort?.abort();
+  coverageAbort = new AbortController();
+  const { signal } = coverageAbort;
   const decodeSeriesList = (v: unknown) => decodeArray(v, decodeSeriesItem, '$.series');
   const decodeMovieList = (v: unknown) => decodeArray(v, decodeMovieItem, '$.movies');
   const [series, movies] = await Promise.all([
-    apiGetTyped('/api/coverage/series', decodeSeriesList),
-    apiGetTyped('/api/coverage/movies', decodeMovieList)
+    apiGetTyped('/api/coverage/series', decodeSeriesList, signal),
+    apiGetTyped('/api/coverage/movies', decodeMovieList, signal)
   ]);
+  if (signal.aborted) return store.get('coverageData') ?? [];
   const merged: CoverageItem[] = [
     ...(series || []).map((s) => ({ ...s, _type: 'series' as const })),
     ...(movies || []).map((m) => ({ ...m, _type: 'movie' as const }))

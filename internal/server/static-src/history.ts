@@ -1,7 +1,7 @@
 // history.ts — download history page (server-side paginated)
 
 import { el, input, select, option } from './dom.js';
-import { apiGet } from './api-client.js';
+import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { on, emit, BusEvent } from './bus.js';
 import { fmtDateTime, fmtEpisode, clickableRow } from './utils.js';
 import { createPagedList } from './paged-list.js';
@@ -38,8 +38,20 @@ function buildApiUrl(offset: number, limit: number): string {
   return `/api/state?${params.toString()}`;
 }
 
+/** Fetch a page of history entries. Pure GET; failures show as empty
+ *  page (caller renders empty-state) but retryNetwork handles transient
+ *  blips so a single network hiccup doesn't leave the user staring at
+ *  "no downloads". error: false because the empty-state IS the error UI. */
+const loadHistoryAction = apiAction<string, HistoryEntry[]>({
+  name: "history.load",
+  request: (path) => ({ method: "GET", path }),
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: false,
+});
+
 async function fetchPage(offset: number, limit: number): Promise<Page<HistoryEntry>> {
-  const items = (await apiGet<HistoryEntry[]>(buildApiUrl(offset, limit))) || [];
+  const items = (await loadHistoryAction.dispatch(buildApiUrl(offset, limit))) ?? [];
   return { items, hasMore: items.length >= limit };
 }
 

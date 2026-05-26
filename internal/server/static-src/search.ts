@@ -5,7 +5,7 @@ import * as notify from './notify.js';
 import { prettyLabel, fmtEpisode, langName } from './utils.js';
 import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from './dom.js';
 import { apiGet, apiGetRaw } from './api-client.js';
-import { apiAction, ActionError, retryNetwork } from './actions/index.js';
+import { apiAction, ActionError, retryNetwork, registerCleanup } from './actions/index.js';
 import { hasCode, ErrorCode } from './error_codes.js';
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from './constants.js';
 import type { Activity, MediaType } from './api-types.js';
@@ -99,6 +99,16 @@ const downloadAction = apiAction<DownloadArgs, DownloadResponse>({
 
 let searchAbort: AbortController | null = null;
 const activePolls: Set<AbortController> = new Set();
+
+// Drain in-flight search + download polls on page unload. Each poll's
+// AbortController is also removed from the Set when it terminates
+// naturally; this hook is a safety net for unload + tests.
+registerCleanup(() => {
+  searchAbort?.abort();
+  searchAbort = null;
+  for (const p of activePolls) p.abort();
+  activePolls.clear();
+});
 
 const searchDlg: HTMLDialogElement = dialog('searchResultPopup');
 
