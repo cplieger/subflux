@@ -4,7 +4,7 @@ import * as store from './store.js';
 import * as notify from './notify.js';
 import { el, text, icon, patch, $ } from './dom.js';
 import { apiGet, apiGetTyped } from './api-client.js';
-import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from './actions/index.js';
+import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { decodeStats, decodeProvidersResponse } from './wire/decoders.gen.js';
 import type { Stats as StatsType, ProvidersResponse as ProvidersResponseType } from './wire/types.gen.js';
 import { fmtTime } from './utils.js';
@@ -153,59 +153,62 @@ function processActivitySideEffects(
   }
 }
 
-let polling = false;
-let pollAbort: AbortController | null = null;
+// Status poll is a deduped action so overlapping dispatches collapse
+// onto a single in-flight request. Replaces the prior `polling` re-entry
+// guard + `pollAbort` AbortController. abortPoll() calls .cancel() to
+// abort in-flight on disconnect / page unload. error: false because
+// transient failures during background polling shouldn't toast.
+//
+// Exported so app.ts can pass the action to pollAction() for the
+// periodic background poll.
+export const pollStatusAction = defineAction<void, void>({
+  name: 'status.poll',
+  dedupe: true,
+  run: async (_args, signal) => {
+    const unconfigured = store.get('isUnconfigured');
+    const popupVisible = isPopupOpen();
 
-// Drain in-flight pollStatus on page unload so the framework's beforeunload
-// hook aborts the request rather than leaving it dangling.
-registerCleanup(() => abortPoll());
+    // Always fetch alerts and activity.
+    const alerts = (await apiGet<Alert[]>('/api/alerts', signal)) || [];
+    const activities = (await apiGet<Activity[]>('/api/activity', signal)) || [];
 
-/** Abort any in-flight poll requests (called from events.ts on disconnect). */
+    let providers: ProvidersResponse = { enabled: false };
+    let stats: Stats | null = null;
+    if (!unconfigured && popupVisible) {
+      const [providersRes, statsRes] = await Promise.all([
+        apiGetTyped('/api/providers/timeout', decodeProvidersResponse, signal),
+        apiGetTyped('/api/state/stats', decodeStats, signal)
+      ]);
+      if (providersRes) providers = providersRes;
+      if (statsRes) stats = statsRes;
+    } else if (!unconfigured) {
+      const providersRes = await apiGetTyped('/api/providers/timeout', decodeProvidersResponse, signal);
+      if (providersRes) providers = providersRes;
+    }
+
+    const btn = $.statusBtn;
+    const ongoing = timedOutProviders(providers);
+    const isActive = updateStatusButton(btn, providers, alerts, activities, ongoing);
+    processActivitySideEffects(btn, activities, isActive);
+
+    if (!popupVisible) return;
+    hideTip();
+    patch($.statusPopup, buildPopupContent(
+      stats, providers, activities, alerts, ongoing, isActive));
+  },
+  error: false,
+});
+
+/** Abort any in-flight status poll (called from events.ts on disconnect). */
 export function abortPoll(): void {
-  pollAbort?.abort();
-  pollAbort = null;
+  pollStatusAction.cancel();
 }
 
+/** Dispatch a single status poll. Used by event handlers and direct
+ *  refresh paths (config save, activity dismiss, SSE state change).
+ *  pollStatusAction's dedupe coalesces with any in-flight poll. */
 export async function pollStatus(): Promise<void> {
-  if (polling) return;
-  polling = true;
-  pollAbort?.abort();
-  pollAbort = new AbortController();
-  const { signal } = pollAbort;
-  try {
-  const unconfigured = store.get('isUnconfigured');
-  const popupVisible = isPopupOpen();
-
-  // Always fetch alerts and activity.
-  const alerts = (await apiGet<Alert[]>('/api/alerts', signal)) || [];
-  const activities = (await apiGet<Activity[]>('/api/activity', signal)) || [];
-
-  let providers: ProvidersResponse = { enabled: false };
-  let stats: Stats | null = null;
-  if (!unconfigured && popupVisible) {
-    const [providersRes, statsRes] = await Promise.all([
-      apiGetTyped('/api/providers/timeout', decodeProvidersResponse, signal),
-      apiGetTyped('/api/state/stats', decodeStats, signal)
-    ]);
-    if (providersRes) providers = providersRes;
-    if (statsRes) stats = statsRes;
-  } else if (!unconfigured) {
-    const providersRes = await apiGetTyped('/api/providers/timeout', decodeProvidersResponse, signal);
-    if (providersRes) providers = providersRes;
-  }
-
-  const btn = $.statusBtn;
-  const ongoing = timedOutProviders(providers);
-  const isActive = updateStatusButton(btn, providers, alerts, activities, ongoing);
-  processActivitySideEffects(btn, activities, isActive);
-
-  if (!popupVisible) return;
-  hideTip();
-  patch($.statusPopup, buildPopupContent(
-    stats, providers, activities, alerts, ongoing, isActive));
-  } finally {
-    polling = false;
-  }
+  await pollStatusAction.dispatch(undefined);
 }
 
 // buildActivityItem constructs a single activity row for the status popup.

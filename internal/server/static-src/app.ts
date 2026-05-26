@@ -4,7 +4,7 @@ import * as store from './store.js';
 import * as notify from './notify.js';
 import * as events from './events.js';
 import * as theme from './theme.js';
-import { pollStatus, updateLiveTimers } from './status.js';
+import { pollStatus, pollStatusAction, updateLiveTimers } from './status.js';
 import { loadCoverage, filterCoverage } from './coverage.js';
 import { renderSeriesDetail, openMovieDetail } from './detail.js';
 import { closeSearchPopup } from './search.js';
@@ -16,7 +16,7 @@ import { initUserMenu } from './user-menu.js';
 import { initSecurity } from './security.js';
 import { el, dialog, onBackdropClose, patch, $ } from './dom.js';
 import { apiGet } from './api-client.js';
-import { subscribeToActions, registerCleanup } from './actions/index.js';
+import { subscribeToActions, registerCleanup, pollAction } from './actions/index.js';
 import { viewTransition, debounce } from './utils.js';
 import { STATUS_POLL_MS } from './constants.js';
 import type { MovieItem, SubtitleEntry } from './api-types.js';
@@ -144,14 +144,22 @@ window.addEventListener('popstate', () => {
   viewTransition(() => applyRoute());
 });
 
-// Background polls. Intervals run for the page lifetime; registerCleanup
-// hooks them into the framework's beforeunload drain so tests + page-leave
-// can stop them cleanly (browsers GC on real unload anyway, but tests
-// importing app.ts would otherwise leak intervals).
-const statusPollId = setInterval(pollStatus, STATUS_POLL_MS);
+// Background polls. The status poll uses pollAction which adds:
+//   - pause-when-hidden: saves battery + server load while the tab is
+//     in the background. Resume on visibilitychange.
+//   - refresh-on-focus: instant freshness when the user returns to the
+//     tab — alerts / activities / providers are repainted immediately.
+//   - auto cleanup: pollAction registers its own cleanup hook for
+//     beforeunload drain (no manual clearInterval needed).
+//
+// updateLiveTimers is a UI tick (formats running durations on screen).
+// It doesn't dispatch any action, so pollAction can't help — raw
+// setInterval + manual cleanup is correct here.
+pollAction(pollStatusAction, undefined, {
+  interval: STATUS_POLL_MS,
+});
 const liveTimerId = setInterval(updateLiveTimers, 1000);
-registerCleanup(() => { clearInterval(statusPollId); clearInterval(liveTimerId); });
-pollStatus();
+registerCleanup(() => { clearInterval(liveTimerId); });
 
 // Helper: check unconfigured state (used by dialog event handlers).
 function isUnconfigured(): boolean { return store.get('isUnconfigured'); }
