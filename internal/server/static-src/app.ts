@@ -16,6 +16,7 @@ import { initUserMenu } from './user-menu.js';
 import { initSecurity } from './security.js';
 import { el, dialog, onBackdropClose, patch, $ } from './dom.js';
 import { apiGet } from './api-client.js';
+import { subscribeToActions } from './actions/index.js';
 import { viewTransition, debounce } from './utils.js';
 import { STATUS_POLL_MS } from './constants.js';
 import type { MovieItem, SubtitleEntry } from './api-types.js';
@@ -97,6 +98,23 @@ theme.init();
 initLanguages();
 initUserMenu();
 initSecurity();
+
+// Action-framework global: live-log every action error to the browser
+// console so failures are visible in DevTools regardless of toast policy
+// (suppressed-toast actions still get logged).
+subscribeToActions((inst) => {
+  if (inst.status !== "error" || inst.error === undefined) return;
+  const meta: string[] = [];
+  if (inst.completedAt !== undefined) meta.push(`${String(inst.completedAt - inst.startedAt)}ms`);
+  if (inst.attempts !== undefined && inst.attempts > 1) meta.push(`${String(inst.attempts)} attempts`);
+  if (inst.error.status !== undefined) meta.push(`HTTP ${String(inst.error.status)}`);
+  if (inst.error.code !== undefined) meta.push(inst.error.code);
+  console.error(
+    `[action] ${inst.name} failed (${meta.join(", ")}): ${inst.error.message}`,
+    inst.error,
+  );
+});
+
 const footerYear = document.getElementById('footerYear');
 if (footerYear) footerYear.textContent = String(new Date().getFullYear());
 

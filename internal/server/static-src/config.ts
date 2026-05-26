@@ -4,7 +4,8 @@ import * as store from './store.js';
 import type { ParsedConfig } from './store.js';
 import * as notify from './notify.js';
 import { el, dialog, closeDialog, patch, $ } from './dom.js';
-import { apiGet, apiPostRaw } from './api-client.js';
+import { apiGet } from './api-client.js';
+import { apiAction } from './actions/index.js';
 import { hasCode, ErrorCode } from './error_codes.js';
 import { pollStatus } from './status.js';
 import { YAML_TIMEOUT_MS } from './constants.js';
@@ -151,13 +152,21 @@ function configSaveError(err: { error?: string; code?: string }): string {
   return friendlyConfigError(err.error || 'Unknown error');
 }
 
+/** Reset config to defaults. Action def with optimistic+rollback would
+ *  be premature here (the reset is destructive and its outcome reshapes
+ *  the entire form); keep it as a non-optimistic action with toast. */
+const resetConfigAction = apiAction<void, unknown>({
+  name: "config.reset",
+  request: () => ({ method: "POST", path: "/api/config/reset" }),
+  dedupe: true,  // double-click protection
+  success: "Config reset to defaults",
+  error: "Reset failed",
+});
+
 async function resetConfig(): Promise<void> {
-  const r = await apiPostRaw<unknown>('/api/config/reset');
-  if (r.ok) {
-    notify.success('Config reset to defaults');
+  const ok = await resetConfigAction.dispatch();
+  if (ok !== null) {
     await loadConfig();
-  } else {
-    notify.error(`Reset failed: ${r.error || 'Unknown error'}`);
   }
 }
 

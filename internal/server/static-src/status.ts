@@ -3,7 +3,8 @@
 import * as store from './store.js';
 import * as notify from './notify.js';
 import { el, text, icon, patch, $ } from './dom.js';
-import { apiGet, apiGetTyped, apiDelete, apiDeleteRaw } from './api-client.js';
+import { apiGet, apiGetTyped, apiDelete } from './api-client.js';
+import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { decodeStats, decodeProvidersResponse } from './wire/decoders.gen.js';
 import type { Stats as StatsType, ProvidersResponse as ProvidersResponseType } from './wire/types.gen.js';
 import { fmtTime } from './utils.js';
@@ -387,13 +388,20 @@ function dismissActivity(id: string): void {
 }
 
 async function dismissAlert(id: number): Promise<void> {
-  const r = await apiDeleteRaw(`/api/alerts?id=${id}`);
-  if (r.ok) {
-    pollStatus();
-  } else {
-    notify.error(`Dismiss failed: ${r.error || 'Unknown error'}`);
-  }
+  const r = await dismissAlertAction.dispatch(id);
+  if (r !== null) pollStatus();
 }
+
+/** Dismiss an alert with retry on transient network failures. Dedupe
+ *  prevents rapid-click duplicate deletes against the same alert id. */
+const dismissAlertAction = apiAction<number, unknown>({
+  name: "alerts.dismiss",
+  request: (id) => ({ method: "DELETE", path: `/api/alerts?id=${id}` }),
+  dedupe: (id) => `alerts.dismiss:${id}`,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: "Dismiss failed",
+});
 
 export function updateLiveTimers(): void {
   const now = new Date();
