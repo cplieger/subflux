@@ -2,12 +2,13 @@
 
 import * as notify from './notify.js';
 import { el, text, option, icon, dialog, closeDialog, onBackdropClose, patch } from './dom.js';
-import { apiGet, apiPostRaw } from './api-client.js';
+import { apiGet } from './api-client.js';
+import { audioSyncAction, saveManualOffsetAction } from './sync-actions.js';
 import { langName } from './utils.js';
 import { DEFAULT_VARIANT } from './constants.js';
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from './sync-timecode.js';
 import type { TimecodeInput } from './sync-timecode.js';
-import type { SubtitleEntry, AudioSyncResponse, MediaType } from './api-types.js';
+import type { SubtitleEntry, MediaType } from './api-types.js';
 
 // --- Subtitle Sync Dialog ---
 
@@ -298,14 +299,11 @@ async function applyManualOffset(): Promise<void> {
     notify.error('No subtitle selected');
     return;
   }
-  const r = await apiPostRaw<unknown>('/api/sync/offset', {
+  const r = await saveManualOffsetAction.dispatch({
     subtitle_path: syncState.subtitlePath,
-    offset_ms: syncState.offsetMs
-  });
-  if (!r.ok) {
-    notify.error(`Save failed: ${r.error || 'Unknown error'}`);
-    return;
-  }
+    offset_ms: syncState.offsetMs,
+  }, { silent: true });
+  if (r === null) return;
   // Update cached entries so reopening the dialog shows the new offset.
   for (const e of syncState.entries) {
     if (e.path === syncState.subtitlePath) {
@@ -326,16 +324,15 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
   btn.textContent = 'Syncing\u2026';
   resultDiv.hidden = true;
   try {
-    const r = await apiPostRaw<AudioSyncResponse>('/api/sync/audio', {
+    const data = await audioSyncAction.dispatch({
       subtitle_path: syncState.subtitlePath,
       video_path: syncState.videoPath,
-      dry_run: true
+      dry_run: true,
     });
-    if (!r.ok || !r.data) {
-      notify.error(`Audio sync failed: ${r.error || 'Unknown error'}`);
+    if (data === null) {
+      notify.error('Audio sync failed');
       return;
     }
-    const data = r.data;
     resultDiv.hidden = false;
     resultDiv.className = 'sync-audio-result';
     if (data.applied) {
