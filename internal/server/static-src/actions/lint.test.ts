@@ -72,9 +72,15 @@ const BACKGROUND_ALLOWLIST = new Set<string>([
 ]);
 
 /** Regex for forbidden patterns. Each match is a regression candidate.
- *  Matches both `void apiX(` (fire-and-forget mutation) and
- *  `await apiX(` outside of action files (caller bypassing the
- *  framework). */
+ *  Catches:
+ *    - `void apiX(`  (fire-and-forget — preferred form for floating promises)
+ *    - `await apiX(` (caller bypassing the framework's lifecycle wrapper)
+ *    - `await apiXRaw(` (caller bypassing the framework to read raw ApiResult)
+ *    - bare `apiX(` at start-of-line / start-of-statement (a floating promise
+ *      with no `void` prefix — silently ignored TypeScript anti-pattern that
+ *      would also bypass the framework). The negative-lookbehind in the regex
+ *      excludes `import`/`return`/`from`/`=`/`.`/`(`/`,`/whitespace-only
+ *      contexts so we only flag actual call invocations. */
 const PATTERNS: { name: string; re: RegExp }[] = [
   { name: "void apiPost", re: /\bvoid\s+apiPost\s*[<(]/g },
   { name: "void apiDelete", re: /\bvoid\s+apiDelete\s*[<(]/g },
@@ -88,6 +94,19 @@ const PATTERNS: { name: string; re: RegExp }[] = [
   { name: "await apiDeleteRaw", re: /\bawait\s+apiDeleteRaw\s*[<(]/g },
   { name: "await apiPutRaw", re: /\bawait\s+apiPutRaw\s*[<(]/g },
   { name: "await apiPatchRaw", re: /\bawait\s+apiPatchRaw\s*[<(]/g },
+  // Bare invocation: `apiPost(...)` at start of statement (preceded only by
+  // whitespace on the line). Catches floating-promise anti-pattern that
+  // bypasses both `void` and `await`. Restricted to start-of-line so we
+  // don't flag legitimate uses like `const r = apiPost(...)` (assignment),
+  // `return apiPost(...)`, or `someFn(apiPost(...))` (argument).
+  { name: "bare apiPost", re: /^\s*apiPost\s*[<(]/gm },
+  { name: "bare apiDelete", re: /^\s*apiDelete\s*[<(]/gm },
+  { name: "bare apiPut", re: /^\s*apiPut\s*[<(]/gm },
+  { name: "bare apiPatch", re: /^\s*apiPatch\s*[<(]/gm },
+  { name: "bare apiPostRaw", re: /^\s*apiPostRaw\s*[<(]/gm },
+  { name: "bare apiDeleteRaw", re: /^\s*apiDeleteRaw\s*[<(]/gm },
+  { name: "bare apiPutRaw", re: /^\s*apiPutRaw\s*[<(]/gm },
+  { name: "bare apiPatchRaw", re: /^\s*apiPatchRaw\s*[<(]/gm },
 ];
 
 function listTSFiles(dir: string, out: string[] = []): string[] {
