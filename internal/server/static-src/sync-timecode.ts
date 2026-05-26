@@ -6,6 +6,10 @@ import { el, icon } from './dom.js';
 export interface TimecodeInput extends HTMLElement {
   handleKey: (e: KeyboardEvent) => void;
   setValue: (newMs: number) => void;
+  /** Stop any pending hold-repeat timers. Caller MUST invoke when the
+   *  widget is removed from the DOM (e.g. dialog close) to prevent a
+   *  pending tick from firing on a detached element. Idempotent. */
+  dispose: () => void;
 }
 
 export function formatOffsetMs(ms: number): string {
@@ -19,11 +23,17 @@ export function formatOffsetMs(ms: number): string {
 
 // Hold-to-repeat: fires adjust on press, then accelerates.
 // Starts at 400ms interval, decreases to 50ms minimum.
+//
+// Returns a `dispose` function the caller MUST invoke when the button
+// is removed from the DOM (e.g. dialog close). Without disposal, a
+// pending tick can fire on a detached element after a slow animation
+// frame, calling adjust() with a stale closure. The dispose() is
+// idempotent — safe to call multiple times.
 function holdRepeat(
   btn: HTMLElement,
   getDelta: () => number,
   adjust: (delta: number) => void
-): void {
+): () => void {
   let timer: ReturnType<typeof setTimeout> | 0 = 0;
   let delay = 400;
 
@@ -51,6 +61,8 @@ function holdRepeat(
   btn.addEventListener('touchstart', start, { passive: false });
   btn.addEventListener('touchend', stop);
   btn.addEventListener('touchcancel', stop);
+
+  return stop;
 }
 
 // Touch drag: vertical swipe adjusts value. Tracks cumulative distance
@@ -184,8 +196,8 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
     'aria-label': 'Decrease'
   }, icon('chevron-down'));
 
-  holdRepeat(upBtn, () => activeSeg ? activeSeg.delta : 0, adjust);
-  holdRepeat(downBtn, () => activeSeg ? -activeSeg.delta : 0, adjust);
+  const stopUp = holdRepeat(upBtn, () => activeSeg ? activeSeg.delta : 0, adjust);
+  const stopDown = holdRepeat(downBtn, () => activeSeg ? -activeSeg.delta : 0, adjust);
 
   const btnStack = el('div', { className: 'tc-btn-stack' }, upBtn, downBtn);
 
@@ -212,6 +224,13 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
   (container as TimecodeInput).setValue = (newMs: number): void => {
     ms = newMs;
     refresh();
+  };
+
+  // Dispose: stop pending hold-repeat timers. Called by sync.ts on dialog
+  // close so a detached element can't keep ticking.
+  (container as TimecodeInput).dispose = (): void => {
+    stopUp();
+    stopDown();
   };
 
   return container;

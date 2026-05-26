@@ -6,6 +6,7 @@ import * as notify from './notify.js';
 import { patchCoverageBadge, fetchAndMergeCoverage } from './coverage.js';
 import { pollStatus, abortPoll } from './status.js';
 import { coverageMediaId } from './utils.js';
+import { registerCleanup } from './actions/index.js';
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from './constants.js';
 import type { CoverageItem } from './api-types.js';
 
@@ -38,6 +39,12 @@ let reconnectAttempt = 0;
 
 export function connect(): void {
   if (eventSource) return;
+
+  // Drain SSE state on page unload so reconnectTimer / visibilityTimer
+  // can't fire into a torn-down DOM during the unload window. Browsers
+  // handle most of this naturally on page close, but registerCleanup
+  // guarantees deterministic teardown for tests + soft-navigation cases.
+  registerCleanup(disconnect);
 
   eventSource = new EventSource('/api/events');
 

@@ -3,6 +3,7 @@
 import * as store from './store.js';
 import { $, el, icon, patch, emptyDiv, errDiv, pad, insertNavButton } from './dom.js';
 import { apiGet } from './api-client.js';
+import { registerCleanup } from './actions/index.js';
 import { fmtEpisode, tvdbMediaId, langName, fmtLangVariant } from './utils.js';
 import { DEFAULT_VARIANT, EMBEDDED_PROVIDER } from './constants.js';
 import { on, emit, BusEvent } from './bus.js';
@@ -14,8 +15,12 @@ import { confirmSeasonSync } from './detail-season-sync.js';
 import type { SeasonSyncEpisode } from './detail-season-sync.js';
 import type { SubtitleEntry, MovieDetail, Episode, SeasonGroup, SeriesItem } from './api-types.js';
 
-// Module-level abort controller for detail navigation fetches.
+// Module-level abort controller for detail navigation fetches. Self-cleans
+// on internal navigation (each new openSeriesDetail/openMovieDetail aborts
+// the previous), but page unload also needs a cleanup hook so in-flight
+// fetches don't outlive the document.
 let detailAbort: AbortController | null = null;
+registerCleanup(() => { detailAbort?.abort(); detailAbort = null; });
 
 // --- API response shapes ---
 

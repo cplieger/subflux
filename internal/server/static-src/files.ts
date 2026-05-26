@@ -3,7 +3,8 @@
 import * as notify from './notify.js';
 import * as store from './store.js';
 import { $, el, icon, patch, emptyDiv, errDiv, confirm } from './dom.js';
-import { apiGet, apiDeleteRaw } from './api-client.js';
+import { apiGet } from './api-client.js';
+import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { fmtEpisode, langName } from './utils.js';
 import { DEFAULT_VARIANT } from './constants.js';
 import { emit, BusEvent } from './bus.js';
@@ -250,26 +251,49 @@ async function deleteFile(f: FileEntry): Promise<void> {
     `Delete "${fileName}"? This cannot be undone.`, 'Delete');
   if (!ok) return;
 
-  try {
+  await deleteFileAction.dispatch(f);
+}
+
+interface DeleteFileOp {
+  index: number;
+  entry: FileEntry;
+}
+
+/** Single-file delete with optimistic remove + rollback restore at the
+ *  original index on failure. dedupe protects against rapid double-click. */
+const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
+  name: "files.delete",
+  request: (f) => {
     const params = new URLSearchParams({
       path: f.path,
       media_type: currentMediaType,
       media_id: f.media_id,
       language: f.language,
-      variant: f.variant
+      variant: f.variant,
     });
-    const r = await apiDeleteRaw(`/api/files?${params}`);
-    if (!r.ok) {
-      notify.error(`Delete failed: ${r.error || 'Unknown error'}`);
-      return;
-    }
-    notify.success('File deleted');
-    refreshFileData();
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    notify.error(`Delete failed: ${msg}`);
-  }
-}
+    return { method: "DELETE", path: `/api/files?${params.toString()}` };
+  },
+  optimistic: (f): DeleteFileOp | undefined => {
+    const index = filesData.indexOf(f);
+    if (index === -1) return undefined;
+    const entry = filesData[index] as FileEntry;
+    filesData.splice(index, 1);
+    renderFiles();
+    return { index, entry };
+  },
+  rollback: (_args, op) => {
+    if (op === undefined) return;
+    // Restore at original index so the table order survives the rollback.
+    const safeIndex = Math.min(op.index, filesData.length);
+    filesData.splice(safeIndex, 0, op.entry);
+    renderFiles();
+  },
+  dedupe: (f) => `files.delete:${f.path}:${f.variant}:${f.language}`,
+  success: "File deleted",
+  error: "Delete failed",
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+});
 
 async function bulkDelete(): Promise<void> {
   const extCount = filesData.filter((f: FileEntry) => f.source === 'external').length;
@@ -278,17 +302,43 @@ async function bulkDelete(): Promise<void> {
     'Delete All');
   if (!ok) return;
 
-  const r = await apiDeleteRaw<BulkDeleteResponse>('/api/files/bulk', {
+  const r = await bulkDeleteAction.dispatch({
     media_type: currentMediaType,
-    media_id: currentMediaID
+    media_id: currentMediaID,
   });
-  if (r.ok && r.data) {
-    notify.success(`Deleted ${r.data.deleted} file(s)`);
+  if (r !== null) {
+    notify.success(`Deleted ${r.deleted} file(s)`);
     refreshFileData();
-  } else {
-    notify.error(`Bulk delete failed: ${r.error || 'Unknown error'}`);
   }
 }
+
+interface BulkDeleteArgs { media_type: string; media_id: string }
+interface BulkDeleteOp { externals: FileEntry[] }
+
+/** Bulk delete optimistically removes all external entries with rollback
+ *  restoration. The custom `success` is set to false so the dispatch
+ *  wrapper above can show the count from the response payload. */
+const bulkDeleteAction = apiAction<BulkDeleteArgs, BulkDeleteResponse, BulkDeleteOp>({
+  name: "files.delete_bulk",
+  request: (args) => ({ method: "DELETE", path: "/api/files/bulk", body: args }),
+  optimistic: (): BulkDeleteOp => {
+    const externals = filesData.filter((f) => f.source === 'external');
+    filesData = filesData.filter((f) => f.source !== 'external');
+    renderFiles();
+    return { externals };
+  },
+  rollback: (_args, op) => {
+    if (op === undefined) return;
+    // Restore externals; order doesn't strictly need to be preserved here
+    // because the next refreshFileData() will canonicalise the list.
+    filesData = [...filesData, ...op.externals];
+    renderFiles();
+  },
+  dedupe: true,
+  success: false,  // dispatch wrapper handles the count-aware message
+  error: "Bulk delete failed",
+  retryable: retryNetwork,
+});
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

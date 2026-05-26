@@ -4,7 +4,8 @@ import * as store from './store.js';
 import * as notify from './notify.js';
 import { prettyLabel, fmtEpisode, langName } from './utils.js';
 import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from './dom.js';
-import { apiGet, apiGetRaw, apiPostRaw } from './api-client.js';
+import { apiGet, apiGetRaw } from './api-client.js';
+import { apiAction, ActionError, retryNetwork, registerCleanup } from './actions/index.js';
 import { hasCode, ErrorCode } from './error_codes.js';
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from './constants.js';
 import type { Activity, MediaType } from './api-types.js';
@@ -68,8 +69,46 @@ interface DownloadOpts {
   isTop: boolean;
 }
 
+interface DownloadArgs {
+  provider: string;
+  subtitle_id: string;
+  release_name: string;
+  file_path: string;
+  language: string;
+  season: number;
+  episode: number;
+  media_type: MediaType;
+  media_id: number;
+  top_pick: boolean;
+  score: number;
+  hearing_impaired: boolean;
+  forced: boolean;
+}
+
+/** Download a subtitle. Server returns 202 + activity_id; the caller
+ *  polls /api/activity for completion. retryNetwork allows the framework
+ *  to recover from transient blips, but app-level "download_failed"
+ *  errors (provider 4xx, IO errors) are NOT retried — the user re-clicks
+ *  via the manually-re-enabled button. */
+const downloadAction = apiAction<DownloadArgs, DownloadResponse>({
+  name: "search.download",
+  request: (args) => ({ method: "POST", path: "/api/search/download", body: args }),
+  retryable: (err) => err.code !== ErrorCode.DownloadFailed && retryNetwork(err),
+  error: false,  // callsite drives icon + tooltip + per-error re-enable logic
+});
+
 let searchAbort: AbortController | null = null;
 const activePolls: Set<AbortController> = new Set();
+
+// Drain in-flight search + download polls on page unload. Each poll's
+// AbortController is also removed from the Set when it terminates
+// naturally; this hook is a safety net for unload + tests.
+registerCleanup(() => {
+  searchAbort?.abort();
+  searchAbort = null;
+  for (const p of activePolls) p.abort();
+  activePolls.clear();
+});
 
 const searchDlg: HTMLDialogElement = dialog('searchResultPopup');
 
@@ -313,7 +352,8 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
   (btn as HTMLButtonElement).disabled = true;
   patch(btn, icon('hourglass'));
 
-  const r = await apiPostRaw<DownloadResponse>('/api/search/download', {
+  let downloadErr: ActionError | undefined;
+  const data = await downloadAction.dispatch({
     provider: sub.provider,
     subtitle_id: sub.subtitle_id,
     release_name: sub.release_name || '',
@@ -326,24 +366,28 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     top_pick: !!isTop,
     score: sub.score || 0,
     hearing_impaired: !!sub.hearing_impaired,
-    forced: !!sub.forced
+    forced: !!sub.forced,
+  }, {
+    // Capture the error so we can decide whether to re-enable the button.
+    onError: (err) => {
+      // ActionError shape; we only need the code here for retry-eligible
+      // re-enable. The framework already toasted the message.
+      downloadErr = err as ActionError;
+    },
   });
-  if (r.status !== 202 || !r.data) {
-    const errText = hasCode(r, ErrorCode.DownloadFailed)
-      ? (r.error || 'Download failed')
-      : (r.error || 'Unknown error');
+  if (data === null) {
     btn.dataset['status'] = 'err';
     patch(btn, icon('close'));
-    btn.setAttribute('data-tip', errText);
-    notify.error(`Download failed: ${errText}`);
-    // Re-enable button for retry on download_failed.
-    if (hasCode(r, ErrorCode.DownloadFailed)) {
+    btn.setAttribute('data-tip', downloadErr?.message ?? 'Download failed');
+    // Re-enable button for retry on download_failed (transient-by-design;
+    // user can manually retry rather than re-search).
+    if (downloadErr !== undefined && downloadErr.code === ErrorCode.DownloadFailed) {
       (btn as HTMLButtonElement).disabled = false;
     }
     return;
   }
   // 202 Accepted: download running in background.
-  const actID: string = r.data.activity_id;
+  const actID: string = data.activity_id;
   patch(btn, el('span', { className: 'spinner' }));
   btn.setAttribute('data-tip', 'Downloading\u2026');
 

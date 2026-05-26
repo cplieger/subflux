@@ -3,7 +3,8 @@
 import * as store from './store.js';
 import * as notify from './notify.js';
 import { el, text, icon, patch, $ } from './dom.js';
-import { apiGet, apiGetTyped, apiDelete, apiDeleteRaw } from './api-client.js';
+import { apiGet, apiGetTyped } from './api-client.js';
+import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from './actions/index.js';
 import { decodeStats, decodeProvidersResponse } from './wire/decoders.gen.js';
 import type { Stats as StatsType, ProvidersResponse as ProvidersResponseType } from './wire/types.gen.js';
 import { fmtTime } from './utils.js';
@@ -154,6 +155,10 @@ function processActivitySideEffects(
 
 let polling = false;
 let pollAbort: AbortController | null = null;
+
+// Drain in-flight pollStatus on page unload so the framework's beforeunload
+// hook aborts the request rather than leaving it dangling.
+registerCleanup(() => abortPoll());
 
 /** Abort any in-flight poll requests (called from events.ts on disconnect). */
 export function abortPoll(): void {
@@ -382,18 +387,41 @@ function dismissActivity(id: string): void {
       btn.replaceChildren(el('span', { className: 'spinner' }));
     }
   }
-  // Fire and forget; next poll will filter it out.
-  apiDelete(`/api/activity?id=${encodeURIComponent(id)}`);
+  // Fire and forget; next poll will filter it out. Silent error: the
+  // dismissedActivities set above already hides the row optimistically;
+  // a server failure surfaces only as the row reappearing on next poll.
+  void dismissActivityAction.dispatch(id);
 }
 
+/** Dismiss an activity. Silent (no toast) — UI feedback is the spinner
+ *  swap + dismissedActivities Set hiding the row until next poll.
+ *  retryNetwork handles transient blips: a quick disconnect would
+ *  otherwise leave the row hidden but never actually dismissed
+ *  server-side. dedupe protects against rapid double-click. */
+const dismissActivityAction = apiAction<string, unknown>({
+  name: "activity.dismiss",
+  request: (id) => ({ method: "DELETE", path: `/api/activity?id=${encodeURIComponent(id)}` }),
+  dedupe: (id) => `activity.dismiss:${id}`,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: false,
+});
+
 async function dismissAlert(id: number): Promise<void> {
-  const r = await apiDeleteRaw(`/api/alerts?id=${id}`);
-  if (r.ok) {
-    pollStatus();
-  } else {
-    notify.error(`Dismiss failed: ${r.error || 'Unknown error'}`);
-  }
+  const r = await dismissAlertAction.dispatch(id);
+  if (r !== null) pollStatus();
 }
+
+/** Dismiss an alert with retry on transient network failures. Dedupe
+ *  prevents rapid-click duplicate deletes against the same alert id. */
+const dismissAlertAction = apiAction<number, unknown>({
+  name: "alerts.dismiss",
+  request: (id) => ({ method: "DELETE", path: `/api/alerts?id=${id}` }),
+  dedupe: (id) => `alerts.dismiss:${id}`,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: "Dismiss failed",
+});
 
 export function updateLiveTimers(): void {
   const now = new Date();

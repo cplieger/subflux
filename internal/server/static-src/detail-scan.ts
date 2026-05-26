@@ -1,12 +1,30 @@
 // detail-scan.ts — Granular scan trigger helpers extracted from detail.ts.
+//
+// Each scan is dispatched through the action framework so we get:
+//   - registry recording (visible to subscribeToActions error logger)
+//   - retry on transient network failures (retryNetwork)
+//   - dedupe protection against rapid-click double-scans
+//
+// The custom UI feedback (icon swap: spinner → check/close) is preserved
+// via onSuccess/onError callbacks since framework toasts would clash
+// with the inline icon-on-button pattern (we set `error: false`).
 
 import * as store from './store.js';
-import { apiPostRaw } from './api-client.js';
+import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import type { SeriesItem, MovieDetail } from './api-types.js';
 
 interface ScanResponse {
   found: number;
 }
+
+const scanAction = apiAction<string, ScanResponse>({
+  name: "scan.run",
+  request: (url) => ({ method: "POST", path: url }),
+  dedupe: (url) => `scan:${url}`,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  error: false,  // UI feedback is on-button; framework toast would double up
+});
 
 /**
  * Trigger a scan and update the button icon with the result.
@@ -27,24 +45,32 @@ export async function triggerScan(
     iconEl.className = 'spinner';
   }
   store.set('scanInFlight', true);
-  const r = await apiPostRaw<ScanResponse>(url);
-  if (btn && iconEl) {
-    if (r.ok && r.data) {
-      iconEl.className = 'icon icon-check';
-      btn.disabled = false;
-      if (onOk) onOk(r.data);
-    } else {
-      iconEl.className = 'icon icon-close';
-      btn.disabled = false;
-    }
-  }
-  store.set('scanInFlight', false);
-  if (store.get('refreshPending')) {
-    store.batch(() => {
-      store.set('refreshPending', false);
-      store.set('needsRefresh', true);
-    });
-  }
+  const data = await scanAction.dispatch(url, {
+    onSuccess: (result) => {
+      if (btn && iconEl) {
+        iconEl.className = 'icon icon-check';
+        btn.disabled = false;
+      }
+      if (onOk) onOk(result);
+    },
+    onError: () => {
+      if (btn && iconEl) {
+        iconEl.className = 'icon icon-close';
+        btn.disabled = false;
+      }
+    },
+    onSettled: () => {
+      store.set('scanInFlight', false);
+      if (store.get('refreshPending')) {
+        store.batch(() => {
+          store.set('refreshPending', false);
+          store.set('needsRefresh', true);
+        });
+      }
+    },
+  });
+  // Suppress unused-var warning; result handling is in onSuccess above.
+  void data;
 }
 
 export async function triggerSeriesScan(series: SeriesItem, btn: HTMLButtonElement | null): Promise<void> {

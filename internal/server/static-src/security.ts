@@ -37,6 +37,25 @@ interface APIKeyCreateResponse {
 // Client-side reauth tracking (5-minute window).
 let lastReauthAt = 0;
 
+/** Wrap an async click handler with disabled + aria-busy lifecycle. The
+ *  button is disabled and announced as busy while the handler runs;
+ *  state restores in `finally` regardless of resolve/reject. Re-clicks
+ *  during pending are no-ops (early return on btn.disabled). Used across
+ *  security.ts ops where the framework allowlist applies but the click
+ *  surface still needs a11y feedback. */
+function busyClick(handler: () => Promise<void>): (ev: Event) => Promise<void> {
+  return async (ev: Event) => {
+    const btn = ev.currentTarget as HTMLButtonElement | null;
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    try { await handler(); } finally {
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+    }
+  };
+}
+
 const secDlg = (): HTMLDialogElement =>
   dialog('securityDialog');
 
@@ -118,7 +137,7 @@ function showReauthPrompt(): Promise<boolean> {
     const footer = el('div', { className: 'dlg-foot' },
       el('button', {
         type: 'button',
-        onclick: async () => {
+        onclick: busyClick(async () => {
           const val = pwInput.value.trim();
           if (!val) return;
           const r = await apiPostRaw<{ ok: boolean }>('/api/auth/reauth', { credential: val });
@@ -129,7 +148,7 @@ function showReauthPrompt(): Promise<boolean> {
             errEl.textContent = r.error || 'Reauthentication failed';
             errEl.hidden = false;
           }
-        }
+        })
       }, 'Confirm'),
       el('button', {
         type: 'button', className: 'ghost',
@@ -172,7 +191,7 @@ function buildPasswordSection(): HTMLElement {
 
   const submitBtn = el('button', {
     type: 'button',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const cur = currentPw.value;
       const nw = newPw.value;
       if (!cur || !nw) {
@@ -195,7 +214,7 @@ function buildPasswordSection(): HTMLElement {
       } else {
         showFeedback(feedback, r.error || 'Failed to change password', true);
       }
-    }
+    })
   }, 'Change Password');
 
   sec.appendChild(el('div', { className: 'sec-fields' },
@@ -228,7 +247,7 @@ function buildTOTPSection(me: MeResponse | null): HTMLElement {
   if (totpEnabled) {
     const disableBtn = el('button', {
       type: 'button', className: 'ghost',
-      onclick: async () => {
+      onclick: busyClick(async () => {
         const ok = await ensureReauth();
         if (!ok) return;
         const code = await showInputDialog('Enter a TOTP code to disable 2FA:', {
@@ -243,13 +262,13 @@ function buildTOTPSection(me: MeResponse | null): HTMLElement {
         } else {
           notify.error(r.error || 'Failed to disable TOTP');
         }
-      }
+      })
     }, 'Disable TOTP');
     content.appendChild(el('div', { className: 'sec-actions' }, disableBtn));
   } else {
     const enableBtn = el('button', {
       type: 'button',
-      onclick: async () => {
+      onclick: busyClick(async () => {
         const ok = await ensureReauth();
         if (!ok) return;
         const data = await apiPost<TOTPEnableResponse>('/api/auth/totp/enable');
@@ -258,7 +277,7 @@ function buildTOTPSection(me: MeResponse | null): HTMLElement {
           return;
         }
         showTOTPSetup(content, data);
-      }
+      })
     }, 'Enable TOTP');
     content.appendChild(el('div', { className: 'sec-actions' }, enableBtn));
   }
@@ -284,7 +303,7 @@ function showTOTPSetup(container: HTMLElement, data: TOTPEnableResponse): void {
 
   const confirmBtn = el('button', {
     type: 'button',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const code = codeInput.value.trim();
       if (!code) return;
       const r = await apiPostRaw<{ recovery_codes?: string[] }>('/api/auth/totp/confirm', { code });
@@ -298,7 +317,7 @@ function showTOTPSetup(container: HTMLElement, data: TOTPEnableResponse): void {
       } else {
         showFeedback(feedback, r.error || 'Invalid code', true);
       }
-    }
+    })
   }, 'Confirm');
 
   container.replaceChildren(uriDisplay,
@@ -346,11 +365,11 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
 
   const addBtn = el('button', {
     type: 'button',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const ok = await ensureReauth();
       if (!ok) return;
       await registerPasskey();
-    }
+    })
   }, 'Add passkey');
   sec.appendChild(el('div', { className: 'sec-actions' }, addBtn));
 
@@ -367,7 +386,7 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
   const deleteBtn = el('button', {
     type: 'button', className: 'close-btn ghost',
     'aria-label': 'Delete passkey',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const ok = await ensureReauth();
       if (!ok) return;
       const r = await apiDeleteRaw<unknown>(`/api/auth/passkeys/${pk.id}`);
@@ -378,7 +397,7 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
       } else {
         notify.error(r.error || 'Failed to delete passkey');
       }
-    }
+    })
   }, icon('trash'));
 
   return el('div', { className: 'sec-row' },
@@ -503,7 +522,7 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
 
   const genBtn = el('button', {
     type: 'button',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const ok = await ensureReauth();
       if (!ok) return;
       const label = await showInputDialog('Label for the new API key:', {
@@ -516,7 +535,7 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
       } else {
         notify.error(r.error || 'Failed to generate API key');
       }
-    }
+    })
   }, 'Generate API key');
   sec.appendChild(el('div', { className: 'sec-actions' }, genBtn));
 
@@ -530,7 +549,7 @@ function apiKeyRow(key: APIKeyItem): HTMLElement {
   const revokeBtn = el('button', {
     type: 'button', className: 'close-btn ghost',
     'aria-label': 'Revoke API key',
-    onclick: async () => {
+    onclick: busyClick(async () => {
       const ok = await ensureReauth();
       if (!ok) return;
       const deleted = await apiDelete(`/api/auth/apikeys/${key.id}`);
@@ -540,7 +559,7 @@ function apiKeyRow(key: APIKeyItem): HTMLElement {
       } else {
         notify.error('Failed to revoke API key');
       }
-    }
+    })
   }, icon('trash'));
 
   return el('div', { className: 'sec-row' },

@@ -1,9 +1,8 @@
 // detail-season-sync.ts — Season audio sync dialog extracted from detail.ts.
 
 import { el, patch, dialog, closeDialog, onBackdropClose, dialogHead, pad } from './dom.js';
-import { apiPost } from './api-client.js';
+import { audioSyncAction } from './sync-actions.js';
 import { SEASON_SYNC_CONCURRENCY } from './constants.js';
-import type { AudioSyncResponse } from './api-types.js';
 
 export interface SeasonSyncEpisode {
   subPath: string;
@@ -81,12 +80,12 @@ async function runSeasonAudioSync(
       done++;
       if (status) status.textContent = `Syncing ${done}/${
         episodes.length}: ${ep.label}\u2026`;
-      const r = await apiPost<AudioSyncResponse>('/api/sync/audio', {
+      const r = await audioSyncAction.dispatch({
         subtitle_path: ep.subPath,
-        video_path: ep.videoPath
-      }, signal);
+        video_path: ep.videoPath,
+      }, { silent: true });
       if (signal.aborted) return;
-      if (!r) { failed++; continue; }
+      if (r === null) { failed++; continue; }
       if (r.applied) applied++;
     }
   }
