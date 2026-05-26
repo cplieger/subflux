@@ -5,7 +5,7 @@ import type { ParsedConfig } from './store.js';
 import * as notify from './notify.js';
 import { el, dialog, closeDialog, patch, $ } from './dom.js';
 import { apiGet } from './api-client.js';
-import { apiAction } from './actions/index.js';
+import { apiAction, defineAction, ActionError, classifyFetchError, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { hasCode, ErrorCode } from './error_codes.js';
 import { pollStatus } from './status.js';
 import { YAML_TIMEOUT_MS } from './constants.js';
@@ -88,34 +88,58 @@ export async function loadConfig(): Promise<void> {
 
 export async function saveConfig(): Promise<void> {
   buildConfigFromForm();
-  // Text/yaml body, not JSON — keeps raw fetch. The server still
-  // returns JSON for both success and error.
-  try {
-    const r = await fetch('/api/config', {
-      method: 'PUT', body: config,
-      headers: { 'Content-Type': 'text/yaml' },
-      signal: AbortSignal.timeout(YAML_TIMEOUT_MS)
-    });
-    if (r.ok) {
-      const wasUnconfigured = store.get('isUnconfigured');
-      notify.success('Configuration saved');
-      initLanguages();
-      store.set('needsRefresh', true);
-      await loadConfig();
-      if (wasUnconfigured && !store.get('isUnconfigured')) {
-        notify.success('Subflux is now configured and running');
-        pollStatus();
-      }
-      closeConfig();
-    } else {
-      const err = await r.json().catch(() => ({})) as { error?: string; code?: string };
-      notify.error(configSaveError(err));
-    }
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    notify.error(`Save failed: ${msg}`);
+  const wasUnconfigured = store.get('isUnconfigured') === true;
+  const r = await saveConfigAction.dispatch(config);
+  if (r === null) return;
+  initLanguages();
+  store.set('needsRefresh', true);
+  await loadConfig();
+  if (wasUnconfigured && !store.get('isUnconfigured')) {
+    notify.success('Subflux is now configured and running');
+    pollStatus();
   }
+  closeConfig();
 }
+
+/** Save the config dialog's YAML body. text/yaml content type means the
+ *  apiAction adapter (which assumes JSON) doesn't fit; defineAction with
+ *  a custom run() does. dedupe protects against rapid Save clicks.
+ *  retryNetwork covers transient blips. The error message is computed
+ *  via configSaveError() to map server codes to user-friendly text. */
+const saveConfigAction = defineAction<string, unknown>({
+  name: "config.save",
+  dedupe: true,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  run: async (yamlBody, signal) => {
+    let r: Response;
+    try {
+      r = await fetch('/api/config', {
+        method: 'PUT', body: yamlBody,
+        headers: { 'Content-Type': 'text/yaml' },
+        signal: AbortSignal.any([signal, AbortSignal.timeout(YAML_TIMEOUT_MS)]),
+      });
+    } catch (e) {
+      throw classifyFetchError(e, signal);
+    }
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({})) as { error?: string; code?: string };
+      const errArg: { error?: string; code?: string } = {};
+      if (body.error !== undefined) errArg.error = body.error;
+      if (body.code !== undefined) errArg.code = body.code;
+      const msg = configSaveError(errArg);
+      const opts: { status: number; code?: string } = { status: r.status };
+      if (body.code !== undefined) opts.code = body.code;
+      throw new ActionError(msg, opts);
+    }
+    return undefined;
+  },
+  success: 'Configuration saved',
+  // The error message produced in run() is already user-friendly (via
+  // configSaveError); pass it through verbatim instead of prepending the
+  // action's name.
+  error: (_args, err) => err.message,
+});
 
 // friendlyConfigError cleans up Go validation errors for display.
 const YAML_ERROR_PATTERNS: ReadonlyArray<{ match: string; message: string }> = [

@@ -1,6 +1,7 @@
 // wizard.ts — Setup wizard extracted from login.ts. Invoked via startConfigWizard().
 
 import { apiGet } from './api-client.js';
+import { defineAction, ActionError, classifyFetchError, retryNetwork, RETRY_STANDARD, registerCleanup } from './actions/index.js';
 import { LANGUAGES } from './languages.js';
 import { $, showPage, showError, hideError } from './dom-core.js';
 import { el, option } from './dom.js';
@@ -221,6 +222,9 @@ function abortValidation(): void {
 function wireWizardNav(): void {
   if (navWired) return;
   navWired = true;
+  // Drain any in-flight validation on page unload so the timeout signal
+  // doesn't fire into a torn-down DOM.
+  registerCleanup(() => { abortValidation(); });
   $('wizardBack')?.addEventListener('click', () => {
     if ($('wizardBack')?.getAttribute('aria-disabled') === 'true') return;
     abortValidation();
@@ -356,23 +360,48 @@ async function finishWizard(): Promise<void> {
 
   if (lines.length === 0) { clearDraft(); window.location.href = '/'; return; }
 
-  try {
-    const res = await fetch('/api/config', {
-      method: 'PUT', headers: { 'Content-Type': 'text/yaml' },
-      body: lines.join('\n') + '\n',
-      signal: AbortSignal.timeout(YAML_TIMEOUT_MS)
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      showError('wizardError', text);
-      return;
-    }
+  hideError('wizardError');
+  const ok = await saveWizardConfigAction.dispatch(lines.join('\n') + '\n', {
+    onError: (err) => {
+      showError('wizardError', 'Save failed: ' + err.message);
+    },
+  });
+  if (ok !== null) {
     clearDraft();
     window.location.href = '/';
-  } catch (e: unknown) {
-    showError('wizardError', 'Save failed: ' + (e instanceof Error ? e.message : String(e)));
   }
 }
+
+/** Save the wizard's assembled YAML config. text/yaml body needs a custom
+ *  run() (apiAction assumes JSON), so we use defineAction here. retryNetwork
+ *  + RETRY_STANDARD recover from transient blips during the most important
+ *  wizard step. dedupe protects against rapid Finish clicks. error: false
+ *  because the wizard surfaces failures inline via showError, not toast. */
+const saveWizardConfigAction = defineAction<string, unknown>({
+  name: "wizard.save_config",
+  dedupe: true,
+  retryable: retryNetwork,
+  retry: RETRY_STANDARD,
+  run: async (yamlBody, signal) => {
+    let res: Response;
+    try {
+      res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/yaml' },
+        body: yamlBody,
+        signal: AbortSignal.any([signal, AbortSignal.timeout(YAML_TIMEOUT_MS)]),
+      });
+    } catch (e) {
+      throw classifyFetchError(e, signal);
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new ActionError(text || `HTTP ${String(res.status)}`, { status: res.status });
+    }
+    return undefined;
+  },
+  error: false,
+});
 
 function hasFilled(vals: Record<string, string>): boolean {
   return Object.values(vals).some((v: string) => v.trim() !== '');

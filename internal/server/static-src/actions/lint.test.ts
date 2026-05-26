@@ -69,6 +69,18 @@ const BACKGROUND_ALLOWLIST = new Set<string>([
   // Best-effort logout: redirects regardless of server response.
   // Action wrapping would add noise without changing behavior.
   "user-menu.ts",
+
+  // Files containing a defineAction with a custom run() that uses raw
+  // fetch for non-JSON content types (text/yaml). The action def IS the
+  // framework wrapper — the raw fetch is correct framework usage, not
+  // a bypass. Each file's defineAction is the only raw fetch present;
+  // any new raw fetch added to these files (outside the action def's
+  // run() body) would still bypass the framework, but the regex can't
+  // distinguish placements. Reviewers should verify on PR.
+  //   - config.ts: saveConfigAction (PUT /api/config with text/yaml body)
+  //   - wizard.ts: saveWizardConfigAction (same shape, wizard finish flow)
+  "config.ts",
+  "wizard.ts",
 ]);
 
 /** Regex for forbidden patterns. Each match is a regression candidate.
@@ -107,6 +119,17 @@ const PATTERNS: { name: string; re: RegExp }[] = [
   { name: "bare apiDeleteRaw", re: /^\s*apiDeleteRaw\s*[<(]/gm },
   { name: "bare apiPutRaw", re: /^\s*apiPutRaw\s*[<(]/gm },
   { name: "bare apiPatchRaw", re: /^\s*apiPatchRaw\s*[<(]/gm },
+  // Raw fetch() with a write method bypasses both api-client and the
+  // framework. Match `fetch('...', { method: 'POST'/'PUT'/'PATCH'/'DELETE',
+  // ... })` shapes regardless of body presence. Allowlist entries (e.g.
+  // wizard.ts saves YAML, login/security do WebAuthn) document the
+  // exceptions. The pattern is liberal — false positives would happen if
+  // the literal "method: 'POST'" appears in a non-fetch context, which is
+  // rare.
+  { name: "raw fetch POST", re: /\bfetch\s*\([^)]*method\s*:\s*['"]POST['"]/g },
+  { name: "raw fetch PUT", re: /\bfetch\s*\([^)]*method\s*:\s*['"]PUT['"]/g },
+  { name: "raw fetch PATCH", re: /\bfetch\s*\([^)]*method\s*:\s*['"]PATCH['"]/g },
+  { name: "raw fetch DELETE", re: /\bfetch\s*\([^)]*method\s*:\s*['"]DELETE['"]/g },
 ];
 
 function listTSFiles(dir: string, out: string[] = []): string[] {

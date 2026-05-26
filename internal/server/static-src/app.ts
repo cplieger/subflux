@@ -16,7 +16,7 @@ import { initUserMenu } from './user-menu.js';
 import { initSecurity } from './security.js';
 import { el, dialog, onBackdropClose, patch, $ } from './dom.js';
 import { apiGet } from './api-client.js';
-import { subscribeToActions } from './actions/index.js';
+import { subscribeToActions, registerCleanup } from './actions/index.js';
 import { viewTransition, debounce } from './utils.js';
 import { STATUS_POLL_MS } from './constants.js';
 import type { MovieItem, SubtitleEntry } from './api-types.js';
@@ -144,8 +144,13 @@ window.addEventListener('popstate', () => {
   viewTransition(() => applyRoute());
 });
 
-setInterval(pollStatus, STATUS_POLL_MS);
-setInterval(updateLiveTimers, 1000);
+// Background polls. Intervals run for the page lifetime; registerCleanup
+// hooks them into the framework's beforeunload drain so tests + page-leave
+// can stop them cleanly (browsers GC on real unload anyway, but tests
+// importing app.ts would otherwise leak intervals).
+const statusPollId = setInterval(pollStatus, STATUS_POLL_MS);
+const liveTimerId = setInterval(updateLiveTimers, 1000);
+registerCleanup(() => { clearInterval(statusPollId); clearInterval(liveTimerId); });
 pollStatus();
 
 // Helper: check unconfigured state (used by dialog event handlers).

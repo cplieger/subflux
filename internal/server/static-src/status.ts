@@ -4,7 +4,7 @@ import * as store from './store.js';
 import * as notify from './notify.js';
 import { el, text, icon, patch, $ } from './dom.js';
 import { apiGet, apiGetTyped } from './api-client.js';
-import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
+import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from './actions/index.js';
 import { decodeStats, decodeProvidersResponse } from './wire/decoders.gen.js';
 import type { Stats as StatsType, ProvidersResponse as ProvidersResponseType } from './wire/types.gen.js';
 import { fmtTime } from './utils.js';
@@ -155,6 +155,10 @@ function processActivitySideEffects(
 
 let polling = false;
 let pollAbort: AbortController | null = null;
+
+// Drain in-flight pollStatus on page unload so the framework's beforeunload
+// hook aborts the request rather than leaving it dangling.
+registerCleanup(() => abortPoll());
 
 /** Abort any in-flight poll requests (called from events.ts on disconnect). */
 export function abortPoll(): void {
