@@ -63,12 +63,19 @@ async function parseJSONSafe(r: Response): Promise<unknown> {
   }
 }
 
-async function requestRaw<T>(method: string, path: string, body?: unknown, signal?: AbortSignal, decoder?: Decoder<T>): Promise<ApiResult<T>> {
+async function requestRaw<T>(method: string, path: string, body?: unknown, signal?: AbortSignal, decoder?: Decoder<T>, extraHeaders?: Record<string, string>): Promise<ApiResult<T>> {
   try {
     const init: RequestInit = { method };
+    const headers: Record<string, string> = {};
     if (body !== undefined) {
-      init.headers = JSON_HEADERS;
+      Object.assign(headers, JSON_HEADERS);
       init.body = JSON.stringify(body);
+    }
+    if (extraHeaders !== undefined) {
+      Object.assign(headers, extraHeaders);
+    }
+    if (Object.keys(headers).length > 0) {
+      init.headers = headers;
     }
     const timeoutSignal = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
     init.signal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
@@ -181,4 +188,19 @@ export function apiPatchRaw<T>(path: string, body?: unknown): Promise<ApiResult<
 
 export function apiDeleteRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
   return requestRaw<T>('DELETE', path, body);
+}
+
+/** Uniform raw-request helper with optional extra headers. Used by the
+ *  actions framework's apiAction adapter to thread per-dispatch headers
+ *  (notably Idempotency-Key) through fetch. The per-method shorthands
+ *  above stay clean for direct callers; this helper is preferred for
+ *  layered code that already knows the method as a string. */
+export function apiRequestRaw<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  headers?: Record<string, string>,
+): Promise<ApiResult<T>> {
+  return requestRaw<T>(method, path, body, signal, undefined, headers);
 }
