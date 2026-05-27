@@ -84,7 +84,9 @@ function cancelAllPending(): void {
  *  first action registration or cleanup hook registration. Uses
  *  beforeunload (not pagehide) so abort fires before navigation. */
 function installBeforeunloadOnce(): void {
-  if (beforeunloadInstalled) return;
+  if (beforeunloadInstalled) {
+    return;
+  }
   beforeunloadInstalled = true;
   if (typeof window !== "undefined") {
     // Use beforeunload (vs pagehide) because we want to fire BEFORE

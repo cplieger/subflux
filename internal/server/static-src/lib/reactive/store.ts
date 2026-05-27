@@ -8,6 +8,7 @@
 //   const { get, set, subscribe, effect, computed, batch } = createStore<MyMap>();
 
 type Callback = (value: unknown) => void;
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- void is intentional for effect return
 type Cleanup = void | (() => void);
 
 export interface Store<M> {
@@ -29,23 +30,33 @@ export function createStore<M>(): Store<M> {
 
   function notifySubs(key: string, value: unknown): void {
     const cbs = subscribers[key];
-    if (!cbs) return;
+    if (!cbs) {
+      return;
+    }
     for (const cb of cbs) {
-      try { cb(value); } catch (e) { console.error("store subscriber error:", e); }
+      try {
+        cb(value);
+      } catch (e) {
+        console.error("store subscriber error:", e);
+      }
     }
   }
 
   function get<K extends keyof M & string>(key: K): M[K] {
-    if (tracking) tracking.add(key);
+    if (tracking) {
+      tracking.add(key);
+    }
     return state[key] as M[K];
   }
 
   function set<K extends keyof M & string>(key: K, value: M[K]): void {
     const prev = state[key];
     state[key] = value;
-    if (prev === value) return;
+    if (prev === value) {
+      return;
+    }
     if (batchDepth > 0) {
-      if (!pendingKeys) pendingKeys = new Map();
+      pendingKeys ??= new Map();
       pendingKeys.set(key, value);
     } else {
       notifySubs(key, value);
@@ -53,56 +64,82 @@ export function createStore<M>(): Store<M> {
   }
 
   function subscribe<K extends keyof M & string>(key: K, cb: (value: M[K]) => void): () => void {
-    if (!subscribers[key]) subscribers[key] = [];
+    subscribers[key] ??= [];
     subscribers[key].push(cb as Callback);
     return () => {
       const arr = subscribers[key];
-      if (arr) subscribers[key] = arr.filter(c => c !== cb);
+      if (arr) {
+        subscribers[key] = arr.filter((c) => c !== cb);
+      }
     };
   }
 
   function storeBatch(fn: () => void): void {
     batchDepth++;
-    try { fn(); } finally {
+    try {
+      fn();
+    } finally {
       batchDepth--;
       if (batchDepth === 0 && pendingKeys) {
         const p = pendingKeys;
         pendingKeys = null;
-        for (const [k, v] of p) notifySubs(k, v);
+        for (const [k, v] of p) {
+          notifySubs(k, v);
+        }
       }
     }
   }
 
   function storeEffect(fn: () => Cleanup): () => void {
-    let unsubs: Array<() => void> = [];
+    let unsubs: (() => void)[] = [];
     let cleanup: Cleanup;
     let disposed = false;
 
     const run = (): void => {
-      if (disposed) return;
-      for (const u of unsubs) u();
+      if (disposed) {
+        return;
+      }
+      for (const u of unsubs) {
+        u();
+      }
       unsubs = [];
-      if (cleanup) { cleanup(); cleanup = undefined; }
+      if (cleanup) {
+        cleanup();
+        cleanup = undefined;
+      }
       const prev = tracking;
       tracking = new Set();
-      try { cleanup = fn(); } catch (e) { console.error("store effect error:", e); }
+      try {
+        cleanup = fn();
+      } catch (e) {
+        console.error("store effect error:", e);
+      }
       const deps = tracking;
       tracking = prev;
       for (const dep of deps) {
-        unsubs.push(subscribe(dep as keyof M & string, run as (value: M[keyof M & string]) => void));
+        unsubs.push(
+          subscribe(dep as keyof M & string, run as (value: M[keyof M & string]) => void),
+        );
       }
     };
     run();
     return () => {
       disposed = true;
-      for (const u of unsubs) u();
+      for (const u of unsubs) {
+        u();
+      }
       unsubs = [];
-      if (cleanup) { cleanup(); cleanup = undefined; }
+      if (cleanup) {
+        cleanup();
+        cleanup = undefined;
+      }
     };
   }
 
   function computed<K extends keyof M & string>(outputKey: K, fn: () => M[K]): () => void {
-    return storeEffect(() => { set(outputKey, fn()); });
+    return storeEffect(() => {
+      set(outputKey, fn());
+    });
   }
 
   return { get, set, subscribe, effect: storeEffect, computed, batch: storeBatch };

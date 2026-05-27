@@ -3,16 +3,16 @@
 # ---------------------------------------------------------------------------
 
 sonarr:
-  enabled: true                         # disable to skip Sonarr integration
-  url: "http://sonarr:8989"             # internal Docker hostname or IP:port
-  api_key: ""                           # required; from Settings > General
-  public_url: ""                        # browser URL, e.g. https://sonarr.example.com
+  enabled: true # disable to skip Sonarr integration
+  url: "http://sonarr:8989" # internal Docker hostname or IP:port
+  api_key: "" # required; from Settings > General
+  public_url: "" # browser URL, e.g. https://sonarr.example.com
 
 radarr:
-  enabled: true                         # disable to skip Radarr integration
-  url: "http://radarr:7878"             # internal Docker hostname or IP:port
-  api_key: ""                           # required; from Settings > General
-  public_url: ""                        # browser URL, e.g. https://radarr.example.com
+  enabled: true # disable to skip Radarr integration
+  url: "http://radarr:7878" # internal Docker hostname or IP:port
+  api_key: "" # required; from Settings > General
+  public_url: "" # browser URL, e.g. https://radarr.example.com
 
 # Must match the media paths inside Sonarr/Radarr containers.
 # If you change this, update the volume mounts in compose.yaml too.
@@ -37,20 +37,20 @@ languages:
     - audio: en
       subtitles:
         - code: fr
-          min_score: 80                 # per-target minimum score override
+          min_score: 80 # per-target minimum score override
 
     # Variants: French audio -> English standard + forced
     - audio: fr
       subtitles:
         - code: en
-          variants: [standard, forced]  # standard, forced, or hi
+          variants: [standard, forced] # standard, forced, or hi
 
     # Provider filter: Japanese audio -> specific providers only
     - audio: ja
       subtitles:
         - code: en
           providers: [opensubtitles, animetosho]
-          exclude: [yifysubtitles]      # skip these providers
+          exclude: [yifysubtitles] # skip these providers
 
     # Skip: Spanish audio -> no subtitles (prevents default)
     - audio: es
@@ -71,47 +71,47 @@ providers:
   # appear in coverage tracking regardless of these settings.
   embedded:
     settings:
-      ignore_pgs: true                  # exclude PGS bitmap subs from search (Blu-ray)
-      ignore_vobsub: true               # exclude VobSub bitmap subs from search (DVD)
-      ignore_ass: false                 # exclude ASS/SSA styled subs from search (anime)
+      ignore_pgs: true # exclude PGS bitmap subs from search (Blu-ray)
+      ignore_vobsub: true # exclude VobSub bitmap subs from search (DVD)
+      ignore_ass: false # exclude ASS/SSA styled subs from search (anime)
   hdbits:
     enabled: false
-    priority: 1                         # tiebreaker: lower = more trusted
+    priority: 1 # tiebreaker: lower = more trusted
     settings:
-      username: ""                      # hdbits.org account
-      passkey: ""                       # from hdbits.org user settings
+      username: "" # hdbits.org account
+      passkey: "" # from hdbits.org user settings
   opensubtitles:
     enabled: false
     priority: 2
     settings:
-      username: ""                      # opensubtitles.com account
-      password: ""                      # opensubtitles.com password
-      api_key: ""                       # from opensubtitles.com/consumers
-      use_hash: true                    # match by file hash (fast, exact)
-      include_ai_translated: false      # include AI/machine-translated subs
+      username: "" # opensubtitles.com account
+      password: "" # opensubtitles.com password
+      api_key: "" # from opensubtitles.com/consumers
+      use_hash: true # match by file hash (fast, exact)
+      include_ai_translated: false # include AI/machine-translated subs
   betaseries:
     enabled: false
     priority: 3
     settings:
-      token: ""                         # from betaseries.com/en/account/api
+      token: "" # from betaseries.com/en/account/api
   gestdown:
     enabled: true
-    priority: 4                         # Addic7ed proxy, TV shows only, no auth
+    priority: 4 # Addic7ed proxy, TV shows only, no auth
   subsource:
     enabled: false
     priority: 5
     settings:
-      api_key: ""                       # from subsource.net API registration
+      api_key: "" # from subsource.net API registration
   subdl:
     enabled: false
     priority: 7
     settings:
-      api_key: ""                       # from subdl.com API registration
+      api_key: "" # from subdl.com API registration
   animetosho:
     enabled: true
     priority: 8
     settings:
-      anidb_client_key: ""              # optional; enables AniDB episode ID search
+      anidb_client_key: "" # optional; enables AniDB episode ID search
   yifysubtitles:
     enabled: true
     priority: 9
@@ -125,19 +125,19 @@ providers:
 # Fractional values OK for all units: 0.5D = 12h, 1.5h = 90m. s/m/h can be combined: 1h30m.
 
 search:
-  scan_interval: 24h                    # time between scan completions (minimum 1h)
-  provider_timeout: 1h                  # cooldown after a provider fails repeatedly (minimum 1h)
-  scan_delay: 5s                        # delay between items during scans (minimum 5s)
-  upgrade_enabled: true                 # search for better subtitles during scans
-  upgrade_window_days: 7                # only upgrade subtitles for this many days
-  exclude_arr_tags:                     # skip media with these Sonarr/Radarr tags
+  scan_interval: 24h # time between scan completions (minimum 1h)
+  provider_timeout: 1h # cooldown after a provider fails repeatedly (minimum 1h)
+  scan_delay: 5s # delay between items during scans (minimum 5s)
+  upgrade_enabled: true # search for better subtitles during scans
+  upgrade_window_days: 7 # only upgrade subtitles for this many days
+  exclude_arr_tags: # skip media with these Sonarr/Radarr tags
     - no-subflux
 
 adaptive:
-  initial_delay: 7D                     # wait before retrying after search
-  max_delay: 90D                        # maximum wait between retries
-  backoff_multiplier: 2                 # multiply delay after each search
-  max_attempts: 10                      # 0 = retry forever
+  initial_delay: 7D # wait before retrying after search
+  max_delay: 90D # maximum wait between retries
+  backoff_multiplier: 2 # multiply delay after each search
+  max_attempts: 10 # 0 = retry forever
 
 # ---------------------------------------------------------------------------
 # Post-processing
@@ -145,14 +145,14 @@ adaptive:
 
 # Applied to every downloaded subtitle before saving to disk.
 post_processing:
-  sync_subtitles: true                  # sync timing against embedded subs on import
-  audio_sync_fallback: false            # fall back to audio sync if no reference sub
-  strip_hi: false                       # remove [sounds], (music), SPEAKER: labels
-  strip_tags: true                      # remove <i>, <b>, <u>, <font> HTML tags
-  normalize_utf8: true                  # convert UTF-16/Windows-1252 to UTF-8
-  normalize_endings: true               # convert line endings to CRLF (SRT standard)
-  clean_whitespace: true                # trim lines, remove empty lines
-  remove_empty: true                    # drop cues with no text after processing
+  sync_subtitles: true # sync timing against embedded subs on import
+  audio_sync_fallback: false # fall back to audio sync if no reference sub
+  strip_hi: false # remove [sounds], (music), SPEAKER: labels
+  strip_tags: true # remove <i>, <b>, <u>, <font> HTML tags
+  normalize_utf8: true # convert UTF-16/Windows-1252 to UTF-8
+  normalize_endings: true # convert line endings to CRLF (SRT standard)
+  clean_whitespace: true # trim lines, remove empty lines
+  remove_empty: true # drop cues with no text after processing
 
 # ---------------------------------------------------------------------------
 # Scoring
@@ -163,13 +163,13 @@ post_processing:
 scoring:
   weights:
     hash: 100
-    source: 28                          # BluRay, WEB-DL, HDTV
+    source: 28 # BluRay, WEB-DL, HDTV
     release_group: 23
-    streaming_service: 14               # AMZN, NF, DSNP
-    edition: 15                         # Director's Cut, Extended, etc.
+    streaming_service: 14 # AMZN, NF, DSNP
+    edition: 15 # Director's Cut, Extended, etc.
     video_codec: 10
     hdr: 8
-    season_pack: 15                     # Consistent subs across episodes
+    season_pack: 15 # Consistent subs across episodes
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -178,5 +178,5 @@ scoring:
 # Uses Go slog; json format is parsed by Alloy/Loki for Grafana dashboards.
 # Use text format for local development or terminal debugging.
 logging:
-  level: info                           # debug, info, warn, error
-  format: json                          # json or text
+  level: info # debug, info, warn, error
+  format: json # json or text

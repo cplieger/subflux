@@ -206,12 +206,12 @@ func TestIsBrowserRequest_table(t *testing.T) {
 		apiKey string
 		want   bool
 	}{
-		{"browser html", "text/html,application/xhtml+xml", "", true},
-		{"browser with wildcard", "text/html, */*", "", true},
-		{"api client json", "application/json", "", false},
-		{"api key overrides browser", "text/html", "sfx_abc123", false},
-		{"empty accept", "", "", false},
-		{"api key with empty accept", "", "sfx_abc123", false},
+		{name: "browser html", accept: "text/html,application/xhtml+xml", apiKey: "", want: true},
+		{name: "browser with wildcard", accept: "text/html, */*", apiKey: "", want: true},
+		{name: "api client json", accept: "application/json", apiKey: "", want: false},
+		{name: "api key overrides browser", accept: "text/html", apiKey: "sfx_abc123", want: false},
+		{name: "empty accept", accept: "", apiKey: "", want: false},
+		{name: "api key with empty accept", accept: "", apiKey: "sfx_abc123", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -236,15 +236,15 @@ func TestIsHTTPS_table(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
-		useTLS         bool
 		forwardedProto string
+		useTLS         bool
 		want           bool
 	}{
-		{"plain http", false, "", false},
-		{"tls connection", true, "", true},
-		{"forwarded https", false, "https", true},
-		{"forwarded http", false, "http", false},
-		{"tls plus forwarded https", true, "https", true},
+		{name: "plain http", useTLS: false, forwardedProto: "", want: false},
+		{name: "tls connection", useTLS: true, forwardedProto: "", want: true},
+		{name: "forwarded https", useTLS: false, forwardedProto: "https", want: true},
+		{name: "forwarded http", useTLS: false, forwardedProto: "http", want: false},
+		{name: "tls plus forwarded https", useTLS: true, forwardedProto: "https", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -269,11 +269,11 @@ func TestSessionCookieName_table(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		tls  bool
 		want string
+		tls  bool
 	}{
-		{"http returns plain cookie", false, CookieNameHTTP},
-		{"https returns secure cookie", true, CookieNameSecure},
+		{name: "http returns plain cookie", tls: false, want: CookieNameHTTP},
+		{name: "https returns secure cookie", tls: true, want: CookieNameSecure},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -294,14 +294,14 @@ func TestSetSessionCookie_sets_correct_attributes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		tls      bool
 		token    string
-		maxAge   int
 		wantName string
+		maxAge   int
+		tls      bool
 		wantSec  bool
 	}{
-		{"http session", false, "tok123", 3600, CookieNameHTTP, false},
-		{"https session", true, "tok456", 7200, CookieNameSecure, true},
+		{name: "http session", tls: false, token: "tok123", maxAge: 3600, wantName: CookieNameHTTP, wantSec: false},
+		{name: "https session", tls: true, token: "tok456", maxAge: 7200, wantName: CookieNameSecure, wantSec: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -367,13 +367,13 @@ func TestReadSessionCookie_table(t *testing.T) {
 		name       string
 		cookieName string
 		value      string
-		tls        bool
 		want       string
+		tls        bool
 	}{
-		{"http cookie present", CookieNameHTTP, "mytoken", false, "mytoken"},
-		{"https cookie present", CookieNameSecure, "sectoken", true, "sectoken"},
-		{"no cookie", "", "", false, ""},
-		{"wrong cookie name", "other_cookie", "val", false, ""},
+		{name: "http cookie present", cookieName: CookieNameHTTP, value: "mytoken", tls: false, want: "mytoken"},
+		{name: "https cookie present", cookieName: CookieNameSecure, value: "sectoken", tls: true, want: "sectoken"},
+		{name: "no cookie", cookieName: "", value: "", tls: false, want: ""},
+		{name: "wrong cookie name", cookieName: "other_cookie", value: "val", tls: false, want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,10 +402,10 @@ func TestHasRole_table(t *testing.T) {
 		required api.Role
 		want     bool
 	}{
-		{"admin accessing admin path", "admin", "admin", true},
-		{"admin accessing user path", "admin", "user", true},
-		{"user accessing user path", "user", "user", true},
-		{"user accessing admin path", "user", "admin", false},
+		{name: "admin accessing admin path", userRole: "admin", required: "admin", want: true},
+		{name: "admin accessing user path", userRole: "admin", required: "user", want: true},
+		{name: "user accessing user path", userRole: "user", required: "user", want: true},
+		{name: "user accessing admin path", userRole: "user", required: "admin", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -427,15 +427,15 @@ func TestValidateRedirectURI_table(t *testing.T) {
 		uri  string
 		want string
 	}{
-		{"empty", "", "/"},
-		{"root", "/", "/"},
-		{"relative path", "/dashboard", "/dashboard"},
-		{"relative with query", "/search?q=test", "/search?q=test"},
-		{"absolute http", "http://evil.com", "/"},
-		{"absolute https", "https://evil.com", "/"},
-		{"protocol-relative", "//evil.com", "/"},
-		{"scheme in path", "/foo://bar", "/"},
-		{"no leading slash", "evil.com", "/"},
+		{name: "empty", uri: "", want: "/"},
+		{name: "root", uri: "/", want: "/"},
+		{name: "relative path", uri: "/dashboard", want: "/dashboard"},
+		{name: "relative with query", uri: "/search?q=test", want: "/search?q=test"},
+		{name: "absolute http", uri: "http://evil.com", want: "/"},
+		{name: "absolute https", uri: "https://evil.com", want: "/"},
+		{name: "protocol-relative", uri: "//evil.com", want: "/"},
+		{name: "scheme in path", uri: "/foo://bar", want: "/"},
+		{name: "no leading slash", uri: "evil.com", want: "/"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

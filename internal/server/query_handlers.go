@@ -9,7 +9,7 @@ import (
 // ensureQueryH lazily initializes queryH for tests that construct Server
 // directly without calling New().
 func (s *Server) ensureQueryH() *queryhandlers.Handler {
-	if s.queryH == nil {
+	s.queryHOnce.Do(func() {
 		s.queryH = queryhandlers.New(queryhandlers.Deps{
 			QueryDB:      s.stores.query,
 			CovDB:        s.db,
@@ -18,7 +18,7 @@ func (s *Server) ensureQueryH() *queryhandlers.Handler {
 			Configured:   func() bool { return s.configured.Load() },
 			CountMissing: countMissing,
 		})
-	}
+	})
 	return s.queryH
 }
 

@@ -14,14 +14,14 @@ func TestParseTmdbID(t *testing.T) {
 		input string
 		want  int
 	}{
-		{"valid integer", "12345", 12345},
-		{"zero", "0", 0},
-		{"empty string returns zero", "", 0},
-		{"non-numeric returns zero", "abc", 0},
-		{"negative number", "-1", -1},
-		{"large number", "999999", 999999},
-		{"float string returns zero", "1.5", 0},
-		{"whitespace returns zero", " 42 ", 0},
+		{name: "valid integer", input: "12345", want: 12345},
+		{name: "zero", input: "0", want: 0},
+		{name: "empty string returns zero", input: "", want: 0},
+		{name: "non-numeric returns zero", input: "abc", want: 0},
+		{name: "negative number", input: "-1", want: -1},
+		{name: "large number", input: "999999", want: 999999},
+		{name: "float string returns zero", input: "1.5", want: 0},
+		{name: "whitespace returns zero", input: " 42 ", want: 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,10 +79,10 @@ func TestEpisodesForSeries(t *testing.T) {
 
 	tests := []struct {
 		name          string
+		wantFirst     string
 		seasonFilter  int
 		episodeFilter int
 		wantCount     int
-		wantFirst     string
 	}{
 		{
 			name:      "no filters returns all episodes with files",
@@ -189,9 +189,9 @@ func TestMatchSeries(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		series api.Series
 		imdbID string
 		title  string
+		series api.Series
 		want   bool
 	}{
 		{
@@ -261,19 +261,19 @@ func TestMatchMovie(t *testing.T) {
 	tests := []struct {
 		name    string
 		imdbID  string
-		tmdbInt int
 		title   string
+		tmdbInt int
 		want    bool
 	}{
-		{"match by imdb", "tt1375666", 0, "", true},
-		{"match by tmdb", "", 27205, "", true},
-		{"match by title case insensitive", "", 0, "inception", true},
-		{"no match all empty", "", 0, "", false},
-		{"no match wrong imdb", "tt9999999", 0, "", false},
-		{"no match wrong tmdb", "", 99999, "", false},
-		{"no match wrong title", "", 0, "Interstellar", false},
-		{"tmdb zero does not match", "", 0, "", false},
-		{"negative tmdb does not match", "", -1, "", false},
+		{name: "match by imdb", imdbID: "tt1375666", tmdbInt: 0, title: "", want: true},
+		{name: "match by tmdb", imdbID: "", tmdbInt: 27205, title: "", want: true},
+		{name: "match by title case insensitive", imdbID: "", tmdbInt: 0, title: "inception", want: true},
+		{name: "no match all empty", imdbID: "", tmdbInt: 0, title: "", want: false},
+		{name: "no match wrong imdb", imdbID: "tt9999999", tmdbInt: 0, title: "", want: false},
+		{name: "no match wrong tmdb", imdbID: "", tmdbInt: 99999, title: "", want: false},
+		{name: "no match wrong title", imdbID: "", tmdbInt: 0, title: "Interstellar", want: false},
+		{name: "tmdb zero does not match", imdbID: "", tmdbInt: 0, title: "", want: false},
+		{name: "negative tmdb does not match", imdbID: "", tmdbInt: -1, title: "", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -315,10 +315,10 @@ func TestFilterRadarrMovies(t *testing.T) {
 	tests := []struct {
 		name      string
 		imdbID    string
-		tmdbInt   int
 		title     string
-		wantCount int
 		wantTitle string
+		tmdbInt   int
+		wantCount int
 	}{
 		{
 			name:      "match by imdb returns first match",

@@ -26,34 +26,34 @@ func TestHdbLangToISO(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"en maps to en", "en", "en"},
-		{"fr maps to fr", "fr", "fr"},
-		{"es maps to es", "es", "es"},
-		{"de maps to de", "de", "de"},
-		{"it maps to it", "it", "it"},
-		{"pt maps to pt", "pt", "pt"},
-		{"nl maps to nl", "nl", "nl"},
-		{"ru maps to ru", "ru", "ru"},
-		{"ja maps to ja", "ja", "ja"},
-		{"zh maps to zh", "zh", "zh"},
-		{"ko maps to ko", "ko", "ko"},
-		{"pl maps to pl", "pl", "pl"},
-		{"sv maps to sv", "sv", "sv"},
-		{"no maps to no", "no", "no"},
-		{"da maps to da", "da", "da"},
-		{"fi maps to fi", "fi", "fi"},
-		{"uk maps to uk", "uk", "uk"},
-		{"br maps to pb", "br", "pb"},
-		{"gr maps to el", "gr", "el"},
-		{"cz maps to cs", "cz", "cs"},
-		{"se maps to sv", "se", "sv"},
-		{"dk maps to da", "dk", "da"},
-		{"kr maps to ko", "kr", "ko"},
-		{"cn maps to zh", "cn", "zh"},
-		{"il maps to he", "il", "he"},
-		{"si maps to sl", "si", "sl"},
-		{"unknown code", "xx", ""},
-		{"empty string", "", ""},
+		{name: "en maps to en", input: "en", want: "en"},
+		{name: "fr maps to fr", input: "fr", want: "fr"},
+		{name: "es maps to es", input: "es", want: "es"},
+		{name: "de maps to de", input: "de", want: "de"},
+		{name: "it maps to it", input: "it", want: "it"},
+		{name: "pt maps to pt", input: "pt", want: "pt"},
+		{name: "nl maps to nl", input: "nl", want: "nl"},
+		{name: "ru maps to ru", input: "ru", want: "ru"},
+		{name: "ja maps to ja", input: "ja", want: "ja"},
+		{name: "zh maps to zh", input: "zh", want: "zh"},
+		{name: "ko maps to ko", input: "ko", want: "ko"},
+		{name: "pl maps to pl", input: "pl", want: "pl"},
+		{name: "sv maps to sv", input: "sv", want: "sv"},
+		{name: "no maps to no", input: "no", want: "no"},
+		{name: "da maps to da", input: "da", want: "da"},
+		{name: "fi maps to fi", input: "fi", want: "fi"},
+		{name: "uk maps to uk", input: "uk", want: "uk"},
+		{name: "br maps to pb", input: "br", want: "pb"},
+		{name: "gr maps to el", input: "gr", want: "el"},
+		{name: "cz maps to cs", input: "cz", want: "cs"},
+		{name: "se maps to sv", input: "se", want: "sv"},
+		{name: "dk maps to da", input: "dk", want: "da"},
+		{name: "kr maps to ko", input: "kr", want: "ko"},
+		{name: "cn maps to zh", input: "cn", want: "zh"},
+		{name: "il maps to he", input: "il", want: "he"},
+		{name: "si maps to sl", input: "si", want: "sl"},
+		{name: "unknown code", input: "xx", want: ""},
+		{name: "empty string", input: "", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -72,17 +72,17 @@ func TestFactory_requires_credentials(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
 		settings map[string]any
+		name     string
 		wantErr  bool
 	}{
-		{"nil settings", nil, true},
-		{"missing both", map[string]any{}, true},
-		{"missing passkey", map[string]any{"username": "user"}, true},
-		{"missing username", map[string]any{"passkey": "key"}, true},
-		{"empty username", map[string]any{"username": "", "passkey": "key"}, true},
-		{"empty passkey", map[string]any{"username": "user", "passkey": ""}, true},
-		{"valid credentials", map[string]any{"username": "user", "passkey": "key"}, false},
+		{name: "nil settings", settings: nil, wantErr: true},
+		{name: "missing both", settings: map[string]any{}, wantErr: true},
+		{name: "missing passkey", settings: map[string]any{"username": "user"}, wantErr: true},
+		{name: "missing username", settings: map[string]any{"passkey": "key"}, wantErr: true},
+		{name: "empty username", settings: map[string]any{"username": "", "passkey": "key"}, wantErr: true},
+		{name: "empty passkey", settings: map[string]any{"username": "user", "passkey": ""}, wantErr: true},
+		{name: "valid credentials", settings: map[string]any{"username": "user", "passkey": "key"}, wantErr: false},
 	}
 
 	for _, tt := range tests {
@@ -113,149 +113,100 @@ func TestFilterSubtitleData(t *testing.T) {
 	type assertFunc func(t *testing.T, got []api.Subtitle)
 
 	tests := []struct {
+		req       *api.SearchRequest
+		assertFn  assertFunc
 		name      string
 		data      []hdbSubtitleItem
-		req       *api.SearchRequest
 		wantCount int
-		assertFn  assertFunc // optional: additional field checks
 	}{
-		{"nil data returns nil", nil, &api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"empty data returns nil", []hdbSubtitleItem{}, &api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"basic movie result mapped correctly",
-			[]hdbSubtitleItem{{Title: "Test Sub", Filename: "test.srt", Language: "en", ID: 42}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, 1,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].Provider != api.ProviderNameHDBits {
-					t.Errorf("Provider = %q, want %q", got[0].Provider, api.ProviderNameHDBits)
-				}
-				if got[0].ID != "42" {
-					t.Errorf("ID = %q, want %q", got[0].ID, "42")
-				}
-				if got[0].Language != "en" {
-					t.Errorf("Language = %q, want %q", got[0].Language, "en")
-				}
-				if got[0].ReleaseName != "Test Sub" {
-					t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Test Sub")
-				}
-				if got[0].MatchedBy != api.MatchByIMDB {
-					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByIMDB)
-				}
-			}},
-		{"episode sets matched_by to tvdb_id",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "episode"}, 1,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].MatchedBy != api.MatchByTVDB {
-					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTVDB)
-				}
-			}},
-		{"unknown language skipped",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "xx", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"language not in requested list skipped",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "fr", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"br mapped to pb",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "br", ID: 1}},
-			&api.SearchRequest{Languages: []string{"pb"}}, 1,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].Language != "pb" {
-					t.Errorf("Language = %q, want %q", got[0].Language, "pb")
-				}
-			}},
-		{"commentary title filtered",
-			[]hdbSubtitleItem{{Title: "Director's Commentary", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"commentary filename filtered",
-			[]hdbSubtitleItem{{Title: "Normal Title", Filename: "commentary.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"extras title filtered",
-			[]hdbSubtitleItem{{Title: "Extras Disc", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"extra without s not filtered",
-			[]hdbSubtitleItem{{Title: "Extraordinary Movie", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, 1, nil},
-		{"case insensitive commentary",
-			[]hdbSubtitleItem{{Title: "COMMENTARY Track", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"nil languages returns no results",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: nil}, 0, nil},
-		{"empty languages returns no results",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{}}, 0, nil},
-		{"gr mapped to el",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "gr", ID: 1}},
-			&api.SearchRequest{Languages: []string{"el"}}, 1,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].Language != "el" {
-					t.Errorf("Language = %q, want %q", got[0].Language, "el")
-				}
-			}},
-		{"non-subtitle extension filtered",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.mp4", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, 0, nil},
-		{"no extension accepted",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "subtitle_no_ext", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, 1, nil},
-		{"lyrics title filtered",
-			[]hdbSubtitleItem{{Title: "Song Lyrics", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"forced in filename not filtered",
-			[]hdbSubtitleItem{{Title: "Normal", Filename: "forced.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 1, nil},
-		{"lyrics filename filtered",
-			[]hdbSubtitleItem{{Title: "Normal", Filename: "lyrics.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}}, 0, nil},
-		{"multiple requested languages",
-			[]hdbSubtitleItem{
-				{Title: "English Sub", Filename: "en.srt", Language: "en", ID: 1},
-				{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 2},
-				{Title: "German Sub", Filename: "de.srt", Language: "de", ID: 3},
-			},
-			&api.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}, 2,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].Language != "en" {
-					t.Errorf("got[0].Language = %q, want %q", got[0].Language, "en")
-				}
-				if got[1].Language != "fr" {
-					t.Errorf("got[1].Language = %q, want %q", got[1].Language, "fr")
-				}
-			}},
-		{"season and episode propagated",
-			[]hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "episode", Season: 3, Episode: 7}, 1,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].Season != 3 {
-					t.Errorf("Season = %d, want 3", got[0].Season)
-				}
-				if got[0].Episode != 7 {
-					t.Errorf("Episode = %d, want 7", got[0].Episode)
-				}
-			}},
-		{"multiple results mixed filtering",
-			[]hdbSubtitleItem{
-				{Title: "Good Sub", Filename: "good.srt", Language: "en", ID: 1},
-				{Title: "Commentary", Filename: "c.srt", Language: "en", ID: 2},
-				{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 3},
-				{Title: "Also Good", Filename: "also.srt", Language: "en", ID: 4},
-			},
-			&api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, 2,
-			func(t *testing.T, got []api.Subtitle) {
-				t.Helper()
-				if got[0].ID != "1" {
-					t.Errorf("got[0].ID = %q, want %q", got[0].ID, "1")
-				}
-				if got[1].ID != "4" {
-					t.Errorf("got[1].ID = %q, want %q", got[1].ID, "4")
-				}
-			}},
+		{name: "nil data returns nil", data: nil, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "empty data returns nil", data: []hdbSubtitleItem{}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "basic movie result mapped correctly", data: []hdbSubtitleItem{{Title: "Test Sub", Filename: "test.srt", Language: "en", ID: 42}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].Provider != api.ProviderNameHDBits {
+				t.Errorf("Provider = %q, want %q", got[0].Provider, api.ProviderNameHDBits)
+			}
+			if got[0].ID != "42" {
+				t.Errorf("ID = %q, want %q", got[0].ID, "42")
+			}
+			if got[0].Language != "en" {
+				t.Errorf("Language = %q, want %q", got[0].Language, "en")
+			}
+			if got[0].ReleaseName != "Test Sub" {
+				t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Test Sub")
+			}
+			if got[0].MatchedBy != api.MatchByIMDB {
+				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByIMDB)
+			}
+		}},
+		{name: "episode sets matched_by to tvdb_id", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "episode"}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].MatchedBy != api.MatchByTVDB {
+				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTVDB)
+			}
+		}},
+		{name: "unknown language skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "xx", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "language not in requested list skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "fr", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "br mapped to pb", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "br", ID: 1}}, req: &api.SearchRequest{Languages: []string{"pb"}}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].Language != "pb" {
+				t.Errorf("Language = %q, want %q", got[0].Language, "pb")
+			}
+		}},
+		{name: "commentary title filtered", data: []hdbSubtitleItem{{Title: "Director's Commentary", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "commentary filename filtered", data: []hdbSubtitleItem{{Title: "Normal Title", Filename: "commentary.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "extras title filtered", data: []hdbSubtitleItem{{Title: "Extras Disc", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "extra without s not filtered", data: []hdbSubtitleItem{{Title: "Extraordinary Movie", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
+		{name: "case insensitive commentary", data: []hdbSubtitleItem{{Title: "COMMENTARY Track", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "nil languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: nil}, wantCount: 0, assertFn: nil},
+		{name: "empty languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{}}, wantCount: 0, assertFn: nil},
+		{name: "gr mapped to el", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "gr", ID: 1}}, req: &api.SearchRequest{Languages: []string{"el"}}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].Language != "el" {
+				t.Errorf("Language = %q, want %q", got[0].Language, "el")
+			}
+		}},
+		{name: "non-subtitle extension filtered", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.mp4", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 0, assertFn: nil},
+		{name: "no extension accepted", data: []hdbSubtitleItem{{Title: "Sub", Filename: "subtitle_no_ext", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
+		{name: "lyrics title filtered", data: []hdbSubtitleItem{{Title: "Song Lyrics", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "forced in filename not filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "forced.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 1, assertFn: nil},
+		{name: "lyrics filename filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "lyrics.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "multiple requested languages", data: []hdbSubtitleItem{
+			{Title: "English Sub", Filename: "en.srt", Language: "en", ID: 1},
+			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 2},
+			{Title: "German Sub", Filename: "de.srt", Language: "de", ID: 3},
+		}, req: &api.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].Language != "en" {
+				t.Errorf("got[0].Language = %q, want %q", got[0].Language, "en")
+			}
+			if got[1].Language != "fr" {
+				t.Errorf("got[1].Language = %q, want %q", got[1].Language, "fr")
+			}
+		}},
+		{name: "season and episode propagated", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "episode", Season: 3, Episode: 7}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].Season != 3 {
+				t.Errorf("Season = %d, want 3", got[0].Season)
+			}
+			if got[0].Episode != 7 {
+				t.Errorf("Episode = %d, want 7", got[0].Episode)
+			}
+		}},
+		{name: "multiple results mixed filtering", data: []hdbSubtitleItem{
+			{Title: "Good Sub", Filename: "good.srt", Language: "en", ID: 1},
+			{Title: "Commentary", Filename: "c.srt", Language: "en", ID: 2},
+			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 3},
+			{Title: "Also Good", Filename: "also.srt", Language: "en", ID: 4},
+		}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []api.Subtitle) {
+			t.Helper()
+			if got[0].ID != "1" {
+				t.Errorf("got[0].ID = %q, want %q", got[0].ID, "1")
+			}
+			if got[1].ID != "4" {
+				t.Errorf("got[1].ID = %q, want %q", got[1].ID, "4")
+			}
+		}},
 	}
 
 	for _, tt := range tests {
@@ -297,20 +248,20 @@ func TestFlexInt_UnmarshalJSON(t *testing.T) {
 		want    int
 		wantErr bool
 	}{
-		{"number", `42`, 42, false},
-		{"zero", `0`, 0, true}, // non-positive IDs rejected
-		{"quoted string", `"123"`, 123, false},
-		{"quoted zero", `"0"`, 0, true}, // non-positive IDs rejected
-		{"non-numeric string", `"abc"`, 0, true},
-		{"empty string", `""`, 0, true},
-		{"negative number", `-5`, 0, true}, // non-positive IDs rejected
-		{"negative quoted string", `"-10"`, 0, true},
-		{"large number", `2147483647`, 2147483647, false},
-		{"float", `3.14`, 0, true},
-		{"quoted float", `"3.14"`, 0, true},
-		{"boolean", `true`, 0, true},
-		{"null value", `null`, 0, true}, // null rejected: id=0 would build getdox.php?id=0&passkey=...
-		{"array", `[1]`, 0, true},
+		{name: "number", input: `42`, want: 42, wantErr: false},
+		{name: "zero", input: `0`, want: 0, wantErr: true}, // non-positive IDs rejected
+		{name: "quoted string", input: `"123"`, want: 123, wantErr: false},
+		{name: "quoted zero", input: `"0"`, want: 0, wantErr: true}, // non-positive IDs rejected
+		{name: "non-numeric string", input: `"abc"`, want: 0, wantErr: true},
+		{name: "empty string", input: `""`, want: 0, wantErr: true},
+		{name: "negative number", input: `-5`, want: 0, wantErr: true}, // non-positive IDs rejected
+		{name: "negative quoted string", input: `"-10"`, want: 0, wantErr: true},
+		{name: "large number", input: `2147483647`, want: 2147483647, wantErr: false},
+		{name: "float", input: `3.14`, want: 0, wantErr: true},
+		{name: "quoted float", input: `"3.14"`, want: 0, wantErr: true},
+		{name: "boolean", input: `true`, want: 0, wantErr: true},
+		{name: "null value", input: `null`, want: 0, wantErr: true}, // null rejected: id=0 would build getdox.php?id=0&passkey=...
+		{name: "array", input: `[1]`, want: 0, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -420,11 +371,11 @@ func TestFilterSubtitleData_extras_word_boundary(t *testing.T) {
 		title string
 		want  int
 	}{
-		{"extras at end", "Bonus Extras", 0},
-		{"extras mid-sentence", "The Extras Collection", 0},
-		{"extra without s", "Extra Features", 1},
-		{"extraordinary", "Extraordinary Movie", 1},
-		{"extras case insensitive", "EXTRAS Disc", 0},
+		{name: "extras at end", title: "Bonus Extras", want: 0},
+		{name: "extras mid-sentence", title: "The Extras Collection", want: 0},
+		{name: "extra without s", title: "Extra Features", want: 1},
+		{name: "extraordinary", title: "Extraordinary Movie", want: 1},
+		{name: "extras case insensitive", title: "EXTRAS Disc", want: 0},
 	}
 
 	for _, tt := range tests {
@@ -599,11 +550,11 @@ func TestBuildLookup(t *testing.T) {
 	p := &Provider{username: "user", passkey: "key"}
 
 	tests := []struct {
-		name         string
 		req          *api.SearchRequest
-		wantNil      bool
-		wantCacheKey string
 		assertParams func(t *testing.T, params map[string]any)
+		name         string
+		wantCacheKey string
+		wantNil      bool
 	}{
 		// Valid inputs.
 		{

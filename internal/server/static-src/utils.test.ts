@@ -8,7 +8,11 @@ import { prettyLabel, langName, fmtEpisode, tvdbMediaId, debounce } from "./util
 describe("prettyLabel", () => {
   const cases = [
     { name: "replaces underscores with spaces", input: "foo_bar", expected: "Foo Bar" },
-    { name: "capitalises first letter of each word", input: "hello_world", expected: "Hello World" },
+    {
+      name: "capitalises first letter of each word",
+      input: "hello_world",
+      expected: "Hello World",
+    },
     { name: "handles single word", input: "hello", expected: "Hello" },
     { name: "handles already-capitalised input", input: "Hello_World", expected: "Hello World" },
     { name: "handles empty string", input: "", expected: "" },
@@ -31,7 +35,11 @@ describe("langName", () => {
     { name: "returns uppercase code for unknown code (xx)", input: "xx", expected: "XX" },
     { name: "returns uppercase code for unknown code (zz)", input: "zz", expected: "ZZ" },
     { name: "passes through 'default' sentinel unchanged", input: "default", expected: "default" },
-    { name: "passes through 'no targets' sentinel unchanged", input: "no targets", expected: "no targets" },
+    {
+      name: "passes through 'no targets' sentinel unchanged",
+      input: "no targets",
+      expected: "no targets",
+    },
     { name: "returns empty string for empty input", input: "", expected: "" },
     { name: "handles Portuguese Brazil code", input: "pb", expected: "Portuguese (Brazil)" },
     { name: "handles Japanese", input: "ja", expected: "Japanese" },
@@ -46,11 +54,26 @@ describe("langName", () => {
 
 describe("fmtEpisode", () => {
   const cases = [
-    { name: "formats single-digit season and episode with padding", season: 1, episode: 5, expected: "S01E05" },
-    { name: "formats double-digit season and episode without extra padding", season: 12, episode: 34, expected: "S12E34" },
+    {
+      name: "formats single-digit season and episode with padding",
+      season: 1,
+      episode: 5,
+      expected: "S01E05",
+    },
+    {
+      name: "formats double-digit season and episode without extra padding",
+      season: 12,
+      episode: 34,
+      expected: "S12E34",
+    },
     { name: "formats season 0 (specials)", season: 0, episode: 1, expected: "S00E01" },
     { name: "formats episode 0", season: 1, episode: 0, expected: "S01E00" },
-    { name: "formats large season/episode numbers", season: 100, episode: 200, expected: "S100E200" },
+    {
+      name: "formats large season/episode numbers",
+      season: 100,
+      episode: 200,
+      expected: "S100E200",
+    },
   ];
 
   for (const tc of cases) {
@@ -79,8 +102,12 @@ describe("tvdbMediaId", () => {
 });
 
 describe("debounce", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("delays execution until after the wait period", () => {
     const fn = vi.fn();
@@ -106,10 +133,10 @@ describe("debounce", () => {
   it("passes arguments from the last call", () => {
     const fn = vi.fn();
     const debounced = debounce(fn, 100);
-    debounced('a');
-    debounced('b');
+    debounced("a");
+    debounced("b");
     vi.advanceTimersByTime(100);
-    expect(fn).toHaveBeenCalledWith('b');
+    expect(fn).toHaveBeenCalledWith("b");
   });
 
   it("fires independently after each wait period", () => {

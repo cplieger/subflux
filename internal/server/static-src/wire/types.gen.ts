@@ -256,4 +256,3 @@ export interface SubtitleEntry {
   score?: number;
   offset_ms?: number;
 }
-

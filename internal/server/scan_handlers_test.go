@@ -496,10 +496,9 @@ func TestHandleBackoffByPrefix_db_error_returns_500(t *testing.T) {
 
 // backoffPrefixTrackingStore tracks params passed to GetBackoffByPrefix.
 type backoffPrefixTrackingStore struct {
-	qhMockStore
-
 	mediaType api.MediaType
 	prefix    string
+	qhMockStore
 }
 
 func (m *backoffPrefixTrackingStore) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, prefix string) ([]api.BackoffEntry, error) {

@@ -90,46 +90,43 @@ type previewDeps struct {
 
 // Server is the main application server.
 type Server struct {
-	authDeps
+	stores storeFacade
+	ctx    context.Context
 	pollDeps
-	scanSubsystem
 	previewDeps
-
 	db           api.Store
 	subtitleProc api.SubtitleProcessor
 	metrics      Metrics
 	registry     api.ProviderRegistry
-	wire         wiring.Func
-	schemaFunc   api.SchemaFunc
+	manualH      *manualops.Handler
+	previewH     *previewhandlers.Handler
 	loadConfig   api.ConfigLoader
 	newArrClient func(baseURL, apiKey string) (api.ArrClient, error)
-	ctx          context.Context
-
-	stores storeFacade
-
-	live atomic.Pointer[liveState]
-
-	queryH    *queryhandlers.Handler
-	configH   *confighandlers.Handler
-	manualH   *manualops.Handler
-	previewH  *previewhandlers.Handler
-	coverageH *coveragehandlers.Handler
-	fileH     *filehandlers.Handler
-	mediaH    *mediahandlers.Handler
-	syncH     *synchandlers.Handler
-
-	alerts   *activity.AlertLog
-	activity *activity.Log
-	events   *events.EventBus
-
+	wire         wiring.Func
+	activity     *activity.Log
+	live         atomic.Pointer[liveState]
+	queryH       *queryhandlers.Handler
+	schemaFunc   api.SchemaFunc
+	configH      *confighandlers.Handler
+	alerts       *activity.AlertLog
+	events       *events.EventBus
+	coverageH    *coveragehandlers.Handler
+	syncH        *synchandlers.Handler
+	fileH        *filehandlers.Handler
+	mediaH       *mediahandlers.Handler
+	scanSubsystem
+	authDeps
 	defaultConfig []byte
-
-	bgWg       sync.WaitGroup
-	reloadMu   sync.Mutex
-	ready      atomic.Bool
-	configured atomic.Bool
-	scanning   atomic.Bool
-	serverPort int
+	bgWg          sync.WaitGroup
+	serverPort    int
+	queryHOnce    sync.Once
+	mediaHOnce    sync.Once
+	fileHOnce     sync.Once
+	coverageHOnce sync.Once
+	reloadMu      sync.Mutex
+	ready         atomic.Bool
+	configured    atomic.Bool
+	scanning      atomic.Bool
 }
 
 // Option configures a Server during construction.

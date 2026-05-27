@@ -20,8 +20,8 @@ func TestPostCommand(t *testing.T) {
 	t.Run("request_properties", func(t *testing.T) {
 		t.Parallel()
 		tests := []struct {
-			name  string
 			check func(t *testing.T, r *http.Request, body []byte)
+			name  string
 		}{
 			{
 				name: "sets_content_type",
@@ -92,16 +92,16 @@ func TestPostCommand(t *testing.T) {
 		t.Parallel()
 		tests := []struct {
 			name        string
-			status      int
 			body        string
-			wantErr     bool
 			errContains string
+			status      int
+			wantErr     bool
 		}{
-			{"status_200_succeeds", http.StatusOK, "", false, ""},
-			{"status_399_succeeds", 399, "", false, ""},
-			{"status_400_returns_error", http.StatusBadRequest, "bad request body", true, "400"},
-			{"error_body_included_in_message", http.StatusInternalServerError, "detailed error info", true, "detailed error info"},
-			{"empty_error_body_returns_status", http.StatusForbidden, "", true, "403"},
+			{name: "status_200_succeeds", status: http.StatusOK, body: "", wantErr: false, errContains: ""},
+			{name: "status_399_succeeds", status: 399, body: "", wantErr: false, errContains: ""},
+			{name: "status_400_returns_error", status: http.StatusBadRequest, body: "bad request body", wantErr: true, errContains: "400"},
+			{name: "error_body_included_in_message", status: http.StatusInternalServerError, body: "detailed error info", wantErr: true, errContains: "detailed error info"},
+			{name: "empty_error_body_returns_status", status: http.StatusForbidden, body: "", wantErr: true, errContains: "403"},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {

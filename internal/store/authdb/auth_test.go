@@ -98,10 +98,10 @@ func TestGetUser_lookup_methods(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
 		lookup    func() (*api.User, error)
-		wantNil   bool
 		checkUser func(t *testing.T, u *api.User)
+		name      string
+		wantNil   bool
 	}{
 		{
 			name:   "ByID_returns_user",

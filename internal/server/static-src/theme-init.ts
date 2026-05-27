@@ -26,10 +26,9 @@
 (function () {
   try {
     const raw = localStorage.getItem("subflux-theme");
-    const stored: "dark" | "light" | null =
-      raw === "dark" || raw === "light" ? raw : null;
-    const theme: "dark" | "light" = stored ??
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const stored: "dark" | "light" | null = raw === "dark" || raw === "light" ? raw : null;
+    const theme: "dark" | "light" =
+      stored ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     document.documentElement.setAttribute("data-theme", theme);
   } catch {
     document.documentElement.setAttribute("data-theme", "dark");

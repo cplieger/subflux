@@ -272,27 +272,27 @@ func TestHandler_returns_prometheus_text_format(t *testing.T) {
 		name    string
 		pattern string
 	}{
-		{"searches counter", `subflux_searches_total{provider="opensubtitles"} 2`},
-		{"search errors", `subflux_search_errors_total{provider="opensubtitles"} 1`},
-		{"downloads counter", `subflux_downloads_total{provider="opensubtitles"} 1`},
-		{"imports counter", `subflux_imports_detected_total{source="sonarr"} 1`},
-		{"scans counter", "subflux_scans_total 1"},
-		{"scan items", "subflux_scan_items_total 42"},
-		{"scan found", "subflux_scan_found_total 7"},
-		{"scan duration", "subflux_scan_duration_seconds 2.000"},
-		{"adaptive skips", "subflux_adaptive_skips_total 1"},
-		{"search duration count", `subflux_search_duration_seconds_count{provider="opensubtitles"} 2`},
-		{"search duration sum", `subflux_search_duration_seconds_sum{provider="opensubtitles"} 1.500`},
-		{"search duration bucket 0.5", `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="0.5"}`},
-		{"search duration bucket 1", `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="1"}`},
-		{"search duration bucket +Inf", `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="+Inf"} 2`},
-		{"TYPE counter", "# TYPE subflux_searches_total counter"},
-		{"TYPE single counter", "# TYPE subflux_scans_total counter"},
-		{"TYPE gauge", "# TYPE subflux_scan_duration_seconds gauge"},
-		{"TYPE histogram", "# TYPE subflux_search_duration_seconds histogram"},
-		{"HELP searches", "# HELP subflux_searches_total Total subtitle searches by provider"},
-		{"HELP scans", "# HELP subflux_scans_total Total full scans completed"},
-		{"HELP duration", "# HELP subflux_search_duration_seconds Search duration"},
+		{name: "searches counter", pattern: `subflux_searches_total{provider="opensubtitles"} 2`},
+		{name: "search errors", pattern: `subflux_search_errors_total{provider="opensubtitles"} 1`},
+		{name: "downloads counter", pattern: `subflux_downloads_total{provider="opensubtitles"} 1`},
+		{name: "imports counter", pattern: `subflux_imports_detected_total{source="sonarr"} 1`},
+		{name: "scans counter", pattern: "subflux_scans_total 1"},
+		{name: "scan items", pattern: "subflux_scan_items_total 42"},
+		{name: "scan found", pattern: "subflux_scan_found_total 7"},
+		{name: "scan duration", pattern: "subflux_scan_duration_seconds 2.000"},
+		{name: "adaptive skips", pattern: "subflux_adaptive_skips_total 1"},
+		{name: "search duration count", pattern: `subflux_search_duration_seconds_count{provider="opensubtitles"} 2`},
+		{name: "search duration sum", pattern: `subflux_search_duration_seconds_sum{provider="opensubtitles"} 1.500`},
+		{name: "search duration bucket 0.5", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="0.5"}`},
+		{name: "search duration bucket 1", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="1"}`},
+		{name: "search duration bucket +Inf", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="+Inf"} 2`},
+		{name: "TYPE counter", pattern: "# TYPE subflux_searches_total counter"},
+		{name: "TYPE single counter", pattern: "# TYPE subflux_scans_total counter"},
+		{name: "TYPE gauge", pattern: "# TYPE subflux_scan_duration_seconds gauge"},
+		{name: "TYPE histogram", pattern: "# TYPE subflux_search_duration_seconds histogram"},
+		{name: "HELP searches", pattern: "# HELP subflux_searches_total Total subtitle searches by provider"},
+		{name: "HELP scans", pattern: "# HELP subflux_scans_total Total full scans completed"},
+		{name: "HELP duration", pattern: "# HELP subflux_search_duration_seconds Search duration"},
 	}
 	for _, c := range checks {
 		if !strings.Contains(body, c.pattern) {
@@ -346,10 +346,10 @@ func TestHandler_empty_metrics_returns_scalar_metrics(t *testing.T) {
 func TestMetrics_concurrent_safety(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		goroutines int
 		action     func(m *Metrics, i int)
 		assert     func(t *testing.T, m *Metrics, goroutines int)
+		name       string
+		goroutines int
 	}{
 		{
 			name:       "RecordSearch_same_provider",

@@ -98,9 +98,7 @@ func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t 
 // constructs one from config (or uses noopHealth if disabled).
 func WithTimeout(h timeout.ProviderHealth) Option { return func(e *Engine) { e.timeout = h } }
 
-// WithFileWriter sets the file writer used for saving downloaded subtitles.
-// When not set, the engine uses fsutil.AtomicWriteFile.
-func WithFileWriter(w FileWriter) Option { return func(e *Engine) { e.fileWriter = w } }
+
 
 // noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}

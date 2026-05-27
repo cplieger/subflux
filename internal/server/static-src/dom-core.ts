@@ -5,15 +5,19 @@ export function $(id: string): HTMLElement | null {
 }
 
 export function show(el: HTMLElement | null): void {
-  if (el) el.hidden = false;
+  if (el) {
+    el.hidden = false;
+  }
 }
 
 export function hide(el: HTMLElement | null): void {
-  if (el) el.hidden = true;
+  if (el) {
+    el.hidden = true;
+  }
 }
 
 export function showPage(pageId: string): void {
-  const pages = document.querySelectorAll('.auth-page');
+  const pages = document.querySelectorAll(".auth-page");
   for (const p of pages) {
     (p as HTMLElement).hidden = true;
   }
@@ -22,7 +26,9 @@ export function showPage(pageId: string): void {
 
 export function showError(id: string, msg: string): void {
   const el = $(id);
-  if (!el) return;
+  if (!el) {
+    return;
+  }
   el.textContent = msg;
   el.hidden = false;
 }

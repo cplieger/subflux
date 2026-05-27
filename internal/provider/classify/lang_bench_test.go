@@ -7,10 +7,10 @@ func BenchmarkAlpha2FromAlpha3(b *testing.B) {
 		name string
 		code string
 	}{
-		{"known_3char", "eng"},
-		{"unknown_3char", "zzz"},
-		{"already_2char", "en"},
-		{"empty", ""},
+		{name: "known_3char", code: "eng"},
+		{name: "unknown_3char", code: "zzz"},
+		{name: "already_2char", code: "en"},
+		{name: "empty", code: ""},
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
@@ -25,14 +25,14 @@ func BenchmarkLookupLangName(b *testing.B) {
 	overrides := map[string]string{"pb": "Brazillian Portuguese"}
 
 	cases := []struct {
+		overrides map[string]string
 		name      string
 		code      string
-		overrides map[string]string
 	}{
-		{"known_no_overrides", "en", nil},
-		{"known_with_overrides", "en", overrides},
-		{"override_hit", "pb", overrides},
-		{"unknown", "xx", nil},
+		{name: "known_no_overrides", code: "en", overrides: nil},
+		{name: "known_with_overrides", code: "en", overrides: overrides},
+		{name: "override_hit", code: "pb", overrides: overrides},
+		{name: "unknown", code: "xx", overrides: nil},
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {

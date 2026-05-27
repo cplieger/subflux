@@ -19,17 +19,14 @@
 import { apiRequestRaw } from "../api-client.js";
 import { defineAction, IDEMPOTENCY_HEADER } from "./define.js";
 import { ActionError } from "./error.js";
-import type {
-  Action,
-  ActionContext,
-  ActionDefinition,
-  RequestSpec,
-} from "./types.js";
+import type { Action, ActionContext, ActionDefinition, RequestSpec } from "./types.js";
 
 /** Caller-facing shape of an apiAction definition. Differs from the
  *  raw ActionDefinition in that `request` replaces `run`. */
-interface ApiActionDefinition<TArgs, TResult, TOp = unknown>
-  extends Omit<ActionDefinition<TArgs, TResult, TOp>, "run"> {
+interface ApiActionDefinition<TArgs, TResult, TOp = unknown> extends Omit<
+  ActionDefinition<TArgs, TResult, TOp>,
+  "run"
+> {
   /** HTTP request descriptor. Re-evaluated for each dispatch with the
    *  current args (so paths can interpolate args). */
   request: (args: TArgs) => RequestSpec;
@@ -72,9 +69,7 @@ async function executeRequest<T>(
   ctx?: ActionContext,
 ): Promise<T> {
   const headers: Record<string, string> | undefined =
-    ctx?.idempotencyKey !== undefined
-      ? { [IDEMPOTENCY_HEADER]: ctx.idempotencyKey }
-      : undefined;
+    ctx?.idempotencyKey !== undefined ? { [IDEMPOTENCY_HEADER]: ctx.idempotencyKey } : undefined;
   const body = spec.method === "GET" ? undefined : spec.body;
   const result = await apiRequestRaw<T>(spec.method, spec.path, body, signal, headers);
   if (!result.ok) {
@@ -88,10 +83,7 @@ async function executeRequest<T>(
       // Network/timeout failure with no server-supplied code.
       opts.code = signal.aborted ? "cancelled" : "network";
     }
-    throw new ActionError(
-      result.error ?? `HTTP ${String(result.status)}`,
-      opts,
-    );
+    throw new ActionError(result.error ?? `HTTP ${String(result.status)}`, opts);
   }
-  return (result.data as T);
+  return result.data as T;
 }

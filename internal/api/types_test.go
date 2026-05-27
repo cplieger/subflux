@@ -95,14 +95,14 @@ func TestVariantFromFlags(t *testing.T) {
 
 	tests := []struct {
 		name   string
+		want   Variant
 		hi     bool
 		forced bool
-		want   Variant
 	}{
-		{"standard", false, false, DefaultVariant},
-		{"hi", true, false, VariantHI},
-		{"forced", false, true, VariantForced},
-		{"hi takes precedence over forced", true, true, VariantHI},
+		{name: "standard", hi: false, forced: false, want: DefaultVariant},
+		{name: "hi", hi: true, forced: false, want: VariantHI},
+		{name: "forced", hi: false, forced: true, want: VariantForced},
+		{name: "hi takes precedence over forced", hi: true, forced: true, want: VariantHI},
 	}
 
 	for _, tt := range tests {
@@ -125,66 +125,18 @@ func TestBuildMediaID(t *testing.T) {
 		req  *SearchRequest
 		want string
 	}{
-		{
-			"movie with tmdb ID",
-			&SearchRequest{MediaType: "movie", TmdbID: 42},
-			"tmdb-42",
-		},
-		{
-			"movie with both IDs prefers tmdb",
-			&SearchRequest{MediaType: "movie", ImdbID: "tt9999999", TmdbID: 42},
-			"tmdb-42",
-		},
-		{
-			"movie with imdb ID only",
-			&SearchRequest{MediaType: "movie", ImdbID: "tt1234567"},
-			"tt1234567",
-		},
-		{
-			"movie with no IDs returns empty",
-			&SearchRequest{MediaType: "movie"},
-			"",
-		},
-		{
-			"episode with tvdb ID",
-			&SearchRequest{MediaType: "episode", TvdbID: 81189, Season: 3, Episode: 7},
-			"tvdb-81189-s03e07",
-		},
-		{
-			"episode with tvdb and imdb prefers tvdb",
-			&SearchRequest{MediaType: "episode", ImdbID: "tt1234567", TvdbID: 81189, Season: 3, Episode: 7},
-			"tvdb-81189-s03e07",
-		},
-		{
-			"episode with imdb only fallback",
-			&SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7},
-			"tt1234567-s03e07",
-		},
-		{
-			"episode with zero season and episode",
-			&SearchRequest{MediaType: "episode", TvdbID: 1, Season: 0, Episode: 0},
-			"tvdb-1-s00e00",
-		},
-		{
-			"episode with large season and episode numbers",
-			&SearchRequest{MediaType: "episode", TvdbID: 99999, Season: 99, Episode: 150},
-			"tvdb-99999-s99e150",
-		},
-		{
-			"episode with no IDs",
-			&SearchRequest{MediaType: "episode", Season: 1, Episode: 1},
-			"s01e01",
-		},
-		{
-			"unknown media type falls through to episode path",
-			&SearchRequest{MediaType: "special", TvdbID: 100, Season: 0, Episode: 1},
-			"tvdb-100-s00e01",
-		},
-		{
-			"movie with negative tmdb ID still used",
-			&SearchRequest{MediaType: "movie", TmdbID: -1},
-			"tmdb--1",
-		},
+		{name: "movie with tmdb ID", req: &SearchRequest{MediaType: "movie", TmdbID: 42}, want: "tmdb-42"},
+		{name: "movie with both IDs prefers tmdb", req: &SearchRequest{MediaType: "movie", ImdbID: "tt9999999", TmdbID: 42}, want: "tmdb-42"},
+		{name: "movie with imdb ID only", req: &SearchRequest{MediaType: "movie", ImdbID: "tt1234567"}, want: "tt1234567"},
+		{name: "movie with no IDs returns empty", req: &SearchRequest{MediaType: "movie"}, want: ""},
+		{name: "episode with tvdb ID", req: &SearchRequest{MediaType: "episode", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
+		{name: "episode with tvdb and imdb prefers tvdb", req: &SearchRequest{MediaType: "episode", ImdbID: "tt1234567", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
+		{name: "episode with imdb only fallback", req: &SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7}, want: "tt1234567-s03e07"},
+		{name: "episode with zero season and episode", req: &SearchRequest{MediaType: "episode", TvdbID: 1, Season: 0, Episode: 0}, want: "tvdb-1-s00e00"},
+		{name: "episode with large season and episode numbers", req: &SearchRequest{MediaType: "episode", TvdbID: 99999, Season: 99, Episode: 150}, want: "tvdb-99999-s99e150"},
+		{name: "episode with no IDs", req: &SearchRequest{MediaType: "episode", Season: 1, Episode: 1}, want: "s01e01"},
+		{name: "unknown media type falls through to episode path", req: &SearchRequest{MediaType: "special", TvdbID: 100, Season: 0, Episode: 1}, want: "tvdb-100-s00e01"},
+		{name: "movie with negative tmdb ID still used", req: &SearchRequest{MediaType: "movie", TmdbID: -1}, want: "tmdb--1"},
 	}
 
 	for _, tt := range tests {
@@ -210,10 +162,10 @@ func TestBuildMovieID(t *testing.T) {
 		want   string
 		tmdbID int
 	}{
-		{"tmdb present", "", "tmdb-42", 42},
-		{"imdb only", "tt1234567", "tt1234567", 0},
-		{"both prefers tmdb", "tt1234567", "tmdb-42", 42},
-		{"neither returns empty", "", "", 0},
+		{name: "tmdb present", imdbID: "", want: "tmdb-42", tmdbID: 42},
+		{name: "imdb only", imdbID: "tt1234567", want: "tt1234567", tmdbID: 0},
+		{name: "both prefers tmdb", imdbID: "tt1234567", want: "tmdb-42", tmdbID: 42},
+		{name: "neither returns empty", imdbID: "", want: "", tmdbID: 0},
 	}
 
 	for _, tt := range tests {
@@ -241,10 +193,10 @@ func TestBuildEpisodeID(t *testing.T) {
 		season  int
 		episode int
 	}{
-		{"tvdb present", "", "tvdb-81189-s03e07", 81189, 3, 7},
-		{"imdb fallback", "tt1234567", "tt1234567-s01e01", 0, 1, 1},
-		{"both prefers tvdb", "tt1234567", "tvdb-81189-s03e07", 81189, 3, 7},
-		{"no IDs", "", "s01e01", 0, 1, 1},
+		{name: "tvdb present", imdbID: "", want: "tvdb-81189-s03e07", tvdbID: 81189, season: 3, episode: 7},
+		{name: "imdb fallback", imdbID: "tt1234567", want: "tt1234567-s01e01", tvdbID: 0, season: 1, episode: 1},
+		{name: "both prefers tvdb", imdbID: "tt1234567", want: "tvdb-81189-s03e07", tvdbID: 81189, season: 3, episode: 7},
+		{name: "no IDs", imdbID: "", want: "s01e01", tvdbID: 0, season: 1, episode: 1},
 	}
 
 	for _, tt := range tests {
@@ -270,10 +222,10 @@ func TestBuildSeriesPrefix(t *testing.T) {
 		want   string
 		tvdbID int
 	}{
-		{"tvdb present", "", "tvdb-81189-", 81189},
-		{"imdb only", "tt1234567", "tt1234567-", 0},
-		{"both prefers tvdb", "tt1234567", "tvdb-81189-", 81189},
-		{"no IDs returns empty", "", "", 0},
+		{name: "tvdb present", imdbID: "", want: "tvdb-81189-", tvdbID: 81189},
+		{name: "imdb only", imdbID: "tt1234567", want: "tt1234567-", tvdbID: 0},
+		{name: "both prefers tvdb", imdbID: "tt1234567", want: "tvdb-81189-", tvdbID: 81189},
+		{name: "no IDs returns empty", imdbID: "", want: "", tvdbID: 0},
 	}
 
 	for _, tt := range tests {
@@ -298,46 +250,14 @@ func TestMediaLabel(t *testing.T) {
 		req  *SearchRequest
 		want string
 	}{
-		{
-			"movie with year",
-			&SearchRequest{MediaType: "movie", Title: "Inception", Year: 2010},
-			"Inception (2010)",
-		},
-		{
-			"movie without year",
-			&SearchRequest{MediaType: "movie", Title: "Inception"},
-			"Inception",
-		},
-		{
-			"episode with year",
-			&SearchRequest{MediaType: "episode", Title: "Bleach", Year: 2004, Season: 9, Episode: 15},
-			"Bleach (2004) - S09E15",
-		},
-		{
-			"episode without year",
-			&SearchRequest{MediaType: "episode", Title: "Bleach", Season: 1, Episode: 1},
-			"Bleach - S01E01",
-		},
-		{
-			"episode zero-pads season and episode",
-			&SearchRequest{MediaType: "episode", Title: "Show", Year: 2020, Season: 1, Episode: 5},
-			"Show (2020) - S01E05",
-		},
-		{
-			"empty title movie",
-			&SearchRequest{MediaType: "movie", Title: ""},
-			"",
-		},
-		{
-			"empty title episode without year",
-			&SearchRequest{MediaType: "episode", Title: "", Season: 1, Episode: 1},
-			" - S01E01",
-		},
-		{
-			"episode with large episode number",
-			&SearchRequest{MediaType: "episode", Title: "Show", Year: 2020, Season: 1, Episode: 999},
-			"Show (2020) - S01E999",
-		},
+		{name: "movie with year", req: &SearchRequest{MediaType: "movie", Title: "Inception", Year: 2010}, want: "Inception (2010)"},
+		{name: "movie without year", req: &SearchRequest{MediaType: "movie", Title: "Inception"}, want: "Inception"},
+		{name: "episode with year", req: &SearchRequest{MediaType: "episode", Title: "Bleach", Year: 2004, Season: 9, Episode: 15}, want: "Bleach (2004) - S09E15"},
+		{name: "episode without year", req: &SearchRequest{MediaType: "episode", Title: "Bleach", Season: 1, Episode: 1}, want: "Bleach - S01E01"},
+		{name: "episode zero-pads season and episode", req: &SearchRequest{MediaType: "episode", Title: "Show", Year: 2020, Season: 1, Episode: 5}, want: "Show (2020) - S01E05"},
+		{name: "empty title movie", req: &SearchRequest{MediaType: "movie", Title: ""}, want: ""},
+		{name: "empty title episode without year", req: &SearchRequest{MediaType: "episode", Title: "", Season: 1, Episode: 1}, want: " - S01E01"},
+		{name: "episode with large episode number", req: &SearchRequest{MediaType: "episode", Title: "Show", Year: 2020, Season: 1, Episode: 999}, want: "Show (2020) - S01E999"},
 	}
 
 	for _, tt := range tests {

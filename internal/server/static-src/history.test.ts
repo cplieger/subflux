@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 vi.mock("./actions/index.js", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue([]) })),
@@ -7,14 +7,17 @@ vi.mock("./actions/index.js", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {}),
+  on: vi.fn(() => () => {
+    /* noop */
+  }),
   emit: vi.fn(),
   BusEvent: { LoadHistory: "load:history", NavRoute: "nav:route" },
 }));
 
 describe("history: renderItems", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="historyPanel"><div id="coverageContent"></div><select id="h-lang"></select><select id="h-provider"></select></div>';
+    document.body.innerHTML =
+      '<div id="historyPanel"><div id="coverageContent"></div><select id="h-lang"></select><select id="h-provider"></select></div>';
   });
 
   it.todo("renders table with thead and tbody");

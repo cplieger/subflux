@@ -274,10 +274,10 @@ func TestNextManualNumber(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		seedSQL   []string
 		mediaType api.MediaType
 		mediaID   string
 		lang      string
+		seedSQL   []string
 		want      int
 	}{
 		{

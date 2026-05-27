@@ -12,8 +12,8 @@ func TestClient_get_timeout_matrix(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
 		ctxFunc     func() (context.Context, context.CancelFunc)
+		name        string
 		defTimeout  time.Duration
 		serverDelay time.Duration
 		wantErr     bool
@@ -110,18 +110,18 @@ func TestStatusError_IsTransient(t *testing.T) {
 		code      int
 		transient bool
 	}{
-		{408, false},
-		{429, true},
-		{500, true},
-		{502, true},
-		{503, true},
-		{504, true},
-		{400, false},
-		{401, false},
-		{403, false},
-		{404, false},
-		{422, false},
-		{200, false},
+		{code: 408, transient: false},
+		{code: 429, transient: true},
+		{code: 500, transient: true},
+		{code: 502, transient: true},
+		{code: 503, transient: true},
+		{code: 504, transient: true},
+		{code: 400, transient: false},
+		{code: 401, transient: false},
+		{code: 403, transient: false},
+		{code: 404, transient: false},
+		{code: 422, transient: false},
+		{code: 200, transient: false},
 	}
 
 	for _, tc := range tests {

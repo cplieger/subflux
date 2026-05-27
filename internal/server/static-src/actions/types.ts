@@ -10,34 +10,33 @@
  *  `ActionStatus` interface from `action-status.ts` which is a richer
  *  per-name snapshot ({ pending, lastError, lastSuccess, ... }). */
 export type ActionLifecycleStatus =
-  | "pending"     // optimistic ran (if any), run() in flight
-  | "success"     // run() resolved
-  | "error"       // run() threw; rollback ran
-  | "cancelled";  // action.cancel() called or signal aborted externally
-
+  | "pending" // optimistic ran (if any), run() in flight
+  | "success" // run() resolved
+  | "error" // run() threw; rollback ran
+  | "cancelled"; // action.cancel() called or signal aborted externally
 
 /** Errors thrown by an action's run() function. ActionError subclass
  *  in error.ts attaches HTTP status + server error code metadata. */
 export interface ActionErrorLike {
   readonly message: string;
-  readonly status?: number;   // HTTP status if applicable
-  readonly code?: string;     // server-side error code
+  readonly status?: number; // HTTP status if applicable
+  readonly code?: string; // server-side error code
   readonly cause?: unknown;
 }
 
 /** Snapshot of a single in-flight or historical action invocation.
  *  Stored in the registry log for observability. */
 export interface ActionInstance<TArgs = unknown, TResult = unknown> {
-  readonly id: string;            // ULID-like; unique per dispatch
-  readonly name: string;          // matches ActionDefinition.name
+  readonly id: string; // ULID-like; unique per dispatch
+  readonly name: string; // matches ActionDefinition.name
   readonly status: ActionLifecycleStatus;
   readonly args: TArgs;
-  readonly dispatchedAt: number;  // Date.now() when dispatch() was called
-  readonly startedAt: number;     // Date.now() when run() begins (after scope queue)
-  readonly completedAt?: number;  // Date.now() at terminal state
-  readonly result?: TResult;      // present iff status === "success"
+  readonly dispatchedAt: number; // Date.now() when dispatch() was called
+  readonly startedAt: number; // Date.now() when run() begins (after scope queue)
+  readonly completedAt?: number; // Date.now() at terminal state
+  readonly result?: TResult; // present iff status === "success"
   readonly error?: ActionErrorLike; // present iff status === "error"
-  readonly attempts?: number;     // total run() invocations (1 = no retry; >1 = retries fired)
+  readonly attempts?: number; // total run() invocations (1 = no retry; >1 = retries fired)
 
   // --- Fields considered and rejected ---
   // signal: AbortSignal — ActionInstance is a serializable snapshot;
@@ -276,7 +275,11 @@ export interface DispatchOptions<TArgs = unknown, TResult = unknown> {
  *  without writing a custom defineAction. */
 export type RequestSpec =
   | { readonly method: "GET"; readonly path: string }
-  | { readonly method: "POST" | "PUT" | "PATCH" | "DELETE"; readonly path: string; readonly body?: unknown };
+  | {
+      readonly method: "POST" | "PUT" | "PATCH" | "DELETE";
+      readonly path: string;
+      readonly body?: unknown;
+    };
 
 // (TransportSpec was an unused parallel descriptor — transportAction
 // uses TypedCommand | Command from transport.ts directly. Removed.)

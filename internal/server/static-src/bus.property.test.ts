@@ -25,19 +25,27 @@ describe("bus property", () => {
         fc.array(fc.string({ maxLength: 50 }), { minLength: 0, maxLength: 30 }), // emitted payloads
         (subCount, payloads) => {
           const buckets: string[][] = [];
-          const unsubs: Array<() => void> = [];
+          const unsubs: (() => void)[] = [];
           for (let i = 0; i < subCount; i++) {
             const seen: string[] = [];
             buckets.push(seen);
-            unsubs.push(on(BusEvent.NavRoute, (path: string) => { seen.push(path); }));
+            unsubs.push(
+              on(BusEvent.NavRoute, (path: string) => {
+                seen.push(path);
+              }),
+            );
           }
           try {
-            for (const p of payloads) emit(BusEvent.NavRoute, p);
+            for (const p of payloads) {
+              emit(BusEvent.NavRoute, p);
+            }
             for (const b of buckets) {
               expect(b).toEqual(payloads);
             }
           } finally {
-            for (const u of unsubs) u();
+            for (const u of unsubs) {
+              u();
+            }
           }
         },
       ),
@@ -53,11 +61,17 @@ describe("bus property", () => {
           const cutoff = Math.min(rawCutoff, payloads.length);
           const a: string[] = [];
           const b: string[] = [];
-          const unsubA = on(BusEvent.NavRoute, (p: string) => { a.push(p); });
-          const unsubB = on(BusEvent.NavRoute, (p: string) => { b.push(p); });
+          const unsubA = on(BusEvent.NavRoute, (p: string) => {
+            a.push(p);
+          });
+          const unsubB = on(BusEvent.NavRoute, (p: string) => {
+            b.push(p);
+          });
           try {
             for (let i = 0; i < payloads.length; i++) {
-              if (i === cutoff) unsubA();
+              if (i === cutoff) {
+                unsubA();
+              }
               emit(BusEvent.NavRoute, payloads[i] as string);
             }
             // a saw exactly the first `cutoff` payloads (after cutoff,
@@ -81,11 +95,19 @@ describe("bus property", () => {
         (aPayloads, bPayloads) => {
           const a: string[] = [];
           const b: string[] = [];
-          const unsubA = on(BusEvent.NavRoute, (p: string) => { a.push(p); });
-          const unsubB = on(BusEvent.NavHistory, (p: string | undefined) => { b.push(p ?? ""); });
+          const unsubA = on(BusEvent.NavRoute, (p: string) => {
+            a.push(p);
+          });
+          const unsubB = on(BusEvent.NavHistory, (p: string | undefined) => {
+            b.push(p ?? "");
+          });
           try {
-            for (const p of aPayloads) emit(BusEvent.NavRoute, p);
-            for (const p of bPayloads) emit(BusEvent.NavHistory, p);
+            for (const p of aPayloads) {
+              emit(BusEvent.NavRoute, p);
+            }
+            for (const p of bPayloads) {
+              emit(BusEvent.NavHistory, p);
+            }
             expect(a).toEqual(aPayloads);
             expect(b).toEqual(bPayloads);
           } finally {

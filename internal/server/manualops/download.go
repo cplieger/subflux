@@ -50,12 +50,7 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 	return nil
 }
 
-// ParseDownloadRequest validates and normalises a DownloadRequest.
-// This is the entry point for request validation after JSON decoding.
-// Alias for ValidateDownloadRequest — kept for API discoverability.
-func ParseDownloadRequest(req *DownloadRequest) error {
-	return ValidateDownloadRequest(req)
-}
+
 
 // DownloadStore is the narrow store interface for manual download operations.
 type DownloadStore interface {

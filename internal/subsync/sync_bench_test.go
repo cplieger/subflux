@@ -9,9 +9,9 @@ import (
 func BenchmarkSyncWithOptions(b *testing.B) {
 	cases := []struct {
 		name string
+		opts SyncOptions
 		refN int
 		incN int
-		opts SyncOptions
 	}{
 		{
 			name: "50_cues_offset",

@@ -405,12 +405,11 @@ func TestHandleState_filters_passed_through(t *testing.T) {
 
 // filterTrackingStore tracks the filter params passed to GetState.
 type filterTrackingStore struct {
-	qhMockStore
-
 	mediaType api.MediaType
 	language  string
 	provider  string
 	search    string
+	qhMockStore
 }
 
 func (m *filterTrackingStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {

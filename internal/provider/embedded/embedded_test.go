@@ -19,18 +19,18 @@ func TestDetectHIFromName(t *testing.T) {
 		input string
 		want  bool
 	}{
-		{"contains_sdh_lower", "English SDH", true},
-		{"contains_sdh_mixed", "english sdh", true},
-		{"contains_hearing_impaired", "English (Hearing Impaired)", true},
-		{"contains_hearing_impaired_lower", "hearing impaired", true},
-		{"contains_hard_of_hearing", "Hard of Hearing", true},
-		{"contains_hard_of_hearing_lower", "hard of hearing", true},
-		{"no_hi_markers", "English", false},
-		{"empty_string", "", false},
-		{"partial_match_sd", "SD quality", false},
-		{"partial_match_hear", "hearing", false},
-		{"forced_not_hi", "English Forced", false},
-		{"sdh_in_middle", "Track SDH English", true},
+		{name: "contains_sdh_lower", input: "English SDH", want: true},
+		{name: "contains_sdh_mixed", input: "english sdh", want: true},
+		{name: "contains_hearing_impaired", input: "English (Hearing Impaired)", want: true},
+		{name: "contains_hearing_impaired_lower", input: "hearing impaired", want: true},
+		{name: "contains_hard_of_hearing", input: "Hard of Hearing", want: true},
+		{name: "contains_hard_of_hearing_lower", input: "hard of hearing", want: true},
+		{name: "no_hi_markers", input: "English", want: false},
+		{name: "empty_string", input: "", want: false},
+		{name: "partial_match_sd", input: "SD quality", want: false},
+		{name: "partial_match_hear", input: "hearing", want: false},
+		{name: "forced_not_hi", input: "English Forced", want: false},
+		{name: "sdh_in_middle", input: "Track SDH English", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,15 +52,15 @@ func TestDetectForcedFromName(t *testing.T) {
 		input string
 		want  bool
 	}{
-		{"contains_forced", "English Forced", true},
-		{"contains_forced_lower", "forced", true},
-		{"contains_foreign", "Foreign Parts Only", true},
-		{"contains_foreign_lower", "foreign", true},
-		{"no_forced_markers", "English", false},
-		{"empty_string", "", false},
-		{"sdh_not_forced", "English SDH", false},
-		{"forced_in_middle", "Track Forced English", true},
-		{"foreign_in_middle", "Track Foreign Parts", true},
+		{name: "contains_forced", input: "English Forced", want: true},
+		{name: "contains_forced_lower", input: "forced", want: true},
+		{name: "contains_foreign", input: "Foreign Parts Only", want: true},
+		{name: "contains_foreign_lower", input: "foreign", want: true},
+		{name: "no_forced_markers", input: "English", want: false},
+		{name: "empty_string", input: "", want: false},
+		{name: "sdh_not_forced", input: "English SDH", want: false},
+		{name: "forced_in_middle", input: "Track Forced English", want: true},
+		{name: "foreign_in_middle", input: "Track Foreign Parts", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,13 +79,13 @@ func TestNormalizeTrack_valid(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
-		index     int
 		codec     string
 		lang      string
 		trackName string
+		wantLang  string
+		index     int
 		forced    bool
 		hi        bool
-		wantLang  string
 		wantForce bool
 		wantHI    bool
 	}{
@@ -210,8 +210,8 @@ func TestNormalizeTrack_returns_nil(t *testing.T) {
 		name string
 		lang string
 	}{
-		{"empty_language", ""},
-		{"undefined_language", "und"},
+		{name: "empty_language", lang: ""},
+		{name: "undefined_language", lang: "und"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -231,22 +231,22 @@ func TestIsIgnoredCodec(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string
+		codec        string
 		ignorePGS    bool
 		ignoreVobSub bool
 		ignoreASS    bool
-		codec        string
 		want         bool
 	}{
-		{"pgs_ignored", true, false, false, "pgs", true},
-		{"pgs_not_ignored", false, false, false, "pgs", false},
-		{"vobsub_ignored", false, true, false, "vobsub", true},
-		{"vobsub_not_ignored", false, false, false, "vobsub", false},
-		{"ass_ignored", false, false, true, "ass", true},
-		{"ssa_ignored", false, false, true, "ssa", true},
-		{"ass_not_ignored", false, false, false, "ass", false},
-		{"srt_never_ignored", true, true, true, "srt", false},
-		{"webvtt_never_ignored", true, true, true, "webvtt", false},
-		{"all_off_pgs", false, false, false, "pgs", false},
+		{name: "pgs_ignored", ignorePGS: true, ignoreVobSub: false, ignoreASS: false, codec: "pgs", want: true},
+		{name: "pgs_not_ignored", ignorePGS: false, ignoreVobSub: false, ignoreASS: false, codec: "pgs", want: false},
+		{name: "vobsub_ignored", ignorePGS: false, ignoreVobSub: true, ignoreASS: false, codec: "vobsub", want: true},
+		{name: "vobsub_not_ignored", ignorePGS: false, ignoreVobSub: false, ignoreASS: false, codec: "vobsub", want: false},
+		{name: "ass_ignored", ignorePGS: false, ignoreVobSub: false, ignoreASS: true, codec: "ass", want: true},
+		{name: "ssa_ignored", ignorePGS: false, ignoreVobSub: false, ignoreASS: true, codec: "ssa", want: true},
+		{name: "ass_not_ignored", ignorePGS: false, ignoreVobSub: false, ignoreASS: false, codec: "ass", want: false},
+		{name: "srt_never_ignored", ignorePGS: true, ignoreVobSub: true, ignoreASS: true, codec: "srt", want: false},
+		{name: "webvtt_never_ignored", ignorePGS: true, ignoreVobSub: true, ignoreASS: true, codec: "webvtt", want: false},
+		{name: "all_off_pgs", ignorePGS: false, ignoreVobSub: false, ignoreASS: false, codec: "pgs", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -270,24 +270,20 @@ func TestIsIgnoredCodec(t *testing.T) {
 func TestFactory(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
 		settings map[string]any
+		name     string
 		wantPGS  bool
 		wantVob  bool
 		wantASS  bool
 	}{
-		{"nil_settings", nil, false, false, false},
-		{"all_defaults", map[string]any{}, false, false, false},
-		{"ignore_pgs", map[string]any{"ignore_pgs": true}, true, false, false},
-		{"ignore_vobsub", map[string]any{"ignore_vobsub": true}, false, true, false},
-		{"ignore_ass", map[string]any{"ignore_ass": true}, false, false, true},
-		{
-			"all_ignored",
-			map[string]any{"ignore_pgs": true, "ignore_vobsub": true, "ignore_ass": true},
-			true, true, true,
-		},
-		{"string_true_accepted", map[string]any{"ignore_pgs": "true"}, true, false, false},
-		{"non_true_value_ignored", map[string]any{"ignore_pgs": "yes"}, false, false, false},
+		{name: "nil_settings", settings: nil, wantPGS: false, wantVob: false, wantASS: false},
+		{name: "all_defaults", settings: map[string]any{}, wantPGS: false, wantVob: false, wantASS: false},
+		{name: "ignore_pgs", settings: map[string]any{"ignore_pgs": true}, wantPGS: true, wantVob: false, wantASS: false},
+		{name: "ignore_vobsub", settings: map[string]any{"ignore_vobsub": true}, wantPGS: false, wantVob: true, wantASS: false},
+		{name: "ignore_ass", settings: map[string]any{"ignore_ass": true}, wantPGS: false, wantVob: false, wantASS: true},
+		{name: "all_ignored", settings: map[string]any{"ignore_pgs": true, "ignore_vobsub": true, "ignore_ass": true}, wantPGS: true, wantVob: true, wantASS: true},
+		{name: "string_true_accepted", settings: map[string]any{"ignore_pgs": "true"}, wantPGS: true, wantVob: false, wantASS: false},
+		{name: "non_true_value_ignored", settings: map[string]any{"ignore_pgs": "yes"}, wantPGS: false, wantVob: false, wantASS: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -391,20 +387,20 @@ func TestNormalizeCodecName(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"subrip", "srt"},
-		{"ass", "ass"},
-		{"ssa", "ssa"},
-		{"webvtt", "webvtt"},
-		{"mov_text", "mov_text"},
-		{"hdmv_pgs_subtitle", "pgs"},
-		{"dvd_subtitle", "vobsub"},
-		{"dvb_subtitle", "dvbsub"},
-		{"dvb_teletext", "teletext"},
-		{"eia_608", "cea608"},
-		{"ttml", "ttml"},
-		{"text", "mov_text"},
-		{"unknown_codec", "unknown_codec"},
-		{"", ""},
+		{input: "subrip", want: "srt"},
+		{input: "ass", want: "ass"},
+		{input: "ssa", want: "ssa"},
+		{input: "webvtt", want: "webvtt"},
+		{input: "mov_text", want: "mov_text"},
+		{input: "hdmv_pgs_subtitle", want: "pgs"},
+		{input: "dvd_subtitle", want: "vobsub"},
+		{input: "dvb_subtitle", want: "dvbsub"},
+		{input: "dvb_teletext", want: "teletext"},
+		{input: "eia_608", want: "cea608"},
+		{input: "ttml", want: "ttml"},
+		{input: "text", want: "mov_text"},
+		{input: "unknown_codec", want: "unknown_codec"},
+		{input: "", want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

@@ -1,10 +1,8 @@
-
 /* ================================================================
    3. Layout shell
    ================================================================ */
 
 /* --- Header --- */
-/* stylelint-disable no-descending-specificity -- scoped selectors don't conflict */
 header:has(h1) {
   display: flex;
   justify-content: space-between;
@@ -24,56 +22,86 @@ header:has(h1) {
     color: var(--accent);
     letter-spacing: -0.02em;
 
-    & a { color: inherit; text-decoration: none; &:hover { opacity: 0.8; text-decoration: none } }
+    & a {
+      color: inherit;
+      text-decoration: none;
+
+      &:hover {
+        opacity: 0.8;
+        text-decoration: none;
+      }
+    }
   }
 
-  & nav { display: flex; gap: var(--sp-4); align-items: center }
+  & nav {
+    display: flex;
+    gap: var(--sp-4);
+    align-items: center;
+  }
 }
 
 .nav-btn {
-  transition: color var(--dur-micro), background var(--dur-micro);
+  transition:
+    color var(--dur-micro),
+    background var(--dur-micro);
 
-  &:active { translate: 0 }
-  &.active { color: var(--accent); background: color-mix(in oklch, var(--surface) 70%, var(--accent)) }
+  &:active {
+    translate: 0;
+  }
+
+  &.active {
+    color: var(--accent);
+    background: color-mix(in oklch, var(--surface) 70%, var(--accent));
+  }
 }
 
-.nav-icon { line-height: 1 }
+.nav-icon {
+  line-height: 1;
+}
 
 /* Theme toggle: sun/moon vertical transition */
 [data-action="theme"] {
   overflow: hidden;
-  transition: box-shadow 0.35s var(--ease-standard)
+  transition: box-shadow 0.35s var(--ease-standard);
 }
 
 [data-action="theme"] .nav-icon {
   display: inline-block;
-  transition: translate var(--dur-enter) var(--ease-enter)
+  transition: translate var(--dur-enter) var(--ease-enter);
 }
 
 [data-action="theme"] .nav-icon.setting {
   translate: 0 1.5rem;
-  transition: translate var(--dur-exit) var(--ease-exit)
+  transition: translate var(--dur-exit) var(--ease-exit);
 }
 
 [data-action="theme"] .nav-icon.rising {
-  translate: 0 -1.5rem
+  translate: 0 -1.5rem;
 }
 
 [data-action="theme"].glow-sun {
-  box-shadow: inset 0 -0.5rem 1rem oklch(82% 0.16 85deg / 60%)
+  box-shadow: inset 0 -0.5rem 1rem oklch(82% 0.16 85deg / 60%);
 }
 
 [data-action="theme"].glow-moon {
-  box-shadow: inset 0 -0.5rem 1rem oklch(80% 0.05 260deg / 35%)
+  box-shadow: inset 0 -0.5rem 1rem oklch(80% 0.05 260deg / 35%);
 }
 
-.nav-label { font-size: var(--text-xs); font-weight: 500 }
+.nav-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
 
 /* Mobile: hide nav labels and make buttons square touch targets */
 @container (width < 700px) {
-  .nav-label { display: none }
+  .nav-label {
+    display: none;
+  }
 
-  header:has(h1) h1 { font-size: 1.75rem; flex-shrink: 0 }
+  header:has(h1) h1 {
+    font-size: 1.75rem;
+    flex-shrink: 0;
+  }
 
   .nav-btn {
     --icon: 1.125rem;
@@ -82,27 +110,54 @@ header:has(h1) {
     padding: 0;
     justify-content: center;
     height: 2.75rem;
-    min-height: 2.75rem
+    min-height: 2.75rem;
   }
 
-  .nav-btn .icon { width: 1.125rem; height: 1.125rem }
+  .nav-btn .icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
 }
 
 /* Status severity (data-status on .nav-btn) */
-.nav-btn[data-status="idle"] { background: var(--ok); color: oklch(100% 0 0deg) }
-.nav-btn[data-status="idle"]:hover { background: color-mix(in oklch, var(--ok) 80%, oklch(0% 0 0deg)) }
-.nav-btn[data-status="scanning"] { background: var(--accent); color: oklch(100% 0 0deg) }
-.nav-btn[data-status="scanning"]:hover { background: var(--accent-hover) }
-.nav-btn[data-status="warn"] { background: light-dark(var(--warn-dim), var(--warn)); color: light-dark(var(--warn), oklch(0% 0 0deg)) }
+.nav-btn[data-status="idle"] {
+  background: var(--ok);
+  color: oklch(100% 0 0deg);
+}
+
+.nav-btn[data-status="idle"]:hover {
+  background: color-mix(in oklch, var(--ok) 80%, oklch(0% 0 0deg));
+}
+
+.nav-btn[data-status="scanning"] {
+  background: var(--accent);
+  color: oklch(100% 0 0deg);
+}
+
+.nav-btn[data-status="scanning"]:hover {
+  background: var(--accent-hover);
+}
+
+.nav-btn[data-status="warn"] {
+  background: light-dark(var(--warn-dim), var(--warn));
+  color: light-dark(var(--warn), oklch(0% 0 0deg));
+}
 
 .nav-btn[data-status="warn"]:hover {
   background: light-dark(
     color-mix(in oklch, var(--warn) 20%, transparent),
     color-mix(in oklch, var(--warn) 80%, oklch(0% 0 0deg))
-  )
+  );
 }
-.nav-btn[data-status="error"] { background: var(--err); color: oklch(100% 0 0deg) }
-.nav-btn[data-status="error"]:hover { background: color-mix(in oklch, var(--err) 80%, oklch(0% 0 0deg)) }
+
+.nav-btn[data-status="error"] {
+  background: var(--err);
+  color: oklch(100% 0 0deg);
+}
+
+.nav-btn[data-status="error"]:hover {
+  background: color-mix(in oklch, var(--err) 80%, oklch(0% 0 0deg));
+}
 
 .nav-btn[data-status="scanning"] .nav-icon {
   display: inline-block;
@@ -112,7 +167,7 @@ header:has(h1) {
   border-block-start-color: oklch(100% 0 0deg);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
-  font-size: 0
+  font-size: 0;
 }
 
 /* --- Main --- */
@@ -121,7 +176,7 @@ main {
   gap: clamp(var(--sp-3), 1vw, var(--sp-5));
   padding: var(--sp-6) clamp(var(--sp-4), 3vw, var(--sp-6));
   align-content: start;
-  view-transition-name: main
+  view-transition-name: main;
 }
 
 /* --- Footer --- */
@@ -136,6 +191,10 @@ body > footer {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    &:hover { color: var(--text); text-decoration: none }
+
+    &:hover {
+      color: var(--text);
+      text-decoration: none;
+    }
   }
 }

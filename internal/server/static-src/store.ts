@@ -1,8 +1,8 @@
 // Reactive state container — backed by shared lib/reactive/store.
 // API is unchanged: get, set, batch, subscribe, effect, computed.
 
-import type { CoverageItem, SeriesItem, SeasonGroup } from './api-types.js';
-import { createStore } from './lib/reactive/store.js';
+import type { CoverageItem, SeriesItem, SeasonGroup } from "./api-types.js";
+import { createStore } from "./lib/reactive/store.js";
 
 // --- Typed store key registry ---
 
@@ -50,9 +50,9 @@ export interface StoreMap {
 
 const store = createStore<StoreMap>();
 
-export const get = store.get;
-export const set = store.set;
-export const batch = store.batch;
-export const subscribe = store.subscribe;
-export const effect = store.effect;
-export const computed = store.computed;
+export const get = store.get.bind(store);
+export const set = store.set.bind(store);
+export const batch = store.batch.bind(store);
+export const subscribe = store.subscribe.bind(store);
+export const effect = store.effect.bind(store);
+export const computed = store.computed.bind(store);

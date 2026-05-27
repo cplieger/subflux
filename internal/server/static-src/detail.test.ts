@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 vi.mock("./api-client.js", () => ({ apiGet: vi.fn().mockResolvedValue(null) }));
 vi.mock("./actions/index.js", () => ({
@@ -9,9 +9,16 @@ vi.mock("./actions/index.js", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {}),
+  on: vi.fn(() => () => {
+    /* noop */
+  }),
   emit: vi.fn(),
-  BusEvent: { PanelConfigure: "panel:configure", NavHistory: "nav:history", OpenSeries: "open:series", OpenMovie: "open:movie" },
+  BusEvent: {
+    PanelConfigure: "panel:configure",
+    NavHistory: "nav:history",
+    OpenSeries: "open:series",
+    OpenMovie: "open:movie",
+  },
 }));
 vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
 vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
@@ -27,7 +34,8 @@ import * as store from "./store.js";
 
 describe("detail: renderSeriesDetail", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
     store.set("detailCtx", null);
   });
 

@@ -156,14 +156,14 @@ func TestFetchByID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
 		callFn     func(c *Client) (any, error)
-		status     int
+		assert     func(t *testing.T, got any)
+		name       string
 		body       string
 		wantPath   string
-		wantErr    bool
 		errContain string
-		assert     func(t *testing.T, got any)
+		status     int
+		wantErr    bool
 	}{
 		{
 			name:     "series_success",

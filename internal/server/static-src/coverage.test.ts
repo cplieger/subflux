@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 // Mock dependencies before importing the module under test.
 vi.mock("./api-client.js", () => ({
@@ -12,20 +12,28 @@ vi.mock("./actions/index.js", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {}),
+  on: vi.fn(() => () => {
+    /* noop */
+  }),
   emit: vi.fn(),
-  BusEvent: { ScanSeries: "scan:series", ScanMovie: "scan:movie", OpenSeries: "open:series", OpenMovie: "open:movie" },
+  BusEvent: {
+    ScanSeries: "scan:series",
+    ScanMovie: "scan:movie",
+    OpenSeries: "open:series",
+    OpenMovie: "open:movie",
+  },
 }));
 
 import * as store from "./store.js";
-import type { CoverageItem } from "./api-types.js";
+import type { CoverageItem as _CoverageItem } from "./api-types.js";
 
 describe("coverage: renderCoverageItems", () => {
   beforeEach(() => {
     store.set("coverageData", null);
     store.set("currentPage", "library");
     store.set("detailCtx", null);
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
   });
 
   it.todo("renders empty state when no items and no coverageData");

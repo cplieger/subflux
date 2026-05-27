@@ -3,7 +3,7 @@ services:
     image: ghcr.io/cplieger/subflux:latest
     container_name: subflux
     restart: unless-stopped
-    user: "1000:1000"  # match your host user
+    user: "1000:1000" # match your host user
 
     environment:
       TZ: "Europe/Paris"

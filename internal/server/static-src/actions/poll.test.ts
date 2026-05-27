@@ -4,7 +4,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../toast.js", () => ({
-  info: vi.fn(), success: vi.fn(), error: vi.fn(), showToast: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+  showToast: vi.fn(),
 }));
 
 import { defineAction, _resetForTest as resetDefine } from "./define.js";
@@ -33,7 +36,7 @@ afterEach(() => {
 describe("pollAction — basic scheduling", () => {
   it("dispatches immediately on start, then at the interval", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.basic",
       run: async () => ++count,
     });
@@ -60,7 +63,7 @@ describe("pollAction — basic scheduling", () => {
 
   it("stop() cancels the next scheduled poll", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.stop",
       run: async () => ++count,
     });
@@ -72,16 +75,22 @@ describe("pollAction — basic scheduling", () => {
 
     stop();
     await vi.advanceTimersByTimeAsync(500);
-    expect(count).toBe(1);  // never advanced past the immediate dispatch
+    expect(count).toBe(1); // never advanced past the immediate dispatch
   });
 
   it("stop() is idempotent", () => {
-    const action = defineAction<void, void>({
+    const action = defineAction<undefined, undefined>({
       name: "test.poll.idempotent",
-      run: async () => {},
+      run: async () => {
+        /* noop */
+      },
     });
     const stop = pollAction(action, undefined, { interval: 1000 });
-    expect(() => { stop(); stop(); stop(); }).not.toThrow();
+    expect(() => {
+      stop();
+      stop();
+      stop();
+    }).not.toThrow();
   });
 });
 
@@ -92,7 +101,7 @@ describe("pollAction — basic scheduling", () => {
 describe("pollAction — pauseWhenHidden", () => {
   it("pauses on visibilitychange to hidden, resumes on visible with immediate dispatch", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.hidden",
       run: async () => ++count,
     });
@@ -120,7 +129,7 @@ describe("pollAction — pauseWhenHidden", () => {
 
   it("doesn't fire the first poll if started while hidden", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.start_hidden",
       run: async () => ++count,
     });
@@ -129,7 +138,7 @@ describe("pollAction — pauseWhenHidden", () => {
     vi.useFakeTimers();
     const stop = pollAction(action, undefined, { interval: 1000, pauseWhenHidden: true });
     await vi.advanceTimersByTimeAsync(5000);
-    expect(count).toBe(0);  // never fired
+    expect(count).toBe(0); // never fired
 
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -141,7 +150,7 @@ describe("pollAction — pauseWhenHidden", () => {
 
   it("pauseWhenHidden: false keeps polling while hidden", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.always",
       run: async () => ++count,
     });
@@ -166,7 +175,7 @@ describe("pollAction — pauseWhenHidden", () => {
 describe("pollAction — refreshOnFocus", () => {
   it("dispatches immediately on window focus", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.focus",
       run: async () => ++count,
     });
@@ -188,7 +197,7 @@ describe("pollAction — refreshOnFocus", () => {
 
   it("refreshOnFocus: false ignores focus events", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.no_focus",
       run: async () => ++count,
     });
@@ -202,7 +211,7 @@ describe("pollAction — refreshOnFocus", () => {
     window.dispatchEvent(new Event("focus"));
     await vi.runAllTicks();
     await vi.advanceTimersByTimeAsync(0);
-    expect(count).toBe(1);  // no refresh
+    expect(count).toBe(1); // no refresh
 
     stop();
   });
@@ -215,7 +224,7 @@ describe("pollAction — refreshOnFocus", () => {
 describe("pollAction — backoffOnError", () => {
   it("delays grow on consecutive failures", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.backoff",
       run: async () => {
         count++;
@@ -246,14 +255,14 @@ describe("pollAction — backoffOnError", () => {
     // Total at 1500ms: ~4 polls. Without backoff at 100ms: ~15 polls.
     await vi.advanceTimersByTimeAsync(1500);
     expect(count).toBeGreaterThan(after1);
-    expect(count).toBeLessThan(10);  // far less than the no-backoff count of ~15
+    expect(count).toBeLessThan(10); // far less than the no-backoff count of ~15
 
     stop();
   });
 
   it("caps the delay at max", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.cap",
       run: async () => {
         count++;
@@ -285,11 +294,13 @@ describe("pollAction — backoffOnError", () => {
   it("resets to base interval after a successful poll", async () => {
     let fail = true;
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.reset",
       run: async () => {
         count++;
-        if (fail) throw new Error("fail");
+        if (fail) {
+          throw new Error("fail");
+        }
         return count;
       },
       error: false,
@@ -326,7 +337,7 @@ describe("pollAction — backoffOnError", () => {
 describe("pollAction — onSuccess callback", () => {
   it("invokes onSuccess with the result on each successful dispatch", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.onSuccess",
       run: async () => ++count,
     });
@@ -335,7 +346,7 @@ describe("pollAction — onSuccess callback", () => {
     const stop = pollAction(action, undefined, {
       interval: 20,
       onSuccess,
-      pauseWhenHidden: false,  // happy-dom may report hidden
+      pauseWhenHidden: false, // happy-dom may report hidden
     });
 
     await new Promise((r) => setTimeout(r, 100));
@@ -347,7 +358,7 @@ describe("pollAction — onSuccess callback", () => {
 
   it("does not invoke onSuccess on failed dispatch", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.onSuccess_fail",
       run: async () => {
         count++;
@@ -372,12 +383,16 @@ describe("pollAction — onSuccess callback", () => {
 
   it("catches errors thrown by onSuccess and continues polling", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.onSuccess_throws",
       run: async () => ++count,
     });
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const onSuccess = vi.fn<(n: number) => void>(() => { throw new Error("kaboom"); });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+      /* noop */
+    });
+    const onSuccess = vi.fn<(n: number) => void>(() => {
+      throw new Error("kaboom");
+    });
 
     const stop = pollAction(action, undefined, {
       interval: 20,
@@ -386,7 +401,7 @@ describe("pollAction — onSuccess callback", () => {
     });
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(count).toBeGreaterThan(1);  // poll continued past the throw
+    expect(count).toBeGreaterThan(1); // poll continued past the throw
     expect(consoleError).toHaveBeenCalled();
 
     consoleError.mockRestore();
@@ -401,7 +416,7 @@ describe("pollAction — onSuccess callback", () => {
 describe("pollAction — cleanup integration", () => {
   it("auto-stops when registered cleanup fires (e.g. beforeunload)", async () => {
     let count = 0;
-    const action = defineAction<void, number>({
+    const action = defineAction<undefined, number>({
       name: "test.poll.cleanup",
       run: async () => ++count,
     });
@@ -415,6 +430,6 @@ describe("pollAction — cleanup integration", () => {
     cancelAllForTest();
 
     await vi.advanceTimersByTimeAsync(500);
-    expect(count).toBe(1);  // stopped, no further polls
+    expect(count).toBe(1); // stopped, no further polls
   });
 });

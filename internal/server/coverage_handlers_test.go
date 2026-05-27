@@ -316,10 +316,9 @@ func TestHandleScanStates_db_error_returns_500(t *testing.T) {
 
 // scanStateTrackingStore tracks the params passed to GetScanStates.
 type scanStateTrackingStore struct {
-	qhMockStore
-
 	mediaType api.MediaType
 	prefix    string
+	qhMockStore
 }
 
 func (m *scanStateTrackingStore) GetScanStates(_ context.Context, mediaType api.MediaType, prefix string) ([]api.ScanStateRow, error) {
@@ -347,21 +346,13 @@ func TestExtractPathSegment_table(t *testing.T) {
 		suffix string
 		want   string
 	}{
-		{"valid extraction", "/api/media/series/42/episodes",
-			"/api/media/series/", "/episodes", "42"},
-		{"non-numeric segment", "/api/media/series/abc/episodes",
-			"/api/media/series/", "/episodes", "abc"},
-		{"missing suffix", "/api/media/series/42",
-			"/api/media/series/", "/episodes", ""},
-		{"wrong prefix", "/other/path/42/episodes",
-			"/api/media/series/", "/episodes", ""},
-		{"empty suffix extracts rest", "/api/coverage/series/81189",
-			"/api/coverage/series/", "", "81189"},
-		{"empty segment between prefix and suffix",
-			"/api/media/series//episodes",
-			"/api/media/series/", "/episodes", ""},
-		{"nested suffix", "/api/media/series/42/episodes/extra",
-			"/api/media/series/", "/episodes", "42"},
+		{name: "valid extraction", path: "/api/media/series/42/episodes", prefix: "/api/media/series/", suffix: "/episodes", want: "42"},
+		{name: "non-numeric segment", path: "/api/media/series/abc/episodes", prefix: "/api/media/series/", suffix: "/episodes", want: "abc"},
+		{name: "missing suffix", path: "/api/media/series/42", prefix: "/api/media/series/", suffix: "/episodes", want: ""},
+		{name: "wrong prefix", path: "/other/path/42/episodes", prefix: "/api/media/series/", suffix: "/episodes", want: ""},
+		{name: "empty suffix extracts rest", path: "/api/coverage/series/81189", prefix: "/api/coverage/series/", suffix: "", want: "81189"},
+		{name: "empty segment between prefix and suffix", path: "/api/media/series//episodes", prefix: "/api/media/series/", suffix: "/episodes", want: ""},
+		{name: "nested suffix", path: "/api/media/series/42/episodes/extra", prefix: "/api/media/series/", suffix: "/episodes", want: "42"},
 	}
 
 	for _, tt := range tests {
@@ -560,12 +551,12 @@ func TestIndexSubStatus(t *testing.T) {
 	ignoredCodecs := map[string]bool{"pgs": true}
 
 	cases := []struct {
-		name         string
-		files        []api.SubtitleFileRow
 		ignored      map[string]bool
-		wantMediaIDs int
-		checkMediaID string
 		checkKey     covKey
+		name         string
+		checkMediaID string
+		files        []api.SubtitleFileRow
+		wantMediaIDs int
 		wantUsable   bool
 		wantIgnored  bool
 	}{
@@ -1293,16 +1284,16 @@ func TestExtractSeriesPrefix_table(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"standard_episode", "tvdb-12345-s01e01", "tvdb-12345-"},
-		{"double_digit_season", "tvdb-99999-s12e05", "tvdb-99999-"},
-		{"imdb_prefix", "imdb-tt1234567-s03e10", "imdb-tt1234567-"},
-		{"empty_string", "", ""},
-		{"no_dash_s_pattern", "tmdb-12345", ""},
-		{"single_char", "s", ""},
-		{"just_dash_s", "-s", "-"},
-		{"trailing_s_no_dash", "abcs", ""},
-		{"multiple_dash_s", "tvdb-123-s01-s02e01", "tvdb-123-s01-"},
-		{"dash_s_at_start", "-s01e01", "-"},
+		{name: "standard_episode", input: "tvdb-12345-s01e01", want: "tvdb-12345-"},
+		{name: "double_digit_season", input: "tvdb-99999-s12e05", want: "tvdb-99999-"},
+		{name: "imdb_prefix", input: "imdb-tt1234567-s03e10", want: "imdb-tt1234567-"},
+		{name: "empty_string", input: "", want: ""},
+		{name: "no_dash_s_pattern", input: "tmdb-12345", want: ""},
+		{name: "single_char", input: "s", want: ""},
+		{name: "just_dash_s", input: "-s", want: "-"},
+		{name: "trailing_s_no_dash", input: "abcs", want: ""},
+		{name: "multiple_dash_s", input: "tvdb-123-s01-s02e01", want: "tvdb-123-s01-"},
+		{name: "dash_s_at_start", input: "-s01e01", want: "-"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

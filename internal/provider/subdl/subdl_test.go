@@ -44,13 +44,13 @@ func TestIso2ToSubDL(t *testing.T) {
 	tests := []struct {
 		name, input, want string
 	}{
-		{"English", "en", "EN"},
-		{"French", "fr", "FR"},
-		{"Persian", "fa", "FA"},
-		{"alpha3 English", "eng", "EN"},
-		{"alpha3 French", "fre", "FR"},
-		{"unknown", "xx", ""},
-		{"empty", "", ""},
+		{name: "English", input: "en", want: "EN"},
+		{name: "French", input: "fr", want: "FR"},
+		{name: "Persian", input: "fa", want: "FA"},
+		{name: "alpha3 English", input: "eng", want: "EN"},
+		{name: "alpha3 French", input: "fre", want: "FR"},
+		{name: "unknown", input: "xx", want: ""},
+		{name: "empty", input: "", want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -67,11 +67,11 @@ func TestSubdlToISO2(t *testing.T) {
 	tests := []struct {
 		name, input, want string
 	}{
-		{"english", "EN", "en"},
-		{"french", "FR", "fr"},
-		{"persian", "FA", "fa"},
-		{"lowercase input", "en", "en"},
-		{"unknown", "XX", ""},
+		{name: "english", input: "EN", want: "en"},
+		{name: "french", input: "FR", want: "fr"},
+		{name: "persian", input: "FA", want: "fa"},
+		{name: "lowercase input", input: "en", want: "en"},
+		{name: "unknown", input: "XX", want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -92,10 +92,10 @@ func TestIsHearingImpaired_via_provider(t *testing.T) {
 		name, comment, filename string
 		want                    bool
 	}{
-		{"empty", "", "", false},
-		{"sdh comment", "SDH version", "sub.srt", true},
-		{"hi filename overrides non-hi comment", "non hi version", "movie_hi_eng.srt", true},
-		{"nonhi excluded", "nonhi version", "sub.srt", false},
+		{name: "empty", comment: "", filename: "", want: false},
+		{name: "sdh comment", comment: "SDH version", filename: "sub.srt", want: true},
+		{name: "hi filename overrides non-hi comment", comment: "non hi version", filename: "movie_hi_eng.srt", want: true},
+		{name: "nonhi excluded", comment: "nonhi version", filename: "sub.srt", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,12 +114,12 @@ func TestFilterResults(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		items     []subtitleItem
-		isEpisode bool
-		matchedBy api.MatchMethod
-		wantCount int
 		check     func(t *testing.T, got []api.Subtitle)
+		name      string
+		matchedBy api.MatchMethod
+		items     []subtitleItem
+		wantCount int
+		isEpisode bool
 	}{
 		{
 			name: "basic_mapping",
@@ -388,9 +388,9 @@ func TestDownload_rejects_non_relative_path(t *testing.T) {
 		name string
 		url  string
 	}{
-		{"absolute URL", "https://evil.com/steal"},
-		{"no leading slash", "dl/sub1.zip"},
-		{"empty path", ""},
+		{name: "absolute URL", url: "https://evil.com/steal"},
+		{name: "no leading slash", url: "dl/sub1.zip"},
+		{name: "empty path", url: ""},
 	}
 
 	for _, tt := range tests {
@@ -640,9 +640,9 @@ func TestHandleDownloadResponse_500_boundary_content_length(t *testing.T) {
 		contentLength int64
 		wantRateLimit bool
 	}{
-		{"zero length is rate limit", 0, true},
-		{"99 bytes is rate limit", 99, true},
-		{"100 bytes is generic error", 100, false},
+		{name: "zero length is rate limit", contentLength: 0, wantRateLimit: true},
+		{name: "99 bytes is rate limit", contentLength: 99, wantRateLimit: true},
+		{name: "100 bytes is generic error", contentLength: 100, wantRateLimit: false},
 	}
 
 	for _, tt := range tests {
@@ -787,10 +787,10 @@ func TestCheckAPIStatus_cant_find_returns_nil_no_error(t *testing.T) {
 	tests := []struct {
 		name, errMsg string
 	}{
-		{"exact lowercase", "can't find the movie"},
-		{"mixed case", "Can't Find this title"},
-		{"uppercase", "CAN'T FIND anything"},
-		{"embedded in longer message", "Sorry, we can't find that"},
+		{name: "exact lowercase", errMsg: "can't find the movie"},
+		{name: "mixed case", errMsg: "Can't Find this title"},
+		{name: "uppercase", errMsg: "CAN'T FIND anything"},
+		{name: "embedded in longer message", errMsg: "Sorry, we can't find that"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -814,9 +814,9 @@ func TestCheckAPIStatus_other_error_returns_error(t *testing.T) {
 	tests := []struct {
 		name, errMsg, wantSub string
 	}{
-		{"invalid api key", "Invalid API key", "Invalid API key"},
-		{"rate limit", "Daily quota exceeded", "Daily quota exceeded"},
-		{"generic", "something broke", "something broke"},
+		{name: "invalid api key", errMsg: "Invalid API key", wantSub: "Invalid API key"},
+		{name: "rate limit", errMsg: "Daily quota exceeded", wantSub: "Daily quota exceeded"},
+		{name: "generic", errMsg: "something broke", wantSub: "something broke"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -888,10 +888,10 @@ func TestInferMatchedBy(t *testing.T) {
 		params url.Values
 		want   api.MatchMethod
 	}{
-		{"film_name wins", url.Values{"film_name": {"Inception"}, "imdb_id": {"tt1"}}, api.MatchByTitle},
-		{"tmdb_id when no film_name", url.Values{"tmdb_id": {"550"}, "imdb_id": {"tt1"}}, api.MatchByTMDB},
-		{"imdb is default", url.Values{"imdb_id": {"tt1"}}, api.MatchByIMDB},
-		{"empty params defaults to imdb", url.Values{}, api.MatchByIMDB},
+		{name: "film_name wins", params: url.Values{"film_name": {"Inception"}, "imdb_id": {"tt1"}}, want: api.MatchByTitle},
+		{name: "tmdb_id when no film_name", params: url.Values{"tmdb_id": {"550"}, "imdb_id": {"tt1"}}, want: api.MatchByTMDB},
+		{name: "imdb is default", params: url.Values{"imdb_id": {"tt1"}}, want: api.MatchByIMDB},
+		{name: "empty params defaults to imdb", params: url.Values{}, want: api.MatchByIMDB},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -17,15 +17,15 @@ func TestBetaLangToISO(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"vo maps to en", "vo", "en"},
-		{"vf maps to fr", "vf", "fr"},
-		{"en maps to en", "en", "en"},
-		{"fr maps to fr", "fr", "fr"},
-		{"uppercase VO", "VO", "en"},
-		{"uppercase VF", "VF", "fr"},
-		{"mixed case Vo", "Vo", "en"},
-		{"unknown code", "de", ""},
-		{"empty string", "", ""},
+		{name: "vo maps to en", input: "vo", want: "en"},
+		{name: "vf maps to fr", input: "vf", want: "fr"},
+		{name: "en maps to en", input: "en", want: "en"},
+		{name: "fr maps to fr", input: "fr", want: "fr"},
+		{name: "uppercase VO", input: "VO", want: "en"},
+		{name: "uppercase VF", input: "VF", want: "fr"},
+		{name: "mixed case Vo", input: "Vo", want: "en"},
+		{name: "unknown code", input: "de", want: ""},
+		{name: "empty string", input: "", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -44,15 +44,15 @@ func TestFactory(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
 		settings map[string]any
+		name     string
 		wantErr  bool
 	}{
-		{"nil settings", nil, true},
-		{"missing token", map[string]any{}, true},
-		{"empty token", map[string]any{"token": ""}, true},
-		{"non-string token", map[string]any{"token": 123}, true},
-		{"valid token", map[string]any{"token": "test-key"}, false},
+		{name: "nil settings", settings: nil, wantErr: true},
+		{name: "missing token", settings: map[string]any{}, wantErr: true},
+		{name: "empty token", settings: map[string]any{"token": ""}, wantErr: true},
+		{name: "non-string token", settings: map[string]any{"token": 123}, wantErr: true},
+		{name: "valid token", settings: map[string]any{"token": "test-key"}, wantErr: false},
 	}
 
 	for _, tt := range tests {
@@ -229,10 +229,10 @@ func TestClassifyBadRequest(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        string
+		wantErrType string
+		wantErrMsg  string
+		wantBody    string
 		wantErr     bool
-		wantErrType string // "auth" or "" for generic
-		wantErrMsg  string // expected error message when wantErr=true
-		wantBody    string // expected body content when wantErr=false
 	}{
 		{
 			name:     "not found 4001",

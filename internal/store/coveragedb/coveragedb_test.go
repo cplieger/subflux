@@ -9,28 +9,25 @@ import (
 func TestDiffSubtitleFiles(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		have, want map[subFileKey]subFileVal
-		wantDel    int
-		wantIns    int
-		wantUpd    int
+		have    map[subFileKey]subFileVal
+		want    map[subFileKey]subFileVal
+		name    string
+		wantDel int
+		wantIns int
+		wantUpd int
 	}{
-		{"both_empty", nil, nil, 0, 0, 0},
-		{"identical", map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}},
-			map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, 0, 0, 0},
-		{"additions_only", nil,
-			map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, 0, 1, 0},
-		{"deletions_only", map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}},
-			nil, 1, 0, 0},
-		{"updates_only", map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}},
-			map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"ass"}}, 0, 0, 1},
-		{"mixed", map[subFileKey]subFileVal{
+		{name: "both_empty", have: nil, want: nil, wantDel: 0, wantIns: 0, wantUpd: 0},
+		{name: "identical", have: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, want: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, wantDel: 0, wantIns: 0, wantUpd: 0},
+		{name: "additions_only", have: nil, want: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, wantDel: 0, wantIns: 1, wantUpd: 0},
+		{name: "deletions_only", have: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, want: nil, wantDel: 1, wantIns: 0, wantUpd: 0},
+		{name: "updates_only", have: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"srt"}}, want: map[subFileKey]subFileVal{{"eng", "full", "os", "/a.srt"}: {"ass"}}, wantDel: 0, wantIns: 0, wantUpd: 1},
+		{name: "mixed", have: map[subFileKey]subFileVal{
 			{"eng", "full", "os", "/a.srt"}: {"srt"},
 			{"fra", "full", "os", "/b.srt"}: {"srt"},
-		}, map[subFileKey]subFileVal{
+		}, want: map[subFileKey]subFileVal{
 			{"eng", "full", "os", "/a.srt"}: {"ass"},
 			{"deu", "full", "os", "/c.srt"}: {"srt"},
-		}, 1, 1, 1},
+		}, wantDel: 1, wantIns: 1, wantUpd: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

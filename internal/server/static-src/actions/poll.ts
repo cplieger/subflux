@@ -96,33 +96,51 @@ export function pollAction<TArgs, TResult>(
 
   /** Compute the next interval, applying backoff on consecutive failures. */
   function nextDelay(): number {
-    if (backoff === undefined || failures === 0) return baseInterval;
+    if (backoff === undefined || failures === 0) {
+      return baseInterval;
+    }
     return Math.min(baseInterval * Math.pow(backoff.factor, failures), backoff.max);
   }
 
   /** Schedule the next poll, unless stopped or paused. */
   function schedule(): void {
-    if (stopped || paused) return;
-    if (timer !== undefined) clearTimeout(timer);
-    timer = setTimeout(() => { void tick(); }, nextDelay());
+    if (stopped || paused) {
+      return;
+    }
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+    timer = setTimeout(() => {
+      void tick();
+    }, nextDelay());
   }
 
   /** One poll cycle: dispatch, track success/failure, schedule next. */
   async function tick(): Promise<void> {
-    if (stopped || paused) return;
-    if (inFlight) return;  // Defensive: focus-trigger collapsed onto in-flight
+    if (stopped || paused) {
+      return;
+    }
+    if (inFlight) {
+      return;
+    } // Defensive: focus-trigger collapsed onto in-flight
     inFlight = true;
     try {
       const result = await action.dispatch(args);
-      if (stopped) return;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stopped may change during await
+      if (stopped) {
+        return;
+      }
       // dispatch resolves to null on error/cancel and to T on success.
       if (result === null) {
         failures += 1;
       } else {
         failures = 0;
         if (onSuccess !== undefined) {
-          try { onSuccess(result); }
-          catch (e) { console.error("[pollAction] onSuccess threw", e); }
+          try {
+            onSuccess(result);
+          } catch (e) {
+            console.error("[pollAction] onSuccess threw", e);
+          }
         }
       }
     } finally {
@@ -133,27 +151,39 @@ export function pollAction<TArgs, TResult>(
 
   /** visibilitychange handler: pause/resume the poll loop. */
   const onVisibility = (): void => {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined") {
+      return;
+    }
     if (document.hidden) {
       paused = true;
-      if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
     } else if (paused) {
       paused = false;
-      void tick();  // immediate refresh on return
+      void tick(); // immediate refresh on return
     }
   };
 
   /** focus handler: refresh on tab regain (skip if already dispatching). */
   const onFocus = (): void => {
-    if (stopped || paused || inFlight) return;
+    if (stopped || paused || inFlight) {
+      return;
+    }
     void tick();
   };
 
   /** Stop the poll. Idempotent. */
   function stop(): void {
-    if (stopped) return;
+    if (stopped) {
+      return;
+    }
     stopped = true;
-    if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
     if (pauseWhenHidden && typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", onVisibility);
     }
@@ -167,7 +197,9 @@ export function pollAction<TArgs, TResult>(
     document.addEventListener("visibilitychange", onVisibility);
     // Initialize paused state from current visibility — if the page
     // loaded while hidden, don't fire the first poll until it's visible.
-    if (document.hidden) paused = true;
+    if (document.hidden) {
+      paused = true;
+    }
   }
   if (refreshOnFocus && typeof window !== "undefined") {
     window.addEventListener("focus", onFocus);
@@ -179,7 +211,9 @@ export function pollAction<TArgs, TResult>(
   registerCleanup(stop);
 
   // Initial dispatch (skipped when starting in hidden tab).
-  if (!paused) void tick();
+  if (!paused) {
+    void tick();
+  }
 
   return stop;
 }

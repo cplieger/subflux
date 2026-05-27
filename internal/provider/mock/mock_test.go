@@ -50,12 +50,12 @@ func TestSearch_static_returns_results(t *testing.T) {
 func TestSearch_modes(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name        string
 		config      map[string]any
-		wantErr     bool
+		name        string
 		errContains string
-		errType     string // "auth", "rate_limit", "deadline"
+		errType     string
 		wantCount   int
+		wantErr     bool
 	}{
 		{
 			name:        "error",

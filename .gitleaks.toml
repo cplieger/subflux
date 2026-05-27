@@ -1,0 +1,9 @@
+title = "subflux gitleaks config"
+
+[allowlist]
+description = "Test fixtures and schema examples with placeholder secrets"
+paths = [
+  '''internal/config/config_auth_test\.go''',
+  '''internal/server/pure_test\.go''',
+  '''internal/config/schema/sections_providers\.go''',
+]

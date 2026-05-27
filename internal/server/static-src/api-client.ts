@@ -19,7 +19,7 @@
 // Pattern mirrors apps/vibekit/web/static-src/api-client.ts.
 // ---------------------------------------------------------------------------
 
-const JSON_HEADERS: Record<string, string> = { 'Content-Type': 'application/json' };
+const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json" };
 
 /** Default timeout for all API requests (30 seconds). Acts as a safety net
  *  for callers that don't pass an explicit AbortSignal. */
@@ -48,9 +48,11 @@ interface ErrorEnvelope {
 export type Decoder<T> = (v: unknown) => T;
 
 async function parseJSONSafe(r: Response): Promise<unknown> {
-  if (r.status === 204) return null;
-  const ct = r.headers.get('Content-Type') || '';
-  if (!ct.includes('application/json')) {
+  if (r.status === 204) {
+    return null;
+  }
+  const ct = r.headers.get("Content-Type") ?? "";
+  if (!ct.includes("application/json")) {
     // Fallback for endpoints that return plain text (e.g. /api/config YAML).
     // Only reached on error paths since every handler routes through api.*.
     const text = await r.text();
@@ -63,7 +65,14 @@ async function parseJSONSafe(r: Response): Promise<unknown> {
   }
 }
 
-async function requestRaw<T>(method: string, path: string, body?: unknown, signal?: AbortSignal, decoder?: Decoder<T>, extraHeaders?: Record<string, string>): Promise<ApiResult<T>> {
+async function requestRaw<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  decoder?: Decoder<T>,
+  extraHeaders?: Record<string, string>,
+): Promise<ApiResult<T>> {
   try {
     const init: RequestInit = { method };
     const headers: Record<string, string> = {};
@@ -82,14 +91,19 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, signa
     const r = await fetch(path, init);
     const parsed = await parseJSONSafe(r);
     if (!r.ok) {
-      const envelope = (parsed as ErrorEnvelope | null) || {};
+      const envelope = (parsed as ErrorEnvelope | null) ?? {};
       const result: ApiResult<T> = {
-        ok: false, status: r.status,
-        error: envelope.error || r.statusText,
+        ok: false,
+        status: r.status,
+        error: envelope.error ?? r.statusText,
         headers: r.headers,
       };
-      if (envelope.code) result.code = envelope.code;
-      if (envelope.request_id) result.requestId = envelope.request_id;
+      if (envelope.code) {
+        result.code = envelope.code;
+      }
+      if (envelope.request_id) {
+        result.requestId = envelope.request_id;
+      }
       return result;
     }
     if (decoder && parsed !== null) {
@@ -97,7 +111,7 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, signa
         return { ok: true, status: r.status, data: decoder(parsed) };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error('api decode failed:', method, path, msg);
+        console.error("api decode failed:", method, path, msg);
         return { ok: false, status: r.status, error: `response shape mismatch: ${msg}` };
       }
     }
@@ -109,41 +123,47 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, signa
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal, decoder?: Decoder<T>): Promise<T | null> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  decoder?: Decoder<T>,
+): Promise<T | null> {
   const r = await requestRaw<T>(method, path, body, signal, decoder);
   if (!r.ok) {
     if (r.status === 0 && signal?.aborted) {
       // Caller aborted; don't log.
       return null;
     }
-    console.warn('api:', method, path, r.status, r.error);
+    console.warn("api:", method, path, r.status, r.error);
     return null;
   }
-  return (r.data ?? null) as T | null;
+  return r.data ?? null;
 }
 
 // --- Typed 2xx-or-null helpers (use these by default) ---
 
 export function apiGet<T>(path: string, signal?: AbortSignal): Promise<T | null> {
-  return request<T>('GET', path, undefined, signal);
+  return request<T>("GET", path, undefined, signal);
 }
 
 export function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T | null> {
-  return request<T>('POST', path, body, signal);
+  return request<T>("POST", path, body, signal);
 }
 
 export function apiPut<T>(path: string, body?: unknown): Promise<T | null> {
-  return request<T>('PUT', path, body);
+  return request<T>("PUT", path, body);
 }
 
 export function apiPatch<T>(path: string, body?: unknown): Promise<T | null> {
-  return request<T>('PATCH', path, body);
+  return request<T>("PATCH", path, body);
 }
 
 export async function apiDelete(path: string, body?: unknown): Promise<boolean> {
-  const r = await requestRaw<unknown>('DELETE', path, body);
+  const r = await requestRaw<unknown>("DELETE", path, body);
   if (!r.ok) {
-    console.warn('api: DELETE', path, r.status, r.error);
+    console.warn("api: DELETE", path, r.status, r.error);
   }
   return r.ok;
 }
@@ -156,38 +176,55 @@ export async function apiDelete(path: string, body?: unknown): Promise<boolean> 
 // or an error envelope (apiGetTypedRaw) rather than a silent undefined.
 // See validators.ts for the available decoders.
 
-export function apiGetTyped<T>(path: string, decoder: Decoder<T>, signal?: AbortSignal): Promise<T | null> {
-  return request<T>('GET', path, undefined, signal, decoder);
+export function apiGetTyped<T>(
+  path: string,
+  decoder: Decoder<T>,
+  signal?: AbortSignal,
+): Promise<T | null> {
+  return request<T>("GET", path, undefined, signal, decoder);
 }
 
-export function apiPostTyped<T>(path: string, body: unknown, decoder: Decoder<T>, signal?: AbortSignal): Promise<T | null> {
-  return request<T>('POST', path, body, signal, decoder);
+export function apiPostTyped<T>(
+  path: string,
+  body: unknown,
+  decoder: Decoder<T>,
+  signal?: AbortSignal,
+): Promise<T | null> {
+  return request<T>("POST", path, body, signal, decoder);
 }
 
-export function apiGetTypedRaw<T>(path: string, decoder: Decoder<T>, signal?: AbortSignal): Promise<ApiResult<T>> {
-  return requestRaw<T>('GET', path, undefined, signal, decoder);
+export function apiGetTypedRaw<T>(
+  path: string,
+  decoder: Decoder<T>,
+  signal?: AbortSignal,
+): Promise<ApiResult<T>> {
+  return requestRaw<T>("GET", path, undefined, signal, decoder);
 }
 
 // --- Raw helpers that expose status + error envelope ---
 
 export function apiGetRaw<T>(path: string, signal?: AbortSignal): Promise<ApiResult<T>> {
-  return requestRaw<T>('GET', path, undefined, signal);
+  return requestRaw<T>("GET", path, undefined, signal);
 }
 
-export function apiPostRaw<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<ApiResult<T>> {
-  return requestRaw<T>('POST', path, body, signal);
+export function apiPostRaw<T>(
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<ApiResult<T>> {
+  return requestRaw<T>("POST", path, body, signal);
 }
 
 export function apiPutRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>('PUT', path, body);
+  return requestRaw<T>("PUT", path, body);
 }
 
 export function apiPatchRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>('PATCH', path, body);
+  return requestRaw<T>("PATCH", path, body);
 }
 
 export function apiDeleteRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>('DELETE', path, body);
+  return requestRaw<T>("DELETE", path, body);
 }
 
 /** Uniform raw-request helper with optional extra headers. Used by the

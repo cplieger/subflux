@@ -138,15 +138,15 @@ func TestPasskeyFriendlyName(t *testing.T) {
 	tests := []struct {
 		name     string
 		aaguid   string
-		existing []string
 		want     string
+		existing []string
 	}{
-		{"known_aaguid", "adce0002-35bc-c60a-648b-0b25f1f05503", nil, "Chrome on Mac"},
-		{"unknown_aaguid", "ffffffff-ffff-ffff-ffff-ffffffffffff", nil, "Passkey 1"},
-		{"duplicate_first", "adce0002-35bc-c60a-648b-0b25f1f05503", nil, "Chrome on Mac"},
-		{"duplicate_second", "adce0002-35bc-c60a-648b-0b25f1f05503", []string{"Chrome on Mac"}, "Chrome on Mac 2"},
-		{"duplicate_third", "adce0002-35bc-c60a-648b-0b25f1f05503", []string{"Chrome on Mac", "Chrome on Mac 2"}, "Chrome on Mac 3"},
-		{"unknown_duplicates", "ffffffff-ffff-ffff-ffff-ffffffffffff", []string{"Passkey 1"}, "Passkey 2"},
+		{name: "known_aaguid", aaguid: "adce0002-35bc-c60a-648b-0b25f1f05503", existing: nil, want: "Chrome on Mac"},
+		{name: "unknown_aaguid", aaguid: "ffffffff-ffff-ffff-ffff-ffffffffffff", existing: nil, want: "Passkey 1"},
+		{name: "duplicate_first", aaguid: "adce0002-35bc-c60a-648b-0b25f1f05503", existing: nil, want: "Chrome on Mac"},
+		{name: "duplicate_second", aaguid: "adce0002-35bc-c60a-648b-0b25f1f05503", existing: []string{"Chrome on Mac"}, want: "Chrome on Mac 2"},
+		{name: "duplicate_third", aaguid: "adce0002-35bc-c60a-648b-0b25f1f05503", existing: []string{"Chrome on Mac", "Chrome on Mac 2"}, want: "Chrome on Mac 3"},
+		{name: "unknown_duplicates", aaguid: "ffffffff-ffff-ffff-ffff-ffffffffffff", existing: []string{"Passkey 1"}, want: "Passkey 2"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -166,11 +166,11 @@ func TestPasskeyFriendlyName(t *testing.T) {
 func TestWebAuthnUser_interface_methods(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name            string
 		user            *api.User
-		creds           []api.PasskeyCredential
+		name            string
 		wantName        string
 		wantDisplayName string
+		creds           []api.PasskeyCredential
 		wantCredCount   int
 	}{
 		{
@@ -226,10 +226,10 @@ func TestWebAuthnUser_WebAuthnID_encodes_varint(t *testing.T) {
 		name string
 		id   int64
 	}{
-		{"zero", 0},
-		{"positive", 42},
-		{"large", 1<<32 - 1},
-		{"negative", -1},
+		{name: "zero", id: 0},
+		{name: "positive", id: 42},
+		{name: "large", id: 1<<32 - 1},
+		{name: "negative", id: -1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -254,15 +254,15 @@ func TestFormatAAGUID_edge_cases(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name  string
-		input []byte
 		want  string
+		input []byte
 	}{
-		{"nil", nil, ""},
-		{"empty", []byte{}, ""},
-		{"too_short", []byte{0x01, 0x02}, ""},
-		{"too_long", make([]byte, 17), ""},
-		{"valid_zeros", make([]byte, 16), "00000000-0000-0000-0000-000000000000"},
-		{"valid_known", parseAAGUID("adce0002-35bc-c60a-648b-0b25f1f05503"), "adce0002-35bc-c60a-648b-0b25f1f05503"},
+		{name: "nil", input: nil, want: ""},
+		{name: "empty", input: []byte{}, want: ""},
+		{name: "too_short", input: []byte{0x01, 0x02}, want: ""},
+		{name: "too_long", input: make([]byte, 17), want: ""},
+		{name: "valid_zeros", input: make([]byte, 16), want: "00000000-0000-0000-0000-000000000000"},
+		{name: "valid_known", input: parseAAGUID("adce0002-35bc-c60a-648b-0b25f1f05503"), want: "adce0002-35bc-c60a-648b-0b25f1f05503"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -282,12 +282,12 @@ func TestParseAAGUID_edge_cases(t *testing.T) {
 		input   string
 		wantNil bool
 	}{
-		{"valid", "adce0002-35bc-c60a-648b-0b25f1f05503", false},
-		{"all_zeros", "00000000-0000-0000-0000-000000000000", false},
-		{"invalid_hex", "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz", true},
-		{"too_short", "adce0002-35bc", true},
-		{"empty", "", true},
-		{"no_dashes", "adce000235bcc60a648b0b25f1f05503", false},
+		{name: "valid", input: "adce0002-35bc-c60a-648b-0b25f1f05503", wantNil: false},
+		{name: "all_zeros", input: "00000000-0000-0000-0000-000000000000", wantNil: false},
+		{name: "invalid_hex", input: "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz", wantNil: true},
+		{name: "too_short", input: "adce0002-35bc", wantNil: true},
+		{name: "empty", input: "", wantNil: true},
+		{name: "no_dashes", input: "adce000235bcc60a648b0b25f1f05503", wantNil: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -310,9 +310,9 @@ func TestAPICredentialToWebAuthn_table(t *testing.T) {
 		transport      string
 		wantTransports int
 	}{
-		{"no_transport", "", 0},
-		{"single_transport", "internal", 1},
-		{"multi_transport", "usb,nfc,ble", 3},
+		{name: "no_transport", transport: "", wantTransports: 0},
+		{name: "single_transport", transport: "internal", wantTransports: 1},
+		{name: "multi_transport", transport: "usb,nfc,ble", wantTransports: 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -377,12 +377,12 @@ func TestWebAuthnCredentialToAPI_table(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
-		transports    []protocol.AuthenticatorTransport
 		wantTransport string
+		transports    []protocol.AuthenticatorTransport
 	}{
-		{"no_transports", nil, ""},
-		{"single", []protocol.AuthenticatorTransport{"internal"}, "internal"},
-		{"multi", []protocol.AuthenticatorTransport{"usb", "nfc"}, "usb,nfc"},
+		{name: "no_transports", transports: nil, wantTransport: ""},
+		{name: "single", transports: []protocol.AuthenticatorTransport{"internal"}, wantTransport: "internal"},
+		{name: "multi", transports: []protocol.AuthenticatorTransport{"usb", "nfc"}, wantTransport: "usb,nfc"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

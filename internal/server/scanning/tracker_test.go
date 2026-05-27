@@ -3,6 +3,7 @@ package scanning
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,11 +16,11 @@ import (
 type mockShowCounter struct {
 	counts map[string]int
 	err    error
-	calls  int
+	calls  atomic.Int32
 }
 
 func (m *mockShowCounter) CountShowSubtitles(_ context.Context, imdbID, lang string) (int, error) {
-	m.calls++
+	m.calls.Add(1)
 	if m.err != nil {
 		return 0, m.err
 	}
@@ -60,13 +61,13 @@ func TestNewSeasonTracker_without_counter(t *testing.T) {
 func TestShouldSkipShow(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name     string
-		counts   map[string]int
 		err      error
-		noCount  bool // if true, use nil counter
+		counts   map[string]int
+		name     string
 		imdb     string
-		episodes int
 		langs    []string
+		episodes int
+		noCount  bool
 		wantSkip bool
 	}{
 		{name: "no_counter", noCount: true, imdb: "tt123", episodes: 100, langs: []string{"fr"}, wantSkip: false},
@@ -102,8 +103,8 @@ func TestShouldSkipShow_caches(t *testing.T) {
 	ctx := context.Background()
 	st.shouldSkipShow(ctx, "tt123", 100, []string{"fr"})
 	st.shouldSkipShow(ctx, "tt123", 100, []string{"fr"})
-	if mock.calls != 1 {
-		t.Fatalf("expected 1 API call (cached), got %d", mock.calls)
+	if int(mock.calls.Load()) != 1 {
+		t.Fatalf("expected 1 API call (cached), got %d", int(mock.calls.Load()))
 	}
 }
 

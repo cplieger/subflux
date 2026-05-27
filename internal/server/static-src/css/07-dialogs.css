@@ -1,4 +1,3 @@
-
 /* ================================================================
    6. Dialogs (sized variants)
    ================================================================ */
@@ -6,8 +5,18 @@
 .dlg-config {
   width: min(33.75rem, 92vw);
   height: min(85dvh, 43.75rem);
-  &[open] { display: flex; flex-direction: column }
-  & > form { display: flex; flex-direction: column; flex: 1; min-height: 0 }
+
+  &[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  & > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
 }
 
 /* Full-screen config on narrow viewports */
@@ -19,44 +28,99 @@
     --text-sm: 0.9375rem;
     --text-base: 1rem;
     --text-lg: 1.25rem;
-    --icon: 1.125rem
+    --icon: 1.125rem;
   }
 
   /* Scale up interactive elements in dialogs */
-  dialog button { height: 2.75rem }
-  dialog input, dialog select, dialog textarea { height: 2.75rem }
-  dialog .dlg-controls select { height: 2.75rem }
-  dialog .close-btn { width: 2.75rem; height: 2.75rem }
-  [popover] .close-btn { width: 2.75rem; height: 2.75rem }
-  dialog .sync-offset-btn { aspect-ratio: 1; min-width: 2.75rem; height: 2.75rem }
-  dialog .tc-seg { min-width: 2.75rem; height: 2.75rem }
-  dialog .tc-chevron { width: 100%; height: 2.75rem }
+  dialog button {
+    height: 2.75rem;
+  }
+
+  dialog input,
+  dialog select,
+  dialog textarea {
+    height: 2.75rem;
+  }
+
+  dialog .dlg-controls select {
+    height: 2.75rem;
+  }
+
+  dialog .close-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  [popover] .close-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  dialog .sync-offset-btn {
+    aspect-ratio: 1;
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  dialog .tc-seg {
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  dialog .tc-chevron {
+    width: 100%;
+    height: 2.75rem;
+  }
 
   dialog .tc-btn-stack {
     border-inline-start: 1px solid var(--border);
     min-width: 3rem;
-    place-self: stretch stretch
+    place-self: stretch stretch;
   }
-  dialog .sync-timecode { width: 100%; grid-template-columns: 3fr 1fr }
-  dialog .toggle { height: 2.75rem }
+
+  dialog .sync-timecode {
+    width: 100%;
+    grid-template-columns: 3fr 1fr;
+  }
+
+  dialog .toggle {
+    height: 2.75rem;
+  }
 
   dialog .toggle input + span {
     width: 3rem;
     height: 1.75rem;
-    border-radius: 0.875rem
+    border-radius: 0.875rem;
   }
 
   dialog .toggle input + span::before {
     width: 1.375rem;
     height: 1.375rem;
     inset-block-end: 0.1875rem;
-    inset-inline-start: 0.1875rem
+    inset-inline-start: 0.1875rem;
   }
-  dialog .toggle input:checked + span::before { translate: 1.25rem }
-  dialog .icon { width: 1.125rem; height: 1.125rem }
-  dialog .result-dl button { aspect-ratio: 1; min-width: 2.75rem }
-  dialog .dlg-head h2 { font-size: var(--text-lg) }
-  dialog .badge { height: 2.75rem }
+
+  dialog .toggle input:checked + span::before {
+    translate: 1.25rem;
+  }
+
+  dialog .icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  dialog .result-dl button {
+    aspect-ratio: 1;
+    min-width: 2.75rem;
+  }
+
+  dialog .dlg-head h2 {
+    font-size: var(--text-lg);
+  }
+
+  dialog .badge {
+    height: 2.75rem;
+  }
 
   .dlg-config {
     width: 100vw;
@@ -64,7 +128,7 @@
     max-width: 100vw;
     max-height: 100dvh;
     border-radius: 0;
-    margin: 0
+    margin: 0;
   }
 }
 
@@ -74,7 +138,7 @@
   overflow: hidden;
   overscroll-behavior: contain;
   display: flex;
-  flex-direction: column
+  flex-direction: column;
 }
 
 .dlg-sync {
@@ -84,7 +148,11 @@
   display: flex;
   flex-direction: column;
 
-  & .dlg-body { display: flex; flex-direction: column; gap: var(--sp-5) }
+  & .dlg-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+  }
 }
 
 /* Near-full dialogs on narrow viewports */
@@ -94,14 +162,19 @@
     width: calc(100vw - 1rem);
     max-width: calc(100vw - 1rem);
     max-height: calc(100dvh - 2rem);
-    border-radius: var(--radius)
+    border-radius: var(--radius);
   }
 
-  .sync-media { display: none }
+  .sync-media {
+    display: none;
+  }
 }
 
 .dlg-confirm {
   max-width: 28rem;
   width: auto;
-  & p { margin: 0 0 var(--sp-4) }
+
+  & p {
+    margin: 0 0 var(--sp-4);
+  }
 }

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "app.ts",
+    "login.ts",
+    "theme-init.ts",
+    "**/*.test.ts",
+    "**/*.fuzz.test.ts",
+    "**/*.property.test.ts"
+  ],
+  "project": ["**/*.ts", "!**/*.d.ts", "!node_modules/**"],
+  "ignoreDependencies": [
+    "eslint",
+    "prettier",
+    "typescript-eslint",
+    "@eslint/js",
+    "@vitest/coverage-v8",
+    "html-validate",
+    "stylelint",
+    "stylelint-config-standard"
+  ],
+  "ignoreBinaries": ["tsgo"],
+  "ignoreMembers": [],
+  "treatConfigHintsAsErrors": true,
+  "includeEntryExports": true,
+  "typescript": {
+    "config": ["tsconfig.json"]
+  }
+}

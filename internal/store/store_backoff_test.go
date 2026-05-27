@@ -414,12 +414,12 @@ func TestRecordNoResult_independent_per_provider(t *testing.T) {
 func TestGetBackoffByPrefix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name      string
-		inserts   []string // media_ids to insert
-		provider  string   // provider for inserts (default "os")
-		prefix    string
-		wantCount int
 		checkFn   func(t *testing.T, items []api.BackoffEntry)
+		name      string
+		provider  string
+		prefix    string
+		inserts   []string
+		wantCount int
 	}{
 		{
 			name:      "no_prefix_returns_all",

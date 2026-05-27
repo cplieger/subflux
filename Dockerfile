@@ -146,10 +146,8 @@ COPY config.example.yaml ./
 COPY internal/ internal/
 COPY --from=ts-builder /src/static/*.js internal/server/static/
 
-# Concatenate per-feature CSS splits into the served bundles. Mirrors
-# lib/shell/build-css.sh + the drift check in scripts/validate-local.sh;
-# inlined here because the Docker build context is apps/subflux/ and can't
-# reach the repo-level lib/. Naming convention:
+# Concatenate per-feature CSS splits into the served bundles.
+# Naming convention:
 #   MANIFEST          -> style.css  (the main bundle, like vibekit/vibecli)
 #   <name>.MANIFEST   -> <name>.css (e.g. login.MANIFEST -> login.css)
 RUN set -eu; \

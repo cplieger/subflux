@@ -8,7 +8,7 @@
 // The module manages: accumulating items across pages, "show more" button,
 // reset on filter change, and loading/error states.
 
-import { el, patch, emptyDiv, errDiv } from './dom.js';
+import { el, patch, emptyDiv, errDiv } from "./dom.js";
 
 /** A single page of results from the data source. */
 export interface Page<T> {
@@ -59,23 +59,35 @@ export function createPagedList<T>(cfg: PagedListConfig<T>): PagedList {
 
   function render(): void {
     if (items.length === 0) {
-      patch(cfg.container, emptyDiv(
-        hasMore ? cfg.emptyMessage : (cfg.emptyNoData || cfg.emptyMessage)));
+      patch(
+        cfg.container,
+        emptyDiv(hasMore ? cfg.emptyMessage : (cfg.emptyNoData ?? cfg.emptyMessage)),
+      );
       return;
     }
     const frag = cfg.renderItems(items);
     if (hasMore) {
-      frag.appendChild(el('button', {
-        type: 'button',
-        className: 'more-btn',
-        onclick: () => { loadMore(); }
-      }, 'Show more\u2026'));
+      frag.appendChild(
+        el(
+          "button",
+          {
+            type: "button",
+            className: "more-btn",
+            onclick: () => {
+              void loadMore();
+            },
+          },
+          "Show more\u2026",
+        ),
+      );
     }
     patch(cfg.container, frag);
   }
 
   async function reload(): Promise<void> {
-    if (loading) return;
+    if (loading) {
+      return;
+    }
     loading = true;
     items = [];
     hasMore = false;
@@ -93,7 +105,9 @@ export function createPagedList<T>(cfg: PagedListConfig<T>): PagedList {
   }
 
   async function loadMore(): Promise<void> {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore) {
+      return;
+    }
     loading = true;
     const scrollPos = window.scrollY;
     try {

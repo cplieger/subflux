@@ -1,14 +1,14 @@
 // Server-Sent Events connection. Receives real-time updates from the
 // server and dispatches them to the store and notification system.
 
-import * as store from './store.js';
-import * as notify from './notify.js';
-import { patchCoverageBadge, fetchAndMergeCoverage } from './coverage.js';
-import { pollStatus, abortPoll } from './status.js';
-import { coverageMediaId } from './utils.js';
-import { registerCleanup } from './actions/index.js';
-import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from './constants.js';
-import type { CoverageItem } from './api-types.js';
+import * as store from "./store.js";
+import * as notify from "./notify.js";
+import { patchCoverageBadge, fetchAndMergeCoverage } from "./coverage.js";
+import { pollStatus, abortPoll } from "./status.js";
+import { coverageMediaId } from "./utils.js";
+import { registerCleanup } from "./actions/index.js";
+import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
+import type { CoverageItem } from "./api-types.js";
 
 // --- Typed SSE event payloads ---
 
@@ -25,6 +25,7 @@ interface ScanStartEvent {
   data?: { action?: string; detail?: string; source?: string; succeeded?: boolean };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- caller specifies T for type narrowing
 function parseSSE<T>(e: MessageEvent): T | null {
   try {
     return JSON.parse(e.data as string) as T;
@@ -38,7 +39,9 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
 
 export function connect(): void {
-  if (eventSource) return;
+  if (eventSource) {
+    return;
+  }
 
   // Drain SSE state on page unload so reconnectTimer / visibilityTimer
   // can't fire into a torn-down DOM during the unload window. Browsers
@@ -46,59 +49,72 @@ export function connect(): void {
   // guarantees deterministic teardown for tests + soft-navigation cases.
   registerCleanup(disconnect);
 
-  eventSource = new EventSource('/api/events');
+  eventSource = new EventSource("/api/events");
 
-  eventSource.addEventListener('open', () => {
+  eventSource.addEventListener("open", () => {
     reconnectAttempt = 0;
   });
 
-  eventSource.addEventListener('coverage', (e: MessageEvent) => {
+  eventSource.addEventListener("coverage", (e: MessageEvent) => {
     const payload = parseSSE<CoverageEvent>(e);
-    const mediaId = (payload?.data?.media_id || payload?.media_id || '') as string;
+    const mediaId = payload?.data?.media_id ?? payload?.media_id ?? "";
 
-    if (mediaId && store.get('currentPage') === 'library'
-        && !store.get('detailCtx')) {
-      fetchAndMergeCoverage().then((fresh) => {
-        const item = fresh.find((i: CoverageItem) => {
-          const id = coverageMediaId(i);
-          // Episode events use "tvdb-{id}-s01e01" while the series row
-          // uses "tvdb-{id}". Use prefix match for series.
-          if (i._type === 'series') {
-            return mediaId.startsWith(id);
+    if (mediaId && store.get("currentPage") === "library" && !store.get("detailCtx")) {
+      fetchAndMergeCoverage()
+        .then((fresh) => {
+          const item = fresh.find((i: CoverageItem) => {
+            const id = coverageMediaId(i);
+            // Episode events use "tvdb-{id}-s01e01" while the series row
+            // uses "tvdb-{id}". Use prefix match for series.
+            if (i._type === "series") {
+              return mediaId.startsWith(id);
+            }
+            return id === mediaId;
+          });
+          if (item) {
+            patchCoverageBadge(coverageMediaId(item), item.targets);
           }
-          return id === mediaId;
+        })
+        .catch(() => {
+          store.set("needsRefresh", true);
         });
-        if (item) {
-          patchCoverageBadge(coverageMediaId(item), item.targets || []);
-        }
-      }).catch(() => {
-        store.set('needsRefresh', true);
-      });
       return;
     }
-    store.set('needsRefresh', true);
+    store.set("needsRefresh", true);
   });
 
-  eventSource.addEventListener('notify', (e: MessageEvent) => {
+  eventSource.addEventListener("notify", (e: MessageEvent) => {
     const payload = parseSSE<NotifyEvent>(e);
-    if (!payload) return;
+    if (!payload) {
+      return;
+    }
     const msg = payload.data;
-    if (!msg) return;
-    if (msg.level === 'error') notify.error(msg.text || '');
-    else if (msg.level === 'success') notify.success(msg.text || '');
-    else notify.info(msg.text || '');
+    if (!msg) {
+      return;
+    }
+    if (msg.level === "error") {
+      notify.error(msg.text || "");
+    } else if (msg.level === "success") {
+      notify.success(msg.text || "");
+    } else {
+      notify.info(msg.text || "");
+    }
   });
 
   // scan:start is an ephemeral "scan started" nudge. The status button
   // already flips to "in progress" from the caller's click handler, so
   // we only surface a short toast — useful for scheduled scans the user
   // did not initiate.
-  eventSource.addEventListener('scan:start', (e: MessageEvent) => {
+  eventSource.addEventListener("scan:start", (e: MessageEvent) => {
     const payload = parseSSE<ScanStartEvent>(e);
-    if (!payload) return;
+    if (!payload) {
+      return;
+    }
     const data = payload.data;
-    if (!data) return;
-    const label = data.detail || data.action || 'Scan';
+    if (!data) {
+      return;
+    }
+    const label = data.detail ?? data.action ?? "Scan";
     notify.info(`Scan started: ${label}`);
   });
 
@@ -106,12 +122,12 @@ export function connect(): void {
   // popup update without waiting up to one poll interval. The existing
   // pollStatus pipeline already handles completion toasts via its own
   // transition detector, so we do not surface a second toast here.
-  eventSource.addEventListener('scan:done', () => {
+  eventSource.addEventListener("scan:done", () => {
     void pollStatus();
   });
 
-  eventSource.addEventListener('error', () => {
-    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+  eventSource.addEventListener("error", () => {
+    if (eventSource?.readyState === EventSource.CLOSED) {
       eventSource = null;
       if (!reconnectTimer) {
         const base = SSE_RECONNECT_MS * Math.pow(2, reconnectAttempt);
@@ -144,7 +160,7 @@ export function disconnect(): void {
 // Debounce reconnect on visible to avoid flapping on quick tab switches.
 let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
 
-document.addEventListener('visibilitychange', () => {
+document.addEventListener("visibilitychange", () => {
   if (visibilityTimer) {
     clearTimeout(visibilityTimer);
     visibilityTimer = null;

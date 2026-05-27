@@ -1,4 +1,3 @@
-
 /* ================================================================
    4. Card & controls
    ================================================================ */
@@ -12,7 +11,7 @@
   container-name: card;
   content-visibility: auto;
   contain-intrinsic-size: auto 18.75rem;
-  isolation: isolate
+  isolation: isolate;
 }
 
 .card-head {
@@ -21,16 +20,26 @@
   margin-block-end: var(--sp-5);
   gap: var(--sp-4);
 
-  &[hidden] { display: none }
+  &[hidden] {
+    display: none;
+  }
 
-  & h2 { font-size: var(--text-lg); font-weight: 500; color: var(--text-2); text-wrap: balance }
+  & h2 {
+    font-size: var(--text-lg);
+    font-weight: 500;
+    color: var(--text-2);
+    text-wrap: balance;
+  }
 
-  & [data-nav], & .detail-nav { align-self: start }
+  & [data-nav],
+  & .detail-nav {
+    align-self: start;
+  }
 
   /* Breadcrumb + title on same line */
   &:has([data-nav], .detail-nav) {
     flex-flow: row wrap;
-    align-items: center
+    align-items: center;
   }
 }
 
@@ -40,7 +49,9 @@
   align-items: center;
   flex-wrap: wrap;
 
-  & input[type="search"] { width: clamp(10rem, 30cqi, 14rem) }
+  & input[type="search"] {
+    width: clamp(10rem, 30cqi, 14rem);
+  }
 }
 
 /* Desktop: card header becomes a row */
@@ -48,8 +59,10 @@
   .card-head {
     flex-flow: row wrap;
     align-items: center;
-    justify-content: space-between
+    justify-content: space-between;
   }
 
-  .card-head h2 { flex: 1 }
+  .card-head h2 {
+    flex: 1;
+  }
 }

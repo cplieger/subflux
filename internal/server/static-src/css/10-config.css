@@ -1,9 +1,10 @@
-
 /* ================================================================
    9. Config form
    ================================================================ */
 
-.cfg-section { margin-block-end: var(--sp-6) }
+.cfg-section {
+  margin-block-end: var(--sp-6);
+}
 
 .cfg-title {
   font-size: var(--text-sm);
@@ -14,10 +15,12 @@
   border-block-end: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between
+  justify-content: space-between;
 }
 
-.cfg-title:first-child { margin-block-start: 0 }
+.cfg-title:first-child {
+  margin-block-start: 0;
+}
 
 .cfg-field {
   display: flex;
@@ -29,23 +32,39 @@
     min-width: 7.5rem;
     font-size: var(--text-sm);
     color: var(--muted);
-    flex-shrink: 0
+    flex-shrink: 0;
   }
 
-  & input, & select { flex: 1 }
-  & :where(.toggle) { margin-inline-start: auto }
+  & input,
+  & select {
+    flex: 1;
+  }
+
+  & :where(.toggle) {
+    margin-inline-start: auto;
+  }
 }
 
 @container (width < 360px) {
   .cfg-field {
     flex-direction: column;
     align-items: stretch;
-    & label:not(.toggle) { min-width: auto }
+
+    & label:not(.toggle) {
+      min-width: auto;
+    }
   }
 }
 
-.cfg-secret { position: relative; flex: 1 }
-.cfg-secret input { width: 100%; padding-inline-end: 2rem }
+.cfg-secret {
+  position: relative;
+  flex: 1;
+}
+
+.cfg-secret input {
+  width: 100%;
+  padding-inline-end: 2rem;
+}
 
 .cfg-reveal {
   position: absolute;
@@ -57,22 +76,28 @@
   color: var(--muted);
   cursor: pointer;
   padding: var(--sp-1);
-  &:hover { color: var(--text) }
+
+  &:hover {
+    color: var(--text);
+  }
 }
 
 .cfg-masked {
   -webkit-text-security: disc;
-  font-family: text-security-disc, password, sans-serif
+  font-family: text-security-disc, password, sans-serif;
 }
 
-.cfg-required { border-color: var(--err); box-shadow: 0 0 0 1px var(--err) }
+.cfg-required {
+  border-color: var(--err);
+  box-shadow: 0 0 0 1px var(--err);
+}
 
 .cfg-error {
   display: block;
   width: 100%;
   font-size: var(--text-xs);
   color: var(--err);
-  margin-block-start: var(--sp-1)
+  margin-block-start: var(--sp-1);
 }
 
 .cfg-banner {
@@ -86,7 +111,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-5);
-  flex-wrap: wrap
+  flex-wrap: wrap;
 }
 
 .cfg-textarea {
@@ -94,7 +119,7 @@
   font-family: ui-monospace, Consolas, monospace;
   resize: vertical;
   min-height: 3.5rem;
-  field-sizing: content
+  field-sizing: content;
 }
 
 .cfg-list {
@@ -102,7 +127,10 @@
   gap: var(--sp-3);
   align-items: center;
   margin-block-end: var(--sp-3);
-  & input { flex: 1 }
+
+  & input {
+    flex: 1;
+  }
 }
 
 /* Provider cards */
@@ -119,7 +147,7 @@
     align-items: center;
     margin-block-end: var(--sp-3);
     font-size: var(--text-sm);
-    font-weight: 500
+    font-weight: 500;
   }
 }
 
@@ -129,21 +157,76 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: var(--sp-4);
-  margin-block-end: var(--sp-4)
+  margin-block-end: var(--sp-4);
 }
 
-.lang-row { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap }
-.lang-label { font-size: var(--text-xs); font-weight: 500; color: var(--muted) }
-.lang-subs { display: flex; flex-direction: column; gap: var(--sp-3) }
-.lang-subs + .ghost { margin-block-start: var(--sp-4) }
-.lang-select { flex: 1; max-width: 12rem }
-.variant-select { flex: 0 0 auto; width: 8rem }
-.lang-advanced { width: 100%; padding-inline-start: var(--sp-4); margin-block: var(--sp-2); font-size: var(--text-sm) }
-.lang-exclude, .lang-min-score, .lang-providers { font-size: var(--text-sm) }
+.lang-row {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.lang-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.lang-subs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.lang-subs + .ghost {
+  margin-block-start: var(--sp-4);
+}
+
+.lang-select {
+  flex: 1;
+  max-width: 12rem;
+}
+
+.variant-select {
+  flex: 0 0 auto;
+  width: 8rem;
+}
+
+.lang-advanced {
+  width: 100%;
+  padding-inline-start: var(--sp-4);
+  margin-block: var(--sp-2);
+  font-size: var(--text-sm);
+}
+
+.lang-exclude,
+.lang-min-score,
+.lang-providers {
+  font-size: var(--text-sm);
+}
 
 /* Config layout helpers */
-.cfg-body { padding-inline-start: var(--sp-2) }
-.provider-head { display: flex; justify-content: space-between; align-items: center }
-.provider-head .badge-health { font-size: var(--text-xs); min-width: auto }
-.cfg-disabled { opacity: 0.45 }
-.provider-body { padding-inline-start: var(--sp-2); padding-block-start: var(--sp-3) }
+.cfg-body {
+  padding-inline-start: var(--sp-2);
+}
+
+.provider-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.provider-head .badge-health {
+  font-size: var(--text-xs);
+  min-width: auto;
+}
+
+.cfg-disabled {
+  opacity: 0.45;
+}
+
+.provider-body {
+  padding-inline-start: var(--sp-2);
+  padding-block-start: var(--sp-3);
+}

@@ -103,9 +103,8 @@ func (m *mockProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, err
 
 // mockStoreWithBackoff extends mockStore with BackedOffProviders support.
 type mockStoreWithBackoff struct {
-	mockStore
-
 	backedOff []api.ProviderID
+	mockStore
 }
 
 func (m *mockStoreWithBackoff) BackedOffProviders(_ context.Context, _ api.MediaType, _, _ string, _ int) ([]api.ProviderID, error) {
@@ -114,11 +113,11 @@ func (m *mockStoreWithBackoff) BackedOffProviders(_ context.Context, _ api.Media
 
 // mockStoreWithScore extends mockStore with CurrentScore support for upgrade tests.
 type mockStoreWithScore struct {
-	mockStore
-
 	mediaImported time.Time
 	score         int
-	found         bool
+	mockStore
+
+	found bool
 }
 
 func (m *mockStoreWithScore) CurrentScore(_ context.Context, _ api.MediaType, _, _ string) (int, time.Time, bool, error) {

@@ -427,10 +427,10 @@ func TestBuildVADSubSignal(t *testing.T) {
 	tests := []struct {
 		name      string
 		cues      []Cue
-		numFrames int
-		wantNil   bool
-		wantLen   int
 		checks    []check
+		numFrames int
+		wantLen   int
+		wantNil   bool
 	}{
 		{
 			name:      "nil cues zero frames",
@@ -512,11 +512,11 @@ func TestVoteOnCandidates(t *testing.T) {
 	inc := ShiftCues(ref, 2*time.Second)
 	incSame := makeLongCues(30, 10*time.Minute)
 	tests := []struct {
+		check      func(t *testing.T, got SyncResult)
 		name       string
 		ref        []Cue
 		inc        []Cue
 		candidates []SyncResult
-		check      func(t *testing.T, got SyncResult)
 	}{
 		{
 			name: "single candidate passthrough",
@@ -682,11 +682,11 @@ func TestBuildClusters(t *testing.T) {
 	tests := []struct {
 		name         string
 		candidates   []SyncResult
-		clusterMs    int64
-		wantClusters int
-		wantMembers  []int // members per cluster
+		wantMembers  []int
 		wantWeight   []float64
 		wantOffset   []int64
+		clusterMs    int64
+		wantClusters int
 	}{
 		{
 			name:         "single candidate",
@@ -861,10 +861,10 @@ func TestPickWinner(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
+		wantMethod     SyncMethod
 		clusters       []voteCluster
 		wantOffset     int64
 		wantConfidence Confidence
-		wantMethod     SyncMethod
 	}{
 		{
 			name: "selects highest weight cluster",

@@ -214,8 +214,8 @@ func TestNewOIDCProvider_validation_errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		cfg     api.OIDCConfig
 		wantErr string
+		cfg     api.OIDCConfig
 	}{
 		{
 			name:    "empty issuer_url",

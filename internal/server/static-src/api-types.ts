@@ -36,9 +36,15 @@ export type {
   StateEntry,
   Stats,
   SubtitleEntry,
-} from './wire/types.gen.js';
+} from "./wire/types.gen.js";
 
-import type { MovieItem, CoverageTarget } from './wire/types.gen.js';
+import type {
+  MovieItem,
+  CoverageTarget,
+  SubtitleEntry,
+  SchemaField,
+  ProviderSchema,
+} from "./wire/types.gen.js";
 
 // --- Client-only types ---
 
@@ -46,7 +52,7 @@ import type { MovieItem, CoverageTarget } from './wire/types.gen.js';
  *  All fields from both SeriesItem and MovieItem are present; fields unique
  *  to one variant are optional. The _type discriminant identifies the source. */
 export interface CoverageItem {
-  _type: 'series' | 'movie';
+  _type: "series" | "movie";
   id: number;
   title: string;
   year: number;
@@ -64,7 +70,7 @@ export interface CoverageItem {
   scene_name?: string;
   in_cinemas?: string;
   digital_release?: string;
-  subs?: import('./wire/types.gen.js').SubtitleEntry[];
+  subs?: SubtitleEntry[];
   // Shared optional
   imdb_id?: string;
   tags?: number[];
@@ -124,8 +130,8 @@ export interface ConfigSchema {
   help?: string;
   required_group?: string;
   enable_key?: string;
-  fields: import('./wire/types.gen.js').SchemaField[];
-  providers: import('./wire/types.gen.js').ProviderSchema[];
+  fields: SchemaField[];
+  providers: ProviderSchema[];
 }
 
 /** Schema field option for select fields. */

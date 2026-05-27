@@ -51,6 +51,8 @@ linters:
       require-explanation: true
       require-specific: true
   exclusions:
+    paths:
+      - node_modules
     presets:
       - comments
       - std-error-handling

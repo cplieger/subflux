@@ -57,9 +57,9 @@ func TestEncrypt_rejects_invalid_key_length(t *testing.T) {
 		name   string
 		keyLen int
 	}{
-		{"empty", 0},
-		{"too_short_16", 16},
-		{"too_long_64", 64},
+		{name: "empty", keyLen: 0},
+		{name: "too_short_16", keyLen: 16},
+		{name: "too_long_64", keyLen: 64},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -81,9 +81,9 @@ func TestDecrypt_rejects_invalid_key_length(t *testing.T) {
 		name   string
 		keyLen int
 	}{
-		{"empty", 0},
-		{"too_short_16", 16},
-		{"too_long_64", 64},
+		{name: "empty", keyLen: 0},
+		{name: "too_short_16", keyLen: 16},
+		{name: "too_long_64", keyLen: 64},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -106,9 +106,9 @@ func TestDecrypt_rejects_short_ciphertext(t *testing.T) {
 		name string
 		data []byte
 	}{
-		{"empty", []byte{}},
-		{"one_byte", []byte{0x01}},
-		{"eleven_bytes", make([]byte, 11)},
+		{name: "empty", data: []byte{}},
+		{name: "one_byte", data: []byte{0x01}},
+		{name: "eleven_bytes", data: make([]byte, 11)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -135,22 +135,22 @@ func TestDecrypt_rejects_tampered_ciphertext(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name   string
 		tamper func([]byte) []byte
+		name   string
 	}{
-		{"flip_last_byte", func(ct []byte) []byte {
+		{name: "flip_last_byte", tamper: func(ct []byte) []byte {
 			out := make([]byte, len(ct))
 			copy(out, ct)
 			out[len(out)-1] ^= 0xFF
 			return out
 		}},
-		{"flip_middle_byte", func(ct []byte) []byte {
+		{name: "flip_middle_byte", tamper: func(ct []byte) []byte {
 			out := make([]byte, len(ct))
 			copy(out, ct)
 			out[len(out)/2] ^= 0xFF
 			return out
 		}},
-		{"truncate_one_byte", func(ct []byte) []byte {
+		{name: "truncate_one_byte", tamper: func(ct []byte) []byte {
 			out := make([]byte, len(ct)-1)
 			copy(out, ct)
 			return out

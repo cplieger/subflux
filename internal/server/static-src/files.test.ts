@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./api-client.js", () => ({ apiGet: vi.fn().mockResolvedValue([]) }));
@@ -14,13 +14,14 @@ vi.mock("./bus.js", () => ({
 }));
 vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
 vi.mock("./dom.js", async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, confirm: vi.fn().mockResolvedValue(true) };
 });
 
 describe("files: renderFiles", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
   });
 
   it.todo("renders empty state when no external files");

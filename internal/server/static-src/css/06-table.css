@@ -1,4 +1,3 @@
-
 /* ================================================================
    5. Data table — mobile-first card layout, table at 700px
    ================================================================ */
@@ -11,7 +10,7 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-  border: 0
+  border: 0;
 }
 
 :where(tbody) tr {
@@ -23,13 +22,20 @@
   border-block-end: 1px solid var(--border);
   align-items: center;
 
-  &:first-child { border-block-start: 1px solid var(--border) }
+  &:first-child {
+    border-block-start: 1px solid var(--border);
+  }
 }
 
 /* Series detail: season headers never get top border */
-.series-detail :where(tbody) tr:first-child { border-block-start: none }
+.series-detail :where(tbody) tr:first-child {
+  border-block-start: none;
+}
 
-:where(tbody) td { padding: 0; border: none }
+:where(tbody) td {
+  padding: 0;
+  border: none;
+}
 
 td[data-col="title"] {
   grid-column: 1 / 3;
@@ -37,19 +43,23 @@ td[data-col="title"] {
   font-size: var(--text-base);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 td[data-col="meta"] {
   grid-row: 2;
   font-size: var(--text-sm);
-  color: var(--muted)
+  color: var(--muted);
 }
 
 /* Library: second meta cell gets column 2 with dot separator */
 .library td[data-col="meta"] + td[data-col="meta"] {
   grid-column: 2;
-  &::before { content: '\00B7\00A0'; color: var(--muted) }
+
+  &::before {
+    content: "\00B7\00A0";
+    color: var(--muted);
+  }
 }
 
 td[data-col="badges"] {
@@ -58,7 +68,7 @@ td[data-col="badges"] {
   margin-block-start: var(--sp-3);
   display: inline-flex;
   flex-wrap: wrap;
-  gap: var(--sp-2)
+  gap: var(--sp-2);
 }
 
 td[data-col="actions"] {
@@ -67,12 +77,14 @@ td[data-col="actions"] {
   place-self: center end;
   display: flex;
   gap: var(--sp-2);
-  align-items: center
+  align-items: center;
 }
 
 /* Desktop: traditional table with fixed column widths */
 @container card (width >= 700px) {
-  :where(table) { table-layout: fixed }
+  :where(table) {
+    table-layout: fixed;
+  }
 
   :where(thead) {
     position: static;
@@ -80,47 +92,106 @@ td[data-col="actions"] {
     height: auto;
     overflow: visible;
     clip-path: none;
-    white-space: normal
+    white-space: normal;
   }
 
-  :where(tbody) tr { display: table-row }
-  :where(tbody) td { display: table-cell; padding: var(--sp-4); vertical-align: middle; line-height: 1.75rem; margin: 0 }
-  td[data-col="actions"] { display: table-cell }
-  .library td[data-col="meta"] + td[data-col="meta"]::before { display: none }
-  td[data-col="badges"] { margin-block-start: 0 }
+  :where(tbody) tr {
+    display: table-row;
+  }
+
+  :where(tbody) td {
+    display: table-cell;
+    padding: var(--sp-4);
+    vertical-align: middle;
+    line-height: 1.75rem;
+    margin: 0;
+  }
+
+  td[data-col="actions"] {
+    display: table-cell;
+  }
+
+  .library td[data-col="meta"] + td[data-col="meta"]::before {
+    display: none;
+  }
+
+  td[data-col="badges"] {
+    margin-block-start: 0;
+  }
 
   /* Library table column widths */
-  .library th:nth-child(1) { width: 30% }
-  .library th:nth-child(2) { width: 8% }
-  .library th:nth-child(3) { width: 10% }
-  .library th:nth-child(4) { width: 40% }
-  .library th:nth-child(5) { width: 12% }
+  .library th:nth-child(1) {
+    width: 30%;
+  }
+
+  .library th:nth-child(2) {
+    width: 8%;
+  }
+
+  .library th:nth-child(3) {
+    width: 10%;
+  }
+
+  .library th:nth-child(4) {
+    width: 40%;
+  }
+
+  .library th:nth-child(5) {
+    width: 12%;
+  }
 
   .library td[data-col="title"] {
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap
+    white-space: nowrap;
   }
 
-  .library td[data-col="badges"] { display: flex; flex-wrap: wrap; gap: var(--sp-2) }
-  .library td:last-child { white-space: nowrap; text-align: end }
+  .library td[data-col="badges"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .library td:last-child {
+    white-space: nowrap;
+    text-align: end;
+  }
 
   /* History table column widths */
-  .history th:nth-child(1) { width: 16% }
-  .history th:nth-child(2) { width: 29% }
-  .history th:nth-child(3) { width: 7% }
-  .history th:nth-child(4) { width: 10% }
-  .history th:nth-child(5) { width: 8% }
-  .history th:nth-child(6) { width: 30% }
+  .history th:nth-child(1) {
+    width: 16%;
+  }
+
+  .history th:nth-child(2) {
+    width: 29%;
+  }
+
+  .history th:nth-child(3) {
+    width: 7%;
+  }
+
+  .history th:nth-child(4) {
+    width: 10%;
+  }
+
+  .history th:nth-child(5) {
+    width: 8%;
+  }
+
+  .history th:nth-child(6) {
+    width: 30%;
+  }
 
   .history td:nth-child(2),
   .history td:nth-child(5) {
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap
+    white-space: nowrap;
   }
 
-  .history tbody tr { display: table-row }
+  .history tbody tr {
+    display: table-row;
+  }
 
   .history tbody td {
     display: table-cell;
@@ -130,58 +201,109 @@ td[data-col="actions"] {
     max-width: unset;
     overflow: visible;
     white-space: normal;
-    text-overflow: clip
+    text-overflow: clip;
   }
-  table.history { display: table; width: 100% }
-  table.history :where(tbody) { display: table-row-group }
+
+  table.history {
+    display: table;
+    width: 100%;
+  }
+
+  table.history :where(tbody) {
+    display: table-row-group;
+  }
 
   .history td[data-col="title"],
-  .history td[data-col="meta"] { flex: unset; min-width: unset; overflow: visible }
-  .history td[data-col="meta"]::before { display: none }
-  .history td[data-col="meta"]::after { display: none }
+  .history td[data-col="meta"] {
+    flex: unset;
+    min-width: unset;
+    overflow: visible;
+  }
+
+  .history td[data-col="meta"]::before {
+    display: none;
+  }
+
+  .history td[data-col="meta"]::after {
+    display: none;
+  }
 
   .history td[data-col="meta"]:nth-child(1) {
     font-size: inherit;
     font-weight: inherit;
-    color: inherit
+    color: inherit;
   }
 
   /* Movie detail: right-align search button */
-  .movie-detail td:last-child { text-align: end }
+  .movie-detail td:last-child {
+    text-align: end;
+  }
 
   /* Series detail: right-align action buttons */
-  .series-detail td:last-child { text-align: end }
+  .series-detail td:last-child {
+    text-align: end;
+  }
 
   /* Shared desktop table reset for detail views */
   .movie-detail tbody tr,
-  .series-detail tbody tr { display: table-row }
+  .series-detail tbody tr {
+    display: table-row;
+  }
 
   .movie-detail tbody td,
-  .series-detail tbody td { display: table-cell; padding: var(--sp-4) }
+  .series-detail tbody td {
+    display: table-cell;
+    padding: var(--sp-4);
+  }
 
-  .movie-detail tbody td { grid-row: unset }
-  .movie-detail tbody td.ep-coverage { display: inline-flex }
+  .movie-detail tbody td {
+    grid-row: unset;
+  }
 
-  table.series-detail { display: table; width: 100% }
-  .series-detail :where(colgroup) { display: table-column-group }
-  .series-detail :where(tbody) { display: table-row-group }
+  .movie-detail tbody td.ep-coverage {
+    display: inline-flex;
+  }
+
+  table.series-detail {
+    display: table;
+    width: 100%;
+  }
+
+  .series-detail :where(colgroup) {
+    display: table-column-group;
+  }
+
+  .series-detail :where(tbody) {
+    display: table-row-group;
+  }
 
   .series-detail .season-head,
   .series-detail .season-head:has(th),
-  .series-detail .season-gap { display: table-row }
+  .series-detail .season-gap {
+    display: table-row;
+  }
 
   .series-detail .season-head td,
-  .series-detail .season-gap td { display: table-cell }
-  .series-detail .ep-coverage { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2) }
+  .series-detail .season-gap td {
+    display: table-cell;
+  }
+
+  .series-detail .ep-coverage {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
 }
 
 /* History mobile: clean 3-row card */
 .history {
   display: block;
-  overflow: hidden
+  overflow: hidden;
 }
 
-.history :where(tbody) { display: block }
+.history :where(tbody) {
+  display: block;
+}
 
 .history :where(tbody) tr {
   display: flex;
@@ -189,7 +311,7 @@ td[data-col="actions"] {
   gap: var(--sp-1) var(--sp-3);
   padding: var(--sp-4);
   border-block-end: 1px solid var(--border);
-  overflow: hidden
+  overflow: hidden;
 }
 
 /* Row 1: title full width */
@@ -199,25 +321,36 @@ td[data-col="actions"] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 /* Row 2: time · lang · provider · mode inline */
-.history td[data-col="meta"]:nth-child(1) { order: 2 }
+.history td[data-col="meta"]:nth-child(1) {
+  order: 2;
+}
 
 .history td[data-col="meta"]:nth-child(3) {
   order: 3;
-  &::before { content: '\00B7\00A0' }
+
+  &::before {
+    content: "\00B7\00A0";
+  }
 }
 
 .history td[data-col="meta"]:nth-child(4) {
   order: 4;
-  &::before { content: '\00B7\00A0' }
+
+  &::before {
+    content: "\00B7\00A0";
+  }
 }
 
 .history td[data-col="meta"]:nth-child(5) {
   order: 5;
-  &::before { content: '\00B7\00A0' }
+
+  &::before {
+    content: "\00B7\00A0";
+  }
 }
 
 /* Row 3: release full width, truncated */
@@ -227,7 +360,7 @@ td[data-col="actions"] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 /* Movie detail mobile: single row with aligned columns */
@@ -237,21 +370,30 @@ td[data-col="actions"] {
   grid-template-rows: auto;
   align-items: center;
   gap: var(--sp-3);
-  padding: var(--sp-4)
+  padding: var(--sp-4);
 }
 
-.movie-detail :where(tbody) tr:hover { background: transparent }
+.movie-detail :where(tbody) tr:hover {
+  background: transparent;
+}
 
 .movie-detail :where(tbody) td {
   padding: 0;
-  grid-row: 1
+  grid-row: 1;
 }
-.movie-detail td[data-col="actions"] { grid-column: 3; justify-self: end }
+
+.movie-detail td[data-col="actions"] {
+  grid-column: 3;
+  justify-self: end;
+}
 
 /* Season headers */
 .season-head {
   cursor: default;
-  &:hover { background: transparent }
+
+  &:hover {
+    background: transparent;
+  }
 
   & td {
     font-size: var(--text-sm);
@@ -259,31 +401,64 @@ td[data-col="actions"] {
     color: var(--accent);
     padding-block: var(--sp-4) var(--sp-3);
     border-block-end: none;
-    white-space: nowrap
+    white-space: nowrap;
   }
 
-  & button { font-weight: 400; color: var(--text) }
+  & button {
+    font-weight: 400;
+    color: var(--text);
+  }
 }
 
-.season-gap { border: none }
-.season-gap td { padding: 0; height: var(--sp-4) }
-.season-gap:hover { background: transparent }
+.season-gap {
+  border: none;
+}
+
+.season-gap td {
+  padding: 0;
+  height: var(--sp-4);
+}
+
+.season-gap:hover {
+  background: transparent;
+}
 
 /* Episode detail columns */
-.ep-num { font-variant-numeric: tabular-nums }
-.ep-title { min-width: 0 }
-.ep-aired { color: var(--muted); font-size: 0.75em }
-.ep-coverage { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2) }
+.ep-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.ep-title {
+  min-width: 0;
+}
+
+.ep-aired {
+  color: var(--muted);
+  font-size: 0.75em;
+}
+
+.ep-coverage {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
 
 /* Series detail mobile: mirror library card pattern
    Row 1: ep number + title (cols 1-2), actions col 3 spanning rows
    Row 2: coverage badges (cols 1-2) */
 @container card (width < 700px) {
-  table.series-detail { display: block; width: 100% }
+  table.series-detail {
+    display: block;
+    width: 100%;
+  }
 
-  .series-detail :where(colgroup) { display: none }
+  .series-detail :where(colgroup) {
+    display: none;
+  }
 
-  .series-detail :where(tbody) { display: block }
+  .series-detail :where(tbody) {
+    display: block;
+  }
 
   .series-detail :where(tbody) tr {
     display: grid;
@@ -292,14 +467,17 @@ td[data-col="actions"] {
     gap: var(--sp-1) var(--sp-3);
     padding: var(--sp-4);
     align-items: center;
-    border-block-end: 1px solid var(--border)
+    border-block-end: 1px solid var(--border);
   }
 
   .series-detail .season-head + .season-head + tr {
-    border-block-start: 1px solid var(--border)
+    border-block-start: 1px solid var(--border);
   }
 
-  .series-detail :where(tbody) td { padding: 0; border: none }
+  .series-detail :where(tbody) td {
+    padding: 0;
+    border: none;
+  }
 
   .series-detail .ep-num {
     grid-column: 1;
@@ -308,12 +486,12 @@ td[data-col="actions"] {
     font-size: var(--text-sm);
     color: var(--muted);
     font-weight: 500;
-    white-space: nowrap
+    white-space: nowrap;
   }
 
   .series-detail .ep-num .ep-aired {
     display: block;
-    font-size: var(--text-xs)
+    font-size: var(--text-xs);
   }
 
   .series-detail .ep-title {
@@ -324,7 +502,7 @@ td[data-col="actions"] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0
+    min-width: 0;
   }
 
   .series-detail td[data-col="actions"] {
@@ -333,12 +511,12 @@ td[data-col="actions"] {
     place-self: center end;
     display: flex;
     gap: var(--sp-2);
-    align-items: center
+    align-items: center;
   }
 
   .series-detail .ep-coverage {
     grid-column: 2;
-    grid-row: 2
+    grid-row: 2;
   }
 
   /* Season header: flex row, label left, actions right */
@@ -347,34 +525,44 @@ td[data-col="actions"] {
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-4);
-    border-block-end: none
+    border-block-end: none;
   }
 
-  .series-detail .season-head td { padding: 0 }
+  .series-detail .season-head td {
+    padding: 0;
+  }
 
-  .series-detail .season-head td:first-child { flex: 1 }
+  .series-detail .season-head td:first-child {
+    flex: 1;
+  }
 
-  .series-detail .season-head td:empty { display: none }
+  .series-detail .season-head td:empty {
+    display: none;
+  }
 
   .series-detail .season-head td[data-col="actions"] {
     grid-column: unset;
     grid-row: unset;
     place-self: unset;
-    flex-shrink: 0
+    flex-shrink: 0;
   }
 
   /* Hide column header rows on mobile */
-  .series-detail .season-head:has(th) { display: none }
+  .series-detail .season-head:has(th) {
+    display: none;
+  }
 
   /* Season gap */
   .series-detail .season-gap {
     display: block;
     padding: 0;
     height: var(--sp-4);
-    border: none
+    border: none;
   }
 
-  .series-detail .season-gap td { display: none }
+  .series-detail .season-gap td {
+    display: none;
+  }
 }
 
 /* Detail navigation */
@@ -382,15 +570,24 @@ td[data-col="actions"] {
   font-weight: 400;
   font-size: var(--text-sm);
   color: var(--muted);
-  &::before { content: '\00A0\00B7\00A0' }
+
+  &::before {
+    content: "\00A0\00B7\00A0";
+  }
 }
 
 /* Action button group (multiple buttons in one cell) */
-.action-group { display: inline-flex; gap: var(--sp-2); align-items: center }
+.action-group {
+  display: inline-flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
 
 /* Collapse action button labels to icon-only on narrow desktop */
 @container card (width < 950px) {
-  .action-group .btn-text { display: none }
+  .action-group .btn-text {
+    display: none;
+  }
 }
 
 /* "Show more" */
@@ -404,5 +601,8 @@ td[data-col="actions"] {
   background: var(--ghost);
   color: var(--text);
   font-size: var(--text-sm);
-  &:hover { background: var(--ghost-hover) }
+
+  &:hover {
+    background: var(--ghost-hover);
+  }
 }
