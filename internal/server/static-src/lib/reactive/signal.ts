@@ -58,7 +58,10 @@ export function signal<T>(initial: T): Signal<T> {
   const subs = new Set<Subscriber>();
   return {
     get value(): T {
-      if (tracking !== null) { subs.add(tracking); tracking.deps.add(subs); }
+      if (tracking !== null) {
+        subs.add(tracking);
+        tracking.deps.add(subs);
+      }
       return val;
     },
     set value(v: T) {
@@ -66,7 +69,9 @@ export function signal<T>(initial: T): Signal<T> {
       val = v;
       notify(subs);
     },
-    peek(): T { return val; },
+    peek(): T {
+      return val;
+    },
   };
 }
 
@@ -81,12 +86,19 @@ export function effect(fn: () => Cleanup): () => void {
       if (disposed) return;
       for (const depSet of sub.deps) depSet.delete(sub);
       sub.deps.clear();
-      if (cleanup) { cleanup(); cleanup = undefined; }
+      if (cleanup) {
+        cleanup();
+        cleanup = undefined;
+      }
       const prev = tracking;
       tracking = sub;
-      try { cleanup = fn(); }
-      catch (e) { console.error("effect error:", e); }
-      finally { tracking = prev; }
+      try {
+        cleanup = fn();
+      } catch (e) {
+        console.error("effect error:", e);
+      } finally {
+        tracking = prev;
+      }
     },
   };
   sub.execute();
@@ -94,13 +106,18 @@ export function effect(fn: () => Cleanup): () => void {
     disposed = true;
     for (const depSet of sub.deps) depSet.delete(sub);
     sub.deps.clear();
-    if (cleanup) { cleanup(); cleanup = undefined; }
+    if (cleanup) {
+      cleanup();
+      cleanup = undefined;
+    }
   };
 }
 
 export function batch(fn: () => void): void {
   batchDepth++;
-  try { fn(); } finally {
+  try {
+    fn();
+  } finally {
     batchDepth--;
     if (batchDepth === 0) schedulePending();
   }

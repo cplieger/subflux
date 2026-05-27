@@ -14,13 +14,14 @@ vi.mock("./bus.js", () => ({
 }));
 vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
 vi.mock("./dom.js", async (importOriginal) => {
-  const actual = await importOriginal() as Record<string, unknown>;
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, confirm: vi.fn().mockResolvedValue(true) };
 });
 
 describe("files: renderFiles", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
   });
 
   it.todo("renders empty state when no external files");

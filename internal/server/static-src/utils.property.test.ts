@@ -10,7 +10,7 @@ describe("coverageMediaId properties", () => {
         const result = coverageMediaId({ _type: "series", tvdb_id: tvdbId });
         expect(result).toBe(`tvdb-${tvdbId}`);
         expect(result.startsWith("tvdb-")).toBe(true);
-      })
+      }),
     );
   });
 
@@ -20,7 +20,7 @@ describe("coverageMediaId properties", () => {
         const result = coverageMediaId({ _type: "movie", tmdb_id: tmdbId });
         expect(result).toBe(`tmdb-${tmdbId}`);
         expect(result.startsWith("tmdb-")).toBe(true);
-      })
+      }),
     );
   });
 });
@@ -28,12 +28,17 @@ describe("coverageMediaId properties", () => {
 describe("tvdbMediaId properties", () => {
   it("always starts with tvdb- and embeds the id", () => {
     fc.assert(
-      fc.property(fc.nat(), fc.integer({ min: 1, max: 99 }), fc.integer({ min: 1, max: 99 }), (id, season, episode) => {
-        const result = tvdbMediaId(id, season, episode);
-        expect(result.startsWith(`tvdb-${id}-`)).toBe(true);
-        expect(result).toContain(`s${String(season).padStart(2, "0")}`);
-        expect(result).toContain(`e${String(episode).padStart(2, "0")}`);
-      })
+      fc.property(
+        fc.nat(),
+        fc.integer({ min: 1, max: 99 }),
+        fc.integer({ min: 1, max: 99 }),
+        (id, season, episode) => {
+          const result = tvdbMediaId(id, season, episode);
+          expect(result.startsWith(`tvdb-${id}-`)).toBe(true);
+          expect(result).toContain(`s${String(season).padStart(2, "0")}`);
+          expect(result).toContain(`e${String(episode).padStart(2, "0")}`);
+        },
+      ),
     );
   });
 });

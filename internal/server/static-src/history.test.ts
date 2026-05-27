@@ -14,7 +14,8 @@ vi.mock("./bus.js", () => ({
 
 describe("history: renderItems", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="historyPanel"><div id="coverageContent"></div><select id="h-lang"></select><select id="h-provider"></select></div>';
+    document.body.innerHTML =
+      '<div id="historyPanel"><div id="coverageContent"></div><select id="h-lang"></select><select id="h-provider"></select></div>';
   });
 
   it.todo("renders table with thead and tbody");

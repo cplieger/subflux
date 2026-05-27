@@ -31,15 +31,18 @@ export class ActionError extends Error implements ActionErrorLike {
   readonly code?: string;
   override readonly cause?: unknown;
 
-  constructor(
-    message: string,
-    opts?: { status?: number; code?: string; cause?: unknown },
-  ) {
+  constructor(message: string, opts?: { status?: number; code?: string; cause?: unknown }) {
     super(message);
     this.name = "ActionError";
-    if (opts?.status !== undefined) this.status = opts.status;
-    if (opts?.code !== undefined) this.code = opts.code;
-    if (opts?.cause !== undefined) this.cause = opts.cause;
+    if (opts?.status !== undefined) {
+      this.status = opts.status;
+    }
+    if (opts?.code !== undefined) {
+      this.code = opts.code;
+    }
+    if (opts?.cause !== undefined) {
+      this.cause = opts.cause;
+    }
   }
 }
 
@@ -47,7 +50,9 @@ export class ActionError extends Error implements ActionErrorLike {
  *  `error` property. Replaces unsafe `as { error?: string }` casts on
  *  parsed JSON bodies throughout the action framework and api-client. */
 export function hasErrorString(v: unknown): v is { error: string } {
-  if (typeof v !== "object" || v === null || !("error" in v)) return false;
+  if (typeof v !== "object" || v === null || !("error" in v)) {
+    return false;
+  }
   return typeof v.error === "string";
 }
 
@@ -57,17 +62,29 @@ export function hasErrorString(v: unknown): v is { error: string } {
  *  Internal — consumed only by define.ts. */
 export function toActionError(e: unknown): ActionErrorLike {
   if (e instanceof ActionError) {
-    const r: { message: string; status?: number; code?: string; cause?: unknown } = { message: e.message };
-    if (e.status !== undefined) r.status = e.status;
-    if (e.code !== undefined) r.code = e.code;
-    if (e.cause !== undefined) r.cause = e.cause;
+    const r: { message: string; status?: number; code?: string; cause?: unknown } = {
+      message: e.message,
+    };
+    if (e.status !== undefined) {
+      r.status = e.status;
+    }
+    if (e.code !== undefined) {
+      r.code = e.code;
+    }
+    if (e.cause !== undefined) {
+      r.cause = e.cause;
+    }
     return r;
   }
   if (e instanceof DOMException) {
-    const code = e.name === "TimeoutError" ? "timeout"
-               : e.name === "AbortError" ? "cancelled"
-               : e.name === "NetworkError" ? "network"
-               : e.name.toLowerCase();
+    const code =
+      e.name === "TimeoutError"
+        ? "timeout"
+        : e.name === "AbortError"
+          ? "cancelled"
+          : e.name === "NetworkError"
+            ? "network"
+            : e.name.toLowerCase();
     const isNetLayer = code === "network" || code === "timeout";
     return { message: e.message, code, ...(isNetLayer && { status: 0 }), cause: e };
   }
@@ -81,9 +98,16 @@ export function toActionError(e: unknown): ActionErrorLike {
     const status = typeof rawStatus === "number" ? rawStatus : undefined;
     const rawCode = "code" in e ? (e as { code: unknown }).code : undefined;
     const code = typeof rawCode === "string" ? rawCode : undefined;
-    const r: { message: string; status?: number; code?: string; cause: unknown } = { message: e.message, cause: e };
-    if (status !== undefined) r.status = status;
-    if (code !== undefined) r.code = code;
+    const r: { message: string; status?: number; code?: string; cause: unknown } = {
+      message: e.message,
+      cause: e,
+    };
+    if (status !== undefined) {
+      r.status = status;
+    }
+    if (code !== undefined) {
+      r.code = code;
+    }
     return r;
   }
   if (typeof e === "object" && e !== null && "message" in e) {
@@ -91,15 +115,30 @@ export function toActionError(e: unknown): ActionErrorLike {
     const message = typeof obj.message === "string" ? obj.message : String(obj.message);
     const status = typeof obj.status === "number" ? obj.status : undefined;
     const code = typeof obj.code === "string" ? obj.code : undefined;
-    const r: { message: string; status?: number; code?: string; cause: unknown } = { message, cause: e };
-    if (status !== undefined) r.status = status;
-    if (code !== undefined) r.code = code;
+    const r: { message: string; status?: number; code?: string; cause: unknown } = {
+      message,
+      cause: e,
+    };
+    if (status !== undefined) {
+      r.status = status;
+    }
+    if (code !== undefined) {
+      r.code = code;
+    }
     return r;
   }
-  if (e === null) return { message: "Unknown error (null thrown)", code: "unknown" };
-  if (e === undefined) return { message: "Unknown error (undefined thrown)", code: "unknown" };
+  if (e === null) {
+    return { message: "Unknown error (null thrown)", code: "unknown" };
+  }
+  if (e === undefined) {
+    return { message: "Unknown error (undefined thrown)", code: "unknown" };
+  }
   const msg = String(e);
-  return { message: msg !== "" ? msg : "Unknown error (empty value thrown)", code: "unknown", cause: e };
+  return {
+    message: msg !== "" ? msg : "Unknown error (empty value thrown)",
+    code: "unknown",
+    cause: e,
+  };
 }
 
 /**
@@ -160,9 +199,17 @@ const TRANSIENT_STATUSES = new Set([408, 429, 502, 503, 504]);
  * everything else immediately".
  */
 export function retryNetwork(err: ActionErrorLike): boolean {
-  if (err.code === "cancelled") return false;
-  if (err.code === "network" || err.code === "timeout") return true;
-  if (err.status === 0) return true;
-  if (err.status !== undefined && TRANSIENT_STATUSES.has(err.status)) return true;
+  if (err.code === "cancelled") {
+    return false;
+  }
+  if (err.code === "network" || err.code === "timeout") {
+    return true;
+  }
+  if (err.status === 0) {
+    return true;
+  }
+  if (err.status !== undefined && TRANSIENT_STATUSES.has(err.status)) {
+    return true;
+  }
   return false;
 }

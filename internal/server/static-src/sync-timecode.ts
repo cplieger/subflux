@@ -1,6 +1,6 @@
 // sync-timecode.ts — Timecode input widget extracted from sync.ts.
 
-import { el, icon } from './dom.js';
+import { el, icon } from "./dom.js";
 
 // TimecodeInput extends HTMLElement with custom methods attached at runtime.
 export interface TimecodeInput extends HTMLElement {
@@ -13,12 +13,14 @@ export interface TimecodeInput extends HTMLElement {
 }
 
 export function formatOffsetMs(ms: number): string {
-  if (ms === 0) return '0.000s';
-  const sign = ms > 0 ? '+' : '-';
+  if (ms === 0) {
+    return "0.000s";
+  }
+  const sign = ms > 0 ? "+" : "-";
   const abs = Math.abs(ms);
   const sec = Math.floor(abs / 1000);
   const frac = abs % 1000;
-  return `${sign + sec}.${String(frac).padStart(3, '0')}s`;
+  return `${sign + sec}.${String(frac).padStart(3, "0")}s`;
 }
 
 // Hold-to-repeat: fires adjust on press, then accelerates.
@@ -32,7 +34,7 @@ export function formatOffsetMs(ms: number): string {
 function holdRepeat(
   btn: HTMLElement,
   getDelta: () => number,
-  adjust: (delta: number) => void
+  adjust: (delta: number) => void,
 ): () => void {
   let timer: ReturnType<typeof setTimeout> | 0 = 0;
   let delay = 400;
@@ -55,48 +57,55 @@ function holdRepeat(
     timer = 0;
   }
 
-  btn.addEventListener('mousedown', start);
-  btn.addEventListener('mouseup', stop);
-  btn.addEventListener('mouseleave', stop);
-  btn.addEventListener('touchstart', start, { passive: false });
-  btn.addEventListener('touchend', stop);
-  btn.addEventListener('touchcancel', stop);
+  btn.addEventListener("mousedown", start);
+  btn.addEventListener("mouseup", stop);
+  btn.addEventListener("mouseleave", stop);
+  btn.addEventListener("touchstart", start, { passive: false });
+  btn.addEventListener("touchend", stop);
+  btn.addEventListener("touchcancel", stop);
 
   return stop;
 }
 
 // Touch drag: vertical swipe adjusts value. Tracks cumulative distance
 // and fires adjust() every 20px of movement.
-function addTouchDrag(
-  seg: HTMLElement,
-  delta: number,
-  adjust: (delta: number) => void
-): void {
+function addTouchDrag(seg: HTMLElement, delta: number, adjust: (delta: number) => void): void {
   let startY = 0;
   let accumulated = 0;
   const threshold = 20;
 
-  seg.addEventListener('touchstart', (e: TouchEvent) => {
-    startY = e.touches[0]!.clientY;
-    accumulated = 0;
-  }, { passive: true });
+  seg.addEventListener(
+    "touchstart",
+    (e: TouchEvent) => {
+      startY = e.touches[0]!.clientY;
+      accumulated = 0;
+    },
+    { passive: true },
+  );
 
-  seg.addEventListener('touchmove', (e: TouchEvent) => {
-    e.preventDefault();
-    const dy = startY - e.touches[0]!.clientY;
-    const steps = Math.trunc((dy - accumulated) / threshold);
-    if (steps !== 0) {
-      accumulated += steps * threshold;
-      adjust(steps * delta);
-    }
-  }, { passive: false });
+  seg.addEventListener(
+    "touchmove",
+    (e: TouchEvent) => {
+      e.preventDefault();
+      const dy = startY - e.touches[0]!.clientY;
+      const steps = Math.trunc((dy - accumulated) / threshold);
+      if (steps !== 0) {
+        accumulated += steps * threshold;
+        adjust(steps * delta);
+      }
+    },
+    { passive: false },
+  );
 }
 
 // Build a segmented timecode input: [±] [S] . [H] [T] [O] s
 // Each segment is focusable; arrow keys and scroll adjust the value.
 // Chevron buttons adjust the currently focused segment.
 // onChange(newMs) is called on every adjustment.
-export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) => void): HTMLElement {
+export function buildTimecodeInput(
+  initialMs: number,
+  onChange: (newMs: number) => void,
+): HTMLElement {
   let ms = initialMs;
   let activeSeg: { seg: HTMLElement; delta: number } | null = null;
 
@@ -109,7 +118,7 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
   }
 
   function decompose(v: number): Decomposed {
-    const sign = v >= 0 ? '+' : '-';
+    const sign = v >= 0 ? "+" : "-";
     const abs = Math.abs(v);
     const sec = Math.floor(abs / 1000);
     const frac = abs % 1000;
@@ -118,7 +127,7 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
       sec: String(sec),
       h: String(Math.floor(frac / 100)),
       t: String(Math.floor((frac % 100) / 10)),
-      o: String(frac % 10)
+      o: String(frac % 10),
     };
   }
 
@@ -138,9 +147,11 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
   }
 
   function setActive(seg: HTMLElement, delta: number): void {
-    if (activeSeg) activeSeg.seg.classList.remove('tc-active');
+    if (activeSeg) {
+      activeSeg.seg.classList.remove("tc-active");
+    }
     activeSeg = { seg, delta };
-    seg.classList.add('tc-active');
+    seg.classList.add("tc-active");
   }
 
   function handleWheel(e: WheelEvent, delta: number): void {
@@ -149,75 +160,113 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
   }
 
   function wireSeg(seg: HTMLElement, delta: number): void {
-    seg.addEventListener('mousedown', (e: MouseEvent) => e.preventDefault());
-    seg.addEventListener('click', () => setActive(seg, delta));
-    seg.addEventListener('wheel', (e: WheelEvent) => handleWheel(e, delta),
-      { passive: false });
+    seg.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+    });
+    seg.addEventListener("click", () => {
+      setActive(seg, delta);
+    });
+    seg.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        handleWheel(e, delta);
+      },
+      { passive: false },
+    );
     addTouchDrag(seg, delta, adjust);
   }
 
   const segAttrs = (label: string): Record<string, string> => ({
-    className: 'tc-seg',
-    role: 'spinbutton',
-    'aria-label': label
+    className: "tc-seg",
+    role: "spinbutton",
+    "aria-label": label,
   });
 
-  const signEl = el('span', {
-    ...segAttrs('Sign'),
-    className: 'tc-seg tc-sign',
-    onclick: () => { ms = -ms; refresh(); onChange(ms); }
+  const signEl = el("span", {
+    ...segAttrs("Sign"),
+    className: "tc-seg tc-sign",
+    onclick: () => {
+      ms = -ms;
+      refresh();
+      onChange(ms);
+    },
   });
 
-  const secEl = el('span', segAttrs('Seconds'));
+  const secEl = el("span", segAttrs("Seconds"));
   wireSeg(secEl, 1000);
 
-  const hEl = el('span', segAttrs('100ms'));
+  const hEl = el("span", segAttrs("100ms"));
   wireSeg(hEl, 100);
 
-  const tEl = el('span', segAttrs('10ms'));
+  const tEl = el("span", segAttrs("10ms"));
   wireSeg(tEl, 10);
 
-  const oEl = el('span', segAttrs('1ms'));
+  const oEl = el("span", segAttrs("1ms"));
   wireSeg(oEl, 1);
 
   // 1ms is the default active segment.
-  oEl.classList.add('tc-active');
+  oEl.classList.add("tc-active");
   activeSeg = { seg: oEl, delta: 1 };
 
   refresh();
 
-  const upBtn = el('button', {
-    type: 'button', className: 'tc-chevron',
-    'aria-label': 'Increase'
-  }, icon('chevron-up'));
+  const upBtn = el(
+    "button",
+    {
+      type: "button",
+      className: "tc-chevron",
+      "aria-label": "Increase",
+    },
+    icon("chevron-up"),
+  );
 
-  const downBtn = el('button', {
-    type: 'button', className: 'tc-chevron',
-    'aria-label': 'Decrease'
-  }, icon('chevron-down'));
+  const downBtn = el(
+    "button",
+    {
+      type: "button",
+      className: "tc-chevron",
+      "aria-label": "Decrease",
+    },
+    icon("chevron-down"),
+  );
 
-  const stopUp = holdRepeat(upBtn, () => activeSeg ? activeSeg.delta : 0, adjust);
-  const stopDown = holdRepeat(downBtn, () => activeSeg ? -activeSeg.delta : 0, adjust);
+  const stopUp = holdRepeat(upBtn, () => (activeSeg ? activeSeg.delta : 0), adjust);
+  const stopDown = holdRepeat(downBtn, () => (activeSeg ? -activeSeg.delta : 0), adjust);
 
-  const btnStack = el('div', { className: 'tc-btn-stack' }, upBtn, downBtn);
+  const btnStack = el("div", { className: "tc-btn-stack" }, upBtn, downBtn);
 
-  const container = el('div', {
-    className: 'sync-timecode', id: 'sync-offset-val'
-  },
-    el('div', { className: 'tc-numbers' },
+  const container = el(
+    "div",
+    {
+      className: "sync-timecode",
+      id: "sync-offset-val",
+    },
+    el(
+      "div",
+      { className: "tc-numbers" },
       signEl,
       secEl,
-      el('span', { className: 'tc-dot' }, '.'),
-      hEl, tEl, oEl,
-      el('span', { className: 'tc-unit' }, 's')),
-    btnStack
+      el("span", { className: "tc-dot" }, "."),
+      hEl,
+      tEl,
+      oEl,
+      el("span", { className: "tc-unit" }, "s"),
+    ),
+    btnStack,
   );
 
   // Keyboard: arrow keys adjust the active segment from anywhere in the dialog.
   (container as TimecodeInput).handleKey = (e: KeyboardEvent): void => {
-    if (!activeSeg) return;
-    if (e.key === 'ArrowUp') { e.preventDefault(); adjust(activeSeg.delta); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); adjust(-activeSeg.delta); }
+    if (!activeSeg) {
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      adjust(activeSeg.delta);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      adjust(-activeSeg.delta);
+    }
   };
 
   // Public method to set value externally (audio sync, reset, dropdown change).
@@ -238,6 +287,8 @@ export function buildTimecodeInput(initialMs: number, onChange: (newMs: number) 
 
 // Update the timecode display from external sources (audio sync, subtitle switch).
 export function updateTimecodeDisplay(newMs: number): void {
-  const tc = document.getElementById('sync-offset-val');
-  if (tc && (tc as TimecodeInput).setValue) (tc as TimecodeInput).setValue(newMs);
+  const tc = document.getElementById("sync-offset-val");
+  if (tc && (tc as TimecodeInput).setValue) {
+    (tc as TimecodeInput).setValue(newMs);
+  }
 }

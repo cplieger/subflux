@@ -1,6 +1,17 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { el, text, icon, patch, option, emptyDiv, errDiv, confirm, closeDialog, dialogHead } from "./dom.js";
+import {
+  el,
+  text,
+  icon,
+  patch,
+  option,
+  emptyDiv,
+  errDiv,
+  confirm,
+  closeDialog,
+  dialogHead,
+} from "./dom.js";
 
 describe("dom: el()", () => {
   it.todo("creates element with tag name");

@@ -6,7 +6,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../notify.js", () => ({
-  info: vi.fn(), success: vi.fn(), error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
 }));
 
 import { apiAction } from "./api.js";
@@ -100,7 +102,7 @@ describe("apiAction — idempotency key wiring", () => {
     const k0 = getRequestHeaders(0).get(IDEMPOTENCY_HEADER);
     const k1 = getRequestHeaders(1).get(IDEMPOTENCY_HEADER);
     expect(k0).not.toBeNull();
-    expect(k0).toEqual(k1);  // same dispatch → same key on retry
+    expect(k0).toEqual(k1); // same dispatch → same key on retry
   });
 
   it("fresh dispatch generates a new key (different from previous dispatch)", async () => {
@@ -117,7 +119,7 @@ describe("apiAction — idempotency key wiring", () => {
     const k1 = getRequestHeaders(1).get(IDEMPOTENCY_HEADER);
     expect(k0).not.toBeNull();
     expect(k1).not.toBeNull();
-    expect(k0).not.toBe(k1);  // different dispatches → different keys
+    expect(k0).not.toBe(k1); // different dispatches → different keys
   });
 });
 

@@ -10,11 +10,7 @@
     "prioritizePerformanceOverAccuracy": false
   },
 
-  "mutate": [
-    "utils.ts",
-    "bus.ts",
-    "store.ts"
-  ],
+  "mutate": ["utils.ts", "bus.ts", "store.ts"],
 
   "testFiles": ["**/*.test.ts"],
 
@@ -22,14 +18,7 @@
     "excludedMutations": ["StringLiteral"]
   },
 
-  "ignorePatterns": [
-    "node_modules",
-    "reports",
-    "coverage",
-    "*.test.ts",
-    "*.d.ts",
-    "../static"
-  ],
+  "ignorePatterns": ["node_modules", "reports", "coverage", "*.test.ts", "*.d.ts", "../static"],
 
   "ignoreStatic": true,
 

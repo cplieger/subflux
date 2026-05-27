@@ -12,10 +12,10 @@ export const ROUTE_TRANSITION_MS = 200;
 export const REAUTH_WINDOW_MS = 5 * 60 * 1_000;
 
 // Default subtitle variant value — the sentinel used when no variant is specified.
-export const DEFAULT_VARIANT = 'standard' as const;
+export const DEFAULT_VARIANT = "standard" as const;
 
 // Built-in embedded subtitle provider name.
-export const EMBEDDED_PROVIDER = 'embedded' as const;
+export const EMBEDDED_PROVIDER = "embedded" as const;
 
 // Concurrency limit for season audio sync (parallel requests).
 export const SEASON_SYNC_CONCURRENCY = 3;
@@ -25,7 +25,7 @@ export const VISIBILITY_DEBOUNCE_MS = 2_000;
 
 // Subtitle variant options — single source of truth for config, wizard, and badge logic.
 export const SUBTITLE_VARIANTS = [
-  { value: DEFAULT_VARIANT, label: 'standard' },
-  { value: 'forced', label: 'forced' },
-  { value: 'hi', label: 'hearing impaired' },
+  { value: DEFAULT_VARIANT, label: "standard" },
+  { value: "forced", label: "forced" },
+  { value: "hi", label: "hearing impaired" },
 ] as const;

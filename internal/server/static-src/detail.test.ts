@@ -11,7 +11,12 @@ vi.mock("./actions/index.js", () => ({
 vi.mock("./bus.js", () => ({
   on: vi.fn(() => () => {}),
   emit: vi.fn(),
-  BusEvent: { PanelConfigure: "panel:configure", NavHistory: "nav:history", OpenSeries: "open:series", OpenMovie: "open:movie" },
+  BusEvent: {
+    PanelConfigure: "panel:configure",
+    NavHistory: "nav:history",
+    OpenSeries: "open:series",
+    OpenMovie: "open:movie",
+  },
 }));
 vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
 vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
@@ -27,7 +32,8 @@ import * as store from "./store.js";
 
 describe("detail: renderSeriesDetail", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
     store.set("detailCtx", null);
   });
 

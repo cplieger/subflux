@@ -19,7 +19,8 @@ vi.mock("./bus.js", () => ({
 
 describe("security: passkeys section", () => {
   beforeEach(() => {
-    document.body.innerHTML = '<dialog id="securityDialog"></dialog><dialog id="confirmDialog"></dialog>';
+    document.body.innerHTML =
+      '<dialog id="securityDialog"></dialog><dialog id="confirmDialog"></dialog>';
   });
 
   it.todo("renders 'No passkeys registered' when list is empty");

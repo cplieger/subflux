@@ -40,8 +40,12 @@ describe("helpers", () => {
 
   it("reqStr/reqNum/reqBool include the path in error messages", () => {
     expect(() => reqStr({ x: 1 }, "x", "$.foo")).toThrow(/\$\.foo\.x: expected string, got number/);
-    expect(() => reqNum({ x: "a" }, "x", "$.foo")).toThrow(/\$\.foo\.x: expected number, got string/);
-    expect(() => reqBool({ x: 1 }, "x", "$.foo")).toThrow(/\$\.foo\.x: expected boolean, got number/);
+    expect(() => reqNum({ x: "a" }, "x", "$.foo")).toThrow(
+      /\$\.foo\.x: expected number, got string/,
+    );
+    expect(() => reqBool({ x: 1 }, "x", "$.foo")).toThrow(
+      /\$\.foo\.x: expected boolean, got number/,
+    );
   });
 
   it("reqNum rejects NaN and Infinity", () => {
@@ -69,8 +73,12 @@ describe("helpers", () => {
 
   it("reqOneOf enforces enum membership", () => {
     expect(reqOneOf({ t: "a" }, "t", ["a", "b"] as const)).toBe("a");
-    expect(() => reqOneOf({ t: "c" }, "t", ["a", "b"] as const)).toThrow(/expected one of a\|b, got "c"/);
-    expect(() => reqOneOf({ t: 1 }, "t", ["a", "b"] as const)).toThrow(/expected one of a\|b, got 1/);
+    expect(() => reqOneOf({ t: "c" }, "t", ["a", "b"] as const)).toThrow(
+      /expected one of a\|b, got "c"/,
+    );
+    expect(() => reqOneOf({ t: 1 }, "t", ["a", "b"] as const)).toThrow(
+      /expected one of a\|b, got 1/,
+    );
   });
 
   it("decodeArray returns mapped values and reports per-index path", () => {
@@ -81,10 +89,14 @@ describe("helpers", () => {
     expect(out).toEqual([2, 4, 6]);
 
     expect(() =>
-      decodeArray([1, "bad", 3], (v) => {
-        if (typeof v !== "number") throw new TypeError("not number");
-        return v;
-      }, "$.list"),
+      decodeArray(
+        [1, "bad", 3],
+        (v) => {
+          if (typeof v !== "number") throw new TypeError("not number");
+          return v;
+        },
+        "$.list",
+      ),
     ).toThrow(/\$\.list\[1\]: not number/);
   });
 
@@ -96,10 +108,14 @@ describe("helpers", () => {
     expect(out).toEqual({ a: 2, b: 3 });
 
     expect(() =>
-      decodeRecord({ a: 1, b: "x" }, (v) => {
-        if (typeof v !== "number") throw new TypeError("not number");
-        return v;
-      }, "$.map"),
+      decodeRecord(
+        { a: 1, b: "x" },
+        (v) => {
+          if (typeof v !== "number") throw new TypeError("not number");
+          return v;
+        },
+        "$.map",
+      ),
     ).toThrow(/\$\.map\.b: not number/);
   });
 });

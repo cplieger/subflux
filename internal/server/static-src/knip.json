@@ -1,13 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "app.ts", "login.ts", "theme-init.ts", "**/*.test.ts", "**/*.fuzz.test.ts", "**/*.property.test.ts"
+    "app.ts",
+    "login.ts",
+    "theme-init.ts",
+    "**/*.test.ts",
+    "**/*.fuzz.test.ts",
+    "**/*.property.test.ts"
   ],
-  "project": [
-    "**/*.ts",
-    "!**/*.d.ts",
-    "!node_modules/**"
-  ],
+  "project": ["**/*.ts", "!**/*.d.ts", "!node_modules/**"],
   "ignoreDependencies": [
     "eslint",
     "prettier",
@@ -15,9 +16,7 @@
     "@eslint/js",
     "@vitest/coverage-v8"
   ],
-  "ignoreBinaries": [
-    "tsgo"
-  ],
+  "ignoreBinaries": ["tsgo"],
   "ignoreMembers": [],
   "treatConfigHintsAsErrors": true,
   "includeEntryExports": true,

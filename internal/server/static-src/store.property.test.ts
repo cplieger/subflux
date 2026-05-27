@@ -61,7 +61,9 @@ describe("store property", () => {
         // no notifications.
         store.set("scanInFlight", !finalVal);
         let observed: boolean | undefined;
-        const unsub = store.subscribe("scanInFlight", (v) => { observed = v; });
+        const unsub = store.subscribe("scanInFlight", (v) => {
+          observed = v;
+        });
         try {
           for (const v of values) store.set("scanInFlight", v);
           expect(observed).toBe(finalVal);
@@ -77,7 +79,9 @@ describe("store property", () => {
       fc.property(fc.array(fc.boolean(), { minLength: 1, maxLength: 50 }), (values) => {
         resetStoreKeys();
         const observed: boolean[] = [];
-        const unsub = store.subscribe("scanInFlight", (v) => { observed.push(v); });
+        const unsub = store.subscribe("scanInFlight", (v) => {
+          observed.push(v);
+        });
         try {
           store.batch(() => {
             for (const v of values) store.set("scanInFlight", v);
@@ -101,7 +105,9 @@ describe("store property", () => {
       fc.property(fc.array(fc.boolean(), { minLength: 1, maxLength: 20 }), (values) => {
         resetStoreKeys();
         let count = 0;
-        const unsub = store.subscribe("scanInFlight", () => { count += 1; });
+        const unsub = store.subscribe("scanInFlight", () => {
+          count += 1;
+        });
         unsub();
         for (const v of values) store.set("scanInFlight", v);
         expect(count).toBe(0);

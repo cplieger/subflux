@@ -1,4 +1,3 @@
-
 /* ================================================================
    11. Sync dialog
    ================================================================ */
@@ -7,19 +6,38 @@
   font-size: var(--text-xs);
   color: var(--text-2);
   line-height: 1.5;
-  & strong { color: var(--text); font-weight: 600 }
+  & strong {
+    color: var(--text);
+    font-weight: 600;
+  }
 }
 
-.sync-audio { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap }
-.sync-audio-result { font-size: var(--text-sm); color: var(--muted) }
-.sync-media { font-weight: 400; color: var(--muted) }
-.sync-unavailable { padding: var(--sp-6); text-align: center; color: var(--muted); font-size: var(--text-sm) }
+.sync-audio {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.sync-audio-result {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.sync-media {
+  font-weight: 400;
+  color: var(--muted);
+}
+.sync-unavailable {
+  padding: var(--sp-6);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
 
 .sync-offset {
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: stretch
+  align-self: stretch;
 }
 
 /* Segmented timecode input */
@@ -34,14 +52,14 @@
   user-select: none;
   background: var(--raised);
   border-radius: var(--radius-sm);
-  padding: var(--sp-1)
+  padding: var(--sp-1);
 }
 
 .tc-numbers {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-1)
+  gap: var(--sp-1);
 }
 
 .sync-audio-btn {
@@ -49,7 +67,7 @@
   align-items: center;
   gap: var(--sp-2);
   font-size: var(--text-sm);
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 .tc-seg {
@@ -61,16 +79,20 @@
   border-radius: var(--radius-sm);
   background: light-dark(oklch(92% 0.005 32deg), var(--bg));
   cursor: pointer;
-  transition: background var(--dur-micro), outline-color var(--dur-micro);
+  transition:
+    background var(--dur-micro),
+    outline-color var(--dur-micro);
   touch-action: none;
   outline: 2px solid transparent;
   outline-offset: -2px;
 
-  &:hover { background: var(--accent-dim) }
+  &:hover {
+    background: var(--accent-dim);
+  }
 
   &.tc-active {
     background: var(--accent-dim);
-    outline-color: var(--accent)
+    outline-color: var(--accent);
   }
 }
 
@@ -81,24 +103,26 @@
   outline: none;
   cursor: default;
 
-  &:hover { background: none }
+  &:hover {
+    background: none;
+  }
 }
 
 .tc-dot {
   color: var(--muted);
-  padding: 0 1px
+  padding: 0 1px;
 }
 
 .tc-unit {
   color: var(--muted);
-  padding-inline-start: var(--sp-1)
+  padding-inline-start: var(--sp-1);
 }
 
 .tc-btn-stack {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-self: center
+  justify-self: center;
 }
 
 .tc-chevron {
@@ -116,10 +140,20 @@
   border-radius: 0;
   transition: background var(--dur-micro);
 
-  &:first-child { border-block-end: none; border-radius: 0 var(--radius-sm) 0 0 }
-  &:last-child { border-radius: 0 0 var(--radius-sm) 0 }
-  &:hover { background: var(--accent-dim) }
-  &:active { background: var(--accent); color: oklch(100% 0 0deg) }
+  &:first-child {
+    border-block-end: none;
+    border-radius: 0 var(--radius-sm) 0 0;
+  }
+  &:last-child {
+    border-radius: 0 0 var(--radius-sm) 0;
+  }
+  &:hover {
+    background: var(--accent-dim);
+  }
+  &:active {
+    background: var(--accent);
+    color: oklch(100% 0 0deg);
+  }
 }
 
 .sync-offset-btn {
@@ -138,10 +172,18 @@
   font-variant-numeric: tabular-nums;
   touch-action: manipulation;
   user-select: none;
-  transition: background var(--dur-micro), border-color var(--dur-micro);
+  transition:
+    background var(--dur-micro),
+    border-color var(--dur-micro);
 
-  &:hover { background: var(--accent-dim); border-color: var(--accent) }
-  &:active { background: var(--accent); color: oklch(100% 0 0deg) }
+  &:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  &:active {
+    background: var(--accent);
+    color: oklch(100% 0 0deg);
+  }
 }
 
 .sync-preview {
@@ -150,7 +192,10 @@
   position: relative;
   align-self: stretch;
 
-  &:has(.sync-play) { aspect-ratio: 16/9; overflow: hidden }
+  &:has(.sync-play) {
+    aspect-ratio: 16/9;
+    overflow: hidden;
+  }
 }
 
 .sync-video-wrap {
@@ -160,7 +205,10 @@
   & video {
     width: 100%;
     display: block;
-    &::cue { font-size: var(--text-base); line-height: 1.6 }
+    &::cue {
+      font-size: var(--text-base);
+      line-height: 1.6;
+    }
   }
 }
 
@@ -177,8 +225,13 @@
   border-radius: 0;
   cursor: pointer;
   transition: background var(--dur-standard);
-  &:hover { background: oklch(100% 0 0deg / 8%) }
-  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px }
+  &:hover {
+    background: oklch(100% 0 0deg / 8%);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
 }
 
 .sync-loading {
@@ -189,7 +242,7 @@
   justify-content: center;
   background: oklch(0% 0 0deg / 60%);
   color: oklch(100% 0 0deg);
-  font-size: var(--text-sm)
+  font-size: var(--text-sm);
 }
 
 .sync-seek {
@@ -200,7 +253,7 @@
   position: relative;
   z-index: 2;
   background: var(--raised);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm)
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
 .sync-seek-spinner {
@@ -208,18 +261,22 @@
   inset-block-end: var(--sp-3);
   inset-inline-start: var(--sp-4);
   width: 1rem;
-  height: 1rem
+  height: 1rem;
 }
 
 /* Arr links */
 .arr-sonarr {
   background: oklch(78.56% 0.1479 224.27deg);
   color: oklch(20% 0.05 224.27deg);
-  &:hover { background: oklch(72% 0.13 224.27deg) }
+  &:hover {
+    background: oklch(72% 0.13 224.27deg);
+  }
 }
 
 .arr-radarr {
   background: oklch(84.73% 0.1623 83.62deg);
   color: oklch(25% 0.05 83.62deg);
-  &:hover { background: oklch(78% 0.14 83.62deg) }
+  &:hover {
+    background: oklch(78% 0.14 83.62deg);
+  }
 }

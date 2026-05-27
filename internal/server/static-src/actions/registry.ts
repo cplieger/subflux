@@ -28,7 +28,10 @@ const MAX_LOG_HARD = 1000;
 //            AND O(1) log-slot overwrites (no backward scan needed).
 // pendingByName: name -> Set<id> for O(1) pendingCount(names).
 const log: (ActionInstance | null)[] = [];
-interface LogSlot { instance: ActionInstance; index: number }
+interface LogSlot {
+  instance: ActionInstance;
+  index: number;
+}
 const idMap = new Map<string, LogSlot>();
 const listeners = new Set<RegistryListener>();
 // Per-name listeners: subscribers that only care about a single action
@@ -50,7 +53,9 @@ let _head = 0;
 
 /** Advance head past leading nulls and compact when prefix is large. */
 function compact(): void {
-  while (_head < log.length && log[_head] === null) _head++;
+  while (_head < log.length && log[_head] === null) {
+    _head++;
+  }
   if (_head > 256) {
     log.splice(0, _head);
     // Re-index: all stored indices shifted by _head.
@@ -87,12 +92,17 @@ export function record(instance: ActionInstance): void {
       const s = pendingByName.get(prev.name);
       if (s !== undefined) {
         s.delete(instance.id);
-        if (s.size === 0) pendingByName.delete(prev.name);
+        if (s.size === 0) {
+          pendingByName.delete(prev.name);
+        }
       }
     } else if (prev.status !== "pending" && instance.status === "pending") {
       _pendingTotal++;
       let s = pendingByName.get(instance.name);
-      if (s === undefined) { s = new Set(); pendingByName.set(instance.name, s); }
+      if (s === undefined) {
+        s = new Set();
+        pendingByName.set(instance.name, s);
+      }
       s.add(instance.id);
     }
     // O(1) overwrite via stored index — no backward scan needed.
@@ -104,11 +114,18 @@ export function record(instance: ActionInstance): void {
     if (instance.status !== "pending" && _liveCount > MAX_LOG_SIZE) {
       for (let i = _head; i < log.length; i++) {
         const entry = log[i];
-        if (entry !== null && entry !== undefined && entry.status !== "pending" && entry.id !== instance.id) {
+        if (
+          entry !== null &&
+          entry !== undefined &&
+          entry.status !== "pending" &&
+          entry.id !== instance.id
+        ) {
           idMap.delete(entry.id);
           log[i] = null;
           _liveCount--;
-          if (_liveCount <= MAX_LOG_SIZE) break;
+          if (_liveCount <= MAX_LOG_SIZE) {
+            break;
+          }
         }
       }
       compact();
@@ -121,7 +138,10 @@ export function record(instance: ActionInstance): void {
     if (instance.status === "pending") {
       _pendingTotal++;
       let s = pendingByName.get(instance.name);
-      if (s === undefined) { s = new Set(); pendingByName.set(instance.name, s); }
+      if (s === undefined) {
+        s = new Set();
+        pendingByName.set(instance.name, s);
+      }
       s.add(instance.id);
     }
     if (_liveCount > MAX_LOG_SIZE) {
@@ -148,7 +168,9 @@ export function record(instance: ActionInstance): void {
             const s = pendingByName.get(entry.name);
             if (s !== undefined) {
               s.delete(entry.id);
-              if (s.size === 0) pendingByName.delete(entry.name);
+              if (s.size === 0) {
+                pendingByName.delete(entry.name);
+              }
             }
           }
           idMap.delete(entry.id);
@@ -214,7 +236,10 @@ export function subscribe(fn: RegistryListener): () => void {
  */
 export function subscribeByName(name: string, fn: RegistryListener): () => void {
   let set = namedListeners.get(name);
-  if (set === undefined) { set = new Set(); namedListeners.set(name, set); }
+  if (set === undefined) {
+    set = new Set();
+    namedListeners.set(name, set);
+  }
   set.add(fn);
   const captured = set;
   return () => {
@@ -222,7 +247,9 @@ export function subscribeByName(name: string, fn: RegistryListener): () => void 
     // Only delete the Map entry if our captured set is still the current
     // one for this name. Prevents double-unsubscribe from nuking a newer
     // Set created after the first unsubscribe emptied and removed ours.
-    if (captured.size === 0 && namedListeners.get(name) === captured) namedListeners.delete(name);
+    if (captured.size === 0 && namedListeners.get(name) === captured) {
+      namedListeners.delete(name);
+    }
   };
 }
 
@@ -231,7 +258,9 @@ export function recentLog(): readonly ActionInstance[] {
   const result: ActionInstance[] = [];
   for (let i = _head; i < log.length; i++) {
     const entry = log[i];
-    if (entry != null) result.push(entry);
+    if (entry != null) {
+      result.push(entry);
+    }
   }
   return result;
 }
@@ -261,11 +290,15 @@ export function isPending(name: string): boolean {
  * ```
  */
 export function pendingCount(names?: readonly string[]): number {
-  if (names === undefined) return _pendingTotal;
+  if (names === undefined) {
+    return _pendingTotal;
+  }
   let total = 0;
   for (let i = 0; i < names.length; i++) {
     const s = pendingByName.get(names[i]!);
-    if (s !== undefined) total += s.size;
+    if (s !== undefined) {
+      total += s.size;
+    }
   }
   return total;
 }

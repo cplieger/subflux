@@ -24,7 +24,11 @@
 import { subscribeByName, isPending, pendingCount } from "./registry.js";
 
 /** Element types that have a `.disabled` writable boolean. */
-type DisableableElement = HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+type DisableableElement =
+  | HTMLButtonElement
+  | HTMLInputElement
+  | HTMLSelectElement
+  | HTMLTextAreaElement;
 
 interface BindLoadingOptions {
   /** When true (default), set `aria-busy="true"` while pending. */
@@ -79,7 +83,13 @@ export function bindLoadingState(
   const names: readonly string[] = typeof actionName === "string" ? [actionName] : actionName;
   if (names.length === 0) return () => {};
 
-  const { ariaBusy = true, preserveAriaBusy = false, pendingClass, preserveDisabled = false, disabledFn } = opts;
+  const {
+    ariaBusy = true,
+    preserveAriaBusy = false,
+    pendingClass,
+    preserveDisabled = false,
+    disabledFn,
+  } = opts;
   const manageAriaBusy = ariaBusy && !preserveAriaBusy;
   // Track pending transitions to snapshot disabled state lazily —
   // avoids stale bind-time capture when external code mutates disabled.
@@ -95,7 +105,11 @@ export function bindLoadingState(
    *  default) rather than stuck in the pending visual state. */
   const resolveBase = (): boolean => {
     if (disabledFn !== undefined) {
-      try { return disabledFn(); } catch { return false; }
+      try {
+        return disabledFn();
+      } catch {
+        return false;
+      }
     }
     return preserveDisabled ? baseDisabled : false;
   };

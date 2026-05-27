@@ -9,9 +9,9 @@
 // via onSuccess/onError callbacks since framework toasts would clash
 // with the inline icon-on-button pattern (we set `error: false`).
 
-import * as store from './store.js';
-import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
-import type { SeriesItem, MovieDetail } from './api-types.js';
+import * as store from "./store.js";
+import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import type { SeriesItem, MovieDetail } from "./api-types.js";
 
 interface ScanResponse {
   found: number;
@@ -23,7 +23,7 @@ const scanAction = apiAction<string, ScanResponse>({
   dedupe: (url) => `scan:${url}`,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
-  error: false,  // UI feedback is on-button; framework toast would double up
+  error: false, // UI feedback is on-button; framework toast would double up
 });
 
 /**
@@ -37,34 +37,34 @@ export async function triggerScan(
   btn: HTMLButtonElement | null,
   onOk?: (data: ScanResponse) => void,
 ): Promise<void> {
-  const iconEl = btn
-    ? btn.querySelector('.icon, .spinner') as HTMLElement | null
-    : null;
+  const iconEl = btn ? btn.querySelector(".icon, .spinner") : null;
   if (btn && iconEl) {
     btn.disabled = true;
-    iconEl.className = 'spinner';
+    iconEl.className = "spinner";
   }
-  store.set('scanInFlight', true);
+  store.set("scanInFlight", true);
   const data = await scanAction.dispatch(url, {
     onSuccess: (result) => {
       if (btn && iconEl) {
-        iconEl.className = 'icon icon-check';
+        iconEl.className = "icon icon-check";
         btn.disabled = false;
       }
-      if (onOk) onOk(result);
+      if (onOk) {
+        onOk(result);
+      }
     },
     onError: () => {
       if (btn && iconEl) {
-        iconEl.className = 'icon icon-close';
+        iconEl.className = "icon icon-close";
         btn.disabled = false;
       }
     },
     onSettled: () => {
-      store.set('scanInFlight', false);
-      if (store.get('refreshPending')) {
+      store.set("scanInFlight", false);
+      if (store.get("refreshPending")) {
         store.batch(() => {
-          store.set('refreshPending', false);
-          store.set('needsRefresh', true);
+          store.set("refreshPending", false);
+          store.set("needsRefresh", true);
         });
       }
     },
@@ -73,7 +73,10 @@ export async function triggerScan(
   void data;
 }
 
-export async function triggerSeriesScan(series: SeriesItem, btn: HTMLButtonElement | null): Promise<void> {
+export async function triggerSeriesScan(
+  series: SeriesItem,
+  btn: HTMLButtonElement | null,
+): Promise<void> {
   await triggerScan(`/api/scan/series/${series.id}`, btn);
 }
 
@@ -82,11 +85,16 @@ export async function triggerSeasonScan(
   seasonNum: number,
   btn: HTMLButtonElement | null,
 ): Promise<void> {
-  await triggerScan(
-    `/api/scan/season/${series.id}/${seasonNum}`, btn,
-    (data) => { if (data.found > 0) store.set('refreshPending', true); });
+  await triggerScan(`/api/scan/season/${series.id}/${seasonNum}`, btn, (data) => {
+    if (data.found > 0) {
+      store.set("refreshPending", true);
+    }
+  });
 }
 
-export async function triggerMovieScan(movie: MovieDetail, btn: HTMLButtonElement | null): Promise<void> {
+export async function triggerMovieScan(
+  movie: MovieDetail,
+  btn: HTMLButtonElement | null,
+): Promise<void> {
   await triggerScan(`/api/scan/movie/${movie.id}`, btn);
 }

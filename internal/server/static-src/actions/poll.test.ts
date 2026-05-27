@@ -4,7 +4,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../toast.js", () => ({
-  info: vi.fn(), success: vi.fn(), error: vi.fn(), showToast: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+  showToast: vi.fn(),
 }));
 
 import { defineAction, _resetForTest as resetDefine } from "./define.js";
@@ -72,7 +75,7 @@ describe("pollAction — basic scheduling", () => {
 
     stop();
     await vi.advanceTimersByTimeAsync(500);
-    expect(count).toBe(1);  // never advanced past the immediate dispatch
+    expect(count).toBe(1); // never advanced past the immediate dispatch
   });
 
   it("stop() is idempotent", () => {
@@ -81,7 +84,11 @@ describe("pollAction — basic scheduling", () => {
       run: async () => {},
     });
     const stop = pollAction(action, undefined, { interval: 1000 });
-    expect(() => { stop(); stop(); stop(); }).not.toThrow();
+    expect(() => {
+      stop();
+      stop();
+      stop();
+    }).not.toThrow();
   });
 });
 
@@ -129,7 +136,7 @@ describe("pollAction — pauseWhenHidden", () => {
     vi.useFakeTimers();
     const stop = pollAction(action, undefined, { interval: 1000, pauseWhenHidden: true });
     await vi.advanceTimersByTimeAsync(5000);
-    expect(count).toBe(0);  // never fired
+    expect(count).toBe(0); // never fired
 
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -202,7 +209,7 @@ describe("pollAction — refreshOnFocus", () => {
     window.dispatchEvent(new Event("focus"));
     await vi.runAllTicks();
     await vi.advanceTimersByTimeAsync(0);
-    expect(count).toBe(1);  // no refresh
+    expect(count).toBe(1); // no refresh
 
     stop();
   });
@@ -246,7 +253,7 @@ describe("pollAction — backoffOnError", () => {
     // Total at 1500ms: ~4 polls. Without backoff at 100ms: ~15 polls.
     await vi.advanceTimersByTimeAsync(1500);
     expect(count).toBeGreaterThan(after1);
-    expect(count).toBeLessThan(10);  // far less than the no-backoff count of ~15
+    expect(count).toBeLessThan(10); // far less than the no-backoff count of ~15
 
     stop();
   });
@@ -335,7 +342,7 @@ describe("pollAction — onSuccess callback", () => {
     const stop = pollAction(action, undefined, {
       interval: 20,
       onSuccess,
-      pauseWhenHidden: false,  // happy-dom may report hidden
+      pauseWhenHidden: false, // happy-dom may report hidden
     });
 
     await new Promise((r) => setTimeout(r, 100));
@@ -377,7 +384,9 @@ describe("pollAction — onSuccess callback", () => {
       run: async () => ++count,
     });
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const onSuccess = vi.fn<(n: number) => void>(() => { throw new Error("kaboom"); });
+    const onSuccess = vi.fn<(n: number) => void>(() => {
+      throw new Error("kaboom");
+    });
 
     const stop = pollAction(action, undefined, {
       interval: 20,
@@ -386,7 +395,7 @@ describe("pollAction — onSuccess callback", () => {
     });
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(count).toBeGreaterThan(1);  // poll continued past the throw
+    expect(count).toBeGreaterThan(1); // poll continued past the throw
     expect(consoleError).toHaveBeenCalled();
 
     consoleError.mockRestore();
@@ -415,6 +424,6 @@ describe("pollAction — cleanup integration", () => {
     cancelAllForTest();
 
     await vi.advanceTimersByTimeAsync(500);
-    expect(count).toBe(1);  // stopped, no further polls
+    expect(count).toBe(1); // stopped, no further polls
   });
 });

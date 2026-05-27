@@ -8,8 +8,8 @@
 // Centralising the action defs here means both dispatch sites get identical
 // retry/dedupe/error semantics without duplicating the request shape.
 
-import { apiAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
-import type { AudioSyncResponse } from './api-types.js';
+import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import type { AudioSyncResponse } from "./api-types.js";
 
 export interface AudioSyncArgs {
   subtitle_path: string;
@@ -26,7 +26,7 @@ export const audioSyncAction = apiAction<AudioSyncArgs, AudioSyncResponse>({
   dedupe: (args) => `sync.audio:${args.subtitle_path}`,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
-  error: false,  // callers handle inline result UI; toast would be redundant
+  error: false, // callers handle inline result UI; toast would be redundant
 });
 
 export interface ManualOffsetArgs {
@@ -36,7 +36,7 @@ export interface ManualOffsetArgs {
 
 /** Save a manually-entered offset. Idempotent server-side (overwrites any
  *  previous offset for the file). dedupe protects against double-click. */
-export const saveManualOffsetAction = apiAction<ManualOffsetArgs, unknown>({
+export const saveManualOffsetAction = apiAction<ManualOffsetArgs>({
   name: "sync.save_offset",
   request: (args) => ({ method: "POST", path: "/api/sync/offset", body: args }),
   dedupe: (args) => `sync.save_offset:${args.subtitle_path}:${args.offset_ms}`,

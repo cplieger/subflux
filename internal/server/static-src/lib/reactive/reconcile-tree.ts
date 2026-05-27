@@ -2,7 +2,10 @@
 // Handles attribute patching, text node updates, element reordering,
 // and recursive child reconciliation. Keying via data-* or *-id attrs.
 
-export function patch(parent: Node, ...children: Array<string | Node | DocumentFragment | null | undefined>): void {
+export function patch(
+  parent: Node,
+  ...children: Array<string | Node | DocumentFragment | null | undefined>
+): void {
   const newChildren: Node[] = [];
   for (const child of children) {
     if (child == null) continue;
@@ -30,12 +33,15 @@ export function reconcileChildren(parent: Node, newChildren: Node[]): void {
     const newChild = newChildren[i]!;
     const newKey = nodeKey(newChild);
 
-    let matched = newKey ? oldByKey.get(newKey) ?? null : null;
+    let matched = newKey ? (oldByKey.get(newKey) ?? null) : null;
     if (matched) {
       oldByKey.delete(newKey);
     } else if (!newKey) {
       while (oldIdx < oldChildren.length && nodeKey(oldChildren[oldIdx]!)) oldIdx++;
-      if (oldIdx < oldChildren.length) { matched = oldChildren[oldIdx]!; oldIdx++; }
+      if (oldIdx < oldChildren.length) {
+        matched = oldChildren[oldIdx]!;
+        oldIdx++;
+      }
     }
 
     if (!matched) {

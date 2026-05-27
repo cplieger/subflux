@@ -17,10 +17,14 @@ export function reconcile<T>(
 ): void {
   const existing = new Map<string, HTMLElement>();
   for (let n = parent.firstChild; n !== null; n = n.nextSibling) {
-    if (n.nodeType !== 1) continue;
+    if (n.nodeType !== 1) {
+      continue;
+    }
     const el = n as HTMLElement;
     const k = el.getAttribute(KEY_ATTR);
-    if (k !== null) existing.set(k, el);
+    if (k !== null) {
+      existing.set(k, el);
+    }
   }
 
   let target: Node | null = null;
@@ -33,7 +37,9 @@ export function reconcile<T>(
       el.setAttribute(KEY_ATTR, k);
     } else {
       existing.delete(k);
-      if (spec.update) spec.update(el, item);
+      if (spec.update) {
+        spec.update(el, item);
+      }
     }
     parent.insertBefore(el, target);
     target = el;

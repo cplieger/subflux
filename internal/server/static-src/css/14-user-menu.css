@@ -1,4 +1,3 @@
-
 /* ================================================================
    User menu popover
    ================================================================ */
@@ -7,7 +6,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: var(--sp-3) 0
+  padding: var(--sp-3) 0;
 }
 
 .um-user {
@@ -15,7 +14,7 @@
   font-weight: 600;
   font-size: var(--text-sm);
   color: var(--text);
-  border-block-end: 1px solid var(--border)
+  border-block-end: 1px solid var(--border);
 }
 
 .um-item {
@@ -33,7 +32,14 @@
   height: auto;
   justify-content: flex-start;
 
-  &:hover { background: var(--ghost-hover); color: var(--text) }
+  &:hover {
+    background: var(--ghost-hover);
+    color: var(--text);
+  }
 }
 
-.um-icon { display: flex; align-items: center; flex-shrink: 0 }
+.um-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}

@@ -138,7 +138,13 @@ function listTSFiles(dir: string, out: string[] = []): string[] {
     const st = statSync(p);
     if (st.isDirectory()) {
       // Skip vendored / build dirs and the framework itself.
-      if (name === "node_modules" || name === ".vitest-cache" || name === "actions" || name === "wire") continue;
+      if (
+        name === "node_modules" ||
+        name === ".vitest-cache" ||
+        name === "actions" ||
+        name === "wire"
+      )
+        continue;
       listTSFiles(p, out);
     } else if (name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts")) {
       out.push(p);

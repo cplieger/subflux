@@ -1,8 +1,8 @@
 // detail-season-sync.ts — Season audio sync dialog extracted from detail.ts.
 
-import { el, patch, dialog, closeDialog, onBackdropClose, dialogHead, pad } from './dom.js';
-import { audioSyncAction } from './sync-actions.js';
-import { SEASON_SYNC_CONCURRENCY } from './constants.js';
+import { el, patch, dialog, closeDialog, onBackdropClose, dialogHead, pad } from "./dom.js";
+import { audioSyncAction } from "./sync-actions.js";
+import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
 
 export interface SeasonSyncEpisode {
   subPath: string;
@@ -15,41 +15,64 @@ export function confirmSeasonSync(
   seasonNum: number,
   episodes: SeasonSyncEpisode[],
 ): void {
-  const dlg = dialog('seasonSyncConfirm');
+  const dlg = dialog("seasonSyncConfirm");
   const label = `${seriesTitle} S${pad(seasonNum)}`;
   const syncAbort = new AbortController();
 
-  const closeFn = (): void => { syncAbort.abort(); closeDialog(dlg); };
+  const closeFn = (): void => {
+    syncAbort.abort();
+    closeDialog(dlg);
+  };
   const header = dialogHead(`Sync ${label}`, closeFn);
 
-  const body = el('div', { className: 'dlg-body' },
-    el('p', null,
-      `This will run audio sync on ${episodes.length
-      } subtitle file${episodes.length === 1 ? '' : 's'
-      } in ${label}.`),
-    el('p', null,
-      'Audio sync analyzes the video audio track to align subtitle '
-      + 'timing automatically. Results depend on audio quality and '
-      + 'are not guaranteed to be accurate for every file.')
+  const body = el(
+    "div",
+    { className: "dlg-body" },
+    el(
+      "p",
+      null,
+      `This will run audio sync on ${episodes.length} subtitle file${
+        episodes.length === 1 ? "" : "s"
+      } in ${label}.`,
+    ),
+    el(
+      "p",
+      null,
+      "Audio sync analyzes the video audio track to align subtitle " +
+        "timing automatically. Results depend on audio quality and " +
+        "are not guaranteed to be accurate for every file.",
+    ),
   );
 
-  const progress = el('div', {
-    id: 'season-sync-status',
-    hidden: true
+  const progress = el("div", {
+    id: "season-sync-status",
+    hidden: true,
   });
   body.appendChild(progress);
 
-  const startBtn = el('button', {
-    type: 'button', id: 'season-sync-start',
-    onclick: () => runSeasonAudioSync(episodes, dlg, syncAbort.signal)
-  }, 'Start Sync');
+  const startBtn = el(
+    "button",
+    {
+      type: "button",
+      id: "season-sync-start",
+      onclick: () => runSeasonAudioSync(episodes, dlg, syncAbort.signal),
+    },
+    "Start Sync",
+  );
 
-  const footer = el('div', { className: 'dlg-foot' },
+  const footer = el(
+    "div",
+    { className: "dlg-foot" },
     startBtn,
-    el('button', {
-      type: 'button', className: 'ghost',
-      onclick: closeFn
-    }, 'Cancel')
+    el(
+      "button",
+      {
+        type: "button",
+        className: "ghost",
+        onclick: closeFn,
+      },
+      "Cancel",
+    ),
   );
 
   patch(dlg, header, body, footer);
@@ -62,10 +85,14 @@ async function runSeasonAudioSync(
   dlg: HTMLDialogElement,
   signal: AbortSignal,
 ): Promise<void> {
-  const startBtn = document.getElementById('season-sync-start') as HTMLButtonElement | null;
-  const status = document.getElementById('season-sync-status');
-  if (startBtn) startBtn.disabled = true;
-  if (status) status.hidden = false;
+  const startBtn = document.getElementById("season-sync-start") as HTMLButtonElement | null;
+  const status = document.getElementById("season-sync-status");
+  if (startBtn) {
+    startBtn.disabled = true;
+  }
+  if (status) {
+    status.hidden = false;
+  }
 
   let done = 0;
   let applied = 0;
@@ -75,31 +102,50 @@ async function runSeasonAudioSync(
   const queue = [...episodes];
   async function worker(): Promise<void> {
     while (queue.length > 0) {
-      if (signal.aborted) return;
+      if (signal.aborted) {
+        return;
+      }
       const ep = queue.shift()!;
       done++;
-      if (status) status.textContent = `Syncing ${done}/${
-        episodes.length}: ${ep.label}\u2026`;
-      const r = await audioSyncAction.dispatch({
-        subtitle_path: ep.subPath,
-        video_path: ep.videoPath,
-      }, { silent: true });
-      if (signal.aborted) return;
-      if (r === null) { failed++; continue; }
-      if (r.applied) applied++;
+      if (status) {
+        status.textContent = `Syncing ${done}/${episodes.length}: ${ep.label}\u2026`;
+      }
+      const r = await audioSyncAction.dispatch(
+        {
+          subtitle_path: ep.subPath,
+          video_path: ep.videoPath,
+        },
+        { silent: true },
+      );
+      if (signal.aborted) {
+        return;
+      }
+      if (r === null) {
+        failed++;
+        continue;
+      }
+      if (r.applied) {
+        applied++;
+      }
     }
   }
 
-  const workers = Array.from({ length: Math.min(SEASON_SYNC_CONCURRENCY, episodes.length) }, () => worker());
+  const workers = Array.from({ length: Math.min(SEASON_SYNC_CONCURRENCY, episodes.length) }, () =>
+    worker(),
+  );
   await Promise.all(workers);
 
-  if (signal.aborted) return;
+  if (signal.aborted) {
+    return;
+  }
   const skipped = episodes.length - applied - failed;
-  if (status) status.textContent = `Done: ${applied} synced${
-    failed > 0 ? `, ${failed} failed` : ''
-  }${skipped > 0 ? `, ${skipped} low confidence` : ''}`;
+  if (status) {
+    status.textContent = `Done: ${applied} synced${
+      failed > 0 ? `, ${failed} failed` : ""
+    }${skipped > 0 ? `, ${skipped} low confidence` : ""}`;
+  }
   if (startBtn) {
-    startBtn.textContent = 'Close';
+    startBtn.textContent = "Close";
     startBtn.disabled = false;
     startBtn.onclick = () => closeDialog(dlg);
   }

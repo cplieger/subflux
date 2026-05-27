@@ -15,8 +15,12 @@ function fail(path: string, msg: string): never {
 }
 
 function typeName(v: unknown): string {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "array";
+  if (v === null) {
+    return "null";
+  }
+  if (Array.isArray(v)) {
+    return "array";
+  }
   return typeof v;
 }
 
@@ -66,7 +70,9 @@ export function reqBool(o: Record<string, unknown>, key: string, path = "$"): bo
 /** Optional string: undefined if key absent, otherwise must be a string. */
 export function optStr(o: Record<string, unknown>, key: string, path = "$"): string | undefined {
   const v = o[key];
-  if (v === undefined) return undefined;
+  if (v === undefined) {
+    return undefined;
+  }
   if (typeof v !== "string") {
     fail(`${path}.${key}`, `expected string or undefined, got ${typeName(v)}`);
   }
@@ -76,7 +82,9 @@ export function optStr(o: Record<string, unknown>, key: string, path = "$"): str
 /** Optional finite number. */
 export function optNum(o: Record<string, unknown>, key: string, path = "$"): number | undefined {
   const v = o[key];
-  if (v === undefined) return undefined;
+  if (v === undefined) {
+    return undefined;
+  }
   if (typeof v !== "number" || !Number.isFinite(v)) {
     fail(`${path}.${key}`, `expected number or undefined, got ${typeName(v)}`);
   }
@@ -86,7 +94,9 @@ export function optNum(o: Record<string, unknown>, key: string, path = "$"): num
 /** Optional boolean. */
 export function optBool(o: Record<string, unknown>, key: string, path = "$"): boolean | undefined {
   const v = o[key];
-  if (v === undefined) return undefined;
+  if (v === undefined) {
+    return undefined;
+  }
   if (typeof v !== "boolean") {
     fail(`${path}.${key}`, `expected boolean or undefined, got ${typeName(v)}`);
   }

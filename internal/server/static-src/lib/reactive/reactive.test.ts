@@ -1,6 +1,15 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
-import { signal, effect, batch, flushSync, createStore, reconcile, KEY_ATTR, patch } from "./index.js";
+import {
+  signal,
+  effect,
+  batch,
+  flushSync,
+  createStore,
+  reconcile,
+  KEY_ATTR,
+  patch,
+} from "./index.js";
 
 // ---------------------------------------------------------------------------
 // signal + effect + batch
@@ -19,7 +28,10 @@ describe("signal", () => {
     expect.assertions(1);
     const s = signal(1);
     const spy = vi.fn();
-    effect(() => { s.value; spy(); });
+    effect(() => {
+      s.value;
+      spy();
+    });
     spy.mockClear();
     s.value = 1;
     expect(spy).not.toHaveBeenCalled();
@@ -29,7 +41,10 @@ describe("signal", () => {
     expect.assertions(1);
     const s = signal(NaN);
     const spy = vi.fn();
-    effect(() => { s.value; spy(); });
+    effect(() => {
+      s.value;
+      spy();
+    });
     spy.mockClear();
     s.value = NaN;
     expect(spy).not.toHaveBeenCalled();
@@ -40,7 +55,9 @@ describe("effect", () => {
   it("runs immediately on creation", () => {
     expect.assertions(1);
     const spy = vi.fn();
-    effect(() => { spy(); });
+    effect(() => {
+      spy();
+    });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
@@ -48,7 +65,9 @@ describe("effect", () => {
     expect.assertions(2);
     const s = signal("a");
     const spy = vi.fn();
-    effect(() => { spy(s.value); });
+    effect(() => {
+      spy(s.value);
+    });
     expect(spy).toHaveBeenCalledWith("a");
     s.value = "b";
     expect(spy).toHaveBeenCalledWith("b");
@@ -60,7 +79,9 @@ describe("effect", () => {
     const a = signal(1);
     const b = signal(2);
     const spy = vi.fn();
-    effect(() => { spy(cond.value ? a.value : b.value); });
+    effect(() => {
+      spy(cond.value ? a.value : b.value);
+    });
     spy.mockClear();
     // b is not tracked when cond=true
     b.value = 99;
@@ -74,7 +95,9 @@ describe("effect", () => {
     effect(() => {
       const v = s.value;
       order.push(`run:${v}`);
-      return () => { order.push(`cleanup:${v}`); };
+      return () => {
+        order.push(`cleanup:${v}`);
+      };
     });
     s.value = 1;
     expect(order).toEqual(["run:0", "cleanup:0", "run:1"]);
@@ -85,7 +108,12 @@ describe("effect", () => {
     expect.assertions(2);
     const s = signal(0);
     let cleaned = false;
-    const dispose = effect(() => { s.value; return () => { cleaned = true; }; });
+    const dispose = effect(() => {
+      s.value;
+      return () => {
+        cleaned = true;
+      };
+    });
     dispose();
     expect(cleaned).toBe(true);
     s.value = 1;
@@ -99,7 +127,9 @@ describe("effect", () => {
     const b = signal(2);
     const cond = signal(true);
     const spy = vi.fn();
-    effect(() => { spy(cond.value ? a.value : b.value); });
+    effect(() => {
+      spy(cond.value ? a.value : b.value);
+    });
     // Switch to b
     cond.value = false;
     spy.mockClear();
@@ -114,9 +144,15 @@ describe("batch", () => {
     expect.assertions(2);
     const s = signal(0);
     const spy = vi.fn();
-    effect(() => { spy(s.value); });
+    effect(() => {
+      spy(s.value);
+    });
     spy.mockClear();
-    batch(() => { s.value = 1; s.value = 2; s.value = 3; });
+    batch(() => {
+      s.value = 1;
+      s.value = 2;
+      s.value = 3;
+    });
     flushSync();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith(3);
@@ -126,10 +162,14 @@ describe("batch", () => {
     expect.assertions(2);
     const s = signal(0);
     const spy = vi.fn();
-    effect(() => { spy(s.value); });
+    effect(() => {
+      spy(s.value);
+    });
     spy.mockClear();
     batch(() => {
-      batch(() => { s.value = 1; });
+      batch(() => {
+        s.value = 1;
+      });
       // Still inside outer batch — effect should not have run
       expect(spy).not.toHaveBeenCalled();
     });
@@ -190,7 +230,11 @@ describe("createStore", () => {
     const spyB = vi.fn();
     store.subscribe("a", spyA);
     store.subscribe("b", spyB);
-    store.batch(() => { store.set("a", 1); store.set("b", 2); store.set("a", 10); });
+    store.batch(() => {
+      store.set("a", 1);
+      store.set("b", 2);
+      store.set("a", 10);
+    });
     expect(spyA).toHaveBeenCalledTimes(1);
     expect(spyA).toHaveBeenCalledWith(10);
   });
@@ -201,7 +245,9 @@ describe("createStore", () => {
     set("x", 0);
     set("y", 0);
     const spy = vi.fn();
-    eff(() => { spy(get("x")); });
+    eff(() => {
+      spy(get("x"));
+    });
     spy.mockClear();
     set("x", 1);
     expect(spy).toHaveBeenCalledWith(1);
@@ -219,7 +265,9 @@ describe("createStore", () => {
     eff(() => {
       const v = get("n");
       order.push(`run:${v}`);
-      return () => { order.push(`cleanup:${v}`); };
+      return () => {
+        order.push(`cleanup:${v}`);
+      };
     });
     set("n", 1);
     expect(order).toEqual(["run:0", "cleanup:0", "run:1"]);
@@ -230,7 +278,9 @@ describe("createStore", () => {
     const { get, set, effect: eff } = createStore<{ n: number }>();
     set("n", 0);
     const spy = vi.fn();
-    const dispose = eff(() => { spy(get("n")); });
+    const dispose = eff(() => {
+      spy(get("n"));
+    });
     spy.mockClear();
     dispose();
     set("n", 1);
@@ -266,7 +316,9 @@ describe("createStore", () => {
     set("a", 1);
     set("b", 2);
     const spy = vi.fn();
-    eff(() => { spy(get("cond") ? get("a") : get("b")); });
+    eff(() => {
+      spy(get("cond") ? get("a") : get("b"));
+    });
     spy.mockClear();
     set("cond", false); // now tracks b, not a
     spy.mockClear();
@@ -285,7 +337,11 @@ describe("reconcile", () => {
     const parent = document.createElement("div");
     reconcile(parent, [{ id: "a" }, { id: "b" }], {
       key: (i) => i.id,
-      mount: (i) => { const el = document.createElement("span"); el.textContent = i.id; return el; },
+      mount: (i) => {
+        const el = document.createElement("span");
+        el.textContent = i.id;
+        return el;
+      },
     });
     expect(parent.children.length).toBe(2);
     expect(parent.children[0]!.getAttribute(KEY_ATTR)).toBe("a");
@@ -296,11 +352,19 @@ describe("reconcile", () => {
     const parent = document.createElement("div");
     reconcile(parent, [{ id: "a" }, { id: "b" }], {
       key: (i) => i.id,
-      mount: (i) => { const el = document.createElement("span"); el.textContent = i.id; return el; },
+      mount: (i) => {
+        const el = document.createElement("span");
+        el.textContent = i.id;
+        return el;
+      },
     });
     reconcile(parent, [{ id: "a" }], {
       key: (i) => i.id,
-      mount: (i) => { const el = document.createElement("span"); el.textContent = i.id; return el; },
+      mount: (i) => {
+        const el = document.createElement("span");
+        el.textContent = i.id;
+        return el;
+      },
     });
     expect(parent.children.length).toBe(1);
   });
@@ -311,8 +375,14 @@ describe("reconcile", () => {
     const removed: string[] = [];
     const spec = {
       key: (i: { id: string }) => i.id,
-      mount: (i: { id: string }) => { const el = document.createElement("span"); el.textContent = i.id; return el; },
-      onRemove: (_el: HTMLElement, key: string) => { removed.push(key); },
+      mount: (i: { id: string }) => {
+        const el = document.createElement("span");
+        el.textContent = i.id;
+        return el;
+      },
+      onRemove: (_el: HTMLElement, key: string) => {
+        removed.push(key);
+      },
     };
     reconcile(parent, [{ id: "a" }, { id: "b" }], spec);
     reconcile(parent, [{ id: "b" }], spec);
@@ -324,7 +394,11 @@ describe("reconcile", () => {
     const parent = document.createElement("div");
     const spec = {
       key: (i: { id: string }) => i.id,
-      mount: (i: { id: string }) => { const el = document.createElement("div"); el.textContent = i.id; return el; },
+      mount: (i: { id: string }) => {
+        const el = document.createElement("div");
+        el.textContent = i.id;
+        return el;
+      },
     };
     reconcile(parent, [{ id: "a" }, { id: "b" }, { id: "c" }], spec);
     const origB = parent.children[1]!;
@@ -339,8 +413,15 @@ describe("reconcile", () => {
     const updated: string[] = [];
     const spec = {
       key: (i: { id: string; v: number }) => i.id,
-      mount: (i: { id: string; v: number }) => { const el = document.createElement("div"); el.textContent = String(i.v); return el; },
-      update: (el: HTMLElement, i: { id: string; v: number }) => { el.textContent = String(i.v); updated.push(i.id); },
+      mount: (i: { id: string; v: number }) => {
+        const el = document.createElement("div");
+        el.textContent = String(i.v);
+        return el;
+      },
+      update: (el: HTMLElement, i: { id: string; v: number }) => {
+        el.textContent = String(i.v);
+        updated.push(i.id);
+      },
     };
     reconcile(parent, [{ id: "a", v: 1 }], spec);
     reconcile(parent, [{ id: "a", v: 2 }], spec);

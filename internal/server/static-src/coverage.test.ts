@@ -14,7 +14,12 @@ vi.mock("./actions/index.js", () => ({
 vi.mock("./bus.js", () => ({
   on: vi.fn(() => () => {}),
   emit: vi.fn(),
-  BusEvent: { ScanSeries: "scan:series", ScanMovie: "scan:movie", OpenSeries: "open:series", OpenMovie: "open:movie" },
+  BusEvent: {
+    ScanSeries: "scan:series",
+    ScanMovie: "scan:movie",
+    OpenSeries: "open:series",
+    OpenMovie: "open:movie",
+  },
 }));
 
 import * as store from "./store.js";
@@ -25,7 +30,8 @@ describe("coverage: renderCoverageItems", () => {
     store.set("coverageData", null);
     store.set("currentPage", "library");
     store.set("detailCtx", null);
-    document.body.innerHTML = '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
   });
 
   it.todo("renders empty state when no items and no coverageData");

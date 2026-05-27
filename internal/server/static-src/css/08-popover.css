@@ -1,9 +1,10 @@
-
 /* ================================================================
    7. Popover (status popup)
    ================================================================ */
 
-.nav-btn[aria-label="Status"] { anchor-name: --status-anchor }
+.nav-btn[aria-label="Status"] {
+  anchor-name: --status-anchor;
+}
 
 [popover] {
   width: min(23.75rem, calc(100vw - 1.5rem));
@@ -25,17 +26,30 @@
   margin-block-start: var(--sp-3);
   opacity: 0;
   translate: 0 -0.5rem;
-  transition: opacity var(--dur-standard), translate var(--dur-standard),
-    overlay var(--dur-standard) allow-discrete, display var(--dur-standard) allow-discrete
+  transition:
+    opacity var(--dur-standard),
+    translate var(--dur-standard),
+    overlay var(--dur-standard) allow-discrete,
+    display var(--dur-standard) allow-discrete;
 }
 
-[popover]:popover-open { opacity: 1; translate: 0 }
+[popover]:popover-open {
+  opacity: 1;
+  translate: 0;
+}
 
-@starting-style { [popover]:popover-open { opacity: 0; translate: 0 -0.5rem } }
+@starting-style {
+  [popover]:popover-open {
+    opacity: 0;
+    translate: 0 -0.5rem;
+  }
+}
 
 /* Narrow viewport: full-width dropdown below header */
 @media (width < 600px) {
-  header:has(h1) { anchor-name: --header-anchor }
+  header:has(h1) {
+    anchor-name: --header-anchor;
+  }
 
   [popover] {
     width: 100%;
@@ -51,14 +65,23 @@
     margin: 0;
     opacity: 0;
     translate: 0 -0.5rem;
-    transition: opacity var(--dur-standard), translate var(--dur-standard),
-      overlay var(--dur-standard) allow-discrete, display var(--dur-standard) allow-discrete
+    transition:
+      opacity var(--dur-standard),
+      translate var(--dur-standard),
+      overlay var(--dur-standard) allow-discrete,
+      display var(--dur-standard) allow-discrete;
   }
 
-  [popover]:popover-open { opacity: 1; translate: 0 }
+  [popover]:popover-open {
+    opacity: 1;
+    translate: 0;
+  }
 
   @starting-style {
-    [popover]:popover-open { opacity: 0; translate: 0 -0.5rem }
+    [popover]:popover-open {
+      opacity: 0;
+      translate: 0 -0.5rem;
+    }
   }
 }
 
@@ -68,8 +91,12 @@
   font-size: var(--text-sm);
   contain: layout style;
 
-  &:last-child { border: none }
-  &:empty { display: none }
+  &:last-child {
+    border: none;
+  }
+  &:empty {
+    display: none;
+  }
 }
 
 .pop-header {
@@ -81,7 +108,7 @@
   font-weight: 500;
   color: var(--muted);
   text-align: center;
-  letter-spacing: 0.02em
+  letter-spacing: 0.02em;
 }
 
 .pop-item.persistent {
@@ -90,7 +117,7 @@
   padding-inline: var(--sp-5) 2rem;
   position: relative;
   border-radius: var(--radius-sm);
-  margin-block-end: var(--sp-2)
+  margin-block-end: var(--sp-2);
 }
 
 /* Activity items: 2-row grid with icon sidebar */
@@ -99,7 +126,7 @@
   grid-template-columns: 1.5rem 1fr auto;
   grid-template-rows: auto auto;
   gap: 0 var(--sp-3);
-  align-items: center
+  align-items: center;
 }
 
 .act-icon {
@@ -108,41 +135,48 @@
   align-self: center;
   display: inline-flex;
   align-items: center;
-  justify-content: center
+  justify-content: center;
 }
 
-.act-icon.act-active { color: var(--accent) }
-.act-icon.act-done { color: var(--ok) }
-.act-icon.act-queued { color: var(--muted) }
+.act-icon.act-active {
+  color: var(--accent);
+}
+.act-icon.act-done {
+  color: var(--ok);
+}
+.act-icon.act-queued {
+  color: var(--muted);
+}
 
 .act-icon .spinner {
   border-color: color-mix(in oklch, var(--accent) 30%, transparent);
-  border-block-start-color: var(--accent)
+  border-block-start-color: var(--accent);
 }
 
 .act-title {
   grid-column: 2;
   grid-row: 1;
-  font-weight: 500
+  font-weight: 500;
 }
 
 .act-detail {
   grid-column: 2;
   grid-row: 2;
   color: var(--muted);
-  font-size: var(--text-xs)
+  font-size: var(--text-xs);
 }
 
 .pop-act > .close-btn {
   grid-column: 3;
   grid-row: 1 / -1;
-  align-self: center
+  align-self: center;
 }
 
 .pop-item.pop-done {
-  transition: opacity var(--dur-exit) var(--ease-exit),
+  transition:
+    opacity var(--dur-exit) var(--ease-exit),
     translate var(--dur-exit) var(--ease-exit),
-    max-height var(--dur-exit) var(--ease-exit)
+    max-height var(--dur-exit) var(--ease-exit);
 }
 
 .pop-item.pop-dismissing {
@@ -151,7 +185,7 @@
   max-height: 0;
   padding-block: 0;
   overflow: hidden;
-  border: none
+  border: none;
 }
 
 .pop-dismiss {
@@ -170,18 +204,33 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  &:hover { color: var(--text); background: var(--border) }
+  &:hover {
+    color: var(--text);
+    background: var(--border);
+  }
 }
 
-.level-ok { color: var(--ok) }
-.level-warn { color: var(--warn) }
-.level-error { color: var(--err) }
-.level-info { color: var(--info) }
+.level-ok {
+  color: var(--ok);
+}
+.level-warn {
+  color: var(--warn);
+}
+.level-error {
+  color: var(--err);
+}
+.level-info {
+  color: var(--info);
+}
 
 .live-timer {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
-  font-size: var(--text-xs)
+  font-size: var(--text-xs);
 }
 
-.pop-time { color: var(--muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums }
+.pop-time {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,4 +1,3 @@
-
 /* ================================================================
    12. Accessibility & view transitions
    ================================================================ */
@@ -8,22 +7,40 @@
 /* (view-transition-name is on main in Layer 3) */
 
 ::view-transition-old(main) {
-  animation: var(--dur-exit) var(--ease) both fade-out
+  animation: var(--dur-exit) var(--ease) both fade-out;
 }
 
 ::view-transition-new(main) {
-  animation: var(--dur-exit) var(--ease) both fade-in
+  animation: var(--dur-exit) var(--ease) both fade-in;
 }
 
-@keyframes fade-out { to { opacity: 0 } }
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
 
-@keyframes fade-in { from { opacity: 0 } }
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
 
 @media (prefers-contrast: more) {
-  :root { --border: oklch(45% 0 0deg); --muted: oklch(70% 0 0deg) }
-  .badge { font-weight: 700 }
+  :root {
+    --border: oklch(45% 0 0deg);
+    --muted: oklch(70% 0 0deg);
+  }
+  .badge {
+    font-weight: 700;
+  }
 }
 
 @media (forced-colors: active) {
-  .badge, .card, [popover], .toast { border: 1px solid CanvasText }
+  .badge,
+  .card,
+  [popover],
+  .toast {
+    border: 1px solid CanvasText;
+  }
 }

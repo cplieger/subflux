@@ -1,10 +1,17 @@
-
 /* ================================================================
    1. Reset & base
    ================================================================ */
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
-html { text-size-adjust: 100% }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html {
+  text-size-adjust: 100%;
+}
 
 body {
   font-family: system-ui, sans-serif;
@@ -18,8 +25,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--sp-6)
+  padding: var(--sp-6);
 }
 
-::placeholder { opacity: 1; color: var(--muted) }
-::selection { background: var(--accent-dim); color: var(--text) }
+::placeholder {
+  opacity: 1;
+  color: var(--muted);
+}
+::selection {
+  background: var(--accent-dim);
+  color: var(--text);
+}
