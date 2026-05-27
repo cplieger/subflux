@@ -16,6 +16,7 @@ const RingBufferSize = 256
 type EventBus struct {
 	notify   chan struct{}
 	ring     [RingBufferSize]Event
+	ringMu   sync.RWMutex
 	writeAt  atomic.Uint64
 	notifyMu sync.Mutex
 	clients  atomic.Int32
@@ -72,7 +73,9 @@ func (s *Subscription) Next() (Event, bool) {
 	if w-s.readAt > RingBufferSize {
 		s.readAt = w - RingBufferSize
 	}
+	s.eb.ringMu.RLock()
 	e := s.eb.ring[s.readAt%RingBufferSize]
+	s.eb.ringMu.RUnlock()
 	s.readAt++
 	return e, true
 }
@@ -84,7 +87,9 @@ func (eb *EventBus) Publish(e Event) {
 		return
 	}
 	pos := eb.writeAt.Load()
+	eb.ringMu.Lock()
 	eb.ring[pos%RingBufferSize] = e
+	eb.ringMu.Unlock()
 	eb.writeAt.Add(1)
 
 	// Wake all waiters by closing the current notify channel and swapping
