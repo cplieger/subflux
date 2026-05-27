@@ -193,12 +193,30 @@ jobs:
         run: |
           (
             WEB=internal/server/static-src
+            # Generate CSS bundle from MANIFEST (same logic as Dockerfile)
+            css_out=$(mktemp -d)
+            for manifest in "$WEB"/css/*MANIFEST; do
+              [ -f "$manifest" ] || continue
+              mname=$(basename "$manifest")
+              if [ "$mname" = "MANIFEST" ]; then
+                out_name=style.css
+              else
+                out_name="${mname%.MANIFEST}.css"
+              fi
+              while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in ''|\#*) continue ;; esac
+                cat "$WEB/css/$line"
+              done < "$manifest" > "$css_out/$out_name"
+            done
+            # Lint the generated bundle(s)
+            find "$css_out" -name "*.css" -print0 \
+              | xargs -0 --no-run-if-empty \
+                "$WEB/node_modules/.bin/stylelint" --config .web-lint/.stylelintrc.json --config-basedir "$WEB"
+            # Lint HTML
             find internal/server/static -name "*.html" -print0 \
               | xargs -0 --no-run-if-empty \
                 "$WEB/node_modules/.bin/html-validate" --config .web-lint/.htmlvalidate.json
-            find internal/server/static -name "*.css" -print0 \
-              | xargs -0 --no-run-if-empty \
-                "$WEB/node_modules/.bin/stylelint" --config .web-lint/.stylelintrc.json --config-basedir "$WEB"
+            rm -rf "$css_out"
           ) || { echo "Lint web (HTML/CSS)" >> /tmp/_ci_failures; exit 1; }
 
       - name: Lint shell scripts
