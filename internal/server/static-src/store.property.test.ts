@@ -65,7 +65,7 @@ describe("store property", () => {
           observed = v;
         });
         try {
-          for (const v of values) store.set("scanInFlight", v);
+          for (const v of values) {store.set("scanInFlight", v);}
           expect(observed).toBe(finalVal);
         } finally {
           unsub();
@@ -84,7 +84,7 @@ describe("store property", () => {
         });
         try {
           store.batch(() => {
-            for (const v of values) store.set("scanInFlight", v);
+            for (const v of values) {store.set("scanInFlight", v);}
           });
           // At most one notification fired (could be zero if final value
           // equals the prior store state, which after reset is `false`).
@@ -109,7 +109,7 @@ describe("store property", () => {
           count += 1;
         });
         unsub();
-        for (const v of values) store.set("scanInFlight", v);
+        for (const v of values) {store.set("scanInFlight", v);}
         expect(count).toBe(0);
       }),
     );

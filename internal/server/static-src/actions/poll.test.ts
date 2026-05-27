@@ -296,7 +296,7 @@ describe("pollAction — backoffOnError", () => {
       name: "test.poll.reset",
       run: async () => {
         count++;
-        if (fail) throw new Error("fail");
+        if (fail) {throw new Error("fail");}
         return count;
       },
       error: false,

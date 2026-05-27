@@ -140,11 +140,11 @@ describe("get/set/subscribe", () => {
 });
 
 describe("effect", () => {
-  const cases: Array<{
+  const cases: {
     name: string;
     run: () => { spy: ReturnType<typeof vi.fn>; cleanup?: () => void };
     assert: (spy: ReturnType<typeof vi.fn>) => void;
-  }> = [
+  }[] = [
     {
       name: 'effect reads key "a" → re-runs when "a" changes',
       run: () => {
@@ -188,7 +188,7 @@ describe("effect", () => {
         const spy = vi.fn();
         effect(() => {
           const a = get("eff_dyn_a");
-          if (a) get("eff_dyn_b");
+          if (a) {get("eff_dyn_b");}
           spy();
         });
         spy.mockClear();
@@ -272,11 +272,11 @@ describe("effect", () => {
 });
 
 describe("computed", () => {
-  const cases: Array<{
+  const cases: {
     name: string;
     run: () => void;
     assert: () => void;
-  }> = [
+  }[] = [
     {
       name: "computed updates when dependency changes",
       run: () => {

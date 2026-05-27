@@ -31,7 +31,7 @@ describe("hasCode property tests", () => {
         fc.subarray(allCodes, { minLength: 1, maxLength: 5 }),
         (code, subset) => {
           const others = subset.filter((c) => c !== code);
-          if (others.length === 0) return; // skip if all match
+          if (others.length === 0) {return;} // skip if all match
           expect(hasCode({ code }, ...others)).toBe(false);
         },
       ),
