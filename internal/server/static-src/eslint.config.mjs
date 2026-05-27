@@ -161,7 +161,9 @@ export default [
     },
   },
 
-  // 5. Generated and config files: drop type-checked rules.
+  // 5. Generated and config files + tests: drop type-checked rules.
+  // Tests are excluded from tsconfig include (deliberate, per vitest setup),
+  // so projectService can't resolve them; disableTypeChecked skips that.
   {
     files: [
       "**/*.gen.ts",
@@ -170,6 +172,11 @@ export default [
       "*.config.ts",
       "*.config.mjs",
       "*.config.js",
+      "**/*.test.ts",
+      "**/*.fuzz.test.ts",
+      "**/*.property.test.ts",
+      "fc-strict-setup.ts",
+      "test-stubs/**",
     ],
     ...tseslint.configs.disableTypeChecked,
   },
