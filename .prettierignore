@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+coverage/
+*.gen.ts
+wire/*.gen.ts
+**/*.min.*
+**/static/**
+*.lock
+*-lock.json

@@ -1,4 +1,0 @@
-{
-  "entry": ["app.ts", "login.ts"],
-  "ignorePatterns": ["node_modules/**"]
-}

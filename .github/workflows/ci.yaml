@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '*.md'
+      - 'docs/**'
+      - 'LICENSE*'
+      - 'AUTHORS*'
+      - 'CHANGELOG*'
+      - 'CONTRIBUTORS*'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.svg'
+      - '**/*.webp'
+      - '**/*.ico'
+      - '**/*.bmp'
+  push:
+    paths-ignore:
+      - '**/*.md'
+      - '*.md'
+      - 'docs/**'
+      - 'LICENSE*'
+      - 'AUTHORS*'
+      - 'CHANGELOG*'
+      - 'CONTRIBUTORS*'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.editorconfig'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.svg'
+      - '**/*.webp'
+      - '**/*.ico'
+      - '**/*.bmp'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install tools
+        run: |
+          # renovate: datasource=github-releases depName=golangci/golangci-lint
+          VERSION=v2.12.2
+          curl -fsSL --retry 3 \
+            "https://raw.githubusercontent.com/golangci/golangci-lint/${VERSION}/install.sh" \
+            | sh -s -- -b /usr/local/bin "${VERSION}"
+
+          # tsgo
+          TMP=$(mktemp -d)
+          npm pack @typescript/native-preview-linux-x64@latest \
+            --pack-destination "$TMP" --loglevel=warn
+          tar xzf "$TMP"/*.tgz -C "$TMP"
+          sudo cp -r "$TMP/package/lib" /usr/local/lib/tsgo
+          sudo ln -sf /usr/local/lib/tsgo/tsgo /usr/local/bin/tsgo
+          rm -rf "$TMP"
+
+          # Web lint tools
+          npm install -g --loglevel=warn html-validate stylelint stylelint-config-standard
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+
+      - name: Lint workflows (actionlint)
+        continue-on-error: true
+        run: |
+          (
+            actionlint -color
+          ) || { echo "Lint workflows (actionlint)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Install Go dead-code tools
+        run: |
+          go install golang.org/x/tools/cmd/deadcode@latest
+          go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+          go install github.com/bep/punused@latest
+
+      - name: Dead code (deadcode)
+        continue-on-error: true
+        run: |
+          (
+            deadcode ./...
+          ) || { echo "Dead code (deadcode)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Field alignment
+        continue-on-error: true
+        run: |
+          (
+            fieldalignment ./...
+          ) || { echo "Field alignment" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Unused exported symbols (punused)
+        continue-on-error: true
+        run: |
+          (
+            punused ./...
+          ) || { echo "Unused exported symbols (punused)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Govulncheck
+        continue-on-error: true
+        run: |
+          (
+            govulncheck ./...
+          ) || { echo "Govulncheck" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Install web lint deps
+        working-directory: internal/server/static-src
+        run: npm install --no-save --loglevel=warn
+
+      - name: Lint TS deps (knip)
+        continue-on-error: true
+        working-directory: internal/server/static-src
+        run: |
+          (
+            npx knip --strict --no-progress
+          ) || { echo "Lint TS deps (knip)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Lint TS (eslint)
+        continue-on-error: true
+        working-directory: internal/server/static-src
+        run: |
+          (
+            npx eslint .
+          ) || { echo "Lint TS (eslint)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Format check (prettier)
+        continue-on-error: true
+        run: |
+          (
+            npx --prefix internal/server/static-src prettier --check .
+          ) || { echo "Format check (prettier)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Verify dependencies
+        continue-on-error: true
+        run: |
+          (
+            go mod verify
+          ) || { echo "Verify dependencies" >> /tmp/_ci_failures; exit 1; }
+      - name: Compile TypeScript
+        continue-on-error: true
+        run: |
+          (
+            cd internal/server/static-src && tsgo --noEmit
+          ) || { echo "Compile TypeScript" >> /tmp/_ci_failures; exit 1; }
+      - name: Lint Go
+        continue-on-error: true
+        run: |
+          (
+            golangci-lint run --timeout=5m ./...
+          ) || { echo "Lint Go" >> /tmp/_ci_failures; exit 1; }
+      - name: Test Go
+        continue-on-error: true
+        run: |
+          (
+            go test -race -count=1 ./...
+          ) || { echo "Test Go" >> /tmp/_ci_failures; exit 1; }
+      - name: CSS bundle drift
+        continue-on-error: true
+        run: |
+          (
+            set -eu
+            css_src=internal/server/static-src/css
+            css_out=internal/server/static
+            for manifest in "$css_src"/*MANIFEST; do
+              [ -f "$manifest" ] || continue
+              mname=$(basename "$manifest")
+              if [ "$mname" = "MANIFEST" ]; then
+                out_name=style.css
+              else
+                out_name="${mname%.MANIFEST}.css"
+              fi
+              tmp=$(mktemp)
+              while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in ''|\#*) continue ;; esac
+                cat "$css_src/$line" >> "$tmp"
+              done < "$manifest"
+              if ! cmp -s "$css_out/$out_name" "$tmp"; then
+                echo "DRIFT: $css_out/$out_name differs from concat of $manifest" >&2
+                rm -f "$tmp"
+                exit 1
+              fi
+              rm -f "$tmp"
+            done
+          ) || { echo "CSS bundle drift" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Lint web (HTML/CSS)
+        continue-on-error: true
+        run: |
+          (
+            WEB=internal/server/static-src
+            find internal/server/static -name "*.html" -print0 \
+              | xargs -0 --no-run-if-empty \
+                "$WEB/node_modules/.bin/html-validate" --config .web-lint/.htmlvalidate.json
+            find internal/server/static -name "*.css" -print0 \
+              | xargs -0 --no-run-if-empty \
+                "$WEB/node_modules/.bin/stylelint" --config .web-lint/.stylelintrc.json --config-basedir "$WEB"
+          ) || { echo "Lint web (HTML/CSS)" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Lint shell scripts
+        continue-on-error: true
+        run: |
+          (
+            shellcheck -x -S info *.sh
+          ) || { echo "Lint shell scripts" >> /tmp/_ci_failures; exit 1; }
+      - name: Validate Dockerfile
+        continue-on-error: true
+        run: |
+          (
+            docker run --rm -i hadolint/hadolint:2.12.0 \
+              hadolint --ignore DL3018 --ignore DL3008 --ignore DL4006 - < Dockerfile
+          ) || { echo "Validate Dockerfile" >> /tmp/_ci_failures; exit 1; }
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@67d4f4bd7a9b17a0db54d2a7519187c65e339de8 # v4.7.3
+        with:
+          fail-on-severity: high
+
+      - name: Check results
+        if: always()
+        run: |
+          if [ -f /tmp/_ci_failures ]; then
+            echo "::error::Failed validation steps:"
+            sort -u /tmp/_ci_failures >&2
+            exit 1
+          fi
+          echo "All validation steps passed"

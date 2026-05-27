@@ -1,5 +1,5 @@
 # subflux/internal/server/static/login.css bundle manifest
-# Files concatenated in declared order by lib/shell/build-css.sh.
+# Files concatenated in declared order at Docker build time.
 #
 # Login shares the full design-token set with style.css via
 # _shared-tokens.css; only layout, forms, wizard, and a11y rules are

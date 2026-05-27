@@ -3,13 +3,25 @@
   "scripts": {
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:coverage": "vitest --run --coverage"
+    "test:coverage": "vitest --run --coverage",
+    "lint:eslint": "eslint .",
+    "lint:prettier": "prettier --check ../..",
+    "lint:fix": "eslint . --fix && prettier --write ../..",
+    "lint:knip": "knip"
   },
   "devDependencies": {
+    "@eslint/js": "^9.36.0",
     "@types/node": "25.9.1",
     "@vitest/coverage-v8": "4.1.7",
+    "eslint": "^9.36.0",
     "fast-check": "4.8.0",
     "happy-dom": "20.9.0",
+    "html-validate": "^11.0.0",
+    "knip": "^6.6.2",
+    "prettier": "^3.6.2",
+    "stylelint": "^16.0.0",
+    "stylelint-config-standard": "^39.0.0",
+    "typescript-eslint": "^8.45.0",
     "vitest": "4.1.7"
   }
 }
