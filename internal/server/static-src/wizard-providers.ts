@@ -90,7 +90,7 @@ function renderProviderCard(container: HTMLElement, prov: ProviderSchema, isAlwa
     header.appendChild(toggle);
     cb.addEventListener("change", () => {
       card.classList.toggle("open", cb.checked);
-      const body = card.querySelector(".wiz-prov-body");
+      const body = card.querySelector<HTMLElement>(".wiz-prov-body");
       if (body) {
         body.hidden = !cb.checked;
       }
