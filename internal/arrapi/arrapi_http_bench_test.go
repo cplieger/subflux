@@ -28,8 +28,8 @@ func BenchmarkFetchAll_prealloc(b *testing.B) {
 	defer srv.Close()
 
 	type item struct {
-		ID    int    `json:"id"`
 		Title string `json:"title"`
+		ID    int    `json:"id"`
 	}
 
 	c := &Client{

@@ -13,8 +13,8 @@ func TestSearchItem_label(t *testing.T) {
 
 	tests := []struct {
 		name string
-		item searchItem
 		want string
+		item searchItem
 	}{
 		{
 			name: "movie with year",
@@ -92,9 +92,9 @@ func TestParseArgs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		wantParams   map[string]string
 		name         string
 		args         []string
-		wantParams   map[string]string
 		wantDownload bool
 	}{
 		{

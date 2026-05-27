@@ -135,10 +135,10 @@ func TestPing(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
 		setup       func(t *testing.T) (*Client, context.Context)
-		wantErr     bool
+		name        string
 		errContains string
+		wantErr     bool
 	}{
 		{
 			name: "success",

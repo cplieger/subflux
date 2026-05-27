@@ -32,11 +32,11 @@ func TestBuildMatches(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
+		deps  MatchDeps
 		video *api.VideoInfo
 		sub   *api.Subtitle
-		deps  MatchDeps
 		check func(t *testing.T, got api.MatchSet)
+		name  string
 	}{
 		{
 			name:  "hash_match",
@@ -154,10 +154,10 @@ func TestMatchBreakdown(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		matches api.MatchSet
-		wantLen int
 		wantKey string
+		wantLen int
 		wantVal int
+		matches api.MatchSet
 	}{
 		{
 			name:    "hash_match_returns_hash_score",

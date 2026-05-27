@@ -60,13 +60,13 @@ func TestNewSeasonTracker_without_counter(t *testing.T) {
 func TestShouldSkipShow(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name     string
-		counts   map[string]int
 		err      error
-		noCount  bool // if true, use nil counter
+		counts   map[string]int
+		name     string
 		imdb     string
-		episodes int
 		langs    []string
+		episodes int
+		noCount  bool
 		wantSkip bool
 	}{
 		{name: "no_counter", noCount: true, imdb: "tt123", episodes: 100, langs: []string{"fr"}, wantSkip: false},

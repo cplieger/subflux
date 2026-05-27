@@ -309,10 +309,9 @@ func TestHandleBulkDeleteFiles_missing_fields_returns_400(t *testing.T) {
 // --- Mock stores for handleHistoryIDs ---
 
 type historyIDsTrackingStore struct {
-	qhMockStore
-
 	mediaType api.MediaType
 	prefix    string
+	qhMockStore
 }
 
 func (m *historyIDsTrackingStore) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, prefix string) ([]string, error) {
@@ -328,9 +327,8 @@ func (m *historyIDsErrorStore) HistoryMediaIDs(_ context.Context, _ api.MediaTyp
 }
 
 type historyIDsResultStore struct {
-	qhMockStore
-
 	ids []string
+	qhMockStore
 }
 
 func (m *historyIDsResultStore) HistoryMediaIDs(_ context.Context, _ api.MediaType, _ string) ([]string, error) {
@@ -368,9 +366,8 @@ func TestHandleListFiles_db_error_returns_500(t *testing.T) {
 }
 
 type listFilesDataStore struct {
-	qhMockStore
-
 	rows []api.SubtitleFileRow
+	qhMockStore
 }
 
 func (m *listFilesDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
@@ -494,9 +491,8 @@ func TestHandleDeleteFile_invalid_path_returns_403(t *testing.T) {
 }
 
 type deleteFileTrackingStore struct {
-	qhMockStore
-
 	variant api.Variant
+	qhMockStore
 }
 
 func (m *deleteFileTrackingStore) DeleteSubtitleFile(_ context.Context, _ api.MediaType, _, _ string, variant api.Variant, _ api.SubtitleSource, _ string) error {
@@ -576,9 +572,8 @@ func TestHandleBulkDeleteFiles_db_error_returns_500(t *testing.T) {
 // --- deleteExternalFile ---
 
 type deleteExtTrackingStore struct {
-	qhMockStore
-
 	deletedPath string
+	qhMockStore
 }
 
 func (m *deleteExtTrackingStore) DeleteSubtitleFile(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant, _ api.SubtitleSource, path string) error {
@@ -669,10 +664,9 @@ func TestDeleteExternalFile_succeeds_for_nonexistent_file(t *testing.T) {
 // --- handleBulkDeleteFiles happy path ---
 
 type bulkDeleteDataStore struct {
-	qhMockStore
-
 	deletedPath string
 	rows        []api.SubtitleFileRow
+	qhMockStore
 }
 
 func (m *bulkDeleteDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {

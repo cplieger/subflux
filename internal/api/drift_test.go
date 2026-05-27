@@ -14,11 +14,11 @@ func TestConfigDrift_Empty(t *testing.T) {
 		drift ConfigDrift
 		want  bool
 	}{
-		{"zero value is empty", ConfigDrift{}, true},
-		{"removed languages not empty", ConfigDrift{RemovedLanguages: []string{"fr"}}, false},
-		{"removed providers not empty", ConfigDrift{RemovedProviders: []ProviderID{"opensubtitles"}}, false},
-		{"adaptive disabled not empty", ConfigDrift{AdaptiveDisabled: true}, false},
-		{"all fields set not empty", ConfigDrift{RemovedLanguages: []string{"fr"}, RemovedProviders: []ProviderID{"os"}, AdaptiveDisabled: true}, false},
+		{name: "zero value is empty", drift: ConfigDrift{}, want: true},
+		{name: "removed languages not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}}, want: false},
+		{name: "removed providers not empty", drift: ConfigDrift{RemovedProviders: []ProviderID{"opensubtitles"}}, want: false},
+		{name: "adaptive disabled not empty", drift: ConfigDrift{AdaptiveDisabled: true}, want: false},
+		{name: "all fields set not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}, RemovedProviders: []ProviderID{"os"}, AdaptiveDisabled: true}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -42,10 +42,10 @@ func TestDetectDrift(t *testing.T) {
 		newLangs             []string
 		oldProvs             []ProviderID
 		newProvs             []ProviderID
-		oldAdaptive          bool
-		newAdaptive          bool
 		wantRemovedLangs     []string
 		wantRemovedProvs     []ProviderID
+		oldAdaptive          bool
+		newAdaptive          bool
 		wantAdaptiveDisabled bool
 		wantEmpty            bool
 	}{

@@ -11,10 +11,10 @@ func TestExtractAnchors(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
+		wantPunct string
 		wantNums  []string
 		wantNouns []string
 		wantCogs  []string
-		wantPunct string
 		wantWords int
 		wantChars int
 	}{

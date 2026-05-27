@@ -9,10 +9,9 @@ import (
 
 // countMissingStore returns configurable subtitle files for countMissing tests.
 type countMissingStore struct {
-	qhMockStore
-
 	episodeFiles []api.SubtitleFileRow
 	movieFiles   []api.SubtitleFileRow
+	qhMockStore
 }
 
 func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
@@ -24,9 +23,8 @@ func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.Me
 
 // countMissingConfig returns configurable targets for countMissing tests.
 type countMissingConfig struct {
-	qhMockConfig
-
 	targets []api.SubtitleTarget
+	qhMockConfig
 }
 
 func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {

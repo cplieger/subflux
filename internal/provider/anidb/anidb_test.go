@@ -12,8 +12,8 @@ import (
 func TestFindInMapping(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name      string
 		list      *animeList
+		name      string
 		tvdbID    int
 		season    int
 		episode   int
@@ -192,21 +192,21 @@ func TestFindEpisodeInMapping(t *testing.T) {
 		tvdbEpisode int
 		want        int
 	}{
-		{"simple match", ";1-1;2-2;3-3;", 2, 2},
-		{"no match", ";1-1;2-2;", 5, 0},
-		{"multi-episode plus", ";1-1+2;3-3;", 2, 1},
-		{"multi-episode first", ";1-1+2;3-3;", 1, 1},
-		{"empty text", "", 1, 0},
-		{"malformed no dash", ";abc;", 1, 0},
-		{"non-numeric anidb side", ";abc-1;", 1, 0},
-		{"non-numeric tvdb side", ";1-abc;", 1, 0},
-		{"whitespace around parts", "; 1-1 ; 2-2 ;", 2, 2},
-		{"whitespace around dash", ";1 - 1;2 - 2;", 2, 2},
-		{"only semicolons", ";;;", 1, 0},
-		{"leading zeros", ";01-01;02-02;", 2, 2},
-		{"duplicate tvdb episode first wins", ";5-3;10-3;", 3, 5},
-		{"single entry no semicolons", "1-1", 1, 1},
-		{"plus with three episodes", ";1-1+2+3;", 3, 1},
+		{name: "simple match", text: ";1-1;2-2;3-3;", tvdbEpisode: 2, want: 2},
+		{name: "no match", text: ";1-1;2-2;", tvdbEpisode: 5, want: 0},
+		{name: "multi-episode plus", text: ";1-1+2;3-3;", tvdbEpisode: 2, want: 1},
+		{name: "multi-episode first", text: ";1-1+2;3-3;", tvdbEpisode: 1, want: 1},
+		{name: "empty text", text: "", tvdbEpisode: 1, want: 0},
+		{name: "malformed no dash", text: ";abc;", tvdbEpisode: 1, want: 0},
+		{name: "non-numeric anidb side", text: ";abc-1;", tvdbEpisode: 1, want: 0},
+		{name: "non-numeric tvdb side", text: ";1-abc;", tvdbEpisode: 1, want: 0},
+		{name: "whitespace around parts", text: "; 1-1 ; 2-2 ;", tvdbEpisode: 2, want: 2},
+		{name: "whitespace around dash", text: ";1 - 1;2 - 2;", tvdbEpisode: 2, want: 2},
+		{name: "only semicolons", text: ";;;", tvdbEpisode: 1, want: 0},
+		{name: "leading zeros", text: ";01-01;02-02;", tvdbEpisode: 2, want: 2},
+		{name: "duplicate tvdb episode first wins", text: ";5-3;10-3;", tvdbEpisode: 3, want: 5},
+		{name: "single entry no semicolons", text: "1-1", tvdbEpisode: 1, want: 1},
+		{name: "plus with three episodes", text: ";1-1+2+3;", tvdbEpisode: 3, want: 1},
 	}
 
 	for _, tt := range tests {
@@ -288,20 +288,20 @@ func TestBuildEpisodeCacheKey(t *testing.T) {
 		want     string
 		seriesID int
 	}{
-		{"numeric simple", "5", "123:5", 123},
-		{"numeric with leading zero", "05", "123:5", 123},
-		{"numeric with leading zeros", "001", "123:1", 123},
-		{"numeric with surrounding whitespace", "  7  ", "123:7", 123},
-		{"numeric zero", "0", "123:0", 123},
-		{"numeric large", "9999", "42:9999", 42},
-		{"special S1", "S1", "123:S1", 123},
-		{"special C1", "C1", "123:C1", 123},
-		{"special T1", "T1", "123:T1", 123},
-		{"non-numeric with whitespace trimmed", "  S2  ", "123:S2", 123},
-		{"empty string falls through to string branch", "", "123:", 123},
-		{"pure whitespace", "   ", "123:", 123},
-		{"mixed alphanumeric", "3a", "123:3a", 123},
-		{"negative-looking numeric", "-1", "123:-1", 123},
+		{name: "numeric simple", epNo: "5", want: "123:5", seriesID: 123},
+		{name: "numeric with leading zero", epNo: "05", want: "123:5", seriesID: 123},
+		{name: "numeric with leading zeros", epNo: "001", want: "123:1", seriesID: 123},
+		{name: "numeric with surrounding whitespace", epNo: "  7  ", want: "123:7", seriesID: 123},
+		{name: "numeric zero", epNo: "0", want: "123:0", seriesID: 123},
+		{name: "numeric large", epNo: "9999", want: "42:9999", seriesID: 42},
+		{name: "special S1", epNo: "S1", want: "123:S1", seriesID: 123},
+		{name: "special C1", epNo: "C1", want: "123:C1", seriesID: 123},
+		{name: "special T1", epNo: "T1", want: "123:T1", seriesID: 123},
+		{name: "non-numeric with whitespace trimmed", epNo: "  S2  ", want: "123:S2", seriesID: 123},
+		{name: "empty string falls through to string branch", epNo: "", want: "123:", seriesID: 123},
+		{name: "pure whitespace", epNo: "   ", want: "123:", seriesID: 123},
+		{name: "mixed alphanumeric", epNo: "3a", want: "123:3a", seriesID: 123},
+		{name: "negative-looking numeric", epNo: "-1", want: "123:-1", seriesID: 123},
 	}
 
 	for _, tt := range tests {

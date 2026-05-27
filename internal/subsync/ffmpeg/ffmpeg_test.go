@@ -10,8 +10,8 @@ var testLangMapper LangMapper = classify.Alpha2FromAlpha3
 
 // mockRunner implements CommandRunner for testing without real ffmpeg binaries.
 type mockRunner struct {
-	output []byte
 	err    error
+	output []byte
 }
 
 func (m mockRunner) Run(_ context.Context, _ string, _ ...string) ([]byte, error) {
@@ -47,28 +47,28 @@ func TestNormalizeFFprobeLang(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"eng", "en"},
-		{"fre", "fr"},
-		{"fra", "fr"},
-		{"en", "en"},
-		{"fr", "fr"},
-		{"en-US", "en"},
-		{"fr-FR", "fr"},
-		{"pt-BR", "pt"},
-		{"und", ""},
-		{"undetermined", ""},
-		{"", ""},
-		{"pob", "pb"},
-		{"ger", "de"},
-		{"deu", "de"},
-		{"jpn", "ja"},
-		{"chi", "zh"},
-		{"zho", "zh"},
-		{"spa", "es"},
-		{"ita", "it"},
-		{"por", "pt"},
-		{"rus", "ru"},
-		{"kor", "ko"},
+		{input: "eng", want: "en"},
+		{input: "fre", want: "fr"},
+		{input: "fra", want: "fr"},
+		{input: "en", want: "en"},
+		{input: "fr", want: "fr"},
+		{input: "en-US", want: "en"},
+		{input: "fr-FR", want: "fr"},
+		{input: "pt-BR", want: "pt"},
+		{input: "und", want: ""},
+		{input: "undetermined", want: ""},
+		{input: "", want: ""},
+		{input: "pob", want: "pb"},
+		{input: "ger", want: "de"},
+		{input: "deu", want: "de"},
+		{input: "jpn", want: "ja"},
+		{input: "chi", want: "zh"},
+		{input: "zho", want: "zh"},
+		{input: "spa", want: "es"},
+		{input: "ita", want: "it"},
+		{input: "por", want: "pt"},
+		{input: "rus", want: "ru"},
+		{input: "kor", want: "ko"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -110,9 +110,9 @@ func TestSelectBestSubTrack(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
-		tracks      []Track
 		lang        string
 		excludeLang string
+		tracks      []Track
 		wantIdx     int
 		wantNil     bool
 	}{
@@ -204,10 +204,10 @@ func TestShortStreamType(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"subtitle", "s"},
-		{"audio", "a"},
-		{"video", "v"},
-		{"other", "other"},
+		{input: "subtitle", want: "s"},
+		{input: "audio", want: "a"},
+		{input: "video", want: "v"},
+		{input: "other", want: "other"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -241,11 +241,11 @@ func TestAlpha2FromAlpha3(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"eng", "en"},
-		{"fre", "fr"},
-		{"fra", "fr"},
-		{"unknown", ""},
-		{"", ""},
+		{input: "eng", want: "en"},
+		{input: "fre", want: "fr"},
+		{input: "fra", want: "fr"},
+		{input: "unknown", want: ""},
+		{input: "", want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -265,19 +265,19 @@ func TestParseFrameRate_fraction(t *testing.T) {
 		input string
 		want  float64
 	}{
-		{"NTSC film", "24000/1001", 23.976023976023978},
-		{"cinema", "24/1", 24.0},
-		{"PAL", "25/1", 25.0},
-		{"NTSC video", "30000/1001", 29.97002997002997},
-		{"integer 30", "30/1", 30.0},
-		{"plain float", "23.976", 23.976},
-		{"plain integer", "25", 25.0},
-		{"zero denominator", "24/0", 0},
-		{"empty string", "", 0},
-		{"garbage", "abc", 0},
-		{"fraction bad num", "abc/1001", 0},
-		{"fraction bad den", "24000/xyz", 0},
-		{"no slash plain bad", "not-a-number", 0},
+		{name: "NTSC film", input: "24000/1001", want: 23.976023976023978},
+		{name: "cinema", input: "24/1", want: 24.0},
+		{name: "PAL", input: "25/1", want: 25.0},
+		{name: "NTSC video", input: "30000/1001", want: 29.97002997002997},
+		{name: "integer 30", input: "30/1", want: 30.0},
+		{name: "plain float", input: "23.976", want: 23.976},
+		{name: "plain integer", input: "25", want: 25.0},
+		{name: "zero denominator", input: "24/0", want: 0},
+		{name: "empty string", input: "", want: 0},
+		{name: "garbage", input: "abc", want: 0},
+		{name: "fraction bad num", input: "abc/1001", want: 0},
+		{name: "fraction bad den", input: "24000/xyz", want: 0},
+		{name: "no slash plain bad", input: "not-a-number", want: 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -295,12 +295,12 @@ func TestNormalizeFFprobeLang_case_insensitive(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"ENG", "en"},
-		{"Fre", "fr"},
-		{"EN", "en"},
-		{"UND", ""},
-		{"Undetermined", ""},
-		{"EN-US", "en"},
+		{input: "ENG", want: "en"},
+		{input: "Fre", want: "fr"},
+		{input: "EN", want: "en"},
+		{input: "UND", want: ""},
+		{input: "Undetermined", want: ""},
+		{input: "EN-US", want: "en"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

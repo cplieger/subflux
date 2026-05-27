@@ -9,19 +9,19 @@ func TestSchemaDefaults_MatchExpected(t *testing.T) {
 	defaults := newWithDefaults()
 
 	tests := []struct {
-		name     string
 		got      any
 		expected any
+		name     string
 	}{
-		{"poll interval", defaults.PollIntervalCfg.D, 30 * time.Second},
-		{"scan interval", defaults.SearchCfg.ScanInterval.D, 24 * time.Hour},
-		{"scan delay", defaults.SearchCfg.ScanDelay.D, 5 * time.Second},
-		{"provider timeout", defaults.SearchCfg.ProviderTimeout.D, time.Hour},
-		{"adaptive enabled", defaults.AdaptiveCfg.Enabled, true},
-		{"adaptive multiplier", defaults.AdaptiveCfg.BackoffMultiplier, float64(2)},
-		{"upgrade enabled", defaults.SearchCfg.UpgradeEnabled, true},
-		{"upgrade window days", defaults.SearchCfg.UpgradeWindowDays, 7},
-		{"max sse clients", defaults.SearchCfg.MaxSSEClients, 32},
+		{name: "poll interval", got: defaults.PollIntervalCfg.D, expected: 30 * time.Second},
+		{name: "scan interval", got: defaults.SearchCfg.ScanInterval.D, expected: 24 * time.Hour},
+		{name: "scan delay", got: defaults.SearchCfg.ScanDelay.D, expected: 5 * time.Second},
+		{name: "provider timeout", got: defaults.SearchCfg.ProviderTimeout.D, expected: time.Hour},
+		{name: "adaptive enabled", got: defaults.AdaptiveCfg.Enabled, expected: true},
+		{name: "adaptive multiplier", got: defaults.AdaptiveCfg.BackoffMultiplier, expected: float64(2)},
+		{name: "upgrade enabled", got: defaults.SearchCfg.UpgradeEnabled, expected: true},
+		{name: "upgrade window days", got: defaults.SearchCfg.UpgradeWindowDays, expected: 7},
+		{name: "max sse clients", got: defaults.SearchCfg.MaxSSEClients, expected: 32},
 	}
 
 	for _, tt := range tests {

@@ -12,12 +12,12 @@ import (
 // the setup methods needed by auth tests. It eliminates the test-time
 // dependency on the real SQLite store package.
 type fakeSessionStore struct {
-	mu       sync.Mutex
 	users    map[int64]*api.User
 	sessions map[string]*api.Session // keyed by TokenHash
 	apiKeys  map[string]*api.Key     // keyed by KeyHash
 	passkeys []api.PasskeyCredential
 	nextID   int64
+	mu       sync.Mutex
 }
 
 func newFakeSessionStore() *fakeSessionStore {

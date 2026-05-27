@@ -253,31 +253,31 @@ func TestNew_uses_custom_weights(t *testing.T) {
 
 // matchSetField is a helper for PBT that maps field indices to MatchSet fields.
 type matchSetField struct {
-	name string
 	set  func(*api.MatchSet)
+	name string
 }
 
 var releaseFields = []matchSetField{
-	{"release_group", func(m *api.MatchSet) { m.ReleaseGroup = true }},
-	{"source", func(m *api.MatchSet) { m.Source = true }},
-	{"streaming_service", func(m *api.MatchSet) { m.StreamingService = true }},
-	{"video_codec", func(m *api.MatchSet) { m.VideoCodec = true }},
-	{"hdr", func(m *api.MatchSet) { m.HDR = true }},
-	{"edition", func(m *api.MatchSet) { m.Edition = true }},
-	{"season_pack", func(m *api.MatchSet) { m.SeasonPack = true }},
+	{name: "release_group", set: func(m *api.MatchSet) { m.ReleaseGroup = true }},
+	{name: "source", set: func(m *api.MatchSet) { m.Source = true }},
+	{name: "streaming_service", set: func(m *api.MatchSet) { m.StreamingService = true }},
+	{name: "video_codec", set: func(m *api.MatchSet) { m.VideoCodec = true }},
+	{name: "hdr", set: func(m *api.MatchSet) { m.HDR = true }},
+	{name: "edition", set: func(m *api.MatchSet) { m.Edition = true }},
+	{name: "season_pack", set: func(m *api.MatchSet) { m.SeasonPack = true }},
 }
 
 var allFields = []matchSetField{
-	{"hash", func(m *api.MatchSet) { m.Hash = true }},
-	{"release_group", func(m *api.MatchSet) { m.ReleaseGroup = true }},
-	{"source", func(m *api.MatchSet) { m.Source = true }},
-	{"streaming_service", func(m *api.MatchSet) { m.StreamingService = true }},
-	{"video_codec", func(m *api.MatchSet) { m.VideoCodec = true }},
-	{"hdr", func(m *api.MatchSet) { m.HDR = true }},
-	{"edition", func(m *api.MatchSet) { m.Edition = true }},
-	{"season_pack", func(m *api.MatchSet) { m.SeasonPack = true }},
-	{"series_imdb", func(m *api.MatchSet) { m.SeriesIMDB = true }},
-	{"imdb", func(m *api.MatchSet) { m.IMDB = true }},
+	{name: "hash", set: func(m *api.MatchSet) { m.Hash = true }},
+	{name: "release_group", set: func(m *api.MatchSet) { m.ReleaseGroup = true }},
+	{name: "source", set: func(m *api.MatchSet) { m.Source = true }},
+	{name: "streaming_service", set: func(m *api.MatchSet) { m.StreamingService = true }},
+	{name: "video_codec", set: func(m *api.MatchSet) { m.VideoCodec = true }},
+	{name: "hdr", set: func(m *api.MatchSet) { m.HDR = true }},
+	{name: "edition", set: func(m *api.MatchSet) { m.Edition = true }},
+	{name: "season_pack", set: func(m *api.MatchSet) { m.SeasonPack = true }},
+	{name: "series_imdb", set: func(m *api.MatchSet) { m.SeriesIMDB = true }},
+	{name: "imdb", set: func(m *api.MatchSet) { m.IMDB = true }},
 }
 
 func randomMatchSet(t *rapid.T, fields []matchSetField, prefix string) api.MatchSet {

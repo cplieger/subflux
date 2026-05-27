@@ -28,22 +28,22 @@ func TestIsValidServerHost(t *testing.T) {
 		host string
 		want bool
 	}{
-		{"valid hostname", "vip-api.opensubtitles.com", true},
-		{"valid subdomain", "api.opensubtitles.com", true},
-		{"apex domain accepted", "opensubtitles.com", true},
-		{"trailing dot tolerated", "api.opensubtitles.com.", true},
-		{"mixed case accepted", "API.OpenSubtitles.com", true},
-		{"unrelated public host rejected", "example.com", false},
-		{"lookalike suffix rejected", "evil-opensubtitles.com", false},
-		{"path injection", "evil.com/steal-creds", false},
-		{"port injection", "evil.com:8080", false},
-		{"userinfo injection", "user@evil.com", false},
-		{"query injection", "evil.com?redirect=true", false},
-		{"fragment injection", "evil.com#frag", false},
-		{"bare hostname", "localhost", false},
-		{"private IP", "192.168.1.1", false},
-		{"loopback IP", "127.0.0.1", false},
-		{"empty string", "", false},
+		{name: "valid hostname", host: "vip-api.opensubtitles.com", want: true},
+		{name: "valid subdomain", host: "api.opensubtitles.com", want: true},
+		{name: "apex domain accepted", host: "opensubtitles.com", want: true},
+		{name: "trailing dot tolerated", host: "api.opensubtitles.com.", want: true},
+		{name: "mixed case accepted", host: "API.OpenSubtitles.com", want: true},
+		{name: "unrelated public host rejected", host: "example.com", want: false},
+		{name: "lookalike suffix rejected", host: "evil-opensubtitles.com", want: false},
+		{name: "path injection", host: "evil.com/steal-creds", want: false},
+		{name: "port injection", host: "evil.com:8080", want: false},
+		{name: "userinfo injection", host: "user@evil.com", want: false},
+		{name: "query injection", host: "evil.com?redirect=true", want: false},
+		{name: "fragment injection", host: "evil.com#frag", want: false},
+		{name: "bare hostname", host: "localhost", want: false},
+		{name: "private IP", host: "192.168.1.1", want: false},
+		{name: "loopback IP", host: "127.0.0.1", want: false},
+		{name: "empty string", host: "", want: false},
 	}
 
 	for _, tt := range tests {
@@ -137,12 +137,12 @@ func TestToOSLang(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"pt maps to pt-PT", "pt", "pt-PT"},
-		{"pb maps to pt-BR", "pb", "pt-BR"},
-		{"zh maps to zh-CN", "zh", "zh-CN"},
-		{"en passes through", "en", "en"},
-		{"fr passes through", "fr", "fr"},
-		{"empty passes through", "", ""},
+		{name: "pt maps to pt-PT", input: "pt", want: "pt-PT"},
+		{name: "pb maps to pt-BR", input: "pb", want: "pt-BR"},
+		{name: "zh maps to zh-CN", input: "zh", want: "zh-CN"},
+		{name: "en passes through", input: "en", want: "en"},
+		{name: "fr passes through", input: "fr", want: "fr"},
+		{name: "empty passes through", input: "", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -165,13 +165,13 @@ func TestFromOSLang(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"pt-PT maps to pt", "pt-PT", "pt"},
-		{"pt-BR maps to pb", "pt-BR", "pb"},
-		{"zh-CN maps to zh", "zh-CN", "zh"},
-		{"ea maps to es", "ea", "es"},
-		{"en passes through", "en", "en"},
-		{"fr passes through", "fr", "fr"},
-		{"empty passes through", "", ""},
+		{name: "pt-PT maps to pt", input: "pt-PT", want: "pt"},
+		{name: "pt-BR maps to pb", input: "pt-BR", want: "pb"},
+		{name: "zh-CN maps to zh", input: "zh-CN", want: "zh"},
+		{name: "ea maps to es", input: "ea", want: "es"},
+		{name: "en passes through", input: "en", want: "en"},
+		{name: "fr passes through", input: "fr", want: "fr"},
+		{name: "empty passes through", input: "", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -190,33 +190,33 @@ func TestFactory_requires_credentials(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
 		settings map[string]any
+		name     string
 		wantErr  bool
 	}{
-		{"nil settings", nil, true},
-		{"missing all", map[string]any{}, true},
-		{"missing password", map[string]any{
+		{name: "nil settings", settings: nil, wantErr: true},
+		{name: "missing all", settings: map[string]any{}, wantErr: true},
+		{name: "missing password", settings: map[string]any{
 			"username": "user", "api_key": "key",
-		}, true},
-		{"missing username", map[string]any{
+		}, wantErr: true},
+		{name: "missing username", settings: map[string]any{
 			"password": "pass", "api_key": "key",
-		}, true},
-		{"missing api_key", map[string]any{
+		}, wantErr: true},
+		{name: "missing api_key", settings: map[string]any{
 			"username": "user", "password": "pass",
-		}, true},
-		{"empty username", map[string]any{
+		}, wantErr: true},
+		{name: "empty username", settings: map[string]any{
 			"username": "", "password": "pass", "api_key": "key",
-		}, true},
-		{"empty password", map[string]any{
+		}, wantErr: true},
+		{name: "empty password", settings: map[string]any{
 			"username": "user", "password": "", "api_key": "key",
-		}, true},
-		{"empty api_key", map[string]any{
+		}, wantErr: true},
+		{name: "empty api_key", settings: map[string]any{
 			"username": "user", "password": "pass", "api_key": "",
-		}, true},
-		{"valid credentials", map[string]any{
+		}, wantErr: true},
+		{name: "valid credentials", settings: map[string]any{
 			"username": "user", "password": "pass", "api_key": "key",
-		}, false},
+		}, wantErr: false},
 	}
 
 	for _, tt := range tests {
@@ -255,21 +255,21 @@ func TestFactory_options(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
 		extra    map[string]any
+		name     string
 		wantHash bool
 		wantAI   bool
 	}{
-		{"defaults", nil, true, false},
-		{"use_hash explicit true", map[string]any{"use_hash": true}, true, false},
-		{"use_hash false", map[string]any{"use_hash": false}, false, false},
-		{"include_ai_translated true", map[string]any{"include_ai_translated": true}, true, true},
-		{"include_ai_translated false", map[string]any{"include_ai_translated": false}, true, false},
-		{"both overridden", map[string]any{
+		{name: "defaults", extra: nil, wantHash: true, wantAI: false},
+		{name: "use_hash explicit true", extra: map[string]any{"use_hash": true}, wantHash: true, wantAI: false},
+		{name: "use_hash false", extra: map[string]any{"use_hash": false}, wantHash: false, wantAI: false},
+		{name: "include_ai_translated true", extra: map[string]any{"include_ai_translated": true}, wantHash: true, wantAI: true},
+		{name: "include_ai_translated false", extra: map[string]any{"include_ai_translated": false}, wantHash: true, wantAI: false},
+		{name: "both overridden", extra: map[string]any{
 			"use_hash": false, "include_ai_translated": true,
-		}, false, true},
-		{"string true accepted", map[string]any{"use_hash": "true"}, true, false},
-		{"string false accepted", map[string]any{"use_hash": "false"}, false, false},
+		}, wantHash: false, wantAI: true},
+		{name: "string true accepted", extra: map[string]any{"use_hash": "true"}, wantHash: true, wantAI: false},
+		{name: "string false accepted", extra: map[string]any{"use_hash": "false"}, wantHash: false, wantAI: false},
 	}
 
 	for _, tt := range tests {
@@ -1050,28 +1050,28 @@ func TestCheckStatus(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		statusCode int
 		body       string
-		wantErr    bool
 		wantMsg    string
-		wantType   string // "auth", "ratelimit", or ""
+		wantType   string
+		statusCode int
+		wantErr    bool
 	}{
-		{"200 OK returns nil", 200, "", false, "", ""},
-		{"201 Created returns nil", 201, "", false, "", ""},
-		{"204 No Content returns nil", 204, "", false, "", ""},
-		{"301 redirect returns nil", 301, "", false, "", ""},
-		{"401 unauthorized", 401, "", true, "authentication failed (401)", "auth"},
-		{"429 rate limited", 429, "", true, "rate limited (429)", "ratelimit"},
-		{"406 download limit", 406, "", true, "download limit exceeded (406)", "ratelimit"},
-		{"500 server error with body", 500, "internal error", true, "HTTP 500: internal error", ""},
-		{"400 bad request with body", 400, "bad request", true, "HTTP 400: bad request", ""},
-		{"403 forbidden with empty body", 403, "", true, "HTTP 403", ""},
-		{"202 Accepted returns nil", 202, "", false, "", ""},
-		{"body truncated at 1024 bytes", 500, strings.Repeat("x", 2000), true, "HTTP 500: " + strings.Repeat("x", 1024), ""},
-		{"304 Not Modified returns nil", 304, "", false, "", ""},
-		{"399 returns nil", 399, "", false, "", ""},
-		{"503 service unavailable with body", 503, "service down", true, "HTTP 503: service down", ""},
-		{"404 not found no body", 404, "", true, "HTTP 404", ""},
+		{name: "200 OK returns nil", statusCode: 200, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "201 Created returns nil", statusCode: 201, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "204 No Content returns nil", statusCode: 204, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "301 redirect returns nil", statusCode: 301, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "401 unauthorized", statusCode: 401, body: "", wantErr: true, wantMsg: "authentication failed (401)", wantType: "auth"},
+		{name: "429 rate limited", statusCode: 429, body: "", wantErr: true, wantMsg: "rate limited (429)", wantType: "ratelimit"},
+		{name: "406 download limit", statusCode: 406, body: "", wantErr: true, wantMsg: "download limit exceeded (406)", wantType: "ratelimit"},
+		{name: "500 server error with body", statusCode: 500, body: "internal error", wantErr: true, wantMsg: "HTTP 500: internal error", wantType: ""},
+		{name: "400 bad request with body", statusCode: 400, body: "bad request", wantErr: true, wantMsg: "HTTP 400: bad request", wantType: ""},
+		{name: "403 forbidden with empty body", statusCode: 403, body: "", wantErr: true, wantMsg: "HTTP 403", wantType: ""},
+		{name: "202 Accepted returns nil", statusCode: 202, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "body truncated at 1024 bytes", statusCode: 500, body: strings.Repeat("x", 2000), wantErr: true, wantMsg: "HTTP 500: " + strings.Repeat("x", 1024), wantType: ""},
+		{name: "304 Not Modified returns nil", statusCode: 304, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "399 returns nil", statusCode: 399, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "503 service unavailable with body", statusCode: 503, body: "service down", wantErr: true, wantMsg: "HTTP 503: service down", wantType: ""},
+		{name: "404 not found no body", statusCode: 404, body: "", wantErr: true, wantMsg: "HTTP 404", wantType: ""},
 	}
 
 	for _, tt := range tests {
@@ -1137,13 +1137,13 @@ func TestBuildQueryParams(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
 		req       *api.SearchRequest
+		name      string
+		wantKey   string
+		wantValue string
 		season    int
 		episode   int
 		includeAI bool
-		wantKey   string
-		wantValue string
 	}{
 		{
 			name:      "title set as query",
@@ -1280,17 +1280,17 @@ func TestJoinOSLangs(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		langs []string
 		want  string
+		langs []string
 	}{
-		{"nil returns empty", nil, ""},
-		{"empty returns empty", []string{}, ""},
-		{"single language", []string{"en"}, "en"},
-		{"multiple sorted", []string{"fr", "en"}, "en,fr"},
-		{"mapped languages", []string{"zh", "pt"}, "pt-PT,zh-CN"},
-		{"mixed mapped and unmapped", []string{"zh", "en", "pt"}, "en,pt-PT,zh-CN"},
-		{"pb maps to pt-BR", []string{"pb"}, "pt-BR"},
-		{"already sorted", []string{"de", "en", "fr"}, "de,en,fr"},
+		{name: "nil returns empty", langs: nil, want: ""},
+		{name: "empty returns empty", langs: []string{}, want: ""},
+		{name: "single language", langs: []string{"en"}, want: "en"},
+		{name: "multiple sorted", langs: []string{"fr", "en"}, want: "en,fr"},
+		{name: "mapped languages", langs: []string{"zh", "pt"}, want: "pt-PT,zh-CN"},
+		{name: "mixed mapped and unmapped", langs: []string{"zh", "en", "pt"}, want: "en,pt-PT,zh-CN"},
+		{name: "pb maps to pt-BR", langs: []string{"pb"}, want: "pt-BR"},
+		{name: "already sorted", langs: []string{"de", "en", "fr"}, want: "de,en,fr"},
 	}
 
 	for _, tt := range tests {
@@ -1316,10 +1316,10 @@ func TestInvalidateTokenOn401(t *testing.T) {
 		err          error
 		wantToken    string
 	}{
-		{"clears token on auth error", "my-token", &api.AuthError{Msg: "401"}, ""},
-		{"preserves token on other error", "my-token", errors.New("some other error"), "my-token"},
-		{"idempotent when token empty", "", &api.AuthError{Msg: "401"}, ""},
-		{"wrapped auth error", "my-token", fmt.Errorf("request failed: %w", &api.AuthError{Msg: "401"}), ""},
+		{name: "clears token on auth error", initialToken: "my-token", err: &api.AuthError{Msg: "401"}, wantToken: ""},
+		{name: "preserves token on other error", initialToken: "my-token", err: errors.New("some other error"), wantToken: "my-token"},
+		{name: "idempotent when token empty", initialToken: "", err: &api.AuthError{Msg: "401"}, wantToken: ""},
+		{name: "wrapped auth error", initialToken: "my-token", err: fmt.Errorf("request failed: %w", &api.AuthError{Msg: "401"}), wantToken: ""},
 	}
 
 	for _, tt := range tests {
@@ -1418,8 +1418,8 @@ func TestCheckStatus_406_respects_retry_after_header_when_present(t *testing.T) 
 func TestUntilNextUTCMidnight(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name string
 		now  time.Time
+		name string
 		want time.Duration
 	}{
 		{
@@ -1476,11 +1476,11 @@ func TestBuildSearchParams_skips_empty_sanitized_imdb(t *testing.T) {
 		mediaType string
 		absentKey string
 	}{
-		{"episode with tt0 skips parent_imdb_id", "tt0", "episode", "parent_imdb_id"},
-		{"episode with tt00000 skips parent_imdb_id", "tt00000", "episode", "parent_imdb_id"},
-		{"episode with bare tt skips parent_imdb_id", "tt", "episode", "parent_imdb_id"},
-		{"movie with tt0 skips imdb_id", "tt0", "movie", "imdb_id"},
-		{"movie with 0000 skips imdb_id", "0000", "movie", "imdb_id"},
+		{name: "episode with tt0 skips parent_imdb_id", imdb: "tt0", mediaType: "episode", absentKey: "parent_imdb_id"},
+		{name: "episode with tt00000 skips parent_imdb_id", imdb: "tt00000", mediaType: "episode", absentKey: "parent_imdb_id"},
+		{name: "episode with bare tt skips parent_imdb_id", imdb: "tt", mediaType: "episode", absentKey: "parent_imdb_id"},
+		{name: "movie with tt0 skips imdb_id", imdb: "tt0", mediaType: "movie", absentKey: "imdb_id"},
+		{name: "movie with 0000 skips imdb_id", imdb: "0000", mediaType: "movie", absentKey: "imdb_id"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

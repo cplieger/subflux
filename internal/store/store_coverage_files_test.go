@@ -519,16 +519,15 @@ func TestDeleteSubtitleFile_requires_all_key_fields(t *testing.T) {
 func TestSyncOffset(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		seedFiles  []api.SubtitleFile
-		seedMedia  string // mediaType
-		seedID     string // mediaID
-		setPath    string
-		setOffset  int64
-		getPath    string
-		wantOffset int64
-		// For multi-file tests:
 		extraCheck func(t *testing.T, db *DB)
+		name       string
+		seedMedia  string
+		seedID     string
+		setPath    string
+		getPath    string
+		seedFiles  []api.SubtitleFile
+		setOffset  int64
+		wantOffset int64
 	}{
 		{
 			name:      "updates_offset",

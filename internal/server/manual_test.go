@@ -696,9 +696,9 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 
 // downloadedRefsStore tracks DownloadedRefs calls and returns configured values.
 type downloadedRefsStore struct {
+	refs []api.DownloadedRef
 	qhMockStore
 
-	refs   []api.DownloadedRef
 	called bool
 }
 

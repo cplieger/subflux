@@ -393,9 +393,8 @@ func (f *retryFakeCacheProvider) ClearCache() { f.cleared = true }
 
 // retryFakeProviderTimed records the wall-clock time of each Download call.
 type retryFakeProviderTimed struct {
-	retryFakeProvider
-
 	callTimes *[]time.Time
+	retryFakeProvider
 }
 
 func (f *retryFakeProviderTimed) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {

@@ -11,9 +11,9 @@ import (
 func TestSaveDownload(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
+		assert  func(t *testing.T, db *DB)
 		name    string
 		records []*api.DownloadRecord
-		assert  func(t *testing.T, db *DB)
 	}{
 		{
 			name: "clears_attempts",

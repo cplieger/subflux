@@ -16,28 +16,28 @@ func TestIsTransient(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
 		err  error
+		name string
 		want bool
 	}{
-		{"nil error", nil, false},
-		{"AuthError is not transient", &api.AuthError{Msg: "bad key"}, false},
-		{"RateLimitError is not transient", &api.RateLimitError{Msg: "slow down"}, false},
-		{"context.DeadlineExceeded is not transient", context.DeadlineExceeded, false},
-		{"context.Canceled is not transient", context.Canceled, false},
-		{"wrapped DeadlineExceeded is not transient", errors.Join(errors.New("op"), context.DeadlineExceeded), false},
-		{"io.ErrUnexpectedEOF is transient", io.ErrUnexpectedEOF, true},
-		{"ECONNRESET is transient", syscall.ECONNRESET, true},
-		{"ECONNREFUSED is transient", syscall.ECONNREFUSED, true},
-		{"DNSError is transient", &net.DNSError{Err: "lookup failed", Name: "example.com"}, true},
-		{"net timeout error is transient", &fakeNetError{timeout: true}, true},
-		{"net non-timeout error is not transient (no Transient iface)", &fakeNetError{timeout: false}, false},
-		{"HTTPStatusError 502 is transient", &HTTPStatusError{Code: 502}, true},
-		{"HTTPStatusError 503 is transient", &HTTPStatusError{Code: 503}, true},
-		{"HTTPStatusError 504 is transient", &HTTPStatusError{Code: 504}, true},
-		{"HTTPStatusError 400 is not transient", &HTTPStatusError{Code: 400}, false},
-		{"HTTPStatusError 404 is not transient", &HTTPStatusError{Code: 404}, false},
-		{"generic error is not transient", errors.New("something failed"), false},
+		{name: "nil error", err: nil, want: false},
+		{name: "AuthError is not transient", err: &api.AuthError{Msg: "bad key"}, want: false},
+		{name: "RateLimitError is not transient", err: &api.RateLimitError{Msg: "slow down"}, want: false},
+		{name: "context.DeadlineExceeded is not transient", err: context.DeadlineExceeded, want: false},
+		{name: "context.Canceled is not transient", err: context.Canceled, want: false},
+		{name: "wrapped DeadlineExceeded is not transient", err: errors.Join(errors.New("op"), context.DeadlineExceeded), want: false},
+		{name: "io.ErrUnexpectedEOF is transient", err: io.ErrUnexpectedEOF, want: true},
+		{name: "ECONNRESET is transient", err: syscall.ECONNRESET, want: true},
+		{name: "ECONNREFUSED is transient", err: syscall.ECONNREFUSED, want: true},
+		{name: "DNSError is transient", err: &net.DNSError{Err: "lookup failed", Name: "example.com"}, want: true},
+		{name: "net timeout error is transient", err: &fakeNetError{timeout: true}, want: true},
+		{name: "net non-timeout error is not transient (no Transient iface)", err: &fakeNetError{timeout: false}, want: false},
+		{name: "HTTPStatusError 502 is transient", err: &HTTPStatusError{Code: 502}, want: true},
+		{name: "HTTPStatusError 503 is transient", err: &HTTPStatusError{Code: 503}, want: true},
+		{name: "HTTPStatusError 504 is transient", err: &HTTPStatusError{Code: 504}, want: true},
+		{name: "HTTPStatusError 400 is not transient", err: &HTTPStatusError{Code: 400}, want: false},
+		{name: "HTTPStatusError 404 is not transient", err: &HTTPStatusError{Code: 404}, want: false},
+		{name: "generic error is not transient", err: errors.New("something failed"), want: false},
 	}
 
 	for _, tt := range tests {
