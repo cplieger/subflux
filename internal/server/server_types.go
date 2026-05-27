@@ -109,13 +109,17 @@ type Server struct {
 
 	live atomic.Pointer[liveState]
 
-	queryH    *queryhandlers.Handler
+	queryH *queryhandlers.Handler
+	queryHOnce sync.Once
 	configH   *confighandlers.Handler
 	manualH   *manualops.Handler
 	previewH  *previewhandlers.Handler
 	coverageH *coveragehandlers.Handler
-	fileH     *filehandlers.Handler
-	mediaH    *mediahandlers.Handler
+	coverageHOnce sync.Once
+	fileH *filehandlers.Handler
+	fileHOnce sync.Once
+	mediaH *mediahandlers.Handler
+	mediaHOnce sync.Once
 	syncH     *synchandlers.Handler
 
 	alerts   *activity.AlertLog

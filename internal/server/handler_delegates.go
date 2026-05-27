@@ -36,7 +36,7 @@ func (s *Server) handleScanStates(w http.ResponseWriter, r *http.Request) {
 
 // ensureCoverageH lazily initializes coverageH for tests that construct Server{} directly.
 func (s *Server) ensureCoverageH() {
-	if s.coverageH == nil {
+	s.coverageHOnce.Do(func() {
 		s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
 			Store: &covStoreProxy{s: s},
 			StateFunc: func() *coveragehandlers.LiveState {
@@ -44,7 +44,7 @@ func (s *Server) ensureCoverageH() {
 				return &coveragehandlers.LiveState{Cfg: ls.cfg, Sonarr: ls.sonarr, Radarr: ls.radarr}
 			},
 		})
-	}
+	})
 }
 
 func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
@@ -88,14 +88,15 @@ func (s *Server) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider,
 }
 
 // ensureFileH lazily initializes fileH for tests that construct Server{} directly.
+// Uses sync.Once to avoid data races when parallel tests call handler delegates.
 func (s *Server) ensureFileH() {
-	if s.fileH == nil {
+	s.fileHOnce.Do(func() {
 		s.fileH = filehandlers.NewHandler(filehandlers.Deps{
 			Store:     &fileStoreProxy{s: s},
 			StateFunc: func() *filehandlers.LiveState { return &filehandlers.LiveState{Cfg: s.state().cfg} },
 			Events:    s.events,
 		})
-	}
+	})
 }
 
 // fileStoreProxy delegates to s.stores.file, allowing tests to swap the store.
@@ -119,7 +120,7 @@ func (p *fileStoreProxy) HistoryMediaIDs(ctx context.Context, mt api.MediaType, 
 
 // ensureMediaH lazily initializes mediaH for tests that construct Server{} directly.
 func (s *Server) ensureMediaH() {
-	if s.mediaH == nil {
+	s.mediaHOnce.Do(func() {
 		s.mediaH = mediahandlers.NewHandler(mediahandlers.Deps{
 			StateFunc: func() *mediahandlers.LiveState {
 				ls := s.state()
@@ -127,7 +128,7 @@ func (s *Server) ensureMediaH() {
 			},
 			ServerCtx: func() context.Context { return s.ctx },
 		})
-	}
+	})
 }
 
 // Type aliases for test compatibility with extracted handler packages.
