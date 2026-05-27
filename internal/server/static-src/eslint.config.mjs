@@ -11,17 +11,26 @@ export default [
   // 1. Ignore generated/build outputs and configs that don't need linting.
   {
     ignores: [
-      "node_modules/**",
-      "dist/**",
-      "build/**",
-      "coverage/**",
-      "**/*.min.js",
+      // Dependencies (any depth — vibekit's web/static-src/node_modules nests deep)
+      "**/node_modules/**",
+      // Build output / generated bundles (TS->JS, CSS bundles, etc.)
+      "**/static/**",
+      "**/static-src/dist/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.next/**",
+      "**/.cache/**",
+      "**/coverage/**",
+      // Minified / generated source
+      "**/*.min.*",
       "**/*.gen.ts",
-      "wire/*.gen.ts",
-      "test-stubs/**",
+      "**/*.gen.js",
+      "**/wire/*.gen.ts",
+      // Test fixtures that aren't real code
+      "**/test-stubs/**",
+      "**/__mocks__/**",
     ],
   },
-
   // 2. Strictest official preset combination (typed linting required).
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

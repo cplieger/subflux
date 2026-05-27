@@ -1,10 +1,29 @@
-node_modules/
-dist/
-build/
-coverage/
-*.gen.ts
-wire/*.gen.ts
+# Dependencies
+**/node_modules/
+
+# Generated output dirs
+**/static/
+**/dist/
+**/build/
+**/coverage/
+**/.next/
+**/.cache/
+
+# Generated files
+**/*.gen.ts
+**/*.gen.js
+**/wire/*.gen.*
+
+# Minified
 **/*.min.*
-**/static/**
+
+# Lockfiles
 *.lock
 *-lock.json
+package-lock.json
+
+# Test stubs
+**/test-stubs/
+
+# Markdown (manage separately via markdownlint if needed)
+**/*.md
