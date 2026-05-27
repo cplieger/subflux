@@ -13,3 +13,4 @@ internal/server/static/*.js
 internal/server/static/actions/
 internal/server/static/wire/
 
+internal/cache/testdata/rapid/
