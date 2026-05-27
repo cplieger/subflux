@@ -85,7 +85,6 @@ body {
 }
 
 :where(select) {
-  appearance: none;
   background-image: url("icons/chevron.svg");
   background-repeat: no-repeat;
   background-position: right 0.4rem center;
@@ -103,7 +102,6 @@ input[type="search"] {
 
 /* Safari/iOS date input: fix height and add visual hint when empty */
 input[type="date"] {
-  -webkit-appearance: none;
   appearance: none;
 }
 
