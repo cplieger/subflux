@@ -6,6 +6,7 @@ import { on, emit, BusEvent } from './bus.js';
 import { fmtDateTime, fmtEpisode, clickableRow } from './utils.js';
 import { createPagedList } from './paged-list.js';
 import type { PagedList, Page } from './paged-list.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 
 interface HistoryEntry {
   media_id: string;
@@ -75,29 +76,34 @@ function renderItems(items: HistoryEntry[]): DocumentFragment {
     el('th', null, 'Release')
   ));
   const tbody = el('tbody');
-  for (const entry of items) {
-    const time = fmtDateTime(new Date(entry.media_imported));
-    let label = entry.title || '';
-    if (entry.season > 0 || entry.episode > 0)
-      label += ` \u00B7 ${fmtEpisode(entry.season, entry.episode)}`;
-    const href = historyMediaHref(entry);
-    const cells = [
-      el('td', { 'data-col': 'meta' }, time),
-      el('td', { 'data-col': 'title' }, label),
-      el('td', { 'data-col': 'meta' }, entry.language),
-      el('td', { 'data-col': 'meta' }, entry.provider),
-      el('td', { 'data-col': 'meta' }, entry.manual ? 'manual' : 'auto'),
-      el('td', { 'data-col': 'meta' }, entry.release_name || '')
-    ];
-    const row = href
-      ? clickableRow(() => emit(BusEvent.NavRoute, href), ...cells)
-      : el('tr', null, ...cells);
-    tbody.appendChild(row);
-  }
+
+  reconcile(tbody, items, {
+    key: (entry) => `${entry.media_id}-${entry.media_imported}`,
+    mount: (entry) => buildHistoryRow(entry),
+  });
+
   frag.appendChild(el('table', { className: 'history' }, thead, tbody));
-  // Update filter dropdowns from the fetched data.
   updateHistoryFilters(items);
   return frag;
+}
+
+function buildHistoryRow(entry: HistoryEntry): HTMLElement {
+  const time = fmtDateTime(new Date(entry.media_imported));
+  let label = entry.title || '';
+  if (entry.season > 0 || entry.episode > 0)
+    label += ` \u00B7 ${fmtEpisode(entry.season, entry.episode)}`;
+  const href = historyMediaHref(entry);
+  const cells = [
+    el('td', { 'data-col': 'meta' }, time),
+    el('td', { 'data-col': 'title' }, label),
+    el('td', { 'data-col': 'meta' }, entry.language),
+    el('td', { 'data-col': 'meta' }, entry.provider),
+    el('td', { 'data-col': 'meta' }, entry.manual ? 'manual' : 'auto'),
+    el('td', { 'data-col': 'meta' }, entry.release_name || '')
+  ];
+  return href
+    ? clickableRow(() => emit(BusEvent.NavRoute, href), ...cells) as HTMLElement
+    : el('tr', null, ...cells);
 }
 
 /** Populate language and provider dropdowns from accumulated data. */

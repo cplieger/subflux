@@ -14,6 +14,7 @@ import { triggerSeriesScan, triggerSeasonScan, triggerMovieScan } from './detail
 import { confirmSeasonSync } from './detail-season-sync.js';
 import type { SeasonSyncEpisode } from './detail-season-sync.js';
 import type { SubtitleEntry, MovieDetail, Episode, SeasonGroup, SeriesItem } from './api-types.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
 // on internal navigation (each new openSeriesDetail/openMovieDetail aborts
@@ -364,75 +365,64 @@ export function renderSeriesDetail(
 
   // Single table for all seasons so columns align across seasons.
   const tbody = el('tbody');
-  let firstSeason = true;
 
+  type DetailRow =
+    | { kind: 'gap'; season: number }
+    | { kind: 'head'; season: number; label: string; syncEps: SeasonSyncEpisode[]; hasHistory: boolean }
+    | { kind: 'cols'; season: number }
+    | { kind: 'ep'; season: number; ep: Episode };
+
+  const rows: DetailRow[] = [];
+  let first = true;
   for (const sg of sortedSeasons) {
-    // Skip seasons with no episodes that have files.
     if (!(sg.episodes || []).some(ep => ep.has_file)) continue;
-
-    // Spacer row between seasons.
-    if (!firstSeason) {
-      tbody.appendChild(el('tr', { className: 'season-gap' },
-        el('td', { colSpan: 999 })));
-    }
-    firstSeason = false;
-
-    const seasonLabel = sg.season === 0
-      ? 'Specials' : `Season ${  sg.season}`;
-
-    const seasonSyncEps = collectSeasonSyncEps(sg, series, subIdx, targetLangs);
-
-    const seasonSearchBtn = el('button', {
-      type: 'button',
-      className: 'ghost',
-      'data-tip': 'Auto: scan and download missing subtitles for this season',
-      onclick: (e: MouseEvent) => triggerSeasonScan(series, sg.season,
-        e.currentTarget as HTMLButtonElement)
-    }, icon('search'),
-      el('span', { className: 'btn-text' }, ' Search'));
-
-    const seasonHasHistory = [...historySet].some(id =>
+    if (!first) rows.push({ kind: 'gap', season: sg.season });
+    first = false;
+    const syncEps = collectSeasonSyncEps(sg, series, subIdx, targetLangs);
+    const hasHist = [...historySet].some(id =>
       id.startsWith(`tvdb-${series.tvdb_id}-s${pad(sg.season)}e`));
-    const seasonHistBtn = seasonHasHistory
-      ? el('button', {
-          type: 'button',
-          className: 'ghost',
-          'data-tip': 'View download history for this season',
-          onclick: () => emit(BusEvent.NavHistory,
-            `${series.title  } S${  pad(sg.season)}`)
-        }, icon('history'), el('span', { className: 'btn-text' }, ' History'))
-      : null;
-
-    const seasonSyncBtn = seasonSyncEps.length > 0
-      ? el('button', {
-          type: 'button',
-          className: 'ghost',
-          'data-tip': 'Audio sync all subtitles in this season',
-          onclick: () => confirmSeasonSync(
-            series.title, sg.season, seasonSyncEps)
-        }, icon('sync'),
-          el('span', { className: 'btn-text' }, ' Sync'))
-      : null;
-
-    // Season header row: same columns as episodes (Ep, Title, Coverage, Actions).
-    tbody.appendChild(el('tr', { className: 'season-head' },
-      el('td', { }, seasonLabel),
-      el('td', { }),
-      el('td', { }),
-      el('td', { 'data-col': 'actions' },
-        el('div', { className: 'action-group' },
-          seasonSyncBtn, seasonHistBtn, seasonSearchBtn))
-    ));
-
-    // Column headers repeated per season.
-    tbody.appendChild(makeColHeaders());
-
+    rows.push({ kind: 'head', season: sg.season, label: sg.season === 0 ? 'Specials' : `Season ${sg.season}`, syncEps, hasHistory: hasHist });
+    rows.push({ kind: 'cols', season: sg.season });
     for (const ep of (sg.episodes || [])) {
       if (!ep.has_file) continue;
-      tbody.appendChild(buildEpisodeRow(
-        series, sg, ep, subIdx, targetLangs, hasAbsOrder, historySet));
+      rows.push({ kind: 'ep', season: sg.season, ep });
     }
   }
+
+  reconcile(tbody, rows, {
+    key: (r) => {
+      switch (r.kind) {
+        case 'gap': return `gap-${r.season}`;
+        case 'head': return `head-${r.season}`;
+        case 'cols': return `cols-${r.season}`;
+        case 'ep': return tvdbMediaId(series.tvdb_id, r.season, r.ep.episode);
+      }
+    },
+    mount: (r) => {
+      switch (r.kind) {
+        case 'gap': return el('tr', { className: 'season-gap' }, el('td', { colSpan: 999 }));
+        case 'head': {
+          const searchBtn = el('button', {
+            type: 'button', className: 'ghost',
+            'data-tip': 'Auto: scan and download missing subtitles for this season',
+            onclick: (e: MouseEvent) => triggerSeasonScan(series, r.season, e.currentTarget as HTMLButtonElement)
+          }, icon('search'), el('span', { className: 'btn-text' }, ' Search'));
+          const histBtn = r.hasHistory
+            ? el('button', { type: 'button', className: 'ghost', 'data-tip': 'View download history for this season', onclick: () => emit(BusEvent.NavHistory, `${series.title} S${pad(r.season)}`) }, icon('history'), el('span', { className: 'btn-text' }, ' History'))
+            : null;
+          const syncBtn = r.syncEps.length > 0
+            ? el('button', { type: 'button', className: 'ghost', 'data-tip': 'Audio sync all subtitles in this season', onclick: () => confirmSeasonSync(series.title, r.season, r.syncEps) }, icon('sync'), el('span', { className: 'btn-text' }, ' Sync'))
+            : null;
+          return el('tr', { className: 'season-head' },
+            el('td', {}, r.label), el('td', {}), el('td', {}),
+            el('td', { 'data-col': 'actions' }, el('div', { className: 'action-group' }, syncBtn, histBtn, searchBtn)));
+        }
+        case 'cols': return makeColHeaders();
+        case 'ep': return buildEpisodeRow(series, { season: r.season, episodes: [] } as unknown as SeasonGroup, r.ep, subIdx, targetLangs, hasAbsOrder, historySet);
+      }
+    },
+  });
+
   frag.appendChild(
     el('table', { className: 'series-detail' },
       el('colgroup', null,

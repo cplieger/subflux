@@ -10,6 +10,7 @@ import { DEFAULT_VARIANT } from './constants.js';
 import { emit, BusEvent } from './bus.js';
 import { openSyncDialog } from './sync.js';
 import type { MediaType } from './api-types.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 
 // --- API response shapes ---
 
@@ -170,74 +171,77 @@ function renderFiles(): void {
   const thead = el('thead', null, el('tr', null, ...headerCols));
   const tbody = el('tbody');
 
-  for (const f of data) {
-    const lang = langName(f.language)
-      + (f.variant !== DEFAULT_VARIANT ? ` (${f.variant})` : '');
-    // Infer codec from file extension for external files.
-    let codec = f.codec || '';
-    if (!codec && f.path) {
-      const parts = f.path.split('.');
-      const ext = (parts[parts.length - 1] ?? '').toLowerCase();
-      const extMap: Record<string, string> = { srt: 'srt', ass: 'ass', ssa: 'ssa', sub: 'sub', vtt: 'vtt' };
-      codec = extMap[ext] ?? ext;
-    }
-    const formatLabel = codec ? `${codec}: ext` : 'ext';
-    const offset = f.offset_ms
-      ? `${f.offset_ms > 0 ? '+' : ''}${(f.offset_ms / 1000).toFixed(1)}s`
-      : '0.0s';
-    const size = f.size ? formatSize(f.size) : '';
-    const ep = parseEp(f.media_id);
-
-    const actionGroup = el('div', { className: 'action-group' });
-    if (f.source === 'external' && f.path) {
-      // Video path: from caller map (keyed by media_id or '' for movies).
-      const vp = videoPaths.get(f.media_id) || videoPaths.get('') || '';
-      if (vp) {
-        actionGroup.appendChild(el('button', {
-          type: 'button', className: 'ghost',
-          'data-tip': 'Adjust subtitle timing',
-          onclick: (e: MouseEvent) => {
-            e.stopPropagation();
-            openSyncDialog(
-              [f], vp, isSeries ? 'series' : currentMediaType as MediaType,
-              currentArrId, isSeries
-                ? fmtEpisode(ep.season, ep.episode)
-                : currentTitle);
-          }
-        }, icon('sync'),
-          el('span', { className: 'btn-text' }, ' Sync')));
-      }
-      actionGroup.appendChild(el('button', {
-        type: 'button', className: 'ghost btn-delete',
-        'data-tip': 'Delete this file',
-        onclick: (e: MouseEvent) => {
-          e.stopPropagation();
-          deleteFile(f);
-        }
-      }, icon('trash'), el('span', { className: 'btn-text' }, ' Delete')));
-    }
-
-    const rowCols: HTMLElement[] = [];
-    if (isSeries) {
-      rowCols.push(el('td', null, fmtEpisode(ep.season, ep.episode)));
-    }
-    const formatBadge = el('span', {
-      className: 'badge',
-      'data-status': 'ok'
-    }, formatLabel);
-    const formatCell = el('td', null, formatBadge);
-    rowCols.push(
-      el('td', null, lang),
-      formatCell,
-      el('td', { 'data-col': 'offset' }, offset),
-      el('td', { 'data-col': 'size' }, size),
-      el('td', { 'data-col': 'actions' }, actionGroup));
-
-    tbody.appendChild(el('tr', null, ...rowCols));
-  }
+  reconcile(tbody, data, {
+    key: (f) => `${f.media_id}-${f.language}-${f.source}`,
+    mount: (f) => buildFileRow(f, isSeries, parseEp),
+  });
 
   frag.appendChild(el('table', { className: 'files-table' }, thead, tbody));
   patch(out, frag);
+}
+
+function buildFileRow(
+  f: FileEntry,
+  isSeries: boolean,
+  parseEp: (id: string) => { season: number; episode: number },
+): HTMLElement {
+  const lang = langName(f.language)
+    + (f.variant !== DEFAULT_VARIANT ? ` (${f.variant})` : '');
+  let codec = f.codec || '';
+  if (!codec && f.path) {
+    const parts = f.path.split('.');
+    const ext = (parts[parts.length - 1] ?? '').toLowerCase();
+    const extMap: Record<string, string> = { srt: 'srt', ass: 'ass', ssa: 'ssa', sub: 'sub', vtt: 'vtt' };
+    codec = extMap[ext] ?? ext;
+  }
+  const formatLabel = codec ? `${codec}: ext` : 'ext';
+  const offset = f.offset_ms
+    ? `${f.offset_ms > 0 ? '+' : ''}${(f.offset_ms / 1000).toFixed(1)}s`
+    : '0.0s';
+  const size = f.size ? formatSize(f.size) : '';
+  const ep = parseEp(f.media_id);
+
+  const actionGroup = el('div', { className: 'action-group' });
+  if (f.source === 'external' && f.path) {
+    const vp = videoPaths.get(f.media_id) || videoPaths.get('') || '';
+    if (vp) {
+      actionGroup.appendChild(el('button', {
+        type: 'button', className: 'ghost',
+        'data-tip': 'Adjust subtitle timing',
+        onclick: (e: MouseEvent) => {
+          e.stopPropagation();
+          openSyncDialog(
+            [f], vp, isSeries ? 'series' : currentMediaType as MediaType,
+            currentArrId, isSeries
+              ? fmtEpisode(ep.season, ep.episode)
+              : currentTitle);
+        }
+      }, icon('sync'),
+        el('span', { className: 'btn-text' }, ' Sync')));
+    }
+    actionGroup.appendChild(el('button', {
+      type: 'button', className: 'ghost btn-delete',
+      'data-tip': 'Delete this file',
+      onclick: (e: MouseEvent) => {
+        e.stopPropagation();
+        deleteFile(f);
+      }
+    }, icon('trash'), el('span', { className: 'btn-text' }, ' Delete')));
+  }
+
+  const rowCols: HTMLElement[] = [];
+  if (isSeries) {
+    rowCols.push(el('td', null, fmtEpisode(ep.season, ep.episode)));
+  }
+  const formatBadge = el('span', { className: 'badge', 'data-status': 'ok' }, formatLabel);
+  rowCols.push(
+    el('td', null, lang),
+    el('td', null, formatBadge),
+    el('td', { 'data-col': 'offset' }, offset),
+    el('td', { 'data-col': 'size' }, size),
+    el('td', { 'data-col': 'actions' }, actionGroup));
+
+  return el('tr', null, ...rowCols);
 }
 
 async function deleteFile(f: FileEntry): Promise<void> {
