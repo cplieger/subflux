@@ -36,9 +36,6 @@ func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodPost)
 }
 
-func RequireDELETE(w http.ResponseWriter, r *http.Request) bool {
-	return RequireMethod(w, r, http.MethodDelete)
-}
 
 // DecodeJSONBody decodes a JSON request body into dst with a size cap.
 // Writes 400 and returns false on decode failure.
@@ -55,17 +52,3 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	return true
 }
 
-// api.MediaType. Defaults to api.MediaTypeEpisode when empty. Writes 400 and
-// returns ("", false) if the value is invalid.
-func ParseMediaTypeParam(w http.ResponseWriter, r *http.Request) (api.MediaType, bool) {
-	raw := r.URL.Query().Get("type")
-	if raw == "" {
-		return api.MediaTypeEpisode, true
-	}
-	mt := api.MediaType(raw)
-	if !mt.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid type parameter")
-		return "", false
-	}
-	return mt, true
-}
