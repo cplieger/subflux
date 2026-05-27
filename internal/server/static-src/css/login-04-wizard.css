@@ -408,7 +408,6 @@
   background: var(--ghost-hover);
   color: var(--text);
 }
-/* stylelint-enable no-descending-specificity */
 
 /* ================================================================
    14. Wizard navigation (back · dots · next)
