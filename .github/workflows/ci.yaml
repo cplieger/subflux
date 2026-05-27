@@ -177,8 +177,7 @@ jobs:
           curl -fsSL \
             "https://registry.npmjs.org/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-${TSGO_VERSION}.tgz" \
             | tar -xz -C /tmp
-          sudo mv /tmp/package/lib/tsgo /usr/local/bin/tsgo
-          rm -rf /tmp/package
+          echo "/tmp/package/lib" >> "$GITHUB_PATH"
 
       - name: Compile TypeScript
         continue-on-error: true
