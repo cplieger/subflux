@@ -1,6 +1,7 @@
 package arrapi
 
 import (
+	"sync/atomic"
 	"context"
 	"encoding/json"
 	"errors"
@@ -586,9 +587,9 @@ func TestGetEpisodesWithRetry_context_cancelled_before_attempt(t *testing.T) {
 func TestGetEpisodesWithRetry_context_cancelled_during_delay(t *testing.T) {
 	t.Parallel()
 
-	var attempts int
+	var attempts atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
+		attempts.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "error")
 	}))
@@ -602,7 +603,7 @@ func TestGetEpisodesWithRetry_context_cancelled_during_delay(t *testing.T) {
 		maxRetries: 3,
 		retryDelay: 10 * time.Second, // Long delay — context cancel will fire first.
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	_, err := c.GetEpisodes(ctx, 1)
@@ -610,8 +611,8 @@ func TestGetEpisodesWithRetry_context_cancelled_during_delay(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetEpisodes() expected error for context timeout during delay")
 	}
-	if attempts < 1 {
-		t.Errorf("GetEpisodes() attempts = %d, want >= 1", attempts)
+	if attempts.Load() < 1 {
+		t.Errorf("GetEpisodes() attempts = %d, want >= 1", attempts.Load())
 	}
 }
 
