@@ -111,47 +111,6 @@ type AlignmentResult struct {
 	Fields []string
 }
 
-// CountMatches reports whether the column count equals the Scan-argument
-// count. This alone catches the most common scanner-drift bug class.
-func (r AlignmentResult) CountMatches() bool {
-	return len(r.Columns) == len(r.ScanArgs)
-}
 
-// Aligned drives `scanFn` against a ScanRecorder and resolves each
-// captured arg's pointer back to a field name within `sample`.
-//
-// `scanFn` is a closure that calls the scanner's scanInto / scan
-// function with the supplied row.
-//
-// Typical usage:
-//
-//	var u api.User
-//	res := testsupport.Aligned(userScanner.columns, &u,
-//	    func(row interface{ Scan(...any) error }) error {
-//	        return scanUserInto(row, &u)
-//	    })
-//	if !res.CountMatches() {
-//	    t.Errorf("columns=%d, scan args=%d", len(res.Columns), len(res.ScanArgs))
-//	}
-//	want := []string{"ID", "Username", ..., "" /* local var */, ...}
-//	if !slices.Equal(res.Fields, want) {
-//	    t.Errorf("scan order:\n  got:  %v\n  want: %v", res.Fields, want)
-//	}
-func Aligned(columns string, sample any, scanFn func(row interface{ Scan(...any) error }) error) AlignmentResult {
-	cols := SplitColumns(columns)
-	rec := &ScanRecorder{}
-	// Scanner errors are irrelevant: ScanRecorder always returns nil,
-	// so any non-nil error indicates a panic recovered upstream or a
-	// programmer error in scanFn itself. The test will see the empty
-	// args slice and fail the count check.
-	_ = scanFn(rec)
-	fields := make([]string, len(rec.Args))
-	for i, arg := range rec.Args {
-		fields[i] = FieldNameAt(sample, arg)
-	}
-	return AlignmentResult{
-		Columns:  cols,
-		ScanArgs: rec.Args,
-		Fields:   fields,
-	}
-}
+
+

@@ -225,17 +225,7 @@ type strongRef struct {
 	origIdx int
 }
 
-// GatherCandidates is the exported version for test compatibility.
-func GatherCandidates(
-	ctx context.Context,
-	incorrect, reference []Cue,
-	incAnchors, refAnchors []Anchor,
-	incStrong, refStrong []bool,
-	inWindow func(incStartMs, refStartMs int64) (bool, float64),
-	topK int,
-) []CuePair {
-	return gatherCandidates(ctx, incorrect, reference, incAnchors, refAnchors, incStrong, refStrong, inWindow, topK)
-}
+
 
 func gatherCandidates(
 	ctx context.Context,

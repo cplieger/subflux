@@ -146,10 +146,7 @@ func stripWordPunct(s string) string {
 	}, s)
 }
 
-// HasAnyAnchor returns true if a cue has at least one distinctive feature.
-func HasAnyAnchor(a *anchor) bool {
-	return hasAnyAnchor(a)
-}
+
 
 func hasAnyAnchor(a *anchor) bool {
 	return len(a.Numbers) > 0 || len(a.ProperNouns) > 0 || len(a.Cognates) > 0
@@ -177,10 +174,7 @@ var defaultAnchorScoreConfig = anchorScoreConfig{
 	PositionBlend:     0.1,
 }
 
-// AnchorMatchScore computes similarity between two anchors.
-func AnchorMatchScore(a, b *anchor) float64 {
-	return anchorMatchScore(a, b)
-}
+
 
 func anchorMatchScore(a, b *anchor) float64 {
 	cfg := defaultAnchorScoreConfig
