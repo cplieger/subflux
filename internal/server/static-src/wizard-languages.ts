@@ -101,11 +101,13 @@ export function buildLanguagesStep(): WizardStep {
 function renderLangDefaults(container: HTMLElement): void {
   container.replaceChildren();
   for (let i = 0; i < langDefault.length; i++) {
+    const entry = langDefault[i];
+    if (!entry) { continue; }
     const row = el("div", { className: "wiz-lang-row" });
     row.appendChild(
-      langSelect("wiz-lang-def-code-" + String(i), langDefault[i]!.code, "Subtitle language"),
+      langSelect("wiz-lang-def-code-" + String(i), entry.code, "Subtitle language"),
     );
-    row.appendChild(variantSelect("wiz-lang-def-variant-" + String(i), langDefault[i]!.variant));
+    row.appendChild(variantSelect("wiz-lang-def-variant-" + String(i), entry.variant));
     if (langDefault.length > 1) {
       const idx = i;
       row.appendChild(
@@ -131,15 +133,17 @@ function renderLangDefaults(container: HTMLElement): void {
 function renderLangRules(container: HTMLElement): void {
   container.replaceChildren();
   for (let i = 0; i < langRules.length; i++) {
+    const entry = langRules[i];
+    if (!entry) { continue; }
     const row = el("div", { className: "wiz-lang-row" });
     row.appendChild(
-      langSelect("wiz-lang-rule-audio-" + String(i), langRules[i]!.audio, "Audio language"),
+      langSelect("wiz-lang-rule-audio-" + String(i), entry.audio, "Audio language"),
     );
     row.appendChild(el("span", { className: "wiz-lang-arrow" }, "\u2192"));
     row.appendChild(
-      langSelect("wiz-lang-rule-code-" + String(i), langRules[i]!.code, "Subtitle language"),
+      langSelect("wiz-lang-rule-code-" + String(i), entry.code, "Subtitle language"),
     );
-    row.appendChild(variantSelect("wiz-lang-rule-variant-" + String(i), langRules[i]!.variant));
+    row.appendChild(variantSelect("wiz-lang-rule-variant-" + String(i), entry.variant));
     const idx = i;
     row.appendChild(
       el(
@@ -162,30 +166,34 @@ function renderLangRules(container: HTMLElement): void {
 
 function collectLangDefaults(): void {
   for (let i = 0; i < langDefault.length; i++) {
+    const entry = langDefault[i];
+    if (!entry) { continue; }
     const c = $("wiz-lang-def-code-" + String(i)) as HTMLSelectElement | null;
     const v = $("wiz-lang-def-variant-" + String(i)) as HTMLSelectElement | null;
     if (c) {
-      langDefault[i]!.code = c.value;
+      entry.code = c.value;
     }
     if (v) {
-      langDefault[i]!.variant = v.value;
+      entry.variant = v.value;
     }
   }
 }
 
 function collectLangRules(): void {
   for (let i = 0; i < langRules.length; i++) {
+    const entry = langRules[i];
+    if (!entry) { continue; }
     const a = $("wiz-lang-rule-audio-" + String(i)) as HTMLSelectElement | null;
     const c = $("wiz-lang-rule-code-" + String(i)) as HTMLSelectElement | null;
     const v = $("wiz-lang-rule-variant-" + String(i)) as HTMLSelectElement | null;
     if (a) {
-      langRules[i]!.audio = a.value;
+      entry.audio = a.value;
     }
     if (c) {
-      langRules[i]!.code = c.value;
+      entry.code = c.value;
     }
     if (v) {
-      langRules[i]!.variant = v.value;
+      entry.variant = v.value;
     }
   }
 }

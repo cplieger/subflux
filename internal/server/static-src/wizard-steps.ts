@@ -37,8 +37,8 @@ export function buildArrStep(): WizardStep {
     validate(): string {
       const sv = wizardValues["sonarr"] ?? {};
       const rv = wizardValues["radarr"] ?? {};
-      const sf = (sv["url"] || "").trim() !== "" || (sv["api_key"] || "").trim() !== "";
-      const rf = (rv["url"] || "").trim() !== "" || (rv["api_key"] || "").trim() !== "";
+      const sf = (sv["url"] ?? "").trim() !== "" || (sv["api_key"] ?? "").trim() !== "";
+      const rf = (rv["url"] ?? "").trim() !== "" || (rv["api_key"] ?? "").trim() !== "";
       if (!sf && !rf) {
         return "At least one of Sonarr or Radarr must be configured";
       }
@@ -72,7 +72,7 @@ function renderArrGroup(
   const header = el("div", { className: "wiz-arr-header" }, el("span", null, name));
   const group = el("div", { className: "wiz-arr-group" }, header);
   const saved = wizardValues[key] ?? {};
-  for (const field of section.fields || []) {
+  for (const field of section.fields) {
     group.appendChild(
       wizField(
         "wiz-" + key + "-" + field.key,
@@ -170,6 +170,7 @@ export function buildMediaRootsStep(): WizardStep {
           { path: p.trim() },
           signal,
         );
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (signal.aborted) {
           return "";
         }
