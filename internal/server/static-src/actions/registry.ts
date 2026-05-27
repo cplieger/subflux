@@ -294,8 +294,8 @@ export function pendingCount(names?: readonly string[]): number {
     return _pendingTotal;
   }
   let total = 0;
-  for (let i = 0; i < names.length; i++) {
-    const s = pendingByName.get(names[i]!);
+  for (const name of names) {
+    const s = pendingByName.get(name);
     if (s !== undefined) {
       total += s.size;
     }

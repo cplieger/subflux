@@ -67,6 +67,7 @@ const NO_OPTS = Object.freeze({}) as DispatchOptions;
 
 /** Shared no-op for .catch() handlers on fire-and-forget promises.
  *  Avoids allocating a new `() => {}` closure on every scoped dispatch. */
+// eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op
 const NOOP = (): void => {};
 
 /** Generate a monotonically-increasing instance ID for registry tracking.
@@ -133,10 +134,12 @@ function safeStringify(args: unknown): string {
   }
   try {
     return (
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- JSON.stringify can return undefined at runtime
       JSON.stringify(args, (_key, value: unknown) => (value === undefined ? "__undef__" : value)) ??
       "undefined"
     );
   } catch {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- intentional fallback
     return String(args);
   }
 }
@@ -357,6 +360,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         if (shared === undefined) {
           if (opts.onSettled) {
             safeInvoke(def.name, "onSettled", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
               opts.onSettled!(args);
             });
           }
@@ -367,6 +371,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
             if (v !== null) {
               if (opts.onSuccess) {
                 safeInvoke(def.name, "onSuccess", () => {
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                   opts.onSuccess!(v, args);
                 });
               }
@@ -374,6 +379,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
               const capturedErr = entry.error;
               if (opts.onError) {
                 safeInvoke(def.name, "onError", () => {
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                   opts.onError!(capturedErr, args);
                 });
               }
@@ -382,6 +388,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
               // Synthesize a generic dedupe error for the caller's onError.
               if (opts.onError) {
                 safeInvoke(def.name, "onError", () => {
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                   opts.onError!(
                     { message: "deduped dispatch did not succeed", code: "dedupe" },
                     args,
@@ -392,6 +399,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
             // Cancelled originals don't fire onError on deduped callers.
             if (opts.onSettled) {
               safeInvoke(def.name, "onSettled", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                 opts.onSettled!(args);
               });
             }
@@ -401,6 +409,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
             // Defensive: runOnce never rejects, but guarantee onSettled fires.
             if (opts.onSettled) {
               safeInvoke(def.name, "onSettled", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                 opts.onSettled!(args);
               });
             }
@@ -500,6 +509,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         } finally {
           if (opts.onSettled) {
             safeInvoke(def.name, "onSettled", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
               opts.onSettled!(args);
             });
           }
@@ -595,6 +605,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
       started.delete(id);
       if (opts.onSettled) {
         safeInvoke(def.name, "onSettled", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
           opts.onSettled!(args);
         });
       }
@@ -666,6 +677,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         emitErrorToast(args, err);
         if (opts.onError) {
           safeInvoke(def.name, "onError", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
             opts.onError!(err, args);
           });
         }
@@ -689,6 +701,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
       // Cancellation can race success — if the signal aborted,
       // treat as cancelled even if run() resolved. Most adapters
       // throw on abort, but be defensive.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- signal.aborted may change during await
       if (ac.signal.aborted) {
         if (dedupeEntry !== null) {
           dedupeEntry.cancelled = true;
@@ -731,6 +744,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
       emitSuccessToast(args, result, opts);
       if (opts.onSuccess) {
         safeInvoke(def.name, "onSuccess", () => {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
           opts.onSuccess!(result, args);
         });
       }
@@ -740,11 +754,13 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
       const attempts = readAttempts(e);
       // If aborted, classify as cancelled rather than error.
       const cancelled = ac.signal.aborted;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled derived from signal.aborted which may change
       const status = cancelled ? "cancelled" : "error";
       // Populate dedupe entry so deduped callers receive the actual
       // outcome (real error or cancellation flag) rather than a
       // synthetic stub.
       if (dedupeEntry !== null) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled derived from runtime signal state
         if (cancelled) {
           dedupeEntry.cancelled = true;
         } else {
@@ -762,22 +778,26 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         dispatchedAt,
         startedAt,
         completedAt: Date.now(),
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled derived from runtime signal state
         ...(!cancelled && { error: err }),
         ...(attempts !== undefined && { attempts }),
       });
       // Rollback the optimistic mutation regardless of cancel/error.
       if (def.rollback !== undefined) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled derived from runtime signal state
           const rbError = cancelled ? { message: "cancelled", code: "cancelled" } : err;
           def.rollback(args, optOp, rbError);
         } catch (rbCaught) {
           console.error(`[actions] rollback for ${def.name} threw`, rbCaught);
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- cancelled derived from runtime signal state
       if (!cancelled) {
         emitErrorToast(args, err);
         if (opts.onError) {
           safeInvoke(def.name, "onError", () => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
             opts.onError!(err, args);
           });
         }
@@ -814,6 +834,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
     const factor = cfg?.factor ?? 2;
     const networkMode = def.networkMode ?? "online";
     let attempt = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- intentional infinite loop
     while (true) {
       if (signal.aborted) {
         const abortErr = new DOMException("aborted", "AbortError");
@@ -825,6 +846,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         const result = await def.run(args, signal, ctx);
         return { result, attempts: attempt };
       } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- signal.aborted may change during await
         if (signal.aborted) {
           attachAttempts(e, attempt);
           throw e;

@@ -89,6 +89,7 @@ export function toActionError(e: unknown): ActionErrorLike {
     return { message: e.message, code, ...(isNetLayer && { status: 0 }), cause: e };
   }
   if (e instanceof AggregateError) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- AggregateError.errors is any[]
     const first = e.errors[0];
     const inner = first instanceof Error ? first.message : e.message;
     return { message: inner || e.message, code: "aggregate", cause: e };
@@ -133,6 +134,7 @@ export function toActionError(e: unknown): ActionErrorLike {
   if (e === undefined) {
     return { message: "Unknown error (undefined thrown)", code: "unknown" };
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string -- intentional fallback stringification
   const msg = String(e);
   return {
     message: msg !== "" ? msg : "Unknown error (empty value thrown)",

@@ -8,6 +8,7 @@
 //   const { get, set, subscribe, effect, computed, batch } = createStore<MyMap>();
 
 type Callback = (value: unknown) => void;
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- void is intentional for effect return
 type Cleanup = void | (() => void);
 
 export interface Store<M> {
@@ -55,9 +56,7 @@ export function createStore<M>(): Store<M> {
       return;
     }
     if (batchDepth > 0) {
-      if (!pendingKeys) {
-        pendingKeys = new Map();
-      }
+      pendingKeys ??= new Map();
       pendingKeys.set(key, value);
     } else {
       notifySubs(key, value);
@@ -65,9 +64,7 @@ export function createStore<M>(): Store<M> {
   }
 
   function subscribe<K extends keyof M & string>(key: K, cb: (value: M[K]) => void): () => void {
-    if (!subscribers[key]) {
-      subscribers[key] = [];
-    }
+    subscribers[key] ??= [];
     subscribers[key].push(cb as Callback);
     return () => {
       const arr = subscribers[key];
