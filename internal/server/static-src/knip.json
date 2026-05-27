@@ -14,7 +14,10 @@
     "prettier",
     "typescript-eslint",
     "@eslint/js",
-    "@vitest/coverage-v8"
+    "@vitest/coverage-v8",
+    "html-validate",
+    "stylelint",
+    "stylelint-config-standard"
   ],
   "ignoreBinaries": ["tsgo"],
   "ignoreMembers": [],
