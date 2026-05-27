@@ -57,7 +57,6 @@
 
   [popover]:popover-open { opacity: 1; translate: 0 }
 
-  /* stylelint-disable-next-line no-duplicate-selectors */
   @starting-style {
     [popover]:popover-open { opacity: 0; translate: 0 -0.5rem }
   }

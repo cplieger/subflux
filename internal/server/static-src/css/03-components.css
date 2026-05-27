@@ -308,7 +308,7 @@ td[data-col="actions"] button {
 }
 
 @position-try --tip-above {
-  /* stylelint-disable-next-line at-rule-descriptor-no-unknown */
+  /* stylelint-disable-next-line at-rule-descriptor-no-unknown -- position-area descriptor not yet recognized by stylelint */
   position-area: block-start span-inline-end;
   margin-block: 0 var(--sp-3)
 }
