@@ -35,7 +35,9 @@ export function reconcileChildren(parent: Node, newChildren: Node[]): void {
   let oldIdx = 0;
   for (let i = 0; i < newChildren.length; i++) {
     const newChild = newChildren[i];
-    if (!newChild) { continue; }
+    if (!newChild) {
+      continue;
+    }
     const newKey = nodeKey(newChild);
 
     let matched = newKey ? (oldByKey.get(newKey) ?? null) : null;
@@ -79,7 +81,9 @@ export function reconcileChildren(parent: Node, newChildren: Node[]): void {
 
   while (parent.childNodes.length > newChildren.length) {
     const last = parent.lastChild;
-    if (last) { last.remove(); }
+    if (last) {
+      last.remove();
+    }
   }
 }
 

@@ -9,7 +9,9 @@ vi.mock("./actions/index.js", () => ({
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => { /* noop */ }),
+  on: vi.fn(() => () => {
+    /* noop */
+  }),
   emit: vi.fn(),
   BusEvent: {},
 }));

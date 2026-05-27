@@ -9,7 +9,9 @@ vi.mock("./actions/index.js", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => { /* noop */ }),
+  on: vi.fn(() => () => {
+    /* noop */
+  }),
   emit: vi.fn(),
   BusEvent: {
     PanelConfigure: "panel:configure",

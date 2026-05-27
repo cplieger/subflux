@@ -118,7 +118,9 @@ describe("apiGet", () => {
       headers: { "Content-Type": "application/json" } as unknown as Headers,
       json: () => Promise.resolve({ error: "not found" }),
     });
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => { /* noop */ });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
     const r = await apiGet("/api/missing");
     expect(r).toBeNull();
     spy.mockRestore();
@@ -129,7 +131,9 @@ describe("apiGet", () => {
     const ctrl = new AbortController();
     ctrl.abort();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("aborted", "AbortError")));
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => { /* noop */ });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
     const r = await apiGet("/api/x", ctrl.signal);
     expect(r).toBeNull();
     expect(spy).not.toHaveBeenCalled();
@@ -159,7 +163,9 @@ describe("apiDelete", () => {
       headers: { "Content-Type": "application/json" } as unknown as Headers,
       json: () => Promise.resolve({ error: "forbidden" }),
     });
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => { /* noop */ });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
     const r = await apiDelete("/api/item/1");
     expect(r).toBe(false);
     spy.mockRestore();
@@ -235,8 +241,12 @@ describe("apiGetTyped", () => {
       headers: { "Content-Type": "application/json" } as unknown as Headers,
       json: () => Promise.resolve({ wrong: "shape" }),
     });
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => { /* noop */ });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => { /* noop */ });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      /* noop */
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
     const decoded = await import("./api-client.js").then((m) =>
       m.apiGetTyped("/api/x", () => {
         throw new TypeError("nope");
@@ -256,7 +266,9 @@ describe("apiGetTyped", () => {
       headers: { "Content-Type": "application/json" } as unknown as Headers,
       json: () => Promise.resolve({ wrong: "shape" }),
     });
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => { /* noop */ });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      /* noop */
+    });
     const r = await import("./api-client.js").then((m) =>
       m.apiGetTypedRaw("/api/x", () => {
         throw new TypeError("field foo: expected string");

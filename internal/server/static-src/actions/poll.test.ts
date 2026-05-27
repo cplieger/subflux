@@ -81,7 +81,9 @@ describe("pollAction — basic scheduling", () => {
   it("stop() is idempotent", () => {
     const action = defineAction<undefined, undefined>({
       name: "test.poll.idempotent",
-      run: async () => { /* noop */ },
+      run: async () => {
+        /* noop */
+      },
     });
     const stop = pollAction(action, undefined, { interval: 1000 });
     expect(() => {
@@ -385,7 +387,9 @@ describe("pollAction — onSuccess callback", () => {
       name: "test.poll.onSuccess_throws",
       run: async () => ++count,
     });
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => { /* noop */ });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+      /* noop */
+    });
     const onSuccess = vi.fn<(n: number) => void>(() => {
       throw new Error("kaboom");
     });

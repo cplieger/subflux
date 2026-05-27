@@ -82,7 +82,9 @@ export function bindLoadingState(
   // capture) are identical.
   const names: readonly string[] = typeof actionName === "string" ? [actionName] : actionName;
   if (names.length === 0) {
-    return () => { /* noop */ };
+    return () => {
+      /* noop */
+    };
   }
 
   const {
