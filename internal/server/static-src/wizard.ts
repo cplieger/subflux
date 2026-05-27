@@ -79,12 +79,12 @@ function loadDraft(): boolean {
       return false;
     }
     const draft = JSON.parse(raw) as SetupDraft;
-    wizardIndex = draft.wizardIndex ?? 0;
-    wizardValues = draft.wizardValues ?? {};
-    providerEnabled = draft.providerEnabled ?? {};
-    langRules = draft.langRules ?? [];
-    langDefault = draft.langDefault ?? [];
-    mediaRoots = draft.mediaRoots ?? [];
+    wizardIndex = draft.wizardIndex;
+    wizardValues = draft.wizardValues;
+    providerEnabled = draft.providerEnabled;
+    langRules = draft.langRules;
+    langDefault = draft.langDefault;
+    mediaRoots = draft.mediaRoots;
     return true;
   } catch {
     return false;
@@ -275,9 +275,11 @@ function updateWizardNav(): void {
     back.setAttribute("aria-disabled", isFirst ? "true" : "false");
   }
   if ($("wizardNext")) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
     $("wizardNext")!.hidden = isLast;
   }
   if ($("wizardFinish")) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
     $("wizardFinish")!.hidden = !isLast;
   }
 }
@@ -307,6 +309,7 @@ function wireWizardNav(): void {
       return;
     }
     abortValidation();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index validated
     wizardSteps[wizardIndex]!.collect();
     saveDraft();
     if (wizardIndex > 0) {
@@ -314,8 +317,10 @@ function wireWizardNav(): void {
       renderCurrentStep();
     }
   });
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   $("wizardNext")?.addEventListener("click", async () => {
     abortValidation();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index validated
     const step = wizardSteps[wizardIndex]!;
     step.collect();
     saveDraft();
@@ -327,7 +332,7 @@ function wireWizardNav(): void {
     if (step.validateAsync) {
       validationAbort = new AbortController();
       const asyncErr = await step.validateAsync(validationAbort.signal);
-      if (validationAbort?.signal.aborted) {
+      if (validationAbort.signal.aborted) {
         return;
       }
       validationAbort = null;
@@ -342,6 +347,7 @@ function wireWizardNav(): void {
       renderCurrentStep();
     }
   });
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   $("wizardFinish")?.addEventListener("click", finishWizard);
 }
 
@@ -360,7 +366,7 @@ async function finishWizard(): Promise<void> {
     if (step.validateAsync) {
       validationAbort = new AbortController();
       const asyncErr = await step.validateAsync(validationAbort.signal);
-      if (validationAbort?.signal.aborted) {
+      if (validationAbort.signal.aborted) {
         return;
       }
       validationAbort = null;

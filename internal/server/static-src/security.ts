@@ -70,9 +70,11 @@ function busyClick(handler: () => Promise<void>): (ev: Event) => Promise<void> {
 }
 
 const secDlg = (): HTMLDialogElement => dialog("securityDialog");
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- dialog always has .dlg-body
+const secDlgBody = (): HTMLElement => secDlg().querySelector<HTMLElement>(".dlg-body")!;
 
 export function initSecurity(): void {
-  bus.on(bus.BusEvent.OpenSecurity, () => openSecurity());
+  bus.on(bus.BusEvent.OpenSecurity, () => { void openSecurity(); });
 }
 
 async function openSecurity(): Promise<void> {
@@ -266,7 +268,7 @@ function buildPasswordSection(): HTMLElement {
           currentPw.value = "";
           newPw.value = "";
         } else {
-          showFeedback(feedback, r.error || "Failed to change password", true);
+          showFeedback(feedback, r.error ?? "Failed to change password", true);
         }
       }),
     },
@@ -337,7 +339,7 @@ function buildTOTPSection(me: MeResponse | null): HTMLElement {
           const r = await apiDeleteRaw<unknown>("/api/auth/totp", { code });
           if (r.ok) {
             notify.success("TOTP disabled");
-            await renderSections(secDlg().querySelector(".dlg-body")!);
+            await renderSections(secDlgBody());
           } else {
             notify.error(r.error ?? "Failed to disable TOTP");
           }
@@ -408,10 +410,10 @@ function showTOTPSetup(container: HTMLElement, data: TOTPEnableResponse): void {
           if (r.data.recovery_codes && r.data.recovery_codes.length > 0) {
             showRecoveryCodes(container, r.data.recovery_codes);
           } else {
-            void renderSections(secDlg().querySelector(".dlg-body")!);
+            void renderSections(secDlgBody());
           }
         } else {
-          showFeedback(feedback, r.error || "Invalid code", true);
+          showFeedback(feedback, r.error ?? "Invalid code", true);
         }
       }),
     },
@@ -442,7 +444,7 @@ function showRecoveryCodes(container: HTMLElement, codes: string[]): void {
         {
           type: "button",
           onclick: () => {
-            void renderSections(secDlg().querySelector(".dlg-body")!);
+            void renderSections(secDlgBody());
           },
         },
         "Done",
@@ -515,7 +517,7 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
         if (r.ok) {
           notify.success("Passkey deleted");
           void sendWebAuthnSignals();
-          await renderSections(secDlg().querySelector(".dlg-body")!);
+          await renderSections(secDlgBody());
         } else {
           notify.error(r.error ?? "Failed to delete passkey");
         }
@@ -555,7 +557,7 @@ function prepareCreationOptions(pk: PublicKeyCredentialCreationOptions): void {
   if (typeof pk.challenge === "string") {
     pk.challenge = base64urlToBuffer(pk.challenge);
   }
-  if (pk.user && typeof pk.user.id === "string") {
+  if (typeof pk.user.id === "string") {
     pk.user.id = base64urlToBuffer(pk.user.id);
   }
   if (pk.excludeCredentials) {
@@ -621,7 +623,7 @@ async function registerPasskey(): Promise<void> {
     if (finishRes.ok) {
       notify.success("Passkey registered");
       void sendWebAuthnSignals();
-      await renderSections(secDlg().querySelector(".dlg-body")!);
+      await renderSections(secDlgBody());
     } else {
       const data = (await finishRes.json().catch(() => ({}))) as { error?: string };
       notify.error(data.error ?? "Failed to register passkey");
@@ -701,7 +703,7 @@ function apiKeyRow(key: APIKeyItem): HTMLElement {
         const deleted = await apiDelete(`/api/auth/apikeys/${key.id}`);
         if (deleted) {
           notify.success("API key revoked");
-          await renderSections(secDlg().querySelector(".dlg-body")!);
+          await renderSections(secDlgBody());
         } else {
           notify.error("Failed to revoke API key");
         }
@@ -755,7 +757,7 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
     {
       type: "button",
       onclick: () => {
-        void renderSections(secDlg().querySelector(".dlg-body")!);
+        void renderSections(secDlgBody());
       },
     },
     "Done",

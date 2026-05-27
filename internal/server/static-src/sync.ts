@@ -148,9 +148,9 @@ export function openSyncDialog(
     status: "idle",
     offsetMs: initialOffset,
     subtitlePath: "",
-    videoPath: videoPath || "",
-    mediaType: mediaType || "",
-    mediaId: mediaId || 0,
+    videoPath: videoPath,
+    mediaType: mediaType,
+    mediaId: mediaId,
     entries: entries,
     previewStart: 0,
     previewBuffered: false,
@@ -165,6 +165,7 @@ export function openSyncDialog(
     "aria-label": "Subtitle",
   }) as HTMLSelectElement;
   for (let i = 0; i < labeled.length; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
     subSel.appendChild(option(String(i), labeled[i]!.label));
   }
   subSel.value = "0";
@@ -373,7 +374,7 @@ function closeSyncDialog(): void {
   // Stop hold-repeat timers in the timecode widget so a pending tick
   // can't fire on the detached element after the dialog closes.
   const tc = document.getElementById("sync-offset-val") as TimecodeInput | null;
-  tc?.dispose?.();
+  tc?.dispose();
   // Clean up video before closing.
   const video = syncDlg.querySelector("video");
   if (video) {
@@ -570,7 +571,7 @@ function startPreviewStream(container: HTMLElement, startSec: number): void {
     "loadedmetadata",
     () => {
       const t = video.querySelector("track");
-      if (t && t.track) {
+      if (t?.track) {
         t.track.mode = "showing";
       }
     },
@@ -637,7 +638,7 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
       "aria-label": "Play/Pause",
       onclick: () => {
         if (video.paused) {
-          video.play().catch(() => {});
+          video.play().catch(() => { /* ignore */ });
         } else {
           video.pause();
         }
@@ -691,6 +692,7 @@ function startMSEStream(video: HTMLVideoElement, startSec: number): void {
 
   ms.addEventListener(
     "sourceopen",
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
     async () => {
       // Revoke the object URL once the MediaSource is connected to the
       // video element. The connection persists after revocation; this
@@ -792,9 +794,7 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
   video.appendChild(track);
   // Safari needs the track to be explicitly set to showing after load.
   const show = (): void => {
-    if (track.track) {
-      track.track.mode = "showing";
-    }
+    track.track.mode = "showing";
   };
   track.addEventListener("load", show, { once: true });
   // Also try immediately for browsers that load synchronously.
@@ -825,7 +825,7 @@ function seekPreview(video: HTMLVideoElement, deltaSec: number): void {
         syncState.videoPath,
       )}&start=${absTarget}&buffered=true`;
     }
-    video.play().catch(() => {});
+    video.play().catch(() => { /* ignore */ });
     video.addEventListener(
       "loadedmetadata",
       () => {

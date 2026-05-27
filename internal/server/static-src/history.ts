@@ -70,11 +70,11 @@ function historyMediaHref(entry: HistoryEntry): string {
   const mid = entry.media_id || "";
   const tm = /^tmdb-(\d+)$/.exec(mid);
   if (tm) {
-    return `/movie/${tm[1]}`;
+    return `/movie/${tm[1] ?? ""}`;
   }
   const tv = /^tvdb-(\d+)/.exec(mid);
   if (tv) {
-    return `/series/${tv[1]}`;
+    return `/series/${tv[1] ?? ""}`;
   }
   return "";
 }
@@ -146,7 +146,7 @@ function updateHistoryFilters(data: HistoryEntry[]): void {
   }
 
   const hLang = select("h-lang");
-  if (hLang) {
+  {
     const current = hLang.value;
     hLang.replaceChildren(option("", "All languages"));
     for (const l of [...langs].sort()) {
@@ -156,7 +156,7 @@ function updateHistoryFilters(data: HistoryEntry[]): void {
   }
 
   const hProv = select("h-provider");
-  if (hProv) {
+  {
     const current = hProv.value;
     hProv.replaceChildren(option("", "All providers"));
     for (const p of [...provs].sort()) {
@@ -192,4 +192,4 @@ export function reloadHistory(): void {
   void ensureList().reload();
 }
 
-on(BusEvent.LoadHistory, () => loadHistory());
+on(BusEvent.LoadHistory, () => { void loadHistory(); });

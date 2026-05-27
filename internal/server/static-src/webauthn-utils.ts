@@ -25,6 +25,7 @@ export function bufferToBase64url(buf: ArrayBuffer): string {
 
 export async function sendWebAuthnSignals(): Promise<void> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
     if (!window.PublicKeyCredential) {
       return;
     }

@@ -99,6 +99,7 @@ async function detectAuthMethods(): Promise<void> {
     /* OIDC not available */
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
   if (window.PublicKeyCredential) {
     show($("passkeyBtn"));
     show($("authDivider"));
@@ -107,12 +108,13 @@ async function detectAuthMethods(): Promise<void> {
   $("oidcBtn")?.addEventListener("click", () => {
     window.location.href = "/api/auth/oidc";
   });
-  $("passkeyBtn")?.addEventListener("click", passkeyLogin);
+  $("passkeyBtn")?.addEventListener("click", () => { void passkeyLogin(); });
 }
 
 // --- Conditional UI (passkey autofill) ---
 
 async function startConditionalUI(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
   if (!window.PublicKeyCredential) {
     return;
   }
@@ -134,9 +136,6 @@ async function startConditionalUI(): Promise<void> {
     }
     webauthnSessionToken = options.session_token ?? "";
     const pk = options.publicKey;
-    if (!pk) {
-      return;
-    }
     pk.challenge = base64urlToBuffer(pk.challenge as unknown as string);
     if (pk.allowCredentials) {
       for (const cred of pk.allowCredentials) {
@@ -182,9 +181,6 @@ async function passkeyLogin(): Promise<void> {
     }
     webauthnSessionToken = options.session_token ?? "";
     const pk = options.publicKey;
-    if (!pk) {
-      return;
-    }
     pk.challenge = base64urlToBuffer(pk.challenge as unknown as string);
     if (pk.allowCredentials) {
       for (const cred of pk.allowCredentials) {
@@ -296,6 +292,7 @@ function wireLoginForm(resumeSetup: boolean): void {
   if (!form) {
     return;
   }
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   form.addEventListener("submit", async (e: Event) => {
     e.preventDefault();
     hideError("loginError");
@@ -351,7 +348,9 @@ function wireTOTPForm(): void {
   if (!form) {
     return;
   }
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   form.addEventListener("submit", async (e: Event) => {
+   
     e.preventDefault();
     hideError("totpError");
     const code = (new FormData(form).get("code") as string) || "";
@@ -386,8 +385,10 @@ function wireSetupForm(): void {
   if (!form) {
     return;
   }
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   form.addEventListener("submit", async (e: Event) => {
     e.preventDefault();
+
     hideError("setupError");
     const formData = new FormData(form);
     const username = (formData.get("username") as string) || "";

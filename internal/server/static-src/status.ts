@@ -53,10 +53,10 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
       parts.push(`Missing: ${stats.missing_subs}`);
     }
   }
-  if (providers && providers.enabled) {
+  if (providers.enabled) {
     const cfg = store.get("config");
     const totalEnabled = cfg
-      ? Object.entries(cfg.providers || {}).filter(
+      ? Object.entries(cfg.providers ?? {}).filter(
           ([name, enabled]) => enabled && name !== EMBEDDED_PROVIDER,
         ).length
       : 0;
@@ -179,7 +179,7 @@ function processActivitySideEffects(
 //
 // Exported so app.ts can pass the action to pollAction() for the
 // periodic background poll.
-export const pollStatusAction = defineAction<void, void>({
+export const pollStatusAction = defineAction<undefined, undefined>({
   name: "status.poll",
   dedupe: true,
   run: async (_args, signal) => {
@@ -187,8 +187,8 @@ export const pollStatusAction = defineAction<void, void>({
     const popupVisible = isPopupOpen();
 
     // Always fetch alerts and activity.
-    const alerts = (await apiGet<Alert[]>("/api/alerts", signal)) || [];
-    const activities = (await apiGet<Activity[]>("/api/activity", signal)) || [];
+    const alerts = (await apiGet<Alert[]>("/api/alerts", signal)) ?? [];
+    const activities = (await apiGet<Activity[]>("/api/activity", signal)) ?? [];
 
     let providers: ProvidersResponse = { enabled: false };
     let stats: Stats | null = null;
@@ -395,7 +395,7 @@ function buildPopupItems(
       if (!p) {
         continue;
       }
-      const err = p.last_error || `${p.recent_failures} failures`;
+      const err = p.last_error ?? `${p.recent_failures} failures`;
       items.push({
         key: `prov-${name}`,
         build: () =>
@@ -415,7 +415,7 @@ function buildPopupItems(
     }
   }
 
-  if (!isActive && stats && stats.last_scan) {
+  if (!isActive && stats?.last_scan) {
     let scanLabel = "";
     const lastDone = activities.filter((a: Activity) => a.done && a.action === "Full Scan").pop();
     if (lastDone?.ended_at) {
@@ -471,7 +471,7 @@ function dismissActivity(id: string): void {
   // Swap close button to spinner for immediate feedback.
   const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
   if (item) {
-    const btn = item.querySelector(".close-btn");
+    const btn = item.querySelector<HTMLButtonElement>(".close-btn");
     if (btn) {
       btn.disabled = true;
       btn.replaceChildren(el("span", { className: "spinner" }));
@@ -519,7 +519,7 @@ export function updateLiveTimers(): void {
   const now = new Date();
   document.querySelectorAll(".live-timer[data-started]").forEach((timer: Element) => {
     timer.textContent = ` \u00B7 ${formatDuration(
-      new Date(timer.getAttribute("data-started") || ""),
+      new Date(timer.getAttribute("data-started") ?? ""),
       now,
     )}`;
   });

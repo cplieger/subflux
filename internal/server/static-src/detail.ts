@@ -50,14 +50,12 @@ function coverageBadge(entries: SubtitleEntry[] | null, langLabel: string | null
   const byCodec: Record<string, string[]> = {};
   for (const sub of entries) {
     const codec = sub.codec ?? "srt";
-    if (!byCodec[codec]) {
-      byCodec[codec] = [];
-    }
+    byCodec[codec] ??= [];
     byCodec[codec].push(sub.source === EMBEDDED_PROVIDER ? "emb" : "ext");
   }
 
   const allIgnored = entries.every(
-    (sub) => sub.source === EMBEDDED_PROVIDER && store.get("ignoredCodecs").has(sub.codec || ""),
+    (sub) => sub.source === EMBEDDED_PROVIDER && store.get("ignoredCodecs").has(sub.codec ?? ""),
   );
   const badgeStatus = allIgnored ? "warn" : "ok";
 
@@ -66,7 +64,7 @@ function coverageBadge(entries: SubtitleEntry[] | null, langLabel: string | null
   );
   let detail = parts.join(" + ");
 
-  const topScore = Math.max(...entries.map((s) => s.score || 0));
+  const topScore = Math.max(...entries.map((s) => s.score ?? 0));
   if (topScore > 0) {
     detail += ` \u2605${topScore}`;
   }
@@ -138,7 +136,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
   if (!skipPush) {
     history.pushState(null, "", `/series/${s.tvdb_id}`);
   }
-  const targets = s.targets || [];
+  const targets = s.targets;
   const subsInfo =
     targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
   const info = `${s.episodes} ep \u00B7 audio: ${langName(
@@ -363,13 +361,11 @@ export function renderSeriesDetail(
   subFiles: SubtitleEntry[],
   historySet?: Set<string>,
 ): void {
-  if (!historySet) {
-    historySet = new Set();
-  }
+  historySet ??= new Set();
   store.set("detailCtx", { series, seasons, tvdbId: series.tvdb_id });
 
   // Show Files button only if any external subtitle exists.
-  const hasExtSubs = (subFiles || []).some((f) => f.source === "external");
+  const hasExtSubs = subFiles.some((f) => f.source === "external");
   const headerEl = document.querySelector("#coveragePanel .card-head");
   if (headerEl) {
     const oldFiles = headerEl.querySelector('[data-nav="files"]');
@@ -412,7 +408,7 @@ export function renderSeriesDetail(
   }
 
   const out = $.coverageContent;
-  const ls = series.targets || [];
+  const ls = series.targets;
   const targetLangs = ls.map((t) => ({
     lang: t.language,
     variant: t.variant,
@@ -646,13 +642,13 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   if (!skipPush) {
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
   }
-  const targets = m.targets || [];
+  const targets = m.targets;
   const subsInfo =
     targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
-  const info = `${m.year || ""} \u00B7 audio: ${langName(
-    m.rule || "default",
+  const info = `${m.year} \u00B7 audio: ${langName(
+    m.rule,
   )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
-  const subs = m.subs || [];
+  const subs = m.subs;
   const hasExtSubs = subs.some((s) => s.source !== EMBEDDED_PROVIDER && s.path);
   emit(BusEvent.PanelConfigure, false, {
     title: m.title,
@@ -700,7 +696,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
         }
       }
     })
-    .catch(() => {});
+    .catch(() => { /* ignore */ });
   // Mark as detail view so refreshCurrentPage doesn't replace with library.
   store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
   const out = $.coverageContent;
@@ -720,7 +716,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
         "data-nav": "sync",
         "data-tip": "Adjust subtitle timing",
         onclick: () => {
-          openSyncDialog(extSubs, m.path || "", "movie", m.id, m.title);
+          openSyncDialog(extSubs, m.path ?? "", "movie", m.id, m.title);
         },
       },
       icon("sync"),
@@ -737,7 +733,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
     const tbody = el("tbody");
     for (const t of targets) {
       const key = `${t.language}|${t.variant}`;
-      const entries = (subIdx as Record<string, SubtitleEntry[] | undefined>)[key] || [];
+      const entries = (subIdx as Record<string, SubtitleEntry[] | undefined>)[key] ?? [];
       const label = langName(t.language) + (t.variant !== DEFAULT_VARIANT ? ` (${t.variant})` : "");
 
       const searchBtn = el(
@@ -761,9 +757,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
         const byCodec: Record<string, SubtitleEntry[]> = {};
         for (const sub of entries) {
           const codec = sub.codec ?? "srt";
-          if (!byCodec[codec]) {
-            byCodec[codec] = [];
-          }
+          byCodec[codec] ??= [];
           byCodec[codec].push(sub);
         }
         for (const [, codecEntries] of Object.entries(byCodec)) {
@@ -813,5 +807,5 @@ on(BusEvent.OpenSeries, (item, skipPush) => {
 on(BusEvent.OpenMovie, (item, skipPush) => {
   openMovieDetail(item as MovieDetail, skipPush);
 });
-on(BusEvent.ScanSeries, (item, btn) => triggerSeriesScan(item as SeriesItem, btn));
-on(BusEvent.ScanMovie, (item, btn) => triggerMovieScan(item as MovieDetail, btn));
+on(BusEvent.ScanSeries, (item, btn) => { void triggerSeriesScan(item as SeriesItem, btn); });
+on(BusEvent.ScanMovie, (item, btn) => { void triggerMovieScan(item as MovieDetail, btn); });

@@ -18,7 +18,7 @@ import type { CoverageItem, SeasonGroup } from "./api-types.js";
 // controls and heading so they don't flash before the detail loads.
 function prepareDetailView(): void {
   showPage("library", true);
-  const ctrl = $.coveragePanel.querySelector(".controls");
+  const ctrl = $.coveragePanel.querySelector<HTMLElement>(".controls");
   if (ctrl) {
     ctrl.style.display = "none";
   }
@@ -64,10 +64,10 @@ function buildLibraryQuery(): string {
 // Restore library filter state from URL query params.
 function restoreLibraryFilters(): void {
   const params = new URLSearchParams(location.search);
-  covTypeFilter.value = params.get("type") || "all";
-  covFilter.value = params.get("q") || "";
+  covTypeFilter.value = params.get("type") ?? "all";
+  covFilter.value = params.get("q") ?? "";
   covMissing.checked = params.get("missing") === "1";
-  covSort.value = params.get("sort") || "title";
+  covSort.value = params.get("sort") ?? "title";
 }
 
 // Push a new URL and apply the route. Use replace=true for initial load
@@ -80,7 +80,7 @@ export function navigate(path: string, replace?: boolean): void {
       history.pushState(null, "", path);
     }
   }
-  viewTransition(() => applyRoute());
+  viewTransition(() => { void applyRoute(); });
 }
 
 // Update library filter query params in the URL without a full
@@ -138,10 +138,11 @@ async function handleSeriesSync(m: RegExpMatchArray): Promise<void> {
   await withSeries(m, (s) => {
     emit(BusEvent.OpenSeries, s, true);
     setTimeout(() => {
-      const btn = document.querySelector('[data-nav="sync"]');
+      const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
         btn.click();
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex group guaranteed
         navigate(`/series/${m[1]!}`, true);
       }
     }, ROUTE_TRANSITION_MS);
@@ -152,9 +153,9 @@ async function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
   const tvdbId = Number(m[1]);
   await withSeries(m, async (s) => {
     const epPaths = new Map<string, string>();
-    const seasons = (await apiGet<SeasonGroup[]>(`/api/media/series/${s.id}/episodes`)) || [];
+    const seasons = (await apiGet<SeasonGroup[]>(`/api/media/series/${s.id}/episodes`)) ?? [];
     for (const sg of seasons) {
-      for (const ep of sg.episodes || []) {
+      for (const ep of sg.episodes ?? []) {
         if (ep.has_file && ep.path) {
           const sn = String(sg.season).padStart(2, "0");
           const en = String(ep.episode).padStart(2, "0");
@@ -186,10 +187,11 @@ async function handleMovieSync(m: RegExpMatchArray): Promise<void> {
   await withMovie(m, (mv) => {
     emit(BusEvent.OpenMovie, mv, true);
     setTimeout(() => {
-      const btn = document.querySelector('[data-nav="sync"]');
+      const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
         btn.click();
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex group guaranteed
         navigate(`/movie/${m[1]!}`, true);
       }
     }, ROUTE_TRANSITION_MS);
@@ -204,7 +206,7 @@ async function handleMovieFiles(m: RegExpMatchArray): Promise<void> {
       `tmdb-${tmdbId}`,
       mv.title,
       `/movie/${tmdbId}`,
-      new Map([["", mv.path || ""]]),
+      new Map([["", mv.path ?? ""]]),
       mv.id,
     );
   });
@@ -306,7 +308,7 @@ function setHistoryHeader(): void {
 
   heading.textContent = "History";
 
-  const backPath = historyBackPath || "/";
+  const backPath = historyBackPath ?? "/";
   const backText = historyBackPath ? " Back" : " Library";
   const backBtn = el(
     "button",

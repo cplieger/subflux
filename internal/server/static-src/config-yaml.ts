@@ -14,6 +14,7 @@ export function parseYAMLSections(lines: string[]): Record<string, string> {
       if (current) {
         sections[current] = buf.join("\n");
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- split always has [0]
       current = line.split(":")[0]!;
       buf = [line];
     } else if (current) {
@@ -44,6 +45,7 @@ export function extractYAMLValue(raw: string, key: string): string {
         (val.startsWith('"') && val.includes('"', 1)) ||
         (val.startsWith("'") && val.includes("'", 1))
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- string is non-empty
         const quote = val[0]!;
         const endIdx = val.indexOf(quote, 1);
         val = val.substring(1, endIdx);
@@ -107,6 +109,7 @@ export function parseProviderBlocks(raw: string): Record<string, string> {
       if (current) {
         providers[current] = buf.join("\n");
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex group [1] guaranteed by match
       current = match[1]!;
       buf = [line];
     } else if (current && (line.startsWith("    ") || line.trim() === "")) {
@@ -149,5 +152,5 @@ export function formatDurationCfg(ns: number | string): string {
     }
     return `${Math.floor(hrs / 24)}D`;
   }
-  return String(ns);
+  return ns;
 }

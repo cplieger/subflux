@@ -105,6 +105,7 @@ async function runSeasonAudioSync(
       if (signal.aborted) {
         return;
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length checked in while condition
       const ep = queue.shift()!;
       done++;
       if (status) {
@@ -117,6 +118,7 @@ async function runSeasonAudioSync(
         },
         { silent: true },
       );
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (signal.aborted) {
         return;
       }

@@ -69,7 +69,7 @@ export async function loadConfig(): Promise<void> {
     ]);
     // Don't throw on raw config failure; render with defaults so the
     // user can fix a broken or unreadable config via the UI.
-    config = rawRes && rawRes.ok ? await rawRes.text() : "";
+    config = rawRes.ok ? await rawRes.text() : "";
     if (parsed) {
       store.batch(() => {
         store.set("config", parsed);
@@ -174,7 +174,7 @@ function friendlyConfigError(raw: string): string {
   msg = msg.replace(/^parse YAML:\s*/i, "");
   const yamlLine = /^yaml:\s*line\s*(\d+)/i.exec(msg);
   if (yamlLine) {
-    const line = yamlLine[1];
+    const line = yamlLine[1] ?? "";
     const rule = YAML_ERROR_PATTERNS.find((r) => msg.includes(r.match));
     if (rule) {
       return `Syntax error on line ${line}: ${rule.message}`;
@@ -214,7 +214,7 @@ function configSaveError(err: { error?: string; code?: string }): string {
 /** Reset config to defaults. Action def with optimistic+rollback would
  *  be premature here (the reset is destructive and its outcome reshapes
  *  the entire form); keep it as a non-optimistic action with toast. */
-const resetConfigAction = apiAction<void>({
+const resetConfigAction = apiAction<undefined>({
   name: "config.reset",
   request: () => ({ method: "POST", path: "/api/config/reset" }),
   dedupe: true, // double-click protection
@@ -223,7 +223,7 @@ const resetConfigAction = apiAction<void>({
 });
 
 async function resetConfig(): Promise<void> {
-  const ok = await resetConfigAction.dispatch();
+  const ok = await resetConfigAction.dispatch(undefined);
   if (ok !== null) {
     await loadConfig();
   }
@@ -337,7 +337,7 @@ function markRequiredFields(): void {
   // member with all required fields filled?
   const groupFilled: Record<string, boolean> = {};
   for (const schema of configSchema) {
-    if (!schema.required_group || !schema.fields) {
+    if (!schema.required_group) {
       continue;
     }
     const grp = schema.required_group;
@@ -347,7 +347,7 @@ function markRequiredFields(): void {
     const allFilled = schema.fields
       .filter((f: SchemaField) => f.required)
       .every((f: SchemaField) => {
-        const inp = body.querySelector(`#${CSS.escape(fieldId(schema.key, f.key))}`);
+        const inp = body.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, f.key))}`);
         if (!inp) {
           return false;
         }
@@ -355,7 +355,7 @@ function markRequiredFields(): void {
         if (f.secret && inp.placeholder === "****") {
           return true;
         }
-        return (inp.value ?? "").trim() !== "";
+        return inp.value.trim() !== "";
       });
     if (allFilled) {
       groupFilled[grp] = true;
@@ -363,14 +363,11 @@ function markRequiredFields(): void {
   }
 
   for (const schema of configSchema) {
-    if (!schema.fields) {
-      continue;
-    }
     for (const field of schema.fields) {
       if (!field.required) {
         continue;
       }
-      const inp = body.querySelector(`#${CSS.escape(fieldId(schema.key, field.key))}`);
+      const inp = body.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, field.key))}`);
       if (!inp) {
         continue;
       }
@@ -386,8 +383,8 @@ function markRequiredFields(): void {
       updateFieldValidation(inp, field);
 
       // Clear the red border when the user types.
-      if (!inp.dataset.requiredWired) {
-        inp.dataset.requiredWired = "true";
+      if (!inp.dataset["requiredWired"]) {
+        inp.dataset["requiredWired"] = "true";
         inp.addEventListener("input", () => {
           updateFieldValidation(inp, field);
         });
@@ -480,7 +477,7 @@ function genList(schema: ConfigSchema): string {
   const listEl = document.getElementById(`${schema.key}-list`);
   const lines: string[] = [`${schema.key}:`];
   if (listEl) {
-    for (const inp of Array.from(listEl.querySelectorAll('input[type="text"]'))) {
+    for (const inp of Array.from(listEl.querySelectorAll<HTMLInputElement>('input[type="text"]'))) {
       const v = inp.value.trim();
       if (v) {
         lines.push(`  - ${v}`);

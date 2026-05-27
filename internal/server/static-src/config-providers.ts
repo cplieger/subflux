@@ -72,7 +72,7 @@ export function renderProvidersSection(
 
     card.appendChild(details);
 
-    const toggle = card.querySelector(`#cfg-prov-${prov.name}-enabled`);
+    const toggle = card.querySelector<HTMLInputElement>(`#cfg-prov-${prov.name}-enabled`);
     if (toggle) {
       toggle.addEventListener("change", () => {
         details.style.display = toggle.checked ? "" : "none";
@@ -114,7 +114,7 @@ export function renderProvidersSection(
         head.insertBefore(badge, head.lastElementChild);
       }
     })
-    .catch(() => {});
+    .catch(() => { /* ignore */ });
 
   return sec;
 }
@@ -161,7 +161,7 @@ export function genProviders(schema: ConfigSchema): string {
       const priEl = document.getElementById(
         `cfg-prov-${prov.name}-priority`,
       ) as HTMLInputElement | null;
-      if (priEl && priEl.value) {
+      if (priEl?.value) {
         lines.push(`    priority: ${priEl.value}`);
       }
     }

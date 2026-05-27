@@ -20,7 +20,7 @@ export function formatOffsetMs(ms: number): string {
   const abs = Math.abs(ms);
   const sec = Math.floor(abs / 1000);
   const frac = abs % 1000;
-  return `${sign + sec}.${String(frac).padStart(3, "0")}s`;
+  return `${sign}${sec}.${String(frac).padStart(3, "0")}s`;
 }
 
 // Hold-to-repeat: fires adjust on press, then accelerates.
@@ -36,7 +36,7 @@ function holdRepeat(
   getDelta: () => number,
   adjust: (delta: number) => void,
 ): () => void {
-  let timer: ReturnType<typeof setTimeout> | 0 = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   let delay = 400;
 
   function tick(): void {
@@ -53,8 +53,8 @@ function holdRepeat(
   }
 
   function stop(): void {
-    clearTimeout(timer);
-    timer = 0;
+    if (timer != null) { clearTimeout(timer); }
+    timer = null;
   }
 
   btn.addEventListener("mousedown", start);
@@ -77,6 +77,7 @@ function addTouchDrag(seg: HTMLElement, delta: number, adjust: (delta: number) =
   seg.addEventListener(
     "touchstart",
     (e: TouchEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- touch event always has touches[0]
       startY = e.touches[0]!.clientY;
       accumulated = 0;
     },
@@ -87,6 +88,7 @@ function addTouchDrag(seg: HTMLElement, delta: number, adjust: (delta: number) =
     "touchmove",
     (e: TouchEvent) => {
       e.preventDefault();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- touch event always has touches[0]
       const dy = startY - e.touches[0]!.clientY;
       const steps = Math.trunc((dy - accumulated) / threshold);
       if (steps !== 0) {
@@ -287,8 +289,8 @@ export function buildTimecodeInput(
 
 // Update the timecode display from external sources (audio sync, subtitle switch).
 export function updateTimecodeDisplay(newMs: number): void {
-  const tc = document.getElementById("sync-offset-val");
-  if (tc && (tc as TimecodeInput).setValue) {
-    (tc as TimecodeInput).setValue(newMs);
+  const tc = document.getElementById("sync-offset-val") as TimecodeInput | null;
+  if (tc) {
+    tc.setValue(newMs);
   }
 }

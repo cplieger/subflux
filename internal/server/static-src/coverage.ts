@@ -84,12 +84,12 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
 }
 
 export function configurePanel(visible: boolean, detail?: DetailConfig): void {
-  const ctrl = $.coveragePanel.querySelector(".controls");
+  const ctrl = $.coveragePanel.querySelector<HTMLElement>(".controls");
   if (ctrl) {
     ctrl.style.display = visible ? "" : "none";
   }
   const heading = $.libHeading;
-  const headerEl = $.coveragePanel.querySelector(".card-head");
+  const headerEl = $.coveragePanel.querySelector<HTMLElement>(".card-head");
   if (!headerEl) {
     return;
   }
@@ -101,20 +101,16 @@ export function configurePanel(visible: boolean, detail?: DetailConfig): void {
   });
 
   if (!detail) {
-    if (heading) {
-      heading.textContent = "Library";
-    }
+    heading.textContent = "Library";
     store.set("detailCtx", null);
     return;
   }
 
   // Drilldown mode: set title with info, add back button and arr link.
-  if (heading) {
-    heading.textContent = "";
-    heading.appendChild(text(detail.title));
-    if (detail.info) {
-      heading.appendChild(el("span", { className: "detail-info" }, detail.info));
-    }
+  heading.textContent = "";
+  heading.appendChild(text(detail.title));
+  if (detail.info) {
+    heading.appendChild(el("span", { className: "detail-info" }, detail.info));
   }
 
   // Back button before the heading.
@@ -194,7 +190,7 @@ export function configurePanel(visible: boolean, detail?: DetailConfig): void {
 // Build coverage badge fragment for a single item's targets.
 function buildBadges(targets: CoverageTarget[]): DocumentFragment {
   const frag = document.createDocumentFragment();
-  if (!targets || targets.length === 0) {
+  if (targets.length === 0) {
     frag.appendChild(el("span", { className: "badge", "data-status": "muted" }, "not scanned"));
     return frag;
   }
@@ -248,13 +244,13 @@ export function patchCoverageBadge(mediaId: string, targets: CoverageTarget[]): 
 }
 
 /** Fetch a page from the in-memory filtered coverage data. */
-async function fetchCoveragePage(offset: number, limit: number): Promise<Page<CoverageItem>> {
+function fetchCoveragePage(offset: number, limit: number): Promise<Page<CoverageItem>> {
   if (cachedFilterVersion !== filterVersion) {
     filteredCache = applyFilters(store.get("coverageData"));
     cachedFilterVersion = filterVersion;
   }
   const slice = filteredCache.slice(offset, offset + limit);
-  return { items: slice, hasMore: offset + limit < filteredCache.length };
+  return Promise.resolve({ items: slice, hasMore: offset + limit < filteredCache.length });
 }
 
 /** Render accumulated coverage items into a table fragment. */
@@ -306,7 +302,7 @@ function renderCoverageItems(items: CoverageItem[]): DocumentFragment {
 
 function buildCoverageRow(item: CoverageItem): HTMLElement {
   const isSeries = item._type === "series";
-  const targets = item.targets || [];
+  const targets = item.targets;
   const covFrag = buildBadges(targets);
   const covId = coverageMediaId(item);
 
@@ -362,21 +358,19 @@ function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
   const covId = coverageMediaId(item);
   const cell = row.querySelector(`[data-cov-id="${CSS.escape(covId)}"]`);
   if (cell) {
-    cell.replaceChildren(buildBadges(item.targets || []));
+    cell.replaceChildren(buildBadges(item.targets));
   }
 }
 
 function ensureList(): PagedList {
-  if (!list) {
-    list = createPagedList<CoverageItem>({
-      container: $.coverageContent,
-      fetchPage: fetchCoveragePage,
-      renderItems: renderCoverageItems,
-      pageSize: COV_PAGE_SIZE,
-      emptyMessage: "No matching items.",
-      emptyNoData: "No media found. Data will appear after the first scheduled scan.",
-    });
-  }
+  list ??= createPagedList<CoverageItem>({
+    container: $.coverageContent,
+    fetchPage: fetchCoveragePage,
+    renderItems: renderCoverageItems,
+    pageSize: COV_PAGE_SIZE,
+    emptyMessage: "No matching items.",
+    emptyNoData: "No media found. Data will appear after the first scheduled scan.",
+  });
   return list;
 }
 
@@ -407,7 +401,7 @@ function applyFilters(data: CoverageItem[] | null | undefined): CoverageItem[] {
   }
   if (missingOnly) {
     filtered = filtered.filter((item: CoverageItem) => {
-      const targets = item.targets || [];
+      const targets = item.targets;
       if (targets.length === 0) {
         return true;
       }

@@ -38,9 +38,9 @@ export function hideTip(): void {
   clearTimeout(tipTimer ?? undefined);
   tipTimer = null;
   if (tipEl) {
-    const anchored = document.querySelector('[style*="--tip-anchor"]');
+    const anchored = document.querySelector<HTMLElement>('[style*="--tip-anchor"]');
     if (anchored) {
-      anchored.style.anchorName = "";
+      (anchored.style as unknown as Record<string, unknown>)["anchorName"] = "";
     }
     tipEl.remove();
     tipEl = null;
@@ -49,7 +49,7 @@ export function hideTip(): void {
 
 document.addEventListener("pointerover", (e: PointerEvent) => {
   const t = e.target as HTMLElement;
-  const target = t.closest("[data-tip]");
+  const target = t.closest<HTMLElement>("[data-tip]");
   if (!target) {
     hideTip();
     return;
@@ -62,7 +62,7 @@ document.addEventListener("pointerover", (e: PointerEvent) => {
 
 document.addEventListener("pointerout", (e: PointerEvent) => {
   const t = e.target as HTMLElement;
-  const target = t.closest("[data-tip]");
+  const target = t.closest<HTMLElement>("[data-tip]");
   if (target) {
     hideTip();
   }

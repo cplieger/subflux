@@ -55,7 +55,7 @@ export function openFileManager(
   currentTitle = title;
   currentBackPath = backPath || "/";
   currentArrId = arrId ?? 0;
-  videoPaths = paths ?? new Map();
+  videoPaths = paths ?? new Map<string, string>();
 
   const path =
     mediaType === "movie"
@@ -103,7 +103,7 @@ async function refreshFileData(): Promise<void> {
     patch(out, errDiv("Failed to load files"));
     return;
   }
-  filesData = data || [];
+  filesData = data;
   renderFiles();
 }
 
@@ -319,6 +319,7 @@ const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
     if (index === -1) {
       return undefined;
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index validated above
     const entry = filesData[index]!;
     filesData.splice(index, 1);
     renderFiles();

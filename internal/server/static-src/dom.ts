@@ -117,6 +117,7 @@ function reconcileChildren(parent: Node, newChildren: Node[]): void {
 
   let oldIdx = 0;
   for (let i = 0; i < newChildren.length; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
     const newChild = newChildren[i]!;
     const newKey = nodeKey(newChild);
 
@@ -124,10 +125,12 @@ function reconcileChildren(parent: Node, newChildren: Node[]): void {
     if (matched) {
       oldByKey.delete(newKey);
     } else if (!newKey) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
       while (oldIdx < oldChildren.length && nodeKey(oldChildren[oldIdx]!)) {
         oldIdx++;
       }
       if (oldIdx < oldChildren.length) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
         matched = oldChildren[oldIdx]!;
         oldIdx++;
       }
@@ -160,6 +163,7 @@ function reconcileChildren(parent: Node, newChildren: Node[]): void {
   }
 
   while (parent.childNodes.length > newChildren.length) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length > 0 guarantees lastChild
     parent.lastChild!.remove();
   }
 }
@@ -178,7 +182,7 @@ function canPatch(oldNode: Node, newNode: Node): boolean {
 }
 
 function nodeKey(node: Node): string {
-  if (node?.nodeType !== 1) {
+  if (node.nodeType !== 1) {
     return "";
   }
   for (const attr of (node as Element).attributes) {
@@ -320,6 +324,7 @@ export function dialogHead(title: string | HTMLElement, closeFn: () => void): HT
 //
 // Pattern mirrors apps/vibekit/web/static-src/dom.ts `$`.
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- caller specifies T for type narrowing
 function req<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
   if (e === null) {

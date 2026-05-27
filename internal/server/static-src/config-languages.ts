@@ -154,8 +154,8 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
   // Only show advanced if any field has a value.
   const hasAdvanced =
     sub.min_score != null ||
-    (sub.providers && sub.providers.length > 0) ||
-    (sub.exclude && sub.exclude.length > 0);
+    (sub.providers != null && sub.providers.length > 0) ||
+    (sub.exclude != null && sub.exclude.length > 0);
   if (!hasAdvanced) {
     adv.style.display = "none";
   }
@@ -244,7 +244,7 @@ export function serializeLanguagesFromForm(): string {
   if (rulesEl && rulesEl.children.length > 0) {
     lines.push("  rules:");
     for (const block of Array.from(rulesEl.children)) {
-      const audioSel = block.querySelector(".lang-row .lang-select");
+      const audioSel = block.querySelector<HTMLSelectElement>(".lang-row .lang-select");
       if (!audioSel) {
         continue;
       }
@@ -279,24 +279,24 @@ function serializeSubTarget(
   indent: number,
   isDefault: boolean,
 ): void {
-  const langSel = row.querySelector(".lang-select");
+  const langSel = row.querySelector<HTMLSelectElement>(".lang-select");
   if (!langSel) {
     return;
   }
   const indentStr = " ".repeat(indent);
   lines.push(`${indentStr}- code: ${langSel.value}`);
   if (!isDefault) {
-    const varSel = row.querySelector(".variant-select");
+    const varSel = row.querySelector<HTMLSelectElement>(".variant-select");
     const v = varSel ? varSel.value : DEFAULT_VARIANT;
     if (v !== DEFAULT_VARIANT) {
       lines.push(`${indentStr}  variant: ${v}`);
     }
-    const msEl = row.querySelector(".lang-min-score");
+    const msEl = row.querySelector<HTMLInputElement>(".lang-min-score");
     if (msEl?.value) {
       lines.push(`${indentStr}  min_score: ${msEl.value}`);
     }
   }
-  const provEl = row.querySelector(".lang-providers");
+  const provEl = row.querySelector<HTMLInputElement>(".lang-providers");
   if (provEl?.value.trim()) {
     const provs = provEl.value
       .split(",")
@@ -304,7 +304,7 @@ function serializeSubTarget(
       .filter(Boolean);
     lines.push(`${indentStr}  providers: [${provs.join(", ")}]`);
   }
-  const exclEl = row.querySelector(".lang-exclude");
+  const exclEl = row.querySelector<HTMLInputElement>(".lang-exclude");
   if (exclEl?.value.trim()) {
     const excls = exclEl.value
       .split(",")

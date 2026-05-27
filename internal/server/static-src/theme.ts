@@ -48,7 +48,7 @@ function updateThemeIcon(): void {
 
   const newName = (active && icons[active]) ?? "moon";
   const current = iconEl.querySelector(".icon");
-  const isSame = current && current.classList.contains(`icon-${newName}`);
+  const isSame = current?.classList.contains(`icon-${newName}`);
   if (isSame) {
     return;
   }

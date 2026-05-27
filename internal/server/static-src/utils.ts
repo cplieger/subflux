@@ -54,6 +54,7 @@ export function prettyLabel(s: string): string {
 let pending: Promise<void> | null = null;
 
 export function viewTransition(fn: () => void): void {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
   if (!document.startViewTransition) {
     fn();
     return;
@@ -63,7 +64,7 @@ export function viewTransition(fn: () => void): void {
     pending = t.finished.then(() => {
       pending = null;
     });
-    t.ready.catch(() => {});
+    t.ready.catch(() => { /* ignore */ });
     t.finished.catch(() => {
       pending = null;
     });
@@ -134,7 +135,7 @@ export function coverageMediaId(item: {
   tvdb_id?: number;
   tmdb_id?: number;
 }): string {
-  return item._type === "series" ? `tvdb-${item.tvdb_id}` : `tmdb-${item.tmdb_id}`;
+  return item._type === "series" ? `tvdb-${item.tvdb_id ?? ""}` : `tmdb-${item.tmdb_id ?? ""}`;
 }
 
 // --- Language codes (imported from languages.ts) ---

@@ -139,7 +139,7 @@ export function openSearchPopup(
 
   // Push search URL.
   const idPart: string =
-    mediaType === "episode" ? `/series/${media.tvdb_id}` : `/movie/${media.tmdb_id}`;
+    mediaType === "episode" ? `/series/${media.tvdb_id ?? ""}` : `/movie/${media.tmdb_id ?? ""}`;
   const searchPath = `${idPart}/search/${defaultLang}`;
   if (location.pathname !== searchPath) {
     history.pushState(null, "", searchPath);
@@ -151,6 +151,7 @@ export function openSearchPopup(
   // Build header.
   let title: string = media.title;
   if (mediaType === "episode" && episode) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- episode implies season
     title += ` ${fmtEpisode(season!, episode.episode)}`;
   }
 
@@ -341,7 +342,7 @@ function renderPopupResults(
   season: number | null,
   episode: CoverageEpisode | null,
 ): void {
-  if (!results || results.length === 0) {
+  if (results.length === 0) {
     patch(out, emptyDiv("No results found."));
     return;
   }
@@ -364,6 +365,7 @@ function renderPopupResults(
 
   const visible: SearchResult[] = results.slice(0, 30);
   for (let i = 0; i < visible.length; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
     const s: SearchResult = visible[i]!;
     const isTop: boolean = i === 0;
 
@@ -391,10 +393,11 @@ function renderPopupResults(
     ) as HTMLButtonElement;
 
     // Build score tooltip from match breakdown.
-    const matches: Record<string, number> = s.matches || {};
+    const matches: Record<string, number> = s.matches;
     const keys: string[] = Object.keys(matches);
     const scoreTip: string =
       keys.length > 0
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key from Object.keys
         ? keys.map((k: string) => `${prettyLabel(k)}: ${matches[k]!}`).join("\n")
         : "No attribute matches";
 
@@ -436,7 +439,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
   let filePath = "";
   if (mediaType === "episode" && episode?.path) {
     filePath = episode.path;
-  } else if (mediaType === "movie" && media?.path) {
+  } else if (mediaType === "movie" && media.path) {
     filePath = media.path;
   }
   if (!filePath) {
@@ -461,11 +464,11 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       season: season ?? 0,
       episode: episode ? episode.episode : 0,
       media_type: mediaType,
-      media_id: media ? media.id : 0,
-      top_pick: !!isTop,
-      score: sub.score || 0,
-      hearing_impaired: !!sub.hearing_impaired,
-      forced: !!sub.forced,
+      media_id: media.id,
+      top_pick: isTop,
+      score: sub.score,
+      hearing_impaired: sub.hearing_impaired,
+      forced: sub.forced,
     },
     {
       // Capture the error so we can decide whether to re-enable the button.
@@ -509,6 +512,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     }
     const acts = await apiGet<Activity[]>("/api/activity", signal);
     if (!acts) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (!signal.aborted) {
         setTimeout(pollDownload, DOWNLOAD_POLL_MS);
       }
@@ -519,6 +523,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       seenActivity = true;
     }
     if (act && !act.done) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (!signal.aborted) {
         setTimeout(pollDownload, DOWNLOAD_POLL_MS);
       }
@@ -539,6 +544,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       }
       btn.removeAttribute("data-tip");
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (!signal.aborted) {
         setTimeout(pollDownload, DOWNLOAD_POLL_MS);
       }

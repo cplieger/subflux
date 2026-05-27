@@ -36,7 +36,7 @@ export function resolveFieldValue(
     return field.default ?? "";
   }
   // Try parsed config first (accurate after env expansion).
-  const parsed = (pc as Record<string, unknown>)[sectionKey] || pc;
+  const parsed = (pc as Record<string, unknown>)[sectionKey] ?? pc;
   const parsedRec = parsed as Record<string, unknown>;
   // Try camelCase and snake_case variants.
   const camel = field.key.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
@@ -52,7 +52,10 @@ export function resolveFieldValue(
     if (Array.isArray(val)) {
       return (val as unknown[]).join(", ");
     }
-    return String(val);
+    if (typeof val === "object") {
+      return JSON.stringify(val);
+    }
+    return `${val as string | number | boolean}`;
   }
   // Fall back to raw YAML extraction.
   const raw = sections[sectionKey] ?? "";
@@ -75,9 +78,11 @@ export function renderFieldsSection(
   // Section header with optional toggle.
   if (hasEnableKey) {
     const raw = sections[schema.key] ?? "";
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
     const enableVal = extractYAMLValue(raw, schema.enable_key!);
     // Default to true for backward compat (omitted = enabled).
     const isEnabled = enableVal !== "false";
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
     const toggleId = fieldId(schema.key, schema.enable_key!);
     const toggle = cfgToggle(toggleId, isEnabled);
     const header = el(
@@ -125,9 +130,10 @@ function wireShowWhen(
       continue;
     }
     const depId = fieldId(schema.key, depKey);
-    const depInput =
+    const depInput = (
       container.querySelector(`#${CSS.escape(depId)}`) ??
-      (container.parentElement && container.parentElement.querySelector(`#${CSS.escape(depId)}`));
+      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)
+    ) as HTMLInputElement | null;
     const target = fieldEls[field.key];
     if (!depInput || !target) {
       continue;
@@ -157,9 +163,10 @@ function wireRequires(
       continue;
     }
     const depId = fieldId(schema.key, depKey);
-    const depInput =
+    const depInput = (
       container.querySelector(`#${CSS.escape(depId)}`) ??
-      (container.parentElement && container.parentElement.querySelector(`#${CSS.escape(depId)}`));
+      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)
+    ) as HTMLInputElement | null;
     const targetEl = fieldEls[field.key];
     if (!depInput || !targetEl) {
       continue;

@@ -25,6 +25,7 @@ interface ScanStartEvent {
   data?: { action?: string; detail?: string; source?: string; succeeded?: boolean };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- caller specifies T for type narrowing
 function parseSSE<T>(e: MessageEvent): T | null {
   try {
     return JSON.parse(e.data as string) as T;
@@ -71,7 +72,7 @@ export function connect(): void {
             return id === mediaId;
           });
           if (item) {
-            patchCoverageBadge(coverageMediaId(item), item.targets || []);
+            patchCoverageBadge(coverageMediaId(item), item.targets);
           }
         })
         .catch(() => {

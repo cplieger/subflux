@@ -50,6 +50,7 @@ export function on<K extends keyof EventMap>(event: K, fn: Listener<K>): () => v
   if (!listeners.has(event)) {
     listeners.set(event, []);
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by has() check above
   listeners.get(event)!.push(fn as (...args: unknown[]) => void);
   return () => {
     const list = listeners.get(event);
