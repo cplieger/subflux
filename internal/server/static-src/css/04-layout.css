@@ -3,7 +3,6 @@
    ================================================================ */
 
 /* --- Header --- */
-/* stylelint-disable no-descending-specificity -- scoped selectors don't conflict */
 header:has(h1) {
   display: flex;
   justify-content: space-between;

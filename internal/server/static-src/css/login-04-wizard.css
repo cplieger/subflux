@@ -228,7 +228,6 @@
 /* ================================================================
    11. Arr subsection
    ================================================================ */
-/* stylelint-disable no-descending-specificity -- scoped selectors don't conflict */
 
 .wiz-arr-group {
   margin-block-end: var(--sp-5);
