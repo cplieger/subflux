@@ -15,9 +15,13 @@ describe("formatOffsetMs properties", () => {
     fc.assert(
       fc.property(fc.integer({ min: -999_999_999, max: 999_999_999 }), (ms) => {
         const result = formatOffsetMs(ms);
-        if (ms > 0) {expect(result.startsWith("+")).toBe(true);}
-        else if (ms < 0) {expect(result.startsWith("-")).toBe(true);}
-        else {expect(result).toBe("0.000s");}
+        if (ms > 0) {
+          expect(result.startsWith("+")).toBe(true);
+        } else if (ms < 0) {
+          expect(result.startsWith("-")).toBe(true);
+        } else {
+          expect(result).toBe("0.000s");
+        }
       }),
     );
   });

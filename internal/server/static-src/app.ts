@@ -161,7 +161,9 @@ window.addEventListener("popstate", () => {
   if (configDlg.open && !isUnconfigured()) {
     configDlg.close();
   }
-  viewTransition(() => { void applyRoute(); });
+  viewTransition(() => {
+    void applyRoute();
+  });
 });
 
 // Background polls. The status poll uses pollAction which adds:

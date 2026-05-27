@@ -188,7 +188,9 @@ describe("effect", () => {
         const spy = vi.fn();
         effect(() => {
           const a = get("eff_dyn_a");
-          if (a) {get("eff_dyn_b");}
+          if (a) {
+            get("eff_dyn_b");
+          }
           spy();
         });
         spy.mockClear();

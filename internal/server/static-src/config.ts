@@ -347,7 +347,9 @@ function markRequiredFields(): void {
     const allFilled = schema.fields
       .filter((f: SchemaField) => f.required)
       .every((f: SchemaField) => {
-        const inp = body.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, f.key))}`);
+        const inp = body.querySelector<HTMLInputElement>(
+          `#${CSS.escape(fieldId(schema.key, f.key))}`,
+        );
         if (!inp) {
           return false;
         }
@@ -367,7 +369,9 @@ function markRequiredFields(): void {
       if (!field.required) {
         continue;
       }
-      const inp = body.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, field.key))}`);
+      const inp = body.querySelector<HTMLInputElement>(
+        `#${CSS.escape(fieldId(schema.key, field.key))}`,
+      );
       if (!inp) {
         continue;
       }

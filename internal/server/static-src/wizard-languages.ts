@@ -102,11 +102,11 @@ function renderLangDefaults(container: HTMLElement): void {
   container.replaceChildren();
   for (let i = 0; i < langDefault.length; i++) {
     const entry = langDefault[i];
-    if (!entry) { continue; }
+    if (!entry) {
+      continue;
+    }
     const row = el("div", { className: "wiz-lang-row" });
-    row.appendChild(
-      langSelect("wiz-lang-def-code-" + String(i), entry.code, "Subtitle language"),
-    );
+    row.appendChild(langSelect("wiz-lang-def-code-" + String(i), entry.code, "Subtitle language"));
     row.appendChild(variantSelect("wiz-lang-def-variant-" + String(i), entry.variant));
     if (langDefault.length > 1) {
       const idx = i;
@@ -134,15 +134,13 @@ function renderLangRules(container: HTMLElement): void {
   container.replaceChildren();
   for (let i = 0; i < langRules.length; i++) {
     const entry = langRules[i];
-    if (!entry) { continue; }
+    if (!entry) {
+      continue;
+    }
     const row = el("div", { className: "wiz-lang-row" });
-    row.appendChild(
-      langSelect("wiz-lang-rule-audio-" + String(i), entry.audio, "Audio language"),
-    );
+    row.appendChild(langSelect("wiz-lang-rule-audio-" + String(i), entry.audio, "Audio language"));
     row.appendChild(el("span", { className: "wiz-lang-arrow" }, "\u2192"));
-    row.appendChild(
-      langSelect("wiz-lang-rule-code-" + String(i), entry.code, "Subtitle language"),
-    );
+    row.appendChild(langSelect("wiz-lang-rule-code-" + String(i), entry.code, "Subtitle language"));
     row.appendChild(variantSelect("wiz-lang-rule-variant-" + String(i), entry.variant));
     const idx = i;
     row.appendChild(
@@ -167,7 +165,9 @@ function renderLangRules(container: HTMLElement): void {
 function collectLangDefaults(): void {
   for (let i = 0; i < langDefault.length; i++) {
     const entry = langDefault[i];
-    if (!entry) { continue; }
+    if (!entry) {
+      continue;
+    }
     const c = $("wiz-lang-def-code-" + String(i)) as HTMLSelectElement | null;
     const v = $("wiz-lang-def-variant-" + String(i)) as HTMLSelectElement | null;
     if (c) {
@@ -182,7 +182,9 @@ function collectLangDefaults(): void {
 function collectLangRules(): void {
   for (let i = 0; i < langRules.length; i++) {
     const entry = langRules[i];
-    if (!entry) { continue; }
+    if (!entry) {
+      continue;
+    }
     const a = $("wiz-lang-rule-audio-" + String(i)) as HTMLSelectElement | null;
     const c = $("wiz-lang-rule-code-" + String(i)) as HTMLSelectElement | null;
     const v = $("wiz-lang-rule-variant-" + String(i)) as HTMLSelectElement | null;

@@ -98,7 +98,11 @@ function buildMenuContent(): void {
   );
 
   // Logout.
-  items.push(menuItem("Logout", "close", () => { void doLogout(); }));
+  items.push(
+    menuItem("Logout", "close", () => {
+      void doLogout();
+    }),
+  );
 
   popup.replaceChildren(...items);
 }

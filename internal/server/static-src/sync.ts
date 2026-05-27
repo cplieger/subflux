@@ -638,7 +638,9 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
       "aria-label": "Play/Pause",
       onclick: () => {
         if (video.paused) {
-          video.play().catch(() => { /* ignore */ });
+          video.play().catch(() => {
+            /* ignore */
+          });
         } else {
           video.pause();
         }
@@ -825,7 +827,9 @@ function seekPreview(video: HTMLVideoElement, deltaSec: number): void {
         syncState.videoPath,
       )}&start=${absTarget}&buffered=true`;
     }
-    video.play().catch(() => { /* ignore */ });
+    video.play().catch(() => {
+      /* ignore */
+    });
     video.addEventListener(
       "loadedmetadata",
       () => {

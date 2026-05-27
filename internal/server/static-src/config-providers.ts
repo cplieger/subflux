@@ -114,7 +114,9 @@ export function renderProvidersSection(
         head.insertBefore(badge, head.lastElementChild);
       }
     })
-    .catch(() => { /* ignore */ });
+    .catch(() => {
+      /* ignore */
+    });
 
   return sec;
 }

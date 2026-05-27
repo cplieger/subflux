@@ -130,10 +130,8 @@ function wireShowWhen(
       continue;
     }
     const depId = fieldId(schema.key, depKey);
-    const depInput = (
-      container.querySelector(`#${CSS.escape(depId)}`) ??
-      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)
-    ) as HTMLInputElement | null;
+    const depInput = (container.querySelector(`#${CSS.escape(depId)}`) ??
+      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)) as HTMLInputElement | null;
     const target = fieldEls[field.key];
     if (!depInput || !target) {
       continue;
@@ -163,10 +161,8 @@ function wireRequires(
       continue;
     }
     const depId = fieldId(schema.key, depKey);
-    const depInput = (
-      container.querySelector(`#${CSS.escape(depId)}`) ??
-      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)
-    ) as HTMLInputElement | null;
+    const depInput = (container.querySelector(`#${CSS.escape(depId)}`) ??
+      container.parentElement?.querySelector(`#${CSS.escape(depId)}`)) as HTMLInputElement | null;
     const targetEl = fieldEls[field.key];
     if (!depInput || !targetEl) {
       continue;

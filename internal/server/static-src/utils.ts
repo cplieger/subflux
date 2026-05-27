@@ -64,7 +64,9 @@ export function viewTransition(fn: () => void): void {
     pending = t.finished.then(() => {
       pending = null;
     });
-    t.ready.catch(() => { /* ignore */ });
+    t.ready.catch(() => {
+      /* ignore */
+    });
     t.finished.catch(() => {
       pending = null;
     });

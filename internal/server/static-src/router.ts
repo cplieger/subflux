@@ -80,7 +80,9 @@ export function navigate(path: string, replace?: boolean): void {
       history.pushState(null, "", path);
     }
   }
-  viewTransition(() => { void applyRoute(); });
+  viewTransition(() => {
+    void applyRoute();
+  });
 }
 
 // Update library filter query params in the URL without a full

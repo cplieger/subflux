@@ -74,7 +74,9 @@ const secDlg = (): HTMLDialogElement => dialog("securityDialog");
 const secDlgBody = (): HTMLElement => secDlg().querySelector<HTMLElement>(".dlg-body")!;
 
 export function initSecurity(): void {
-  bus.on(bus.BusEvent.OpenSecurity, () => { void openSecurity(); });
+  bus.on(bus.BusEvent.OpenSecurity, () => {
+    void openSecurity();
+  });
 }
 
 async function openSecurity(): Promise<void> {

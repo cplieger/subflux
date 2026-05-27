@@ -360,7 +360,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         if (shared === undefined) {
           if (opts.onSettled) {
             safeInvoke(def.name, "onSettled", () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
               opts.onSettled!(args);
             });
           }
@@ -399,7 +399,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
             // Cancelled originals don't fire onError on deduped callers.
             if (opts.onSettled) {
               safeInvoke(def.name, "onSettled", () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                 opts.onSettled!(args);
               });
             }
@@ -409,7 +409,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
             // Defensive: runOnce never rejects, but guarantee onSettled fires.
             if (opts.onSettled) {
               safeInvoke(def.name, "onSettled", () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
                 opts.onSettled!(args);
               });
             }
@@ -509,7 +509,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
         } finally {
           if (opts.onSettled) {
             safeInvoke(def.name, "onSettled", () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
               opts.onSettled!(args);
             });
           }
@@ -605,7 +605,7 @@ export function defineAction<TArgs, TResult, TOp = unknown>(
       started.delete(id);
       if (opts.onSettled) {
         safeInvoke(def.name, "onSettled", () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
           opts.onSettled!(args);
         });
       }

@@ -38,7 +38,13 @@ export type {
   SubtitleEntry,
 } from "./wire/types.gen.js";
 
-import type { MovieItem, CoverageTarget, SubtitleEntry, SchemaField, ProviderSchema } from "./wire/types.gen.js";
+import type {
+  MovieItem,
+  CoverageTarget,
+  SubtitleEntry,
+  SchemaField,
+  ProviderSchema,
+} from "./wire/types.gen.js";
 
 // --- Client-only types ---
 

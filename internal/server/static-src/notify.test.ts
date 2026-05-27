@@ -84,7 +84,9 @@ describe("notify", () => {
     expect(toasts().length).toBe(1);
     vi.advanceTimersByTime(4000);
     const toast = document.querySelector(".toast") as HTMLElement;
-    if (toast) {toast.dispatchEvent(new Event("animationend"));}
+    if (toast) {
+      toast.dispatchEvent(new Event("animationend"));
+    }
     vi.advanceTimersByTime(400);
     expect(toasts().length).toBe(0);
   });

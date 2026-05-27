@@ -397,8 +397,8 @@ function renderPopupResults(
     const keys: string[] = Object.keys(matches);
     const scoreTip: string =
       keys.length > 0
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key from Object.keys
-        ? keys.map((k: string) => `${prettyLabel(k)}: ${matches[k]!}`).join("\n")
+        ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key from Object.keys
+          keys.map((k: string) => `${prettyLabel(k)}: ${matches[k]!}`).join("\n")
         : "No attribute matches";
 
     const row: HTMLElement = el(

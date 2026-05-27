@@ -143,8 +143,9 @@ function listTSFiles(dir: string, out: string[] = []): string[] {
         name === ".vitest-cache" ||
         name === "actions" ||
         name === "wire"
-      )
-        {continue;}
+      ) {
+        continue;
+      }
       listTSFiles(p, out);
     } else if (name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts")) {
       out.push(p);
@@ -159,9 +160,13 @@ describe("action framework — regression guard", () => {
     for (const file of listTSFiles(ROOT)) {
       const rel = relative(ROOT, file);
       const base = rel.split("/").pop() ?? rel;
-      if (BACKGROUND_ALLOWLIST.has(base)) {continue;}
+      if (BACKGROUND_ALLOWLIST.has(base)) {
+        continue;
+      }
       // Skip api-client itself — it's the underlying primitive.
-      if (base === "api-client.ts") {continue;}
+      if (base === "api-client.ts") {
+        continue;
+      }
       const src = readFileSync(file, "utf8");
       for (const { name, re } of PATTERNS) {
         for (const m of src.matchAll(re)) {

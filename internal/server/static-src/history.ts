@@ -192,4 +192,6 @@ export function reloadHistory(): void {
   void ensureList().reload();
 }
 
-on(BusEvent.LoadHistory, () => { void loadHistory(); });
+on(BusEvent.LoadHistory, () => {
+  void loadHistory();
+});

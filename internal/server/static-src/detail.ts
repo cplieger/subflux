@@ -696,7 +696,9 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
         }
       }
     })
-    .catch(() => { /* ignore */ });
+    .catch(() => {
+      /* ignore */
+    });
   // Mark as detail view so refreshCurrentPage doesn't replace with library.
   store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
   const out = $.coverageContent;
@@ -807,5 +809,9 @@ on(BusEvent.OpenSeries, (item, skipPush) => {
 on(BusEvent.OpenMovie, (item, skipPush) => {
   openMovieDetail(item as MovieDetail, skipPush);
 });
-on(BusEvent.ScanSeries, (item, btn) => { void triggerSeriesScan(item as SeriesItem, btn); });
-on(BusEvent.ScanMovie, (item, btn) => { void triggerMovieScan(item as MovieDetail, btn); });
+on(BusEvent.ScanSeries, (item, btn) => {
+  void triggerSeriesScan(item as SeriesItem, btn);
+});
+on(BusEvent.ScanMovie, (item, btn) => {
+  void triggerMovieScan(item as MovieDetail, btn);
+});

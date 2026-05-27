@@ -3,7 +3,10 @@
 // Inside batch(): effects are deferred and coalesced, flushed via
 // MessageChannel on the next microtask (React scheduler pattern).
 
-interface Subscriber { execute(): void; deps: Set<Set<Subscriber>> }
+interface Subscriber {
+  execute(): void;
+  deps: Set<Set<Subscriber>>;
+}
 let tracking: Subscriber | null = null;
 let batchDepth = 0;
 const pending = new Set<Subscriber>();
@@ -19,32 +22,46 @@ function flush(): void {
 }
 
 function drainPending(): void {
-  if (flushing) {return;}
+  if (flushing) {
+    return;
+  }
   flushing = true;
   // Drain iteratively — effects may enqueue more effects.
   while (pending.size > 0) {
     const fns = [...pending];
     pending.clear();
-    for (const s of fns) {s.execute();}
+    for (const s of fns) {
+      s.execute();
+    }
   }
   flushing = false;
 }
 
 function notify(subs: Set<Subscriber>): void {
-  for (const s of subs) {pending.add(s);}
-  if (batchDepth === 0) {drainPending();}
+  for (const s of subs) {
+    pending.add(s);
+  }
+  if (batchDepth === 0) {
+    drainPending();
+  }
 }
 
 function schedulePending(): void {
-  if (pending.size === 0 || scheduled) {return;}
+  if (pending.size === 0 || scheduled) {
+    return;
+  }
   scheduled = true;
   channel.port2.postMessage(null);
 }
 
 /** Flush all pending effects synchronously. No-op inside batch(). */
 export function flushSync(): void {
-  if (batchDepth > 0) {return;}
-  if (scheduled) {scheduled = false;}
+  if (batchDepth > 0) {
+    return;
+  }
+  if (scheduled) {
+    scheduled = false;
+  }
   drainPending();
 }
 
@@ -65,7 +82,9 @@ export function signal<T>(initial: T): Signal<T> {
       return val;
     },
     set value(v: T) {
-      if (Object.is(val, v)) {return;}
+      if (Object.is(val, v)) {
+        return;
+      }
       val = v;
       notify(subs);
     },
@@ -83,8 +102,12 @@ export function effect(fn: () => Cleanup): () => void {
   const sub: Subscriber = {
     deps: new Set(),
     execute() {
-      if (disposed) {return;}
-      for (const depSet of sub.deps) {depSet.delete(sub);}
+      if (disposed) {
+        return;
+      }
+      for (const depSet of sub.deps) {
+        depSet.delete(sub);
+      }
       sub.deps.clear();
       if (cleanup) {
         cleanup();
@@ -104,7 +127,9 @@ export function effect(fn: () => Cleanup): () => void {
   sub.execute();
   return () => {
     disposed = true;
-    for (const depSet of sub.deps) {depSet.delete(sub);}
+    for (const depSet of sub.deps) {
+      depSet.delete(sub);
+    }
     sub.deps.clear();
     if (cleanup) {
       cleanup();
@@ -119,6 +144,8 @@ export function batch(fn: () => void): void {
     fn();
   } finally {
     batchDepth--;
-    if (batchDepth === 0) {schedulePending();}
+    if (batchDepth === 0) {
+      schedulePending();
+    }
   }
 }

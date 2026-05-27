@@ -108,7 +108,9 @@ async function detectAuthMethods(): Promise<void> {
   $("oidcBtn")?.addEventListener("click", () => {
     window.location.href = "/api/auth/oidc";
   });
-  $("passkeyBtn")?.addEventListener("click", () => { void passkeyLogin(); });
+  $("passkeyBtn")?.addEventListener("click", () => {
+    void passkeyLogin();
+  });
 }
 
 // --- Conditional UI (passkey autofill) ---
@@ -350,7 +352,6 @@ function wireTOTPForm(): void {
   }
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   form.addEventListener("submit", async (e: Event) => {
-   
     e.preventDefault();
     hideError("totpError");
     const code = (new FormData(form).get("code") as string) || "";

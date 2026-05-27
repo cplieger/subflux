@@ -53,7 +53,9 @@ function holdRepeat(
   }
 
   function stop(): void {
-    if (timer != null) { clearTimeout(timer); }
+    if (timer != null) {
+      clearTimeout(timer);
+    }
     timer = null;
   }
 
