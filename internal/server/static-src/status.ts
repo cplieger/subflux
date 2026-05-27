@@ -2,7 +2,7 @@
 
 import * as store from './store.js';
 import * as notify from './notify.js';
-import { el, text, icon, patch, $ } from './dom.js';
+import { el, text, icon, $ } from './dom.js';
 import { apiGet, apiGetTyped } from './api-client.js';
 import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from './actions/index.js';
 import { decodeStats, decodeProvidersResponse } from './wire/decoders.gen.js';
@@ -11,6 +11,7 @@ import { fmtTime } from './utils.js';
 import { EMBEDDED_PROVIDER } from './constants.js';
 import { hideTip } from './tooltip.js';
 import type { Activity } from './api-types.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 
 interface Alert {
   id: number;
@@ -193,8 +194,7 @@ export const pollStatusAction = defineAction<void, void>({
 
     if (!popupVisible) return;
     hideTip();
-    patch($.statusPopup, buildPopupContent(
-      stats, providers, activities, alerts, ongoing, isActive));
+    renderPopup(stats, providers, activities, alerts, ongoing, isActive);
   },
   error: false,
 });
@@ -264,88 +264,76 @@ function buildActivityItem(a: Activity): HTMLElement {
     dismissBtn);
 }
 
-// appendAlerts adds persistent and transient alert items to the fragment.
-function appendAlerts(frag: DocumentFragment, alerts: Alert[]): void {
-  for (const a of alerts.filter((x: Alert) => x.kind === 'persistent')) {
-    const dismissBtn = el('button', {
-      type: 'button', className: 'pop-dismiss',
-      'aria-label': 'Dismiss alert',
-      onclick: () => dismissAlert(a.id)
-    }, icon('close'));
-    frag.appendChild(
-      el('div', { className: 'pop-item persistent' },
-        el('span', { className: `level-${a.level}` },
-          `[${a.source}]`),
-        text(` ${a.message}`), dismissBtn,
-        el('div', { className: 'pop-time' },
-          fmtTime(new Date(a.time)))));
-  }
-  for (const a of alerts.filter((x: Alert) => x.kind !== 'persistent')) {
-    const dismissBtn = el('button', {
-      type: 'button', className: 'pop-dismiss',
-      'aria-label': 'Dismiss alert',
-      onclick: () => dismissAlert(a.id)
-    }, icon('close'));
-    frag.appendChild(el('div', { className: 'pop-item' },
-      el('span', { className: `level-${a.level}` },
-        `[${a.level}]`),
+function buildAlertItem(a: Alert): HTMLElement {
+  const dismissBtn = el('button', {
+    type: 'button', className: 'pop-dismiss',
+    'aria-label': 'Dismiss alert',
+    onclick: () => dismissAlert(a.id)
+  }, icon('close'));
+  if (a.kind === 'persistent') {
+    return el('div', { className: 'pop-item persistent' },
+      el('span', { className: `level-${a.level}` }, `[${a.source}]`),
       text(` ${a.message}`), dismissBtn,
-      el('div', { className: 'pop-time' },
-        `${a.source} \u00B7 ${fmtTime(new Date(a.time))}`)));
+      el('div', { className: 'pop-time' }, fmtTime(new Date(a.time))));
   }
+  return el('div', { className: 'pop-item' },
+    el('span', { className: `level-${a.level}` }, `[${a.level}]`),
+    text(` ${a.message}`), dismissBtn,
+    el('div', { className: 'pop-time' }, `${a.source} \u00B7 ${fmtTime(new Date(a.time))}`));
 }
 
 // buildPopupContent constructs the status popup DOM fragment.
-function buildPopupContent(
+interface PopupItem { key: string; build: () => HTMLElement }
+
+function buildPopupItems(
   stats: Stats | null,
   providers: ProvidersResponse,
   activities: Activity[],
   alerts: Alert[],
   ongoing: string[],
   isActive: boolean
-): DocumentFragment {
-  const frag = document.createDocumentFragment();
+): PopupItem[] {
+  const items: PopupItem[] = [];
 
   const statsSummary = buildStatsSummary(stats, providers);
-  if (statsSummary) frag.appendChild(statsSummary);
+  if (statsSummary) items.push({ key: 'stats', build: () => statsSummary });
 
-  // Activity items (skip manual search/download; results visible inline).
   const autoActivities = Array.isArray(activities)
     ? activities.filter((a: Activity) => a.action !== 'Manual Search'
       && a.action !== 'Manual Download'
       && !dismissedActivities.has(a.id))
     : [];
-  for (const a of autoActivities) frag.appendChild(buildActivityItem(a));
+  for (const a of autoActivities) {
+    items.push({ key: `act-${a.id}`, build: () => buildActivityItem(a) });
+  }
 
-  // Embedded subtitle detection errors.
   if (providers.enabled && providers.providers
       && providers.providers[EMBEDDED_PROVIDER]) {
     const emb = providers.providers[EMBEDDED_PROVIDER];
     if (emb.last_error) {
-      frag.appendChild(el('div', { className: 'pop-item' },
-        el('span', { className: 'level-warn' },
-          'Embedded detection: '),
-        text(emb.last_error.replace(
-          /detect embedded subs: /g, ''))));
+      const errMsg = emb.last_error.replace(/detect embedded subs: /g, '');
+      items.push({ key: 'emb-err', build: () => el('div', { className: 'pop-item' },
+        el('span', { className: 'level-warn' }, 'Embedded detection: '),
+        text(errMsg)) });
     }
   }
 
-  // Unhealthy providers.
   if (ongoing.length > 0) {
     for (const name of ongoing) {
       const p = providers.providers?.[name];
       if (!p) continue;
       const err = p.last_error || `${p.recent_failures} failures`;
-      frag.appendChild(el('div', { className: 'pop-item' },
-        el('span', { className: 'level-warn' }, `${name}: `),
-        text(err)));
+      items.push({ key: `prov-${name}`, build: () => el('div', { className: 'pop-item' },
+        el('span', { className: 'level-warn' }, `${name}: `), text(err)) });
     }
   }
 
-  // Alerts.
-  if (Array.isArray(alerts) && alerts.length > 0) appendAlerts(frag, alerts);
+  if (Array.isArray(alerts) && alerts.length > 0) {
+    for (const a of alerts) {
+      items.push({ key: `alert-${a.id}`, build: () => buildAlertItem(a) });
+    }
+  }
 
-  // Scan timing (hidden during active scans).
   if (!isActive && stats && stats.last_scan) {
     let scanLabel = '';
     const lastDone = activities.filter((a: Activity) => a.done
@@ -367,16 +355,31 @@ function buildPopupContent(
           new Date(), new Date(Date.now() + remaining))}`;
       }
     }
-    frag.appendChild(
-      el('div', { className: 'pop-item muted' }, scanText));
+    items.push({ key: 'scan-timing', build: () =>
+      el('div', { className: 'pop-item muted' }, scanText) });
   }
 
-  if (frag.childNodes.length === 0) {
-    frag.appendChild(
-      el('div', { className: 'pop-item muted' }, 'All clear'));
+  if (items.length === 0) {
+    items.push({ key: 'empty', build: () =>
+      el('div', { className: 'pop-item muted' }, 'All clear') });
   }
 
-  return frag;
+  return items;
+}
+
+function renderPopup(
+  stats: Stats | null,
+  providers: ProvidersResponse,
+  activities: Activity[],
+  alerts: Alert[],
+  ongoing: string[],
+  isActive: boolean
+): void {
+  const items = buildPopupItems(stats, providers, activities, alerts, ongoing, isActive);
+  reconcile($.statusPopup, items, {
+    key: (item) => item.key,
+    mount: (item) => item.build(),
+  });
 }
 
 function dismissActivity(id: string): void {

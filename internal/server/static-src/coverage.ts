@@ -12,6 +12,7 @@ import type { DetailConfig } from './bus.js';
 import { createPagedList } from './paged-list.js';
 import type { PagedList, Page } from './paged-list.js';
 import type { CoverageTarget, CoverageItem } from './api-types.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 
 // --- Coverage view ---
 
@@ -222,52 +223,15 @@ function renderCoverageItems(items: CoverageItem[]): DocumentFragment {
     el('th')
   ));
   const tbody = el('tbody');
-  for (const item of items) {
-    const isSeries = item._type === 'series';
-    const targets = item.targets || [];
-    const covFrag = buildBadges(targets);
 
-    const arrType = isSeries ? 'Sonarr' : 'Radarr';
-    let actionBtn: HTMLElement;
-    if (item.excluded) {
-      actionBtn = el('span', {
-        className: 'badge', 'data-status': 'muted',
-        'data-tip': `Excluded by arr tag. Remove the tag in ${
-           arrType  } to enable.`
-      }, icon('excluded'));
-    } else {
-      const scanEvent = isSeries ? BusEvent.ScanSeries : BusEvent.ScanMovie;
-      actionBtn = el('button', {
-        type: 'button', className: 'ghost',
-        'data-tip': 'Auto: scan and download missing subtitles',
-        onclick: (e: MouseEvent) => {
-          e.stopPropagation();
-          emit(scanEvent, item, e.currentTarget as HTMLButtonElement | null);
-        }
-      }, icon('search'),
-        el('span', { className: 'btn-text' }, ' Search'));
-    }
-
-    const openDetail = isSeries
-      ? () => emit(BusEvent.OpenSeries, item)
-      : () => emit(BusEvent.OpenMovie, item);
-
-    const covId = coverageMediaId(item);
-
-    tbody.appendChild(clickableRow(openDetail,
-      el('td', { 'data-col': 'title' }, item.title),
-      el('td', { 'data-col': 'meta' }, String(item.year || '')),
-      el('td', { 'data-col': 'meta' },
-        langName(item.rule || 'default')),
-      el('td', { 'data-col': 'badges', 'data-cov-id': covId },
-        covFrag),
-      el('td', { 'data-col': 'actions' }, actionBtn)
-    ));
-  }
+  reconcile(tbody, items, {
+    key: (item) => coverageMediaId(item),
+    mount: (item) => buildCoverageRow(item),
+    update: (row, item) => updateCoverageRow(row, item),
+  });
 
   const frag = document.createDocumentFragment();
   const tbl = el('table', { className: 'library' }, thead, tbody);
-  // Estimate title column width from the full filtered set.
   const source = filteredCache.length > 0 ? filteredCache : items;
   const avgLen = Math.ceil(
     source.reduce((sum: number, i: CoverageItem) => sum + i.title.length, 0)
@@ -275,6 +239,51 @@ function renderCoverageItems(items: CoverageItem[]): DocumentFragment {
   tbl.style.setProperty('--title-w', `${avgLen  }ch`);
   frag.appendChild(tbl);
   return frag;
+}
+
+function buildCoverageRow(item: CoverageItem): HTMLElement {
+  const isSeries = item._type === 'series';
+  const targets = item.targets || [];
+  const covFrag = buildBadges(targets);
+  const covId = coverageMediaId(item);
+
+  const arrType = isSeries ? 'Sonarr' : 'Radarr';
+  let actionBtn: HTMLElement;
+  if (item.excluded) {
+    actionBtn = el('span', {
+      className: 'badge', 'data-status': 'muted',
+      'data-tip': `Excluded by arr tag. Remove the tag in ${arrType} to enable.`
+    }, icon('excluded'));
+  } else {
+    const scanEvent = isSeries ? BusEvent.ScanSeries : BusEvent.ScanMovie;
+    actionBtn = el('button', {
+      type: 'button', className: 'ghost',
+      'data-tip': 'Auto: scan and download missing subtitles',
+      onclick: (e: MouseEvent) => {
+        e.stopPropagation();
+        emit(scanEvent, item, e.currentTarget as HTMLButtonElement | null);
+      }
+    }, icon('search'),
+      el('span', { className: 'btn-text' }, ' Search'));
+  }
+
+  const openDetail = isSeries
+    ? () => emit(BusEvent.OpenSeries, item)
+    : () => emit(BusEvent.OpenMovie, item);
+
+  return clickableRow(openDetail,
+    el('td', { 'data-col': 'title' }, item.title),
+    el('td', { 'data-col': 'meta' }, String(item.year || '')),
+    el('td', { 'data-col': 'meta' }, langName(item.rule || 'default')),
+    el('td', { 'data-col': 'badges', 'data-cov-id': covId }, covFrag),
+    el('td', { 'data-col': 'actions' }, actionBtn)
+  ) as HTMLElement;
+}
+
+function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
+  const covId = coverageMediaId(item);
+  const cell = row.querySelector(`[data-cov-id="${CSS.escape(covId)}"]`);
+  if (cell) cell.replaceChildren(buildBadges(item.targets || []));
 }
 
 function ensureList(): PagedList {

@@ -3,6 +3,7 @@
 import * as bus from './bus.js';
 import * as notify from './notify.js';
 import { el, icon, dialog, closeDialog, dialogHead, onBackdropClose, patch } from './dom.js';
+import { reconcile } from './lib/reactive/reconcile.js';
 import { apiGet, apiPost, apiPostRaw, apiPut, apiPutRaw, apiDelete, apiDeleteRaw } from './api-client.js';
 import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from './webauthn-utils.js';
 import type { MeResponse } from './api-types.js';
@@ -353,13 +354,14 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
 
   const items = passkeys || [];
 
+  const list = el('div', { className: 'sec-list' });
+  reconcile(list, items, {
+    key: (pk) => String(pk.id),
+    mount: (pk) => passkeyRow(pk),
+  });
   if (items.length === 0) {
     sec.appendChild(el('p', { className: 'muted' }, 'No passkeys registered.'));
   } else {
-    const list = el('div', { className: 'sec-list' });
-    for (const pk of items) {
-      list.appendChild(passkeyRow(pk));
-    }
     sec.appendChild(list);
   }
 
@@ -510,13 +512,14 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
 
   const keys = apikeys || [];
 
+  const list = el('div', { className: 'sec-list' });
+  reconcile(list, keys, {
+    key: (k) => String(k.id),
+    mount: (k) => apiKeyRow(k),
+  });
   if (keys.length === 0) {
     sec.appendChild(el('p', { className: 'muted' }, 'No API keys.'));
   } else {
-    const list = el('div', { className: 'sec-list' });
-    for (const key of keys) {
-      list.appendChild(apiKeyRow(key));
-    }
     sec.appendChild(list);
   }
 
