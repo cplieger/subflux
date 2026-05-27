@@ -55,6 +55,7 @@ td[data-col="meta"] {
 /* Library: second meta cell gets column 2 with dot separator */
 .library td[data-col="meta"] + td[data-col="meta"] {
   grid-column: 2;
+
   &::before {
     content: "\00B7\00A0";
     color: var(--muted);
@@ -97,6 +98,7 @@ td[data-col="actions"] {
   :where(tbody) tr {
     display: table-row;
   }
+
   :where(tbody) td {
     display: table-cell;
     padding: var(--sp-4);
@@ -104,12 +106,15 @@ td[data-col="actions"] {
     line-height: 1.75rem;
     margin: 0;
   }
+
   td[data-col="actions"] {
     display: table-cell;
   }
+
   .library td[data-col="meta"] + td[data-col="meta"]::before {
     display: none;
   }
+
   td[data-col="badges"] {
     margin-block-start: 0;
   }
@@ -118,15 +123,19 @@ td[data-col="actions"] {
   .library th:nth-child(1) {
     width: 30%;
   }
+
   .library th:nth-child(2) {
     width: 8%;
   }
+
   .library th:nth-child(3) {
     width: 10%;
   }
+
   .library th:nth-child(4) {
     width: 40%;
   }
+
   .library th:nth-child(5) {
     width: 12%;
   }
@@ -142,6 +151,7 @@ td[data-col="actions"] {
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
+
   .library td:last-child {
     white-space: nowrap;
     text-align: end;
@@ -151,18 +161,23 @@ td[data-col="actions"] {
   .history th:nth-child(1) {
     width: 16%;
   }
+
   .history th:nth-child(2) {
     width: 29%;
   }
+
   .history th:nth-child(3) {
     width: 7%;
   }
+
   .history th:nth-child(4) {
     width: 10%;
   }
+
   .history th:nth-child(5) {
     width: 8%;
   }
+
   .history th:nth-child(6) {
     width: 30%;
   }
@@ -188,10 +203,12 @@ td[data-col="actions"] {
     white-space: normal;
     text-overflow: clip;
   }
+
   table.history {
     display: table;
     width: 100%;
   }
+
   table.history :where(tbody) {
     display: table-row-group;
   }
@@ -202,9 +219,11 @@ td[data-col="actions"] {
     min-width: unset;
     overflow: visible;
   }
+
   .history td[data-col="meta"]::before {
     display: none;
   }
+
   .history td[data-col="meta"]::after {
     display: none;
   }
@@ -240,6 +259,7 @@ td[data-col="actions"] {
   .movie-detail tbody td {
     grid-row: unset;
   }
+
   .movie-detail tbody td.ep-coverage {
     display: inline-flex;
   }
@@ -248,9 +268,11 @@ td[data-col="actions"] {
     display: table;
     width: 100%;
   }
+
   .series-detail :where(colgroup) {
     display: table-column-group;
   }
+
   .series-detail :where(tbody) {
     display: table-row-group;
   }
@@ -265,6 +287,7 @@ td[data-col="actions"] {
   .series-detail .season-gap td {
     display: table-cell;
   }
+
   .series-detail .ep-coverage {
     display: inline-flex;
     flex-wrap: wrap;
@@ -308,6 +331,7 @@ td[data-col="actions"] {
 
 .history td[data-col="meta"]:nth-child(3) {
   order: 3;
+
   &::before {
     content: "\00B7\00A0";
   }
@@ -315,6 +339,7 @@ td[data-col="actions"] {
 
 .history td[data-col="meta"]:nth-child(4) {
   order: 4;
+
   &::before {
     content: "\00B7\00A0";
   }
@@ -322,6 +347,7 @@ td[data-col="actions"] {
 
 .history td[data-col="meta"]:nth-child(5) {
   order: 5;
+
   &::before {
     content: "\00B7\00A0";
   }
@@ -355,6 +381,7 @@ td[data-col="actions"] {
   padding: 0;
   grid-row: 1;
 }
+
 .movie-detail td[data-col="actions"] {
   grid-column: 3;
   justify-self: end;
@@ -363,6 +390,7 @@ td[data-col="actions"] {
 /* Season headers */
 .season-head {
   cursor: default;
+
   &:hover {
     background: transparent;
   }
@@ -385,10 +413,12 @@ td[data-col="actions"] {
 .season-gap {
   border: none;
 }
+
 .season-gap td {
   padding: 0;
   height: var(--sp-4);
 }
+
 .season-gap:hover {
   background: transparent;
 }
@@ -397,13 +427,16 @@ td[data-col="actions"] {
 .ep-num {
   font-variant-numeric: tabular-nums;
 }
+
 .ep-title {
   min-width: 0;
 }
+
 .ep-aired {
   color: var(--muted);
   font-size: 0.75em;
 }
+
 .ep-coverage {
   display: inline-flex;
   flex-wrap: wrap;
@@ -537,6 +570,7 @@ td[data-col="actions"] {
   font-weight: 400;
   font-size: var(--text-sm);
   color: var(--muted);
+
   &::before {
     content: "\00A0\00B7\00A0";
   }
@@ -567,6 +601,7 @@ td[data-col="actions"] {
   background: var(--ghost);
   color: var(--text);
   font-size: var(--text-sm);
+
   &:hover {
     background: var(--ghost-hover);
   }

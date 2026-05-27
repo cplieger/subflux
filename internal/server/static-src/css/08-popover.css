@@ -94,6 +94,7 @@
   &:last-child {
     border: none;
   }
+
   &:empty {
     display: none;
   }
@@ -141,9 +142,11 @@
 .act-icon.act-active {
   color: var(--accent);
 }
+
 .act-icon.act-done {
   color: var(--ok);
 }
+
 .act-icon.act-queued {
   color: var(--muted);
 }
@@ -204,6 +207,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
+
   &:hover {
     color: var(--text);
     background: var(--border);
@@ -213,12 +217,15 @@
 .level-ok {
   color: var(--ok);
 }
+
 .level-warn {
   color: var(--warn);
 }
+
 .level-error {
   color: var(--err);
 }
+
 .level-info {
   color: var(--info);
 }

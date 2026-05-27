@@ -41,6 +41,7 @@
   .files-table td[data-col="offset"] {
     display: table-cell;
   }
+
   .files-table td:last-child {
     text-align: end;
   }

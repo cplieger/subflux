@@ -14,9 +14,11 @@
   &:last-child {
     border: none;
   }
+
   &:hover {
     background: var(--accent-dim);
   }
+
   &.top {
     background: var(--ok-dim);
     border-radius: var(--radius-sm);
@@ -48,10 +50,12 @@
   color: var(--warn);
   font-size: var(--text-xs);
 }
+
 .result-dl {
   text-align: end;
   padding-inline-end: var(--sp-4);
 }
+
 .result-count {
   margin-block-end: var(--sp-4);
   font-size: var(--text-sm);
@@ -82,6 +86,7 @@
       grid-column: 2;
       grid-row: 2;
       font-size: var(--text-xs);
+
       &::before {
         content: "Provider: ";
       }

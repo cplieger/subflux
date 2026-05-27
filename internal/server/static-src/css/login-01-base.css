@@ -9,6 +9,7 @@
   margin: 0;
   padding: 0;
 }
+
 html {
   text-size-adjust: 100%;
 }
@@ -32,6 +33,7 @@ body {
   opacity: 1;
   color: var(--muted);
 }
+
 ::selection {
   background: var(--accent-dim);
   color: var(--text);

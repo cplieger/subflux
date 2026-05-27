@@ -31,6 +31,7 @@
     --border: oklch(45% 0 0deg);
     --muted: oklch(70% 0 0deg);
   }
+
   .badge {
     font-weight: 700;
   }

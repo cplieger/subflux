@@ -16,74 +16,97 @@
 .icon-warning {
   mask-image: url("icons/warning.svg");
 }
+
 .icon-moon {
   mask-image: url("icons/moon.svg");
 }
+
 .icon-sun {
   mask-image: url("icons/sun.svg");
 }
+
 .icon-arrow-left {
   mask-image: url("icons/chevron.svg");
   rotate: 90deg;
 }
+
 .icon-external {
   mask-image: url("icons/external.svg");
 }
+
 .icon-excluded {
   mask-image: url("icons/excluded.svg");
 }
+
 .icon-history {
   mask-image: url("icons/history.svg");
 }
+
 .icon-check {
   mask-image: url("icons/check.svg");
 }
+
 .icon-close {
   mask-image: url("icons/close.svg");
 }
+
 .icon-dot {
   mask-image: url("icons/dot.svg");
 }
+
 .icon-eye {
   mask-image: url("icons/eye.svg");
 }
+
 .icon-eye-off {
   mask-image: url("icons/eye-off.svg");
 }
+
 .icon-settings {
   mask-image: url("icons/settings.svg");
 }
+
 .icon-sync {
   mask-image: url("icons/sync.svg");
 }
+
 .icon-search {
   mask-image: url("icons/search.svg");
 }
+
 .icon-download {
   mask-image: url("icons/download.svg");
 }
+
 .icon-hourglass {
   mask-image: url("icons/hourglass.svg");
 }
+
 .icon-play {
   mask-image: url("icons/play.svg");
 }
+
 .icon-pause {
   mask-image: url("icons/pause.svg");
 }
+
 .icon-file {
   mask-image: url("icons/file.svg");
 }
+
 .icon-trash {
   mask-image: url("icons/trash.svg");
 }
+
 .icon-user {
   mask-image: url("icons/user.svg");
 }
+
 .icon-chevron-up {
   mask-image: url("icons/chevron-bold.svg");
   rotate: 180deg;
 }
+
 .icon-chevron-down {
   mask-image: url("icons/chevron-bold.svg");
 }
@@ -122,18 +145,22 @@ td[data-col="actions"] button {
   background: var(--ok-dim);
   color: var(--ok);
 }
+
 .badge[data-status="partial"] {
   background: var(--warn-dim);
   color: var(--warn);
 }
+
 .badge[data-status="warn"] {
   background: var(--warn-dim);
   color: var(--warn);
 }
+
 .badge[data-status="err"] {
   background: var(--err-dim);
   color: var(--err);
 }
+
 .badge[data-status="manual"] {
   background: var(--warn);
   color: oklch(0% 0 0deg);
@@ -191,6 +218,7 @@ td[data-col="actions"] button {
   0% {
     --shimmer-x: 200%;
   }
+
   100% {
     --shimmer-x: -200%;
   }
@@ -254,6 +282,7 @@ td[data-col="actions"] button {
 
   & input:checked + span {
     background: var(--accent);
+
     &::before {
       translate: 1rem;
     }
@@ -352,6 +381,7 @@ td[data-col="actions"] button {
   color: oklch(100% 0 0deg);
   border: none;
 }
+
 .toast[data-level="err"] {
   background: var(--err);
   color: oklch(100% 0 0deg);
@@ -377,6 +407,7 @@ td[data-col="actions"] button {
     translate: 0 1rem;
     scale: 0.95;
   }
+
   to {
     opacity: 1;
     translate: 0;
@@ -390,6 +421,7 @@ td[data-col="actions"] button {
     translate: 0;
     scale: 1;
   }
+
   to {
     opacity: 0;
     translate: 1rem 0;
@@ -401,6 +433,7 @@ td[data-col="actions"] button {
   from {
     width: 100%;
   }
+
   to {
     width: 0;
   }

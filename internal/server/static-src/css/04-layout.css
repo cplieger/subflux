@@ -26,6 +26,7 @@ header:has(h1) {
     & a {
       color: inherit;
       text-decoration: none;
+
       &:hover {
         opacity: 0.8;
         text-decoration: none;
@@ -48,6 +49,7 @@ header:has(h1) {
   &:active {
     translate: 0;
   }
+
   &.active {
     color: var(--accent);
     background: color-mix(in oklch, var(--surface) 70%, var(--accent));
@@ -123,16 +125,20 @@ header:has(h1) {
   background: var(--ok);
   color: oklch(100% 0 0deg);
 }
+
 .nav-btn[data-status="idle"]:hover {
   background: color-mix(in oklch, var(--ok) 80%, oklch(0% 0 0deg));
 }
+
 .nav-btn[data-status="scanning"] {
   background: var(--accent);
   color: oklch(100% 0 0deg);
 }
+
 .nav-btn[data-status="scanning"]:hover {
   background: var(--accent-hover);
 }
+
 .nav-btn[data-status="warn"] {
   background: light-dark(var(--warn-dim), var(--warn));
   color: light-dark(var(--warn), oklch(0% 0 0deg));
@@ -144,10 +150,12 @@ header:has(h1) {
     color-mix(in oklch, var(--warn) 80%, oklch(0% 0 0deg))
   );
 }
+
 .nav-btn[data-status="error"] {
   background: var(--err);
   color: oklch(100% 0 0deg);
 }
+
 .nav-btn[data-status="error"]:hover {
   background: color-mix(in oklch, var(--err) 80%, oklch(0% 0 0deg));
 }
@@ -184,6 +192,7 @@ body > footer {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
+
     &:hover {
       color: var(--text);
       text-decoration: none;

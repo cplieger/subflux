@@ -30,10 +30,12 @@
   outline: none;
   border-color: var(--accent);
 }
+
 .auth-card :where(input):user-invalid {
   border-color: var(--err);
   background: var(--err-dim);
 }
+
 .auth-card button[type="submit"] {
   margin-block-start: var(--sp-4);
 }
@@ -68,13 +70,16 @@
 .auth-card :where(button):hover {
   background: var(--accent-hover);
 }
+
 .auth-card :where(button):active {
   translate: 0 1px;
 }
+
 .auth-card :where(button):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
 .auth-card :where(button):disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -85,10 +90,12 @@
   color: var(--text-2);
   width: 100%;
 }
+
 .auth-alt-btn:hover {
   background: var(--ghost-hover);
   color: var(--text);
 }
+
 .auth-alt-btn[hidden] {
   display: none;
 }
@@ -109,6 +116,7 @@
 .auth-divider[hidden] {
   display: none;
 }
+
 .auth-divider::before,
 .auth-divider::after {
   content: "";

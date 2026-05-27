@@ -59,6 +59,7 @@
   background: var(--err-dim);
   color: var(--err);
 }
+
 .sec-feedback-ok {
   background: var(--ok-dim);
   color: var(--ok);
