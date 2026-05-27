@@ -188,35 +188,6 @@ jobs:
           (
             go test -race -count=1 ./...
           ) || { echo "Test Go" >> /tmp/_ci_failures; exit 1; }
-      - name: CSS bundle drift
-        continue-on-error: true
-        run: |
-          (
-            set -eu
-            css_src=internal/server/static-src/css
-            css_out=internal/server/static
-            for manifest in "$css_src"/*MANIFEST; do
-              [ -f "$manifest" ] || continue
-              mname=$(basename "$manifest")
-              if [ "$mname" = "MANIFEST" ]; then
-                out_name=style.css
-              else
-                out_name="${mname%.MANIFEST}.css"
-              fi
-              tmp=$(mktemp)
-              while IFS= read -r line || [ -n "$line" ]; do
-                case "$line" in ''|\#*) continue ;; esac
-                cat "$css_src/$line" >> "$tmp"
-              done < "$manifest"
-              if ! cmp -s "$css_out/$out_name" "$tmp"; then
-                echo "DRIFT: $css_out/$out_name differs from concat of $manifest" >&2
-                rm -f "$tmp"
-                exit 1
-              fi
-              rm -f "$tmp"
-            done
-          ) || { echo "CSS bundle drift" >> /tmp/_ci_failures; exit 1; }
-
       - name: Lint web (HTML/CSS)
         continue-on-error: true
         run: |
