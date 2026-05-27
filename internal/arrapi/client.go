@@ -50,20 +50,7 @@ func defaultTransport() *http.Transport {
 // ClientOption configures optional Client parameters.
 type ClientOption func(*Client)
 
-// WithRetry sets the maximum retry count and delay between retries.
-func WithRetry(maxRetries int, retryDelay time.Duration) ClientOption {
-	return func(c *Client) {
-		c.maxRetries = maxRetries
-		c.retryDelay = retryDelay
-	}
-}
 
-// WithTransport sets a custom HTTP transport for the client.
-func WithTransport(t http.RoundTripper) ClientOption {
-	return func(c *Client) {
-		c.httpClient = &http.Client{Transport: t, Timeout: safetyTimeout}
-	}
-}
 
 // Client talks to a Sonarr or Radarr instance.
 type Client struct {

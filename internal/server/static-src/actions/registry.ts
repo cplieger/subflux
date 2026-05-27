@@ -253,18 +253,6 @@ export function subscribeByName(name: string, fn: RegistryListener): () => void 
   };
 }
 
-/** @internal Test-only public surface. */
-export function recentLog(): readonly ActionInstance[] {
-  const result: ActionInstance[] = [];
-  for (let i = _head; i < log.length; i++) {
-    const entry = log[i];
-    if (entry != null) {
-      result.push(entry);
-    }
-  }
-  return result;
-}
-
 /** O(1) check: true if at least one instance of the named action is
  *  currently pending. Prefer over `pendingCount([name]) > 0` when
  *  you only need the boolean (avoids allocating the result array). */
