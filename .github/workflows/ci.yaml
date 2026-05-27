@@ -4,44 +4,44 @@ on:
   pull_request:
     branches: [main]
     paths-ignore:
-      - '**/*.md'
-      - '*.md'
-      - 'docs/**'
-      - 'LICENSE*'
-      - 'AUTHORS*'
-      - 'CHANGELOG*'
-      - 'CONTRIBUTORS*'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
-      - '**/*.png'
-      - '**/*.jpg'
-      - '**/*.jpeg'
-      - '**/*.gif'
-      - '**/*.svg'
-      - '**/*.webp'
-      - '**/*.ico'
-      - '**/*.bmp'
+      - "**/*.md"
+      - "*.md"
+      - "docs/**"
+      - "LICENSE*"
+      - "AUTHORS*"
+      - "CHANGELOG*"
+      - "CONTRIBUTORS*"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".editorconfig"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "**/*.jpeg"
+      - "**/*.gif"
+      - "**/*.svg"
+      - "**/*.webp"
+      - "**/*.ico"
+      - "**/*.bmp"
   push:
     paths-ignore:
-      - '**/*.md'
-      - '*.md'
-      - 'docs/**'
-      - 'LICENSE*'
-      - 'AUTHORS*'
-      - 'CHANGELOG*'
-      - 'CONTRIBUTORS*'
-      - '.gitignore'
-      - '.gitattributes'
-      - '.editorconfig'
-      - '**/*.png'
-      - '**/*.jpg'
-      - '**/*.jpeg'
-      - '**/*.gif'
-      - '**/*.svg'
-      - '**/*.webp'
-      - '**/*.ico'
-      - '**/*.bmp'
+      - "**/*.md"
+      - "*.md"
+      - "docs/**"
+      - "LICENSE*"
+      - "AUTHORS*"
+      - "CHANGELOG*"
+      - "CONTRIBUTORS*"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".editorconfig"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "**/*.jpeg"
+      - "**/*.gif"
+      - "**/*.svg"
+      - "**/*.webp"
+      - "**/*.ico"
+      - "**/*.bmp"
   workflow_dispatch:
 
 concurrency:

@@ -3,14 +3,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'Dockerfile'
-      - '**/Dockerfile'
-      - 'go.mod'
-      - 'go.sum'
-      - '**/go.mod'
-      - '**/go.sum'
+      - "Dockerfile"
+      - "**/Dockerfile"
+      - "go.mod"
+      - "go.sum"
+      - "**/go.mod"
+      - "**/go.sum"
   schedule:
-    - cron: '17 5 * * 1'
+    - cron: "17 5 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -48,30 +48,30 @@ jobs:
           scan-type: fs
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '1'
-          format: 'sarif'
-          output: 'trivy-fs.sarif'
+          exit-code: "1"
+          format: "sarif"
+          output: "trivy-fs.sarif"
 
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@9ab158e8597f3b310480b9a69402b419bc03dbd5 # v0.34.0
         with:
-          image-ref: 'ci-scan:latest'
+          image-ref: "ci-scan:latest"
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '1'
-          format: 'sarif'
-          output: 'trivy-image.sarif'
+          exit-code: "1"
+          format: "sarif"
+          output: "trivy-image.sarif"
 
       - name: Upload SARIF — filesystem
         if: always() && hashFiles('trivy-fs.sarif') != ''
         uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
         with:
-          sarif_file: 'trivy-fs.sarif'
-          category: 'trivy-fs'
+          sarif_file: "trivy-fs.sarif"
+          category: "trivy-fs"
 
       - name: Upload SARIF — image
         if: always() && hashFiles('trivy-image.sarif') != ''
         uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.30.5
         with:
-          sarif_file: 'trivy-image.sarif'
-          category: 'trivy-image'
+          sarif_file: "trivy-image.sarif"
+          category: "trivy-image"
