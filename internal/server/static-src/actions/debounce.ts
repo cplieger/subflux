@@ -99,19 +99,19 @@ export function debouncedDispatch<TArgs, TResult>(
       lastFiredAt = now;
       lastArgs = undefined;
       pending = true;
-      if (timer !== undefined) clearTimeout(timer);
+      if (timer !== undefined) {clearTimeout(timer);}
       timer = setTimeout(fireTrailing, opts.wait);
       return;
     }
     lastArgs = args;
     pending = true;
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) {clearTimeout(timer);}
     timer = setTimeout(() => {
       timer = undefined;
       pending = false;
       const a = lastArgs;
       lastArgs = undefined;
-      if (a !== undefined) void action.dispatch(a);
+      if (a !== undefined) {void action.dispatch(a);}
     }, opts.wait);
   }) as DebouncedDispatch<TArgs>;
 
@@ -146,7 +146,7 @@ export function debouncedDispatch<TArgs, TResult>(
       // Treat flush as a leading-edge fire in leading mode (starts a
       // new cooldown window). In trailing mode, lastFiredAt is never
       // read so we skip the assignment to avoid a misleading dead write.
-      if (opts.leading === true) lastFiredAt = Date.now();
+      if (opts.leading === true) {lastFiredAt = Date.now();}
       return action.dispatch(a);
     }
     return undefined;
