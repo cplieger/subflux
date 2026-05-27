@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createPagedList } from "./paged-list.js";
+import { describe, it, beforeEach } from "vitest";
+import { createPagedList as _createPagedList } from "./paged-list.js";
 
 describe("paged-list", () => {
   let container: HTMLElement;

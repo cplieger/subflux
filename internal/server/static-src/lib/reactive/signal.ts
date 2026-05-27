@@ -94,7 +94,7 @@ export function signal<T>(initial: T): Signal<T> {
   };
 }
 
-export type Cleanup = void | (() => void);
+export type Cleanup = undefined | (() => void);
 
 export function effect(fn: () => Cleanup): () => void {
   let cleanup: Cleanup;

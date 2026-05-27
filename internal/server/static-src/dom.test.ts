@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, beforeEach } from "vitest";
 import {
-  el,
-  text,
-  icon,
-  patch,
-  option,
-  emptyDiv,
-  errDiv,
-  confirm,
-  closeDialog,
-  dialogHead,
+  el as _el,
+  text as _text,
+  icon as _icon,
+  patch as _patch,
+  option as _option,
+  emptyDiv as _emptyDiv,
+  errDiv as _errDiv,
+  confirm as _confirm,
+  closeDialog as _closeDialog,
+  dialogHead as _dialogHead,
 } from "./dom.js";
 
 describe("dom: el()", () => {

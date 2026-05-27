@@ -82,7 +82,7 @@ export function bindLoadingState(
   // capture) are identical.
   const names: readonly string[] = typeof actionName === "string" ? [actionName] : actionName;
   if (names.length === 0) {
-    return () => {};
+    return () => { /* noop */ };
   }
 
   const {
@@ -142,9 +142,9 @@ export function bindLoadingState(
    *  case uses the cheaper isPending() (one Map lookup); multi-name uses
    *  pendingCount(names) > 0. */
   const readPending = (): boolean =>
-    names.length === 1 ? isPending(names[0]!) : pendingCount(names) > 0;
+    names.length === 1 ? isPending(names[0] ?? "") : pendingCount(names) > 0;
 
-  let unsubs: (() => void)[] | undefined;
+  let unsubs!: (() => void)[]; // eslint-disable-line prefer-const -- assigned after apply() closure captures it
 
   const apply = (): void => {
     if (disposed) {
@@ -154,10 +154,8 @@ export function bindLoadingState(
     // stale bindings and keeps the closure from leaking the element.
     if (wasConnected && !el.isConnected) {
       disposed = true;
-      if (unsubs) {
-        for (const u of unsubs) {
-          u();
-        }
+      for (const u of unsubs) {
+        u();
       }
       return;
     }
@@ -205,10 +203,8 @@ export function bindLoadingState(
   return () => {
     disposed = true;
     restore();
-    if (unsubs) {
-      for (const u of unsubs) {
-        u();
-      }
+    for (const u of unsubs) {
+      u();
     }
   };
 }

@@ -145,7 +145,7 @@ export function debouncedDispatch<TArgs, TResult>(
       clearTimeout(timer);
       timer = undefined;
     }
-    const a = args !== undefined ? args : lastArgs;
+    const a = args ?? lastArgs;
     lastArgs = undefined;
     pending = false;
     if (a !== undefined) {

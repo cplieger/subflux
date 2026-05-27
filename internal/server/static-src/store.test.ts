@@ -245,7 +245,7 @@ describe("effect", () => {
       run: () => {
         set("eff_throw", 0);
         set("eff_ok", 0);
-        const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const errSpy = vi.spyOn(console, "error").mockImplementation(() => { /* noop */ });
         effect(() => {
           get("eff_throw");
           throw new Error("boom");

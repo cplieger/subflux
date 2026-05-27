@@ -29,7 +29,7 @@ describe("signal", () => {
     const s = signal(1);
     const spy = vi.fn();
     effect(() => {
-      s.value;
+      void s.value;
       spy();
     });
     spy.mockClear();
@@ -42,7 +42,7 @@ describe("signal", () => {
     const s = signal(NaN);
     const spy = vi.fn();
     effect(() => {
-      s.value;
+      void s.value;
       spy();
     });
     spy.mockClear();
@@ -109,7 +109,7 @@ describe("effect", () => {
     const s = signal(0);
     let cleaned = false;
     const dispose = effect(() => {
-      s.value;
+      void s.value;
       return () => {
         cleaned = true;
       };

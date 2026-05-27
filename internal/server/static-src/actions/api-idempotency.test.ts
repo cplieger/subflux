@@ -62,7 +62,7 @@ describe("apiAction — idempotency key wiring", () => {
 
   it("does NOT send Idempotency-Key when not configured", async () => {
     mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
-    const action = apiAction<void, { ok: boolean }>({
+    const action = apiAction<undefined, { ok: boolean }>({
       name: "test.idem.absent",
       request: () => ({ method: "POST", path: "/api/items", body: { name: "y" } }),
       error: false,
@@ -89,7 +89,7 @@ describe("apiAction — idempotency key wiring", () => {
     mockFetch
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: "down" }), { status: 503 }))
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
-    const action = apiAction<void, { ok: boolean }>({
+    const action = apiAction<undefined, { ok: boolean }>({
       name: "test.idem.retry",
       request: () => ({ method: "POST", path: "/api/items", body: {} }),
       idempotencyKey: true,
@@ -107,7 +107,7 @@ describe("apiAction — idempotency key wiring", () => {
 
   it("fresh dispatch generates a new key (different from previous dispatch)", async () => {
     mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
-    const action = apiAction<void, { ok: boolean }>({
+    const action = apiAction<undefined, { ok: boolean }>({
       name: "test.idem.fresh",
       request: () => ({ method: "POST", path: "/api/items", body: {} }),
       idempotencyKey: true,
@@ -127,7 +127,7 @@ describe("apiAction — Idempotency-Key on different methods", () => {
   for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
     it(`threads the header on ${method}`, async () => {
       mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
-      const action = apiAction<void, { ok: boolean }>({
+      const action = apiAction<undefined, { ok: boolean }>({
         name: `test.idem.${method.toLowerCase()}`,
         request: () => ({ method, path: "/api/items/1", body: { x: 1 } }),
         idempotencyKey: true,
@@ -146,7 +146,7 @@ describe("apiAction — Idempotency-Key on different methods", () => {
     // wiring fires for ANY method whose def opts in; servers may ignore on
     // GET routes where idempotency middleware isn't installed.
     mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
-    const action = apiAction<void, { ok: boolean }>({
+    const action = apiAction<undefined, { ok: boolean }>({
       name: "test.idem.get",
       request: () => ({ method: "GET", path: "/api/items" }),
       idempotencyKey: true,

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 // Mock dependencies before importing the module under test.
 vi.mock("./api-client.js", () => ({
@@ -12,7 +12,7 @@ vi.mock("./actions/index.js", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {}),
+  on: vi.fn(() => () => { /* noop */ }),
   emit: vi.fn(),
   BusEvent: {
     ScanSeries: "scan:series",
@@ -23,7 +23,7 @@ vi.mock("./bus.js", () => ({
 }));
 
 import * as store from "./store.js";
-import type { CoverageItem } from "./api-types.js";
+import type { CoverageItem as _CoverageItem } from "./api-types.js";
 
 describe("coverage: renderCoverageItems", () => {
   beforeEach(() => {

@@ -34,18 +34,19 @@ export function reconcileChildren(parent: Node, newChildren: Node[]): void {
 
   let oldIdx = 0;
   for (let i = 0; i < newChildren.length; i++) {
-    const newChild = newChildren[i]!;
+    const newChild = newChildren[i];
+    if (!newChild) { continue; }
     const newKey = nodeKey(newChild);
 
     let matched = newKey ? (oldByKey.get(newKey) ?? null) : null;
     if (matched) {
       oldByKey.delete(newKey);
     } else if (!newKey) {
-      while (oldIdx < oldChildren.length && nodeKey(oldChildren[oldIdx]!)) {
+      while (oldIdx < oldChildren.length && nodeKey(oldChildren[oldIdx] as Node)) {
         oldIdx++;
       }
       if (oldIdx < oldChildren.length) {
-        matched = oldChildren[oldIdx]!;
+        matched = oldChildren[oldIdx] as Node;
         oldIdx++;
       }
     }
@@ -77,7 +78,8 @@ export function reconcileChildren(parent: Node, newChildren: Node[]): void {
   }
 
   while (parent.childNodes.length > newChildren.length) {
-    parent.lastChild!.remove();
+    const last = parent.lastChild;
+    if (last) { last.remove(); }
   }
 }
 
@@ -95,7 +97,7 @@ function canPatch(oldNode: Node, newNode: Node): boolean {
 }
 
 function nodeKey(node: Node): string {
-  if (node?.nodeType !== 1) {
+  if (node.nodeType !== 1) {
     return "";
   }
   for (const attr of (node as Element).attributes) {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach } from "vitest";
 
 vi.mock("./api-client.js", () => ({
   apiGet: vi.fn().mockResolvedValue(null),
@@ -12,7 +12,7 @@ vi.mock("./actions/index.js", () => ({
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn() }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {}),
+  on: vi.fn(() => () => { /* noop */ }),
   emit: vi.fn(),
   BusEvent: { OpenSecurity: "open:security" },
 }));

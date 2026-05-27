@@ -1,5 +1,5 @@
 // Unit tests for bus.ts — typed event bus.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { on, emit, BusEvent } from "./bus.js";
 
 describe("bus", () => {
