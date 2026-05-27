@@ -171,9 +171,10 @@ jobs:
           ) || { echo "Verify dependencies" >> /tmp/_ci_failures; exit 1; }
       - name: Compile TypeScript
         continue-on-error: true
+        working-directory: internal/server/static-src
         run: |
           (
-            cd internal/server/static-src && tsgo --noEmit
+            npx tsc --noEmit -p tsconfig.json
           ) || { echo "Compile TypeScript" >> /tmp/_ci_failures; exit 1; }
       - name: Lint Go
         continue-on-error: true
