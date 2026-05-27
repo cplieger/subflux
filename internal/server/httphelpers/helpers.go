@@ -36,7 +36,6 @@ func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodPost)
 }
 
-// RequireDELETE is sugar for RequireMethod(w, r, http.MethodDelete).
 func RequireDELETE(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodDelete)
 }
@@ -56,7 +55,6 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	return true
 }
 
-// ParseMediaTypeParam extracts and validates the "type" query parameter as an
 // api.MediaType. Defaults to api.MediaTypeEpisode when empty. Writes 400 and
 // returns ("", false) if the value is invalid.
 func ParseMediaTypeParam(w http.ResponseWriter, r *http.Request) (api.MediaType, bool) {
