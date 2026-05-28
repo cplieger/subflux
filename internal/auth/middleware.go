@@ -94,9 +94,26 @@ func HasRole(user *api.User, role api.Role) bool {
 }
 
 // ValidateRedirectURI ensures the URI is a safe relative path.
-// Returns "/" if the URI is empty, absolute, or contains a protocol scheme.
+// Returns "/" if the URI is empty, absolute, has a scheme, has a host,
+// or uses backslashes (some browsers normalize \\evil to //evil).
 func ValidateRedirectURI(uri string) string {
-	if uri == "" || !strings.HasPrefix(uri, "/") || strings.HasPrefix(uri, "//") || strings.Contains(uri, "://") {
+	if uri == "" || !strings.HasPrefix(uri, "/") {
+		return "/"
+	}
+	// Reject scheme-relative ("//evil.com") and explicit scheme ("http://").
+	if strings.HasPrefix(uri, "//") || strings.Contains(uri, "://") {
+		return "/"
+	}
+	// Reject backslash bypass: some browsers normalize "\evil.com" to
+	// "//evil.com" before navigation.
+	if strings.ContainsAny(uri, "\\") {
+		return "/"
+	}
+	// Defense-in-depth: parse and verify no scheme + no host. url.Parse
+	// catches edge cases that string-prefix checks miss (control chars,
+	// non-ASCII path segments that some routers interpret).
+	u, err := url.Parse(uri)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" {
 		return "/"
 	}
 	return uri
