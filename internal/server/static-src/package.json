@@ -10,10 +10,10 @@
     "lint:knip": "knip"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.4",
+    "@eslint/js": "10.0.1",
     "@types/node": "25.9.1",
     "@vitest/coverage-v8": "4.1.7",
-    "eslint": "9.39.4",
+    "eslint": "10.4.0",
     "fast-check": "4.8.0",
     "happy-dom": "20.9.0",
     "html-validate": "11.4.0",
