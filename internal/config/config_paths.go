@@ -86,10 +86,19 @@ func pathUnderRoot(root, path string) bool {
 // RemoveUnderRoot deletes a file atomically through an os.Root handle,
 // eliminating the TOCTOU window between path validation and removal.
 // Returns nil if the file was removed or did not exist.
+//
+// If no media_roots are configured the operation is refused — earlier
+// versions fell back to a bare os.Remove(path), but that gave callers
+// implicit superuser-style FS access that bypassed the os.Root
+// containment guarantee. The fallback also tripped CodeQL's
+// go/path-injection rule for code paths where row.Path originates from
+// the database (and ultimately from a filesystem scan that itself ran
+// outside any safety envelope). Refusing is the safe default; admins
+// who want subtitle deletion to work must configure media_roots.
 func (c *Config) RemoveUnderRoot(ctx context.Context, path string) error {
 	if len(c.MediaRootDirs) == 0 {
-		slog.Debug("RemoveUnderRoot: no media_roots configured, removing directly", "path", path)
-		return os.Remove(path)
+		slog.Warn("RemoveUnderRoot: refused, no media_roots configured", "path", path)
+		return fmt.Errorf("path %q: %w (no media_roots configured)", path, ErrPathNotAllowed)
 	}
 	for i, root := range c.MediaRootDirs {
 		if err := ctx.Err(); err != nil {

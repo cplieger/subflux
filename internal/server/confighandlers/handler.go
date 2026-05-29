@@ -195,6 +195,15 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 		api.WriteJSON(w, pathValidationResponse{Error: "path must be absolute"})
 		return
 	}
+	// Clean the path and reject traversal segments before touching the
+	// filesystem. This endpoint is admin-only and read-only (os.Stat),
+	// but the explicit guard satisfies CodeQL's go/path-injection rule
+	// and prevents the cleaned/uncleaned mismatch a caller might rely on.
+	p = filepath.Clean(p)
+	if strings.Contains(p, "..") {
+		api.WriteJSON(w, pathValidationResponse{Error: "path must not contain '..'"})
+		return
+	}
 
 	info, err := os.Stat(p)
 	if err != nil {
