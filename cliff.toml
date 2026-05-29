@@ -3,7 +3,7 @@
 [bump]
 features_always_bump_minor = false
 breaking_always_bump_major = false
-initial_tag = "0.1.0"
+initial_tag = "v0.1.0"
 no_increment_regex = "^chore|^ci|^docs|^style|^test"
 
 [changelog]
