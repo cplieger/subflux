@@ -1,3 +1,11 @@
+# Version-bump policy. Pre-1.0 (alpha): stay within 0.x.
+# feat -> patch in 0.x; breaking -> minor (stays 0.x, no auto 1.0).
+[bump]
+features_always_bump_minor = false
+breaking_always_bump_major = false
+initial_tag = "0.1.0"
+no_increment_regex = "^chore|^ci|^docs|^style|^test"
+
 [changelog]
 header = ""
 body = """
