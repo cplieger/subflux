@@ -142,7 +142,7 @@ func TestPathUnderRoot_symlink_escape(t *testing.T) {
 
 // --- RemoveUnderRoot ---
 
-func TestRemoveUnderRoot_no_roots_removes_directly(t *testing.T) {
+func TestRemoveUnderRoot_no_roots_refuses(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.srt")
@@ -150,11 +150,18 @@ func TestRemoveUnderRoot_no_roots_removes_directly(t *testing.T) {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
 	cfg := &Config{}
-	if err := cfg.RemoveUnderRoot(context.Background(), path); err != nil {
-		t.Errorf("RemoveUnderRoot(%q) = %v, want nil", path, err)
+	err := cfg.RemoveUnderRoot(context.Background(), path)
+	if err == nil {
+		t.Errorf("RemoveUnderRoot with no media_roots = nil, want refusal error")
 	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Error("file still exists after RemoveUnderRoot")
+	if !errors.Is(err, ErrPathNotAllowed) {
+		t.Errorf("RemoveUnderRoot error = %v, want ErrPathNotAllowed", err)
+	}
+	// File must NOT have been removed — with no roots configured,
+	// RemoveUnderRoot now refuses rather than falling back to a
+	// scoped-by-media_roots-bypass os.Remove.
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("file should still exist after refused RemoveUnderRoot: %v", err)
 	}
 }
 

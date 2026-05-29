@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -23,7 +25,15 @@ var hashBufPool = sync.Pool{
 // The hash is based on the file size and the first and last 64KB of the file.
 // ctx is checked between the two I/O operations for shutdown cancellation.
 func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64, err error) {
-	f, err := os.Open(path)
+	// Validate the path locally so CodeQL's go/path-injection analyzer
+	// can prove safety without tracking the media-root scan that
+	// produced `path`. Read-only hashing still warrants the guard:
+	// reject non-absolute paths and ".." traversal segments.
+	clean := filepath.Clean(path)
+	if !filepath.IsAbs(clean) || strings.Contains(clean, "..") {
+		return "", 0, fmt.Errorf("hashFile: unsafe path %q", path)
+	}
+	f, err := os.Open(clean)
 	if err != nil {
 		return "", 0, fmt.Errorf("open: %w", err)
 	}

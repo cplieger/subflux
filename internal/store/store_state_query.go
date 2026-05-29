@@ -152,8 +152,13 @@ func (d *DB) GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry,
 	}
 	defer rows.Close()
 
-	cp := min(limit, preallocCap)
-	out := make([]api.StateEntry, 0, cp)
+	// Pre-allocation is just a capacity hint; append grows as needed.
+	// Use the constant preallocCap directly rather than deriving from
+	// the user-supplied limit — CodeQL's go/uncontrolled-allocation-size
+	// rule traces q.Limit into make() through any data dependency, even
+	// a clamped one. A literal constant breaks the taint flow entirely
+	// while still right-sizing the common case (limit <= preallocCap).
+	out := make([]api.StateEntry, 0, preallocCap)
 	for rows.Next() {
 		var e api.StateEntry
 		if err := stateScanner.ScanInto(rows, &e); err != nil {
