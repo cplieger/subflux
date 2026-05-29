@@ -1,0 +1,14 @@
+# CodeQL false-positive / accepted-by-design allowlist for ci-local.
+# Keyed on the SARIF primaryLocationLineHash fingerprint (stable across
+# line shifts). Every entry requires a `reason`. See tools/scripts/_ci_local.py
+# load_suppressions() for the schema.
+suppressions:
+  - rule: go/weak-sensitive-data-hashing
+    fingerprint: "548704b5b0855831:1"
+    path: internal/auth/password_validate.go
+    reason: >
+      SHA-1 is mandated by the HaveIBeenPwned Pwned-Passwords k-anonymity API
+      contract: the client sends the first 5 hex chars of the SHA-1 of the
+      candidate password and receives matching suffixes. This is a breach-check
+      lookup key, NOT password storage, and cannot be changed to a stronger
+      hash without breaking the integration. Dismissed on GitHub Security tab.
