@@ -184,7 +184,7 @@ jobs:
         working-directory: internal/server/static-src
         run: |
           (
-            tsgo --project tsconfig.json --noEmit
+            npx tsc --noEmit
           ) || { echo "Compile TypeScript" >> /tmp/_ci_failures; exit 1; }
       - name: Lint Go
         continue-on-error: true
