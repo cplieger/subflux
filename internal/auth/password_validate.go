@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -57,6 +58,13 @@ func CheckBreachedPassword(ctx context.Context, client *http.Client, password st
 		return false, fmt.Errorf("auth: create HIBP request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Subflux-Auth")
+	// Add-Padding: true requests HIBP pad every response to 800-1000 entries
+	// regardless of the real bucket size. Without padding, an attacker
+	// observing the encrypted TLS response size can correlate it with the
+	// hash-prefix bucket — leaking partial info about the password's SHA-1
+	// prefix. Padding entries always have count=0 and are filtered below.
+	// See https://www.troyhunt.com/enhancing-pwned-passwords-privacy-with-padding
+	req.Header.Set("Add-Padding", "true")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -80,9 +88,17 @@ func CheckBreachedPassword(ctx context.Context, client *http.Client, password st
 	for line := range strings.SplitSeq(strings.TrimSpace(string(body)), "\n") {
 		line = strings.TrimSpace(line)
 		parts := strings.SplitN(line, ":", 2)
-		if len(parts) == 2 && strings.EqualFold(parts[0], suffix) {
-			return true, nil
+		if len(parts) != 2 || !strings.EqualFold(parts[0], suffix) {
+			continue
 		}
+		// Discard padding entries (count == 0). Per HIBP docs, padded
+		// entries always have a 0 count and must be ignored to avoid a
+		// synthetic suffix accidentally matching the user's hash.
+		count, convErr := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if convErr != nil || count == 0 {
+			continue
+		}
+		return true, nil
 	}
 
 	return false, nil
