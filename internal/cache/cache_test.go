@@ -227,13 +227,21 @@ func BenchmarkCache_concurrent(b *testing.B) {
 	})
 }
 
-func TestCache_property_set_then_get(t *testing.T) {
+func TestCache_property_set_then_get_value_correctness(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(rt *rapid.T) {
-		// Invariant 2: Set followed by immediate Get always returns the value (TTL > 0).
-		// Use minimum 1ms to avoid expiry between Set and Get.
-		ttl := time.Duration(rapid.Int64Range(int64(time.Millisecond), int64(time.Hour)).Draw(rt, "ttl"))
-		c := New[int](ttl)
+		// Invariant 2 (data-flow): Set followed by immediate Get returns the
+		// value, for any (key, value) pair. The original version of this test
+		// drew a random TTL >= 1ms, but on loaded CI runners the wall-clock
+		// gap between Set and Get can exceed 1ms (GC pauses, scheduler
+		// jitter), causing spurious "expired" Get results that rapid
+		// reported as un-reproducible flakes. TTL handling is exercised
+		// deterministically by TestCache_Get_expired_entry and
+		// TestCache_Reap_removes_expired (which use time.Sleep with margins
+		// well above scheduling jitter); this test is now purely about the
+		// data-flow invariant — TTL is fixed at time.Hour to remove the
+		// time dependency.
+		c := New[int](time.Hour)
 		key := rapid.String().Draw(rt, "key")
 		val := rapid.Int().Draw(rt, "val")
 
@@ -244,6 +252,42 @@ func TestCache_property_set_then_get(t *testing.T) {
 		}
 		if got != val {
 			rt.Fatalf("Get(%q) = %v, want %v", key, got, val)
+		}
+	})
+}
+
+// TestCache_property_set_get_sequence drives a small log of Set / Get
+// operations against the cache and an in-memory reference map, then asserts
+// the two agree at each Get. Strictly more coverage than the original
+// "single Set + single Get" property: catches overwrite-on-repeat-Set, key
+// isolation across many keys, and value preservation across interleaved
+// operations. No time dependency — TTL is time.Hour.
+func TestCache_property_set_get_sequence(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(rt *rapid.T) {
+		c := New[int](time.Hour)
+		ref := make(map[string]int)
+		// 1-30 ops of either Set(key,val) or Get(key); keys drawn from a
+		// small alphabet so the same key is reused often (exercising
+		// overwrite + repeated-read paths).
+		ops := rapid.IntRange(1, 30).Draw(rt, "ops")
+		for i := range ops {
+			key := rapid.SampledFrom([]string{"a", "b", "c", "d", "e"}).Draw(rt, fmt.Sprintf("key-%d", i))
+			switch rapid.IntRange(0, 1).Draw(rt, fmt.Sprintf("op-%d", i)) {
+			case 0: // Set
+				val := rapid.Int().Draw(rt, fmt.Sprintf("val-%d", i))
+				c.Set(key, val)
+				ref[key] = val
+			case 1: // Get
+				got, ok := c.Get(key)
+				want, wantOK := ref[key]
+				if ok != wantOK {
+					rt.Fatalf("Get(%q): ok=%v, want %v (op %d)", key, ok, wantOK, i)
+				}
+				if ok && got != want {
+					rt.Fatalf("Get(%q) = %v, want %v (op %d)", key, got, want, i)
+				}
+			}
 		}
 	})
 }
