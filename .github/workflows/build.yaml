@@ -29,6 +29,17 @@ env:
 
 jobs:
   build:
+    # Skip Docker build + push when the head commit was a renovate-managed
+    # tsgo bump (marked with [skip-build] via the commitMessageSuffix in
+    # .github/renovate.json). Latest tsgo cuts every few days; rebuilding the
+    # whole image for each is waste. CI (.github/workflows/ci.yaml) still runs
+    # on the bump PR to validate the new version compiles.
+    #
+    # CLEANUP WHEN TS 7 IS STABLE: drop this if-guard. The matching
+    # commitMessageSuffix in renovate.json should be removed at the same
+    # time. See the description on the @typescript/native-preview rule
+    # in .github/renovate.json for the full rationale.
+    if: ${{ !contains(github.event.head_commit.message, '[skip-build]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
