@@ -77,14 +77,10 @@ jobs:
             "https://raw.githubusercontent.com/golangci/golangci-lint/${VERSION}/install.sh" \
             | sh -s -- -b /usr/local/bin "${VERSION}"
 
-          # tsgo
-          TMP=$(mktemp -d)
-          npm pack @typescript/native-preview-linux-x64@latest \
-            --pack-destination "$TMP" --loglevel=warn
-          tar xzf "$TMP"/*.tgz -C "$TMP"
-          sudo cp -r "$TMP/package/lib" /usr/local/lib/tsgo
-          sudo ln -sf /usr/local/lib/tsgo/tsgo /usr/local/bin/tsgo
-          rm -rf "$TMP"
+          # tsgo is installed by the dedicated "Install tsgo" step below,
+          # pinned to the beta dist-tag (matches the Dockerfile). Don't
+          # install it here too — a second @latest pull drifts ahead of
+          # the pinned beta and breaks CI/Docker compiler parity.
 
           # Web lint tools
           npm install -g --loglevel=warn html-validate stylelint stylelint-config-standard
