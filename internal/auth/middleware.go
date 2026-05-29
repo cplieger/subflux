@@ -97,15 +97,24 @@ func HasRole(user *api.User, role api.Role) bool {
 // Returns "/" if the URI is empty, absolute, has a scheme, has a host,
 // or uses backslashes (some browsers normalize \\evil to //evil).
 func ValidateRedirectURI(uri string) string {
-	if uri == "" || !strings.HasPrefix(uri, "/") {
+	// Canonical open-redirect guard (per CodeQL go/bad-redirect-check):
+	// require a leading '/' AND a second character that is neither '/'
+	// nor '\\'. Browsers treat "//evil.com" and "/\evil.com" as
+	// absolute URLs, so checking only the first character is unsafe.
+	// A bare "/" (len 1) is allowed as the safe default below.
+	if uri == "/" {
 		return "/"
 	}
-	// Reject scheme-relative ("//evil.com") and explicit scheme ("http://").
-	if strings.HasPrefix(uri, "//") || strings.Contains(uri, "://") {
+	if len(uri) < 2 || uri[0] != '/' || uri[1] == '/' || uri[1] == '\\' {
 		return "/"
 	}
-	// Reject backslash bypass: some browsers normalize "\evil.com" to
-	// "//evil.com" before navigation.
+	// Reject any explicit scheme ("http://", "javascript:" smuggled
+	// mid-path, etc.).
+	if strings.Contains(uri, "://") {
+		return "/"
+	}
+	// Reject backslashes anywhere: some browsers normalize "\evil.com"
+	// to "//evil.com" before navigation.
 	if strings.ContainsAny(uri, "\\") {
 		return "/"
 	}
