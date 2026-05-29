@@ -39,7 +39,13 @@ jobs:
     # commitMessageSuffix in renovate.json should be removed at the same
     # time. See the description on the @typescript/native-preview rule
     # in .github/renovate.json for the full rationale.
-    if: ${{ !contains(github.event.head_commit.message, '[skip-build]') }}
+    # Skip the Docker build only when BOTH conditions hold:
+    #   1. The head commit was authored by renovate[bot]
+    #   2. The commit message contains the [skip-build] marker
+    # The dual gate stops a non-renovate commit body that happens to
+    # mention [skip-build] in prose (e.g. this comment in a squash-merge
+    # body) from accidentally skipping the build.
+    if: ${{ !(github.event.head_commit.author.name == 'renovate[bot]' && contains(github.event.head_commit.message, '[skip-build]')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
