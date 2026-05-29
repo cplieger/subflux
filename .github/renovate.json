@@ -24,9 +24,9 @@
       "groupName": "Go dependencies"
     },
     {
-      "description": "tsgo: follow beta dist-tag (all versions are 7.0.0-dev prerelease)",
+      "description": "tsgo: follow latest dist-tag (all versions are 7.0.0-dev prerelease)",
       "matchPackageNames": ["@typescript/native-preview"],
-      "followTag": "beta",
+      "followTag": "latest",
       "ignoreUnstable": false
     },
     {

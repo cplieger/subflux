@@ -109,7 +109,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 # --- TypeScript build (compile static-src/*.ts → static/*.js) ---
 # Uses the same tsgo (Microsoft's typescript-go native preview) tarball
 # pattern as apps/vibekit and apps/vibecli; renovate tracks the npm package
-# @typescript/native-preview's `beta` dist-tag (Microsoft's curated stabler
+# @typescript/native-preview's `latest` dist-tag (Microsoft's curated stabler
 # channel) rather than the daily `latest` channel — the platform-specific
 # linux-x64 tarball is published in lockstep at the same version string.
 # Plain alpine here (not golang-alpine) because nothing in this stage needs
@@ -122,7 +122,7 @@ SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 RUN apk add --no-cache ca-certificates curl
 
 # renovate: datasource=npm depName=@typescript/native-preview
-ARG TSGO_VERSION=7.0.0-dev.20260421.2
+ARG TSGO_VERSION=7.0.0-dev.20260527.2
 RUN curl -fsSL \
       "https://registry.npmjs.org/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-${TSGO_VERSION}.tgz" \
     | tar -xz -C /tmp

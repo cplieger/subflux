@@ -78,7 +78,7 @@ jobs:
             | sh -s -- -b /usr/local/bin "${VERSION}"
 
           # tsgo is installed by the dedicated "Install tsgo" step below,
-          # pinned to the beta dist-tag (matches the Dockerfile). Don't
+          # pinned to the latest dist-tag (matches the Dockerfile). Don't
           # install it here too — a second @latest pull drifts ahead of
           # the pinned beta and breaks CI/Docker compiler parity.
 
@@ -169,7 +169,7 @@ jobs:
       - name: Install tsgo
         run: |
           # renovate: datasource=npm depName=@typescript/native-preview
-          TSGO_VERSION=7.0.0-dev.20260421.2
+          TSGO_VERSION=7.0.0-dev.20260527.2
           curl -fsSL \
             "https://registry.npmjs.org/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-${TSGO_VERSION}.tgz" \
             | tar -xz -C /tmp
