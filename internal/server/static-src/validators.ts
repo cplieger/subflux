@@ -127,7 +127,7 @@ export function decodeArray<T>(v: unknown, decode: Decoder<T>, path = "$"): T[] 
       return decode(el);
     } catch (e) {
       if (e instanceof TypeError) {
-        throw new TypeError(`${path}[${String(i)}]: ${e.message}`);
+        throw new TypeError(`${path}[${String(i)}]: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -144,7 +144,7 @@ export function decodeRecord<T>(v: unknown, decode: Decoder<T>, path = "$"): Rec
       out[k] = decode(val);
     } catch (e) {
       if (e instanceof TypeError) {
-        throw new TypeError(`${path}.${k}: ${e.message}`);
+        throw new TypeError(`${path}.${k}: ${e.message}`, { cause: e });
       }
       throw e;
     }
