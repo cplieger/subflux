@@ -33,19 +33,21 @@ const (
 	HeaderWebAuthnSession = "X-WebAuthn-Session"
 )
 
-// PendingTOTP holds state for a user who passed password verification
-// but still needs to provide a TOTP code.
-type PendingTOTP struct {
-	CreatedAt time.Time
-	SessHash  string // hash of the session-to-be, for binding
-	IP        string
-	UserID    int64
-}
-
 // WebAuthnSession holds ephemeral WebAuthn ceremony data.
 type WebAuthnSession struct {
 	Data      *webauthn.SessionData
 	CreatedAt time.Time
+}
+
+// PendingLink holds state for an OIDC login that matched an existing local
+// account by username but not by (issuer, sub). The user must prove ownership
+// of the local account with its password before the OIDC identity is linked
+// (link-on-login). Stored under a random token, single-use, TTL-bounded.
+type PendingLink struct {
+	CreatedAt  time.Time
+	OIDCSub    string
+	OIDCIssuer string
+	UserID     int64
 }
 
 // ShardedCeremonyMap is a sharded map for ephemeral ceremony state.
@@ -131,15 +133,15 @@ func (sm *ShardedCeremonyMap[V]) Cleanup(isExpired func(V) bool) {
 // CeremonyStore holds ephemeral ceremony state for auth flows.
 // Owned by the Server struct to enable per-instance isolation in tests.
 type CeremonyStore struct {
-	TOTP     *ShardedCeremonyMap[*PendingTOTP]
 	WebAuthn *ShardedCeremonyMap[*WebAuthnSession]
+	Link     *ShardedCeremonyMap[*PendingLink]
 }
 
 // NewCeremonyStore creates a new ceremony store.
 func NewCeremonyStore() *CeremonyStore {
 	return &CeremonyStore{
-		TOTP:     NewShardedCeremonyMap[*PendingTOTP](),
 		WebAuthn: NewShardedCeremonyMap[*WebAuthnSession](),
+		Link:     NewShardedCeremonyMap[*PendingLink](),
 	}
 }
 
@@ -168,10 +170,10 @@ func GenerateCeremonyToken() (string, error) {
 // Called periodically by the server.
 func (cs *CeremonyStore) Cleanup() {
 	now := time.Now()
-	cs.TOTP.Cleanup(func(v *PendingTOTP) bool {
+	cs.WebAuthn.Cleanup(func(v *WebAuthnSession) bool {
 		return now.Sub(v.CreatedAt) > CeremonyTTL
 	})
-	cs.WebAuthn.Cleanup(func(v *WebAuthnSession) bool {
+	cs.Link.Cleanup(func(v *PendingLink) bool {
 		return now.Sub(v.CreatedAt) > CeremonyTTL
 	})
 }

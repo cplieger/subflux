@@ -16,13 +16,6 @@ interface SetupResponse {
 }
 
 interface LoginResponse {
-  totp_required?: boolean;
-  pending_token?: string;
-  redirect?: string;
-  error?: string;
-}
-
-interface TOTPResponse {
   redirect?: string;
   error?: string;
 }
@@ -34,7 +27,6 @@ interface WebAuthnOptions {
 
 // --- State ---
 
-let pendingToken = "";
 let conditionalAbort: AbortController | null = null;
 let conditionalRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let webauthnSessionToken = "";
@@ -55,6 +47,15 @@ registerCleanup(() => {
 // --- Initialization ---
 
 async function init(): Promise<void> {
+  // Link-on-login: an OIDC login that collided with an existing local account
+  // redirects here with ?oidc_link=<token>; prove the password to link it.
+  const linkToken = new URLSearchParams(window.location.search).get("oidc_link");
+  if (linkToken) {
+    showPage("loginPage");
+    wireOIDCLinkForm(linkToken);
+    return;
+  }
+
   const data = await apiGet<SetupResponse>("/api/auth/setup");
   if (!data) {
     showError("loginError", "Failed to initialize");
@@ -71,13 +72,11 @@ async function init(): Promise<void> {
   if (!data.config_valid) {
     showPage("loginPage");
     wireLoginForm(true);
-    wireTOTPForm();
     return;
   }
 
   showPage("loginPage");
   wireLoginForm(false);
-  wireTOTPForm();
   await detectAuthMethods();
   void startConditionalUI();
 }
@@ -276,7 +275,6 @@ const LOGIN_ERROR_MAP: readonly {
     code: ErrorCode.AuthAccountNotSetup,
     msg: "Account setup is incomplete. Contact your administrator.",
   },
-  { code: ErrorCode.TOTPRequired, msg: "Two-factor authentication required." },
 ];
 
 function loginErrorMessage(res: ApiResult<LoginResponse>): string {
@@ -323,12 +321,6 @@ function wireLoginForm(resumeSetup: boolean): void {
         return;
       }
       const data = res.data ?? {};
-      if (data.totp_required) {
-        pendingToken = data.pending_token ?? "";
-        showPage("totpPage");
-        ($("totpCode") as HTMLInputElement | null)?.focus();
-        return;
-      }
       if (resumeSetup) {
         await startConfigWizard();
         return;
@@ -343,36 +335,38 @@ function wireLoginForm(resumeSetup: boolean): void {
   });
 }
 
-// --- TOTP form ---
+// --- OIDC link-on-login ---
 
-function wireTOTPForm(): void {
-  const form = $("totpForm") as HTMLFormElement | null;
+function wireOIDCLinkForm(linkToken: string): void {
+  const form = $("loginForm") as HTMLFormElement | null;
   if (!form) {
     return;
+  }
+  // The token identifies the account; the username field is irrelevant here.
+  const userInput = form.querySelector<HTMLInputElement>('input[name="username"]');
+  if (userInput) {
+    userInput.removeAttribute("required");
+    ((userInput.closest("label") as HTMLElement | null) ?? userInput).hidden = true;
+  }
+  showError(
+    "loginError",
+    "Enter your password to switch this account to single sign-on. You'll no longer be able to sign in with a password or passkey.",
+  );
+  const hint = $("loginError");
+  if (hint) {
+    hint.dataset["level"] = "info";
   }
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- event handler
   form.addEventListener("submit", async (e: Event) => {
     e.preventDefault();
-    hideError("totpError");
-    const code = (new FormData(form).get("code") as string) || "";
-    const res = await apiPostRaw<TOTPResponse>("/api/auth/totp", {
-      code,
-      pending_token: pendingToken,
+    hideError("loginError");
+    const password = (new FormData(form).get("password") as string) || "";
+    const res = await apiPostRaw<LoginResponse>("/api/auth/oidc/link", {
+      link_token: linkToken,
+      password,
     });
     if (!res.ok) {
-      if (hasCode(res, ErrorCode.TOTPInvalid, ErrorCode.TOTPReplay)) {
-        const inp = $("totpCode") as HTMLInputElement | null;
-        if (inp) {
-          inp.value = "";
-          inp.focus();
-        }
-        const msg = hasCode(res, ErrorCode.TOTPReplay)
-          ? "Code already used. Wait for the next code."
-          : "Invalid code. Please try again.";
-        showError("totpError", msg);
-      } else {
-        showError("totpError", res.data?.error ?? res.error ?? "Invalid code");
-      }
+      showError("loginError", res.data?.error ?? res.error ?? "Failed to link account");
       return;
     }
     window.location.href = res.data?.redirect ?? "/";

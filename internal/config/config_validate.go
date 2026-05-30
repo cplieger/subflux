@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -131,13 +132,12 @@ func validate(ctx context.Context, cfg *Config) error {
 		}))
 	}
 	ve.Add(validateLogging(&cfg.Logging))
+	ve.Add(validateBackup(&cfg.Backup))
 	if cfg.Auth.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}
-	if cfg.Auth.TOTPKey != "" {
-		if _, err := validateTOTPKeyHex(cfg.Auth.TOTPKey); err != nil {
-			ve.Add(fmt.Errorf("auth.totp_encryption_key: %w", err))
-		}
+	if cfg.Auth.BasicEnabled != nil && !*cfg.Auth.BasicEnabled && !cfg.Auth.OIDCEnabled {
+		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true (otherwise no one could log in); a CLI override can re-enable it"))
 	}
 	if len(cfg.MediaRootDirs) == 0 {
 		slog.Warn("media_roots not configured, all paths will be allowed")
@@ -177,6 +177,28 @@ func validateDurationConstraints(constraints []durationConstraint) error {
 		}
 	}
 	return nil
+}
+
+// validateBackup checks the scheduled-backup settings when enabled.
+func validateBackup(c *yamlBackupConfig) error {
+	if !c.Enabled {
+		return nil
+	}
+	var ve ValidationErrors
+	if c.Retention < 1 {
+		ve.Add(configFieldErr("backup.retention", "backup.retention must be at least 1 when backups are enabled"))
+	}
+	ve.Add(validateDurationConstraints([]durationConstraint{
+		{"backup.frequency", c.Frequency.D, defaults.MinBackupFrequency, false},
+	}))
+	if c.Path != "" {
+		if !filepath.IsAbs(c.Path) {
+			ve.Add(configFieldErr("backup.path", "backup.path must be an absolute directory"))
+		} else if strings.Contains(c.Path, "..") {
+			ve.Add(configFieldErr("backup.path", "backup.path must not contain '..'"))
+		}
+	}
+	return ve.Err()
 }
 
 // validateLogging checks that log level and format are recognized values.

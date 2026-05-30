@@ -53,11 +53,3 @@ describe("security: password section", () => {
 
   it.todo("change password submits to API");
 });
-
-describe("security: TOTP section", () => {
-  it.todo("shows enable button when TOTP not configured");
-
-  it.todo("shows disable button when TOTP is configured");
-
-  it.todo("enable flow shows QR URI and verification input");
-});

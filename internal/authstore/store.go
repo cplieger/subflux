@@ -26,6 +26,5 @@ type AuthStore interface {
 	api.SessionPersister
 	api.PasskeyStore
 	api.KeyStore
-	api.TOTPStore
 	api.OIDCStateStore
 }

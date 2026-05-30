@@ -9,8 +9,6 @@ import (
 	"subflux/internal/auth"
 )
 
-const jsonKeyError = "error"
-
 // --- Request middleware ---
 //
 // Every middleware has signature `func(http.HandlerFunc) http.HandlerFunc`
@@ -126,27 +124,6 @@ func (s *Server) requireRole(role api.Role) middleware {
 	}
 }
 
-// requireRecentReauth gates the handler behind a fresh session reauth
-// (within auth.CeremonyTimeout). API-key-authenticated requests bypass this
-// check because API keys don't participate in the reauth flow. Must
-// chain after requireAuth so the session hash is in the context.
-func (s *Server) requireRecentReauth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		sessHash := api.SessionHashFromContext(r.Context())
-		// API key callers: no session to refresh; accept.
-		if sessHash == "" {
-			next(w, r)
-			return
-		}
-		sess, err := s.authStore.GetSessionByHash(r.Context(), sessHash)
-		if err != nil || sess == nil ||
-			sess.ReauthAt == nil || time.Since(*sess.ReauthAt) > auth.CeremonyTimeout {
-			api.WriteJSONStatus(w, http.StatusForbidden, map[string]any{
-				jsonKeyError:           "reauthentication required",
-				"reauth_required": true,
-			})
-			return
-		}
-		next(w, r)
-	}
-}
+// requireRecentReauth removed: reauthentication step-up was dropped in favor
+// of client-side confirmation on destructive actions (session cookie flags are
+// the compensating control).

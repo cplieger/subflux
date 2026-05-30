@@ -26,6 +26,8 @@ const (
 	DefaultAdaptiveInitDelay = 7 * 24 * time.Hour
 	DefaultAdaptiveMaxDelay  = 3 * 730 * time.Hour
 	DefaultBackoffMultiplier = 2
+	DefaultBackupFrequency   = 24 * time.Hour
+	DefaultBackupRetention   = 7
 )
 
 // Minimum validation thresholds — the floor below which config is rejected.
@@ -34,6 +36,7 @@ const (
 	MinScanDelay       = 5 * time.Second
 	MinProviderTimeout = time.Hour
 	MinScanInterval    = time.Hour
+	MinBackupFrequency = time.Hour
 )
 
 // Session timeout defaults.

@@ -45,8 +45,6 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 
 // Config is the top-level configuration.
 type Config struct {
-	// totpKeyOnce ensures TOTP key initialization is thread-safe.
-	totpKeyOnce totpKeyInit
 	// ruleIndex maps audio language code to its index in Languages.Rules for O(1) lookup.
 	ruleIndex map[string]int
 	Providers map[api.ProviderID]yamlProviderCfg `yaml:"providers"`
@@ -68,6 +66,7 @@ type Config struct {
 	// eliminating per-request OpenRoot syscalls.
 	cachedRoots     []*os.Root
 	Auth            yamlAuthConfig        `yaml:"auth"`
+	Backup          yamlBackupConfig      `yaml:"backup"`
 	SearchCfg       yamlSearchConfig      `yaml:"search"`
 	AdaptiveCfg     yamlAdaptiveConfig    `yaml:"adaptive"`
 	PostProcessing  yamlPostProcessConfig `yaml:"post_processing"`
@@ -233,12 +232,19 @@ type yamlOIDCConfig struct {
 	RedirectURI  string `yaml:"redirect_uri"`
 }
 
+// yamlBackupConfig controls scheduled SQLite backups (yaml-tagged).
+type yamlBackupConfig struct {
+	Path      string   `yaml:"path"`
+	Frequency Duration `yaml:"frequency"`
+	Retention int      `yaml:"retention"`
+	Enabled   bool     `yaml:"enabled"`
+}
+
 // yamlAuthConfig holds authentication settings (yaml-tagged).
 type yamlAuthConfig struct {
 	BasicEnabled     *bool          `yaml:"basic_enabled,omitempty"`
 	CheckBreached    *bool          `yaml:"check_breached_passwords,omitempty"`
 	OIDC             yamlOIDCConfig `yaml:"oidc"`
-	TOTPKey          string         `yaml:"totp_encryption_key"`
 	WebAuthnRPID     string         `yaml:"webauthn_rp_id"`
 	SessionIdle      Duration       `yaml:"session_idle_timeout"`
 	SessionAbsolute  Duration       `yaml:"session_absolute_timeout"`

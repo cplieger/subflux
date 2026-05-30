@@ -27,9 +27,11 @@ var (
 // OIDCClaims holds the verified claims extracted from an OIDC ID token.
 type OIDCClaims struct {
 	Subject           string `json:"sub"`
+	Issuer            string `json:"iss"`
 	Email             string `json:"email"`
 	PreferredUsername string `json:"preferred_username"`
 	Name              string `json:"name"`
+	EmailVerified     bool   `json:"email_verified"`
 }
 
 // OIDCProvider wraps the coreos/go-oidc provider with PKCE support.
@@ -164,23 +166,22 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, codeVerifier, nonce s
 	return &claims, expiry, nil
 }
 
-// ResolveOIDCUser determines whether an OIDC identity matches an existing user
-// or needs a new account. This is a pure function; the caller handles DB operations.
+// ResolveOIDCUser maps an OIDC identity to a user by (issuer, sub) only.
+// This is a pure function; the caller handles DB operations.
 //
-// Resolution priority:
-//  1. existingByOIDCSub (already linked) → return it
-//  2. existingByEmail (link by email) → return it
-//  3. existingByUsername (link by username) → return it
-//  4. No match → create a new User with role "user"
-func ResolveOIDCUser(claims *OIDCClaims, existingByOIDCSub, existingByEmail, existingByUsername *api.User) (user *api.User, isNew bool) {
-	if existingByOIDCSub != nil {
-		return existingByOIDCSub, false
-	}
-	if existingByEmail != nil {
-		return existingByEmail, false
-	}
-	if existingByUsername != nil {
-		return existingByUsername, false
+// Email and username are deliberately NOT used for matching. They are
+// mutable and attacker-influenceable, and auto-linking an OIDC identity to
+// an existing local account on a matching email/username is a well-known
+// account-takeover vector (e.g. CVE-2026-41574, CVE-2026-44166). The only
+// stable, safe identity key is the (issuer, subject) pair.
+//
+// A nil existingBySub yields a new JIT-provisioned user (role "user"). If the
+// derived username collides with an existing local account, the caller must
+// route through the explicit link-on-login flow (prove the existing password)
+// rather than silently merging.
+func ResolveOIDCUser(claims *OIDCClaims, existingBySub *api.User) (user *api.User, isNew bool) {
+	if existingBySub != nil {
+		return existingBySub, false
 	}
 
 	// Determine username for the new user.
@@ -195,6 +196,7 @@ func ResolveOIDCUser(claims *OIDCClaims, existingByOIDCSub, existingByEmail, exi
 		DisplayName: claims.Name,
 		Role:        api.RoleUser,
 		OIDCSub:     claims.Subject,
+		OIDCIssuer:  claims.Issuer,
 		Enabled:     true,
 	}, true
 }

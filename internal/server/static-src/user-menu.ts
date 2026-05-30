@@ -5,6 +5,7 @@ import * as theme from "./theme.js";
 import { el, icon } from "./dom.js";
 import { apiGet, apiPost } from "./api-client.js";
 import { openConfig } from "./config.js";
+import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
 
 // --- Inline interfaces for API response shapes ---
@@ -20,6 +21,7 @@ async function fetchMe(): Promise<void> {
   const data = await apiGet<MeResponse>("/api/auth/me");
   if (data) {
     userInfo = data;
+    store.set("isAdmin", data.role === "admin");
     buildMenuContent();
   }
 }

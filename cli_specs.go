@@ -19,6 +19,7 @@ const (
 	cmdProviders      = "providers"
 	cmdScan           = "scan"
 	cmdResetPassword  = "reset-password"
+	cmdEnablePwLogin  = "enable-password-login"
 	cmdGenerateAPIKey = "generate-api-key"
 	cmdLang           = "lang"
 	cmdSearch         = "search"
@@ -150,6 +151,11 @@ var cliSpecs = map[string]cliparse.Spec{
 			{Name: "user", Help: "Username", Required: true},
 			{Name: "label", Help: "Label for tracking key usage", Required: true},
 		},
+	},
+	cmdEnablePwLogin: {
+		Name:     cmdEnablePwLogin,
+		Synopsis: "Re-enable password login (lockout recovery)",
+		Help:     "Sets auth.basic_enabled: true in the config file. Use when password login was disabled and OIDC is unavailable. Restart subflux to apply.",
 	},
 }
 

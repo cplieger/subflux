@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/sha1" //nolint:gosec // SHA-1 required by HIBP k-anonymity API (not for security)
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,13 +13,14 @@ import (
 	"time"
 )
 
-// PasswordMinLengthMultiFactor is the minimum password length when a second
-// factor (TOTP, passkey) is configured. NIST 800-63B Rev 4 allows shorter
-// passwords when combined with a second factor.
+// PasswordMinLengthMultiFactor is the minimum password length when password
+// login is not the sole sufficient factor (i.e. basic auth is disabled, so a
+// password cannot authenticate on its own). NIST 800-63B Rev 4 allows shorter
+// memorized secrets when they are not independently sufficient.
 const PasswordMinLengthMultiFactor = 8
 
-// PasswordMinLengthSolo is the minimum password length when password is the
-// sole authentication method. Per NIST 800-63B Rev 4 guidance.
+// PasswordMinLengthSolo is the minimum password length when password login is
+// enabled and thus a sole sufficient factor. Per NIST 800-63B Rev 4 guidance.
 const PasswordMinLengthSolo = 15
 
 // hibpRequestTimeout is the HTTP request timeout for the Have I Been Pwned
@@ -35,6 +37,20 @@ func ValidatePasswordLength(password string, passwordOnly bool) error {
 	}
 	if len([]rune(password)) < minLen {
 		return fmt.Errorf("password must be at least %d characters", minLen)
+	}
+	return nil
+}
+
+// ValidatePasswordContext rejects passwords that trivially embed the username
+// or the application name. Breach lists miss these context-specific weak
+// passwords; NIST 800-63B Rev 4 recommends a context-specific blocklist.
+func ValidatePasswordContext(password, username string) error {
+	lower := strings.ToLower(password)
+	if strings.Contains(lower, "subflux") {
+		return errors.New("password must not contain the application name")
+	}
+	if len(username) >= 4 && strings.Contains(lower, strings.ToLower(username)) {
+		return errors.New("password must not contain your username")
 	}
 	return nil
 }

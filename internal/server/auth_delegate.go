@@ -8,10 +8,7 @@ package server
 
 import "net/http"
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) { s.authH.HandleLogin(w, r) }
-func (s *Server) handleTOTPVerify(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleTOTPVerify(w, r)
-}
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request)  { s.authH.HandleLogin(w, r) }
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) { s.authH.HandleLogout(w, r) }
 func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleSetupStatus(w, r)
@@ -20,24 +17,8 @@ func (s *Server) handleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleSetupCreate(w, r)
 }
 func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) { s.authH.HandleAuthMe(w, r) }
-func (s *Server) handleReauth(w http.ResponseWriter, r *http.Request) { s.authH.HandleReauth(w, r) }
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleChangePassword(w, r)
-}
-func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleTOTPEnable(w, r)
-}
-func (s *Server) handleTOTPConfirm(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleTOTPConfirm(w, r)
-}
-func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleTOTPDisable(w, r)
-}
-func (s *Server) handleRecoveryCodesStatus(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleRecoveryCodesStatus(w, r)
-}
-func (s *Server) handleRegenerateRecoveryCodes(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleRegenerateRecoveryCodes(w, r)
 }
 func (s *Server) handleListPasskeys(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleListPasskeys(w, r)
@@ -47,12 +28,6 @@ func (s *Server) handleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) handleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleRenamePasskey(w, r)
-}
-func (s *Server) handleReauthPasskeyBegin(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleReauthPasskeyBegin(w, r)
-}
-func (s *Server) handleReauthPasskeyFinish(w http.ResponseWriter, r *http.Request) {
-	s.authH.HandleReauthPasskeyFinish(w, r)
 }
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	s.authH.HandleListUsers(w, r)

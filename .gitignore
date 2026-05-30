@@ -12,5 +12,6 @@ internal/server/static/login.css
 internal/server/static/*.js
 internal/server/static/actions/
 internal/server/static/wire/
+internal/server/static/lib/
 
 internal/cache/testdata/rapid/

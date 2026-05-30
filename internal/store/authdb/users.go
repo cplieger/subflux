@@ -15,8 +15,7 @@ var _ api.UserStore = (*AuthDB)(nil)
 
 var userScanner = txutil.TableScanner[api.User]{
 	Columns: `id, username, email, display_name, password_hash, role,
-	oidc_sub, oidc_issuer, totp_secret, totp_enabled,
-	enabled, last_totp_step, created_at, updated_at`,
+	oidc_sub, oidc_issuer, enabled, created_at, updated_at`,
 	Scan:     scanUser,
 	ScanInto: scanUserInto,
 }
@@ -30,12 +29,10 @@ func scanUser(row interface{ Scan(...any) error }) (*api.User, error) {
 }
 
 func scanUserInto(row interface{ Scan(...any) error }, u *api.User) error {
-	var totpSecret []byte
 	return row.Scan(
 		&u.ID, &u.Username, &u.Email, &u.DisplayName,
 		&u.PasswordHash, &u.Role, &u.OIDCSub, &u.OIDCIssuer,
-		&totpSecret, &u.TOTPEnabled, &u.Enabled, &u.LastTOTPStep,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.Enabled, &u.CreatedAt, &u.UpdatedAt,
 	)
 }
 
@@ -43,12 +40,10 @@ func scanUserInto(row interface{ Scan(...any) error }, u *api.User) error {
 func (a *AuthDB) CreateUser(ctx context.Context, user *api.User) error {
 	res, err := a.db.ExecContext(ctx, `
 		INSERT INTO auth_users (username, email, display_name, password_hash, role,
-			oidc_sub, oidc_issuer, totp_secret, totp_enabled,
-			enabled, last_totp_step)
-		VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+			oidc_sub, oidc_issuer, enabled)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.Username, user.Email, user.DisplayName, user.PasswordHash, user.Role,
-		user.OIDCSub, user.OIDCIssuer, user.TOTPEnabled,
-		user.Enabled, user.LastTOTPStep,
+		user.OIDCSub, user.OIDCIssuer, user.Enabled,
 	)
 	if err != nil {
 		return err
@@ -94,11 +89,13 @@ func (a *AuthDB) GetUserByEmail(ctx context.Context, email string) (*api.User, e
 	return u, err
 }
 
-// GetUserByOIDCSub returns the user with the given OIDC subject identifier,
-// or nil if not found.
-func (a *AuthDB) GetUserByOIDCSub(ctx context.Context, sub string) (*api.User, error) {
+// GetUserByOIDCSub returns the user with the given OIDC (issuer, subject)
+// identity, or nil if not found. Matching on subject alone is unsafe: a
+// subject is only unique within its issuer, so a changed or second IdP could
+// collide and resolve to the wrong account.
+func (a *AuthDB) GetUserByOIDCSub(ctx context.Context, issuer, sub string) (*api.User, error) {
 	u, err := scanUser(a.db.QueryRowContext(ctx,
-		`SELECT `+userScanner.Columns+` FROM auth_users WHERE oidc_sub = ?`, sub))
+		`SELECT `+userScanner.Columns+` FROM auth_users WHERE oidc_issuer = ? AND oidc_sub = ?`, issuer, sub))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -130,13 +127,13 @@ func (a *AuthDB) UpdateUser(ctx context.Context, user *api.User) error {
 	_, err := a.db.ExecContext(ctx, `
 		UPDATE auth_users SET
 			username = ?, email = ?, display_name = ?, password_hash = ?,
-			role = ?, oidc_sub = ?, oidc_issuer = ?, totp_enabled = ?,
-			enabled = ?, last_totp_step = ?,
+			role = ?, oidc_sub = ?, oidc_issuer = ?,
+			enabled = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		user.Username, user.Email, user.DisplayName, user.PasswordHash,
-		user.Role, user.OIDCSub, user.OIDCIssuer, user.TOTPEnabled,
-		user.Enabled, user.LastTOTPStep, user.ID,
+		user.Role, user.OIDCSub, user.OIDCIssuer,
+		user.Enabled, user.ID,
 	)
 	return err
 }

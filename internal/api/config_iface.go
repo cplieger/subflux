@@ -71,7 +71,6 @@ type AuthConfigProvider interface {
 	OIDCConfig() OIDCConfig
 	SessionIdleTimeout() time.Duration
 	SessionAbsoluteTimeout() time.Duration
-	TOTPEncryptionKey() ([]byte, error)
 	CheckBreachedPasswords() bool
 	WebAuthnRPID() string
 }

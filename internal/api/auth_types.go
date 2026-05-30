@@ -11,11 +11,9 @@ type AuthMethod string
 
 // Auth method identifiers stored in sessions and used for method guards.
 const (
-	MethodPassword     AuthMethod = "password"
-	MethodPasswordTOTP AuthMethod = "password+totp"
-	MethodPasskey      AuthMethod = "passkey"
-	MethodOIDC         AuthMethod = "oidc"
-	MethodTOTP         AuthMethod = "totp" // reauth-only: verify TOTP without password
+	MethodPassword AuthMethod = "password"
+	MethodPasskey  AuthMethod = "passkey"
+	MethodOIDC     AuthMethod = "oidc"
 )
 
 // Role is a typed string identifying a user's authorization level.
@@ -40,8 +38,6 @@ type User struct {
 	OIDCSub      string    `json:"-"`
 	OIDCIssuer   string    `json:"-"`
 	ID           int64     `json:"id"`
-	LastTOTPStep int64     `json:"-"`
-	TOTPEnabled  bool      `json:"totp_enabled"`
 	Enabled      bool      `json:"-"`
 }
 
@@ -49,7 +45,6 @@ type User struct {
 type Session struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	LastActivity time.Time  `json:"last_activity"`
-	ReauthAt     *time.Time `json:"-"`
 	OIDCExpiry   *time.Time `json:"oidc_expiry,omitempty"`
 	TokenHash    string     `json:"-"`
 	AuthMethod   AuthMethod `json:"auth_method"`

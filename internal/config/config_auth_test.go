@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 )
@@ -133,9 +132,11 @@ auth:
 
 func TestBasicAuthEnabled_explicit_false(t *testing.T) {
 	t.Parallel()
+	// Disabling password login requires OIDC enabled (lockout guard).
 	yaml := minimalValidYAML() + `
 auth:
   basic_enabled: false
+  oidc_enabled: true
 `
 	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
 	if err != nil {
@@ -143,6 +144,19 @@ auth:
 	}
 	if cfg.BasicAuthEnabled() {
 		t.Error("BasicAuthEnabled() = true, want false")
+	}
+}
+
+// TestBasicAuthDisabled_requires_oidc verifies the lockout guard: password
+// login cannot be disabled unless OIDC is enabled.
+func TestBasicAuthDisabled_requires_oidc(t *testing.T) {
+	t.Parallel()
+	yaml := minimalValidYAML() + `
+auth:
+  basic_enabled: false
+`
+	if _, err := LoadFromBytes(context.Background(), []byte(yaml)); err == nil {
+		t.Fatal("LoadFromBytes() = nil error, want lockout-guard error")
 	}
 }
 
@@ -189,100 +203,5 @@ auth:
 	}
 	if cfg.CheckBreachedPasswords() {
 		t.Error("CheckBreachedPasswords() = true, want false")
-	}
-}
-
-// --- TOTPEncryptionKey coverage ---
-
-func TestTOTPEncryptionKey_generates_ephemeral_when_empty(t *testing.T) {
-	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
-	}
-	key, keyErr := cfg.TOTPEncryptionKey()
-	if keyErr != nil {
-		t.Fatalf("TOTPEncryptionKey() unexpected error: %v", keyErr)
-	}
-	if len(key) != 32 {
-		t.Errorf("TOTPEncryptionKey() len = %d, want 32", len(key))
-	}
-	// Second call should return the same key (cached in TOTPKey field).
-	key2, keyErr2 := cfg.TOTPEncryptionKey()
-	if keyErr2 != nil {
-		t.Fatalf("TOTPEncryptionKey() second call unexpected error: %v", keyErr2)
-	}
-	if len(key2) != 32 {
-		t.Errorf("TOTPEncryptionKey() second call len = %d, want 32", len(key2))
-	}
-}
-
-func TestTOTPEncryptionKey_valid_hex(t *testing.T) {
-	t.Parallel()
-	yaml := minimalValidYAML() + `
-auth:
-  totp_encryption_key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-`
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
-	}
-	key, keyErr := cfg.TOTPEncryptionKey()
-	if keyErr != nil {
-		t.Fatalf("TOTPEncryptionKey() unexpected error: %v", keyErr)
-	}
-	if len(key) != 32 {
-		t.Errorf("TOTPEncryptionKey() len = %d, want 32", len(key))
-	}
-}
-
-func TestTOTPEncryptionKey_errors(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name string
-		key  string
-	}{
-		{"invalid_hex", "not-valid-hex"},
-		{"wrong_length", "0123456789abcdef0123456789abcdef"}, // 16 bytes instead of 32
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			cfg := &Config{Auth: yamlAuthConfig{TOTPKey: tc.key}}
-			key, keyErr := cfg.TOTPEncryptionKey()
-			if keyErr == nil {
-				t.Errorf("TOTPEncryptionKey() error = nil, want error for %s", tc.name)
-			}
-			if key != nil {
-				t.Errorf("TOTPEncryptionKey() = %v, want nil for %s", key, tc.name)
-			}
-		})
-	}
-}
-
-// --- TOTP key validation at config load ---
-
-func TestValidate_totp_key_errors(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name       string
-		key        string
-		wantSubstr string
-	}{
-		{"invalid_hex", "not-valid-hex", "totp_encryption_key"},
-		{"wrong_length", "0123456789abcdef0123456789abcdef", "32 bytes"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			yaml := minimalValidYAML() + "\nauth:\n  totp_encryption_key: \"" + tc.key + "\"\n"
-			_, err := LoadFromBytes(context.Background(), []byte(yaml))
-			if err == nil {
-				t.Fatalf("LoadFromBytes() = nil, want error for %s totp key", tc.name)
-			}
-			if !strings.Contains(err.Error(), tc.wantSubstr) {
-				t.Errorf("error = %q, want mention of %q", err, tc.wantSubstr)
-			}
-		})
 	}
 }

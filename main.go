@@ -177,6 +177,8 @@ func handleCLI(cmd string) (code int, handled bool) {
 		return runCLIScore(), true
 	case cmdResetPassword:
 		return runCLIResetPassword(), true
+	case cmdEnablePwLogin:
+		return runCLIEnablePasswordLogin(), true
 	case cmdGenerateAPIKey:
 		return runCLIGenerateAPIKey(), true
 	default:

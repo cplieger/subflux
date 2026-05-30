@@ -46,6 +46,7 @@ export interface StoreMap {
   needsRefresh: boolean;
   isUnconfigured: boolean;
   isReady: boolean;
+  isAdmin: boolean;
 }
 
 const store = createStore<StoreMap>();

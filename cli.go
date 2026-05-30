@@ -13,7 +13,10 @@ import (
 	"subflux/internal/cliparse"
 	"subflux/internal/clisearch"
 	"subflux/internal/config"
+	"subflux/internal/fsutil"
 	"subflux/internal/store"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // runCLISearch performs a manual subtitle search from the command line.
@@ -91,6 +94,9 @@ func doResetPassword(username string) error {
 	if errLen := auth.ValidatePasswordLength(password, true); errLen != nil {
 		return errLen
 	}
+	if errCtx := auth.ValidatePasswordContext(password, username); errCtx != nil {
+		return errCtx
+	}
 
 	hash, err := auth.HashPassword(password)
 	if err != nil {
@@ -158,4 +164,75 @@ func doGenerateAPIKey(username, label string) error {
 
 	fmt.Println(plaintext)
 	return nil
+}
+
+// runCLIEnablePasswordLogin re-enables password login by setting
+// auth.basic_enabled: true in the config file. Lockout recovery for when
+// password login was disabled and the OIDC path is unavailable.
+// Returns 0 on success, 1 on runtime failure.
+func runCLIEnablePasswordLogin() int {
+	if err := doEnablePasswordLogin(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func doEnablePasswordLogin() error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("read config %s: %w", configPath, err)
+	}
+	var doc yaml.Node
+	if uerr := yaml.Unmarshal(data, &doc); uerr != nil {
+		return fmt.Errorf("parse config: %w", uerr)
+	}
+	if len(doc.Content) == 0 {
+		return errors.New("config is empty")
+	}
+	yamlSetBool(yamlChild(doc.Content[0], "auth"), "basic_enabled", true)
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	if err := fsutil.AtomicWriteFileMode(context.Background(), configPath, out, 0o600); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	fmt.Fprintln(os.Stderr, "Password login re-enabled (auth.basic_enabled: true). Restart subflux to apply.")
+	return nil
+}
+
+// yamlChild returns the mapping node for key under m, creating it if absent
+// or coercing a non-mapping value (e.g. null) into an empty mapping.
+func yamlChild(m *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			v := m.Content[i+1]
+			if v.Kind != yaml.MappingNode {
+				v.Kind, v.Tag, v.Value, v.Content = yaml.MappingNode, "", "", nil
+			}
+			return v
+		}
+	}
+	k := &yaml.Node{Kind: yaml.ScalarNode, Value: key}
+	v := &yaml.Node{Kind: yaml.MappingNode}
+	m.Content = append(m.Content, k, v)
+	return v
+}
+
+// yamlSetBool sets key to a boolean value in mapping m, adding or replacing it.
+func yamlSetBool(m *yaml.Node, key string, val bool) {
+	s := "false"
+	if val {
+		s = "true"
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content[i+1].Kind, m.Content[i+1].Tag, m.Content[i+1].Value = yaml.ScalarNode, "!!bool", s
+			return
+		}
+	}
+	m.Content = append(m.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: s})
 }

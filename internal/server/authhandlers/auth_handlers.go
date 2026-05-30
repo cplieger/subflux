@@ -13,6 +13,11 @@ import (
 // --- POST /api/auth/login ---
 
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if cfg := h.Config(); cfg != nil && !cfg.BasicAuthEnabled() {
+		api.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
+		return
+	}
+
 	req, ok := decodeAuthBody[struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -70,38 +75,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Password verified. Check if TOTP is required.
-	if user.TOTPEnabled {
-		token, err := GenerateCeremonyToken()
-		if err != nil {
-			slog.Error("login: generate totp token", "error", err)
-			api.InternalErrorC(w, r, nil, api.CodeInternalError)
-			return
-		}
-
-		if !h.Ceremonies.TOTP.Store(token, &PendingTOTP{
-			UserID:    user.ID,
-			SessHash:  "", // filled on completion
-			IP:        ip,
-			CreatedAt: time.Now(),
-		}) {
-			slog.Warn("login: ceremony session limit reached")
-			api.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "too many pending sessions")
-			return
-		}
-
-		api.WriteJSONStatus(w, http.StatusUnauthorized, api.TOTPRequiredResponse{
-			Error:        "totp_required",
-			TOTPRequired: true,
-			TOTPToken:    token,
-		})
-		// Password verified, awaiting TOTP. Audited as login.success
-		// happens once TOTP completes; this intermediate stage is not
-		// itself a login.
-		return
-	}
-
-	// No TOTP: create session directly.
+	// Password verified: create session directly.
 	if err := h.createSessionAndRespond(w, r, user, api.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -109,86 +83,6 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
 		slog.String("method", string(api.MethodPassword)))
-}
-
-// --- POST /api/auth/totp ---
-
-func (h *Handler) HandleTOTPVerify(w http.ResponseWriter, r *http.Request) {
-	req, ok := decodeAuthBody[struct {
-		Code      string `json:"code"`
-		TOTPToken string `json:"totp_token"`
-	}](w, r)
-	if !ok {
-		return
-	}
-
-	// Look up and consume the pending TOTP entry.
-	pending, ok := h.Ceremonies.TOTP.LoadAndDelete(req.TOTPToken)
-
-	if !ok || time.Since(pending.CreatedAt) > CeremonyTTL {
-		api.UnauthorizedC(w, r, api.CodeAuthSessionInvalid, "invalid or expired totp token")
-		return
-	}
-
-	ctx := r.Context()
-	dbCtx, dbCancel := dbCtx(ctx)
-	user, err := h.Store.GetUserByID(dbCtx, pending.UserID)
-	dbCancel()
-	if err != nil || user == nil {
-		slog.Error("totp: user lookup failed", "error", err, "user_id", pending.UserID)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
-
-	// Get the TOTP secret and validate the code.
-	ok, err = h.decryptAndVerifyTOTP(ctx, user.ID, req.Code)
-	if err != nil {
-		slog.Error("totp: verify", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
-
-	// Try TOTP code first, then recovery code.
-	ip := ClientIP(r)
-	if ok {
-		// Check replay: track last_totp_step to prevent reuse within the same 30s window.
-		currentStep, replayed := checkTOTPReplay(user)
-		if replayed {
-			Audit(r, slog.LevelWarn, AuditTOTPVerify, false, user.Username,
-				slog.String("reason", "replay_detected"))
-			api.UnauthorizedC(w, r, api.CodeTOTPReplay, "code already used")
-			return
-		}
-		user.LastTOTPStep = currentStep
-		if err := h.Store.UpdateUser(ctx, user); err != nil {
-			slog.Error("totp: update last step", "error", err)
-		}
-	} else {
-		// Try as recovery code: hash it and attempt to consume from DB.
-		codeHash := auth.HexSHA256(req.Code)
-		used, err := h.Store.UseRecoveryCode(ctx, user.ID, codeHash)
-		if err != nil || !used {
-			h.RateLimiter.Record(ip, user.Username)
-			Audit(r, slog.LevelWarn, AuditTOTPVerify, false, user.Username,
-				slog.String("reason", "invalid_code"))
-			api.UnauthorizedC(w, r, api.CodeTOTPInvalid, "invalid code")
-			return
-		}
-		remaining, rcErr := h.Store.RecoveryCodeCount(ctx, user.ID)
-		if rcErr != nil {
-			slog.Warn("totp: recovery code count", "error", rcErr)
-		}
-		Audit(r, slog.LevelInfo, AuditRecoveryUse, true, user.Username,
-			slog.Int("remaining", remaining))
-	}
-
-	if err := h.createSessionAndRespond(w, r, user, api.MethodPasswordTOTP); err != nil {
-		slog.Error("totp: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
-	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
-		slog.String("method", string(api.MethodPasswordTOTP)))
 }
 
 // --- POST /api/auth/logout ---
@@ -260,7 +154,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, true, checkBreach, h.HTTPClient)
+	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, req.Username, true, checkBreach, h.HTTPClient)
 	if userMsg != "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return
@@ -322,111 +216,8 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,
-		TOTPEnabled: user.TOTPEnabled,
 		HasPasskeys: passkeyCount > 0,
+		OIDCLinked:  user.OIDCSub != "",
+		HasPassword: user.PasswordHash != "",
 	})
-}
-
-// --- POST /api/auth/reauth ---
-
-func (h *Handler) HandleReauth(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
-
-	req, ok := decodeAuthBody[struct {
-		Method   string `json:"method"`
-		Password string `json:"password"`
-		Code     string `json:"code"`
-	}](w, r)
-	if !ok {
-		return
-	}
-
-	ctx := r.Context()
-	verified := false
-
-	switch api.AuthMethod(req.Method) {
-	case api.MethodPassword:
-		if user.PasswordHash == "" {
-			api.BadRequestC(w, r, api.CodeBadRequest, "no password set")
-			return
-		}
-		ip := ClientIP(r)
-		allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
-		if !allowed {
-			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-			api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
-			return
-		}
-		ok, err := auth.VerifyPassword(req.Password, user.PasswordHash)
-		if err != nil {
-			slog.Error("reauth: verify password", "error", err)
-			api.InternalErrorC(w, r, nil, api.CodeInternalError)
-			return
-		}
-		if !ok {
-			h.RateLimiter.Record(ip, user.Username)
-			Audit(r, slog.LevelWarn, AuditReauthFailure, false, user.Username,
-				slog.String("method", string(api.MethodPassword)),
-				slog.String("reason", "invalid_password"))
-		}
-		verified = ok
-
-	case api.MethodTOTP:
-		if !user.TOTPEnabled {
-			api.BadRequestC(w, r, api.CodeTOTPNotEnabled, "TOTP not enabled")
-			return
-		}
-		ok, err := h.decryptAndVerifyTOTP(ctx, user.ID, req.Code)
-		if err != nil {
-			slog.Error("reauth: TOTP verify", "error", err)
-			api.InternalErrorC(w, r, nil, api.CodeInternalError)
-			return
-		}
-		if ok {
-			currentStep, replayed := checkTOTPReplay(user)
-			if replayed {
-				Audit(r, slog.LevelWarn, AuditReauthFailure, false, user.Username,
-					slog.String("method", string(api.MethodTOTP)),
-					slog.String("reason", "replay_detected"))
-				api.UnauthorizedC(w, r, api.CodeTOTPReplay, "code already used")
-				return
-			}
-			user.LastTOTPStep = currentStep
-			if err := h.Store.UpdateUser(ctx, user); err != nil {
-				slog.Error("reauth: update last TOTP step", "error", err)
-			}
-			verified = true
-		} else {
-			Audit(r, slog.LevelWarn, AuditReauthFailure, false, user.Username,
-				slog.String("method", string(api.MethodTOTP)),
-				slog.String("reason", "invalid_code"))
-		}
-
-	default:
-		api.BadRequestC(w, r, api.CodeBadRequest, "unsupported method")
-		return
-	}
-
-	if !verified {
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "verification failed")
-		return
-	}
-
-	// Update session reauth_at timestamp.
-	if sessHash := api.SessionHashFromContext(ctx); sessHash != "" {
-		if err := h.Store.UpdateSessionReauth(ctx, sessHash, time.Now()); err != nil {
-			slog.Warn("reauth: update session", "error", err)
-		}
-	}
-
-	api.Ok(w)
-	Audit(r, slog.LevelInfo, AuditReauthSuccess, true, user.Username,
-		slog.String("method", req.Method))
-}
-
-// checkTOTPReplay detects TOTP code reuse within the same 30-second window.
-// Returns the current step and whether the code was already used (replayed).
-func checkTOTPReplay(user *api.User) (currentStep int64, replayed bool) {
-	currentStep = time.Now().Unix() / 30
-	return currentStep, user.LastTOTPStep >= currentStep
 }

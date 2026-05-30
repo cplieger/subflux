@@ -45,9 +45,7 @@ func TestScannerAlignment(t *testing.T) {
 			expectedFields: []string{
 				"ID", "Username", "Email", "DisplayName",
 				"PasswordHash", "Role", "OIDCSub", "OIDCIssuer",
-				"", // totp_secret decrypts into a local []byte, not a struct field
-				"TOTPEnabled", "Enabled", "LastTOTPStep",
-				"CreatedAt", "UpdatedAt",
+				"Enabled", "CreatedAt", "UpdatedAt",
 			},
 		},
 		{

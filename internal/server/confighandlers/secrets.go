@@ -13,7 +13,7 @@ import (
 // --- Secret management ---
 
 // secretKeyNames lists YAML keys that typically contain secrets.
-var secretKeyNames = []string{"api_key", "password", "passkey", "token", "secret", "client_key", "anidb_client_key", "client_secret", "totp_encryption_key"}
+var secretKeyNames = []string{"api_key", "password", "passkey", "token", "secret", "client_key", "anidb_client_key", "client_secret"}
 
 // SecretKeyNames returns the list of YAML keys treated as secrets.
 // Exported for cross-package testing (providers_test.go verifies coverage).

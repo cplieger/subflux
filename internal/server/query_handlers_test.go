@@ -110,7 +110,6 @@ func (m *qhMockConfig) OIDCEnabled() bool                         { return false
 func (m *qhMockConfig) OIDCConfig() api.OIDCConfig                { return api.OIDCConfig{} }
 func (m *qhMockConfig) SessionIdleTimeout() time.Duration         { return 24 * time.Hour }
 func (m *qhMockConfig) SessionAbsoluteTimeout() time.Duration     { return 7 * 24 * time.Hour }
-func (m *qhMockConfig) TOTPEncryptionKey() ([]byte, error)        { return nil, nil }
 func (m *qhMockConfig) CheckBreachedPasswords() bool              { return false }
 func (m *qhMockConfig) WebAuthnRPID() string                      { return "" }
 
@@ -164,7 +163,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		// authenticator keeps the Server invariant (auth is always wired)
 		// without requiring each test to stand up real auth state.
 		authDeps: authDeps{
-			authenticator: &auth.Authenticator{BypassAuth: true},
+			authenticator: &auth.Authenticator{Bypass: func() bool { return true }},
 		},
 	}
 	s.configured.Store(true)

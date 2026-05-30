@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"subflux/internal/api"
@@ -102,6 +103,32 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 
 	user := api.UserFromContext(r.Context())
 
+	// Adding a passkey creates a local login credential. SSO-governed accounts
+	// (no password) cannot self-provision one; local accounts must prove their
+	// password.
+	if user.PasswordHash == "" {
+		api.ForbiddenC(w, r, api.CodeForbidden, "this account is managed by your identity provider")
+		return
+	}
+	req, ok := decodeAuthBody[struct {
+		Password string `json:"password"`
+	}](w, r)
+	if !ok {
+		return
+	}
+	ip := ClientIP(r)
+	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	if !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		return
+	}
+	if okPass, perr := auth.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
+		h.RateLimiter.Record(ip, user.Username)
+		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid password")
+		return
+	}
+
 	ctx := r.Context()
 	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
 	if err != nil {
@@ -131,10 +158,14 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	h.Ceremonies.WebAuthn.Store(token, &WebAuthnSession{
+	if !h.Ceremonies.WebAuthn.Store(token, &WebAuthnSession{
 		Data:      sessionData,
 		CreatedAt: time.Now(),
-	})
+	}) {
+		slog.Warn("webauthn register: ceremony session limit reached")
+		api.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "too many pending ceremonies")
+		return
+	}
 
 	api.WriteJSON(w, WebAuthnRegisterBeginResponse{
 		PublicKey:    creation,
