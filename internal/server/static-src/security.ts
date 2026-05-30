@@ -595,7 +595,7 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
       "Disconnect",
     );
     sec.appendChild(el("div", { className: "sec-actions" }, unlinkBtn));
-  } else {
+  } else if (me?.can_link_oidc) {
     const connectBtn = el(
       "button",
       {
@@ -607,6 +607,14 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
       "Connect",
     );
     sec.appendChild(el("div", { className: "sec-actions" }, connectBtn));
+  } else {
+    sec.appendChild(
+      el(
+        "p",
+        { className: "muted" },
+        "Create another admin before switching this account to single sign-on.",
+      ),
+    );
   }
 
   return sec;

@@ -212,6 +212,15 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("auth me: passkey count", "error", errPK)
 	}
 
+	// The last local admin can't migrate to SSO-only (break-glass guard), so
+	// the UI shouldn't offer the link.
+	canLinkOIDC := true
+	if last, err := h.isLastLocalAdmin(r.Context(), user); err != nil {
+		slog.Warn("auth me: admin check", "error", err)
+	} else if last {
+		canLinkOIDC = false
+	}
+
 	api.WriteJSON(w, api.UserMeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
@@ -219,5 +228,6 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		HasPasskeys: passkeyCount > 0,
 		OIDCLinked:  user.OIDCSub != "",
 		HasPassword: user.PasswordHash != "",
+		CanLinkOIDC: canLinkOIDC,
 	})
 }

@@ -65,6 +65,7 @@ export interface MeResponse {
   has_passkeys: boolean;
   oidc_linked: boolean;
   has_password: boolean;
+  can_link_oidc: boolean;
 }
 
 export interface MovieItem {

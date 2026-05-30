@@ -16,6 +16,7 @@ type UserMeResponse struct {
 	HasPasskeys bool   `json:"has_passkeys"`
 	OIDCLinked  bool   `json:"oidc_linked"`
 	HasPassword bool   `json:"has_password"`
+	CanLinkOIDC bool   `json:"can_link_oidc"`
 }
 
 // LoginSuccessResponse is the JSON response after successful login.
