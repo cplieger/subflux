@@ -73,10 +73,7 @@ CREATE TABLE IF NOT EXISTS auth_users (
     role          TEXT NOT NULL DEFAULT 'user',
     oidc_sub      TEXT NOT NULL DEFAULT '',
     oidc_issuer   TEXT NOT NULL DEFAULT '',
-    totp_secret   BLOB,
-    totp_enabled  INTEGER NOT NULL DEFAULT 0,
     enabled       INTEGER NOT NULL DEFAULT 1,
-    last_totp_step INTEGER NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -90,7 +87,6 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     ip_address   TEXT NOT NULL DEFAULT '',
     created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    reauth_at    DATETIME,
     oidc_expiry  DATETIME
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON auth_sessions(user_id);
@@ -126,15 +122,6 @@ CREATE TABLE IF NOT EXISTS auth_api_keys (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_apikeys_user ON auth_api_keys(user_id);
-CREATE INDEX IF NOT EXISTS idx_apikeys_hash ON auth_api_keys(key_hash);
-
-CREATE TABLE IF NOT EXISTS auth_recovery_codes (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id   INTEGER NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
-    code_hash TEXT NOT NULL,
-    used      INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_recovery_user ON auth_recovery_codes(user_id);
 
 CREATE TABLE IF NOT EXISTS auth_oidc_states (
     state      TEXT PRIMARY KEY,

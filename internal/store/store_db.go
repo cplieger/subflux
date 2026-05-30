@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"strings"
@@ -74,7 +75,7 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		return nil, errors.New("open db: path contains null byte")
 	}
 	db, err := sql.Open("sqlite",
-		path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_time_format=sqlite&_texttotime=1")
+		path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)&_pragma=secure_delete(ON)&_time_format=sqlite&_texttotime=1")
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
@@ -84,6 +85,14 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	if schemaErr := applySchema(ctx, db); schemaErr != nil {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", schemaErr)
+	}
+	// The DB holds password hashes, emails, and client IPs — restrict to owner.
+	// SQLite recreates the -wal/-shm sidecars with the main file's mode, so this
+	// is durable; the loop also fixes any sidecars applySchema already created.
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if cErr := os.Chmod(p, 0o600); cErr != nil && !errors.Is(cErr, fs.ErrNotExist) {
+			slog.Warn("chmod db file", "path", p, "error", cErr)
+		}
 	}
 	var journalMode string
 	if scanErr := db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journalMode); scanErr != nil {

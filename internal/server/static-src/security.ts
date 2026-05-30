@@ -1,8 +1,17 @@
-// security.ts — Security popup: password, TOTP, passkeys, API keys.
+// security.ts — Security popup: password, passkeys, API keys.
 
 import * as bus from "./bus.js";
 import * as notify from "./notify.js";
-import { el, icon, dialog, closeDialog, dialogHead, onBackdropClose, patch } from "./dom.js";
+import {
+  el,
+  icon,
+  dialog,
+  closeDialog,
+  dialogHead,
+  onBackdropClose,
+  patch,
+  confirm,
+} from "./dom.js";
 import { reconcile } from "./lib/reactive/reconcile.js";
 import {
   apiGet,
@@ -15,7 +24,6 @@ import {
 } from "./api-client.js";
 import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./webauthn-utils.js";
 import type { MeResponse } from "./api-types.js";
-import { REAUTH_WINDOW_MS } from "./constants.js";
 
 // --- Inline interfaces for API response shapes ---
 
@@ -33,18 +41,9 @@ interface APIKeyItem {
   created_at: string;
 }
 
-interface TOTPEnableResponse {
-  secret: string;
-  uri: string;
-  recovery_codes?: string[];
-}
-
 interface APIKeyCreateResponse {
   key: string;
 }
-
-// Client-side reauth tracking (5-minute window).
-let lastReauthAt = 0;
 
 /** Wrap an async click handler with disabled + aria-busy lifecycle. The
  *  button is disabled and announced as busy while the handler runs;
@@ -98,123 +97,31 @@ async function openSecurity(): Promise<void> {
 }
 
 async function renderSections(body: HTMLElement): Promise<void> {
-  const [me, passkeys, apikeys] = await Promise.all([
+  const [me, passkeys, oidcAvailable] = await Promise.all([
     apiGet<MeResponse>("/api/auth/me"),
     apiGet<PasskeyItem[]>("/api/auth/passkeys"),
-    apiGet<APIKeyItem[]>("/api/auth/apikeys"),
+    detectOIDC(),
   ]);
 
   const frag = document.createDocumentFragment();
 
-  frag.appendChild(buildPasswordSection());
-  frag.appendChild(buildTOTPSection(me));
-  frag.appendChild(buildPasskeysSection(passkeys));
-  frag.appendChild(buildAPIKeysSection(apikeys));
+  // Local-credential management is only for accounts that have a password.
+  // SSO-governed (password-less) accounts are managed at the identity provider.
+  if (me?.has_password) {
+    frag.appendChild(buildPasswordSection());
+    frag.appendChild(buildPasskeysSection(passkeys));
+  }
+  // API keys are admin-only (bearer credentials carrying the owner's role).
+  if (me?.role === "admin") {
+    const apikeys = await apiGet<APIKeyItem[]>("/api/auth/apikeys");
+    frag.appendChild(buildAPIKeysSection(apikeys));
+  }
+  const oidcSection = buildOIDCSection(me, oidcAvailable);
+  if (oidcSection) {
+    frag.appendChild(oidcSection);
+  }
 
   patch(body, frag);
-}
-
-// --- Reauthentication ---
-
-function needsReauth(): boolean {
-  return Date.now() - lastReauthAt > REAUTH_WINDOW_MS;
-}
-
-async function ensureReauth(): Promise<boolean> {
-  if (!needsReauth()) {
-    return true;
-  }
-  return showReauthPrompt();
-}
-
-function showReauthPrompt(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const dlg = dialog("confirmDialog");
-    if (dlg.open) {
-      dlg.close();
-    }
-    let resolved = false;
-    const settle = (ok: boolean): void => {
-      if (resolved) {
-        return;
-      }
-      resolved = true;
-      closeDialog(dlg);
-      resolve(ok);
-    };
-
-    const header = dialogHead("Reauthenticate", () => {
-      settle(false);
-    });
-
-    const pwInput = el("input", {
-      type: "password",
-      id: "reauth-pw",
-      autocomplete: "current-password",
-      placeholder: "Password or TOTP code",
-    }) as HTMLInputElement;
-
-    const errEl = el("div", { className: "empty", hidden: true });
-
-    const body = el(
-      "div",
-      { className: "dlg-body" },
-      el("p", null, "Enter your password or TOTP code to continue."),
-      pwInput,
-      errEl,
-    );
-
-    const footer = el(
-      "div",
-      { className: "dlg-foot" },
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: busyClick(async () => {
-            const val = pwInput.value.trim();
-            if (!val) {
-              return;
-            }
-            const r = await apiPostRaw<{ ok: boolean }>("/api/auth/reauth", { credential: val });
-            if (r.ok) {
-              lastReauthAt = Date.now();
-              settle(true);
-            } else {
-              errEl.textContent = r.error ?? "Reauthentication failed";
-              errEl.hidden = false;
-            }
-          }),
-        },
-        "Confirm",
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          onclick: () => {
-            settle(false);
-          },
-        },
-        "Cancel",
-      ),
-    );
-
-    dlg.replaceChildren(header, body, footer);
-    dlg.showModal();
-    onBackdropClose(dlg, () => {
-      settle(false);
-    });
-    dlg.addEventListener(
-      "close",
-      () => {
-        settle(false);
-      },
-      { once: true },
-    );
-    pwInput.focus();
-  });
 }
 
 // --- Change Password ---
@@ -257,10 +164,6 @@ function buildPasswordSection(): HTMLElement {
           showFeedback(feedback, "Password must be at least 8 characters", true);
           return;
         }
-        const ok = await ensureReauth();
-        if (!ok) {
-          return;
-        }
         const r = await apiPutRaw<unknown>("/api/auth/password", {
           current_password: cur,
           new_password: nw,
@@ -292,169 +195,6 @@ function buildPasswordSection(): HTMLElement {
   return sec;
 }
 
-// --- TOTP ---
-
-function buildTOTPSection(me: MeResponse | null): HTMLElement {
-  const sec = el("div", { className: "sec-section" });
-  sec.appendChild(el("h3", null, "Two-Factor Authentication"));
-
-  const totpEnabled = me?.totp_enabled ?? false;
-
-  const status = el(
-    "div",
-    { className: "sec-status" },
-    el("span", null, "Status: "),
-    el(
-      "span",
-      {
-        className: "badge",
-        "data-status": totpEnabled ? "ok" : "",
-      },
-      totpEnabled ? "Enabled" : "Disabled",
-    ),
-  );
-  sec.appendChild(status);
-
-  const content = el("div", { className: "sec-totp-content" });
-  sec.appendChild(content);
-
-  if (totpEnabled) {
-    const disableBtn = el(
-      "button",
-      {
-        type: "button",
-        className: "ghost",
-        onclick: busyClick(async () => {
-          const ok = await ensureReauth();
-          if (!ok) {
-            return;
-          }
-          const code = await showInputDialog("Enter a TOTP code to disable 2FA:", {
-            inputmode: "numeric",
-            pattern: "[0-9]*",
-            maxlength: "6",
-            autocomplete: "one-time-code",
-          });
-          if (!code) {
-            return;
-          }
-          const r = await apiDeleteRaw<unknown>("/api/auth/totp", { code });
-          if (r.ok) {
-            notify.success("TOTP disabled");
-            await renderSections(secDlgBody());
-          } else {
-            notify.error(r.error ?? "Failed to disable TOTP");
-          }
-        }),
-      },
-      "Disable TOTP",
-    );
-    content.appendChild(el("div", { className: "sec-actions" }, disableBtn));
-  } else {
-    const enableBtn = el(
-      "button",
-      {
-        type: "button",
-        onclick: busyClick(async () => {
-          const ok = await ensureReauth();
-          if (!ok) {
-            return;
-          }
-          const data = await apiPost<TOTPEnableResponse>("/api/auth/totp/enable");
-          if (!data) {
-            notify.error("Failed to start TOTP setup");
-            return;
-          }
-          showTOTPSetup(content, data);
-        }),
-      },
-      "Enable TOTP",
-    );
-    content.appendChild(el("div", { className: "sec-actions" }, enableBtn));
-  }
-
-  return sec;
-}
-
-function showTOTPSetup(container: HTMLElement, data: TOTPEnableResponse): void {
-  const uriDisplay = el(
-    "div",
-    { className: "sec-totp-uri" },
-    el("p", null, "Scan this URI with your authenticator app:"),
-    el("code", null, data.uri),
-  );
-
-  const codeInput = el("input", {
-    type: "text",
-    inputmode: "numeric",
-    pattern: "[0-9]*",
-    autocomplete: "one-time-code",
-    placeholder: "Enter 6-digit code",
-    maxlength: "6",
-  }) as HTMLInputElement;
-
-  const feedback = el("div", { className: "sec-feedback", hidden: true });
-
-  const confirmBtn = el(
-    "button",
-    {
-      type: "button",
-      onclick: busyClick(async () => {
-        const code = codeInput.value.trim();
-        if (!code) {
-          return;
-        }
-        const r = await apiPostRaw<{ recovery_codes?: string[] }>("/api/auth/totp/confirm", {
-          code,
-        });
-        if (r.ok && r.data) {
-          notify.success("TOTP enabled");
-          if (r.data.recovery_codes && r.data.recovery_codes.length > 0) {
-            showRecoveryCodes(container, r.data.recovery_codes);
-          } else {
-            void renderSections(secDlgBody());
-          }
-        } else {
-          showFeedback(feedback, r.error ?? "Invalid code", true);
-        }
-      }),
-    },
-    "Confirm",
-  );
-
-  container.replaceChildren(
-    uriDisplay,
-    el("div", { className: "sec-fields" }, el("label", null, "Verification code"), codeInput),
-    feedback,
-    el("div", { className: "sec-actions" }, confirmBtn),
-  );
-}
-
-function showRecoveryCodes(container: HTMLElement, codes: string[]): void {
-  const list = el("div", { className: "sec-recovery-codes" });
-  for (const code of codes) {
-    list.appendChild(el("code", null, code));
-  }
-  container.replaceChildren(
-    el("p", null, "Save these recovery codes. They will not be shown again."),
-    list,
-    el(
-      "div",
-      { className: "sec-actions" },
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: () => {
-            void renderSections(secDlgBody());
-          },
-        },
-        "Done",
-      ),
-    ),
-  );
-}
-
 // --- Passkeys ---
 
 function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
@@ -479,11 +219,14 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
     {
       type: "button",
       onclick: busyClick(async () => {
-        const ok = await ensureReauth();
-        if (!ok) {
+        const password = await showInputDialog("Enter your password to add a passkey:", {
+          type: "password",
+          autocomplete: "current-password",
+        });
+        if (password === null) {
           return;
         }
-        await registerPasskey();
+        await registerPasskey(password);
       }),
     },
     "Add passkey",
@@ -511,8 +254,13 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
       className: "close-btn ghost",
       "aria-label": "Delete passkey",
       onclick: busyClick(async () => {
-        const ok = await ensureReauth();
-        if (!ok) {
+        if (
+          !(await confirm(
+            "Delete passkey",
+            "This passkey can no longer be used to sign in.",
+            "Delete",
+          ))
+        ) {
           return;
         }
         const r = await apiDeleteRaw<unknown>(`/api/auth/passkeys/${pk.id}`);
@@ -571,12 +319,12 @@ function prepareCreationOptions(pk: PublicKeyCredentialCreationOptions): void {
   }
 }
 
-async function registerPasskey(): Promise<void> {
+async function registerPasskey(password: string): Promise<void> {
   try {
     const begin = await apiPost<{
       publicKey: PublicKeyCredentialCreationOptions;
       session_token?: string;
-    }>("/api/auth/webauthn/register/begin");
+    }>("/api/auth/webauthn/register/begin", { password });
     if (!begin) {
       notify.error("Failed to start passkey registration");
       return;
@@ -662,10 +410,6 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
     {
       type: "button",
       onclick: busyClick(async () => {
-        const ok = await ensureReauth();
-        if (!ok) {
-          return;
-        }
         const label = await showInputDialog("Label for the new API key:", {
           maxlength: "64",
         });
@@ -698,8 +442,13 @@ function apiKeyRow(key: APIKeyItem): HTMLElement {
       className: "close-btn ghost",
       "aria-label": "Revoke API key",
       onclick: busyClick(async () => {
-        const ok = await ensureReauth();
-        if (!ok) {
+        if (
+          !(await confirm(
+            "Revoke API key",
+            "Applications using this key will stop working.",
+            "Revoke",
+          ))
+        ) {
           return;
         }
         const deleted = await apiDelete(`/api/auth/apikeys/${key.id}`);
@@ -780,6 +529,89 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
   }
 }
 
+// --- Single Sign-On (OIDC) ---
+
+/** Probe whether an OIDC provider is configured (mirrors the login page). */
+async function detectOIDC(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/oidc", {
+      method: "HEAD",
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+    return res.status === 200 || res.type === "opaqueredirect" || res.status === 302;
+  } catch {
+    return false;
+  }
+}
+
+/** Build the SSO section. Returns null when OIDC is neither linked nor available. */
+function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElement | null {
+  const linked = me?.oidc_linked ?? false;
+  if (!linked && !available) {
+    return null;
+  }
+
+  const sec = el("div", { className: "sec-section" });
+  sec.appendChild(el("h3", null, "Single Sign-On"));
+  sec.appendChild(
+    el(
+      "div",
+      { className: "sec-status" },
+      el("span", null, "Status: "),
+      el(
+        "span",
+        { className: "badge", "data-status": linked ? "ok" : "" },
+        linked ? "Connected" : "Not connected",
+      ),
+    ),
+  );
+
+  if (linked) {
+    const unlinkBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "ghost",
+        onclick: busyClick(async () => {
+          if (
+            !(await confirm(
+              "Disconnect single sign-on",
+              "You'll no longer be able to sign in through your identity provider.",
+              "Disconnect",
+            ))
+          ) {
+            return;
+          }
+          const r = await apiDeleteRaw<unknown>("/api/auth/oidc/link");
+          if (r.ok) {
+            notify.success("Single sign-on disconnected");
+            await renderSections(secDlgBody());
+          } else {
+            notify.error(r.error ?? "Failed to disconnect single sign-on");
+          }
+        }),
+      },
+      "Disconnect",
+    );
+    sec.appendChild(el("div", { className: "sec-actions" }, unlinkBtn));
+  } else {
+    const connectBtn = el(
+      "button",
+      {
+        type: "button",
+        onclick: () => {
+          window.location.href = "/api/auth/oidc";
+        },
+      },
+      "Connect",
+    );
+    sec.appendChild(el("div", { className: "sec-actions" }, connectBtn));
+  }
+
+  return sec;
+}
+
 // --- Utilities ---
 
 /** Show a custom input dialog (replaces native prompt() for styled, validated input). */
@@ -806,6 +638,7 @@ function showInputDialog(message: string, attrs?: Record<string, string>): Promi
     const inp = el("input", {
       type: "text",
       autocomplete: "off",
+      "aria-label": message,
       ...attrs,
     }) as HTMLInputElement;
 

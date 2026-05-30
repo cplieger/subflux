@@ -46,6 +46,7 @@ func Schema(providerSchemas []api.ProviderSchema) []api.SchemaSection {
 		postProcessSection(),
 		authSection(),
 		scoringSection(),
+		backupSection(),
 		loggingSection(),
 	}
 }

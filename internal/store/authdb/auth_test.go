@@ -147,7 +147,7 @@ func TestGetUser_lookup_methods(t *testing.T) {
 		},
 		{
 			name:   "ByOIDCSub_returns_user",
-			lookup: func() (*api.User, error) { return a.GetUserByOIDCSub(ctx, "sub-123") },
+			lookup: func() (*api.User, error) { return a.GetUserByOIDCSub(ctx, "https://issuer.example.com", "sub-123") },
 			checkUser: func(t *testing.T, u *api.User) {
 				if u.Username != "oidcuser" {
 					t.Errorf("Username = %q, want %q", u.Username, "oidcuser")
@@ -156,7 +156,7 @@ func TestGetUser_lookup_methods(t *testing.T) {
 		},
 		{
 			name:    "ByOIDCSub_not_found_returns_nil",
-			lookup:  func() (*api.User, error) { return a.GetUserByOIDCSub(ctx, "nonexistent-sub") },
+			lookup:  func() (*api.User, error) { return a.GetUserByOIDCSub(ctx, "https://issuer.example.com", "nonexistent-sub") },
 			wantNil: true,
 		},
 	}
@@ -369,7 +369,6 @@ func TestCreateSession_with_nullable_times(t *testing.T) {
 	}
 
 	now := time.Now().Truncate(time.Second)
-	reauthAt := now.Add(time.Hour)
 	oidcExpiry := now.Add(24 * time.Hour)
 	sess := &api.Session{
 		TokenHash:    "hash-nullable",
@@ -377,7 +376,6 @@ func TestCreateSession_with_nullable_times(t *testing.T) {
 		AuthMethod:   "oidc",
 		CreatedAt:    now,
 		LastActivity: now,
-		ReauthAt:     &reauthAt,
 		OIDCExpiry:   &oidcExpiry,
 	}
 	if err := a.CreateSession(context.Background(), sess); err != nil {
@@ -390,9 +388,6 @@ func TestCreateSession_with_nullable_times(t *testing.T) {
 	}
 	if got == nil {
 		t.Fatal("GetSessionByHash() = nil, want session")
-	}
-	if got.ReauthAt == nil {
-		t.Fatal("GetSessionByHash().ReauthAt = nil, want non-nil")
 	}
 	if got.OIDCExpiry == nil {
 		t.Fatal("GetSessionByHash().OIDCExpiry = nil, want non-nil")
@@ -689,189 +684,6 @@ func TestDeleteAPIKey_removes_key(t *testing.T) {
 	}
 }
 
-func TestTOTPSecret_set_get_clear_roundtrip(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	u := &api.User{Username: "totpuser", Role: "user", Enabled: true}
-	if err := a.CreateUser(context.Background(), u); err != nil {
-		t.Fatalf("CreateUser() unexpected error: %v", err)
-	}
-
-	secret, err := a.GetTOTPSecret(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetTOTPSecret() unexpected error: %v", err)
-	}
-	if secret != nil {
-		t.Errorf("GetTOTPSecret() = %v, want nil (no secret set)", secret)
-	}
-
-	encrypted := []byte("encrypted-totp-secret-data")
-	if err := a.SetTOTPSecret(context.Background(), u.ID, encrypted); err != nil {
-		t.Fatalf("SetTOTPSecret() unexpected error: %v", err)
-	}
-
-	secret, err = a.GetTOTPSecret(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetTOTPSecret() unexpected error: %v", err)
-	}
-	if string(secret) != string(encrypted) {
-		t.Errorf("GetTOTPSecret() = %q, want %q", secret, encrypted)
-	}
-
-	got, err := a.GetUserByID(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetUserByID() unexpected error: %v", err)
-	}
-	if !got.TOTPEnabled {
-		t.Error("SetTOTPSecret() did not enable TOTP on user")
-	}
-
-	if err := a.ClearTOTPSecret(context.Background(), u.ID); err != nil {
-		t.Fatalf("ClearTOTPSecret() unexpected error: %v", err)
-	}
-
-	secret, err = a.GetTOTPSecret(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetTOTPSecret() after clear unexpected error: %v", err)
-	}
-	if secret != nil {
-		t.Errorf("GetTOTPSecret() after clear = %v, want nil", secret)
-	}
-
-	got, err = a.GetUserByID(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("GetUserByID() unexpected error: %v", err)
-	}
-	if got.TOTPEnabled {
-		t.Error("ClearTOTPSecret() did not disable TOTP on user")
-	}
-}
-
-func TestGetTOTPSecret_nonexistent_user_returns_nil(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	secret, err := a.GetTOTPSecret(context.Background(), 99999)
-	if err != nil {
-		t.Fatalf("GetTOTPSecret(99999) unexpected error: %v", err)
-	}
-	if secret != nil {
-		t.Errorf("GetTOTPSecret(99999) = %v, want nil", secret)
-	}
-}
-
-func TestSetRecoveryCodes_replaces_existing(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	u := &api.User{Username: "recuser", Role: "user", Enabled: true}
-	if err := a.CreateUser(context.Background(), u); err != nil {
-		t.Fatalf("CreateUser() unexpected error: %v", err)
-	}
-
-	hashes1 := []string{"hash-a", "hash-b", "hash-c"}
-	if err := a.SetRecoveryCodes(context.Background(), u.ID, hashes1); err != nil {
-		t.Fatalf("SetRecoveryCodes(first) unexpected error: %v", err)
-	}
-
-	count, err := a.RecoveryCodeCount(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("RecoveryCodeCount() unexpected error: %v", err)
-	}
-	if count != 3 {
-		t.Errorf("RecoveryCodeCount() = %d, want 3", count)
-	}
-
-	hashes2 := []string{"hash-x", "hash-y"}
-	if err := a.SetRecoveryCodes(context.Background(), u.ID, hashes2); err != nil {
-		t.Fatalf("SetRecoveryCodes(second) unexpected error: %v", err)
-	}
-
-	count, err = a.RecoveryCodeCount(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("RecoveryCodeCount() unexpected error: %v", err)
-	}
-	if count != 2 {
-		t.Errorf("RecoveryCodeCount() after replace = %d, want 2", count)
-	}
-}
-
-func TestUseRecoveryCode_consumes_matching_code(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	u := &api.User{Username: "userecuser", Role: "user", Enabled: true}
-	if err := a.CreateUser(context.Background(), u); err != nil {
-		t.Fatalf("CreateUser() unexpected error: %v", err)
-	}
-
-	hashes := []string{"code-1", "code-2", "code-3"}
-	if err := a.SetRecoveryCodes(context.Background(), u.ID, hashes); err != nil {
-		t.Fatalf("SetRecoveryCodes() unexpected error: %v", err)
-	}
-
-	used, err := a.UseRecoveryCode(context.Background(), u.ID, "code-2")
-	if err != nil {
-		t.Fatalf("UseRecoveryCode(code-2) unexpected error: %v", err)
-	}
-	if !used {
-		t.Error("UseRecoveryCode(code-2) = false, want true")
-	}
-
-	count, err := a.RecoveryCodeCount(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("RecoveryCodeCount() unexpected error: %v", err)
-	}
-	if count != 2 {
-		t.Errorf("RecoveryCodeCount() after use = %d, want 2", count)
-	}
-
-	used, err = a.UseRecoveryCode(context.Background(), u.ID, "code-2")
-	if err != nil {
-		t.Fatalf("UseRecoveryCode(code-2 again) unexpected error: %v", err)
-	}
-	if used {
-		t.Error("UseRecoveryCode(code-2 again) = true, want false (already used)")
-	}
-}
-
-func TestUseRecoveryCode_nonexistent_code_returns_false(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	u := &api.User{Username: "norecuser", Role: "user", Enabled: true}
-	if err := a.CreateUser(context.Background(), u); err != nil {
-		t.Fatalf("CreateUser() unexpected error: %v", err)
-	}
-
-	used, err := a.UseRecoveryCode(context.Background(), u.ID, "nonexistent")
-	if err != nil {
-		t.Fatalf("UseRecoveryCode(nonexistent) unexpected error: %v", err)
-	}
-	if used {
-		t.Error("UseRecoveryCode(nonexistent) = true, want false")
-	}
-}
-
-func TestRecoveryCodeCount_no_codes_returns_zero(t *testing.T) {
-	t.Parallel()
-	a := openTestAuthDB(t)
-
-	u := &api.User{Username: "nocodeuser", Role: "user", Enabled: true}
-	if err := a.CreateUser(context.Background(), u); err != nil {
-		t.Fatalf("CreateUser() unexpected error: %v", err)
-	}
-
-	count, err := a.RecoveryCodeCount(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("RecoveryCodeCount() unexpected error: %v", err)
-	}
-	if count != 0 {
-		t.Errorf("RecoveryCodeCount() = %d, want 0", count)
-	}
-}
-
 func TestOIDCState_create_and_consume(t *testing.T) {
 	t.Parallel()
 	a := openTestAuthDB(t)
@@ -898,6 +710,23 @@ func TestOIDCState_create_and_consume(t *testing.T) {
 	_, _, _, err = a.ConsumeOIDCState(context.Background(), "state-abc")
 	if err == nil {
 		t.Error("ConsumeOIDCState(consumed) expected error, got nil")
+	}
+}
+
+func TestConsumeOIDCState_expired_returns_error(t *testing.T) {
+	t.Parallel()
+	a := openTestAuthDB(t)
+	ctx := context.Background()
+	if err := a.CreateOIDCState(ctx, "old-state", "n", "v", "/cb"); err != nil {
+		t.Fatalf("CreateOIDCState() unexpected error: %v", err)
+	}
+	// Backdate past the TTL so consumption must reject it regardless of cleanup.
+	if _, err := a.db.ExecContext(ctx,
+		"UPDATE auth_oidc_states SET created_at = datetime('now', '-20 minutes') WHERE state = 'old-state'"); err != nil {
+		t.Fatalf("backdate created_at: %v", err)
+	}
+	if _, _, _, err := a.ConsumeOIDCState(ctx, "old-state"); err == nil {
+		t.Error("ConsumeOIDCState(expired) expected error, got nil")
 	}
 }
 

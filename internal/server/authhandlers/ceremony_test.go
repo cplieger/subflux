@@ -7,10 +7,16 @@ import (
 	"time"
 )
 
+type testCeremonyVal struct {
+	CreatedAt time.Time
+	IP        string
+	UserID    int64
+}
+
 func TestShardedCeremonyMap_Store_Load_roundtrip(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[PendingTOTP]()
-	val := PendingTOTP{CreatedAt: time.Now(), UserID: 42, IP: "1.2.3.4"}
+	sm := NewShardedCeremonyMap[testCeremonyVal]()
+	val := testCeremonyVal{CreatedAt: time.Now(), UserID: 42, IP: "1.2.3.4"}
 	if !sm.Store("key1", val) {
 		t.Fatal("Store returned false")
 	}

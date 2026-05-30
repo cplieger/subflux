@@ -2,13 +2,6 @@ package api
 
 import "time"
 
-// TOTPRequiredResponse signals the client that TOTP verification is needed.
-type TOTPRequiredResponse struct {
-	Error        string `json:"error"`
-	TOTPToken    string `json:"totp_token"`
-	TOTPRequired bool   `json:"totp_required"`
-}
-
 // SetupStatusResponse is the JSON response for GET /api/auth/setup.
 type SetupStatusResponse struct {
 	SetupRequired bool `json:"setup_required"`
@@ -20,31 +13,15 @@ type UserMeResponse struct {
 	Username    string `json:"username"`
 	Role        Role   `json:"role"`
 	ID          int64  `json:"id"`
-	TOTPEnabled bool   `json:"totp_enabled"`
 	HasPasskeys bool   `json:"has_passkeys"`
+	OIDCLinked  bool   `json:"oidc_linked"`
+	HasPassword bool   `json:"has_password"`
 }
 
 // LoginSuccessResponse is the JSON response after successful login.
 type LoginSuccessResponse struct {
 	Redirect string         `json:"redirect"`
 	User     UserMeResponse `json:"user"`
-}
-
-// TOTPSetupResponse is the JSON response for POST /api/auth/totp/enable.
-type TOTPSetupResponse struct {
-	Secret string `json:"secret"`
-	URI    string `json:"uri"`
-}
-
-// RecoveryCodesResponse wraps recovery codes returned after TOTP confirm or regeneration.
-type RecoveryCodesResponse struct {
-	RecoveryCodes []string `json:"recovery_codes"`
-}
-
-// RecoveryCodesStatusResponse is the JSON response for GET /api/auth/recovery-codes.
-type RecoveryCodesStatusResponse struct {
-	Remaining int `json:"remaining"`
-	Total     int `json:"total"`
 }
 
 // WebAuthnUnknownCredentialResponse signals an unknown credential to the client.

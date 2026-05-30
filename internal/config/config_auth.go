@@ -1,11 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
-	"log/slog"
-	"sync"
 	"time"
 
 	"subflux/internal/api"
@@ -63,54 +58,6 @@ func (c *Config) SessionAbsoluteTimeout() time.Duration {
 		return DefaultSessionAbsoluteTimeout
 	}
 	return c.Auth.SessionAbsolute.D
-}
-
-// validateTOTPKeyHex decodes a hex-encoded TOTP encryption key and validates
-// that it is exactly 32 bytes (AES-256). Returns the decoded key or an error.
-func validateTOTPKeyHex(s string) ([]byte, error) {
-	key, err := hex.DecodeString(s)
-	if err != nil {
-		return nil, fmt.Errorf("invalid totp_encryption_key (must be hex-encoded): %w", err)
-	}
-	if len(key) != 32 {
-		return nil, fmt.Errorf("invalid totp_encryption_key: must be 64 hex chars (32 bytes), got %d bytes", len(key))
-	}
-	return key, nil
-}
-
-// TOTPEncryptionKey returns the AES-256 key for TOTP secret encryption.
-// If not configured, generates 32 random bytes, caches them in the config
-// struct, and logs a warning. The generated key is ephemeral and will be
-// lost on restart, making TOTP secrets unrecoverable.
-// Thread-safe: uses sync.Once to ensure the key is initialized exactly once.
-func (c *Config) TOTPEncryptionKey() ([]byte, error) {
-	return c.totpKeyOnce.get(c)
-}
-
-// totpKeyInit is a sync.Once wrapper for TOTP key initialization.
-type totpKeyInit struct {
-	err  error
-	key  []byte
-	once sync.Once
-}
-
-func (t *totpKeyInit) get(c *Config) ([]byte, error) {
-	t.once.Do(func() {
-		if c.Auth.TOTPKey == "" {
-			slog.Warn("totp_encryption_key not configured, generating ephemeral key " +
-				"(TOTP secrets will be unrecoverable after restart)")
-			key := make([]byte, 32)
-			if _, err := rand.Read(key); err != nil {
-				t.err = fmt.Errorf("generate TOTP encryption key: %w", err)
-				return
-			}
-			c.Auth.TOTPKey = hex.EncodeToString(key)
-			t.key = key
-			return
-		}
-		t.key, t.err = validateTOTPKeyHex(c.Auth.TOTPKey)
-	})
-	return t.key, t.err
 }
 
 // CheckBreachedPasswords returns whether to check passwords against HIBP.

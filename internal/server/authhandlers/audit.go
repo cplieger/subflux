@@ -46,18 +46,12 @@ const (
 	AuditLoginRateLimited AuditEvent = "login.rate_limited"
 	AuditLogout           AuditEvent = "logout"
 	AuditPasswordChange   AuditEvent = "password.change"
-	AuditTOTPEnable       AuditEvent = "totp.enable"
-	AuditTOTPDisable      AuditEvent = "totp.disable"
-	AuditTOTPVerify       AuditEvent = "totp.verify"
 	AuditPasskeyAdd       AuditEvent = "passkey.add"
 	AuditPasskeyDelete    AuditEvent = "passkey.delete"
 	AuditPasskeyRename    AuditEvent = "passkey.rename"
 	AuditAPIKeyCreate     AuditEvent = "apikey.create"
 	AuditAPIKeyRevoke     AuditEvent = "apikey.revoke"
-	AuditReauthSuccess    AuditEvent = "reauth.success"
-	AuditReauthFailure    AuditEvent = "reauth.failure"
 	AuditOIDCCallback     AuditEvent = "oidc.callback"
-	AuditRecoveryUse      AuditEvent = "recovery.use"
 )
 
 // Audit emits a structured auth audit record at the specified slog

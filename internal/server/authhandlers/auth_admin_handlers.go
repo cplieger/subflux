@@ -19,25 +19,23 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type userInfo struct {
-		CreatedAt   time.Time `json:"created_at"`
-		Username    string    `json:"username"`
-		Email       string    `json:"email"`
-		Role        api.Role  `json:"role"`
-		ID          int64     `json:"id"`
-		Enabled     bool      `json:"enabled"`
-		TOTPEnabled bool      `json:"totp_enabled"`
+		CreatedAt time.Time `json:"created_at"`
+		Username  string    `json:"username"`
+		Email     string    `json:"email"`
+		Role      api.Role  `json:"role"`
+		ID        int64     `json:"id"`
+		Enabled   bool      `json:"enabled"`
 	}
 
 	out := make([]userInfo, 0, len(users))
 	for i := range users {
 		out = append(out, userInfo{
-			ID:          users[i].ID,
-			Username:    users[i].Username,
-			Email:       users[i].Email,
-			Role:        users[i].Role,
-			Enabled:     users[i].Enabled,
-			TOTPEnabled: users[i].TOTPEnabled,
-			CreatedAt:   users[i].CreatedAt,
+			ID:        users[i].ID,
+			Username:  users[i].Username,
+			Email:     users[i].Email,
+			Role:      users[i].Role,
+			Enabled:   users[i].Enabled,
+			CreatedAt: users[i].CreatedAt,
 		})
 	}
 
@@ -80,7 +78,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, true, checkBreach, h.HTTPClient)
+	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, req.Username, true, checkBreach, h.HTTPClient)
 	if userMsg != "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return
@@ -133,6 +131,38 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	if userID == admin.ID {
 		api.ConflictC(w, r, api.CodeConflict, "cannot delete your own account")
 		return
+	}
+
+	// Last-admin protection: never delete the only remaining admin account,
+	// which would leave the instance unmanageable.
+	users, listErr := h.AdminDB.ListUsers(r.Context())
+	if listErr != nil {
+		slog.Error("delete user: list users", "error", listErr)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+	var target *api.User
+	adminCount, localAdmins := 0, 0
+	for i := range users {
+		if users[i].Role == api.RoleAdmin {
+			adminCount++
+			if users[i].PasswordHash != "" {
+				localAdmins++
+			}
+		}
+		if users[i].ID == userID {
+			target = &users[i]
+		}
+	}
+	if target != nil && target.Role == api.RoleAdmin {
+		if adminCount <= 1 {
+			api.ConflictC(w, r, api.CodeConflict, "cannot delete the last admin account")
+			return
+		}
+		if target.PasswordHash != "" && localAdmins <= 1 {
+			api.ConflictC(w, r, api.CodeConflict, "cannot delete the last local (break-glass) admin account")
+			return
+		}
 	}
 
 	if err := h.AdminDB.DeleteUser(r.Context(), userID); err != nil {

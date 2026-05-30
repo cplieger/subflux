@@ -6,7 +6,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.3
-	github.com/pquerna/otp v1.5.0
 	github.com/ulikunitz/xz v0.5.15
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.52.0
@@ -17,7 +16,6 @@ require (
 )
 
 require (
-	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect

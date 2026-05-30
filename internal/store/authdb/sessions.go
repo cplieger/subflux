@@ -15,7 +15,7 @@ var _ api.SessionPersister = (*AuthDB)(nil)
 
 var sessionScanner = txutil.TableScanner[api.Session]{
 	Columns: `token_hash, user_id, auth_method, ip_address,
-	created_at, last_activity, reauth_at, oidc_expiry`,
+	created_at, last_activity, oidc_expiry`,
 	Scan:     scanSession,
 	ScanInto: scanSessionInto,
 }
@@ -29,17 +29,13 @@ func scanSession(row interface{ Scan(...any) error }) (*api.Session, error) {
 }
 
 func scanSessionInto(row interface{ Scan(...any) error }, s *api.Session) error {
-	var reauthAt sql.NullTime
 	var oidcExpiry sql.NullTime
 	err := row.Scan(
 		&s.TokenHash, &s.UserID, &s.AuthMethod, &s.IPAddress,
-		&s.CreatedAt, &s.LastActivity, &reauthAt, &oidcExpiry,
+		&s.CreatedAt, &s.LastActivity, &oidcExpiry,
 	)
 	if err != nil {
 		return err
-	}
-	if reauthAt.Valid {
-		s.ReauthAt = &reauthAt.Time
 	}
 	if oidcExpiry.Valid {
 		s.OIDCExpiry = &oidcExpiry.Time
@@ -53,10 +49,10 @@ func scanSessionInto(row interface{ Scan(...any) error }, s *api.Session) error 
 func (a *AuthDB) CreateSession(ctx context.Context, sess *api.Session) error {
 	_, err := a.db.ExecContext(ctx, `
 		INSERT INTO auth_sessions (token_hash, user_id, auth_method, ip_address,
-			created_at, last_activity, reauth_at, oidc_expiry)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			created_at, last_activity, oidc_expiry)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		sess.TokenHash, sess.UserID, sess.AuthMethod, sess.IPAddress,
-		sess.CreatedAt, sess.LastActivity, sess.ReauthAt, sess.OIDCExpiry,
+		sess.CreatedAt, sess.LastActivity, sess.OIDCExpiry,
 	)
 	if err == nil {
 		slog.Debug("session created", "user_id", sess.UserID, "method", sess.AuthMethod)
@@ -105,14 +101,6 @@ func (a *AuthDB) BatchUpdateSessionActivity(ctx context.Context, tokenHashes []s
 		}
 	}
 	return tx.Commit()
-}
-
-// UpdateSessionReauth updates the reauth_at and last_activity timestamps for a session.
-func (a *AuthDB) UpdateSessionReauth(ctx context.Context, tokenHash string, now time.Time) error {
-	_, err := a.db.ExecContext(ctx,
-		`UPDATE auth_sessions SET reauth_at = ?, last_activity = ? WHERE token_hash = ?`,
-		now, now, tokenHash)
-	return err
 }
 
 // DeleteSession removes the session with the given token hash.

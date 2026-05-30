@@ -170,7 +170,7 @@ export function configurePanel(visible: boolean, detail?: DetailConfig): void {
   }
 
   // Files button.
-  if (detail.filesAction) {
+  if (detail.filesAction && store.get("isAdmin")) {
     const filesBtn = el(
       "button",
       {

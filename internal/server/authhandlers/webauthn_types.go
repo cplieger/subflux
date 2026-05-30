@@ -3,7 +3,7 @@ package authhandlers
 import "github.com/go-webauthn/webauthn/protocol"
 
 // WebAuthnLoginBeginResponse wraps WebAuthn assertion options with a session token.
-// Used for login and reauth ceremonies.
+// Used for login ceremonies.
 type WebAuthnLoginBeginResponse struct {
 	PublicKey    *protocol.CredentialAssertion `json:"publicKey"`
 	SessionToken string                        `json:"session_token"`

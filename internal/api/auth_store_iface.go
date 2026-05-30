@@ -11,7 +11,7 @@ type UserStore interface {
 	GetUserByID(ctx context.Context, id int64) (*User, error)
 	GetUserByUsername(ctx context.Context, username string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	GetUserByOIDCSub(ctx context.Context, sub string) (*User, error)
+	GetUserByOIDCSub(ctx context.Context, issuer, sub string) (*User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUser(ctx context.Context, user *User) error
 	DeleteUser(ctx context.Context, id int64) error
@@ -23,7 +23,6 @@ type SessionPersister interface {
 	CreateSession(ctx context.Context, sess *Session) error
 	GetSessionByHash(ctx context.Context, tokenHash string) (*Session, error)
 	UpdateSessionActivity(ctx context.Context, tokenHash string, now time.Time) error
-	UpdateSessionReauth(ctx context.Context, tokenHash string, now time.Time) error
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteUserSessions(ctx context.Context, userID int64, exceptHash string) error
 	CleanupExpiredSessions(ctx context.Context, now time.Time, idleTimeout, absTimeout time.Duration) (int64, error)
@@ -54,16 +53,6 @@ type KeyStore interface {
 	// DeleteAPIKey removes an API key. Both id and userID are required to
 	// prevent cross-user deletion.
 	DeleteAPIKey(ctx context.Context, id, userID int64) error
-}
-
-// TOTPStore persists TOTP secrets and recovery codes.
-type TOTPStore interface {
-	SetTOTPSecret(ctx context.Context, userID int64, encryptedSecret []byte) error
-	GetTOTPSecret(ctx context.Context, userID int64) ([]byte, error)
-	ClearTOTPSecret(ctx context.Context, userID int64) error
-	SetRecoveryCodes(ctx context.Context, userID int64, hashes []string) error
-	UseRecoveryCode(ctx context.Context, userID int64, codeHash string) (bool, error)
-	RecoveryCodeCount(ctx context.Context, userID int64) (int, error)
 }
 
 // OIDCStateStore persists OIDC authentication state.

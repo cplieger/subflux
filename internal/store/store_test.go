@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -315,4 +316,38 @@ func TestIntPow_property_matches_repeated_multiplication(t *testing.T) {
 			t.Errorf("intPow(%v, %v) = %v, want %v", base, exp, got, want)
 		}
 	})
+}
+
+func TestOpen_appliesFileModeAndSecurityPragmas(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "sec.db")
+	db, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close(context.Background()) })
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("db file mode = %o, want 600", perm)
+	}
+
+	var secureDelete int
+	if err := db.db.QueryRowContext(context.Background(), "PRAGMA secure_delete").Scan(&secureDelete); err != nil {
+		t.Fatalf("PRAGMA secure_delete: %v", err)
+	}
+	if secureDelete != 1 {
+		t.Errorf("secure_delete = %d, want 1 (ON)", secureDelete)
+	}
+
+	var synchronous int
+	if err := db.db.QueryRowContext(context.Background(), "PRAGMA synchronous").Scan(&synchronous); err != nil {
+		t.Fatalf("PRAGMA synchronous: %v", err)
+	}
+	if synchronous != 1 {
+		t.Errorf("synchronous = %d, want 1 (NORMAL)", synchronous)
+	}
 }

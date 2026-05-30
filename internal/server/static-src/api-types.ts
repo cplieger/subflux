@@ -21,8 +21,6 @@ export type {
   ProviderSchema,
   ProviderStatus,
   ProvidersResponse,
-  RecoveryCodes,
-  RecoveryCodesStatus,
   ScanEvent,
   SchemaField,
   SchemaOption,

@@ -4,8 +4,7 @@
 //   - server.go       — New() constructor and lifecycle (this file)
 //   - server_types.go — Server struct, embedded dep groups, Option functions
 //   - server_init.go  — initHandlers (handler family construction)
-//   - middleware.go   — requireAuth / requireRole / requireConfigured /
-//     requireRecentReauth
+//   - middleware.go   — requireAuth / requireRole / requireConfigured
 //   - routes.go       — routeGroup + registerRoutes + permission model
 //   - poller.go       — Sonarr/Radarr history polling + import processing
 //   - scheduler.go    — full-scan pipeline + DB maintenance + auth cleanup
@@ -116,6 +115,14 @@ func New(db api.Store, reg api.ProviderRegistry, opts ...Option) *Server {
 	return s
 }
 
+// authBypass reports whether auth.disable_auth is currently set. It reads the
+// live config so toggling disable_auth via hot-reload takes effect without a
+// restart (the Authenticator calls it per request).
+func (s *Server) authBypass() bool {
+	cfg, ok := s.state().cfg.(*config.Config)
+	return ok && cfg.AuthDisabled()
+}
+
 // SetAuth configures authentication dependencies on the server.
 func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *webauthn.WebAuthn, oidc *auth.OIDCProvider) {
 	s.authStore = store
@@ -128,19 +135,15 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *we
 
 	idle := config.DefaultSessionIdleTimeout
 	abs := config.DefaultSessionAbsoluteTimeout
-	bypass := false
 	if ls := s.state(); ls != nil && ls.cfg != nil {
 		idle = ls.cfg.SessionIdleTimeout()
 		abs = ls.cfg.SessionAbsoluteTimeout()
-		if cfg, ok := ls.cfg.(*config.Config); ok {
-			bypass = cfg.AuthDisabled()
-		}
 	}
 	s.authenticator = &auth.Authenticator{
 		Store:       store,
 		IdleTimeout: idle,
 		AbsTimeout:  abs,
-		BypassAuth:  bypass,
+		Bypass:      s.authBypass,
 	}
 
 	s.authH = &authhandlers.Handler{
@@ -207,13 +210,16 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 	addr := fmt.Sprintf(":%d", ls.cfg.ServerPort())
 
 	if s.configured.Load() {
-		s.bgWg.Add(2)
+		s.bgWg.Add(3)
 		go func() { defer s.bgWg.Done(); s.runScheduler(ctx) }()
 		go func() { defer s.bgWg.Done(); s.runPoller(ctx) }()
+		go func() { defer s.bgWg.Done(); s.runBackup(ctx) }()
 	}
 
 	if cfg, ok := s.state().cfg.(*config.Config); ok && cfg.AuthDisabled() {
 		slog.Warn("AUTHENTICATION DISABLED via auth.disable_auth config; all requests treated as admin")
+		s.alerts.RecordPersistent("security",
+			"Authentication is DISABLED (auth.disable_auth): all requests are treated as admin. Remove this setting to restore login.")
 	}
 
 	s.serveAndWait(ctx, addr, mux, onReady)

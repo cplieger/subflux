@@ -83,7 +83,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 
 	// 4. Generate API key: POST /api/auth/apikeys.
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/apikeys",
-		strings.NewReader(`{"label":"integration-test"}`))
+		strings.NewReader(`{"label":"integration-test","password":"super-secure-password-here"}`))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
 	s.handleGenerateAPIKey(rec, req)
@@ -313,27 +313,22 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 		t.Errorf("user /api/scan: status = %d, want %d", resp.StatusCode, http.StatusForbidden)
 	}
 
-	// 10. reauth group with stale session (no recent reauth) → 403 reauth_required.
-	// /api/auth/apikeys POST → reauth group. A session that hasn't reauthed
-	// within reauthMaxAge must be rejected before reaching the handler.
-	// The default test session has ReauthAt == nil, so this should always
-	// return 403 with reauth_required=true.
+	// 10. API key creation with a valid session → success. Reauth step-up was
+	// removed; /api/auth/apikeys POST is now in the plain authenticated group,
+	// so a valid session suffices (sensitive actions are confirmed client-side).
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/api/auth/apikeys",
-		strings.NewReader(`{"label":"test"}`))
+		strings.NewReader(`{"label":"test","password":"correct-horse-battery-staple"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: adminToken})
 	resp, err = client.Do(req)
 	if err != nil {
-		t.Fatalf("stale-session /api/auth/apikeys request: %v", err)
+		t.Fatalf("authed /api/auth/apikeys request: %v", err)
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("stale-session /api/auth/apikeys: status = %d, want %d; body: %s",
-			resp.StatusCode, http.StatusForbidden, body)
-	}
-	if !strings.Contains(string(body), `"reauth_required":true`) {
-		t.Errorf("stale-session /api/auth/apikeys: body missing reauth_required flag; got: %s", body)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("authed /api/auth/apikeys: status = %d, want %d; body: %s",
+			resp.StatusCode, http.StatusOK, body)
 	}
 }
 
@@ -386,10 +381,6 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	if err := db.CreateAPIKey(ctx, apiKey); err != nil {
 		t.Fatalf("auth_api_keys table: %v", err)
-	}
-
-	if err := db.SetRecoveryCodes(ctx, user.ID, []string{"hash1", "hash2"}); err != nil {
-		t.Fatalf("auth_recovery_codes table: %v", err)
 	}
 
 	if err := db.CreateOIDCState(ctx, "state1", "nonce1", "verifier1", "/"); err != nil {
@@ -632,41 +623,5 @@ func TestSecurity_CookieFallback(t *testing.T) {
 	}
 	if !foundSecure {
 		t.Error("TLS request should produce __Host-sfx_session cookie")
-	}
-}
-
-func TestSecurity_TOTPCodeReplay(t *testing.T) {
-	t.Parallel()
-	_, db := testAuthServer(t)
-	user := createTestUser(t, db, "totp-replay", "correct-horse-battery-staple")
-
-	// Set user's LastTOTPStep to the current step to simulate a recently used code.
-	currentStep := time.Now().Unix() / 30
-	user.TOTPEnabled = true
-	user.LastTOTPStep = currentStep
-	if err := db.UpdateUser(context.Background(), user); err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify the user's LastTOTPStep is set.
-	updated, err := db.GetUserByID(context.Background(), user.ID)
-	if err != nil || updated == nil {
-		t.Fatal("user not found")
-	}
-	if updated.LastTOTPStep != currentStep {
-		t.Fatalf("LastTOTPStep = %d, want %d", updated.LastTOTPStep, currentStep)
-	}
-
-	// The TOTP handler checks: if user.LastTOTPStep >= currentStep, reject.
-	// This means any code for the current 30s window would be rejected.
-	// We verify this by checking the stored step matches what the handler would compare.
-	handlerStep := time.Now().Unix() / 30
-	if updated.LastTOTPStep >= handlerStep {
-		// This is the expected state: the handler would reject a code for this step.
-		t.Logf("TOTP replay protection active: LastTOTPStep=%d >= currentStep=%d",
-			updated.LastTOTPStep, handlerStep)
-	} else {
-		t.Errorf("TOTP replay protection not active: LastTOTPStep=%d < currentStep=%d",
-			updated.LastTOTPStep, handlerStep)
 	}
 }

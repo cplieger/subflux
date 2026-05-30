@@ -2,12 +2,12 @@ package authhandlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"subflux/internal/api"
 	"subflux/internal/auth"
@@ -102,9 +102,24 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, _, err := h.resolveOIDCUser(ctx, claims)
+	user, linkToken, err := h.resolveOrLinkOIDC(ctx, claims)
 	if err != nil {
+		if errors.Is(err, errOIDCLinkNoPassword) {
+			Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
+				slog.String("reason", "username_conflict_no_password"))
+			api.ConflictC(w, r, api.CodeConflict, "an account with this username already exists")
+			return
+		}
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "oidc resolve user")
+		return
+	}
+	if linkToken != "" {
+		// Username collides with a password-protected local account. Redirect
+		// to the login page to prove ownership and link (link-on-login).
+		Audit(r, slog.LevelInfo, AuditOIDCCallback, true, "",
+			slog.String("stage", "link_required"))
+		//nolint:gosec // G710: linkToken is a server-generated hex token, not user input
+		http.Redirect(w, r, "/login.html?oidc_link="+linkToken, http.StatusFound)
 		return
 	}
 
@@ -127,64 +142,215 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURI, http.StatusFound) //nolint:gosec // G710: redirectURI validated above
 }
 
-// resolveOIDCUser looks up or creates a user from OIDC claims.
-func (h *Handler) resolveOIDCUser(ctx context.Context, claims *auth.OIDCClaims) (*api.User, bool, error) {
+// errOIDCLinkNoPassword is returned when an OIDC login matches an existing
+// local account by username but that account has no password to prove
+// ownership with, so it cannot be safely linked.
+var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordless account")
+
+// resolveOrLinkOIDC resolves an OIDC identity by (issuer, sub) only. Outcomes:
+//   - (user, "", nil)       matched by sub, or a fresh JIT-provisioned user → log in
+//   - (nil, linkToken, nil) username collides with a password account → caller
+//     must complete link-on-login (the user proves the existing password)
+//   - (nil, "", err)        lookup/create error, or errOIDCLinkNoPassword
+//
+// Email and username are never used to auto-link; that is an account-takeover
+// vector. A username collision triggers an explicit, password-proven link.
+func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *auth.OIDCClaims) (*api.User, string, error) {
+	bySub, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
+	if err != nil {
+		return nil, "", fmt.Errorf("lookup by sub: %w", err)
+	}
+	if bySub != nil {
+		return bySub, "", nil
+	}
+
 	username := claims.PreferredUsername
 	if username == "" {
 		username = claims.Email
 	}
-
-	var (
-		existingBySub             *api.User
-		existingByEmail           *api.User
-		existingByUsername        *api.User
-		errSub, errEmail, errUser error
-	)
-
-	g, gctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		existingBySub, errSub = h.OidcDB.GetUserByOIDCSub(gctx, claims.Subject)
-		return nil
-	})
-	g.Go(func() error {
-		existingByEmail, errEmail = h.OidcDB.GetUserByEmail(gctx, claims.Email)
-		return nil
-	})
-	g.Go(func() error {
-		existingByUsername, errUser = h.OidcDB.GetUserByUsername(gctx, username)
-		return nil
-	})
-	if err := g.Wait(); err != nil {
-		slog.Warn("oidc: concurrent lookup error", "error", err)
+	byName, err := h.OidcDB.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, "", fmt.Errorf("lookup by username: %w", err)
 	}
-
-	if errSub != nil {
-		slog.Warn("oidc: lookup by sub", "error", errSub)
-	}
-	if errEmail != nil {
-		slog.Warn("oidc: lookup by email", "error", errEmail)
-	}
-	if errUser != nil {
-		slog.Warn("oidc: lookup by username", "error", errUser)
-	}
-
-	user, isNew := auth.ResolveOIDCUser(claims, existingBySub, existingByEmail, existingByUsername)
-
-	if isNew {
-		now := time.Now()
-		user.CreatedAt = now
-		user.UpdatedAt = now
-		if err := h.OidcDB.CreateUser(ctx, user); err != nil {
-			return nil, false, fmt.Errorf("create user: %w", err)
+	if byName != nil {
+		// Do NOT auto-link. Require the user to prove ownership of the
+		// existing account with its password before linking the OIDC sub.
+		if byName.PasswordHash == "" {
+			return nil, "", errOIDCLinkNoPassword
 		}
-		slog.Info("oidc: new user created", "username", user.Username, "sub", claims.Subject)
-	} else if user.OIDCSub == "" {
-		user.OIDCSub = claims.Subject
-		user.UpdatedAt = time.Now()
-		if err := h.OidcDB.UpdateUser(ctx, user); err != nil {
-			slog.Warn("oidc: link user", "error", err)
+		token, gerr := GenerateCeremonyToken()
+		if gerr != nil {
+			return nil, "", gerr
+		}
+		h.Ceremonies.Link.Store(token, &PendingLink{
+			UserID:     byName.ID,
+			OIDCSub:    claims.Subject,
+			OIDCIssuer: claims.Issuer,
+			CreatedAt:  time.Now(),
+		})
+		return nil, token, nil
+	}
+
+	// No sub match and no username collision → JIT-provision a new user.
+	newUser, _ := auth.ResolveOIDCUser(claims, nil)
+	now := time.Now()
+	newUser.CreatedAt = now
+	newUser.UpdatedAt = now
+	if err := h.OidcDB.CreateUser(ctx, newUser); err != nil {
+		return nil, "", fmt.Errorf("create user: %w", err)
+	}
+	slog.Info("oidc: new user created", "username", newUser.Username, "sub", claims.Subject)
+	return newUser, "", nil
+}
+
+// --- POST /api/auth/oidc/link ---
+
+// HandleOIDCLink completes link-on-login: the user proves ownership of the
+// existing local account by password, and the pending OIDC identity is linked
+// to it. The link token is single-use and TTL-bounded.
+func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
+	req, ok := decodeAuthBody[struct {
+		LinkToken string `json:"link_token"`
+		Password  string `json:"password"`
+	}](w, r)
+	if !ok {
+		return
+	}
+
+	pending, ok := h.Ceremonies.Link.LoadAndDelete(req.LinkToken)
+	if !ok || time.Since(pending.CreatedAt) > CeremonyTTL {
+		api.UnauthorizedC(w, r, api.CodeAuthSessionInvalid, "invalid or expired link token")
+		return
+	}
+
+	ctx := r.Context()
+	user, err := h.Store.GetUserByID(ctx, pending.UserID)
+	if err != nil || user == nil {
+		slog.Error("oidc link: user lookup", "error", err)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+
+	ip := ClientIP(r)
+	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	if !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		return
+	}
+
+	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
+	if err != nil || !okPass {
+		h.RateLimiter.Record(ip, user.Username)
+		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
+			slog.String("reason", "link_password_invalid"))
+		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		return
+	}
+
+	// Link-on-login is a MIGRATION to SSO governance: it removes the local
+	// password and passkeys so the IdP becomes the sole control point. Never
+	// strip the last local (password) admin — the break-glass account.
+	if last, lerr := h.isLastLocalAdmin(ctx, user); lerr != nil {
+		slog.Error("oidc link: admin check", "error", lerr)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	} else if last {
+		api.ConflictC(w, r, api.CodeConflict,
+			"cannot switch the last local admin to SSO-only; keep a break-glass admin or reset via the CLI")
+		return
+	}
+
+	user.OIDCSub = pending.OIDCSub
+	user.OIDCIssuer = pending.OIDCIssuer
+	user.PasswordHash = ""
+	user.UpdatedAt = time.Now()
+	if err := h.Store.UpdateUser(ctx, user); err != nil {
+		slog.Error("oidc link: update user", "error", err)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+	h.clearPasskeys(ctx, user.ID)
+
+	if err := h.createSessionAndRespond(w, r, user, api.MethodOIDC); err != nil {
+		slog.Error("oidc link: create session", "error", err)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+	slog.Info("oidc: account linked", "username", user.Username)
+	Audit(r, slog.LevelInfo, AuditOIDCCallback, true, user.Username,
+		slog.String("stage", "linked"))
+}
+
+// isLastLocalAdmin reports whether u is an admin and the only admin with a
+// local password — i.e. migrating it to SSO-only would remove the break-glass
+// account. Non-admins always return false.
+func (h *Handler) isLastLocalAdmin(ctx context.Context, u *api.User) (bool, error) {
+	if u.Role != api.RoleAdmin {
+		return false, nil
+	}
+	users, err := h.Store.ListUsers(ctx)
+	if err != nil {
+		return false, err
+	}
+	localAdmins := 0
+	for i := range users {
+		if users[i].Role == api.RoleAdmin && users[i].PasswordHash != "" {
+			localAdmins++
+		}
+	}
+	return localAdmins <= 1, nil
+}
+
+// clearPasskeys removes all of a user's passkeys (best-effort) so that an
+// OIDC-migrated account retains no local login method.
+func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
+	passkeys, err := h.Store.GetPasskeysByUserID(ctx, userID)
+	if err != nil {
+		slog.Warn("oidc link: list passkeys", "error", err)
+		return
+	}
+	for i := range passkeys {
+		if derr := h.Store.DeletePasskey(ctx, passkeys[i].ID, userID); derr != nil {
+			slog.Warn("oidc link: delete passkey", "error", derr)
+		}
+	}
+}
+
+// --- DELETE /api/auth/oidc/link ---
+
+// HandleOIDCUnlink removes the OIDC binding from the current user's account.
+// It refuses if doing so would leave the account with no way to log in (no
+// password and no passkey), mirroring the disable-password lockout guard.
+func (h *Handler) HandleOIDCUnlink(w http.ResponseWriter, r *http.Request) {
+	user := api.UserFromContext(r.Context())
+	ctx := r.Context()
+
+	if user.OIDCSub == "" {
+		api.BadRequestC(w, r, api.CodeBadRequest, "no OIDC account linked")
+		return
+	}
+	if user.PasswordHash == "" {
+		passkeys, err := h.Store.PasskeyCountForUser(ctx, user.ID)
+		if err != nil {
+			slog.Error("oidc unlink: passkey count", "error", err)
+			api.InternalErrorC(w, r, nil, api.CodeInternalError)
+			return
+		}
+		if passkeys == 0 {
+			api.ConflictC(w, r, api.CodeConflict, "cannot unlink: set a password or add a passkey first")
+			return
 		}
 	}
 
-	return user, isNew, nil
+	user.OIDCSub = ""
+	user.OIDCIssuer = ""
+	user.UpdatedAt = time.Now()
+	if err := h.Store.UpdateUser(ctx, user); err != nil {
+		slog.Error("oidc unlink: update user", "error", err)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+	slog.Info("oidc: account unlinked", "username", user.Username)
+	api.Ok(w)
 }

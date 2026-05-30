@@ -20,62 +20,33 @@ func TestProperty_OIDCIdentityResolution(t *testing.T) {
 		// Generate random OIDC claims.
 		claims := &OIDCClaims{
 			Subject:           rapid.StringMatching(`[a-z0-9]{8,32}`).Draw(t, "sub"),
+			Issuer:            "https://idp.example.com",
 			Email:             rapid.StringMatching(`[a-z]{4,8}@[a-z]{4,8}\.[a-z]{2,4}`).Draw(t, "email"),
 			PreferredUsername: rapid.StringMatching(`[a-z]{4,16}`).Draw(t, "preferred_username"),
 			Name:              rapid.StringMatching(`[A-Z][a-z]{2,8} [A-Z][a-z]{2,8}`).Draw(t, "name"),
 		}
 
-		// Generate existing users for each lookup path.
-		existingByOIDCSub := &api.User{
+		existingBySub := &api.User{
 			ID:       rapid.Int64Range(1, 1000).Draw(t, "subUserID"),
 			Username: "oidc-sub-user",
 			Role:     "admin",
 			Enabled:  true,
 		}
-		existingByEmail := &api.User{
-			ID:       rapid.Int64Range(1001, 2000).Draw(t, "emailUserID"),
-			Username: "email-user",
-			Role:     "user",
-			Enabled:  true,
-		}
-		existingByUsername := &api.User{
-			ID:       rapid.Int64Range(2001, 3000).Draw(t, "usernameUserID"),
-			Username: "username-user",
-			Role:     "user",
-			Enabled:  true,
-		}
 
-		// Test path 1: existingByOIDCSub set → returns that user, isNew=false
-		user, isNew := ResolveOIDCUser(claims, existingByOIDCSub, existingByEmail, existingByUsername)
-		if user != existingByOIDCSub {
-			t.Fatal("expected existingByOIDCSub when all three exist")
+		// Path 1: sub match → returns that user, isNew=false. Email and
+		// username are never consulted (no auto-link by mutable attributes).
+		user, isNew := ResolveOIDCUser(claims, existingBySub)
+		if user != existingBySub {
+			t.Fatal("expected existingBySub on sub match")
 		}
 		if isNew {
-			t.Fatal("expected isNew=false for existingByOIDCSub")
+			t.Fatal("expected isNew=false for existingBySub")
 		}
 
-		// Test path 2: existingByOIDCSub nil, existingByEmail set → returns email user
-		user, isNew = ResolveOIDCUser(claims, nil, existingByEmail, existingByUsername)
-		if user != existingByEmail {
-			t.Fatal("expected existingByEmail when sub is nil")
-		}
-		if isNew {
-			t.Fatal("expected isNew=false for existingByEmail")
-		}
-
-		// Test path 3: existingByOIDCSub nil, existingByEmail nil, existingByUsername set
-		user, isNew = ResolveOIDCUser(claims, nil, nil, existingByUsername)
-		if user != existingByUsername {
-			t.Fatal("expected existingByUsername when sub and email are nil")
-		}
-		if isNew {
-			t.Fatal("expected isNew=false for existingByUsername")
-		}
-
-		// Test path 4: all nil → returns new user with role "user", isNew=true
-		user, isNew = ResolveOIDCUser(claims, nil, nil, nil)
+		// Path 2: no sub match → new JIT user with role "user".
+		user, isNew = ResolveOIDCUser(claims, nil)
 		if !isNew {
-			t.Fatal("expected isNew=true when all lookups are nil")
+			t.Fatal("expected isNew=true when sub is nil")
 		}
 		if user.Role != "user" {
 			t.Fatalf("expected role 'user', got %q", user.Role)
@@ -91,6 +62,9 @@ func TestProperty_OIDCIdentityResolution(t *testing.T) {
 		}
 		if user.OIDCSub != claims.Subject {
 			t.Fatalf("expected OIDCSub %q, got %q", claims.Subject, user.OIDCSub)
+		}
+		if user.OIDCIssuer != claims.Issuer {
+			t.Fatalf("expected OIDCIssuer %q, got %q", claims.Issuer, user.OIDCIssuer)
 		}
 		if !user.Enabled {
 			t.Fatal("expected new user to be enabled")
@@ -110,7 +84,7 @@ func TestProperty_OIDCIdentityResolution_EmptyPreferredUsername(t *testing.T) {
 			Name:              rapid.StringMatching(`[A-Z][a-z]{2,8} [A-Z][a-z]{2,8}`).Draw(t, "name"),
 		}
 
-		user, isNew := ResolveOIDCUser(claims, nil, nil, nil)
+		user, isNew := ResolveOIDCUser(claims, nil)
 		if !isNew {
 			t.Fatal("expected isNew=true")
 		}

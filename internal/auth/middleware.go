@@ -15,15 +15,18 @@ var ErrUnauthenticated = errors.New("unauthenticated")
 
 // Authenticator resolves an HTTP request to an authenticated user.
 //
-// When BypassAuth is true (operator escape hatch via config.disable_auth),
+// When Bypass returns true (operator escape hatch via config.disable_auth),
 // Authenticate short-circuits to a synthetic admin user before touching
-// any credentials or the store. This is the single enforcement point for
-// the bypass; no caller should re-check the flag.
+// any credentials or the store. Bypass is read live on each request so the
+// flag tracks config hot-reloads. This is the single enforcement point for
+// the bypass; no caller should re-check it.
 type Authenticator struct {
-	Store       SessionStore
+	Store SessionStore
+	// Bypass reports whether all authentication is disabled (nil means never).
+	// Read live per request so it tracks config hot-reloads.
+	Bypass      func() bool
 	IdleTimeout time.Duration
 	AbsTimeout  time.Duration
-	BypassAuth  bool
 }
 
 // syntheticAdminUser is the user injected when BypassAuth is true. It has
@@ -43,10 +46,10 @@ var syntheticAdminUser = &api.User{
 // When session validation fails (expired, disabled user, DB error), authentication
 // falls through to API key methods rather than returning an error immediately.
 //
-// When BypassAuth is true, returns the synthetic admin with an empty session
+// When Bypass returns true, returns the synthetic admin with an empty session
 // hash before any credential lookup.
 func (a *Authenticator) Authenticate(r *http.Request) (*api.User, string, error) {
-	if a.BypassAuth {
+	if a.Bypass != nil && a.Bypass() {
 		return syntheticAdminUser, "", nil
 	}
 

@@ -56,14 +56,6 @@ func BeginLogin(wa *webauthn.WebAuthn) (*protocol.CredentialAssertion, *webauthn
 	return wa.BeginDiscoverableLogin()
 }
 
-// BeginUserLogin starts a WebAuthn assertion ceremony scoped to a specific
-// user's credentials. Unlike BeginLogin, the resulting challenge can only be
-// completed by one of the given user's passkeys. Used for reauth flows where
-// we already know who the user is and just need fresh proof-of-possession.
-func BeginUserLogin(wa *webauthn.WebAuthn, user *WebAuthnUser) (*protocol.CredentialAssertion, *webauthn.SessionData, error) {
-	return wa.BeginLogin(user)
-}
-
 // BeginConditionalLogin starts a WebAuthn assertion ceremony with conditional
 // mediation. The browser shows passkeys in the autofill dropdown instead of
 // a full-screen modal.
@@ -76,11 +68,4 @@ func BeginConditionalLogin(wa *webauthn.WebAuthn) (*protocol.CredentialAssertion
 // Returns both the resolved user and the validated credential.
 func FinishLogin(wa *webauthn.WebAuthn, sessionData *webauthn.SessionData, response *http.Request, userFinder func(rawID, userHandle []byte) (webauthn.User, error)) (webauthn.User, *webauthn.Credential, error) {
 	return wa.FinishPasskeyLogin(userFinder, *sessionData, response)
-}
-
-// FinishUserLogin completes a WebAuthn assertion ceremony scoped to a specific
-// user (started with BeginUserLogin). Returns the validated credential so the
-// caller can update the stored sign count and backup flags.
-func FinishUserLogin(wa *webauthn.WebAuthn, user *WebAuthnUser, sessionData *webauthn.SessionData, response *http.Request) (*webauthn.Credential, error) {
-	return wa.FinishLogin(user, *sessionData, response)
 }

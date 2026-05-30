@@ -372,7 +372,7 @@ export function renderSeriesDetail(
     if (oldFiles) {
       oldFiles.remove();
     }
-    if (hasExtSubs) {
+    if (hasExtSubs && store.get("isAdmin")) {
       // Build media_id → video path map from episode data.
       const epPaths = new Map<string, string>();
       for (const sg of seasons) {

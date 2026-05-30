@@ -23,18 +23,10 @@ export const ErrorCode = {
   AuthPasswordBreached: "auth_password_breached",
   AuthSessionInvalid: "auth_session_invalid",
   AuthSessionRequired: "auth_session_required",
-  AuthReauthRequired: "auth_reauth_required",
   AuthRoleRequired: "auth_role_required",
   AuthAPIKeyInvalid: "auth_apikey_invalid",
   AuthAPIKeyDisabled: "auth_apikey_disabled",
   AuthCSRF: "auth_csrf",
-
-  // totp
-  TOTPRequired: "totp_required",
-  TOTPInvalid: "totp_invalid",
-  TOTPReplay: "totp_replay",
-  TOTPAlreadyEnabled: "totp_already_enabled",
-  TOTPNotEnabled: "totp_not_enabled",
 
   // webauthn
   WebAuthnSessionInvalid: "webauthn_session_invalid",

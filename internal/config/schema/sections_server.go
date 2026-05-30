@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"strconv"
 	"strings"
 
 	"subflux/internal/api"
@@ -181,5 +182,34 @@ func languagesSection() api.SchemaSection {
 	return api.SchemaSection{
 		Key: keyLanguages, Title: "Languages", Type: fieldLanguages,
 		Help: "Audio-to-subtitle language mapping using ISO 639-1 codes.",
+	}
+}
+
+func backupSection() api.SchemaSection {
+	return api.SchemaSection{
+		Key:       "backup",
+		Title:     "Database Backups",
+		Type:      fieldFields,
+		EnableKey: keyEnabled,
+		Fields: []api.SchemaField{
+			{
+				Key: "frequency", Label: "Frequency", Type: fieldDuration,
+				Default:     defaults.FormatDuration(defaults.DefaultBackupFrequency),
+				Placeholder: defaults.FormatDuration(defaults.DefaultBackupFrequency),
+				Min:         defaults.FormatDuration(defaults.MinBackupFrequency),
+				Help:        "How often to write a consistent database snapshot (minimum 1h).",
+			},
+			{
+				Key: "retention", Label: "Retention", Type: fieldNumber,
+				Default: strconv.Itoa(defaults.DefaultBackupRetention),
+				Min:     "1",
+				Help:    "How many backup files to keep; older ones are pruned.",
+			},
+			{
+				Key: "path", Label: "Backup Directory", Type: fieldText,
+				Placeholder: "/config",
+				Help:        "Absolute directory for backups. Leave empty to write next to the database.",
+			},
+		},
 	}
 }

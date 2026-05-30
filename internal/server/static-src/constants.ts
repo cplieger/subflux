@@ -8,8 +8,6 @@ export const SSE_RECONNECT_MS = 5_000;
 export const SSE_MAX_RECONNECT_MS = 60_000;
 export const YAML_TIMEOUT_MS = 15_000;
 export const ROUTE_TRANSITION_MS = 200;
-// Security: how long a user can perform sensitive operations without re-authenticating.
-export const REAUTH_WINDOW_MS = 5 * 60 * 1_000;
 
 // Default subtitle variant value — the sentinel used when no variant is specified.
 export const DEFAULT_VARIANT = "standard" as const;

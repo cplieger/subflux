@@ -4,8 +4,8 @@ package server
 //
 // Every HTTP endpoint declares its policy by which routeGroup it joins in
 // registerRoutes (server.go). The group's middleware chain is the single
-// enforcement point for that policy; handlers do not re-check auth, do not
-// re-check roles, and do not call reauth helpers inline. This is the only
+// enforcement point for that policy; handlers do not re-check auth or
+// roles. This is the only
 // file in the server package that encodes per-endpoint permissions.
 //
 // Each middleware is a clean leaf — it performs exactly one check and
@@ -22,16 +22,6 @@ package server
 //	user             — requireAuth. Handlers in this chain may rely on
 //	                   UserFromContext returning a non-nil, enabled user.
 //	admin            — requireAuth + requireRole(admin).
-//	reauth           — requireAuth + requireRecentReauth. Reserved for
-//	                   operations that delete credentials or mint
-//	                   long-lived tokens without providing fresh in-band
-//	                   proof: DELETE passkey, DELETE TOTP, POST api key,
-//	                   DELETE api key. Operations that come with their
-//	                   own fresh proof (password change verifies current
-//	                   password; TOTP confirm verifies the code; WebAuthn
-//	                   register finishes a ceremony) stay in the `user`
-//	                   group because the ceremony itself is the fresh
-//	                   factor.
 //	userConfigured   — requireAuth + requireConfigured. 503 if no valid
 //	                   config yet.
 //	adminConfigured  — requireAuth + requireRole(admin) + requireConfigured.
@@ -42,9 +32,7 @@ package server
 //  2. Every non-public handler can read `api.UserFromContext(r.Context())`
 //     without a nil check.
 //  3. Every admin handler can skip role checks.
-//  4. Every reauth handler runs with a session token; API-key clients are
-//     allowed to proceed without reauth (the middleware no-ops for them).
-//  5. Configured handlers run only when a valid config is loaded; they may
+//  4. Configured handlers run only when a valid config is loaded; they may
 //     dereference s.state().cfg without checking s.configured.
 
 import (
@@ -95,7 +83,6 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	public := newRouteGroup(mux)
 	user := newRouteGroup(mux, s.requireAuth)
 	admin := newRouteGroup(mux, s.requireAuth, s.requireRole(api.RoleAdmin))
-	reauth := newRouteGroup(mux, s.requireAuth, s.requireRecentReauth)
 	userConfigured := newRouteGroup(mux, s.requireAuth, s.requireConfigured)
 	adminConfigured := newRouteGroup(mux, s.requireAuth, s.requireRole(api.RoleAdmin), s.requireConfigured)
 
@@ -115,10 +102,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	public.Add("GET /api/auth/setup", s.authH.HandleSetupStatus)
 	public.Add("POST /api/auth/setup", s.authH.HandleSetupCreate)
 	public.Add("POST /api/auth/login", s.authH.HandleLogin)
-	public.Add("POST /api/auth/totp", s.authH.HandleTOTPVerify)
 	public.Add("POST /api/auth/logout", s.authH.HandleLogout)
 	public.Add("GET /api/auth/oidc", s.authH.HandleOIDCRedirect)
 	public.Add("GET /api/auth/oidc/callback", s.authH.HandleOIDCCallback)
+	public.Add("POST /api/auth/oidc/link", s.authH.HandleOIDCLink)
 	public.Add("POST /api/auth/webauthn/login/begin", s.authH.HandleWebAuthnLoginBegin)
 	public.Add("POST /api/auth/webauthn/login/finish", s.authH.HandleWebAuthnLoginFinish)
 
@@ -132,28 +119,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// that confirm credentials (changePassword, totpConfirm, webauthn
 	// register finish) carry their own in-band proof and also live here.
 	user.Add("GET /api/auth/me", s.authH.HandleAuthMe)
-	user.Add("POST /api/auth/reauth", s.authH.HandleReauth)
-	// Passkey reauth ceremony. Begin returns a user-scoped WebAuthn
-	// challenge; finish verifies the assertion and bumps ReauthAt on the
-	// current session. Both are user-group (the user is already
-	// authenticated; reauth is just freshness).
-	user.Add("POST /api/auth/reauth/passkey/begin", s.authH.HandleReauthPasskeyBegin)
-	user.Add("POST /api/auth/reauth/passkey/finish", s.authH.HandleReauthPasskeyFinish)
 	user.Add("PUT /api/auth/password", s.authH.HandleChangePassword)
-	user.Add("POST /api/auth/totp/enable", s.authH.HandleTOTPEnable)
-	user.Add("POST /api/auth/totp/confirm", s.authH.HandleTOTPConfirm)
 	user.Add("GET /api/auth/passkeys", s.authH.HandleListPasskeys)
 	user.Add("GET /api/auth/webauthn/signal-data", s.authH.HandleWebAuthnSignalData)
 	user.Add("POST /api/auth/webauthn/register/begin", s.authH.HandleWebAuthnRegisterBegin)
 	user.Add("POST /api/auth/webauthn/register/finish", s.authH.HandleWebAuthnRegisterFinish)
 	user.Add("PUT /api/auth/passkeys/", s.authH.HandleRenamePasskey)
-	user.Add("GET /api/auth/apikeys", s.authH.HandleListAPIKeys)
-
-	// Recovery code status (count). Not sensitive; anyone who can read
-	// /api/auth/me can see whether the user has TOTP configured, and
-	// "how many recovery codes remain" is the next question the UI
-	// needs answered. No reauth required.
-	user.Add("GET /api/auth/recovery-codes", s.authH.HandleRecoveryCodesStatus)
 
 	// Config schema (read-only; available even when unconfigured).
 	user.Add("GET /api/config/schema", s.configH.HandleConfigSchema)
@@ -166,20 +137,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	user.Add("GET /api/activity", s.handleGetActivity)
 	user.Add("DELETE /api/activity", s.handleDismissActivity)
 
-	// --- reauth: requires session + recent reauth ---
-	//
-	// Operations that destroy credentials (delete passkey, disable TOTP)
-	// or mint long-lived tokens (create/revoke API key) must be gated
-	// behind a fresh session reauth. API-key callers bypass the reauth
-	// check (the middleware no-ops for them).
-	reauth.Add("DELETE /api/auth/totp", s.authH.HandleTOTPDisable)
-	reauth.Add("DELETE /api/auth/passkeys/", s.authH.HandleDeletePasskey)
-	reauth.Add("POST /api/auth/apikeys", s.authH.HandleGenerateAPIKey)
-	reauth.Add("DELETE /api/auth/apikeys/", s.authH.HandleRevokeAPIKey)
-	// Regenerating recovery codes invalidates all previous codes and
-	// returns fresh plaintext. Treated as a credential-mutation op and
-	// guarded the same way as API key creation.
-	reauth.Add("POST /api/auth/recovery-codes", s.authH.HandleRegenerateRecoveryCodes)
+	// Credential management on your own account (delete own passkey, unlink
+	// own OIDC). Destructive actions are confirmed client-side. API-key
+	// management is admin-only (see the admin group).
+	user.Add("DELETE /api/auth/passkeys/", s.authH.HandleDeletePasskey)
+	user.Add("DELETE /api/auth/oidc/link", s.authH.HandleOIDCUnlink)
 
 	// --- admin: requires admin role ---
 
@@ -187,6 +149,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	admin.Add("GET /api/auth/users", s.authH.HandleListUsers)
 	admin.Add("POST /api/auth/users", s.authH.HandleCreateUser)
 	admin.Add("DELETE /api/auth/users/", s.authH.HandleDeleteUser)
+
+	// API key management (admin-only: keys are bearer credentials that carry
+	// the owner's role).
+	admin.Add("GET /api/auth/apikeys", s.authH.HandleListAPIKeys)
+	admin.Add("POST /api/auth/apikeys", s.authH.HandleGenerateAPIKey)
+	admin.Add("DELETE /api/auth/apikeys/", s.authH.HandleRevokeAPIKey)
 
 	// Config CRUD (available even unconfigured; admin is the only party
 	// allowed to modify config at runtime).
@@ -226,10 +194,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	userConfigured.Add("POST /api/search/clear-lock", s.manualH.HandleClearLock)
 	userConfigured.Add("POST /api/score", s.queryH.HandleScore)
 
-	// File manager endpoints.
+	// File manager: listing is available to any user; deletion is admin-only.
 	userConfigured.Add("GET /api/files", s.fileH.HandleListFiles)
-	userConfigured.Add("DELETE /api/files", s.fileH.HandleDeleteFile)
-	userConfigured.Add("DELETE /api/files/bulk", s.fileH.HandleBulkDeleteFiles)
+	adminConfigured.Add("DELETE /api/files", s.fileH.HandleDeleteFile)
+	adminConfigured.Add("DELETE /api/files/bulk", s.fileH.HandleBulkDeleteFiles)
 
 	// Sync endpoints.
 	userConfigured.Add("POST /api/sync/audio", s.syncH.HandleSyncAudio)
@@ -243,12 +211,13 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	// --- adminConfigured: requires admin + valid config ---
 
-	// Scan triggers.
+	// Full-library scan is an admin/maintenance operation.
 	adminConfigured.Add("POST /api/scan", s.handleScan)
-	adminConfigured.Add("POST /api/scan/series/", s.handleScanSeries)
-	adminConfigured.Add("POST /api/scan/season/", s.handleScanSeason)
-	adminConfigured.Add("POST /api/scan/movie/", s.handleScanMovie)
-	adminConfigured.Add("POST /api/scan/item", s.handleScanItem)
+	// Per-item subtitle search/download is a normal user action.
+	userConfigured.Add("POST /api/scan/series/", s.handleScanSeries)
+	userConfigured.Add("POST /api/scan/season/", s.handleScanSeason)
+	userConfigured.Add("POST /api/scan/movie/", s.handleScanMovie)
+	userConfigured.Add("POST /api/scan/item", s.handleScanItem)
 
 	// Provider timeout reset.
 	adminConfigured.Add("POST /api/providers/timeout/reset", s.queryH.HandleProviderTimeoutReset)

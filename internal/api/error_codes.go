@@ -39,20 +39,10 @@ const (
 	CodeAuthPasswordBreached   = "auth_password_breached"
 	CodeAuthSessionInvalid     = "auth_session_invalid"
 	CodeAuthSessionRequired    = "auth_session_required"
-	CodeAuthReauthRequired     = "auth_reauth_required"
 	CodeAuthRoleRequired       = "auth_role_required"
 	CodeAuthAPIKeyInvalid      = "auth_apikey_invalid"
 	CodeAuthAPIKeyDisabled     = "auth_apikey_disabled"
 	CodeAuthCSRF               = "auth_csrf"
-)
-
-// TOTP codes.
-const (
-	CodeTOTPRequired       = "totp_required"
-	CodeTOTPInvalid        = "totp_invalid"
-	CodeTOTPReplay         = "totp_replay"
-	CodeTOTPAlreadyEnabled = "totp_already_enabled"
-	CodeTOTPNotEnabled     = "totp_not_enabled"
 )
 
 // WebAuthn codes.

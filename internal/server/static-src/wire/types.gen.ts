@@ -62,8 +62,9 @@ export interface MeResponse {
   username: string;
   role: Role;
   id: number;
-  totp_enabled: boolean;
   has_passkeys: boolean;
+  oidc_linked: boolean;
+  has_password: boolean;
 }
 
 export interface MovieItem {
@@ -115,15 +116,6 @@ export interface ProviderStatus {
 export interface ProvidersResponse {
   providers?: Record<string, ProviderStatus>;
   enabled: boolean;
-}
-
-export interface RecoveryCodes {
-  recovery_codes: string[];
-}
-
-export interface RecoveryCodesStatus {
-  remaining: number;
-  total: number;
 }
 
 export interface ScanEvent {
@@ -256,3 +248,4 @@ export interface SubtitleEntry {
   score?: number;
   offset_ms?: number;
 }
+

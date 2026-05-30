@@ -99,10 +99,11 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 	// If transitioning from unconfigured to configured, start the
 	// scheduler and poller that were skipped during StartUnconfigured.
 	if wasUnconfigured {
-		slog.Info("configuration activated; starting scheduler and poller")
-		s.bgWg.Add(2)
+		slog.Info("configuration activated; starting scheduler, poller, and backup")
+		s.bgWg.Add(3)
 		go func() { defer s.bgWg.Done(); s.runScheduler(s.ctx) }()
 		go func() { defer s.bgWg.Done(); s.runPoller(s.ctx) }()
+		go func() { defer s.bgWg.Done(); s.runBackup(s.ctx) }()
 	}
 
 	return nil

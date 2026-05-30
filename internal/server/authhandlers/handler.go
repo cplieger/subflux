@@ -3,7 +3,6 @@ package authhandlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,7 +22,7 @@ import (
 // AuthConfig is the narrow interface consumed by auth handlers for
 // configuration access. Mirrors the auth-related subset of api.ConfigProvider.
 type AuthConfig interface {
-	TOTPEncryptionKey() ([]byte, error)
+	BasicAuthEnabled() bool
 	CheckBreachedPasswords() bool
 	OIDCEnabled() bool
 }
@@ -50,9 +49,6 @@ const (
 
 	// msgBreachedPassword is the user-facing error when a password appears in a breach database.
 	msgBreachedPassword = "this password has appeared in a data breach; please choose a different one"
-
-	// TOTPIssuer is the issuer name used in TOTP secret generation.
-	TOTPIssuer = "Subflux"
 
 	// maxAuthBodySize limits request body size for auth endpoints (4 KB).
 	maxAuthBodySize = 4096
@@ -126,8 +122,9 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 			ID:          user.ID,
 			Username:    user.Username,
 			Role:        user.Role,
-			TOTPEnabled: user.TOTPEnabled,
 			HasPasskeys: passkeyCount > 0,
+			OIDCLinked:  user.OIDCSub != "",
+			HasPassword: user.PasswordHash != "",
 		},
 	})
 }
@@ -142,35 +139,15 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-// decryptAndVerifyTOTP retrieves the encrypted TOTP secret for the user,
-// decrypts it, and validates the provided code.
-func (h *Handler) decryptAndVerifyTOTP(ctx context.Context, userID int64, code string) (bool, error) {
-	encSecret, err := h.Store.GetTOTPSecret(ctx, userID)
-	if err != nil {
-		return false, fmt.Errorf("get TOTP secret: %w", err)
-	}
-	if len(encSecret) == 0 {
-		return false, errors.New("no TOTP secret stored")
-	}
-
-	cfg := h.Config()
-	totpKey, keyErr := cfg.TOTPEncryptionKey()
-	if keyErr != nil {
-		return false, fmt.Errorf("TOTP encryption key: %w", keyErr)
-	}
-	secret, err := auth.Decrypt(encSecret, totpKey)
-	if err != nil {
-		return false, fmt.Errorf("decrypt TOTP secret: %w", err)
-	}
-
-	return auth.ValidateTOTPCode(string(secret), code), nil
-}
-
-// ValidateAndHashPassword validates password length, checks against breach databases
-// (if checkBreach is true), and returns the bcrypt hash.
-func ValidateAndHashPassword(ctx context.Context, password string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
+// ValidateAndHashPassword validates password length and context (rejecting
+// passwords that contain the username or app name), checks against breach
+// databases (if checkBreach is true), and returns the Argon2id hash.
+func ValidateAndHashPassword(ctx context.Context, password, username string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
 	if errLen := auth.ValidatePasswordLength(password, passwordOnly); errLen != nil {
 		return "", errLen.Error(), nil
+	}
+	if errCtx := auth.ValidatePasswordContext(password, username); errCtx != nil {
+		return "", errCtx.Error(), nil
 	}
 	if checkBreach {
 		breached, errBreach := auth.CheckBreachedPassword(ctx, client, password)

@@ -25,8 +25,8 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*api.User, error
 	return d.authDB.GetUserByEmail(ctx, email)
 }
 
-func (d *DB) GetUserByOIDCSub(ctx context.Context, sub string) (*api.User, error) {
-	return d.authDB.GetUserByOIDCSub(ctx, sub)
+func (d *DB) GetUserByOIDCSub(ctx context.Context, issuer, sub string) (*api.User, error) {
+	return d.authDB.GetUserByOIDCSub(ctx, issuer, sub)
 }
 
 func (d *DB) ListUsers(ctx context.Context) ([]api.User, error) {
@@ -61,10 +61,6 @@ func (d *DB) UpdateSessionActivity(ctx context.Context, tokenHash string, now ti
 
 func (d *DB) BatchUpdateSessionActivity(ctx context.Context, tokenHashes []string, now time.Time) error {
 	return d.authDB.BatchUpdateSessionActivity(ctx, tokenHashes, now)
-}
-
-func (d *DB) UpdateSessionReauth(ctx context.Context, tokenHash string, now time.Time) error {
-	return d.authDB.UpdateSessionReauth(ctx, tokenHash, now)
 }
 
 func (d *DB) DeleteSession(ctx context.Context, tokenHash string) error {
@@ -125,32 +121,6 @@ func (d *DB) ListAPIKeysByUserID(ctx context.Context, userID int64) ([]api.Key, 
 
 func (d *DB) DeleteAPIKey(ctx context.Context, id, userID int64) error {
 	return d.authDB.DeleteAPIKey(ctx, id, userID)
-}
-
-// --- MFA delegation ---
-
-func (d *DB) SetTOTPSecret(ctx context.Context, userID int64, encryptedSecret []byte) error {
-	return d.authDB.SetTOTPSecret(ctx, userID, encryptedSecret)
-}
-
-func (d *DB) GetTOTPSecret(ctx context.Context, userID int64) ([]byte, error) {
-	return d.authDB.GetTOTPSecret(ctx, userID)
-}
-
-func (d *DB) ClearTOTPSecret(ctx context.Context, userID int64) error {
-	return d.authDB.ClearTOTPSecret(ctx, userID)
-}
-
-func (d *DB) SetRecoveryCodes(ctx context.Context, userID int64, hashes []string) error {
-	return d.authDB.SetRecoveryCodes(ctx, userID, hashes)
-}
-
-func (d *DB) UseRecoveryCode(ctx context.Context, userID int64, codeHash string) (bool, error) {
-	return d.authDB.UseRecoveryCode(ctx, userID, codeHash)
-}
-
-func (d *DB) RecoveryCodeCount(ctx context.Context, userID int64) (int, error) {
-	return d.authDB.RecoveryCodeCount(ctx, userID)
 }
 
 // --- OIDC State delegation ---
