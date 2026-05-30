@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"subflux/internal/api"
@@ -41,6 +42,9 @@ type Handler struct {
 	Config       func() AuthConfig // returns current config (hot-reloadable)
 	Configured   func() bool       // returns whether server has valid config
 	HTTPClient   *http.Client      // shared client for outbound requests (HIBP, etc.)
+	// migrateMu serializes OIDC link-migrations so the last-local-admin check
+	// and the password clear are atomic within this (single-binary) process.
+	migrateMu sync.Mutex
 }
 
 const (

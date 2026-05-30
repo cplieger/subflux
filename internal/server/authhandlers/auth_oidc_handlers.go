@@ -251,6 +251,9 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	// Link-on-login is a MIGRATION to SSO governance: it removes the local
 	// password and passkeys so the IdP becomes the sole control point. Never
 	// strip the last local (password) admin — the break-glass account.
+	// Serialize so the last-admin check and the clear are atomic in-process.
+	h.migrateMu.Lock()
+	defer h.migrateMu.Unlock()
 	if last, lerr := h.isLastLocalAdmin(ctx, user); lerr != nil {
 		slog.Error("oidc link: admin check", "error", lerr)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
