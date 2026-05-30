@@ -91,6 +91,7 @@ export const decodeMeResponse: Decoder<MeResponse> = (v) => {
     has_passkeys: reqBool(o, "has_passkeys", "$.me_response"),
     oidc_linked: reqBool(o, "oidc_linked", "$.me_response"),
     has_password: reqBool(o, "has_password", "$.me_response"),
+    can_link_oidc: reqBool(o, "can_link_oidc", "$.me_response"),
   };
   return out;
 };
