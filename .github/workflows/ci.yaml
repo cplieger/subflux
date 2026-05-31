@@ -17,7 +17,7 @@ on:
 
 jobs:
   go:
-    uses: cplieger/ci/.github/workflows/go-ci.yaml@v1
+    uses: cplieger/ci/.github/workflows/go-ci.yaml@8f09bcd5f8ac39bc5059f4c45d3fcb10a1a3b23a # v1
     with:
       app: true
       dockerfile-lint: true
@@ -25,7 +25,7 @@ jobs:
       go-version-file: "go.mod"
 
   web:
-    uses: cplieger/ci/.github/workflows/ts-ci.yaml@v1
+    uses: cplieger/ci/.github/workflows/ts-ci.yaml@8f09bcd5f8ac39bc5059f4c45d3fcb10a1a3b23a # v1
     with:
       working-directory: "internal/server/static-src"
       web-lint: true
