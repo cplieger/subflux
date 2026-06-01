@@ -1,0 +1,3 @@
+**/*.gen.ts
+**/*.gen.js
+.vitest-cache/
