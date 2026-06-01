@@ -7,17 +7,17 @@ describe("bus", () => {
     const cases = [
       {
         name: "delivers event to subscriber",
-        event: BusEvent.NavRoute as const,
+        event: BusEvent.NavRoute,
         args: ["/test"] as [string],
       },
       {
         name: "delivers event with no args",
-        event: BusEvent.LoadHistory as const,
+        event: BusEvent.LoadHistory,
         args: [] as [],
       },
       {
         name: "delivers event with optional arg",
-        event: BusEvent.NavHistory as const,
+        event: BusEvent.NavHistory,
         args: ["filter"] as [string],
       },
     ];

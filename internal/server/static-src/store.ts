@@ -47,6 +47,8 @@ export interface StoreMap {
   isUnconfigured: boolean;
   isReady: boolean;
   isAdmin: boolean;
+  // Allow arbitrary keys for test usage.
+  [key: string]: unknown;
 }
 
 const store = createStore<StoreMap>();

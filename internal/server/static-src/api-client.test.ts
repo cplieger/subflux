@@ -103,7 +103,7 @@ describe("apiPostRaw", () => {
     vi.stubGlobal("fetch", fetchMock);
     const r = await apiPostRaw("/api/create", { name: "x" });
     expect(r.ok).toBe(true);
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
   });
 });
