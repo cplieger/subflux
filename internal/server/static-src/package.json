@@ -1,6 +1,8 @@
 {
   "type": "module",
   "scripts": {
+    "typecheck": "tsgo -project tsconfig.json",
+    "typecheck:tests": "tsgo -project tsconfig.test.json",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --run --coverage",
