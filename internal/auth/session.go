@@ -37,11 +37,6 @@ func ValidateSession(sess *api.Session, idleTimeout, absTimeout time.Duration, n
 	return nil
 }
 
-// HexSHA256 returns the hex-encoded SHA-256 hash of s.
-func HexSHA256(s string) string {
-	return authlib.HexSHA256(s)
-}
-
 // SessionHash returns the hex-encoded SHA-256 hash of a plaintext token.
 func SessionHash(token string) string {
 	return authlib.SessionHash(token)
