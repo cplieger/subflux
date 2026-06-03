@@ -37,14 +37,10 @@ var alpha3to2 = map[string]string{
 func Alpha2FromAlpha3(code string) string {
 	code = strings.ToLower(code)
 	if len(code) == 2 {
-		// Reject non-letter 2-char inputs (e.g. "0x", "12", "a!").
-		// The mapping is ISO 639-1 codes, all of which are letters.
-		for _, r := range code {
-			if r < 'a' || r > 'z' {
-				return ""
-			}
+		if code[0] >= 'a' && code[0] <= 'z' && code[1] >= 'a' && code[1] <= 'z' {
+			return code
 		}
-		return code
+		return ""
 	}
 	if v, ok := alpha3to2[code]; ok {
 		return v

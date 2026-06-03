@@ -19,11 +19,15 @@ func FuzzHistoryEventTypeUnmarshal(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var h HistoryEventType
 		err := json.Unmarshal(data, &h)
-		if err == nil && h != 0 {
-			// When successfully unmarshalled to a non-zero value,
-			// it should be a valid positive integer.
-			if h < 0 {
-				t.Fatalf("unexpected negative event type: %d", h)
+		if err == nil {
+			// Round-trip: marshal back and re-unmarshal should be stable.
+			data2, _ := json.Marshal(h)
+			var h2 HistoryEventType
+			if err2 := json.Unmarshal(data2, &h2); err2 != nil {
+				t.Fatalf("round-trip unmarshal failed: %v", err2)
+			}
+			if h != h2 {
+				t.Fatalf("round-trip mismatch: %d vs %d", h, h2)
 			}
 		}
 	})

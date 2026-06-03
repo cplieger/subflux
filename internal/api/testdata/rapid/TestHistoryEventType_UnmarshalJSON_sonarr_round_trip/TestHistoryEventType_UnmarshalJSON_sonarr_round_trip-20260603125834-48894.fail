@@ -1,0 +1,7 @@
+# 2026/06/03 12:58:34.265977 [TestHistoryEventType_UnmarshalJSON_sonarr_round_trip] [rapid] draw event_type: -1
+# 2026/06/03 12:58:34.265988 [TestHistoryEventType_UnmarshalJSON_sonarr_round_trip] UnmarshalJSON(-1) error: eventType: negative value -1
+# 
+v0.4.8#10463382383178078437
+0x10000000000000
+0x0
+0x0

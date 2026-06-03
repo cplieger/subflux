@@ -1,17 +1,17 @@
-// Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx; this package
-// retains application-specific constants and thin adapters that bridge httpx
-// error types to the internal api.* error types used across the codebase.
+// Package httputil provides shared HTTP utilities for subtitle providers:
+// status checking, retry-after parsing, context-aware sleep, and common constants.
 package httputil
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
-
-	"github.com/cplieger/httpx"
 
 	"subflux/internal/api"
 )
@@ -26,144 +26,211 @@ const HeaderContentType = "Content-Type"
 const ContentTypeJSON = "application/json"
 
 // MaxDownloadBytes is the maximum response body size for subtitle/archive
-// downloads (10 MB).
+// downloads (10 MB). All provider Download methods use this via
+// io.LimitReader to prevent OOM from oversized responses.
 const MaxDownloadBytes = 10 << 20
 
 // MaxSingleSubtitleBytes is the maximum size for a single subtitle file
-// download (5 MB).
+// download (5 MB). Used by providers that never return archives (e.g.
+// gestdown) where the tighter cap is appropriate.
 const MaxSingleSubtitleBytes = 5 << 20
 
-// MaxJSONResponseBytes is the maximum size for a JSON API response body (5 MB).
+// MaxJSONResponseBytes is the maximum size for a JSON API response body
+// from a provider (5 MB). Prevents OOM from oversized metadata responses.
 const MaxJSONResponseBytes = 5 << 20
 
-// MaxSearchResponseBytes is the maximum size for a search/lookup JSON response (1 MB).
+// MaxSearchResponseBytes is the maximum size for a search/lookup JSON response
+// (1 MB). Used by providers with tighter per-endpoint caps for search queries.
 const MaxSearchResponseBytes = 1 << 20
 
-// MaxListResponseBytes is the maximum size for a list/detail JSON response (2 MB).
+// MaxListResponseBytes is the maximum size for a list/detail JSON response
+// (2 MB). Used by providers returning subtitle lists or detailed metadata.
 const MaxListResponseBytes = 2 << 20
 
 // MaxErrorBodyBytes is the maximum size for reading error response bodies (1 MB).
+// Used by arrapi and other clients to cap error body reads.
 const MaxErrorBodyBytes = 1 << 20
 
 // MaxBulkListBytes is the maximum size for bulk list responses (200 MB).
+// Used by arrapi for full series/movie/episode list fetches.
 const MaxBulkListBytes = 200 << 20
 
 // HTTPStatusError represents a non-2xx HTTP response that is not already
-// covered by a more specific typed error. Delegates to httpx.HTTPStatusError.
-type HTTPStatusError = httpx.HTTPStatusError
-
-// ParseRetryAfter parses the Retry-After header from a response.
-// Delegates to httpx.ParseRetryAfterResponse (uncapped, matching original behavior).
-func ParseRetryAfter(resp *http.Response) time.Duration {
-	return httpx.ParseRetryAfterResponse(resp)
+// covered by a more specific typed error (AuthError for 401/403,
+// RateLimitError for 429). Retry logic uses errors.As with this type to
+// classify transient 5xx responses without string matching.
+type HTTPStatusError struct {
+	Code int
 }
 
-// CheckHTTPStatus maps HTTP error status codes to typed errors.
-// Returns nil for 2xx/3xx. Bridges httpx error types to api.* types
-// so callers can continue using errors.As with *api.AuthError and
-// *api.RateLimitError.
+var _ api.Transient = (*HTTPStatusError)(nil)
+
+func (e *HTTPStatusError) Error() string { return fmt.Sprintf("HTTP %d", e.Code) }
+
+// IsTransient reports whether the HTTP status code indicates a retryable
+// server-side failure (502 Bad Gateway, 503 Service Unavailable, 504
+// Gateway Timeout). Auth errors (401/403) and rate limits (429) are handled
+// by dedicated error types and are NOT transient from this type's perspective.
+func (e *HTTPStatusError) IsTransient() bool {
+	return e.Code == 502 || e.Code == 503 || e.Code == 504
+}
+
+// IsServerError reports whether the status code is a 5xx server error.
+func (e *HTTPStatusError) IsServerError() bool { return e.Code >= 500 }
+
+// IsClientError reports whether the status code is a 4xx client error.
+func (e *HTTPStatusError) IsClientError() bool { return e.Code >= 400 && e.Code < 500 }
+
+// ParseRetryAfter parses the Retry-After header per RFC 7231 (delta-seconds
+// or HTTP-date). Returns zero if absent or unparseable. Negative durations
+// (past HTTP-date) are clamped to zero. Exported so providers with custom
+// status handling (opensubtitles' 406 in particular) can reuse the same
+// parser their shared CheckHTTPStatus uses.
+func ParseRetryAfter(resp *http.Response) time.Duration {
+	ra := resp.Header.Get("Retry-After")
+	if ra == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(ra); err == nil {
+		if secs < 0 {
+			return 0
+		}
+		const maxRetry = 86400 // 24h cap
+		if secs > maxRetry {
+			secs = maxRetry
+		}
+		return time.Duration(secs) * time.Second
+	}
+	if t, err := http.ParseTime(ra); err == nil {
+		d := time.Until(t)
+		if d < 0 {
+			return 0
+		}
+		return d
+	}
+	return 0
+}
+
+// statusErrors maps HTTP status codes to error constructors. CheckHTTPStatus
+// looks up the response code in this table before falling through to the
+// generic >=400 handler. The table is package-visible for test inspection.
+var statusErrors = map[int]func(*http.Response) error{
+	http.StatusBadRequest: func(_ *http.Response) error {
+		return &HTTPStatusError{Code: http.StatusBadRequest}
+	},
+	http.StatusUnauthorized: func(_ *http.Response) error {
+		return &api.AuthError{Msg: "invalid API key (401)"}
+	},
+	http.StatusForbidden: func(_ *http.Response) error {
+		return &api.AuthError{Msg: "access denied (403)"}
+	},
+	http.StatusTooManyRequests: func(r *http.Response) error {
+		return &api.RateLimitError{Msg: "rate limited (429)", RetryAfter: ParseRetryAfter(r)}
+	},
+}
+
+// CheckHTTPStatus maps common HTTP error status codes to typed errors.
+// Returns nil for 2xx responses. Providers with custom status handling
+// (e.g. gestdown's 423, opensubtitles' 406) should call this first and
+// handle their custom codes separately.
+//
+// 429 responses parse the Retry-After header into RateLimitError.RetryAfter
+// so the scan engine's provider timeout manager can honor the hint.
 func CheckHTTPStatus(resp *http.Response) error {
-	err := httpx.CheckHTTPStatus(resp)
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+		return nil
+	}
+	if fn, ok := statusErrors[resp.StatusCode]; ok {
+		return fn(resp)
+	}
+	if resp.StatusCode >= 400 {
+		return &HTTPStatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
+// RedactTransportError unwraps *url.Error (which embeds the full request URL
+// including secrets) and redacts the secret from the resulting error message.
+// Use this at every provider HTTP call site where the URL contains an API key.
+//
+// Pattern replaced:
+//
+//	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+//	    return nil, provider.RedactSecret(fmt.Errorf("prefix: %w", urlErr.Err), secret)
+//	}
+//	return nil, provider.RedactSecret(fmt.Errorf("prefix: %w", err), secret)
+//
+// Becomes:
+//
+//	return nil, httputil.RedactTransportError(err, "prefix", secret)
+func RedactTransportError(err error, prefix, secret string) error {
 	if err == nil {
 		return nil
 	}
-	var hAuth *httpx.AuthError
-	if errors.As(err, &hAuth) {
-		return &api.AuthError{Msg: hAuth.Msg}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		err = urlErr.Err
 	}
-	var hRL *httpx.RateLimitError
-	if errors.As(err, &hRL) {
-		return &api.RateLimitError{Msg: hRL.Msg, RetryAfter: hRL.RetryAfter}
+	var wrapped error
+	if prefix == "" {
+		wrapped = err
+	} else {
+		wrapped = fmt.Errorf("%s: %w", prefix, err)
 	}
-	return err
+	if secret == "" {
+		return wrapped
+	}
+	// Redact secret from the full error message (including prefix).
+	msg := wrapped.Error()
+	if !strings.Contains(msg, secret) {
+		return wrapped
+	}
+	return errors.New(strings.ReplaceAll(msg, secret, "[REDACTED]"))
 }
 
-// IsTransient returns true for errors likely caused by temporary server
-// or network issues worth retrying. Bridges api.AuthError and
-// api.RateLimitError exclusion with httpx.IsTransient for network checks.
-func IsTransient(err error) bool {
-	if err == nil {
-		return false
+// SleepCtx sleeps for the given duration or returns early if the context
+// is cancelled. Returns nil on successful sleep, ctx.Err() on cancellation.
+// Safe to call with d <= 0 (returns immediately).
+func SleepCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
 	}
-	var authErr *api.AuthError
-	if errors.As(err, &authErr) {
-		return false
+	t := time.NewTimer(d)
+	select {
+	case <-ctx.Done():
+		t.Stop()
+		return ctx.Err()
+	case <-t.C:
+		return nil
 	}
-	var rlErr *api.RateLimitError
-	if errors.As(err, &rlErr) {
-		return false
-	}
-	return httpx.IsTransient(err)
 }
 
-// RedactTransportError unwraps *url.Error and redacts the secret.
-func RedactTransportError(err error, prefix, secret string) error {
-	return httpx.RedactTransportError(err, prefix, secret)
+// drainBytes is the maximum number of bytes to read from a response body
+// before closing, allowing HTTP/1.1 connection reuse by the transport pool.
+const drainBytes = 4096
+
+// DrainClose reads remaining bytes (up to drainBytes) from rc before closing it.
+// This allows HTTP/1.1 connection reuse by the transport pool.
+func DrainClose(rc io.ReadCloser) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(rc, drainBytes))
+	rc.Close()
+}
+
+// LimitedBody wraps resp.Body with a read cap (MaxDownloadBytes) while
+// preserving Close on the original body so the transport pool can drain
+// and recycle the connection.
+func LimitedBody(resp *http.Response) io.ReadCloser {
+	return struct {
+		io.Reader
+		io.Closer
+	}{io.LimitReader(resp.Body, MaxDownloadBytes), resp.Body}
 }
 
 // RedactSecret replaces occurrences of secret in err's message with "REDACTED".
+// Returns err unchanged if err is nil, secret is empty, or the secret doesn't
+// appear in the error message.
+//
+// This is a convenience wrapper around RedactTransportError with an empty prefix.
 func RedactSecret(err error, secret string) error {
-	return httpx.RedactSecret(err, secret)
-}
-
-// SleepCtx sleeps for the given duration or returns early if the context is cancelled.
-func SleepCtx(ctx context.Context, d time.Duration) error {
-	return httpx.SleepCtx(ctx, d)
-}
-
-// DrainClose reads remaining bytes from rc before closing it.
-func DrainClose(rc io.ReadCloser) {
-	httpx.DrainClose(rc)
-}
-
-// LimitedBody wraps resp.Body with a read cap while preserving Close.
-func LimitedBody(resp *http.Response) io.ReadCloser {
-	return httpx.LimitedBody(resp, MaxDownloadBytes)
-}
-
-// JitteredBackoff returns a jittered duration in [backoff/2, backoff].
-func JitteredBackoff(backoff time.Duration) time.Duration {
-	return httpx.JitteredBackoff(backoff)
-}
-
-// SafeDouble doubles a duration while guarding against int64 overflow.
-func SafeDouble(d time.Duration) time.Duration {
-	return httpx.SafeDouble(d)
-}
-
-// RetryOnRateLimit retries fn up to maxAttempts times when it returns a
-// *api.RateLimitError. Bridges the api.RateLimitError type to httpx.RateLimitError.
-func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duration, fn func() error) error {
-	return httpx.RetryOnRateLimit(ctx, maxAttempts, maxWait, func(_ context.Context) error {
-		err := fn()
-		if err == nil {
-			return nil
-		}
-		var rl *api.RateLimitError
-		if errors.As(err, &rl) {
-			return &httpx.RateLimitError{Msg: rl.Msg, RetryAfter: rl.RetryAfter}
-		}
-		return err
-	})
-}
-
-// RetryWithBackoff retries fn with jittered exponential backoff.
-func RetryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time.Duration,
-	label string, fn func(ctx context.Context) (T, error)) (T, error) {
-	return httpx.RetryWithBackoff(ctx, maxRetries, baseDelay, label, func(ctx context.Context) (T, error) {
-		result, err := fn(ctx)
-		if err == nil {
-			return result, nil
-		}
-		// Bridge api.* errors to httpx.* so httpx.IsTransient classifies correctly.
-		var authErr *api.AuthError
-		if errors.As(err, &authErr) {
-			return result, httpx.Permanent(err)
-		}
-		var rlErr *api.RateLimitError
-		if errors.As(err, &rlErr) {
-			return result, httpx.Permanent(err)
-		}
-		return result, err
-	})
+	return RedactTransportError(err, "", secret)
 }

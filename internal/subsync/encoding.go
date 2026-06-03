@@ -54,12 +54,20 @@ func NormalizeEncoding(data []byte) []byte {
 
 	// UTF-16 BE BOM.
 	if bytes.HasPrefix(data, bomUTF16BE) {
-		return decodeUTF16BE(data[len(bomUTF16BE):])
+		payload := data[len(bomUTF16BE):]
+		if len(payload) == 0 {
+			return []byte{}
+		}
+		return decodeUTF16BE(payload)
 	}
 
 	// UTF-16 LE BOM.
 	if bytes.HasPrefix(data, bomUTF16LE) {
-		return decodeUTF16LE(data[len(bomUTF16LE):])
+		payload := data[len(bomUTF16LE):]
+		if len(payload) == 0 {
+			return []byte{}
+		}
+		return decodeUTF16LE(payload)
 	}
 
 	// Heuristic for UTF-16 without BOM.
