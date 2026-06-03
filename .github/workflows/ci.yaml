@@ -22,11 +22,8 @@ jobs:
   go:
     uses: cplieger/ci/.github/workflows/go-ci.yaml@38aa4e20293b20ff3f707553f46f54e287c97b5f # v1
     with:
-      app: true
-      dockerfile-lint: true
       working-directory: "."
       go-version-file: "go.mod"
-
   web:
     uses: cplieger/ci/.github/workflows/ts-ci.yaml@38aa4e20293b20ff3f707553f46f54e287c97b5f # v1
     with:
