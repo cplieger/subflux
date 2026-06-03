@@ -6,8 +6,12 @@ import { success, error } from "./notify.js";
 
 export function initActions(): void {
   configure({
-    success: (msg) => success(msg),
-    error: (msg, retry) => error(msg, retry),
+    success: (msg) => {
+      success(msg);
+    },
+    error: (msg, retry) => {
+      error(msg, retry);
+    },
   });
   configureApi({
     credentials: "same-origin",
