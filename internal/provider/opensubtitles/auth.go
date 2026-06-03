@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"subflux/internal/httputil"
-	"subflux/internal/ssrf"
+	"github.com/cplieger/ssrf"
 )
 
 const (

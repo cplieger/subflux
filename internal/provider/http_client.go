@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"subflux/internal/httputil"
-	"subflux/internal/ssrf"
+	"github.com/cplieger/ssrf"
 )
 
 // HTTPTimeoutStandard is the default timeout for lightweight provider APIs

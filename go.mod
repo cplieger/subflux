@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/coreos/go-oidc/v3 v3.18.0
+	github.com/cplieger/ssrf v1.0.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/ulikunitz/xz v0.5.15

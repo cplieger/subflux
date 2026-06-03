@@ -23,7 +23,7 @@ import (
 	"subflux/internal/provider/anidb"
 	"subflux/internal/provider/archive"
 	"subflux/internal/provider/classify"
-	"subflux/internal/ssrf"
+	"github.com/cplieger/ssrf"
 )
 
 // Compile-time assertion that Provider implements api.Provider.
