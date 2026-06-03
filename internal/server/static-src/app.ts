@@ -1,7 +1,11 @@
 // Subflux Web UI — ES module entry point.
 
+import { initActions } from "./actions-boot.js";
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+
+// Wire @cplieger/actions notifier + API layer before any action is created.
+initActions();
 import * as events from "./events.js";
 import * as theme from "./theme.js";
 import { pollStatus, pollStatusAction, updateLiveTimers } from "./status.js";
@@ -16,7 +20,7 @@ import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
 import { el, dialog, onBackdropClose, patch, $ } from "./dom.js";
 import { apiGet } from "./api-client.js";
-import { subscribeToActions, registerCleanup, pollAction } from "./actions/index.js";
+import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 import { STATUS_POLL_MS } from "./constants.js";
 import type { MovieItem, SubtitleEntry } from "./api-types.js";

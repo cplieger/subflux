@@ -3,7 +3,7 @@
 import * as notify from "./notify.js";
 import { el, text, option, icon, dialog, closeDialog, onBackdropClose, patch } from "./dom.js";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
-import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "./actions/index.js";
+import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";

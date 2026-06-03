@@ -5,7 +5,7 @@ vi.mock("./api-client.js", () => ({
   apiGet: vi.fn().mockResolvedValue(null),
   apiGetTyped: vi.fn().mockResolvedValue(null),
 }));
-vi.mock("./actions/index.js", () => ({
+vi.mock("@cplieger/actions", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue(null) })),
   defineAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue(null) })),
   retryNetwork: vi.fn((fn: unknown) => fn),

@@ -5,7 +5,7 @@ import * as notify from "./notify.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
 import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from "./dom.js";
 import { apiGet, apiGetRaw } from "./api-client.js";
-import { apiAction, type ActionError, retryNetwork, registerCleanup } from "./actions/index.js";
+import { apiAction, type ActionError, retryNetwork, registerCleanup } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from "./constants.js";
 import type { Activity, MediaType } from "./api-types.js";

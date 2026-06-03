@@ -3,7 +3,7 @@
 import * as store from "./store.js";
 import { $, el, icon, patch, emptyDiv, errDiv, pad, insertNavButton } from "./dom.js";
 import { apiGet } from "./api-client.js";
-import { registerCleanup } from "./actions/index.js";
+import { registerCleanup } from "@cplieger/actions";
 import { fmtEpisode, tvdbMediaId, langName, fmtLangVariant } from "./utils.js";
 import { DEFAULT_VARIANT, EMBEDDED_PROVIDER } from "./constants.js";
 import { on, emit, BusEvent } from "./bus.js";

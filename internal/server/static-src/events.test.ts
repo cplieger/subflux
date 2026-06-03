@@ -11,7 +11,7 @@ vi.mock("./coverage.js", () => ({
   fetchAndMergeCoverage: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./status.js", () => ({ pollStatus: vi.fn(), abortPoll: vi.fn() }));
-vi.mock("./actions/index.js", () => ({ registerCleanup: vi.fn() }));
+vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 
 describe("events: SSE connection", () => {
   it.todo("connect creates EventSource to /api/events");

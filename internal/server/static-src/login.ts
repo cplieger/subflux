@@ -2,7 +2,7 @@
 
 import { apiGet, apiPost, apiPostRaw } from "./api-client.js";
 import type { ApiResult } from "./api-client.js";
-import { registerCleanup } from "./actions/index.js";
+import { registerCleanup } from "@cplieger/actions";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
 import { startConfigWizard } from "./wizard.js";
 import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./webauthn-utils.js";

@@ -2,7 +2,7 @@
 import { describe, it, vi, beforeEach } from "vitest";
 
 vi.mock("./api-client.js", () => ({ apiGet: vi.fn().mockResolvedValue(null) }));
-vi.mock("./actions/index.js", () => ({
+vi.mock("@cplieger/actions", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue(null) })),
   retryNetwork: vi.fn((fn: unknown) => fn),
   RETRY_STANDARD: {},

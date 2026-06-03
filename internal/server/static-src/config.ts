@@ -12,7 +12,7 @@ import {
   classifyFetchError,
   retryNetwork,
   RETRY_STANDARD,
-} from "./actions/index.js";
+} from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
 import { YAML_TIMEOUT_MS } from "./constants.js";

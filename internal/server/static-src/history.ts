@@ -1,7 +1,7 @@
 // history.ts — download history page (server-side paginated)
 
 import { el, input, select, option } from "./dom.js";
-import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow } from "./utils.js";
 import { createPagedList } from "./paged-list.js";

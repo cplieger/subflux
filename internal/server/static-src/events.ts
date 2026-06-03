@@ -6,7 +6,7 @@ import * as notify from "./notify.js";
 import { patchCoverageBadge, fetchAndMergeCoverage } from "./coverage.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { coverageMediaId } from "./utils.js";
-import { registerCleanup } from "./actions/index.js";
+import { registerCleanup } from "@cplieger/actions";
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
 import type { CoverageItem } from "./api-types.js";
 
