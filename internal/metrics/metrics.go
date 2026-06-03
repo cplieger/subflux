@@ -19,19 +19,19 @@ var BucketBounds = [8]float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0}
 
 // Metrics holds all application metrics.
 type Metrics struct {
-	searches    *extmetrics.LabeledCounter
+	scansTotal  *extmetrics.Counter
 	errors      *extmetrics.LabeledCounter
 	downloads   *extmetrics.LabeledCounter
 	dlErrors    *extmetrics.LabeledCounter
 	durations   *extmetrics.LabeledHistogram
 	imports     *extmetrics.LabeledCounter
-	scansTotal  *extmetrics.Counter
+	searches    *extmetrics.LabeledCounter
 	scanItems   *extmetrics.Counter
 	scanFound   *extmetrics.Counter
 	scanDur     *extmetrics.Gauge
 	adaptSkips  *extmetrics.Counter
-	totalSearch atomic.Int64
 	registry    *extmetrics.Registry
+	totalSearch atomic.Int64
 }
 
 // New creates a new Metrics instance.
