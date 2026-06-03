@@ -1,25 +1,22 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	"github.com/cplieger/httpx"
+)
 
 // --- Provider errors ---
 
 // AuthError indicates invalid or expired credentials.
-type AuthError struct{ Msg string }
-
-func (e *AuthError) Error() string { return e.Msg }
+type AuthError = httpx.AuthError
 
 // RateLimitError indicates the provider's rate limit was exceeded.
 // RetryAfter, when non-zero, is the hint from the upstream's Retry-After
 // header (delta-seconds or HTTP-date resolved to a positive duration).
 // Consumers may use it to schedule the next attempt; a zero value means
 // no hint was provided.
-type RateLimitError struct {
-	Msg        string
-	RetryAfter time.Duration
-}
-
-func (e *RateLimitError) Error() string { return e.Msg }
+type RateLimitError = httpx.RateLimitError
 
 // TimeoutStatus is the state of a single provider's timeout.
 type TimeoutStatus struct {

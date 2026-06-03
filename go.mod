@@ -4,6 +4,8 @@ go 1.26.4
 
 require (
 	github.com/coreos/go-oidc/v3 v3.18.0
+	github.com/cplieger/httpx v0.0.0-00010101000000-000000000000
+	github.com/cplieger/auth v0.0.0-00010101000000-000000000000
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/ulikunitz/xz v0.5.15
@@ -35,3 +37,6 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/cplieger/httpx => ../httpx
+replace github.com/cplieger/auth => ../auth

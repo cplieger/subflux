@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"time"
+
+	"github.com/cplieger/httpx"
 )
 
 // This file contains implementation/provider contracts: interfaces that
@@ -23,9 +25,7 @@ import (
 // retryable (transient server/network failures) vs permanent. Used by
 // retry logic to decide whether to retry without importing concrete
 // error packages.
-type Transient interface {
-	IsTransient() bool
-}
+type Transient = httpx.Transient
 
 // Provider is the interface all subtitle providers must implement.
 type Provider interface {
