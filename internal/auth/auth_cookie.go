@@ -13,8 +13,7 @@ const (
 	CookieNameHTTP   = "sfx_session"
 )
 
-// IsBrowserRequest returns true if the request appears to be from a browser
-// (Accept header contains text/html and no X-API-Key header).
+// IsBrowserRequest returns true if the request appears to be from a browser.
 func IsBrowserRequest(r *http.Request) bool {
 	if r.Header.Get(api.HeaderXAPIKey) != "" {
 		return false
@@ -27,8 +26,7 @@ func isHTTPS(r *http.Request) bool {
 	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
-// SessionCookieName returns the appropriate cookie name based on whether
-// the request arrived over HTTPS.
+// SessionCookieName returns the appropriate cookie name.
 func SessionCookieName(r *http.Request) string {
 	if isHTTPS(r) {
 		return CookieNameSecure
@@ -43,11 +41,7 @@ func SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, maxA
 	if secure {
 		name = CookieNameSecure
 	}
-	// gosec:G124 flags the conditional Secure attribute. This is
-	// intentional: LAN HTTP deployments need a working session cookie,
-	// and the caller selects the cookie name (__Host- prefix) and
-	// HttpOnly + SameSite unconditionally. Over HTTPS, Secure is set.
-	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure is conditional for LAN HTTP support; HttpOnly+SameSite always set
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124
 		Name:     name,
 		Value:    token,
 		Path:     "/",
