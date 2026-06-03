@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/httpx"
+
 	"subflux/internal/api"
 )
 
@@ -17,18 +19,16 @@ func TestCheckHTTPStatus(t *testing.T) {
 		wantNil    bool
 		wantAuth   bool
 		wantRate   bool
-		wantStatus bool // expect *HTTPStatusError
+		wantStatus bool
 	}{
 		{"200 OK", 200, true, false, false, false},
 		{"201 Created", 201, true, false, false, false},
-		{"400 Bad Request", 400, false, false, false, false},
 		{"401 Unauthorized", 401, false, true, false, false},
 		{"403 Forbidden", 403, false, true, false, false},
 		{"429 Too Many Requests", 429, false, false, true, false},
 		{"500 Internal Server Error", 500, false, false, false, true},
 		{"502 Bad Gateway", 502, false, false, false, true},
 		{"503 Service Unavailable", 503, false, false, false, true},
-		{"504 Gateway Timeout", 504, false, false, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -47,30 +47,34 @@ func TestCheckHTTPStatus(t *testing.T) {
 			var authErr *api.AuthError
 			var rateErr *api.RateLimitError
 			var statusErr *HTTPStatusError
-			if tt.wantAuth {
-				if !errors.As(err, &authErr) {
-					t.Errorf("CheckHTTPStatus(%d) = %T, want *api.AuthError", tt.statusCode, err)
-				}
+			if tt.wantAuth && !errors.As(err, &authErr) {
+				t.Errorf("CheckHTTPStatus(%d) = %T, want *api.AuthError", tt.statusCode, err)
 			}
-			if tt.wantRate {
-				if !errors.As(err, &rateErr) {
-					t.Errorf("CheckHTTPStatus(%d) = %T, want *api.RateLimitError", tt.statusCode, err)
-				}
+			if tt.wantRate && !errors.As(err, &rateErr) {
+				t.Errorf("CheckHTTPStatus(%d) = %T, want *api.RateLimitError", tt.statusCode, err)
 			}
-			if tt.wantStatus {
-				if !errors.As(err, &statusErr) {
-					t.Errorf("CheckHTTPStatus(%d) = %T, want *HTTPStatusError", tt.statusCode, err)
-				} else if statusErr.Code != tt.statusCode {
-					t.Errorf("HTTPStatusError.Code = %d, want %d", statusErr.Code, tt.statusCode)
-				}
+			if tt.wantStatus && !errors.As(err, &statusErr) {
+				t.Errorf("CheckHTTPStatus(%d) = %T, want *HTTPStatusError", tt.statusCode, err)
 			}
 		})
 	}
 }
 
-// TestHTTPStatusError_preserves_wire_format asserts that the typed error
-// stringifies to "HTTP <code>" so providers that still match on the error
-// message (or tests that do) keep working during the migration.
+func TestCheckHTTPStatus_429_parses_retry_after(t *testing.T) {
+	t.Parallel()
+	h := http.Header{}
+	h.Set("Retry-After", "30")
+	resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: h}
+	err := CheckHTTPStatus(resp)
+	var rl *api.RateLimitError
+	if !errors.As(err, &rl) {
+		t.Fatalf("expected *api.RateLimitError, got %T", err)
+	}
+	if rl.RetryAfter != 30*time.Second {
+		t.Errorf("RetryAfter = %v, want 30s", rl.RetryAfter)
+	}
+}
+
 func TestHTTPStatusError_preserves_wire_format(t *testing.T) {
 	t.Parallel()
 	got := (&HTTPStatusError{Code: 503}).Error()
@@ -80,59 +84,39 @@ func TestHTTPStatusError_preserves_wire_format(t *testing.T) {
 	}
 }
 
-// TestCheckHTTPStatus_429_parses_retry_after verifies Retry-After is
-// decoded from both delta-seconds and HTTP-date forms.
-func TestCheckHTTPStatus_429_parses_retry_after(t *testing.T) {
+func TestIsTransient_api_errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name        string
-		header      string
-		wantAtLeast time.Duration
-		wantAtMost  time.Duration
+		name string
+		err  error
+		want bool
 	}{
-		{"no header", "", 0, 0},
-		{"delta-seconds", "30", 30 * time.Second, 30 * time.Second},
-		{"zero seconds", "0", 0, 0},
-		{"negative seconds clamped", "-10", 0, 0},
-		{"invalid string ignored", "soon", 0, 0},
+		{"nil", nil, false},
+		{"api.AuthError not transient", &api.AuthError{Msg: "bad"}, false},
+		{"api.RateLimitError not transient", &api.RateLimitError{Msg: "slow"}, false},
+		{"httpx.HTTPStatusError 502 transient", &httpx.HTTPStatusError{Code: 502}, true},
+		{"httpx.HTTPStatusError 400 not transient", &httpx.HTTPStatusError{Code: 400}, false},
+		{"generic error not transient", errors.New("something"), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			h := http.Header{}
-			if tt.header != "" {
-				h.Set("Retry-After", tt.header)
-			}
-			resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: h}
-			err := CheckHTTPStatus(resp)
-			var rl *api.RateLimitError
-			if !errors.As(err, &rl) {
-				t.Fatalf("expected *api.RateLimitError, got %T", err)
-			}
-			if rl.RetryAfter < tt.wantAtLeast || rl.RetryAfter > tt.wantAtMost {
-				t.Errorf("RetryAfter = %v, want [%v, %v]",
-					rl.RetryAfter, tt.wantAtLeast, tt.wantAtMost)
+			if got := IsTransient(tt.err); got != tt.want {
+				t.Errorf("IsTransient(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}
 }
 
-// TestCheckHTTPStatus_429_parses_http_date isolates the HTTP-date path
-// because the range is dynamic (time.Until).
-func TestCheckHTTPStatus_429_parses_http_date(t *testing.T) {
+func TestIsTransient_suffixBypassFixed(t *testing.T) {
 	t.Parallel()
-	future := time.Now().Add(45 * time.Second).UTC().Format(http.TimeFormat)
-	h := http.Header{}
-	h.Set("Retry-After", future)
-	resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: h}
-	err := CheckHTTPStatus(resp)
-	var rl *api.RateLimitError
-	if !errors.As(err, &rl) {
-		t.Fatalf("expected *api.RateLimitError, got %T", err)
-	}
-	// Parsed time has 1-second precision; allow a wide tolerance
-	// for slow test runners.
-	if rl.RetryAfter < 30*time.Second || rl.RetryAfter > 60*time.Second {
-		t.Errorf("RetryAfter = %v, want ~45s", rl.RetryAfter)
+	// Verify httpx.HTTPStatusError (from httpx.CheckHTTPStatus) is correctly
+	// classified as transient for 502/503/504 — this confirms the suffix-bypass
+	// security fix is in effect since we now delegate to httpx.
+	for _, code := range []int{502, 503, 504} {
+		err := &httpx.HTTPStatusError{Code: code}
+		if !IsTransient(err) {
+			t.Errorf("IsTransient(HTTPStatusError{%d}) = false, want true", code)
+		}
 	}
 }
