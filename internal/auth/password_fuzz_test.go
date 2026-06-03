@@ -9,9 +9,8 @@ func FuzzVerifyPassword(f *testing.F) {
 	f.Add("$argon2id$v=99$m=19456,t=2,p=1$AAAA$BBBB")
 	f.Add("not-a-hash-at-all")
 	f.Fuzz(func(t *testing.T, encoded string) {
-		// parsePHC validates parameters before calling argon2.
-		// VerifyPassword may panic on zero iterations, so we only
-		// call parsePHC to fuzz the parser itself.
-		_, _ = parsePHC(encoded)
+		// Exercise the lib's parser via VerifyPassword.
+		// We only care that it doesn't panic on arbitrary input.
+		_, _ = VerifyPassword("test", encoded)
 	})
 }
