@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json.schemastore.org/stylelintrc",
+  "extends": ["stylelint-config-standard"],
+  "defaultSeverity": "error",
+  "reportDescriptionlessDisables": true,
+  "reportInvalidScopeDisables": true,
+  "reportNeedlessDisables": true,
+  "reportUnscopedDisables": true,
+  "rules": {
+    "declaration-block-single-line-max-declarations": null,
+    "declaration-no-important": true,
+    "declaration-property-value-no-unknown": true,
+    "function-no-unknown": true,
+    "max-nesting-depth": [
+      4,
+      {
+        "ignore": ["blockless-at-rules", "pseudo-classes"]
+      }
+    ],
+    "no-unknown-animations": true,
+    "no-unknown-custom-properties": null,
+    "number-max-precision": [
+      4,
+      {
+        "insideFunctions": {
+          "/^(oklch|oklab|lch|lab|color-mix)$/": 6
+        }
+      }
+    ],
+    "selector-max-id": 0,
+    "color-named": "never",
+    "color-hex-alpha": "never",
+    "font-weight-notation": "numeric",
+    "selector-no-qualifying-type": [
+      true,
+      {
+        "ignore": ["attribute", "class"]
+      }
+    ],
+    "selector-max-compound-selectors": 5,
+    "selector-max-specificity": "0,4,3",
+    "selector-max-pseudo-class": 3,
+    "selector-max-attribute": 2,
+    "selector-max-combinators": 4,
+    "selector-max-universal": 1,
+    "time-min-milliseconds": 10,
+    "at-rule-no-vendor-prefix": true,
+    "property-no-vendor-prefix": [
+      true,
+      {
+        "ignoreProperties": ["text-size-adjust", "font-smoothing", "tap-highlight-color"]
+      }
+    ],
+    "value-no-vendor-prefix": [
+      true,
+      {
+        "ignoreValues": ["box", "inline-box"]
+      }
+    ],
+    "selector-no-vendor-prefix": true,
+    "media-feature-name-no-vendor-prefix": true,
+    "no-descending-specificity": null,
+    "no-duplicate-selectors": null,
+    "comment-empty-line-before": null,
+    "rule-empty-line-before": null
+  }
+}

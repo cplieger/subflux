@@ -1,0 +1,28 @@
+{
+  "$schema": "https://html-validate.org/schemas/config.json",
+  "extends": [
+    "html-validate:recommended",
+    "html-validate:standard",
+    "html-validate:document",
+    "html-validate:a11y"
+  ],
+  "rules": {
+    "no-inline-style": "error",
+    "no-trailing-whitespace": "error",
+    "no-style-tag": "error",
+    "tel-non-breaking": "error",
+    "valid-id": "error",
+    "class-pattern": ["error", { "pattern": "kebabcase" }],
+    "id-pattern": ["error", { "pattern": ["camelcase", "kebabcase"] }],
+    "heading-level": "error",
+    "no-implicit-close": "error",
+    "no-implicit-button-type": "error",
+    "no-implicit-input-type": "error",
+    "input-missing-label": "error",
+    "no-redundant-aria-label": "error",
+    "no-redundant-role": "error",
+    "no-redundant-for": "error",
+    "no-unused-disable": "error",
+    "require-sri": "off"
+  }
+}
