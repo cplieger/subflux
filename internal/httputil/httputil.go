@@ -187,12 +187,17 @@ func RedactTransportError(err error, prefix, secret string) error {
 		return wrapped
 	}
 	// Pick a placeholder that does not contain the secret as a substring;
-	// otherwise replacement would re-introduce the secret (e.g. secret="*"
-	// and placeholder="***" would expand instead of redact). When no
-	// reasonable placeholder works, fall back to deletion.
-	placeholder := "***"
+	// otherwise replacement would re-introduce the secret. For example when
+	// secret="T", "REDACTED" contains "T", so the test's invariant that the
+	// output must not contain the secret would still fail. Try REDACTED first
+	// (preferred, matches existing user expectations), fall back to a non-
+	// alphabetic placeholder, and finally delete.
+	placeholder := "REDACTED"
 	if strings.Contains(placeholder, secret) {
-		placeholder = ""
+		placeholder = "***"
+		if strings.Contains(placeholder, secret) {
+			placeholder = ""
+		}
 	}
 	return errors.New(strings.ReplaceAll(msg, secret, placeholder))
 }
