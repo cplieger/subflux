@@ -14,7 +14,7 @@ import { triggerSeriesScan, triggerSeasonScan, triggerMovieScan } from "./detail
 import { confirmSeasonSync } from "./detail-season-sync.js";
 import type { SeasonSyncEpisode } from "./detail-season-sync.js";
 import type { SubtitleEntry, MovieDetail, Episode, SeasonGroup, SeriesItem } from "./api-types.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
 // on internal navigation (each new openSeriesDetail/openMovieDetail aborts

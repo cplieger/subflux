@@ -12,7 +12,7 @@ import type { DetailConfig } from "./bus.js";
 import { createPagedList } from "./paged-list.js";
 import type { PagedList, Page } from "./paged-list.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 
 // --- Coverage view ---
 

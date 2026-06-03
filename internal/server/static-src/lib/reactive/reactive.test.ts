@@ -9,7 +9,7 @@ import {
   reconcile,
   KEY_ATTR,
   patch,
-} from "./index.js";
+} from "@cplieger/reactive";
 
 // ---------------------------------------------------------------------------
 // signal + effect + batch

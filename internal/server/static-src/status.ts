@@ -14,7 +14,7 @@ import { fmtTime } from "./utils.js";
 import { EMBEDDED_PROVIDER } from "./constants.js";
 import { hideTip } from "./tooltip.js";
 import type { Activity } from "./api-types.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 
 interface Alert {
   id: number;

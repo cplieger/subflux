@@ -6,7 +6,7 @@ import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow } from "./utils.js";
 import { createPagedList } from "./paged-list.js";
 import type { PagedList, Page } from "./paged-list.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 
 interface HistoryEntry {
   media_id: string;
