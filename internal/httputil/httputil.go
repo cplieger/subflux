@@ -95,6 +95,12 @@ func ParseRetryAfter(resp *http.Response) time.Duration {
 		if secs < 0 {
 			return 0
 		}
+		// Cap at 60s to prevent abuse + avoid int64 overflow when
+		// secs is huge (e.g. 10000000000 * 1e9 ns wraps negative).
+		const maxRetry = 60
+		if secs > maxRetry {
+			secs = maxRetry
+		}
 		return time.Duration(secs) * time.Second
 	}
 	if t, err := http.ParseTime(ra); err == nil {
@@ -180,7 +186,15 @@ func RedactTransportError(err error, prefix, secret string) error {
 	if !strings.Contains(msg, secret) {
 		return wrapped
 	}
-	return errors.New(strings.ReplaceAll(msg, secret, "REDACTED"))
+	// Pick a placeholder that does not contain the secret as a substring;
+	// otherwise replacement would re-introduce the secret (e.g. secret="*"
+	// and placeholder="***" would expand instead of redact). When no
+	// reasonable placeholder works, fall back to deletion.
+	placeholder := "***"
+	if strings.Contains(placeholder, secret) {
+		placeholder = ""
+	}
+	return errors.New(strings.ReplaceAll(msg, secret, placeholder))
 }
 
 // SleepCtx sleeps for the given duration or returns early if the context
