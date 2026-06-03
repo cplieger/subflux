@@ -18,7 +18,6 @@ func BenchmarkRender_20_metrics(b *testing.B) {
 			for i := range providers {
 				providers[i] = api.ProviderID(fmt.Sprintf("provider-%d", i))
 			}
-			// Providers are lazily created via RecordSearch below.
 
 			for _, p := range providers {
 				for range 10 {

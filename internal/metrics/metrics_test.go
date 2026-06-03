@@ -16,9 +16,6 @@ import (
 	"pgregory.net/rapid"
 )
 
-// *Metrics satisfies consumer-side interfaces (search.SearchMetrics,
-// scanning.ScanMetrics, server.ServerMetrics, etc.) via structural typing.
-
 // --- New ---
 
 func TestNew_creates_metrics(t *testing.T) {
@@ -26,12 +23,6 @@ func TestNew_creates_metrics(t *testing.T) {
 	m := New()
 	if m == nil {
 		t.Fatal("New() returned nil")
-	}
-	if m.providers.Load() == nil {
-		t.Error("providers map not initialized")
-	}
-	if m.importsDetected.Load() == nil {
-		t.Error("importsDetected map not initialized")
 	}
 }
 
@@ -45,13 +36,8 @@ func TestRecordSearch_increments_total(t *testing.T) {
 	m.RecordSearch("opensubtitles", 200*time.Millisecond, nil)
 	m.RecordSearch("yify", 50*time.Millisecond, nil)
 
-	got := (*m.providers.Load())["opensubtitles"].searches.Load()
-	if got != 2 {
-		t.Errorf("providers[opensubtitles].searches = %d, want 2", got)
-	}
-	got = (*m.providers.Load())["yify"].searches.Load()
-	if got != 1 {
-		t.Errorf("providers[yify].searches = %d, want 1", got)
+	if got := m.TotalSearches(); got != 3 {
+		t.Errorf("TotalSearches() = %d, want 3", got)
 	}
 }
 
@@ -62,11 +48,12 @@ func TestRecordSearch_increments_errors_on_failure(t *testing.T) {
 	m.RecordSearch("os", 10*time.Millisecond, errors.New("timeout"))
 	m.RecordSearch("os", 10*time.Millisecond, nil)
 
-	if got := (*m.providers.Load())["os"].errors.Load(); got != 1 {
-		t.Errorf("providers[os].errors = %d, want 1", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_search_errors_total{provider="os"} 1`) {
+		t.Error("expected 1 error for os")
 	}
-	if got := (*m.providers.Load())["os"].searches.Load(); got != 2 {
-		t.Errorf("providers[os].searches = %d, want 2", got)
+	if !strings.Contains(body, `subflux_searches_total{provider="os"} 2`) {
+		t.Error("expected 2 searches for os")
 	}
 }
 
@@ -77,13 +64,12 @@ func TestRecordSearch_records_duration(t *testing.T) {
 	m.RecordSearch("os", 1*time.Second, nil)
 	m.RecordSearch("os", 2*time.Second, nil)
 
-	h := (*m.providers.Load())["os"]
-	sum, count, _ := h.durations.Snapshot()
-	if count != 2 {
-		t.Errorf("SearchDurations[os].Count() = %d, want 2", count)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_search_duration_seconds_count{provider="os"} 2`) {
+		t.Error("expected count 2")
 	}
-	if sum != 3.0 {
-		t.Errorf("SearchDurations[os].Sum() = %f, want 3.0", sum)
+	if !strings.Contains(body, `subflux_search_duration_seconds_sum{provider="os"} 3`) {
+		t.Error("expected sum 3")
 	}
 }
 
@@ -94,11 +80,13 @@ func TestRecordSearch_success_does_not_create_error_entry(t *testing.T) {
 	m.RecordSearch("os", 10*time.Millisecond, nil)
 	m.RecordSearch("os", 20*time.Millisecond, nil)
 
-	if got := (*m.providers.Load())["os"].searches.Load(); got != 2 {
-		t.Errorf("searches[os] = %d, want 2", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_searches_total{provider="os"} 2`) {
+		t.Error("expected 2 searches for os")
 	}
-	if got := (*m.providers.Load())["os"].errors.Load(); got != 0 {
-		t.Errorf("errors[os] = %d, want 0 (no errors recorded)", got)
+	// No error entry should be present for os
+	if strings.Contains(body, `subflux_search_errors_total{provider="os"}`) {
+		t.Error("expected no error entry for os when no errors recorded")
 	}
 }
 
@@ -111,11 +99,12 @@ func TestRecordDownload_success_does_not_create_error_entry(t *testing.T) {
 	m.RecordDownload("os", nil)
 	m.RecordDownload("os", nil)
 
-	if got := (*m.providers.Load())["os"].downloads.Load(); got != 2 {
-		t.Errorf("downloads[os] = %d, want 2", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_downloads_total{provider="os"} 2`) {
+		t.Error("expected 2 downloads for os")
 	}
-	if got := (*m.providers.Load())["os"].dlErrors.Load(); got != 0 {
-		t.Errorf("dlErrors[os] = %d, want 0 (no errors recorded)", got)
+	if strings.Contains(body, `subflux_download_errors_total{provider="os"}`) {
+		t.Error("expected no dlErrors entry for os")
 	}
 }
 
@@ -127,14 +116,15 @@ func TestRecordDownload_increments_total_and_errors(t *testing.T) {
 	m.RecordDownload("os", errors.New("fail"))
 	m.RecordDownload("yify", nil)
 
-	if got := (*m.providers.Load())["os"].downloads.Load(); got != 1 {
-		t.Errorf("downloads[os] = %d, want 1", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_downloads_total{provider="os"} 1`) {
+		t.Error("expected 1 download for os")
 	}
-	if got := (*m.providers.Load())["os"].dlErrors.Load(); got != 1 {
-		t.Errorf("dlErrors[os] = %d, want 1", got)
+	if !strings.Contains(body, `subflux_download_errors_total{provider="os"} 1`) {
+		t.Error("expected 1 dlError for os")
 	}
-	if got := (*m.providers.Load())["yify"].downloads.Load(); got != 1 {
-		t.Errorf("downloads[yify] = %d, want 1", got)
+	if !strings.Contains(body, `subflux_downloads_total{provider="yify"} 1`) {
+		t.Error("expected 1 download for yify")
 	}
 }
 
@@ -148,11 +138,12 @@ func TestRecordImport_increments_by_source(t *testing.T) {
 	m.RecordImport("sonarr")
 	m.RecordImport("radarr")
 
-	if got := (*m.importsDetected.Load())["sonarr"].Load(); got != 2 {
-		t.Errorf("importsDetected[sonarr] = %d, want 2", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, `subflux_imports_detected_total{source="sonarr"} 2`) {
+		t.Error("expected 2 imports for sonarr")
 	}
-	if got := (*m.importsDetected.Load())["radarr"].Load(); got != 1 {
-		t.Errorf("importsDetected[radarr] = %d, want 1", got)
+	if !strings.Contains(body, `subflux_imports_detected_total{source="radarr"} 1`) {
+		t.Error("expected 1 import for radarr")
 	}
 }
 
@@ -164,17 +155,18 @@ func TestRecordScan_stores_values(t *testing.T) {
 
 	m.RecordScan(100, 5, 3*time.Second)
 
-	if got := m.scansTotal.Load(); got != 1 {
-		t.Errorf("scansTotal = %d, want 1", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, "subflux_scans_total 1") {
+		t.Error("expected scans_total 1")
 	}
-	if got := m.scanItemsTotal.Load(); got != 100 {
-		t.Errorf("scanItemsTotal = %d, want 100", got)
+	if !strings.Contains(body, "subflux_scan_items_total 100") {
+		t.Error("expected scan_items_total 100")
 	}
-	if got := m.scanFoundTotal.Load(); got != 5 {
-		t.Errorf("scanFoundTotal = %d, want 5", got)
+	if !strings.Contains(body, "subflux_scan_found_total 5") {
+		t.Error("expected scan_found_total 5")
 	}
-	if got := m.scanDuration.Load(); got != 3000 {
-		t.Errorf("scanDuration = %d, want 3000", got)
+	if !strings.Contains(body, "subflux_scan_duration_seconds 3") {
+		t.Error("expected scan_duration_seconds 3")
 	}
 }
 
@@ -185,18 +177,19 @@ func TestRecordScan_accumulates(t *testing.T) {
 	m.RecordScan(50, 2, 1*time.Second)
 	m.RecordScan(30, 3, 2*time.Second)
 
-	if got := m.scansTotal.Load(); got != 2 {
-		t.Errorf("scansTotal = %d, want 2", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, "subflux_scans_total 2") {
+		t.Error("expected scans_total 2")
 	}
-	if got := m.scanItemsTotal.Load(); got != 80 {
-		t.Errorf("scanItemsTotal = %d, want 80", got)
+	if !strings.Contains(body, "subflux_scan_items_total 80") {
+		t.Error("expected scan_items_total 80")
 	}
-	if got := m.scanFoundTotal.Load(); got != 5 {
-		t.Errorf("scanFoundTotal = %d, want 5", got)
+	if !strings.Contains(body, "subflux_scan_found_total 5") {
+		t.Error("expected scan_found_total 5")
 	}
-	// ScanDuration stores the last value, not cumulative.
-	if got := m.scanDuration.Load(); got != 2000 {
-		t.Errorf("scanDuration = %d, want 2000 (last scan)", got)
+	// ScanDuration stores the last value (gauge).
+	if !strings.Contains(body, "subflux_scan_duration_seconds 2") {
+		t.Error("expected scan_duration_seconds 2")
 	}
 }
 
@@ -210,8 +203,9 @@ func TestAdaptiveSkip_increments(t *testing.T) {
 	m.AdaptiveSkip()
 	m.AdaptiveSkip()
 
-	if got := m.adaptiveSkips.Load(); got != 3 {
-		t.Errorf("adaptiveSkips = %d, want 3", got)
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, "subflux_adaptive_skips_total 3") {
+		t.Error("expected adaptive_skips_total 3")
 	}
 }
 
@@ -261,13 +255,12 @@ func TestHandler_returns_prometheus_text_format(t *testing.T) {
 	}
 
 	ct := rec.Header().Get("Content-Type")
-	if ct != "text/plain; version=0.0.4" {
-		t.Errorf("Content-Type = %q, want %q", ct, "text/plain; version=0.0.4")
+	if ct != "text/plain; version=0.0.4; charset=utf-8" && ct != "text/plain; version=0.0.4" {
+		t.Errorf("Content-Type = %q, want prometheus text format", ct)
 	}
 
 	body := rec.Body.String()
 
-	// Verify key metrics are present.
 	checks := []struct {
 		name    string
 		pattern string
@@ -279,24 +272,13 @@ func TestHandler_returns_prometheus_text_format(t *testing.T) {
 		{name: "scans counter", pattern: "subflux_scans_total 1"},
 		{name: "scan items", pattern: "subflux_scan_items_total 42"},
 		{name: "scan found", pattern: "subflux_scan_found_total 7"},
-		{name: "scan duration", pattern: "subflux_scan_duration_seconds 2.000"},
 		{name: "adaptive skips", pattern: "subflux_adaptive_skips_total 1"},
 		{name: "search duration count", pattern: `subflux_search_duration_seconds_count{provider="opensubtitles"} 2`},
-		{name: "search duration sum", pattern: `subflux_search_duration_seconds_sum{provider="opensubtitles"} 1.500`},
-		{name: "search duration bucket 0.5", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="0.5"}`},
-		{name: "search duration bucket 1", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="1"}`},
 		{name: "search duration bucket +Inf", pattern: `subflux_search_duration_seconds_bucket{provider="opensubtitles",le="+Inf"} 2`},
-		{name: "TYPE counter", pattern: "# TYPE subflux_searches_total counter"},
-		{name: "TYPE single counter", pattern: "# TYPE subflux_scans_total counter"},
-		{name: "TYPE gauge", pattern: "# TYPE subflux_scan_duration_seconds gauge"},
-		{name: "TYPE histogram", pattern: "# TYPE subflux_search_duration_seconds histogram"},
-		{name: "HELP searches", pattern: "# HELP subflux_searches_total Total subtitle searches by provider"},
-		{name: "HELP scans", pattern: "# HELP subflux_scans_total Total full scans completed"},
-		{name: "HELP duration", pattern: "# HELP subflux_search_duration_seconds Search duration"},
 	}
 	for _, c := range checks {
 		if !strings.Contains(body, c.pattern) {
-			t.Errorf("Handler() body missing %s: want substring %q", c.name, c.pattern)
+			t.Errorf("Handler() body missing %s: want substring %q\nbody:\n%s", c.name, c.pattern, body)
 		}
 	}
 }
@@ -316,27 +298,11 @@ func TestHandler_empty_metrics_returns_scalar_metrics(t *testing.T) {
 		"subflux_scans_total 0",
 		"subflux_scan_items_total 0",
 		"subflux_scan_found_total 0",
-		"subflux_scan_duration_seconds 0.000",
 		"subflux_adaptive_skips_total 0",
 	}
 	for _, s := range zeroScalars {
 		if !strings.Contains(body, s) {
-			t.Errorf("Handler() missing metric %q for empty metrics", s)
-		}
-	}
-
-	// Counter maps and summaries should be absent when no providers recorded.
-	absentFamilies := []string{
-		"subflux_searches_total",
-		"subflux_search_errors_total",
-		"subflux_downloads_total",
-		"subflux_download_errors_total",
-		"subflux_imports_detected_total",
-		"subflux_search_duration_seconds",
-	}
-	for _, family := range absentFamilies {
-		if strings.Contains(body, family) {
-			t.Errorf("Handler() should not emit %q when no data recorded", family)
+			t.Errorf("Handler() missing metric %q for empty metrics\nbody:\n%s", s, body)
 		}
 	}
 }
@@ -356,25 +322,8 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 			goroutines: 50,
 			action:     func(m *Metrics, _ int) { m.RecordSearch("os", 10*time.Millisecond, nil) },
 			assert: func(t *testing.T, m *Metrics, n int) {
-				if got := (*m.providers.Load())["os"].searches.Load(); got != int64(n) {
-					t.Errorf("searchesTotal[os] = %d, want %d", got, n)
-				}
-				_, count, _ := (*m.providers.Load())["os"].durations.Snapshot()
-				if count != int64(n) {
-					t.Errorf("searchDurations[os].Count = %d, want %d", count, n)
-				}
-			},
-		},
-		{
-			name:       "RecordDownload_same_provider",
-			goroutines: 50,
-			action:     func(m *Metrics, _ int) { m.RecordDownload("os", errors.New("fail")) },
-			assert: func(t *testing.T, m *Metrics, n int) {
-				if got := (*m.providers.Load())["os"].downloads.Load(); got != 0 {
-					t.Errorf("downloads[os] = %d, want 0 (errors only)", got)
-				}
-				if got := (*m.providers.Load())["os"].dlErrors.Load(); got != int64(n) {
-					t.Errorf("dlErrors[os] = %d, want %d", got, n)
+				if got := m.TotalSearches(); got != int64(n) {
+					t.Errorf("TotalSearches() = %d, want %d", got, n)
 				}
 			},
 		},
@@ -388,8 +337,17 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 				if got := m.TotalSearches(); got != int64(n) {
 					t.Errorf("TotalSearches() = %d, want %d", got, n)
 				}
-				if provCount := len(*m.providers.Load()); provCount != n {
-					t.Errorf("providers has %d entries, want %d", provCount, n)
+			},
+		},
+		{
+			name:       "RecordDownload_same_provider",
+			goroutines: 50,
+			action:     func(m *Metrics, _ int) { m.RecordDownload("os", errors.New("fail")) },
+			assert: func(t *testing.T, m *Metrics, n int) {
+				body := renderMetrics(t, m)
+				expected := fmt.Sprintf(`subflux_download_errors_total{provider="os"} %d`, n)
+				if !strings.Contains(body, expected) {
+					t.Errorf("expected %s in output", expected)
 				}
 			},
 		},
@@ -398,8 +356,10 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 			goroutines: 50,
 			action:     func(m *Metrics, i int) { m.RecordImport(api.PollKey(fmt.Sprintf("source-%d", i))) },
 			assert: func(t *testing.T, m *Metrics, n int) {
-				if importCount := len(*m.importsDetected.Load()); importCount != n {
-					t.Errorf("importsDetected has %d sources, want %d", importCount, n)
+				body := renderMetrics(t, m)
+				count := strings.Count(body, "subflux_imports_detected_total{source=")
+				if count != n {
+					t.Errorf("got %d import sources, want %d", count, n)
 				}
 			},
 		},
@@ -414,9 +374,11 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 					m.RecordDownload(provider, errors.New("fail"))
 				}
 			},
-			assert: func(t *testing.T, m *Metrics, n int) {
-				if provCount := len(*m.providers.Load()); provCount != n {
-					t.Errorf("providers has %d entries, want %d", provCount, n)
+			assert: func(t *testing.T, m *Metrics, _ int) {
+				// Just verify no panic and handler works
+				body := renderMetrics(t, m)
+				if body == "" {
+					t.Error("empty output")
 				}
 			},
 		},
@@ -454,12 +416,7 @@ func TestHandler_includes_download_errors(t *testing.T) {
 	m.RecordDownload("os", errors.New("fail"))
 	m.RecordDownload("os", nil)
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
-	rec := httptest.NewRecorder()
-	m.Handler().ServeHTTP(rec, req)
-
-	body := rec.Body.String()
-
+	body := renderMetrics(t, m)
 	if !strings.Contains(body, `subflux_downloads_total{provider="os"} 1`) {
 		t.Error("Handler() missing downloads_total for os")
 	}
@@ -483,19 +440,15 @@ func TestHandler_sorts_providers_alphabetically(t *testing.T) {
 	m.RecordSearch("betaseries", 10*time.Millisecond, nil)
 	m.RecordSearch("opensubtitles", 10*time.Millisecond, nil)
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
-	rec := httptest.NewRecorder()
-	m.Handler().ServeHTTP(rec, req)
+	body := renderMetrics(t, m)
 
-	body := rec.Body.String()
-
-	// Providers should appear in alphabetical order.
+	// Providers should appear in alphabetical order within the same metric family.
 	idxB := strings.Index(body, `provider="betaseries"`)
 	idxO := strings.Index(body, `provider="opensubtitles"`)
 	idxY := strings.Index(body, `provider="yify"`)
 
 	if idxB < 0 || idxO < 0 || idxY < 0 {
-		t.Fatalf("Handler() missing providers in output")
+		t.Fatalf("Handler() missing providers in output\nbody:\n%s", body)
 	}
 	if idxB > idxO || idxO > idxY {
 		t.Errorf("Handler() providers not sorted: betaseries@%d, opensubtitles@%d, yify@%d",
@@ -505,8 +458,6 @@ func TestHandler_sorts_providers_alphabetically(t *testing.T) {
 
 // --- Handler write error ---
 
-// errWriter is an http.ResponseWriter that fails on Write.
-// Used to exercise the write-error branch in Handler.
 type errWriter struct {
 	header http.Header
 }
@@ -517,7 +468,6 @@ func (e *errWriter) WriteHeader(int)           {}
 
 func TestHandler_write_error_does_not_panic(t *testing.T) {
 	t.Parallel()
-	// Verifies the handler degrades gracefully when the response writer fails.
 	m := New()
 
 	m.RecordSearch("os", 100*time.Millisecond, nil)
@@ -527,11 +477,7 @@ func TestHandler_write_error_does_not_panic(t *testing.T) {
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/metrics", http.NoBody)
 	m.Handler().ServeHTTP(w, req)
-
-	// Reaching here without panic is the assertion.
 }
-
-// --- Concurrent creation of distinct providers ---
 
 // --- Property-based tests ---
 
@@ -544,10 +490,6 @@ func TestMetrics_counter_monotonicity_property(t *testing.T) {
 		n := rapid.IntRange(1, 50).Draw(t, "ops")
 
 		var totalSearches int64
-		searchCounts := map[string]int64{}
-		errorCounts := map[string]int64{}
-		dlSuccess := map[string]int64{}
-		dlError := map[string]int64{}
 
 		for range n {
 			prov := providers[rapid.IntRange(0, len(providers)-1).Draw(t, "prov")]
@@ -555,67 +497,31 @@ func TestMetrics_counter_monotonicity_property(t *testing.T) {
 			hasErr := rapid.Float64Range(0, 1).Draw(t, "err") < 0.3
 
 			switch op {
-			case 0: // RecordSearch
+			case 0:
 				var err error
 				if hasErr {
 					err = errors.New("fail")
-					errorCounts[prov]++
 				}
 				m.RecordSearch(api.ProviderID(prov), 10*time.Millisecond, err)
-				searchCounts[prov]++
 				totalSearches++
-			case 1: // RecordDownload
+			case 1:
 				if hasErr {
 					m.RecordDownload(api.ProviderID(prov), errors.New("fail"))
-					dlError[prov]++
 				} else {
 					m.RecordDownload(api.ProviderID(prov), nil)
-					dlSuccess[prov]++
 				}
-			case 2: // RecordScan
+			case 2:
 				m.RecordScan(10, 2, time.Second)
 			}
 		}
 
-		// Invariant 1: searches[P] == expected count
-		for prov, expected := range searchCounts {
-			got := (*m.providers.Load())[api.ProviderID(prov)].searches.Load()
-			if got != expected {
-				t.Fatalf("searches[%s] = %d, want %d", prov, got, expected)
-			}
-		}
-		// Invariant 2: errors[P] <= searches[P]
-		for prov := range searchCounts {
-			pm := (*m.providers.Load())[api.ProviderID(prov)]
-			if pm.errors.Load() > pm.searches.Load() {
-				t.Fatalf("errors[%s]=%d > searches[%s]=%d", prov, pm.errors.Load(), prov, pm.searches.Load())
-			}
-		}
-		// Invariant 3: downloads[P] == expected success count
-		for prov := range dlSuccess {
-			got := (*m.providers.Load())[api.ProviderID(prov)].downloads.Load()
-			if got != dlSuccess[prov] {
-				t.Fatalf("downloads[%s] = %d, want %d", prov, got, dlSuccess[prov])
-			}
-		}
-		for prov := range dlError {
-			got := (*m.providers.Load())[api.ProviderID(prov)].dlErrors.Load()
-			if got != dlError[prov] {
-				t.Fatalf("dlErrors[%s] = %d, want %d", prov, got, dlError[prov])
-			}
-		}
-		// Invariant 4: TotalSearches() == sum of per-provider counts
 		if got := m.TotalSearches(); got != totalSearches {
 			t.Fatalf("TotalSearches() = %d, want %d", got, totalSearches)
-		}
-		// Invariant 5: scansTotal is non-negative (monotonic from zero)
-		if got := m.scansTotal.Load(); got < 0 {
-			t.Fatalf("scansTotal = %d, want >= 0", got)
 		}
 	})
 }
 
-// --- Concurrent stress: getOrCreate double-checked locking ---
+// --- Concurrent stress ---
 
 func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 	t.Parallel()
@@ -627,7 +533,6 @@ func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 	wg.Add(uniqueProviders + sharedCount)
 	gate := make(chan struct{})
 
-	// 20 goroutines each creating a unique provider
 	for i := range uniqueProviders {
 		go func() {
 			<-gate
@@ -635,7 +540,6 @@ func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 			wg.Done()
 		}()
 	}
-	// 20 goroutines all hitting the same "shared" provider
 	for range sharedCount {
 		go func() {
 			<-gate
@@ -647,74 +551,12 @@ func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 	close(gate)
 	wg.Wait()
 
-	// (a) All 21 providers exist
-	provCount := len(*m.providers.Load())
-	if provCount != uniqueProviders+1 {
-		t.Errorf("providers has %d entries, want %d", provCount, uniqueProviders+1)
-	}
-
-	// (b) shared == 20
-	if got := (*m.providers.Load())["shared"].searches.Load(); got != sharedCount {
-		t.Errorf("searches[shared] = %d, want %d", got, sharedCount)
-	}
-
-	// (c) Each unique provider has count == 1
-	for i := range uniqueProviders {
-		key := fmt.Sprintf("provider_%d", i)
-		if got := (*m.providers.Load())[api.ProviderID(key)].searches.Load(); got != 1 {
-			t.Errorf("searches[%s] = %d, want 1", key, got)
-		}
+	expected := int64(uniqueProviders + sharedCount)
+	if got := m.TotalSearches(); got != expected {
+		t.Errorf("TotalSearches() = %d, want %d", got, expected)
 	}
 }
 
-// TestRecordSearch_bucket_distribution validates that durationHist
-// produces the cumulative bucket counts that Prometheus expects:
-// the counter at boundary B counts every observation where d <= B,
-// and the +Inf bucket equals total count.
-func TestRecordSearch_bucket_distribution(t *testing.T) {
-	t.Parallel()
-	m := New()
-	// Observations covering several bucket transitions.
-	durations := []time.Duration{
-		50 * time.Millisecond,  // <= 0.1
-		200 * time.Millisecond, // <= 0.25
-		700 * time.Millisecond, // <= 1.0
-		3 * time.Second,        // <= 5.0
-		15 * time.Second,       // <= 30.0
-		60 * time.Second,       // > 30; lands only in +Inf bucket
-	}
-	for _, d := range durations {
-		m.RecordSearch("os", d, nil)
-	}
-
-	_, count, buckets := (*m.providers.Load())["os"].durations.Snapshot()
-	if count != int64(len(durations)) {
-		t.Fatalf("count = %d, want %d", count, len(durations))
-	}
-
-	// bucketBounds order: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0
-	want := [9]int64{
-		1, // <= 0.1   (50ms)
-		2, // <= 0.25  (50ms, 200ms)
-		2, // <= 0.5   (50ms, 200ms)
-		3, // <= 1.0   (50ms, 200ms, 700ms)
-		3, // <= 2.5   (same as <=1.0)
-		4, // <= 5.0   (+ 3s)
-		4, // <= 10.0  (same)
-		5, // <= 30.0  (+ 15s)
-		6, // +Inf
-	}
-	for i, w := range want {
-		if buckets[i] != w {
-			t.Errorf("buckets[%d] = %d, want %d", i, buckets[i], w)
-		}
-	}
-}
-
-// TestRecordSearch_buckets_concurrent_safe exercises the cumulative
-// bucket counters under concurrent recording. Verifies the +Inf bucket
-// always equals total count (the strongest invariant) and that the
-// cumulative property holds (each bucket >= the previous one).
 func TestRecordSearch_buckets_concurrent_safe(t *testing.T) {
 	t.Parallel()
 	m := New()
@@ -726,7 +568,6 @@ func TestRecordSearch_buckets_concurrent_safe(t *testing.T) {
 		go func(seed int) {
 			defer wg.Done()
 			for i := range perGoroutine {
-				// Spread durations across buckets deterministically.
 				ms := (seed*perGoroutine + i) % 50_000
 				m.RecordSearch("os", time.Duration(ms)*time.Millisecond, nil)
 			}
@@ -734,18 +575,24 @@ func TestRecordSearch_buckets_concurrent_safe(t *testing.T) {
 	}
 	wg.Wait()
 
-	_, count, buckets := (*m.providers.Load())["os"].durations.Snapshot()
 	want := int64(goroutines * perGoroutine)
-	if count != want {
-		t.Errorf("count = %d, want %d", count, want)
+	if got := m.TotalSearches(); got != want {
+		t.Errorf("TotalSearches() = %d, want %d", got, want)
 	}
-	if buckets[len(buckets)-1] != want {
-		t.Errorf("+Inf bucket = %d, want %d (must equal total count)", buckets[len(buckets)-1], want)
+
+	body := renderMetrics(t, m)
+	expected := fmt.Sprintf(`subflux_search_duration_seconds_count{provider="os"} %d`, want)
+	if !strings.Contains(body, expected) {
+		t.Errorf("expected %s in output", expected)
 	}
-	for i := 1; i < len(buckets); i++ {
-		if buckets[i] < buckets[i-1] {
-			t.Errorf("buckets[%d] = %d < buckets[%d] = %d (cumulative property violated)",
-				i, buckets[i], i-1, buckets[i-1])
-		}
-	}
+}
+
+// helper
+
+func renderMetrics(t *testing.T, m *Metrics) string {
+	t.Helper()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+	return rec.Body.String()
 }

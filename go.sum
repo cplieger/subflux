@@ -1,7 +1,7 @@
 github.com/coreos/go-oidc/v3 v3.18.0 h1:V9orjXynvu5wiC9SemFTWnG4F45v403aIcjWo0d41+A=
 github.com/coreos/go-oidc/v3 v3.18.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/ssrf v1.0.0 h1:xn0HFG+RcCaB2fGSAiHJq7LwlwxAkCH3aY2CCDrH8r0=
-github.com/cplieger/ssrf v1.0.0/go.mod h1:eCiJVzVWRqafzuk64RDRuGCZgmepWxAR/CC/5pXwmQc=
+github.com/cplieger/metrics v1.0.0 h1:xPM4O19+K8hBM4+RY/x7V2Qm+4kpbEnykBDM3/pg4+w=
+github.com/cplieger/metrics v1.0.0/go.mod h1:Q+d/UoGECpuuyJ2runs5dU+H8p5ZVI+EwcjQtVZReaM=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=

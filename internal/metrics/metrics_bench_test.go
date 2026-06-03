@@ -12,13 +12,9 @@ import (
 	"subflux/internal/api"
 )
 
-// BenchmarkRecordSearch measures the hot path of RecordSearch with both
-// registered (fast path: atomic load + map lookup) and new (slow path:
-// copy-on-write) provider scenarios.
 func BenchmarkRecordSearch(b *testing.B) {
 	m := New()
 
-	// Pre-populate providers for the registered sub-benchmark.
 	prePopulated := []api.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
 	for _, p := range prePopulated {
 		m.RecordSearch(p, time.Millisecond, nil)
@@ -45,13 +41,9 @@ func BenchmarkRecordSearch(b *testing.B) {
 	})
 }
 
-// BenchmarkHandler measures Prometheus text serialization throughput for
-// a realistic metrics state (multiple providers with searches, downloads,
-// errors, and scan data populated).
 func BenchmarkHandler(b *testing.B) {
 	m := New()
 
-	// Populate realistic metrics state.
 	providers := []api.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
 	for _, p := range providers {
 		for range 100 {
