@@ -82,6 +82,11 @@ func decodeUTF16BE(data []byte) []byte { return decodeUTF16(data, true) }
 // big-endian byte order, false for little-endian. Lone surrogates are
 // replaced with U+FFFD by WriteRune.
 func decodeUTF16(data []byte, bigEndian bool) []byte {
+	if len(data) < 2 {
+		// No code units to decode (e.g. lone BOM with no payload). Return a
+		// non-nil empty slice so callers don't have to special-case nil.
+		return []byte{}
+	}
 	var buf bytes.Buffer
 	buf.Grow(len(data)) // rough estimate
 
@@ -111,6 +116,9 @@ func decodeUTF16(data []byte, bigEndian bool) []byte {
 // Windows-1252 is a superset of ISO-8859-1 with printable characters
 // in the 0x80-0x9F range (where ISO-8859-1 has control characters).
 func decodeWindows1252(data []byte) []byte {
+	if len(data) == 0 {
+		return []byte{}
+	}
 	var buf bytes.Buffer
 	buf.Grow(len(data)) // most bytes are ASCII (1:1); non-ASCII expand slightly
 
