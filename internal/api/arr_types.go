@@ -158,6 +158,13 @@ func (h *HistoryEventType) UnmarshalJSON(data []byte) error {
 	// Try integer first (Sonarr). Also handles JSON null (unmarshals to 0).
 	var n int
 	if err := json.Unmarshal(data, &n); err == nil {
+		if n < 0 {
+			// Negative event types are nonsensical (the *arr APIs only emit
+			// positive ints). Treat as unknown rather than propagating a
+			// negative HistoryEventType that could confuse callers.
+			*h = 0
+			return nil
+		}
 		*h = HistoryEventType(n)
 		return nil
 	}

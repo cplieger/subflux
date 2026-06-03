@@ -23,7 +23,7 @@ func TestHistoryEventType_UnmarshalJSON(t *testing.T) {
 		{"sonarr integer imported", `3`, HistoryImported, false},
 		{"sonarr integer deleted", `5`, historyFileDeleted, false},
 		{"sonarr integer zero", `0`, 0, false},
-		{"sonarr integer negative", `-1`, -1, false},
+		{"sonarr integer negative", `-1`, 0, false}, // negative ints normalize to 0 (treat as unknown)
 		{"sonarr integer large", `999`, 999, false},
 		{"radarr string imported", `"downloadFolderImported"`, HistoryImported, false},
 		{"radarr string deleted", `"movieFileDeleted"`, historyFileDeleted, false},
@@ -474,7 +474,7 @@ func TestHistoryEventType_UnmarshalJSON_sonarr_round_trip(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		n := rapid.IntRange(-1000, 1000).Draw(t, "event_type")
+		n := rapid.IntRange(0, 1000).Draw(t, "event_type")
 		data, err := json.Marshal(n)
 		if err != nil {
 			t.Fatalf("json.Marshal(%d) error: %v", n, err)
@@ -488,6 +488,23 @@ func TestHistoryEventType_UnmarshalJSON_sonarr_round_trip(t *testing.T) {
 		}
 		if int(got) != n {
 			t.Errorf("UnmarshalJSON(%s) = %d, want %d", data, got, n)
+		}
+	})
+
+	// Negative ints normalize to 0 (treat as unknown event type) rather than
+	// round-tripping. The arr APIs only emit non-negative event types.
+	rapid.Check(t, func(t *rapid.T) {
+		n := rapid.IntRange(-1000, -1).Draw(t, "negative_event_type")
+		data, err := json.Marshal(n)
+		if err != nil {
+			t.Fatalf("json.Marshal(%d) error: %v", n, err)
+		}
+		var got HistoryEventType
+		if err := got.UnmarshalJSON(data); err != nil {
+			t.Fatalf("UnmarshalJSON(%s) error: %v", data, err)
+		}
+		if got != 0 {
+			t.Errorf("UnmarshalJSON(%s) = %d, want 0 (negative-normalize)", data, got)
 		}
 	})
 }
