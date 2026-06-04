@@ -8,7 +8,7 @@
 // Centralising the action defs here means both dispatch sites get identical
 // retry/dedupe/error semantics without duplicating the request shape.
 
-import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import type { AudioSyncResponse } from "./api-types.js";
 
 export interface AudioSyncArgs {

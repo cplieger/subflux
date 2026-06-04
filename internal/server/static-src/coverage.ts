@@ -3,7 +3,7 @@
 import * as store from "./store.js";
 import { $, el, text, icon, patch, errDiv, input, select, insertNavButton } from "./dom.js";
 import { apiGetTyped } from "./api-client.js";
-import { registerCleanup } from "./actions/index.js";
+import { registerCleanup } from "@cplieger/actions";
 import { decodeSeriesItem, decodeMovieItem } from "./wire/decoders.gen.js";
 import { decodeArray } from "./validators.js";
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from "./utils.js";

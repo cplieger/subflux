@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, vi, beforeEach } from "vitest";
 
-vi.mock("./actions/index.js", () => ({
+vi.mock("@cplieger/actions", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue([]) })),
   retryNetwork: vi.fn((fn: unknown) => fn),
   RETRY_STANDARD: {},

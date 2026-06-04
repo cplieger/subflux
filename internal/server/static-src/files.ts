@@ -4,7 +4,7 @@ import * as notify from "./notify.js";
 import * as store from "./store.js";
 import { $, el, icon, patch, emptyDiv, errDiv, confirm } from "./dom.js";
 import { apiGet } from "./api-client.js";
-import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { fmtEpisode, langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { emit, BusEvent } from "./bus.js";

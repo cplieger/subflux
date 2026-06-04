@@ -10,7 +10,7 @@
 // with the inline icon-on-button pattern (we set `error: false`).
 
 import * as store from "./store.js";
-import { apiAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import type { SeriesItem, MovieDetail } from "./api-types.js";
 
 interface ScanResponse {

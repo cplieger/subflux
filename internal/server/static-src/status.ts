@@ -4,7 +4,7 @@ import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { el, text, icon, $ } from "./dom.js";
 import { apiGet, apiGetTyped } from "./api-client.js";
-import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "./actions/index.js";
+import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { decodeStats, decodeProvidersResponse } from "./wire/decoders.gen.js";
 import type {
   Stats as StatsType,

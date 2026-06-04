@@ -8,7 +8,7 @@ import {
   retryNetwork,
   RETRY_STANDARD,
   registerCleanup,
-} from "./actions/index.js";
+} from "@cplieger/actions";
 import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
 import { el, option } from "./dom.js";

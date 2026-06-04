@@ -5,7 +5,7 @@ vi.mock("./api-client.js", () => ({
   apiGet: vi.fn().mockResolvedValue(null),
   apiPostRaw: vi.fn().mockResolvedValue({ ok: true, data: null }),
 }));
-vi.mock("./actions/index.js", () => ({
+vi.mock("@cplieger/actions", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue({ ok: true }) })),
   retryNetwork: vi.fn((fn: unknown) => fn),
   RETRY_STANDARD: {},
