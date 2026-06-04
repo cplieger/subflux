@@ -1,6 +1,9 @@
 package cliparse
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func FuzzParseArgs(f *testing.F) {
 	f.Add("--lang en --season 1")
@@ -37,13 +40,7 @@ func FuzzParseArgs(f *testing.F) {
 			}
 		}
 		// download flag consistency
-		found := false
-		for _, a := range args {
-			if a == "--download" {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(args, "--download")
 		if found != dl {
 			t.Errorf("download mismatch: found=%v dl=%v", found, dl)
 		}
