@@ -6,12 +6,8 @@ ARG FFMPEG_VERSION=8.1
 # renovate: datasource=git-refs depName=https://code.videolan.org/videolan/x264.git currentValue=stable
 ARG X264_COMMIT=4613ac3c
 
-# --- Cross-compilation support (native arm64 builds, no QEMU) ---
-# renovate: datasource=docker depName=tonistiigi/xx
-FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.9.0@sha256:c64defb9ed5a91eacb37f96ccc3d4cd72521c4bd18d5442905b95e2226b0e707 AS xx
-
-# --- Source downloads (shared across platforms, cached independently) ---
-FROM --platform=$BUILDPLATFORM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS sources
+# --- Source downloads (cached independently) ---
+FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 ARG FFMPEG_VERSION=8.1
@@ -37,27 +33,19 @@ RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
 # Produces ~5MB ffmpeg + ~2MB ffprobe. No network, no HW accel.
-# Native cross-compilation via xx (no QEMU for C builds).
-FROM --platform=$BUILDPLATFORM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ffmpeg-builder
+FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ffmpeg-builder
 
-COPY --from=xx / /
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-ARG TARGETPLATFORM
 
 # hadolint ignore=DL3018
-RUN apk add --no-cache build-base yasm nasm bash pkgconf clang lld \
-    && xx-apk add --no-cache gcc musl-dev linux-headers
+RUN apk add --no-cache build-base yasm nasm bash pkgconf clang lld gcc musl-dev linux-headers
 
 # Build x264 as a static library (Alpine has no x264-static package).
-# CC=xx-clang for cross-compilation; STRIP=true to skip .o stripping
-# (host strip can't process cross-arch objects). Host ar/ranlib are
-# arch-agnostic for static archives.
 COPY --from=sources /tmp/x264-stable /tmp/x264-stable
 WORKDIR /tmp/x264-stable
-RUN export CC=xx-clang STRIP=true \
+RUN export CC=clang \
     && bash ./configure --enable-static --disable-cli --disable-opencl \
         --prefix=/usr/local \
-        --host="$(xx-clang --print-target-triple)" \
     && make -j"$(nproc)" \
     && make install \
     && rm -rf /tmp/x264-stable
@@ -67,10 +55,6 @@ RUN export CC=xx-clang STRIP=true \
 # Subtitle decoders: SRT, ASS, MOV text, WebVTT, PGS, DVD, DVB.
 # Video encoder: libx264 only (360p ultrafast preview). Audio encoder: AAC + PCM.
 # Filters: scale (resize), aresample, aformat. Muxer: MP4 (fMP4 streaming).
-# --strip=true: skip post-link stripping (host strip can't process cross-arch
-# binaries). -s in extra-ldflags strips at link time via lld instead.
-# ffmpeg's Makefile with STRIPTYPE=direct runs "true -o ffmpeg ffmpeg_g" which
-# is a no-op (true ignores args), so we cp the _g binaries after make.
 COPY --from=sources /tmp/ffmpeg /tmp/ffmpeg
 WORKDIR /tmp/ffmpeg
 RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
@@ -85,11 +69,6 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
         --enable-gpl --enable-libx264 \
         --disable-runtime-cpudetect --disable-pixelutils \
         --enable-swscale \
-        --enable-cross-compile \
-        --target-os=linux \
-        --arch="$(xx-info arch)" \
-        --cc=xx-clang \
-        --strip=true \
         --extra-ldflags="-static -fuse-ld=lld -s" \
         --enable-filter=aresample,anull,aformat,scale \
         --enable-demuxer=matroska,mov,mp3,flac,ogg,wav,aac,ac3,eac3,dts,dtshd,srt,ass,avi,mpegts,webvtt,flv \
@@ -115,7 +94,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 # Plain alpine here (not golang-alpine) because nothing in this stage needs
 # Go — tsgo is a self-contained native binary. See .github/renovate.json
 # for the followTag rule.
-FROM --platform=$BUILDPLATFORM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ts-builder
+FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018
@@ -165,12 +144,10 @@ RUN /tmp/package/lib/tsgo --project tsconfig.json && \
         node_modules/@cplieger/reactive/src/*.ts
 
 # --- Go build ---
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
+FROM golang:1.26-alpine@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
 ENV GOTOOLCHAIN=auto
 
 WORKDIR /src
-ARG TARGETOS
-ARG TARGETARCH
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
@@ -202,7 +179,7 @@ RUN set -eu; \
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    CGO_ENABLED=0 \
     go build -trimpath -ldflags="-s -w" -o /subflux .
 
 # --- Final image ---
