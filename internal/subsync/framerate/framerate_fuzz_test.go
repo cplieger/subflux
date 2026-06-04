@@ -15,7 +15,7 @@ func FuzzLinearRegression(f *testing.F) {
 	f.Fuzz(func(t *testing.T, t1, d1, t2, d2, t3, d3 float64) {
 		for _, v := range []float64{t1, d1, t2, d2, t3, d3} {
 			if math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > 1e15 {
-				return
+				t.Skip()
 			}
 		}
 		points := []DriftPoint{
