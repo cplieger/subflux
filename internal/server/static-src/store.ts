@@ -1,8 +1,8 @@
-// Reactive state container — backed by shared lib/reactive/store.
+// Reactive state container — backed by @cplieger/reactive store.
 // API is unchanged: get, set, batch, subscribe, effect, computed.
 
 import type { CoverageItem, SeriesItem, SeasonGroup } from "./api-types.js";
-import { createStore } from "./lib/reactive/store.js";
+import { createStore } from "@cplieger/reactive";
 
 // --- Typed store key registry ---
 

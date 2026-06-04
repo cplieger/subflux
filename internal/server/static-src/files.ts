@@ -10,7 +10,7 @@ import { DEFAULT_VARIANT } from "./constants.js";
 import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
 import type { MediaType } from "./api-types.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 
 // --- API response shapes ---
 

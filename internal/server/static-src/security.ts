@@ -12,7 +12,7 @@ import {
   patch,
   confirm,
 } from "./dom.js";
-import { reconcile } from "./lib/reactive/reconcile.js";
+import { reconcile } from "@cplieger/reactive";
 import {
   apiGet,
   apiPost,
