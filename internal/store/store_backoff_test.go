@@ -38,8 +38,10 @@ func TestRecordNoResult_delay_increases_with_multiplier(t *testing.T) {
 
 	expectedDelay := initialDelay
 	actualDelay := time.Until(nextRetry)
-	if actualDelay < expectedDelay-time.Second || actualDelay > expectedDelay+time.Second {
-		t.Errorf("first failure delay = %v, want ~%v", actualDelay, expectedDelay)
+	// Tolerance: ±3s. The 1s tolerance was too tight under CI load — observed
+	// delays of 18.997s when expectedDelay was 20s on slow runners.
+	if actualDelay < expectedDelay-3*time.Second || actualDelay > expectedDelay+3*time.Second {
+		t.Errorf("first failure delay = %v, want ~%v (±3s)", actualDelay, expectedDelay)
 	}
 
 	if err := db.RecordNoResult(context.Background(), "movie", "tt123", "fr", "testprov",
@@ -58,8 +60,8 @@ func TestRecordNoResult_delay_increases_with_multiplier(t *testing.T) {
 
 	expectedDelay = 20 * time.Second
 	actualDelay = time.Until(nextRetry)
-	if actualDelay < expectedDelay-time.Second || actualDelay > expectedDelay+time.Second {
-		t.Errorf("second failure delay = %v, want ~%v", actualDelay, expectedDelay)
+	if actualDelay < expectedDelay-3*time.Second || actualDelay > expectedDelay+3*time.Second {
+		t.Errorf("second failure delay = %v, want ~%v (±3s)", actualDelay, expectedDelay)
 	}
 }
 
