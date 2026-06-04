@@ -152,13 +152,13 @@ RUN mkdir -p node_modules/@cplieger/reactive && \
 # (see internal/server/static/index.html).
 RUN /tmp/package/lib/tsgo --project tsconfig.json && \
     /tmp/package/lib/tsgo \
-        --module ESNext --target ESNext --moduleResolution bundler \
+        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-actions \
         --rootDir node_modules/@cplieger/actions/src \
         --skipLibCheck --strict \
         node_modules/@cplieger/actions/src/*.ts && \
     /tmp/package/lib/tsgo \
-        --module ESNext --target ESNext --moduleResolution bundler \
+        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-reactive \
         --rootDir node_modules/@cplieger/reactive/src \
         --skipLibCheck --strict \
