@@ -87,16 +87,16 @@ func TestHTTPStatusError_preserves_wire_format(t *testing.T) {
 func TestIsTransient_api_errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name string
 		err  error
+		name string
 		want bool
 	}{
-		{"nil", nil, false},
-		{"api.AuthError not transient", &api.AuthError{Msg: "bad"}, false},
-		{"api.RateLimitError not transient", &api.RateLimitError{Msg: "slow"}, false},
-		{"httpx.HTTPStatusError 502 transient", &httpx.HTTPStatusError{Code: 502}, true},
-		{"httpx.HTTPStatusError 400 not transient", &httpx.HTTPStatusError{Code: 400}, false},
-		{"generic error not transient", errors.New("something"), false},
+		{name: "nil", err: nil, want: false},
+		{name: "api.AuthError not transient", err: &api.AuthError{Msg: "bad"}, want: false},
+		{name: "api.RateLimitError not transient", err: &api.RateLimitError{Msg: "slow"}, want: false},
+		{name: "httpx.HTTPStatusError 502 transient", err: &httpx.HTTPStatusError{Code: 502}, want: true},
+		{name: "httpx.HTTPStatusError 400 not transient", err: &httpx.HTTPStatusError{Code: 400}, want: false},
+		{name: "generic error not transient", err: errors.New("something"), want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
