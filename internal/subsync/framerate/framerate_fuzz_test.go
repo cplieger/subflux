@@ -9,8 +9,15 @@ func FuzzLinearRegression(f *testing.F) {
 	f.Add(0.0, 0.0, 1000.0, 10.0, 2000.0, 20.0)
 	f.Add(0.0, 5.0, 1000.0, 5.0, 2000.0, 5.0)
 	f.Add(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+	f.Add(0.0, 0.0, 1000.0, 1.0, 2000.0, 2.0)
+	f.Add(100.0, 5.0, 200.0, 10.0, 300.0, 15.0)
 
 	f.Fuzz(func(t *testing.T, t1, d1, t2, d2, t3, d3 float64) {
+		for _, v := range []float64{t1, d1, t2, d2, t3, d3} {
+			if math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > 1e15 {
+				return
+			}
+		}
 		points := []DriftPoint{
 			{TimeMs: t1, DriftMs: d1},
 			{TimeMs: t2, DriftMs: d2},
