@@ -167,3 +167,22 @@ func RetryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time
 		return result, err
 	})
 }
+
+// JitteredBackoff returns a randomized duration in [d/2, d) used between
+// retry attempts. Thin re-export of httpx.JitteredBackoff so callers in
+// internal/provider continue to import a single httputil package.
+func JitteredBackoff(d time.Duration) time.Duration {
+	return httpx.JitteredBackoff(d)
+}
+
+// SafeDouble doubles a duration, capped at the maximum representable
+// time.Duration to avoid overflow. Thin re-export of httpx.SafeDouble.
+func SafeDouble(d time.Duration) time.Duration {
+	return httpx.SafeDouble(d)
+}
+
+// SleepCtx sleeps for d or until ctx is canceled, whichever comes first.
+// Returns ctx.Err() on cancel, nil on completion. Thin re-export.
+func SleepCtx(ctx context.Context, d time.Duration) error {
+	return httpx.SleepCtx(ctx, d)
+}
