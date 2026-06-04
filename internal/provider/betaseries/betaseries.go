@@ -17,7 +17,7 @@ import (
 	"subflux/internal/api"
 	"subflux/internal/httputil"
 	"subflux/internal/provider"
-	"subflux/internal/ssrf"
+	"github.com/cplieger/ssrf"
 )
 
 const sourceSeriessub = "seriessub"

@@ -18,7 +18,7 @@ import (
 	"subflux/internal/httputil"
 	"subflux/internal/provider"
 	"subflux/internal/provider/classify"
-	"subflux/internal/ssrf"
+	"github.com/cplieger/ssrf"
 )
 
 const langBrazilianPT = "Brazilian Portuguese"
