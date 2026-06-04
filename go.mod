@@ -4,11 +4,11 @@ go 1.26.4
 
 require (
 	github.com/coreos/go-oidc/v3 v3.18.0
-	github.com/cplieger/auth v1.0.1
-	github.com/cplieger/health v1.0.1
-	github.com/cplieger/httpx v1.0.1
-	github.com/cplieger/metrics v1.0.1
-	github.com/cplieger/ssrf v1.0.1
+	github.com/cplieger/auth v1.0.3
+	github.com/cplieger/health v1.0.2
+	github.com/cplieger/httpx v1.0.2
+	github.com/cplieger/metrics v1.0.2
+	github.com/cplieger/ssrf v1.0.2
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.3
 	github.com/ulikunitz/xz v0.5.15
