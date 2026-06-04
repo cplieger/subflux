@@ -129,7 +129,40 @@ RUN curl -fsSL \
 
 WORKDIR /src/static-src
 COPY internal/server/static-src/ ./
-RUN /tmp/package/lib/tsgo --project tsconfig.json
+
+# Fetch @cplieger/actions and @cplieger/reactive TS source from npm registry
+# so tsgo can resolve the `import ... from "@cplieger/<lib>"` statements at
+# build time. Each lib publishes TS source only — same pattern as vibekit /
+# vibecli. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsgo's
+# bundler resolution finds the package + its types.
+# renovate: datasource=npm depName=@cplieger/actions
+ARG CPLIEGER_ACTIONS_VERSION=1.1.0
+RUN mkdir -p node_modules/@cplieger/actions && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/actions --strip-components=1
+# renovate: datasource=npm depName=@cplieger/reactive
+ARG CPLIEGER_REACTIVE_VERSION=1.0.2
+RUN mkdir -p node_modules/@cplieger/reactive && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/reactive --strip-components=1
+
+# Compile app TypeScript and the @cplieger lib TS source in a single layer.
+# App TS emits to ../static via tsconfig.json's outDir; lib TS emits to
+# ../static/vendor/<scope>-<lib>/ for the importmap-based browser resolution
+# (see internal/server/static/index.html).
+RUN /tmp/package/lib/tsgo --project tsconfig.json && \
+    /tmp/package/lib/tsgo \
+        --module ESNext --target ESNext --moduleResolution bundler \
+        --outDir ../static/vendor/cplieger-actions \
+        --rootDir node_modules/@cplieger/actions/src \
+        --skipLibCheck --strict \
+        node_modules/@cplieger/actions/src/*.ts && \
+    /tmp/package/lib/tsgo \
+        --module ESNext --target ESNext --moduleResolution bundler \
+        --outDir ../static/vendor/cplieger-reactive \
+        --rootDir node_modules/@cplieger/reactive/src \
+        --skipLibCheck --strict \
+        node_modules/@cplieger/reactive/src/*.ts
 
 # --- Go build ---
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
