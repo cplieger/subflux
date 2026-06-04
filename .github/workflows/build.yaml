@@ -25,5 +25,4 @@ jobs:
     with:
       registries: "ghcr"
       skip-build-guard: true
-      notify-repo: "cplieger/homelab"
     secrets: inherit
