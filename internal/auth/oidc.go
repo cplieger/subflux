@@ -2,9 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +9,7 @@ import (
 	"subflux/internal/api"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	authoidc "github.com/cplieger/auth/oidc"
 	"golang.org/x/oauth2"
 )
 
@@ -43,31 +41,19 @@ type OIDCProvider struct {
 }
 
 // GeneratePKCE generates a PKCE code verifier and its S256 challenge.
-// The verifier is 32 bytes of crypto/rand, base64url-encoded (no padding).
-// The challenge is SHA-256(verifier), base64url-encoded (no padding).
 func GeneratePKCE() (verifier, challenge string, err error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", "", err
-	}
-	verifier = base64.RawURLEncoding.EncodeToString(b)
-	h := sha256.Sum256([]byte(verifier))
-	challenge = base64.RawURLEncoding.EncodeToString(h[:])
-	return verifier, challenge, nil
+	return authoidc.GeneratePKCE()
 }
 
 // GenerateOIDCState generates a random state string for OIDC flows.
-// Returns 32 bytes from crypto/rand, hex-encoded.
 func GenerateOIDCState() (string, error) {
-	return generateRandomHex(32)
+	return authoidc.GenerateState()
 }
 
-// oidcHTTPTimeout is the maximum time allowed for outbound OIDC HTTP calls
-// (discovery and code exchange).
+// oidcHTTPTimeout is the maximum time allowed for outbound OIDC HTTP calls.
 const oidcHTTPTimeout = 10 * time.Second
 
 // ValidateOIDCConfig checks that the required fields of an OIDCConfig are set.
-// Returns an error wrapping ErrOIDCConfigInvalid if any field is missing.
 func ValidateOIDCConfig(cfg api.OIDCConfig) error {
 	if cfg.IssuerURL == "" {
 		return fmt.Errorf("%w: issuer_url is required", ErrOIDCConfigInvalid)
@@ -82,7 +68,6 @@ func ValidateOIDCConfig(cfg api.OIDCConfig) error {
 }
 
 // NewOIDCProvider creates an OIDC provider from config.
-// Performs OIDC discovery (fetches .well-known/openid-configuration).
 func NewOIDCProvider(ctx context.Context, cfg api.OIDCConfig) (*OIDCProvider, error) {
 	if err := ValidateOIDCConfig(cfg); err != nil {
 		return nil, err
@@ -126,7 +111,6 @@ func (p *OIDCProvider) AuthorizationURL(state, nonce, codeChallenge string) stri
 }
 
 // Exchange exchanges an authorization code for tokens and validates the ID token.
-// Returns the verified claims (sub, email, preferred_username, name).
 func (p *OIDCProvider) Exchange(ctx context.Context, code, codeVerifier, nonce string) (*OIDCClaims, *time.Time, error) {
 	ctx, cancel := context.WithTimeout(ctx, oidcHTTPTimeout)
 	defer cancel()
@@ -157,7 +141,6 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, codeVerifier, nonce s
 		return nil, nil, errors.Join(ErrOIDCTokenInvalid, err)
 	}
 
-	// Use token expiry for session lifetime if available.
 	var expiry *time.Time
 	if !token.Expiry.IsZero() {
 		expiry = &token.Expiry
@@ -167,24 +150,11 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, codeVerifier, nonce s
 }
 
 // ResolveOIDCUser maps an OIDC identity to a user by (issuer, sub) only.
-// This is a pure function; the caller handles DB operations.
-//
-// Email and username are deliberately NOT used for matching. They are
-// mutable and attacker-influenceable, and auto-linking an OIDC identity to
-// an existing local account on a matching email/username is a well-known
-// account-takeover vector (e.g. CVE-2026-41574, CVE-2026-44166). The only
-// stable, safe identity key is the (issuer, subject) pair.
-//
-// A nil existingBySub yields a new JIT-provisioned user (role "user"). If the
-// derived username collides with an existing local account, the caller must
-// route through the explicit link-on-login flow (prove the existing password)
-// rather than silently merging.
 func ResolveOIDCUser(claims *OIDCClaims, existingBySub *api.User) (user *api.User, isNew bool) {
 	if existingBySub != nil {
 		return existingBySub, false
 	}
 
-	// Determine username for the new user.
 	username := claims.PreferredUsername
 	if username == "" {
 		username = claims.Email

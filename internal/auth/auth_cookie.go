@@ -2,9 +2,8 @@ package auth
 
 import (
 	"net/http"
-	"strings"
 
-	"subflux/internal/api"
+	authlib "github.com/cplieger/auth"
 )
 
 // Session cookie names.
@@ -16,10 +15,7 @@ const (
 // IsBrowserRequest returns true if the request appears to be from a browser
 // (Accept header contains text/html and no X-API-Key header).
 func IsBrowserRequest(r *http.Request) bool {
-	if r.Header.Get(api.HeaderXAPIKey) != "" {
-		return false
-	}
-	return strings.Contains(r.Header.Get("Accept"), "text/html")
+	return authlib.IsBrowserRequest(r)
 }
 
 // isHTTPS returns true if the request arrived over HTTPS.
@@ -43,10 +39,6 @@ func SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, maxA
 	if secure {
 		name = CookieNameSecure
 	}
-	// gosec:G124 flags the conditional Secure attribute. This is
-	// intentional: LAN HTTP deployments need a working session cookie,
-	// and the caller selects the cookie name (__Host- prefix) and
-	// HttpOnly + SameSite unconditionally. Over HTTPS, Secure is set.
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure is conditional for LAN HTTP support; HttpOnly+SameSite always set
 		Name:     name,
 		Value:    token,
