@@ -31,6 +31,7 @@ import (
 	"subflux/internal/store"
 	"subflux/internal/wiring"
 
+	"github.com/cplieger/health"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -49,12 +50,12 @@ var defaultConfig []byte
 // marker is the package-level health marker. Initialised lazily via
 // ensureMarker() at server startup so CLI subcommands (which never touch
 // the marker) don't probe the filesystem.
-var marker *healthMarker
+var marker *health.Marker
 
 // ensureMarker lazily constructs the package-level health marker.
-func ensureMarker() *healthMarker {
+func ensureMarker() *health.Marker {
 	if marker == nil {
-		marker = newHealthMarker(healthMarkerPath)
+		marker = health.NewMarker(health.DefaultPath)
 	}
 	return marker
 }
@@ -78,7 +79,7 @@ func run() int {
 	// CLI health probe for Docker healthcheck (distroless has no curl/wget).
 	// Checks for a marker file instead of making an HTTP request; no port needed.
 	if len(os.Args) > 1 && os.Args[1] == "health" {
-		runProbe(healthMarkerPath)
+		health.RunProbe(health.DefaultPath)
 	}
 
 	// Root help: `subflux --help` or `subflux -h`. The no-arg case is
