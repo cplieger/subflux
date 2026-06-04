@@ -1,8 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/stylelintrc",
-  "extends": [
-    "stylelint-config-standard"
-  ],
+  "extends": ["stylelint-config-standard"],
   "defaultSeverity": "error",
   "reportDescriptionlessDisables": true,
   "reportInvalidScopeDisables": true,
@@ -16,10 +14,7 @@
     "max-nesting-depth": [
       4,
       {
-        "ignore": [
-          "blockless-at-rules",
-          "pseudo-classes"
-        ]
+        "ignore": ["blockless-at-rules", "pseudo-classes"]
       }
     ],
     "no-unknown-animations": true,
@@ -39,10 +34,7 @@
     "selector-no-qualifying-type": [
       true,
       {
-        "ignore": [
-          "attribute",
-          "class"
-        ]
+        "ignore": ["attribute", "class"]
       }
     ],
     "selector-max-compound-selectors": 5,
@@ -56,20 +48,13 @@
     "property-no-vendor-prefix": [
       true,
       {
-        "ignoreProperties": [
-          "text-size-adjust",
-          "font-smoothing",
-          "tap-highlight-color"
-        ]
+        "ignoreProperties": ["text-size-adjust", "font-smoothing", "tap-highlight-color"]
       }
     ],
     "value-no-vendor-prefix": [
       true,
       {
-        "ignoreValues": [
-          "box",
-          "inline-box"
-        ]
+        "ignoreValues": ["box", "inline-box"]
       }
     ],
     "selector-no-vendor-prefix": true,
