@@ -1,6 +1,8 @@
 package cliparse
 
 import (
+	"bytes"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -8,62 +10,130 @@ import (
 func FuzzParseArgs(f *testing.F) {
 	f.Add("--host localhost --port 8080")
 	f.Add("--download --lang en")
+	f.Add("--lang en --season 1")
+	f.Add("--lang en --imdb tt1234567")
+	f.Add("--download")
 	f.Add("")
 	f.Add("--key=value")
 	f.Add("--flag")
+	f.Add("-- --value")
+	f.Add("--flag value --another thing")
 
-	f.Fuzz(func(t *testing.T, input string) {
-		args := strings.Fields(input)
-		params, _ := ParseArgs(args)
+	f.Fuzz(func(t *testing.T, raw string) {
+		var args []string
+		if raw != "" {
+			cur := ""
+			for _, c := range raw {
+				if c == ' ' {
+					if cur != "" {
+						args = append(args, cur)
+						cur = ""
+					}
+				} else {
+					cur += string(c)
+				}
+			}
+			if cur != "" {
+				args = append(args, cur)
+			}
+		}
+		params, dl := ParseArgs(args)
 		if params == nil {
-			t.Fatal("ParseArgs returned nil map")
+			t.Fatal("params should never be nil")
+		}
+		for k := range params {
+			if k == "" {
+				t.Error("empty key in params")
+			}
+		}
+		// download flag consistency
+		found := slices.Contains(args, "--download")
+		if found != dl {
+			t.Errorf("download mismatch: found=%v dl=%v", found, dl)
+		}
+	})
+}
+
+func FuzzEditDistance(f *testing.F) {
+	f.Add("abc", "abc")
+	f.Add("", "hello")
+	f.Add("kitten", "sitting")
+	f.Add("a", "b")
+	f.Add("host", "hst")
+	f.Add("", "abc")
+	f.Add("abc", "")
+	f.Add("same", "same")
+	f.Add("hello", "helo")
+
+	f.Fuzz(func(t *testing.T, a, b string) {
+		d := editDistance(a, b)
+		if d < 0 {
+			t.Errorf("editDistance(%q,%q) = %d < 0", a, b, d)
+		}
+		if editDistance(a, a) != 0 {
+			t.Errorf("editDistance(%q,%q) != 0", a, a)
+		}
+		if a == "" && d != len(b) {
+			t.Errorf("editDistance(\"\",%q) = %d, want %d", b, d, len(b))
+		}
+		// symmetry
+		dba := editDistance(b, a)
+		if d != dba {
+			t.Errorf("editDistance(%q,%q)=%d != editDistance(%q,%q)=%d", a, b, d, b, a, dba)
 		}
 	})
 }
 
 func FuzzValidate(f *testing.F) {
-	f.Add("--host localhost --port 8080", "host", "localhost", "port", "8080")
-	f.Add("--unknown foo", "", "", "", "")
-	f.Add("--hst localhost", "", "", "", "")
-
+	f.Add("--host localhost --port 8080")
+	f.Add("--lang en --season 1")
+	f.Add("--lang en --imdb tt1234567")
+	f.Add("--unknown foo")
+	f.Add("--unknown-flag value")
+	f.Add("")
+	f.Add("--help")
+	f.Add("--hlp")
 	spec := &Spec{
 		Name: "test",
 		Flags: []Flag{
 			{Name: "host", Type: "string"},
+			{Name: "lang", Type: "string"},
+			{Name: "imdb", Type: "string"},
 			{Name: "port", Type: "int"},
+			{Name: "season", Type: "int"},
+			{Name: "count", Type: "int"},
 			{Name: "timeout", Type: "duration"},
 			{Name: "verbose", Type: "bool"},
+			{Name: "download", Type: "bool"},
 		},
 	}
-
-	f.Fuzz(func(t *testing.T, rawArgs, k1, v1, k2, v2 string) {
-		args := strings.Fields(rawArgs)
-		params := make(map[string]string)
-		if k1 != "" {
-			params[k1] = v1
-		}
-		if k2 != "" {
-			params[k2] = v2
-		}
-		// Must not panic.
+	f.Fuzz(func(t *testing.T, raw string) {
+		args := strings.Fields(raw)
+		params, _ := ParseArgs(args)
+		// Should never panic
 		_ = Validate(args, params, spec)
 	})
 }
 
-func FuzzEditDistance(f *testing.F) {
-	f.Add("host", "hst")
-	f.Add("", "abc")
-	f.Add("abc", "")
-	f.Add("same", "same")
+func FuzzPrintHelp(f *testing.F) {
+	f.Add("search", "Search for subtitles", "lang", "string")
+	f.Fuzz(func(t *testing.T, name, synopsis, flagName, flagType string) {
+		spec := &Spec{
+			Name:     name,
+			Synopsis: synopsis,
+			Flags:    []Flag{{Name: flagName, Type: flagType}},
+		}
+		var buf bytes.Buffer
+		// Must not panic.
+		PrintHelp(&buf, spec)
+	})
+}
 
-	f.Fuzz(func(t *testing.T, a, b string) {
-		d := editDistance(a, b)
-		if d < 0 {
-			t.Fatalf("editDistance(%q, %q) = %d, want >= 0", a, b, d)
-		}
-		// Symmetry property.
-		if d != editDistance(b, a) {
-			t.Fatalf("editDistance not symmetric: (%q,%q)=%d vs (%q,%q)=%d", a, b, d, b, a, editDistance(b, a))
-		}
+func FuzzSuggestName(f *testing.F) {
+	f.Add("serch", "search,sync,scan,backup,health")
+	f.Fuzz(func(t *testing.T, input, candidatesStr string) {
+		candidates := strings.Fields(candidatesStr)
+		// Must not panic.
+		_, _ = SuggestName(input, candidates)
 	})
 }
