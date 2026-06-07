@@ -115,7 +115,7 @@ COPY internal/server/static-src/ ./
 # vibecli. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsgo's
 # bundler resolution finds the package + its types.
 # renovate: datasource=npm depName=@cplieger/actions
-ARG CPLIEGER_ACTIONS_VERSION=1.1.2
+ARG CPLIEGER_ACTIONS_VERSION=1.1.3
 RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/actions --strip-components=1
