@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *DB satisfies api.ManualLockStore.

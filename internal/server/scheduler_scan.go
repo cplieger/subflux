@@ -5,10 +5,10 @@
 package server
 
 import (
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/server/scanning"
-	"subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // scanDeps builds the scanning.Deps from Server fields.

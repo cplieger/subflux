@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // Compile-time assertion: *StatusError satisfies api.Transient.
@@ -104,6 +104,7 @@ func (c *Client) get(ctx context.Context, path string) (*http.Response, error) {
 
 // retryWithBackoff delegates to httputil.RetryWithBackoff for shared retry logic.
 func retryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time.Duration,
-	label string, fn func(ctx context.Context) (T, error)) (T, error) {
+	label string, fn func(ctx context.Context) (T, error),
+) (T, error) {
 	return httputil.RetryWithBackoff(ctx, maxRetries, baseDelay, label, fn)
 }

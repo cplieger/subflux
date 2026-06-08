@@ -242,7 +242,7 @@ func overlapTotal(corrSpans, refSpans []TimeSpan) (totalOverlap, totalRef float6
 			}
 		}
 	}
-	return
+	return totalOverlap, totalRef
 }
 
 // segmentConfidence computes overall confidence by measuring how well

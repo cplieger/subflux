@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 const valTrue = "true"

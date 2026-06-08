@@ -7,9 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/api"
-
 	extmetrics "github.com/cplieger/metrics"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // BucketBounds are the histogram boundaries in seconds. Tuned for the

@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 // numbering represents one (season, episode) pair to search.
@@ -67,8 +67,8 @@ func episodeNumberings(req *api.SearchRequest) []numbering {
 
 // searchNumbering runs a paginated search for a specific (season, episode) pair.
 func (p *Provider) searchNumbering(ctx context.Context, req *api.SearchRequest,
-	season, episode int) ([]api.Subtitle, error) {
-
+	season, episode int,
+) ([]api.Subtitle, error) {
 	maxResults := req.MaxResults
 	if maxResults <= 0 {
 		maxResults = 60
@@ -117,8 +117,8 @@ func (p *Provider) searchNumbering(ctx context.Context, req *api.SearchRequest,
 
 // paginatedSearch runs a paginated search with the given parameters.
 func (p *Provider) paginatedSearch(ctx context.Context, params url.Values,
-	languages []string, maxResults int) ([]api.Subtitle, error) {
-
+	languages []string, maxResults int,
+) ([]api.Subtitle, error) {
 	const maxPages = 3
 	var allResults []api.Subtitle
 	warnPartial := func(page int, err error) {
@@ -184,7 +184,8 @@ func joinOSLangs(langs []string) string {
 // commonSearchParams returns the parameters shared by both ID-based and
 // query-based searches: languages, season/episode numbers, and AI filter.
 func (p *Provider) commonSearchParams(req *api.SearchRequest,
-	season, episode int) url.Values {
+	season, episode int,
+) url.Values {
 	params := url.Values{}
 	params.Set("languages", joinOSLangs(req.Languages))
 	if req.MediaType == api.MediaTypeEpisode {
@@ -202,7 +203,8 @@ func (p *Provider) commonSearchParams(req *api.SearchRequest,
 }
 
 func (p *Provider) buildSearchParams(req *api.SearchRequest,
-	season, episode int) url.Values {
+	season, episode int,
+) url.Values {
 	params := p.commonSearchParams(req, season, episode)
 
 	// Hash.
@@ -236,7 +238,8 @@ func (p *Provider) buildSearchParams(req *api.SearchRequest,
 // instead of an ID. Used as a fallback when ID-based search returns no results
 // (common when Sonarr/Radarr metadata IDs don't match OpenSubtitles' catalog).
 func (p *Provider) buildQueryParams(req *api.SearchRequest,
-	season, episode int) url.Values {
+	season, episode int,
+) url.Values {
 	params := p.commonSearchParams(req, season, episode)
 	params.Set("query", req.Title)
 	return params

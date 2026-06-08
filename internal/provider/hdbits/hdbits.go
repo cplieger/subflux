@@ -17,20 +17,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/cache"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/archive"
+	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/provider/dlcache"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
-
-	"subflux/internal/api"
-	"subflux/internal/cache"
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/provider/archive"
-	"subflux/internal/provider/classify"
-	"subflux/internal/provider/dlcache"
 )
 
-const settingPasskey = "passkey"
-const settingUsername = "username"
+const (
+	settingPasskey  = "passkey"
+	settingUsername = "username"
+)
 
 // --- Constants and factory ---
 
@@ -97,8 +98,10 @@ type Provider struct {
 }
 
 // Compile-time interface checks.
-var _ api.Provider = (*Provider)(nil)
-var _ api.CacheClearer = (*Provider)(nil)
+var (
+	_ api.Provider     = (*Provider)(nil)
+	_ api.CacheClearer = (*Provider)(nil)
+)
 
 // --- Provider API (Name, Search, Download) ---
 

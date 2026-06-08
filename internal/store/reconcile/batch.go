@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // batchDelete collects video paths from entries with missing videos
@@ -23,8 +23,8 @@ func batchDelete(ctx context.Context, db DBTX, entries []Entry) (api.CleanupResu
 // subtitle files are missing. Uses a single transaction for all groups
 // to avoid N+1 transaction overhead.
 func batchReset(ctx context.Context, db DBTX,
-	missing map[GroupKey][]Entry, present map[GroupKey]bool) (int64, error) {
-
+	missing map[GroupKey][]Entry, present map[GroupKey]bool,
+) (int64, error) {
 	if len(missing) == 0 {
 		return 0, nil
 	}

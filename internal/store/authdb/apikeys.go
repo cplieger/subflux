@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // Compile-time assertion: *AuthDB implements api.KeyStore.

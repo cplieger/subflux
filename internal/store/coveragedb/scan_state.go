@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // RecordScanState upserts the scan timestamp and metadata for a media item.

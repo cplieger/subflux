@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // CredentialVerifier resolves an HTTP request to an authenticated user

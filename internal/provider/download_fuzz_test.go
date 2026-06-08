@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzExtractAndValidate exercises ExtractAndValidate with arbitrary data,
@@ -15,9 +15,9 @@ func FuzzExtractAndValidate(f *testing.F) {
 	f.Add([]byte("WEBVTT\n\n00:00.000 --> 00:01.000\nHi"), 1, 1)
 	f.Add([]byte{0x00, 0x01, 0x02, 0x03}, 1, 1)
 	f.Add([]byte("plain text that might look like a subtitle"), 0, 0)
-	f.Add([]byte{'P', 'K', 3, 4, 0, 0, 0, 0}, 1, 1) // ZIP magic
+	f.Add([]byte{'P', 'K', 3, 4, 0, 0, 0, 0}, 1, 1)           // ZIP magic
 	f.Add([]byte{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00}, 1, 1) // RAR magic
-	f.Add(make([]byte, 128), 1, 1) // all zeros
+	f.Add(make([]byte, 128), 1, 1)                            // all zeros
 
 	f.Fuzz(func(t *testing.T, data []byte, season, episode int) {
 		result, err := ExtractAndValidate(data, season, episode)

@@ -39,7 +39,7 @@ import (
 	"net/http"
 	"slices"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.

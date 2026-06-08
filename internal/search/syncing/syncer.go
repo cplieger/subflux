@@ -6,8 +6,8 @@ import (
 	"context"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subsync"
 )
 
 // Subtitle format extensions used for ASS/SSA detection.

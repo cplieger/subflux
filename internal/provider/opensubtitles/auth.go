@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/httputil"
 	"github.com/cplieger/ssrf"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 const (
 	settingUsername = "username"
-	hostOpenSubs   = "opensubtitles.com"
-	langPtBR       = "pt-BR"
+	hostOpenSubs    = "opensubtitles.com"
+	langPtBR        = "pt-BR"
 )
 
 // --- Authentication ---

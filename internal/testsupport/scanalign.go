@@ -110,7 +110,3 @@ type AlignmentResult struct {
 	// for args that point outside the sample struct (local variables).
 	Fields []string
 }
-
-
-
-

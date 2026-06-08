@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // scanSeries scans all episodes in a series.
@@ -24,8 +24,8 @@ func (h *Handler) scanSeason(ctx context.Context, seriesID, seasonNum int) int {
 
 // scanEpisodes fetches episodes for a series and scans those matching the filter.
 func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
-	filterEp func(*api.Episode) bool) int {
-
+	filterEp func(*api.Episode) bool,
+) int {
 	st := h.deps.StateFunc()
 	if st.Sonarr == nil {
 		return 0
@@ -112,8 +112,8 @@ func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
 
 // scanSingleEpisode scans a single episode asynchronously.
 func (h *Handler) scanSingleEpisode(ctx context.Context,
-	seriesID, seasonNum, episodeNum int) {
-
+	seriesID, seasonNum, episodeNum int,
+) {
 	st := h.deps.StateFunc()
 	if st.Sonarr == nil {
 		return

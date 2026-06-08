@@ -16,8 +16,8 @@ func FuzzFromMap(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, k1, v1, k2, v2 string, boolVal bool, intVal int64, floatVal float64) {
 		settings := map[string]any{
-			k1: v1,
-			k2: boolVal,
+			k1:            v1,
+			k2:            boolVal,
 			"extra_int":   intVal,
 			"extra_float": floatVal,
 		}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func BenchmarkRender_20_metrics(b *testing.B) {

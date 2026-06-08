@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestRecordScanState_inserts_new_record(t *testing.T) {

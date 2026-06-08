@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- GET /api/auth/apikeys ---

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
 )
 
 func makeBenchSubs(n int) []api.Subtitle {

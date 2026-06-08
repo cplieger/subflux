@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // CleanupDrift applies DB cleanup for config changes.

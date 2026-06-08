@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
 )
 
 // --- Provider sweep ---
@@ -19,8 +18,8 @@ import (
 // searchProvider executes a single provider search and classifies the outcome.
 // If trackTimeout is true, failures/successes are recorded in the timeout tracker.
 func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
-	req *api.SearchRequest, trackTimeout bool) ([]api.Subtitle, api.ProviderID, error) {
-
+	req *api.SearchRequest, trackTimeout bool,
+) ([]api.Subtitle, api.ProviderID, error) {
 	start := time.Now()
 	subs, err := p.Search(ctx, req)
 	dur := time.Since(start)
@@ -65,7 +64,8 @@ func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
 // duplicate provider HTTP requests. The key includes VideoPath/VideoHash
 // so requests differing only by file artifact get separate calls.
 func (e *Engine) searchProvidersFiltered(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider) searchOutcome {
+	req *api.SearchRequest, providers []api.Provider,
+) searchOutcome {
 	key := buildSearchKey(req, providers)
 	// Use a detached context for the shared work so that a single caller's
 	// cancellation doesn't abort the flight for all waiters.
@@ -118,7 +118,8 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 // searchProvidersFilteredInner does the actual provider sweep — wrapped by
 // searchProvidersFiltered to provide singleflight deduplication.
 func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider) searchOutcome {
+	req *api.SearchRequest, providers []api.Provider,
+) searchOutcome {
 	var (
 		mu          sync.Mutex
 		results     = make([]api.Subtitle, 0, len(providers)*16)

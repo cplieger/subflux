@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
 )
 
 // writeSubtitleFile atomically writes subtitle data to the given path.
@@ -17,8 +17,8 @@ func writeSubtitleFile(ctx context.Context, path string, data []byte) error {
 // recordDownload persists the download record using the injected recorder.
 func recordDownload(ctx context.Context, req *api.SearchRequest,
 	item *searchItem, chosen *api.ScoredResult,
-	subPath, lang string, pickN int, recorder DownloadRecorder) {
-
+	subPath, lang string, pickN int, recorder DownloadRecorder,
+) {
 	if recorder == nil {
 		return
 	}

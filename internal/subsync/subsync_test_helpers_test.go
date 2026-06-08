@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // syncReader synchronizes subtitle content from readers. It is the

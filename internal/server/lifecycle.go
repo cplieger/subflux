@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
 )
 
 // serveAndWait binds the HTTP listener, starts the server, and blocks
@@ -150,8 +150,8 @@ type asyncActionResponse struct {
 // asyncAction starts fn in a background goroutine, returning 202 if started,
 // 409 if already running, 405 on non-POST requests.
 func (s *Server) asyncAction(ctx context.Context, w http.ResponseWriter, r *http.Request,
-	flag *atomic.Bool, busyMsg, startedMsg string, fn func(context.Context)) {
-
+	flag *atomic.Bool, busyMsg, startedMsg string, fn func(context.Context),
+) {
 	if r.Method != http.MethodPost {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return

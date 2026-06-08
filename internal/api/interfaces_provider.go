@@ -47,7 +47,7 @@ type ShowSubtitleCounter interface {
 	// CountShowSubtitles returns the total number of subtitles available for
 	// a show in the given language. The request should have ImdbID set and
 	// Season/Episode set to 0.
-	CountShowSubtitles(ctx context.Context, imdbID string, lang string) (int, error)
+	CountShowSubtitles(ctx context.Context, imdbID, lang string) (int, error)
 }
 
 // CacheClearer is an optional interface for providers that cache download

@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/store/migrations"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/migrations"
 	_ "modernc.org/sqlite"
 )
 
@@ -155,8 +154,10 @@ func TestGetUser_lookup_methods(t *testing.T) {
 			},
 		},
 		{
-			name:    "ByOIDCSub_not_found_returns_nil",
-			lookup:  func() (*api.User, error) { return a.GetUserByOIDCSub(ctx, "https://issuer.example.com", "nonexistent-sub") },
+			name: "ByOIDCSub_not_found_returns_nil",
+			lookup: func() (*api.User, error) {
+				return a.GetUserByOIDCSub(ctx, "https://issuer.example.com", "nonexistent-sub")
+			},
 			wantNil: true,
 		},
 	}

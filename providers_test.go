@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/server"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server"
 )
 
 func TestNewProviderRegistry_registers_all_providers(t *testing.T) {

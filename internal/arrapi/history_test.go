@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // --- api.HistoryEntry integration ---
@@ -38,8 +38,10 @@ func TestGetHistorySince_returns_entries(t *testing.T) {
 	t.Parallel()
 
 	entries := []api.HistoryEntry{
-		{SeriesID: 10, EpisodeID: 100,
-			Data: map[string]string{"importedPath": "/tv/show/s01e01.mkv"}},
+		{
+			SeriesID: 10, EpisodeID: 100,
+			Data: map[string]string{"importedPath": "/tv/show/s01e01.mkv"},
+		},
 		{MovieID: 5},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +53,6 @@ func TestGetHistorySince_returns_entries(t *testing.T) {
 	c := newTestClient(t, srv)
 	since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	got, err := c.GetHistorySince(context.Background(), since, api.HistoryImported)
-
 	if err != nil {
 		t.Fatalf("GetHistorySince() unexpected error: %v", err)
 	}
@@ -78,7 +79,6 @@ func TestGetHistorySince_sends_correct_params(t *testing.T) {
 	c := newTestClient(t, srv)
 	since := time.Date(2024, 6, 15, 12, 30, 0, 0, time.UTC)
 	_, err := c.GetHistorySince(context.Background(), since, api.HistoryImported)
-
 	if err != nil {
 		t.Fatalf("GetHistorySince() unexpected error: %v", err)
 	}
@@ -103,7 +103,6 @@ func TestGetHistorySince_zero_event_type_omits_param(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	_, err := c.GetHistorySince(context.Background(), time.Now(), 0)
-
 	if err != nil {
 		t.Fatalf("GetHistorySince() unexpected error: %v", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"subflux/internal/subsync/fft"
+	"github.com/cplieger/subflux/internal/subsync/fft"
 )
 
 func generateSignal(n int) []float64 {

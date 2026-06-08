@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
-	"subflux/internal/httputil"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // SyncStore documents the api.Store methods used by sync handlers.

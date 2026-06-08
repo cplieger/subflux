@@ -6,9 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -113,8 +112,8 @@ func RunFullScan(ctx context.Context, deps *Deps, ls *LiveState) {
 // Returns the number of items skipped due to recent scanning.
 func processItems(ctx context.Context, deps *Deps, ls *LiveState,
 	queue []ScanItem, recentlyScanned map[string]bool,
-	stats *api.ScanStats, actID string, scanDelay time.Duration) int {
-
+	stats *api.ScanStats, actID string, scanDelay time.Duration,
+) int {
 	tracker := newSeasonTracker(ls.ShowCounter, deps.ShowSkipCache)
 	langs := ls.Cfg.LanguageCodes()
 	skippedSeries := make(map[string]struct{})
@@ -146,8 +145,8 @@ func processItems(ctx context.Context, deps *Deps, ls *LiveState,
 func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 	series *api.Series, ep *api.Episode,
 	tracker *seasonTracker, langs []string,
-	skippedSeries map[string]struct{}, stats *api.ScanStats, actID string) {
-
+	skippedSeries map[string]struct{}, stats *api.ScanStats, actID string,
+) {
 	epCount := 0
 	if series.Statistics != nil {
 		epCount = series.Statistics.EpisodeFileCount
@@ -205,8 +204,8 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 }
 
 func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
-	m *api.Movie, stats *api.ScanStats, actID string) {
-
+	m *api.Movie, stats *api.ScanStats, actID string,
+) {
 	outcome := ScanMovie(ctx, deps, ls, m)
 	switch outcome {
 	case ScanFound:

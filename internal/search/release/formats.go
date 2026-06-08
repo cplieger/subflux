@@ -27,46 +27,86 @@ const (
 
 // SonarrSources are source patterns ported from Sonarr QualityParser.cs.
 var SonarrSources = []Format{
-	{Name: "Remux", Normalize: NormRemux,
-		Regex: `(?:[_. ]|\d{4}p-|\bHybrid-)(?:(BD|UHD)[-_. ]?)?Remux\b|(?:(BD|UHD)[-_. ]?)?Remux[_. ]\d{4}p`},
-	{Name: "BluRay", Normalize: NormBluray,
-		Regex: `\b(?:BluRay|Blu-Ray|HD-?DVD|BDMux|BD(?!$))\b`},
-	{Name: "WEB-DL", Normalize: NormWebDL,
-		Regex: `WEB[-_. ]DL(?:mux)?|WEBDL|AmazonHD|AmazonSD|iTunesHD|MaxdomeHD|NetflixU?HD|WebHD|HBOMaxHD|DisneyHD|[. ]WEB[. ](?:[xh][ .]?26[45]|AVC|HEVC|DDP?5[. ]1)|[. ](?-i:WEB)$|(?:720|1080|2160)p[-. ]WEB[-. ]|[-. ]WEB[-. ](?:720|1080|2160)p|\b\s/\sWEB\s/\s\b|(?:AMZN|NF|DP)[. -]WEB[. -](?!Rip)`},
-	{Name: "WEBRip", Normalize: NormWebRip,
-		Regex: `\b(?:WebRip|Web-Rip|WEBMux)\b`},
-	{Name: "HDTV", Normalize: NormHDTV,
-		Regex: `\b(?:HDTV)\b`},
-	{Name: "BDRip", Normalize: NormBluray,
-		Regex: `\b(?:BDRip|BDLight)\b`},
-	{Name: "BRRip", Normalize: NormBluray,
-		Regex: `\b(?:BRRip)\b`},
-	{Name: "DVD", Normalize: NormDVD,
-		Regex: `\b(?:DVD|DVDRip|NTSC|PAL|xvidvd)\b`},
-	{Name: "DSR", Normalize: NormSDTV,
-		Regex: `\b(?:WS[-_. ]DSR|DSR)\b`},
-	{Name: "PDTV", Normalize: NormSDTV,
-		Regex: `\b(?:PDTV)\b`},
-	{Name: "SDTV", Normalize: NormSDTV,
-		Regex: `\b(?:SDTV)\b`},
-	{Name: "TVRip", Normalize: NormSDTV,
-		Regex: `\b(?:TVRip)\b`},
-	{Name: "HD-TV", Normalize: NormHDTV,
-		Regex: `HD[-_. ]TV`},
-	{Name: "SD-TV", Normalize: NormSDTV,
-		Regex: `SD[-_. ]TV`},
-	{Name: "Anime BD", Normalize: NormBluray,
-		Regex: `bd(?:720|1080|2160)|(?<=[-_. (\[])bd(?=[-_. )\]])`},
-	{Name: "Anime WEB", Normalize: NormWebDL,
-		Regex: `\[WEB\]|[\[\(]WEB[ .]`},
-	{Name: "CAM", Normalize: NormCam,
-		Regex: `\b(?:CAM|HDCAM)\b`},
-	{Name: "Telesync", Normalize: NormTelesync,
-		Regex: `\b(?:Telesync|TS|PDVD)\b`},
-	{Name: "Telecine", Normalize: NormTelecine,
-		Regex: `\b(?:Telecine|TC)\b`},
-	{Name: "HDRip", Normalize: NormHDRip,
-		Regex: `\b(?:HDRip)\b`},
+	{
+		Name: "Remux", Normalize: NormRemux,
+		Regex: `(?:[_. ]|\d{4}p-|\bHybrid-)(?:(BD|UHD)[-_. ]?)?Remux\b|(?:(BD|UHD)[-_. ]?)?Remux[_. ]\d{4}p`,
+	},
+	{
+		Name: "BluRay", Normalize: NormBluray,
+		Regex: `\b(?:BluRay|Blu-Ray|HD-?DVD|BDMux|BD(?!$))\b`,
+	},
+	{
+		Name: "WEB-DL", Normalize: NormWebDL,
+		Regex: `WEB[-_. ]DL(?:mux)?|WEBDL|AmazonHD|AmazonSD|iTunesHD|MaxdomeHD|NetflixU?HD|WebHD|HBOMaxHD|DisneyHD|[. ]WEB[. ](?:[xh][ .]?26[45]|AVC|HEVC|DDP?5[. ]1)|[. ](?-i:WEB)$|(?:720|1080|2160)p[-. ]WEB[-. ]|[-. ]WEB[-. ](?:720|1080|2160)p|\b\s/\sWEB\s/\s\b|(?:AMZN|NF|DP)[. -]WEB[. -](?!Rip)`,
+	},
+	{
+		Name: "WEBRip", Normalize: NormWebRip,
+		Regex: `\b(?:WebRip|Web-Rip|WEBMux)\b`,
+	},
+	{
+		Name: "HDTV", Normalize: NormHDTV,
+		Regex: `\b(?:HDTV)\b`,
+	},
+	{
+		Name: "BDRip", Normalize: NormBluray,
+		Regex: `\b(?:BDRip|BDLight)\b`,
+	},
+	{
+		Name: "BRRip", Normalize: NormBluray,
+		Regex: `\b(?:BRRip)\b`,
+	},
+	{
+		Name: "DVD", Normalize: NormDVD,
+		Regex: `\b(?:DVD|DVDRip|NTSC|PAL|xvidvd)\b`,
+	},
+	{
+		Name: "DSR", Normalize: NormSDTV,
+		Regex: `\b(?:WS[-_. ]DSR|DSR)\b`,
+	},
+	{
+		Name: "PDTV", Normalize: NormSDTV,
+		Regex: `\b(?:PDTV)\b`,
+	},
+	{
+		Name: "SDTV", Normalize: NormSDTV,
+		Regex: `\b(?:SDTV)\b`,
+	},
+	{
+		Name: "TVRip", Normalize: NormSDTV,
+		Regex: `\b(?:TVRip)\b`,
+	},
+	{
+		Name: "HD-TV", Normalize: NormHDTV,
+		Regex: `HD[-_. ]TV`,
+	},
+	{
+		Name: "SD-TV", Normalize: NormSDTV,
+		Regex: `SD[-_. ]TV`,
+	},
+	{
+		Name: "Anime BD", Normalize: NormBluray,
+		Regex: `bd(?:720|1080|2160)|(?<=[-_. (\[])bd(?=[-_. )\]])`,
+	},
+	{
+		Name: "Anime WEB", Normalize: NormWebDL,
+		Regex: `\[WEB\]|[\[\(]WEB[ .]`,
+	},
+	{
+		Name: "CAM", Normalize: NormCam,
+		Regex: `\b(?:CAM|HDCAM)\b`,
+	},
+	{
+		Name: "Telesync", Normalize: NormTelesync,
+		Regex: `\b(?:Telesync|TS|PDVD)\b`,
+	},
+	{
+		Name: "Telecine", Normalize: NormTelecine,
+		Regex: `\b(?:Telecine|TC)\b`,
+	},
+	{
+		Name: "HDRip", Normalize: NormHDRip,
+		Regex: `\b(?:HDRip)\b`,
+	},
 }
 
 const sonarrReleaseGroupRegex = `-([a-z0-9]+(-[a-z0-9]+)?(?!.+?(?:480p|576p|720p|1080p|2160p)))` +

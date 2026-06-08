@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // Compile-time assertion: *DB satisfies api.BackoffStore.
@@ -26,8 +26,8 @@ var backoffScanner = txutil.TableScanner[api.BackoffEntry]{
 // Uses a single upsert with SQLite POWER() to compute next_retry inline,
 // eliminating the round-trip and race window of the former two-query approach.
 func (d *DB) RecordNoResult(ctx context.Context, mediaType api.MediaType, mediaID, language string, providerName api.ProviderID,
-	bp api.BackoffParams) error {
-
+	bp api.BackoffParams,
+) error {
 	now := time.Now()
 	nextRetry := now.Add(bp.InitialDelay)
 	initialDelaySec := bp.InitialDelay.Seconds()
@@ -36,7 +36,6 @@ func (d *DB) RecordNoResult(ctx context.Context, mediaType api.MediaType, mediaI
 	_, err := d.stmtRecordNoRes.ExecContext(ctx,
 		mediaType, mediaID, language, providerName, now,
 		nextRetry, int64(maxDelaySec), int64(initialDelaySec), bp.Multiplier)
-
 	if err != nil {
 		return err
 	}

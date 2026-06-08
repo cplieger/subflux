@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/fsutil"
 )
 
 // --- Secret management ---

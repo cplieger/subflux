@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"subflux/internal/server/scanning"
-	"subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // ScanHandlerClient is the narrow interface consumed by scan handlers.

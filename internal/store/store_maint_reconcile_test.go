@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestReconcileState_removes_missing_files(t *testing.T) {

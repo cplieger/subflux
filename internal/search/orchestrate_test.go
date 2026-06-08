@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestProviderConcurrency(t *testing.T) {

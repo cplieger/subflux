@@ -3,8 +3,8 @@ package server
 import (
 	"slices"
 
-	"subflux/internal/api"
-	"subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 )
 
 // SecretKeyNames returns the list of YAML keys treated as secrets.
@@ -24,7 +24,8 @@ func mergeSecrets(newData []byte, configPath string) []byte {
 // enabledProviders returns the sorted names of enabled providers in a config.
 func enabledProviders(cfg interface {
 	ProviderConfigs() map[api.ProviderID]api.ProviderCfg
-}) []api.ProviderID {
+},
+) []api.ProviderID {
 	var names []api.ProviderID
 	for name, pcfg := range cfg.ProviderConfigs() {
 		if pcfg.Enabled {
@@ -51,6 +52,7 @@ func findClosingQuote(val []byte, q byte) int { return confighandlers.FindClosin
 func secretContextKey(lines [][]byte, lineIdx int, key string) string {
 	return confighandlers.SecretContextKey(lines, lineIdx, key)
 }
+
 func extractSecretValues(data []byte) map[string]string {
 	return confighandlers.ExtractSecretValues(data)
 }

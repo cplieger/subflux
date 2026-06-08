@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // --- handleHistoryIDs ---

@@ -410,7 +410,6 @@ func TestValidateSubtitleData_checks_only_first_512_bytes(t *testing.T) {
 	data := append(header, bytes.Repeat([]byte{0x01}, 1000)...)
 
 	err := ValidateSubtitleData(data)
-
 	if err != nil {
 		t.Errorf("ValidateSubtitleData() with clean header = %v, want nil", err)
 	}
@@ -504,7 +503,6 @@ func TestValidateSubtitleData_pure_text_never_rejected(t *testing.T) {
 		}
 
 		err := ValidateSubtitleData(data)
-
 		if err != nil {
 			t.Errorf("ValidateSubtitleData(pure text, len=%d) = %v, want nil",
 				length, err)

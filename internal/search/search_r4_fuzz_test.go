@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func FuzzFilterByScore(f *testing.F) {

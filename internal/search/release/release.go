@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Edition regex follows standard scene naming conventions.

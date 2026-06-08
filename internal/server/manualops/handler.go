@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
 )
 
 // HandlerDeps holds the dependencies for the manual search/download HTTP handlers.
@@ -201,8 +201,8 @@ type downloadAcceptedResponse struct {
 
 // runManualDownload performs the actual download in the background.
 func (h *Handler) runManualDownload(ls *LiveState, prov api.Provider,
-	req *DownloadRequest, actID string) {
-
+	req *DownloadRequest, actID string,
+) {
 	serverCtx := h.deps.ServerCtx()
 	ctx, cancel := context.WithTimeout(serverCtx, DownloadTimeout)
 	defer cancel()

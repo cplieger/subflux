@@ -17,7 +17,7 @@
 // "passes one thing that satisfies all of them" composition type.
 package authstore
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // AuthStore is the composite store interface implemented by the
 // concrete authdb persistence layer and consumed by auth/ and server/.

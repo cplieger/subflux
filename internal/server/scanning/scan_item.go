@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ScanEpisode searches for subtitles for a single episode.
@@ -112,7 +112,8 @@ func ExtractAltTitles(alts []api.AlternateTitle, primary string) []string {
 
 // collectEpisodes fetches all wanted episodes from Sonarr.
 func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
-	excludeTags map[int]struct{}) []ScanItem {
+	excludeTags map[int]struct{},
+) []ScanItem {
 	items := make([]ScanItem, 0, 60000)
 	slog.Debug("fetching series from sonarr")
 	err := ls.Sonarr.GetWantedEpisodes(ctx, excludeTags,
@@ -136,7 +137,8 @@ func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 
 // collectMovies fetches all wanted movies from Radarr.
 func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
-	excludeTags map[int]struct{}) []ScanItem {
+	excludeTags map[int]struct{},
+) []ScanItem {
 	items := make([]ScanItem, 0, 5000)
 	slog.Debug("fetching movies from radarr")
 	err := ls.Radarr.GetWantedMovies(ctx, excludeTags,

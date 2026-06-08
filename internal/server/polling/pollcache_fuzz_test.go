@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzPollCacheRoundtrip verifies that Set(k, t) followed by Get(k) returns

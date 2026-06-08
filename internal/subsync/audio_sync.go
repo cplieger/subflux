@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"slices"
-	"subflux/internal/subsync/ffmpeg"
-	"subflux/internal/subsync/vad"
 	"time"
 
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subsync/vad"
 	"golang.org/x/sync/errgroup"
 )
 

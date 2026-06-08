@@ -5,9 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/search/release"
 	"pgregory.net/rapid"
-
-	"subflux/internal/search/release"
 )
 
 // compilePCRE delegates to release.CompilePCRE for test compatibility.

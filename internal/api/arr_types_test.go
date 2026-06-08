@@ -482,7 +482,6 @@ func TestHistoryEventType_UnmarshalJSON_sonarr_round_trip(t *testing.T) {
 
 		var got HistoryEventType
 		err = got.UnmarshalJSON(data)
-
 		if err != nil {
 			t.Fatalf("UnmarshalJSON(%s) error: %v", data, err)
 		}

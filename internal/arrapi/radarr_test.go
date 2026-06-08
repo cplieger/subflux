@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // --- GetMovies ---
@@ -29,7 +29,6 @@ func TestGetMovies_returns_all_movies(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := c.GetMovies(context.Background())
-
 	if err != nil {
 		t.Fatalf("GetMovies() unexpected error: %v", err)
 	}
@@ -44,15 +43,23 @@ func TestGetWantedMovies_filters_correctly(t *testing.T) {
 	t.Parallel()
 
 	movies := []api.Movie{
-		{ID: 1, Title: "Has file", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"}},
+		{
+			ID: 1, Title: "Has file", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"},
+		},
 		{ID: 2, Title: "No file", HasFile: false},
-		{ID: 3, Title: "Unmonitored with file", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/c.mkv"}},
-		{ID: 4, Title: "Has file but nil movieFile", HasFile: true,
-			MovieFile: nil},
-		{ID: 5, Title: "Excluded by tag", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/e.mkv"}, Tags: []int{42}},
+		{
+			ID: 3, Title: "Unmonitored with file", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/c.mkv"},
+		},
+		{
+			ID: 4, Title: "Has file but nil movieFile", HasFile: true,
+			MovieFile: nil,
+		},
+		{
+			ID: 5, Title: "Excluded by tag", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/e.mkv"}, Tags: []int{42},
+		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
@@ -67,7 +74,6 @@ func TestGetWantedMovies_filters_correctly(t *testing.T) {
 		got = append(got, m)
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedMovies() unexpected error: %v", err)
 	}
@@ -82,8 +88,10 @@ func TestGetWantedMovies_callback_error_propagates(t *testing.T) {
 	t.Parallel()
 
 	movies := []api.Movie{
-		{ID: 1, Title: "Movie", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"}},
+		{
+			ID: 1, Title: "Movie", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"},
+		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
@@ -128,10 +136,14 @@ func TestGetWantedMovies_cancelled_context_during_iteration(t *testing.T) {
 	t.Parallel()
 
 	movies := []api.Movie{
-		{ID: 1, Title: "Movie 1", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"}},
-		{ID: 2, Title: "Movie 2", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/b.mkv"}},
+		{
+			ID: 1, Title: "Movie 1", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"},
+		},
+		{
+			ID: 2, Title: "Movie 2", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/b.mkv"},
+		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
@@ -163,10 +175,14 @@ func TestGetWantedMovies_nil_exclude_includes_all(t *testing.T) {
 	t.Parallel()
 
 	movies := []api.Movie{
-		{ID: 1, Title: "Monitored", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"}},
-		{ID: 2, Title: "Unmonitored", HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/b.mkv"}},
+		{
+			ID: 1, Title: "Monitored", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/a.mkv"},
+		},
+		{
+			ID: 2, Title: "Unmonitored", HasFile: true,
+			MovieFile: &api.MovieFile{Path: "/movies/b.mkv"},
+		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
@@ -180,7 +196,6 @@ func TestGetWantedMovies_nil_exclude_includes_all(t *testing.T) {
 		got = append(got, m.Title)
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedMovies(nil exclude) unexpected error: %v", err)
 	}
@@ -204,7 +219,6 @@ func TestGetWantedMovies_empty_list_succeeds(t *testing.T) {
 		called = true
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedMovies(empty) unexpected error: %v", err)
 	}

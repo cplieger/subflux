@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/events"
-	"subflux/internal/server/manualops"
-	"subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 func TestParseManualSearchQuery(t *testing.T) {
@@ -239,12 +239,18 @@ func TestBuildManualSearchResults_multiple_historical_matches(t *testing.T) {
 	t.Parallel()
 
 	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", Language: "fr",
-			ReleaseName: "Movie.2024.BluRay-GRP", ID: "1"}, Score: 300},
-		{Sub: api.Subtitle{Provider: "subdl", Language: "fr",
-			ReleaseName: "Movie.2024.WEB-DL-OTHER", ID: "2"}, Score: 250},
-		{Sub: api.Subtitle{Provider: "yify", Language: "fr",
-			ReleaseName: "Movie.2024.Other-NEW", ID: "3"}, Score: 200},
+		{Sub: api.Subtitle{
+			Provider: "os", Language: "fr",
+			ReleaseName: "Movie.2024.BluRay-GRP", ID: "1",
+		}, Score: 300},
+		{Sub: api.Subtitle{
+			Provider: "subdl", Language: "fr",
+			ReleaseName: "Movie.2024.WEB-DL-OTHER", ID: "2",
+		}, Score: 250},
+		{Sub: api.Subtitle{
+			Provider: "yify", Language: "fr",
+			ReleaseName: "Movie.2024.Other-NEW", ID: "3",
+		}, Score: 200},
 	}
 
 	refs := []api.DownloadedRef{
@@ -603,10 +609,14 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 		providers: []api.Provider{&resultProvider{
 			stubProvider: stubProvider{name: "os"},
 			results: []api.Subtitle{
-				{Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
-					MatchedBy: "imdb", ID: "sub-1"},
-				{Provider: "os", Language: "fr", ReleaseName: "Movie.2024.WEB-DL-OTHER",
-					MatchedBy: "title", ID: "sub-2"},
+				{
+					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
+					MatchedBy: "imdb", ID: "sub-1",
+				},
+				{
+					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.WEB-DL-OTHER",
+					MatchedBy: "title", ID: "sub-2",
+				},
 			},
 		}},
 	})
@@ -666,8 +676,10 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 			&resultProvider{
 				stubProvider: stubProvider{name: "good"},
 				results: []api.Subtitle{
-					{Provider: "good", Language: "fr", ReleaseName: "Movie-GRP",
-						MatchedBy: "imdb", ID: "sub-1"},
+					{
+						Provider: "good", Language: "fr", ReleaseName: "Movie-GRP",
+						MatchedBy: "imdb", ID: "sub-1",
+					},
 				},
 			},
 		},
@@ -730,13 +742,19 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 		providers: []api.Provider{&resultProvider{
 			stubProvider: stubProvider{name: "os"},
 			results: []api.Subtitle{
-				{Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
-					MatchedBy: "imdb", ID: "sub-1"},
-				{Provider: "subdl", Language: "fr", ReleaseName: "Movie.2024.WEB-DL-OTHER",
-					MatchedBy: "title", ID: "sub-2"},
+				{
+					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
+					MatchedBy: "imdb", ID: "sub-1",
+				},
+				{
+					Provider: "subdl", Language: "fr", ReleaseName: "Movie.2024.WEB-DL-OTHER",
+					MatchedBy: "title", ID: "sub-2",
+				},
 				// Not-yet-downloaded release — should NOT be on disk.
-				{Provider: "yify", Language: "fr", ReleaseName: "Movie.2024.Other-NEW",
-					MatchedBy: "title", ID: "sub-3"},
+				{
+					Provider: "yify", Language: "fr", ReleaseName: "Movie.2024.Other-NEW",
+					MatchedBy: "title", ID: "sub-3",
+				},
 			},
 		}},
 	})

@@ -22,8 +22,10 @@ type Anchor struct {
 // internal alias for use within the package
 type anchor = Anchor
 
-var numberRe = regexp.MustCompile(`\d[\d.,]*\d|\d`)
-var subTagRe = regexp.MustCompile(`</?[a-zA-Z][^>]*>|\{\\[^}]*\}`)
+var (
+	numberRe = regexp.MustCompile(`\d[\d.,]*\d|\d`)
+	subTagRe = regexp.MustCompile(`</?[a-zA-Z][^>]*>|\{\\[^}]*\}`)
+)
 
 func stripSubTags(text string) string {
 	return subTagRe.ReplaceAllString(text, "")
@@ -146,8 +148,6 @@ func stripWordPunct(s string) string {
 	}, s)
 }
 
-
-
 func hasAnyAnchor(a *anchor) bool {
 	return len(a.Numbers) > 0 || len(a.ProperNouns) > 0 || len(a.Cognates) > 0
 }
@@ -173,8 +173,6 @@ var defaultAnchorScoreConfig = anchorScoreConfig{
 	MinScore:          0.05,
 	PositionBlend:     0.1,
 }
-
-
 
 func anchorMatchScore(a, b *anchor) float64 {
 	cfg := defaultAnchorScoreConfig

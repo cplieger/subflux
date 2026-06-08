@@ -7,8 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"subflux/internal/api"
-
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -130,8 +129,8 @@ type ManualSearchResponse struct {
 // RunSearch executes the manual search against all providers and returns
 // the JSON-ready response payload.
 func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
-	req *api.SearchRequest, lang string, mediaType api.MediaType, filePath string) ManualSearchResponse {
-
+	req *api.SearchRequest, lang string, mediaType api.MediaType, filePath string,
+) ManualSearchResponse {
 	mediaID := api.BuildMediaID(req)
 	isLocked, lockErr := deps.DB.IsManuallyLocked(ctx, mediaType, mediaID, lang)
 	if lockErr != nil {

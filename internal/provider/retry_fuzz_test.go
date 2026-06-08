@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzWrapRetryAll exercises WrapRetryAll with varying provider counts and
@@ -52,6 +52,7 @@ func (f *fakeWrapProvider) Name() api.ProviderID { return f.name }
 func (f *fakeWrapProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
 	return nil, nil
 }
+
 func (f *fakeWrapProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
 	return nil, nil
 }

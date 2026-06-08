@@ -9,7 +9,7 @@ import (
 	"context"
 	"log/slog"
 
-	"subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
 // LangMapper is a type alias for ffmpeg.LangMapper, preserving backward

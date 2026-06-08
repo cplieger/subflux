@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 // Sentinel errors for the most common config validation failures.

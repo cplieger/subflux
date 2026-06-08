@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/config/defaults"
-
+	"github.com/cplieger/subflux/internal/config/defaults"
 	"pgregory.net/rapid"
 )
 

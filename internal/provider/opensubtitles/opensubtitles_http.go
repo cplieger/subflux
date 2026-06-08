@@ -1,6 +1,7 @@
 package opensubtitles
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,10 +10,8 @@ import (
 	"net/url"
 	"time"
 
-	"context"
-
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // doPostDownload performs a rate-limited, authenticated POST to the default
@@ -21,7 +20,8 @@ import (
 // 10 MB-capped ReadCloser. 401 responses invalidate the cached token so
 // the next API call triggers a fresh login.
 func (p *Provider) doPostDownload(ctx context.Context, path string,
-	body io.Reader) (io.ReadCloser, error) {
+	body io.Reader,
+) (io.ReadCloser, error) {
 	if err := p.rateLimit(ctx); err != nil {
 		return nil, err
 	}

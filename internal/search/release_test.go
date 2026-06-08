@@ -4,10 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/scorer"
-	"subflux/internal/search/release"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search/release"
 	"pgregory.net/rapid"
 )
 

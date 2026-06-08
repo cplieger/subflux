@@ -7,8 +7,7 @@ import (
 	"time"
 
 	authlib "github.com/cplieger/auth"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ErrUnauthenticated is returned when no valid credential is found.

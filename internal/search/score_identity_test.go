@@ -3,10 +3,10 @@ package search
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/search/scoring"
-	"subflux/internal/search/syncing"
-	"subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/subsync"
 )
 
 // Test-only aliases for functions moved to the scoring sub-package.

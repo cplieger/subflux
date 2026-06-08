@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"subflux/internal/config"
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 // backupStore is the narrow capability the backup runner needs from the store.

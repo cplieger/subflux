@@ -4,7 +4,7 @@ import (
 	"context"
 	"unsafe"
 
-	"subflux/internal/subsync/crosslang"
+	"github.com/cplieger/subflux/internal/subsync/crosslang"
 )
 
 // crossLangAlign delegates to the crosslang sub-package.

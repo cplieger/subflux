@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzStatsCacheGetAfterInvalidate verifies that after Invalidate(), the

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzExtractAltTitlesNoDuplicates verifies that ExtractAltTitles never

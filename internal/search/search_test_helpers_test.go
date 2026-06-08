@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/search/syncing"
-	"subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // Syncer is a test-only alias for syncing.Syncer after shim elimination.
@@ -33,10 +33,12 @@ func (m *mockStore) RecordNoResult(_ context.Context, _ api.MediaType, _, _ stri
 	m.failureCalled = true
 	return nil
 }
+
 func (m *mockStore) SaveDownload(_ context.Context, _ *api.DownloadRecord) error {
 	m.successCalled = true
 	return nil
 }
+
 func (m *mockStore) IsManuallyLocked(_ context.Context, _ api.MediaType, _, _ string) (bool, error) {
 	return m.manualLocked, nil
 }
@@ -67,6 +69,7 @@ func (m *mockConfig) PostProcessConfig() api.PostProcessConfig {
 		StripTags:        true,
 	}
 }
+
 func (m *mockConfig) SyncConfig() api.SyncConfig {
 	return api.SyncConfig{SyncSubtitles: true}
 }
@@ -97,6 +100,7 @@ func (m *mockProvider) Name() api.ProviderID { return api.ProviderID(m.name) }
 func (m *mockProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
 	return m.results, m.searchErr
 }
+
 func (m *mockProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
 	return m.data, m.downloadErr
 }
@@ -138,7 +142,8 @@ func (m *mockFilterConfig) ProvidersForTarget(target *api.SubtitleTarget, all []
 
 // newEngine is a test helper that mirrors the old 7-parameter New signature.
 func newEngine(providers []api.Provider, db SearchStore, cfg SearchCfg,
-	m SearchMetrics, sc api.Scorer, syncer SubtitleSyncer, tracks TrackDetector) *Engine {
+	m SearchMetrics, sc api.Scorer, syncer SubtitleSyncer, tracks TrackDetector,
+) *Engine {
 	return New(providers, WithStore(db), WithConfig(cfg),
 		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks))
 }

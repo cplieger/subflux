@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/scoring"
 )
 
 // searchLangGroup searches providers once for a language and processes
@@ -24,21 +24,21 @@ import (
 func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	targets []api.SubtitleTarget, videoPath string, mediaType api.MediaType, mediaID string,
 	existing *existingSubs, searchCfg *api.SearchConfig,
-	upgradeCutoff time.Time) (paths []string, searched, skipped int) {
-
+	upgradeCutoff time.Time,
+) (paths []string, searched, skipped int) {
 	lang := targets[0].Code
 	label := req.MediaLabel()
 
 	if reason := e.shouldSkipLang(ctx, mediaType, mediaID, label, lang); reason != "" {
 		skipped = len(targets)
-		return
+		return paths, searched, skipped
 	}
 
 	states, anyNeedsSearch := e.buildTargetStates(ctx, req, targets, existing,
 		searchCfg, mediaType, mediaID, lang, label, upgradeCutoff)
 	if !anyNeedsSearch {
 		skipped = len(targets)
-		return
+		return paths, searched, skipped
 	}
 
 	// Collect the union of providers across all targets that need searching.
@@ -49,7 +49,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 			"media", label, "lang", lang,
 			"total_providers", len(unionProvs))
 		searched = len(targets)
-		return
+		return paths, searched, skipped
 	}
 
 	// Single provider query for this language.
@@ -84,7 +84,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 			paths = append(paths, path)
 		}
 	}
-	return
+	return paths, searched, skipped
 }
 
 // processTargetVariant filters, scores, and downloads a subtitle for one
@@ -94,8 +94,8 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 // saved path or empty string if no suitable subtitle was found.
 func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchRequest,
 	state *targetState, outcome *searchOutcome,
-	videoPath string, mediaType api.MediaType, mediaID, lang, label string) string {
-
+	videoPath string, mediaType api.MediaType, mediaID, lang, label string,
+) string {
 	// Filter by variant.
 	filtered, variantFallback := filterByVariant(
 		outcome.results, state.variant)

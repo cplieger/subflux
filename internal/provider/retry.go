@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // DownloadRetryAttempts is the maximum number of download attempts per provider.

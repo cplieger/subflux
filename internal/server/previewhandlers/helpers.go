@@ -11,7 +11,7 @@ import (
 
 const (
 	errMediaNotFound = "media file not found on server"
-	styleFanart     = "fanart"
+	styleFanart      = "fanart"
 )
 
 // buildVideoArgs constructs ffmpeg arguments for streaming 360p fMP4.

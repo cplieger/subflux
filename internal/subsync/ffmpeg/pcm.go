@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -9,8 +10,6 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
-
-	"context"
 	"time"
 )
 

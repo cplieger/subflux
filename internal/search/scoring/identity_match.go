@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func AnyTitleMatches(req *api.SearchRequest, candidate string) bool {
@@ -66,8 +66,10 @@ func matchesPair(subSeason, subEpisode, candSeason, candEpisode int) bool {
 	return seasonOK && episodeOK
 }
 
-var SeasonEpRe = regexp.MustCompile(`(?i)S\d{1,2}E\d{1,3}`)
-var SeasonOnlyRe = regexp.MustCompile(`(?i)S(\d{1,2})(?:E\d{1,3})?`)
+var (
+	SeasonEpRe   = regexp.MustCompile(`(?i)S\d{1,2}E\d{1,3}`)
+	SeasonOnlyRe = regexp.MustCompile(`(?i)S(\d{1,2})(?:E\d{1,3})?`)
+)
 
 func ExtractReleaseSeason(releaseName string) int {
 	m := SeasonOnlyRe.FindStringSubmatch(releaseName)

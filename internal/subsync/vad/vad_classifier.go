@@ -31,7 +31,7 @@ func vadGaussProb(input, mean, std int16) (prob int32, delta int16) {
 		}
 	}
 	prob = int32(invStd) * int32(expVal) // Q20
-	return
+	return prob, delta
 }
 
 // vadNormW32 counts leading zeros up to bit 30 (WebRTC NormW32 equivalent).
@@ -132,7 +132,7 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 				nmk2 := nmk
 				if vadflag == 0 {
 					delt := int16((int32(ngprvec[g]) * int32(deltaN[g])) >> 11) //nolint:gosec // G115: fixed-point DSP
-					nmk2 = nmk + int16((int32(delt)*int32(v.noiseUpdate))>>22) //nolint:gosec // G115: fixed-point DSP
+					nmk2 = nmk + int16((int32(delt)*int32(v.noiseUpdate))>>22)  //nolint:gosec // G115: fixed-point DSP
 				}
 
 				// Long-term noise correction.
@@ -152,7 +152,7 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 				if vadflag != 0 {
 					// Update speech mean.
 					delt := int16((int32(sgprvec[g]) * int32(deltaS[g])) >> 11) //nolint:gosec // G115: fixed-point DSP
-					tmp := int16((int32(delt) * int32(v.speechUpdate)) >> 21) //nolint:gosec // G115: fixed-point DSP
+					tmp := int16((int32(delt) * int32(v.speechUpdate)) >> 21)   //nolint:gosec // G115: fixed-point DSP
 					smk2 := smk + ((tmp + 1) >> 1)
 					mx := maxspe + 640
 					if smk2 < minMean[k] {
@@ -215,7 +215,7 @@ func (v *vadInst) gmmProbabilityLLR(features [vadNumCh]int16, totalPower int16) 
 			if diff < minDiff[ch] {
 				gap := minDiff[ch] - diff
 				sShift := int16((13 * int32(gap)) >> 2) //nolint:gosec // G115: fixed-point DSP
-				nShift := int16((3 * int32(gap)) >> 2) //nolint:gosec // G115: fixed-point DSP
+				nShift := int16((3 * int32(gap)) >> 2)  //nolint:gosec // G115: fixed-point DSP
 				for k := range vadNumGauss {
 					v.speechMeans[ch+k*vadNumCh] += sShift
 					v.noiseMeans[ch+k*vadNumCh] -= nShift

@@ -3,7 +3,7 @@ package search
 import (
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- External subtitle path parsing ---

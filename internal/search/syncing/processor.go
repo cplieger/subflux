@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subsync"
 )
 
 // SubtitleProcessor implements api.SubtitleProcessor directly using subsync,

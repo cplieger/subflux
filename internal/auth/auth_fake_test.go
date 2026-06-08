@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // fakeSessionStore is an in-memory implementation of SessionStore plus

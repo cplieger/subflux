@@ -5,7 +5,7 @@ import (
 	"context"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time interface assertion.

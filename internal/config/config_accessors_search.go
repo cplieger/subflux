@@ -1,6 +1,6 @@
 package config
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // Adaptive returns the adaptive search config.
 func (c *Config) Adaptive() api.AdaptiveConfig {

@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"subflux/internal/cliparse"
+	"github.com/cplieger/subflux/internal/cliparse"
 )
 
 // cliClient is a shared HTTP client for CLI commands with a reasonable timeout.

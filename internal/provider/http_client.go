@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"subflux/internal/httputil"
 	"github.com/cplieger/ssrf"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // HTTPTimeoutStandard is the default timeout for lightweight provider APIs

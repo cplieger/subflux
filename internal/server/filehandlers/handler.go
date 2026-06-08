@@ -9,10 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/config"
-	"subflux/internal/server/events"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // FileStore is the narrow store interface used by file handlers.

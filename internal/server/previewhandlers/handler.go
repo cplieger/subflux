@@ -6,8 +6,7 @@ import (
 	"context"
 	"net/http"
 
-	"subflux/internal/api"
-
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/semaphore"
 )
 

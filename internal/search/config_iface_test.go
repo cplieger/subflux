@@ -1,8 +1,8 @@
 package search_test
 
 import (
-	"subflux/internal/config"
-	"subflux/internal/search"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/search"
 )
 
 // Compile-time assertion: *config.Config satisfies search.SearchCfg.

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
 )
 
 func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
@@ -294,8 +294,10 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 	p := &mockProvider{
 		name: "test",
 		results: []api.Subtitle{
-			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
-				Language: "fr", HearingImp: true},
+			{
+				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
+				Language: "fr", HearingImp: true,
+			},
 		},
 		data: subData,
 	}
@@ -334,8 +336,10 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 	p := &mockProvider{
 		name: "test",
 		results: []api.Subtitle{
-			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
-				Language: "fr", Forced: true},
+			{
+				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
+				Language: "fr", Forced: true,
+			},
 		},
 		data: subData,
 	}
@@ -371,8 +375,10 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 	p := &mockProvider{
 		name: "test",
 		results: []api.Subtitle{
-			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
-				Language: "fr", HearingImp: true},
+			{
+				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
+				Language: "fr", HearingImp: true,
+			},
 		},
 		data: subData,
 	}
@@ -502,10 +508,14 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 	p := &mockProvider{
 		name: "test",
 		results: []api.Subtitle{
-			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
-				Language: "fr", HearingImp: false, Forced: false},
-			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
-				Language: "fr", HearingImp: false, Forced: true},
+			{
+				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
+				Language: "fr", HearingImp: false, Forced: false,
+			},
+			{
+				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
+				Language: "fr", HearingImp: false, Forced: true,
+			},
 		},
 		data: subData,
 	}

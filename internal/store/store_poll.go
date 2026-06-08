@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *DB satisfies api.PollStore.

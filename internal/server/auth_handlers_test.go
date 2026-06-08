@@ -13,14 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
-	"subflux/internal/ratelimit"
-	"subflux/internal/server/authhandlers"
-	"subflux/internal/server/confighandlers"
-	"subflux/internal/store"
-
-	"subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/ratelimit"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/store"
 )
 
 // --- Test helpers ---
@@ -87,6 +86,7 @@ func (c *authTestConfig) BasicAuthEnabled() bool       { return true }
 func (c *authTestConfig) SessionIdleTimeout() time.Duration {
 	return 24 * time.Hour
 }
+
 func (c *authTestConfig) SessionAbsoluteTimeout() time.Duration {
 	return 7 * 24 * time.Hour
 }

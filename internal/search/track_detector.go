@@ -3,7 +3,7 @@ package search
 import (
 	"context"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // TrackDetector detects embedded subtitle tracks in video containers.

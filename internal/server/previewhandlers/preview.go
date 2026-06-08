@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // previewTimeout is the maximum duration for a single preview stream.
@@ -83,16 +83,16 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 
 // streamVideo runs ffmpeg to transcode video to 360p H.264 + AAC as fMP4.
 func (h *Handler) streamVideo(ctx context.Context, w http.ResponseWriter,
-	path string, startSec float64) error {
-
+	path string, startSec float64,
+) error {
 	args := buildVideoArgs(path, startSec)
 	return h.runFFmpegStream(ctx, w, args)
 }
 
 // serveBuffered runs ffmpeg to a temp file, then serves it with Content-Length.
 func (h *Handler) serveBuffered(ctx context.Context, w http.ResponseWriter,
-	r *http.Request, path string, startSec float64) error {
-
+	r *http.Request, path string, startSec float64,
+) error {
 	if err := h.deps.FFmpegSem.Acquire(ctx, 1); err != nil {
 		return fmt.Errorf("preview concurrency limit: %w", err)
 	}
@@ -144,8 +144,8 @@ func (h *Handler) serveBuffered(ctx context.Context, w http.ResponseWriter,
 
 // runFFmpegStream executes ffmpeg and streams stdout to the HTTP response.
 func (h *Handler) runFFmpegStream(ctx context.Context, w http.ResponseWriter,
-	args []string) error {
-
+	args []string,
+) error {
 	if err := h.deps.FFmpegSem.Acquire(ctx, 1); err != nil {
 		return fmt.Errorf("preview concurrency limit: %w", err)
 	}

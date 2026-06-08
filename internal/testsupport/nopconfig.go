@@ -1,7 +1,7 @@
 package testsupport
 
 import (
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // NopConfig is a zero-value implementation of search.SearchCfg for tests.

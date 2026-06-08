@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // hotReload swaps the live config and reinitializes providers and engine.

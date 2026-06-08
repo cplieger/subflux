@@ -8,14 +8,13 @@ import (
 	"os"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
-	"subflux/internal/cliparse"
-	"subflux/internal/clisearch"
-	"subflux/internal/config"
-	"subflux/internal/fsutil"
-	"subflux/internal/store"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/cliparse"
+	"github.com/cplieger/subflux/internal/clisearch"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/store"
 	"go.yaml.in/yaml/v3"
 )
 

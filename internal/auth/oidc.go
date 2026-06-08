@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"subflux/internal/api"
-
 	"github.com/coreos/go-oidc/v3/oidc"
 	authoidc "github.com/cplieger/auth/oidc"
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/oauth2"
 )
 

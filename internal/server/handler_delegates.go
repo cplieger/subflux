@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"subflux/internal/api"
-	"subflux/internal/server/coveragehandlers"
-	"subflux/internal/server/filehandlers"
-	"subflux/internal/server/mediahandlers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/coveragehandlers"
+	"github.com/cplieger/subflux/internal/server/filehandlers"
+	"github.com/cplieger/subflux/internal/server/mediahandlers"
 )
 
 // Test-compatibility delegates: these forward to the extracted handler packages
@@ -105,15 +105,19 @@ type fileStoreProxy struct{ s *Server }
 func (p *fileStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleFileRow, error) {
 	return p.s.stores.file.GetSubtitleFiles(ctx, mt, prefix)
 }
+
 func (p *fileStoreProxy) DeleteSubtitleFile(ctx context.Context, mt api.MediaType, mediaID, lang string, v api.Variant, src api.SubtitleSource, path string) error {
 	return p.s.stores.file.DeleteSubtitleFile(ctx, mt, mediaID, lang, v, src, path)
 }
+
 func (p *fileStoreProxy) ManualSubtitlePaths(ctx context.Context, mt api.MediaType, mediaID, lang string) ([]string, error) {
 	return p.s.stores.file.ManualSubtitlePaths(ctx, mt, mediaID, lang)
 }
+
 func (p *fileStoreProxy) ClearManualLock(ctx context.Context, mt api.MediaType, mediaID, lang string) error {
 	return p.s.stores.file.ClearManualLock(ctx, mt, mediaID, lang)
 }
+
 func (p *fileStoreProxy) HistoryMediaIDs(ctx context.Context, mt api.MediaType, prefix string) ([]string, error) {
 	return p.s.stores.file.HistoryMediaIDs(ctx, mt, prefix)
 }
@@ -132,12 +136,14 @@ func (s *Server) ensureMediaH() {
 }
 
 // Type aliases for test compatibility with extracted handler packages.
-type seriesCoverage = coveragehandlers.SeriesCoverage
-type movieCoverage = coveragehandlers.MovieCoverage
-type fileEntry = filehandlers.FileEntry
-type seriesItem = mediahandlers.SeriesItem
-type movieItem = mediahandlers.MovieItem
-type seasonGroup = mediahandlers.SeasonGroup
+type (
+	seriesCoverage = coveragehandlers.SeriesCoverage
+	movieCoverage  = coveragehandlers.MovieCoverage
+	fileEntry      = filehandlers.FileEntry
+	seriesItem     = mediahandlers.SeriesItem
+	movieItem      = mediahandlers.MovieItem
+	seasonGroup    = mediahandlers.SeasonGroup
+)
 
 // covStoreProxy delegates to s.stores.cov, allowing tests to swap the store.
 type covStoreProxy struct{ s *Server }
@@ -145,6 +151,7 @@ type covStoreProxy struct{ s *Server }
 func (p *covStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleFileRow, error) {
 	return p.s.stores.cov.GetSubtitleFiles(ctx, mt, prefix)
 }
+
 func (p *covStoreProxy) GetScanStates(ctx context.Context, mt api.MediaType, prefix string) ([]api.ScanStateRow, error) {
 	return p.s.stores.cov.GetScanStates(ctx, mt, prefix)
 }

@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
 )
 
 // (AuthStore composite moved to internal/authstore/ to break a test-time

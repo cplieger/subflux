@@ -1,9 +1,10 @@
 package server
 
 import (
-	"subflux/internal/server/activity"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/server/activity"
 )
 
 // --- activity.Log.setQueued ---

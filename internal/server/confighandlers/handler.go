@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // AlertLog is the narrow interface for alert operations.
@@ -232,8 +232,8 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 // pingArrIfChanged pings an arr instance only when its URL or API key
 // differs from the current live config.
 func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
-	newArr api.ArrConfig, oldCfg api.ConfigProvider) error {
-
+	newArr api.ArrConfig, oldCfg api.ConfigProvider,
+) error {
 	if newArr.URL == "" {
 		return nil
 	}

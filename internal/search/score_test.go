@@ -3,9 +3,8 @@ package search
 import (
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/search/scoring"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/scoring"
 	"pgregory.net/rapid"
 )
 

@@ -5,9 +5,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"subflux/internal/api"
-	"subflux/internal/server/showskip"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/showskip"
 	"golang.org/x/sync/errgroup"
 )
 

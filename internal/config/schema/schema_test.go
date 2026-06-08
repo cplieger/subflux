@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/config"
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 func TestFormatDuration(t *testing.T) {

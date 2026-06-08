@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func BenchmarkScore(b *testing.B) {

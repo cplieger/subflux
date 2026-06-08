@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // TestScannerAlignment validates that the column lists declared for

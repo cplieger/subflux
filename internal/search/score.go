@@ -7,9 +7,9 @@ import (
 	"cmp"
 	"slices"
 
-	"subflux/internal/api"
-	"subflux/internal/search/release"
-	"subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/search/scoring"
 )
 
 // scoredSub pairs a subtitle with its computed score and match breakdown.

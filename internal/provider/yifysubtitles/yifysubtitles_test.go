@@ -2,8 +2,9 @@ package yifysubtitles
 
 import (
 	"context"
-	"subflux/internal/api"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- Factory ---
@@ -127,29 +128,43 @@ func TestExtractDownloadLink(t *testing.T) {
 		html string
 		want string
 	}{
-		{"valid download link",
+		{
+			"valid download link",
 			`<a class="download-subtitle" href="/subtitle/12345.zip">Download</a>`,
-			"/subtitle/12345.zip"},
-		{"multi-class download link",
+			"/subtitle/12345.zip",
+		},
+		{
+			"multi-class download link",
 			`<a class="btn-icon download-subtitle" href="/subtitle/99.zip"><span>DL</span></a>`,
-			"/subtitle/99.zip"},
-		{"extra attributes between class and href",
+			"/subtitle/99.zip",
+		},
+		{
+			"extra attributes between class and href",
 			`<a class="download-subtitle" data-id="1" href="/subtitle/99.zip">DL</a>`,
-			"/subtitle/99.zip"},
-		{"link with query params",
+			"/subtitle/99.zip",
+		},
+		{
+			"link with query params",
 			`<a class="download-subtitle" href="/subtitle/12345.zip?v=2">Download</a>`,
-			"/subtitle/12345.zip?v=2"},
-		{"class present but no href",
+			"/subtitle/12345.zip?v=2",
+		},
+		{
+			"class present but no href",
 			`<a class="download-subtitle">Download</a>`,
-			""},
-		{"no download link",
+			"",
+		},
+		{
+			"no download link",
 			`<a href="/other">Other</a>`,
-			""},
+			"",
+		},
 		{"empty html", "", ""},
-		{"multiple links returns first",
+		{
+			"multiple links returns first",
 			`<a class="download-subtitle" href="/first.zip">A</a>` +
 				`<a class="download-subtitle" href="/second.zip">B</a>`,
-			"/first.zip"},
+			"/first.zip",
+		},
 	}
 
 	for _, tt := range tests {

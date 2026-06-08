@@ -9,7 +9,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/authstore"
 )
 
 // Compile-time assertion: *AuthDB implements authstore.AuthStore.

@@ -3,7 +3,7 @@ package coverage_test
 import (
 	"testing"
 
-	"subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/server/coverage"
 )
 
 // --- CountMissing ---

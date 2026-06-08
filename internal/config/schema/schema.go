@@ -3,7 +3,7 @@
 package schema
 
 import (
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Schema field type constants used across section builders.
@@ -39,8 +39,10 @@ func Schema(providerSchemas []api.ProviderSchema) []api.SchemaSection {
 		mediaRootsSection(),
 		pollIntervalSection(),
 		languagesSection(),
-		{Key: sectionProviders, Title: "Providers", Type: sectionProviders,
-			Providers: providerSchemas},
+		{
+			Key: sectionProviders, Title: "Providers", Type: sectionProviders,
+			Providers: providerSchemas,
+		},
 		searchSection(),
 		adaptiveSection(),
 		postProcessSection(),

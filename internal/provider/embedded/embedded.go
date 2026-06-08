@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/provider"
-	"subflux/internal/provider/classify"
-	"subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
 const (
@@ -232,10 +232,10 @@ func normalizeCodecName(codec string) string {
 
 var ffprobeCodecMap = map[string]string{
 	"subrip":            "srt",
-	codecASS:               codecASS,
-	codecSSA:               codecSSA,
+	codecASS:            codecASS,
+	codecSSA:            codecSSA,
 	"webvtt":            "webvtt",
-	codecMovText:          codecMovText,
+	codecMovText:        codecMovText,
 	"hdmv_pgs_subtitle": "pgs",
 	"dvd_subtitle":      "vobsub",
 	"dvb_subtitle":      "dvbsub",

@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ClearProviderCaches calls ClearCache on any provider that implements

@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func BenchmarkBuildMatches(b *testing.B) {

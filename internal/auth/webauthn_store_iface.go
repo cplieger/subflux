@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
 )
 
 // WebAuthnStore is the narrow interface consumed by WebAuthn/passkey

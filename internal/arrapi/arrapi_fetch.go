@@ -3,7 +3,7 @@ package arrapi
 import (
 	"context"
 
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // fetchAllAvgItemSize is a conservative lower-bound estimate of the average

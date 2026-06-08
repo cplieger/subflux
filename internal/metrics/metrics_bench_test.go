@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func BenchmarkRecordSearch(b *testing.B) {

@@ -3,7 +3,7 @@ package coverage
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func FuzzExtractSeriesPrefix(f *testing.F) {

@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // Handler preludes. Every handler opens with the same pattern:

@@ -19,10 +19,10 @@ package wiring
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/provider/embedded"
-	"subflux/internal/search"
-	"subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider/embedded"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/syncing"
 )
 
 // Func creates the search engine, scorer, and loaded providers from config.

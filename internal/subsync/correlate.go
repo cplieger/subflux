@@ -6,7 +6,7 @@ import (
 	"math/cmplx"
 	"sync"
 
-	"subflux/internal/subsync/fft"
+	"github.com/cplieger/subflux/internal/subsync/fft"
 )
 
 // frameMs is the analysis frame duration in milliseconds.

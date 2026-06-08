@@ -1,6 +1,6 @@
 package search
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // Subtitle source identifiers for coverage tracking.
 const sourceExternal = api.SourceExternal

@@ -13,10 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
 	"golang.org/x/sync/singleflight"
-
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
 )
 
 const (

@@ -40,7 +40,7 @@ func FuzzDecompressIfGzipped(f *testing.F) {
 	f.Add([]byte{}, int64(1024))
 	f.Add([]byte("not gzip"), int64(1024))
 	f.Add([]byte{0x1f, 0x8b, 0x08, 0x00}, int64(1024)) // truncated gzip
-	f.Add([]byte{0x1f, 0x8b}, int64(0))                 // zero limit
+	f.Add([]byte{0x1f, 0x8b}, int64(0))                // zero limit
 
 	f.Fuzz(func(t *testing.T, data []byte, maxBytes int64) {
 		if maxBytes < 0 {

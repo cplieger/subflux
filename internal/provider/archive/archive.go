@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // SubtitleExts lists file extensions recognized as subtitle formats.

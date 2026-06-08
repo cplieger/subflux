@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 func BenchmarkFetchAll_prealloc(b *testing.B) {

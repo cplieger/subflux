@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestFactory_defaults(t *testing.T) {

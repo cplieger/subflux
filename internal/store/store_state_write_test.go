@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestSaveDownload(t *testing.T) {
@@ -18,8 +18,10 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "clears_attempts",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "opensubtitles",
-					ReleaseName: "Movie.2024.BluRay-GRP", Path: "/path/movie.fr.srt", Score: 180},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "opensubtitles",
+					ReleaseName: "Movie.2024.BluRay-GRP", Path: "/path/movie.fr.srt", Score: 180,
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				// Seed a backoff first.
@@ -45,9 +47,11 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "with_metadata",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie.2024-GRP", Path: "/path/movie.fr.srt", Score: 200,
-					Meta: &api.DownloadMeta{Title: "Test Movie", ImdbID: "tt123", ReleaseTag: "BluRay"}},
+					Meta: &api.DownloadMeta{Title: "Test Movie", ImdbID: "tt123", ReleaseTag: "BluRay"},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				downloads, _, _ := db.Stats(context.Background())
@@ -59,8 +63,10 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "nil_meta_does_not_panic",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
-					ReleaseName: "Movie-GRP", Path: "/path/movie.fr.srt", Score: 100},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+					ReleaseName: "Movie-GRP", Path: "/path/movie.fr.srt", Score: 100,
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				if locked, _ := db.IsManuallyLocked(context.Background(), "movie", "tt123", "fr"); locked {
@@ -71,9 +77,11 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "manual_meta_creates_lock",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-GRP", Path: "/path/movie.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{Manual: true}},
+					Meta: &api.DownloadMeta{Manual: true},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				if locked, _ := db.IsManuallyLocked(context.Background(), "movie", "tt123", "fr"); !locked {
@@ -84,10 +92,14 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "auto_replaces_previous_auto",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
-					ReleaseName: "Movie-V1", Path: "/path/v1.srt", Score: 100},
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
-					ReleaseName: "Movie-V2", Path: "/path/v2.srt", Score: 150},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+					ReleaseName: "Movie-V1", Path: "/path/v1.srt", Score: 100,
+				},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+					ReleaseName: "Movie-V2", Path: "/path/v2.srt", Score: 150,
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				downloads, _, _ := db.Stats(context.Background())
@@ -106,12 +118,16 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "manual_does_not_replace_previous",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-V1", Path: "/path/v1.srt", Score: 100,
-					Meta: &api.DownloadMeta{Manual: true}},
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+					Meta: &api.DownloadMeta{Manual: true},
+				},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-V2", Path: "/path/v2.srt", Score: 150,
-					Meta: &api.DownloadMeta{Manual: true}},
+					Meta: &api.DownloadMeta{Manual: true},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				downloads, _, _ := db.Stats(context.Background())
@@ -123,11 +139,15 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "manual_preserves_auto_records",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
-					ReleaseName: "Auto-V1", Path: "/path/auto.srt", Score: 100},
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+					ReleaseName: "Auto-V1", Path: "/path/auto.srt", Score: 100,
+				},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Manual-V1", Path: "/path/manual.srt", Score: 200,
-					Meta: &api.DownloadMeta{Manual: true}},
+					Meta: &api.DownloadMeta{Manual: true},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				downloads, _, _ := db.Stats(context.Background())
@@ -139,10 +159,14 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "metadata_fields_stored",
 			records: []*api.DownloadRecord{
-				{MediaType: "episode", MediaID: "tt0903747-s05e16", Language: "en", ProviderName: "os",
+				{
+					MediaType: "episode", MediaID: "tt0903747-s05e16", Language: "en", ProviderName: "os",
 					ReleaseName: "Breaking.Bad.S05E16.BluRay-DEMAND", Path: "/path/bb.en.srt", Score: 250,
-					Meta: &api.DownloadMeta{Title: "Breaking Bad S05E16", ImdbID: "tt0903747",
-						ReleaseTag: "BluRay.x264-DEMAND", Season: 5, Episode: 16}},
+					Meta: &api.DownloadMeta{
+						Title: "Breaking Bad S05E16", ImdbID: "tt0903747",
+						ReleaseTag: "BluRay.x264-DEMAND", Season: 5, Episode: 16,
+					},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				entries, err := db.GetState(context.Background(), &api.StateQuery{MediaType: "episode"})
@@ -222,9 +246,11 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "manual_stores_video_path",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-GRP", Path: "/path/movie.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{Manual: true, Title: "Test Movie", VideoPath: "/media/movie.mkv"}},
+					Meta: &api.DownloadMeta{Manual: true, Title: "Test Movie", VideoPath: "/media/movie.mkv"},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				var videoPath string
@@ -240,9 +266,11 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "auto_stores_video_path",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-GRP", Path: "/path/movie.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{Title: "Test Movie", VideoPath: "/media/movie.mkv"}},
+					Meta: &api.DownloadMeta{Title: "Test Movie", VideoPath: "/media/movie.mkv"},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				var videoPath string
@@ -258,12 +286,16 @@ func TestSaveDownload(t *testing.T) {
 		{
 			name: "auto_update_changes_video_path",
 			records: []*api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "V1", Path: "/p/v1.srt", Score: 80,
-					Meta: &api.DownloadMeta{VideoPath: "/media/old.mkv"}},
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "yify",
+					Meta: &api.DownloadMeta{VideoPath: "/media/old.mkv"},
+				},
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "yify",
 					ReleaseName: "V2", Path: "/p/v2.srt", Score: 150,
-					Meta: &api.DownloadMeta{VideoPath: "/media/new.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/media/new.mkv"},
+				},
 			},
 			assert: func(t *testing.T, db *DB) {
 				var videoPath string

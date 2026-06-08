@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"subflux/internal/server/polling"
+	"github.com/cplieger/subflux/internal/server/polling"
 )
 
 // runPoller delegates to the polling.Poller subsystem.

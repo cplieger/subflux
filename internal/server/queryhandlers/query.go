@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/search"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // providerTimeoutResponse is an alias for the canonical wire type.
@@ -307,8 +307,8 @@ func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Requ
 // handleTypePrefixQuery is a shared handler for GET endpoints that
 // accept ?type=...&prefix=... and delegate to a DB query function.
 func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
-	label string, queryFn func(string, string) (any, error)) {
-
+	label string, queryFn func(string, string) (any, error),
+) {
 	if !httphelpers.RequireGET(w, r) {
 		return
 	}

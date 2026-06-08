@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // retryFakeProvider records calls and returns configured errors.
@@ -415,6 +415,7 @@ func (benchNoopProvider) Name() api.ProviderID { return "bench" }
 func (benchNoopProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
 	return nil, nil
 }
+
 func (benchNoopProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
 	return []byte("ok"), nil
 }

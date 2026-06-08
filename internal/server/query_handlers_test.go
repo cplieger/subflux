@@ -13,17 +13,17 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
-	"subflux/internal/metrics"
-	"subflux/internal/provider/embedded"
-	"subflux/internal/scorer"
-	"subflux/internal/search"
-	"subflux/internal/search/syncing"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/confighandlers"
-	"subflux/internal/server/events"
-	"subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/provider/embedded"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // --- Mock implementations for query handler tests ---
@@ -193,8 +193,10 @@ func TestHandleState_returns_entries(t *testing.T) {
 	t.Parallel()
 	db := &qhMockStore{
 		state: []api.StateEntry{
-			{ID: 1, MediaType: "movie", MediaID: "tt123",
-				Language: "fr", Provider: "os", Score: 200},
+			{
+				ID: 1, MediaType: "movie", MediaID: "tt123",
+				Language: "fr", Provider: "os", Score: 200,
+			},
 		},
 	}
 	s := newTestServer(db, &qhMockConfig{})

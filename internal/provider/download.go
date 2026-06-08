@@ -1,8 +1,8 @@
 package provider
 
 import (
-	"subflux/internal/api"
-	"subflux/internal/provider/archive"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider/archive"
 )
 
 // ExtractAndValidate attempts to extract a subtitle from an archive (zip/rar),

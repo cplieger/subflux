@@ -3,9 +3,9 @@ package testsupport_test
 import (
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/search"
-	"subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // TestNopConfigContract verifies NopConfig satisfies search.SearchCfg at runtime

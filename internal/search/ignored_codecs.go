@@ -3,7 +3,7 @@ package search
 import (
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ignoredCodecMap maps provider setting keys to the codec names they control.
@@ -36,7 +36,8 @@ func parseBoolSetting(settings map[string]any, key string) bool {
 // api.ConfigProvider and search.SearchCfg).
 func IgnoredCodecsFromConfig(cfg interface {
 	ProviderConfigs() map[api.ProviderID]api.ProviderCfg
-}) map[string]bool {
+},
+) map[string]bool {
 	provCfgs := cfg.ProviderConfigs()
 	embCfg, ok := provCfgs[api.ProviderNameEmbedded]
 	if !ok {

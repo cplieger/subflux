@@ -12,11 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
-	"subflux/internal/authstore"
-	"subflux/internal/ratelimit"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 

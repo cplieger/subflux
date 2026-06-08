@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/syncing"
 )
 
 // SyncAndPostProcess syncs subtitle timing and normalizes content using
@@ -29,8 +29,8 @@ import (
 // configured strip_hi value is honored. Callers that need just the timing
 // step without post-processing should use syncSubtitle directly.
 func (e *Engine) SyncAndPostProcess(ctx context.Context, data []byte,
-	videoPath, lang string, variant api.Variant) (synced []byte, offsetMs int64) {
-
+	videoPath, lang string, variant api.Variant,
+) (synced []byte, offsetMs int64) {
 	data, offsetMs = e.syncSubtitle(ctx, data, videoPath, lang, e.cfg.SyncConfig())
 	pp := e.cfg.PostProcessConfig()
 	if variant == api.VariantHI {
@@ -76,8 +76,8 @@ func (e *Engine) syncSubtitleAudio(ctx context.Context, data []byte, videoPath s
 // downloadAndSave downloads the best subtitle, syncs timing, post-processes,
 // saves to disk, and records success in the store.
 func (e *Engine) downloadAndSave(ctx context.Context, req *api.SearchRequest,
-	best *scoredSub, videoPath string, mediaType api.MediaType, mediaID, lang string, variant api.Variant) (string, error) {
-
+	best *scoredSub, videoPath string, mediaType api.MediaType, mediaID, lang string, variant api.Variant,
+) (string, error) {
 	slog.Debug("downloading subtitle",
 		"media", req.MediaLabel(), "lang", lang,
 		"provider", best.sub.Provider, "score", best.score,
@@ -133,8 +133,8 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *api.SearchRequest,
 // persistDownload records the subtitle in the store and updates coverage.
 func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 	best *scoredSub, subPath, videoPath string, mediaType api.MediaType, mediaID, lang string,
-	syncOffsetMs int64, saveHI bool) {
-
+	syncOffsetMs int64, saveHI bool,
+) {
 	saveVariant := api.VariantFromFlags(saveHI, best.sub.Forced)
 	if err := e.store.UpsertSubtitleFile(ctx, mediaType, mediaID, &api.SubtitleFile{
 		Language: lang,
@@ -181,8 +181,8 @@ func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 // save path. Returns the path, the effective HI flag (after strip-HI logic),
 // and the processed data.
 func (e *Engine) postProcessSub(data []byte, best *scoredSub,
-	videoPath, lang string, variant api.Variant) (subPath string, saveHI bool, processed []byte) {
-
+	videoPath, lang string, variant api.Variant,
+) (subPath string, saveHI bool, processed []byte) {
 	pp := e.cfg.PostProcessConfig()
 	// Strip HI behavior depends on the target variant:
 	// - hi variant target: never strip (user explicitly wants HI annotations).
@@ -213,8 +213,8 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 // downloadBestCandidate tries candidates in score order with a bounded number
 // of attempts. Returns the saved path or empty string if all attempts fail.
 func (e *Engine) downloadBestCandidate(ctx context.Context, req *api.SearchRequest,
-	candidates []scoredSub, videoPath string, mediaType api.MediaType, mediaID, lang string, variant api.Variant, label string) string {
-
+	candidates []scoredSub, videoPath string, mediaType api.MediaType, mediaID, lang string, variant api.Variant, label string,
+) string {
 	maxAttempts := e.cfg.Search().DownloadMaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = api.DefaultDownloadMaxAttempts

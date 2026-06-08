@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"subflux/internal/fsutil"
-	"subflux/internal/server/activity"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/server/activity"
 )
 
 func TestActivityLog_start_records_entry(t *testing.T) {

@@ -3,14 +3,14 @@ package archive
 import (
 	"testing"
 
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 func FuzzDecompress(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte("plain text"))
 	f.Add([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0xFF}) // xz magic + garbage
-	f.Add([]byte{0x1f, 0x8b, 0x08, 0x00})                    // gzip magic + truncated
+	f.Add([]byte{0x1f, 0x8b, 0x08, 0x00})                   // gzip magic + truncated
 	f.Add(make([]byte, 128))
 
 	f.Fuzz(func(t *testing.T, data []byte) {

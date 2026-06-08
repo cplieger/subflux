@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/queryhandlers"
 )
 
 // ensureQueryH lazily initializes queryH for tests that construct Server

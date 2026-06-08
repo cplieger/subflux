@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 const (

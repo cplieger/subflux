@@ -1,8 +1,8 @@
 package search_test
 
 import (
-	"subflux/internal/search"
-	"subflux/internal/store"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/store"
 )
 
 // Compile-time assertion: *store.DB satisfies search.SearchStore.

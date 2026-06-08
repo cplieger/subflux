@@ -6,9 +6,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
 )
 
 // episodeFetchConcurrency limits parallel episode fetches per series.
@@ -55,7 +54,7 @@ func (c *Client) GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]st
 					"series", s.Title, "series_id", s.ID, "error", err)
 				return nil
 			}
-			var wanted = make([]api.Episode, 0, len(episodes))
+			wanted := make([]api.Episode, 0, len(episodes))
 			for i := range episodes {
 				if wantedEpisode(&episodes[i]) {
 					wanted = append(wanted, episodes[i])

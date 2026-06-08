@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // readErrorBody reads and returns the error body from a non-OK response,

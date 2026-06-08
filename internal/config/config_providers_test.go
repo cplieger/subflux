@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- ProvidersForTarget ---

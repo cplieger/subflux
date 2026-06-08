@@ -7,10 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider/classify"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 func TestFactory_requires_api_key(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- Detection ---

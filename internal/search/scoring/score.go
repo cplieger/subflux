@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ReleaseInfo holds metadata extracted from a release/scene name.

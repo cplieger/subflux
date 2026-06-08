@@ -9,10 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-
-	"subflux/internal/server/activity"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
 	"pgregory.net/rapid"
 )
 
@@ -29,12 +27,15 @@ func (dummyArrClient) GetMovies(context.Context) ([]api.Movie, error) { return n
 func (dummyArrClient) GetHistorySince(context.Context, time.Time, api.HistoryEventType) ([]api.HistoryEntry, error) {
 	return nil, nil
 }
+
 func (dummyArrClient) GetWantedEpisodes(context.Context, map[int]struct{}, func(api.Series, api.Episode) error) error {
 	return nil
 }
+
 func (dummyArrClient) GetWantedMovies(context.Context, map[int]struct{}, func(api.Movie) error) error {
 	return nil
 }
+
 func (dummyArrClient) ResolveExcludeTagIDs(context.Context, []string, bool) map[int]struct{} {
 	return nil
 }
@@ -43,9 +44,11 @@ func (dummyArrClient) RefreshMovie(context.Context, int) error  { return nil }
 func (dummyArrClient) GetSeriesByID(context.Context, int) (*api.Series, error) {
 	return nil, nil
 }
+
 func (dummyArrClient) GetEpisodeByID(context.Context, int) (*api.Episode, error) {
 	return nil, nil
 }
+
 func (dummyArrClient) GetMovieByID(context.Context, int) (*api.Movie, error) {
 	return nil, nil
 }

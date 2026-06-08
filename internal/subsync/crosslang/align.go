@@ -225,8 +225,6 @@ type strongRef struct {
 	origIdx int
 }
 
-
-
 func gatherCandidates(
 	ctx context.Context,
 	incorrect, reference []Cue,

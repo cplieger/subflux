@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // APIKeyVerifier authenticates requests via X-API-Key header or api_key query param.

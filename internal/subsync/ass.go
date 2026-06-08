@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
 const (
@@ -161,7 +161,7 @@ func ffmpegExtractASSDialogue(ctx context.Context, videoPath string, streamIndex
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",  //nolint:gosec // G204: args from validated config
+	cmd := exec.CommandContext(ctx, "ffmpeg", //nolint:gosec // G204: args from validated config
 		"-i", "file:"+videoPath,
 		"-map", fmt.Sprintf("0:%d", streamIndex),
 		"-c:s", "copy",
