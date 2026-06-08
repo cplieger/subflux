@@ -43,8 +43,12 @@ RUN apk add --no-cache build-base yasm nasm bash pkgconf clang lld gcc musl-dev 
 # Build x264 as a static library (Alpine has no x264-static package).
 COPY --from=sources /tmp/x264-stable /tmp/x264-stable
 WORKDIR /tmp/x264-stable
+# --enable-pic is required for the static aarch64 build: without it x264's
+# arm64 asm/data emit non-PIC R_AARCH64_ABS64 relocations that ld.lld rejects
+# when ffmpeg statically links libx264.a (--extra-ldflags="-static -fuse-ld=lld"),
+# failing configure with "x264 not found using pkg-config". No-op on amd64.
 RUN export CC=clang \
-    && bash ./configure --enable-static --disable-cli --disable-opencl \
+    && bash ./configure --enable-static --enable-pic --disable-cli --disable-opencl \
         --prefix=/usr/local \
     && make -j"$(nproc)" \
     && make install \
