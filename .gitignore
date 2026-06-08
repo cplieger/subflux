@@ -15,3 +15,8 @@ internal/server/static/wire/
 internal/server/static/lib/
 
 internal/cache/testdata/rapid/
+
+# Kiro skill artifacts (code-review, refactor, steering-maintenance)
+**/.code-review/
+**/.refactor/
+**/.steering-maintenance/
