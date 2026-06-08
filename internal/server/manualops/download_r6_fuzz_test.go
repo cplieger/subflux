@@ -3,7 +3,7 @@ package manualops
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzValidateDownloadRequest verifies that validation either returns an error

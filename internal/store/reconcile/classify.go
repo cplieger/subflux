@@ -7,7 +7,7 @@ import (
 	"errors"
 	"os"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Entry holds data for a single subtitle_state row during reconciliation.

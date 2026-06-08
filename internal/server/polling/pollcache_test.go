@@ -3,11 +3,12 @@ package polling
 import (
 	"context"
 	"errors"
-	"subflux/internal/api"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestPollCache_Get_calls_readFn_on_miss(t *testing.T) {

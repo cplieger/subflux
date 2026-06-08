@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"subflux/internal/api"
-	"subflux/internal/cache"
-	"subflux/internal/httputil"
-	"subflux/internal/provider/classify"
-	"subflux/internal/provider/dlcache"
 	"testing"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/cache"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/provider/dlcache"
 	"pgregory.net/rapid"
 )
 

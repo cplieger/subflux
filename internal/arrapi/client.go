@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 	"golang.org/x/sync/singleflight"
-
-	"subflux/internal/api"
-	"subflux/internal/httputil"
 )
 
 // --- Client ---
@@ -49,8 +48,6 @@ func defaultTransport() *http.Transport {
 
 // ClientOption configures optional Client parameters.
 type ClientOption func(*Client)
-
-
 
 // Client talks to a Sonarr or Radarr instance.
 type Client struct {

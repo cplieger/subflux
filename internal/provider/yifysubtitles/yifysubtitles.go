@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/provider/classify"
 	"github.com/cplieger/ssrf"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 const langBrazilianPT = "Brazilian Portuguese"

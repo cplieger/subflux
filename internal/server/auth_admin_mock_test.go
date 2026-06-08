@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"subflux/internal/server/activity"
-	"subflux/internal/server/authhandlers"
-	"subflux/internal/store"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/store"
 )
 
 func testAdminServer(t *testing.T) *Server {

@@ -1,7 +1,7 @@
 package server
 
 import (
-	"subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/server/synchandlers"
 )
 
 // syncStore is a type alias for the synchandlers.SyncStore interface.

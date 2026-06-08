@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // ScanGuard serializes manual scan requests. Extracted from activity.Log

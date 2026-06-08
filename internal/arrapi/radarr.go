@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // GetMovies fetches all movies from Radarr.

@@ -5,8 +5,7 @@ import (
 	"time"
 
 	authlib "github.com/cplieger/auth"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Sentinel errors for session operations.

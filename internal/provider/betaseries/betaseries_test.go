@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestBetaLangToISO(t *testing.T) {

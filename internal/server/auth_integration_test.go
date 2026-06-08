@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/auth"
-	"subflux/internal/store"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/store"
 )
 
 // =============================================================================

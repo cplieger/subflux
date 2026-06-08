@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- Eligibility ---
@@ -14,8 +14,8 @@ import (
 // Returns (currentScore, true) if eligible, (0, false) if not.
 func (e *Engine) checkUpgradeEligibility(
 	ctx context.Context, existing *existingSubs, searchCfg *api.SearchConfig,
-	mediaType api.MediaType, mediaID, lang string, variant api.Variant, title string, cutoff time.Time) (int, bool) {
-
+	mediaType api.MediaType, mediaID, lang string, variant api.Variant, title string, cutoff time.Time,
+) (int, bool) {
 	if !existing.hasSubtitle(lang, variant) {
 		return 0, false // No subtitle on disk; not an upgrade.
 	}
@@ -46,8 +46,8 @@ func (e *Engine) checkUpgradeEligibility(
 // score threshold, distinguishing between upgrade and initial search cases.
 func (e *Engine) logNoResults(ctx context.Context, state *targetState, scored []scoredSub,
 	outcome *searchOutcome, mediaType api.MediaType, mediaID, lang, label string,
-	minScore int) {
-
+	minScore int,
+) {
 	bestScore := 0
 	if len(scored) > 0 {
 		bestScore = scored[0].score

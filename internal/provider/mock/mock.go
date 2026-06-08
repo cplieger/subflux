@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
 const (
@@ -52,10 +52,10 @@ const (
 	keySubtitleContent = "subtitle_content"
 	keyFlakyRate       = "flaky_rate"
 
-	fieldBool = "bool"
-	fieldText = "text"
+	fieldBool      = "bool"
+	fieldText      = "text"
 	keyIncludeHash = "include_hash"
-	valFalse  = "false"
+	valFalse       = "false"
 )
 
 const providerName = api.ProviderNameMock
@@ -294,30 +294,54 @@ Timestamp: %s
 // Schema returns the UI schema fields for the mock provider settings page.
 func Schema() []api.ProviderSchemaField {
 	return []api.ProviderSchemaField{
-		{Key: keyMode, Label: "Mode", Type: fieldText,
+		{
+			Key: keyMode, Label: "Mode", Type: fieldText,
 			Default: "static",
-			Help:    "static, error, timeout, rate_limit, auth_error, empty, slow, flaky, season_pack"},
-		{Key: keyDelayMs, Label: "Delay (ms)", Type: fieldText,
-			Default: "0", Help: "Artificial latency per call"},
-		{Key: keyResultCount, Label: "Result Count", Type: fieldText,
-			Default: "3", Help: "Number of results in static mode"},
-		{Key: keyScoreBase, Label: "Base Score", Type: fieldText,
-			Default: "50", Help: "Starting score (decrements by 5 per result)"},
-		{Key: keyLanguages, Label: "Languages", Type: fieldText,
-			Help: "Comma-separated language codes to return results for (empty = all)"},
-		{Key: keyIncludeHash, Label: "Include Hash Match", Type: fieldBool,
-			Default: valFalse, Help: "First result uses hash matching"},
-		{Key: keyHearingImpaired, Label: "Hearing Impaired", Type: fieldBool,
-			Default: valFalse, Help: "Flag results as HI"},
-		{Key: keyForced, Label: "Forced", Type: fieldBool,
-			Default: valFalse, Help: "Flag results as forced"},
-		{Key: keyErrorMessage, Label: "Error Message", Type: fieldText,
-			Help: "Custom error message for error modes"},
-		{Key: keyDownloadError, Label: "Download Error", Type: fieldText,
-			Help: "If set, Download() returns this error"},
-		{Key: keySubtitleContent, Label: "Subtitle Content", Type: fieldText,
-			Help: "Custom SRT content for downloads (default: auto-generated)"},
-		{Key: keyFlakyRate, Label: "Flaky Rate", Type: fieldText,
-			Default: "0.5", Help: "Failure probability for flaky mode (0.0-1.0)"},
+			Help:    "static, error, timeout, rate_limit, auth_error, empty, slow, flaky, season_pack",
+		},
+		{
+			Key: keyDelayMs, Label: "Delay (ms)", Type: fieldText,
+			Default: "0", Help: "Artificial latency per call",
+		},
+		{
+			Key: keyResultCount, Label: "Result Count", Type: fieldText,
+			Default: "3", Help: "Number of results in static mode",
+		},
+		{
+			Key: keyScoreBase, Label: "Base Score", Type: fieldText,
+			Default: "50", Help: "Starting score (decrements by 5 per result)",
+		},
+		{
+			Key: keyLanguages, Label: "Languages", Type: fieldText,
+			Help: "Comma-separated language codes to return results for (empty = all)",
+		},
+		{
+			Key: keyIncludeHash, Label: "Include Hash Match", Type: fieldBool,
+			Default: valFalse, Help: "First result uses hash matching",
+		},
+		{
+			Key: keyHearingImpaired, Label: "Hearing Impaired", Type: fieldBool,
+			Default: valFalse, Help: "Flag results as HI",
+		},
+		{
+			Key: keyForced, Label: "Forced", Type: fieldBool,
+			Default: valFalse, Help: "Flag results as forced",
+		},
+		{
+			Key: keyErrorMessage, Label: "Error Message", Type: fieldText,
+			Help: "Custom error message for error modes",
+		},
+		{
+			Key: keyDownloadError, Label: "Download Error", Type: fieldText,
+			Help: "If set, Download() returns this error",
+		},
+		{
+			Key: keySubtitleContent, Label: "Subtitle Content", Type: fieldText,
+			Help: "Custom SRT content for downloads (default: auto-generated)",
+		},
+		{
+			Key: keyFlakyRate, Label: "Flaky Rate", Type: fieldText,
+			Default: "0.5", Help: "Failure probability for flaky mode (0.0-1.0)",
+		},
 	}
 }

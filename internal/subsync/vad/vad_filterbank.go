@@ -29,8 +29,10 @@ func vadSplit(in []int16, n int, upper, lower *int16, hp, lp []int16) {
 	}
 }
 
-var hpZero = [3]int16{6631, -13262, 6631}
-var hpPole = [3]int16{16384, -7756, 5620}
+var (
+	hpZero = [3]int16{6631, -13262, 6631}
+	hpPole = [3]int16{16384, -7756, 5620}
+)
 
 func vadHP(in []int16, n int, state, out []int16) {
 	for i := range n {
@@ -118,5 +120,5 @@ func (v *vadInst) extractFeatures(frame []int16) (features [vadNumCh]int16, tota
 	var hpOut [5]int16
 	vadHP(lp60[:5], 5, v.hpState[:], hpOut[:])
 	features[0], _ = vadLogEnergy(hpOut[:], 5, offsets[0])
-	return
+	return features, totalE
 }

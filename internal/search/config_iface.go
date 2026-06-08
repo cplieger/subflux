@@ -1,6 +1,6 @@
 package search
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // SearchCfg is the narrow configuration interface consumed by the search engine.
 // Only the methods actually called by search are declared here.

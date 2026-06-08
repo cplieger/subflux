@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/store/storetest"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/storetest"
 )
 
 // TestNopStoreContract verifies that NopStore satisfies the same basic

@@ -1,7 +1,6 @@
 package arrapi
 
 import (
-	"sync/atomic"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,11 +8,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // --- fetchAll ---
@@ -33,7 +33,6 @@ func TestFetchAll_decodes_items(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := fetchAll[api.Series](context.Background(), c, apiPrefix+"/series")
-
 	if err != nil {
 		t.Fatalf("fetchAll() unexpected error: %v", err)
 	}
@@ -59,7 +58,6 @@ func TestFetchAll_empty_array(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := fetchAll[api.Series](context.Background(), c, apiPrefix+"/series")
-
 	if err != nil {
 		t.Fatalf("fetchAll() unexpected error: %v", err)
 	}
@@ -117,7 +115,6 @@ func TestGet_sends_api_key_header(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	resp, err := c.get(context.Background(), apiPrefix+"/series")
-
 	if err != nil {
 		t.Fatalf("get() unexpected error: %v", err)
 	}
@@ -222,7 +219,6 @@ func TestGetSeries_streams_all_series(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := c.GetSeries(context.Background())
-
 	if err != nil {
 		t.Fatalf("GetSeries() unexpected error: %v", err)
 	}
@@ -251,7 +247,6 @@ func TestGetEpisodes_returns_episodes(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := c.GetEpisodes(context.Background(), 5)
-
 	if err != nil {
 		t.Fatalf("GetEpisodes() unexpected error: %v", err)
 	}
@@ -324,7 +319,6 @@ func TestGetWantedEpisodes_filters_excluded_series(t *testing.T) {
 		count++
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedEpisodes() unexpected error: %v", err)
 	}
@@ -342,11 +336,15 @@ func TestGetWantedEpisodes_filters_episodes_without_files(t *testing.T) {
 	})
 	mux.HandleFunc(apiPrefix+"/episode", func(w http.ResponseWriter, _ *http.Request) {
 		json.NewEncoder(w).Encode([]api.Episode{
-			{ID: 10, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"}},
+			{
+				ID: 10, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"},
+			},
 			{ID: 11, HasFile: false},
-			{ID: 12, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e03.mkv"}},
+			{
+				ID: 12, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e03.mkv"},
+			},
 			{ID: 13, HasFile: true, EpisodeFile: nil},
 		})
 	})
@@ -359,7 +357,6 @@ func TestGetWantedEpisodes_filters_episodes_without_files(t *testing.T) {
 		gotEpisodeIDs = append(gotEpisodeIDs, ep.ID)
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedEpisodes() unexpected error: %v", err)
 	}
@@ -377,8 +374,10 @@ func TestGetWantedEpisodes_callback_error_propagates(t *testing.T) {
 	})
 	mux.HandleFunc(apiPrefix+"/episode", func(w http.ResponseWriter, _ *http.Request) {
 		json.NewEncoder(w).Encode([]api.Episode{
-			{ID: 10, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"}},
+			{
+				ID: 10, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"},
+			},
 		})
 	})
 	srv := httptest.NewServer(mux)
@@ -410,8 +409,10 @@ func TestGetWantedEpisodes_skips_series_on_episode_fetch_error(t *testing.T) {
 			return
 		}
 		json.NewEncoder(w).Encode([]api.Episode{
-			{ID: 20, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"}},
+			{
+				ID: 20, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/show/s01e01.mkv"},
+			},
 		})
 	})
 	srv := httptest.NewServer(mux)
@@ -423,7 +424,6 @@ func TestGetWantedEpisodes_skips_series_on_episode_fetch_error(t *testing.T) {
 		gotEpisodeIDs = append(gotEpisodeIDs, ep.ID)
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedEpisodes() unexpected error: %v", err)
 	}
@@ -473,8 +473,10 @@ func TestGetWantedEpisodes_cancelled_context_during_iteration(t *testing.T) {
 	})
 	mux.HandleFunc(apiPrefix+"/episode", func(w http.ResponseWriter, _ *http.Request) {
 		json.NewEncoder(w).Encode([]api.Episode{
-			{ID: 10, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/s01e01.mkv"}},
+			{
+				ID: 10, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/s01e01.mkv"},
+			},
 		})
 	})
 	srv := httptest.NewServer(mux)
@@ -504,8 +506,10 @@ func TestGetWantedEpisodes_statistics_accumulation(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(apiPrefix+"/series", func(w http.ResponseWriter, _ *http.Request) {
 		json.NewEncoder(w).Encode([]api.Series{
-			{ID: 1, Title: "Show With Stats",
-				Statistics: &api.SeriesStatistics{EpisodeFileCount: 10}},
+			{
+				ID: 1, Title: "Show With Stats",
+				Statistics: &api.SeriesStatistics{EpisodeFileCount: 10},
+			},
 			{ID: 2, Title: "Show Without Stats"},
 		})
 	})
@@ -519,7 +523,6 @@ func TestGetWantedEpisodes_statistics_accumulation(t *testing.T) {
 	err := c.GetWantedEpisodes(context.Background(), nil, func(_ api.Series, _ api.Episode) error {
 		return nil
 	})
-
 	// This test exercises the Statistics != nil branch (sonarr.go:40-42).
 	// No callback invocations expected (no episodes with files).
 	if err != nil {
@@ -539,8 +542,10 @@ func TestGetWantedEpisodes_nil_exclude_includes_all(t *testing.T) {
 	})
 	mux.HandleFunc(apiPrefix+"/episode", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]api.Episode{
-			{ID: 10, HasFile: true,
-				EpisodeFile: &api.EpisodeFile{Path: "/tv/s01e01.mkv"}},
+			{
+				ID: 10, HasFile: true,
+				EpisodeFile: &api.EpisodeFile{Path: "/tv/s01e01.mkv"},
+			},
 		})
 	})
 	srv := httptest.NewServer(mux)
@@ -552,7 +557,6 @@ func TestGetWantedEpisodes_nil_exclude_includes_all(t *testing.T) {
 		gotSeriesTitles = append(gotSeriesTitles, s.Title)
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("GetWantedEpisodes(nil exclude) unexpected error: %v", err)
 	}
@@ -636,7 +640,6 @@ func TestGetEpisodesWithRetry_succeeds_after_transient_failure(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := c.GetEpisodes(context.Background(), 1)
-
 	if err != nil {
 		t.Fatalf("GetEpisodes() unexpected error: %v", err)
 	}
@@ -695,7 +698,6 @@ func TestGetTags_returns_all_tags(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	got, err := c.getTags(context.Background())
-
 	if err != nil {
 		t.Fatalf("getTags() unexpected error: %v", err)
 	}

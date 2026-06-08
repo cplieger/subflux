@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/scorer"
-	"subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subsync"
 )
 
 func TestSyncSubtitle(t *testing.T) {

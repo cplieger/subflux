@@ -7,8 +7,8 @@ import (
 	"context"
 	"database/sql"
 
-	"subflux/internal/api"
-	"subflux/internal/store/reconcile"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/reconcile"
 )
 
 // reconcileAdapter adapts *DB to the reconcile.DBTX interface.

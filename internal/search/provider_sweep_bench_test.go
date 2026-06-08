@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/scorer"
-	"subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search/syncing"
 )
 
 func BenchmarkSearchProviders(b *testing.B) {

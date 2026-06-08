@@ -13,15 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/config/schema"
-	"subflux/internal/provider"
-
-	"subflux/internal/server/activity"
-	"subflux/internal/server/confighandlers"
-	"subflux/internal/server/manualops"
-	"subflux/internal/server/scanning"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/schema"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/scanning"
 	"pgregory.net/rapid"
 )
 
@@ -111,52 +109,82 @@ func TestRedactSecrets(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"api_key redacted",
+		{
+			"api_key redacted",
 			"  api_key: my-secret-key",
-			"  api_key: \"********\""},
-		{"password redacted",
+			"  api_key: \"********\"",
+		},
+		{
+			"password redacted",
 			"  password: hunter2",
-			"  password: \"********\""},
-		{"token redacted",
+			"  password: \"********\"",
+		},
+		{
+			"token redacted",
 			"  token: abc123",
-			"  token: \"********\""},
-		{"secret redacted",
+			"  token: \"********\"",
+		},
+		{
+			"secret redacted",
 			"  secret: top-secret-value",
-			"  secret: \"********\""},
-		{"passkey redacted",
+			"  secret: \"********\"",
+		},
+		{
+			"passkey redacted",
 			"  passkey: secret123",
-			"  passkey: \"********\""},
-		{"non-secret preserved",
+			"  passkey: \"********\"",
+		},
+		{
+			"non-secret preserved",
 			"  url: http://example.com",
-			"  url: http://example.com"},
-		{"case insensitive match",
+			"  url: http://example.com",
+		},
+		{
+			"case insensitive match",
 			"  API_KEY: my-key",
-			"  API_KEY: \"********\""},
-		{"multiline mixed",
+			"  API_KEY: \"********\"",
+		},
+		{
+			"multiline mixed",
 			"  url: http://example.com\n  token: secret\n  port: 8080",
-			"  url: http://example.com\n  token: \"********\"\n  port: 8080"},
+			"  url: http://example.com\n  token: \"********\"\n  port: 8080",
+		},
 		{"empty input", "", ""},
-		{"partial key match not redacted",
+		{
+			"partial key match not redacted",
 			"  api_key_name: visible",
-			"  api_key_name: visible"},
-		{"empty double-quoted value not redacted",
+			"  api_key_name: visible",
+		},
+		{
+			"empty double-quoted value not redacted",
 			"  api_key: \"\"",
-			"  api_key: \"\""},
-		{"empty single-quoted value not redacted",
+			"  api_key: \"\"",
+		},
+		{
+			"empty single-quoted value not redacted",
 			"  api_key: ''",
-			"  api_key: ''"},
-		{"blank value not redacted",
+			"  api_key: ''",
+		},
+		{
+			"blank value not redacted",
 			"  api_key: ",
-			"  api_key: "},
-		{"inline comment stripped before redaction",
+			"  api_key: ",
+		},
+		{
+			"inline comment stripped before redaction",
 			"  token: my-secret # this is a comment",
-			"  token: \"********\""},
-		{"client_key redacted",
+			"  token: \"********\"",
+		},
+		{
+			"client_key redacted",
 			"  client_key: ck-12345",
-			"  client_key: \"********\""},
-		{"anidb_client_key redacted",
+			"  client_key: \"********\"",
+		},
+		{
+			"anidb_client_key redacted",
 			"  anidb_client_key: anidb-key-123",
-			"  anidb_client_key: \"********\""},
+			"  anidb_client_key: \"********\"",
+		},
 	}
 
 	for _, tt := range tests {
@@ -615,12 +643,18 @@ func TestSecretContextKey(t *testing.T) {
 	}{
 		{name: "top level key", yaml: "api_key: secret123", lineIdx: 0, key: "api_key", want: "api_key"},
 		{name: "nested under one parent", yaml: "sonarr:\n  api_key: secret123", lineIdx: 1, key: "api_key", want: "sonarr.api_key"},
-		{name: "deeply nested", yaml: "providers:\n  opensubtitles:\n    settings:\n      password: hunter2", lineIdx: 3, key: "password",
-			want: "providers.opensubtitles.settings.password"},
-		{name: "skips blank lines", yaml: "providers:\n\n  os:\n    api_key: abc", lineIdx: 3, key: "api_key",
-			want: "providers.os.api_key"},
-		{name: "skips comment lines", yaml: "providers:\n  # comment\n  os:\n    api_key: abc", lineIdx: 3, key: "api_key",
-			want: "providers.os.api_key"},
+		{
+			name: "deeply nested", yaml: "providers:\n  opensubtitles:\n    settings:\n      password: hunter2", lineIdx: 3, key: "password",
+			want: "providers.opensubtitles.settings.password",
+		},
+		{
+			name: "skips blank lines", yaml: "providers:\n\n  os:\n    api_key: abc", lineIdx: 3, key: "api_key",
+			want: "providers.os.api_key",
+		},
+		{
+			name: "skips comment lines", yaml: "providers:\n  # comment\n  os:\n    api_key: abc", lineIdx: 3, key: "api_key",
+			want: "providers.os.api_key",
+		},
 	}
 
 	for _, tt := range tests {

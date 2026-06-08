@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/search/release"
 )
 
 // Local aliases for test readability.

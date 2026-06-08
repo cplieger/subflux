@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // CommandName is a typed string for arr API command names.

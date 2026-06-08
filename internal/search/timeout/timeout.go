@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ProviderHealth abstracts provider timeout tracking.

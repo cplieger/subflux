@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzShiftAndFilterCuesNonNegative verifies that all output cue times are

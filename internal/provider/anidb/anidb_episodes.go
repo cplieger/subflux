@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // --- AniDB HTTP API ---

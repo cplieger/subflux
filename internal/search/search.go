@@ -6,11 +6,10 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
-	"subflux/internal/search/scoring"
-	"subflux/internal/search/timeout"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/search/timeout"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
@@ -97,8 +96,6 @@ func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t 
 // WithTimeout sets the provider health tracker. When not set, the engine
 // constructs one from config (or uses noopHealth if disabled).
 func WithTimeout(h timeout.ProviderHealth) Option { return func(e *Engine) { e.timeout = h } }
-
-
 
 // noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}
@@ -249,8 +246,8 @@ func groupTargetsByLang(targets []api.SubtitleTarget) (groups map[string][]api.S
 // Always searches for regular (non-HI, non-forced) subs, with HI as fallback.
 // Respects per-target provider filtering and min scores.
 func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
-	videoPath string, targets []api.SubtitleTarget) (api.SearchResult, error) {
-
+	videoPath string, targets []api.SubtitleTarget,
+) (api.SearchResult, error) {
 	slog.Debug("SearchTargets entry",
 		"media", req.MediaLabel(), "media_type", req.MediaType,
 		"imdb", req.ImdbID, "targets", len(targets),

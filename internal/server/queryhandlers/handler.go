@@ -3,7 +3,7 @@ package queryhandlers
 import (
 	"context"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // QueryStore documents the api.Store methods used by query handlers.

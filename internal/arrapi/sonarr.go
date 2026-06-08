@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // doSingleflight wraps singleflight.Group.DoChan with type safety and context

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestHandleMediaSeries_no_sonarr_returns_empty(t *testing.T) {

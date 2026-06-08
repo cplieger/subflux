@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
 )
 
 // GetHistorySince returns history events since the given time.

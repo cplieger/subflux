@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // PollCacher is the interface for poll timestamp caching. Consumers depend

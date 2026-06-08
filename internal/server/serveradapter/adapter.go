@@ -4,11 +4,11 @@
 package serveradapter
 
 import (
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/events"
-	"subflux/internal/server/manualops"
-	"subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/scanning"
 )
 
 // Compile-time assertions.

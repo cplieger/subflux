@@ -8,9 +8,10 @@ import (
 	"maps"
 	"net/http"
 	"strings"
-	"subflux/internal/api"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // errReader is an io.Reader that always returns an error.

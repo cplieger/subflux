@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // handleEvents delegates to events.HandleEvents with the server's config.

@@ -10,7 +10,7 @@
 package main
 
 import (
-	"subflux/internal/cliparse"
+	"github.com/cplieger/subflux/internal/cliparse"
 )
 
 const (

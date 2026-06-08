@@ -3,8 +3,8 @@ package schema
 import (
 	"strconv"
 
-	"subflux/internal/api"
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 func searchSection() api.SchemaSection {
@@ -157,22 +157,38 @@ func scoringSection() api.SchemaSection {
 		Key: "scoring", Title: "Scoring", Type: fieldFields,
 		Help: "Weights control how subtitles are ranked. Hash match scores 100 automatically.",
 		Fields: []api.SchemaField{
-			{Key: "hash", Label: "Hash", Type: fieldNumber, Default: strconv.Itoa(d.Hash),
-				Help: "File hash match (authoritative, bypasses other weights)"},
-			{Key: "source", Label: "Source", Type: fieldNumber, Default: strconv.Itoa(d.Source),
-				Help: "BluRay, WEB-DL, HDTV, DVDRip, etc."},
-			{Key: "release_group", Label: "Release Group", Type: fieldNumber, Default: strconv.Itoa(d.ReleaseGroup),
-				Help: "Scene group name (e.g. SPARKS, FGT)"},
-			{Key: "streaming_service", Label: "Streaming Service", Type: fieldNumber, Default: strconv.Itoa(d.StreamingService),
-				Help: "AMZN, NF, DSNP, ATVP, etc."},
-			{Key: "video_codec", Label: "Video Codec", Type: fieldNumber, Default: strconv.Itoa(d.VideoCodec),
-				Help: "x264, x265, AV1, etc."},
-			{Key: "hdr", Label: "HDR", Type: fieldNumber, Default: strconv.Itoa(d.HDR),
-				Help: "HDR10, Dolby Vision, HDR10+, etc."},
-			{Key: "edition", Label: "Edition", Type: fieldNumber, Default: strconv.Itoa(d.Edition),
-				Help: "Director's Cut, Extended, Theatrical (movies only)"},
-			{Key: "season_pack", Label: "Season Pack", Type: fieldNumber, Default: strconv.Itoa(d.SeasonPack),
-				Help: "Bonus for season packs (consistent subs across episodes)"},
+			{
+				Key: "hash", Label: "Hash", Type: fieldNumber, Default: strconv.Itoa(d.Hash),
+				Help: "File hash match (authoritative, bypasses other weights)",
+			},
+			{
+				Key: "source", Label: "Source", Type: fieldNumber, Default: strconv.Itoa(d.Source),
+				Help: "BluRay, WEB-DL, HDTV, DVDRip, etc.",
+			},
+			{
+				Key: "release_group", Label: "Release Group", Type: fieldNumber, Default: strconv.Itoa(d.ReleaseGroup),
+				Help: "Scene group name (e.g. SPARKS, FGT)",
+			},
+			{
+				Key: "streaming_service", Label: "Streaming Service", Type: fieldNumber, Default: strconv.Itoa(d.StreamingService),
+				Help: "AMZN, NF, DSNP, ATVP, etc.",
+			},
+			{
+				Key: "video_codec", Label: "Video Codec", Type: fieldNumber, Default: strconv.Itoa(d.VideoCodec),
+				Help: "x264, x265, AV1, etc.",
+			},
+			{
+				Key: "hdr", Label: "HDR", Type: fieldNumber, Default: strconv.Itoa(d.HDR),
+				Help: "HDR10, Dolby Vision, HDR10+, etc.",
+			},
+			{
+				Key: "edition", Label: "Edition", Type: fieldNumber, Default: strconv.Itoa(d.Edition),
+				Help: "Director's Cut, Extended, Theatrical (movies only)",
+			},
+			{
+				Key: "season_pack", Label: "Season Pack", Type: fieldNumber, Default: strconv.Itoa(d.SeasonPack),
+				Help: "Bonus for season packs (consistent subs across episodes)",
+			},
 		},
 	}
 }

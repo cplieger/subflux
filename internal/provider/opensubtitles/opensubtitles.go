@@ -15,12 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/provider/classify"
 	"github.com/cplieger/ssrf"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/classify"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )

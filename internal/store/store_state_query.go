@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // defaultQueryLimit is the safety cap applied when callers pass Limit=0
@@ -105,7 +105,6 @@ func (d *DB) Stats(ctx context.Context) (downloads, attempts int, err error) {
 // GetState returns subtitle state, most recent first.
 // Accepts optional filters; zero-value fields mean no filter.
 func (d *DB) GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
-
 	slog.Debug("GetState",
 		"media_type", q.MediaType, "lang", q.Language,
 		"provider", q.Provider, "search", q.Search,

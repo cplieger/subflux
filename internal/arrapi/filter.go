@@ -3,7 +3,7 @@ package arrapi
 import (
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // logMovieSummary logs pre-scan totals from the movie list.

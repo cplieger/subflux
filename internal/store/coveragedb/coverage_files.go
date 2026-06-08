@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
 // subtitleFileInsertBatch is the maximum number of subtitle file rows to
@@ -144,8 +144,8 @@ type subFileVal struct{ codec string }
 
 // loadSubtitleFiles reads the current subtitle_files rows for a media item.
 func (d *CoverageDB) loadSubtitleFiles(ctx context.Context,
-	mediaType api.MediaType, mediaID string) (map[subFileKey]subFileVal, error) {
-
+	mediaType api.MediaType, mediaID string,
+) (map[subFileKey]subFileVal, error) {
 	rows, err := d.stmtLoadSubFiles.QueryContext(ctx, mediaType, mediaID)
 	if err != nil {
 		return nil, fmt.Errorf("load existing subtitle_files: %w", err)
@@ -172,8 +172,8 @@ func (d *CoverageDB) loadSubtitleFiles(ctx context.Context,
 
 // diffSubtitleFiles computes the diff between current DB state and desired state.
 func diffSubtitleFiles(have, want map[subFileKey]subFileVal) (
-	toDelete, toInsert, toUpdate []subFileKey) {
-
+	toDelete, toInsert, toUpdate []subFileKey,
+) {
 	toDelete = make([]subFileKey, 0, len(have))
 	toInsert = make([]subFileKey, 0, len(want))
 	toUpdate = make([]subFileKey, 0, min(len(have), len(want)))
@@ -191,14 +191,14 @@ func diffSubtitleFiles(have, want map[subFileKey]subFileVal) (
 			toUpdate = append(toUpdate, k)
 		}
 	}
-	return
+	return toDelete, toInsert, toUpdate
 }
 
 // applySubtitleFileDiff executes the diff operations in a single transaction.
 func (d *CoverageDB) applySubtitleFileDiff(ctx context.Context,
 	mediaType api.MediaType, mediaID string, want map[subFileKey]subFileVal,
-	toDelete, toInsert, toUpdate []subFileKey) error {
-
+	toDelete, toInsert, toUpdate []subFileKey,
+) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)

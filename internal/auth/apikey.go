@@ -6,8 +6,7 @@ import (
 	"errors"
 
 	authlib "github.com/cplieger/auth"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ErrInvalidAPIKey is returned when an API key cannot be verified.

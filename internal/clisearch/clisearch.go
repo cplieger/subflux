@@ -10,14 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/embedded"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/syncing"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
-	"subflux/internal/provider"
-	"subflux/internal/provider/embedded"
-	"subflux/internal/scorer"
-	"subflux/internal/search"
-	"subflux/internal/search/syncing"
 )
 
 // defaultProviderTimeout is the per-provider search timeout for CLI searches.
@@ -189,8 +188,8 @@ func (d Deps) providerTimeoutOrDefault() time.Duration {
 // results, and optionally downloads the best match.
 func runItemSearch(ctx context.Context, engine api.SearchEngine, sc api.Scorer,
 	providers []api.Provider, item *searchItem,
-	lang string, download bool, pickN int, recorder DownloadRecorder, timeout time.Duration) {
-
+	lang string, download bool, pickN int, recorder DownloadRecorder, timeout time.Duration,
+) {
 	fmt.Printf("--- %s ---\n", item.label())
 
 	req := &api.SearchRequest{
@@ -271,8 +270,8 @@ func printScoredResults(scored []api.ScoredResult, sc api.Scorer, mediaType api.
 func downloadSubtitle(ctx context.Context, engine api.SearchEngine, sc api.Scorer,
 	providers []api.Provider,
 	req *api.SearchRequest, item *searchItem,
-	results []api.ScoredResult, lang string, pickN int, recorder DownloadRecorder) {
-
+	results []api.ScoredResult, lang string, pickN int, recorder DownloadRecorder,
+) {
 	idx := pickN - 1
 	if idx >= len(results) {
 		fmt.Printf("  --pick %d but only %d result(s)\n", pickN, len(results))

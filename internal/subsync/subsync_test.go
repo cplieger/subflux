@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestSyncFile_nil_opts(t *testing.T) {

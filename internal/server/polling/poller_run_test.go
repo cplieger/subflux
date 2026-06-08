@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // --- Mock implementations ---
@@ -60,15 +60,19 @@ type mockHistoryPoller struct {
 func (m *mockHistoryPoller) GetHistorySince(_ context.Context, _ time.Time, _ api.HistoryEventType) ([]api.HistoryEntry, error) {
 	return m.history, m.historyErr
 }
+
 func (m *mockHistoryPoller) GetSeriesByID(_ context.Context, id int) (*api.Series, error) {
 	return m.series[id], nil
 }
+
 func (m *mockHistoryPoller) GetEpisodeByID(_ context.Context, id int) (*api.Episode, error) {
 	return m.episodes[id], nil
 }
+
 func (m *mockHistoryPoller) GetMovieByID(_ context.Context, id int) (*api.Movie, error) {
 	return m.movies[id], nil
 }
+
 func (m *mockHistoryPoller) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return m.excludeIDs
 }
@@ -97,6 +101,7 @@ type mockEngine struct {
 func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
 	return m.result, m.err
 }
+
 func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.TimeoutStatus, bool) {
 	return nil, false
 }
@@ -104,12 +109,15 @@ func (m *mockEngine) ResetTimeouts() {}
 func (m *mockEngine) SimulateScore(_ api.MediaType, _, _ string, _ api.MatchMethod) api.ScoreResult {
 	return api.ScoreResult{}
 }
+
 func (m *mockEngine) ScoreSubtitles(_ *api.SearchRequest, _ []api.Subtitle) []api.ScoredResult {
 	return nil
 }
+
 func (m *mockEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ api.Variant) ([]byte, int64) {
 	return data, 0
 }
+
 func (m *mockEngine) HashFile(_ context.Context, _ string) (string, int64, error) {
 	return "", 0, nil
 }
@@ -201,7 +209,7 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 func TestProcessPollImport_search_success(t *testing.T) {
 	tmp := t.TempDir()
 	videoPath := filepath.Join(tmp, "video.mkv")
-	if err := os.WriteFile(videoPath, []byte("fake"), 0644); err != nil {
+	if err := os.WriteFile(videoPath, []byte("fake"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -278,10 +286,14 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	now := time.Now().UTC()
 	sonarr := &mockHistoryPoller{
 		history: []api.HistoryEntry{
-			{Date: now,
-				Data: map[string]string{"importedPath": "/missing/path/a.mkv"}},
-			{Date: now.Add(time.Second),
-				Data: map[string]string{"importedPath": "/missing/path/b.mkv"}},
+			{
+				Date: now,
+				Data: map[string]string{"importedPath": "/missing/path/a.mkv"},
+			},
+			{
+				Date: now.Add(time.Second),
+				Data: map[string]string{"importedPath": "/missing/path/b.mkv"},
+			},
 		},
 	}
 	deps := Deps{

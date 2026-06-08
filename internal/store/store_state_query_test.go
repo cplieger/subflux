@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestGetState_filters_all_combinations(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 
-	"subflux/internal/api"
-	"subflux/internal/server/events"
-	"subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/scanning"
 )
 
 // processPollImport is the shared logic for Sonarr/Radarr import events.

@@ -9,11 +9,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
-	"subflux/internal/search"
-	"subflux/internal/server/coverage"
 )
 
 var (

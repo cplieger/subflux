@@ -10,9 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/singleflight"
-
-	"subflux/internal/api"
 )
 
 // MediaFetcher is the narrow interface consumed by media browser handlers.

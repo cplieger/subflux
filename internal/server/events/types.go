@@ -1,8 +1,8 @@
 package events
 
 import (
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
 )
 
 // EventType is a typed string for server-sent event types.

@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	"subflux/internal/api"
-	"subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/manualops"
 )
 
 // downloadStore is the narrow store interface used by manual_download.go.

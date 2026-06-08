@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // DownloadTimeout is the context timeout for manual downloads.
@@ -18,8 +18,8 @@ const DownloadTimeout = 5 * time.Minute
 // RunDownload performs the actual download, post-processing, and save.
 // Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	prov api.Provider, req *DownloadRequest) bool {
-
+	prov api.Provider, req *DownloadRequest,
+) bool {
 	// Download the subtitle.
 	sub := api.Subtitle{
 		Provider:    req.Provider,
@@ -118,8 +118,8 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 // ResolveMediaIDs determines the coverage and history media IDs for a manual
 // download.
 func ResolveMediaIDs(ctx context.Context, ls *LiveState,
-	mediaType api.MediaType, arrID, season, episode int) (coverageID, historyID string) {
-
+	mediaType api.MediaType, arrID, season, episode int,
+) (coverageID, historyID string) {
 	if mediaType == api.MediaTypeMovie && arrID > 0 {
 		coverageID = LookupMovieMediaID(ctx, ls, arrID)
 	} else if mediaType == api.MediaTypeEpisode && arrID > 0 {
@@ -188,8 +188,8 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaTyp
 // PostDownloadUpdate updates coverage DB and refreshes the arr after a
 // successful manual download.
 func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
-	req *DownloadRequest, mediaType api.MediaType, coverageMediaID, subPath string, variant api.Variant) {
-
+	req *DownloadRequest, mediaType api.MediaType, coverageMediaID, subPath string, variant api.Variant,
+) {
 	if coverageMediaID != "" {
 		if err := db.UpsertSubtitleFile(ctx, mediaType, coverageMediaID, &api.SubtitleFile{
 			Language: req.Language,

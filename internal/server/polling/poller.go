@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // HistoryPoller is the narrow interface consumed by the poller subsystem.

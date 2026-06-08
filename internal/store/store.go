@@ -18,10 +18,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/txutil"
 	_ "modernc.org/sqlite" // register sqlite3 database/sql driver
-
-	"subflux/internal/api"
-	"subflux/internal/store/txutil"
 )
 
 // sqliteBatchSize is the maximum number of SQL parameters per statement,

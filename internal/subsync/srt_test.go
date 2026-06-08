@@ -132,9 +132,11 @@ func TestWriteSRT_empty_cues(t *testing.T) {
 func TestWriteSRT_format(t *testing.T) {
 	t.Parallel()
 	cues := []Cue{
-		{Start: 1*time.Hour + 2*time.Minute + 3*time.Second + 456*time.Millisecond,
-			End:  1*time.Hour + 2*time.Minute + 6*time.Second + 789*time.Millisecond,
-			Text: "Test"},
+		{
+			Start: 1*time.Hour + 2*time.Minute + 3*time.Second + 456*time.Millisecond,
+			End:   1*time.Hour + 2*time.Minute + 6*time.Second + 789*time.Millisecond,
+			Text:  "Test",
+		},
 	}
 
 	var buf bytes.Buffer

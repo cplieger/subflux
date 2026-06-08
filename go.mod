@@ -1,4 +1,4 @@
-module subflux
+module github.com/cplieger/subflux
 
 go 1.26.4
 

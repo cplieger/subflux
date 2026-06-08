@@ -3,7 +3,7 @@ package auth
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func FuzzCanDisableAuthMethod(f *testing.F) {

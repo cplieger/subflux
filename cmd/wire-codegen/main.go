@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/coverage"
-	"subflux/internal/server/coveragehandlers"
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/server/coveragehandlers"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 const (
@@ -668,7 +668,6 @@ func sanitizeVarName(wireName string) string {
 			b.WriteString(p)
 		} else if p != "" {
 			b.WriteString(strings.ToUpper(p[:1]) + p[1:])
-
 		}
 	}
 	s := b.String()

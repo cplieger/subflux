@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/api"
-
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/singleflight"
 )
 

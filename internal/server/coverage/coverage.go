@@ -3,7 +3,7 @@
 // handling — they operate solely on api types.
 package coverage
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // Key identifies a subtitle by language and variant for coverage indexing.
 type Key struct{ Lang, Variant string }

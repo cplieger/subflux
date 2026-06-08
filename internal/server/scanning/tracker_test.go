@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/provider"
-	"subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/server/showskip"
 )
 
 // mockShowCounter implements api.ShowSubtitleCounter for testing.
@@ -31,6 +31,7 @@ func (m *mockShowCounter) Name() api.ProviderID { return "opensubtitles" }
 func (m *mockShowCounter) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
 	return nil, nil
 }
+
 func (m *mockShowCounter) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
 	return nil, nil
 }

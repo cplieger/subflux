@@ -16,16 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/config"
-	"subflux/internal/metrics"
-
-	"subflux/internal/server/activity"
-	"subflux/internal/server/events"
-	"subflux/internal/server/manualops"
-	"subflux/internal/server/scanning"
-	"subflux/internal/server/serveradapter"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"pgregory.net/rapid"
 )
 

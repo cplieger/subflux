@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion that NopStore implements api.Store.
@@ -27,6 +27,7 @@ type NopStore struct{ panicStore } //nolint:unused // embedded for compile-time 
 func (*NopStore) RecordNoResult(context.Context, api.MediaType, string, string, api.ProviderID, api.BackoffParams) error {
 	return nil
 }
+
 func (*NopStore) BackedOffProviders(context.Context, api.MediaType, string, string, int) ([]api.ProviderID, error) {
 	return nil, nil
 }
@@ -38,15 +39,19 @@ func (*NopStore) GetBackoffByPrefix(context.Context, api.MediaType, string) ([]a
 // --- State (downloads + history) ---
 
 func (*NopStore) SaveDownload(context.Context, *api.DownloadRecord) error { return nil }
+
 func (*NopStore) DownloadedRefs(context.Context, api.MediaType, string, string) ([]api.DownloadedRef, error) {
 	return nil, nil
 }
+
 func (*NopStore) CurrentScore(context.Context, api.MediaType, string, string) (score int, at time.Time, found bool, _ error) {
 	return 0, time.Time{}, false, nil
 }
+
 func (*NopStore) GetState(context.Context, *api.StateQuery) ([]api.StateEntry, error) {
 	return nil, nil
 }
+
 func (*NopStore) HistoryMediaIDs(context.Context, api.MediaType, string) ([]string, error) {
 	return nil, nil
 }
@@ -60,6 +65,7 @@ func (*NopStore) ClearManualLock(context.Context, api.MediaType, string, string)
 func (*NopStore) ManualDownloadCount(context.Context, api.MediaType, string, string) (int, error) {
 	return 0, nil
 }
+
 func (*NopStore) ManualSubtitlePaths(context.Context, api.MediaType, string, string) ([]string, error) {
 	return nil, nil
 }
@@ -71,21 +77,27 @@ func (*NopStore) GetManualLocks(context.Context) ([]api.ManualLockEntry, error) 
 func (*NopStore) RecordSubtitleFiles(context.Context, api.MediaType, string, []api.SubtitleFile) (bool, error) {
 	return false, nil
 }
+
 func (*NopStore) UpsertSubtitleFile(context.Context, api.MediaType, string, *api.SubtitleFile) error {
 	return nil
 }
+
 func (*NopStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleFileRow, error) {
 	return nil, nil
 }
+
 func (*NopStore) DeleteSubtitleFile(context.Context, api.MediaType, string, string, api.Variant, api.SubtitleSource, string) error {
 	return nil
 }
+
 func (*NopStore) RecordScanState(context.Context, *api.ScanRecord) error {
 	return nil
 }
+
 func (*NopStore) GetScanStates(context.Context, api.MediaType, string) ([]api.ScanStateRow, error) {
 	return nil, nil
 }
+
 func (*NopStore) RecentlyScanned(context.Context, time.Time) (map[string]bool, error) {
 	return nil, nil
 }
@@ -107,6 +119,7 @@ func (*NopStore) SetPollTimestamp(context.Context, api.PollKey, time.Time) error
 // --- Maintenance ---
 
 func (*NopStore) Stats(context.Context) (downloads, backoffs int, _ error) { return 0, 0, nil }
+
 func (*NopStore) DeleteStateByPaths(context.Context, []string) (api.CleanupResult, error) {
 	return api.CleanupResult{}, nil
 }

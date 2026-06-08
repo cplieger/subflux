@@ -6,9 +6,8 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/ulikunitz/xz"
-
-	"subflux/internal/httputil"
 )
 
 // Decompress detects compressed data by magic bytes and decompresses it.

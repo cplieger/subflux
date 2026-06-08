@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // ScanItem holds either an episode or a movie for alphabetical scanning.

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"subflux/internal/api"
-	"subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // TestNew_UnconfiguredMode_NoPanic guards against a regression where

@@ -6,12 +6,10 @@ import (
 	"context"
 	"testing"
 
-	"pgregory.net/rapid"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/ulikunitz/xz"
-
-	"subflux/internal/api"
-	"subflux/internal/provider/archive"
+	"pgregory.net/rapid"
 )
 
 func TestFactory(t *testing.T) {

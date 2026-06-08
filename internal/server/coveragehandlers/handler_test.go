@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // mockCoverageStore implements CoverageStore for testing.

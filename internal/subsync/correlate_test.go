@@ -4,9 +4,9 @@ import (
 	"context"
 	"math"
 	"math/cmplx"
-	"subflux/internal/subsync/fft"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/subsync/fft"
 	"pgregory.net/rapid"
 )
 

@@ -33,8 +33,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
 )
 
 // Options configures a sync operation.

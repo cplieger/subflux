@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/provider"
-	"subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 // --- JSON types (hdbSubtitleItem, flexInt) ---

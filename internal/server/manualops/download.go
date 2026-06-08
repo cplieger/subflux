@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // DownloadRequest holds the parsed fields for a manual download.
@@ -49,8 +49,6 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 	}
 	return nil
 }
-
-
 
 // DownloadStore is the narrow store interface for manual download operations.
 type DownloadStore interface {

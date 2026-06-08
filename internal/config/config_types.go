@@ -5,9 +5,8 @@ import (
 	"os"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/config/defaults"
-
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/defaults"
 	"go.yaml.in/yaml/v3"
 )
 

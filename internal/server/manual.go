@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/manualops"
 )
 
 // manualStore documents the api.Store methods used by manual search/download handlers.
@@ -51,6 +51,7 @@ func (s *Server) lookupEpisodeMediaID(ctx context.Context, ls *liveState, series
 // resolveMediaIDs wraps manualops.ResolveMediaIDs with the server's
 // manualLiveState adapter.
 func (s *Server) resolveMediaIDs(ctx context.Context, ls *liveState,
-	mediaType api.MediaType, arrID, season, episode int) (mediaID, title string) {
+	mediaType api.MediaType, arrID, season, episode int,
+) (mediaID, title string) {
 	return manualops.ResolveMediaIDs(ctx, s.manualLiveState(ls), mediaType, arrID, season, episode)
 }

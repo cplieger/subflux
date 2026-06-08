@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/server/scheduler"
-	"subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/server/scheduler"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // authCleanupInterval is how often expired sessions and stale auth state

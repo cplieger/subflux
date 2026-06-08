@@ -2,10 +2,10 @@ package store
 
 import (
 	"context"
-	"subflux/internal/api"
 	"testing"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
 	"pgregory.net/rapid"
 )
 

@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // MaxDefaultBodySize is the default JSON body size cap for most handlers (1 MiB).
@@ -36,7 +36,6 @@ func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodPost)
 }
 
-
 // DecodeJSONBody decodes a JSON request body into dst with a size cap.
 // Writes 400 and returns false on decode failure.
 func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
@@ -51,4 +50,3 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	}
 	return true
 }
-

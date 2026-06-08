@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"subflux/internal/server/sessionbatch"
+	"github.com/cplieger/subflux/internal/server/sessionbatch"
 )
 
 // sessionBatchUpdater is the interface for batch session activity updates.

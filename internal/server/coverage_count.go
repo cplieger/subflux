@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/coverage"
 )
 
 // countMissing delegates to coverage.CountMissing.

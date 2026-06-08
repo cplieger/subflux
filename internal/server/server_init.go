@@ -4,19 +4,18 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/fsutil"
-	"subflux/internal/server/confighandlers"
-	"subflux/internal/server/coveragehandlers"
-	"subflux/internal/server/filehandlers"
-	"subflux/internal/server/manualops"
-	"subflux/internal/server/mediahandlers"
-	"subflux/internal/server/polling"
-	"subflux/internal/server/previewhandlers"
-	"subflux/internal/server/queryhandlers"
-	"subflux/internal/server/serveradapter"
-	"subflux/internal/server/synchandlers"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/coveragehandlers"
+	"github.com/cplieger/subflux/internal/server/filehandlers"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/mediahandlers"
+	"github.com/cplieger/subflux/internal/server/polling"
+	"github.com/cplieger/subflux/internal/server/previewhandlers"
+	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/server/synchandlers"
 )
 
 // initHandlers constructs all handler families on the server.

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- GET /api/auth/users ---

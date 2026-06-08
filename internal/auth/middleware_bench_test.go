@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func BenchmarkAuthenticate(b *testing.B) {

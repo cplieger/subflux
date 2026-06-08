@@ -3,8 +3,8 @@ package authhandlers
 import (
 	"context"
 
-	"subflux/internal/api"
-	"subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
 )
 
 // AuthAdminStore is the narrow interface consumed by admin user management handlers.

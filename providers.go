@@ -5,18 +5,18 @@
 package main
 
 import (
-	"subflux/internal/api"
-	"subflux/internal/provider"
-	"subflux/internal/provider/animetosho"
-	"subflux/internal/provider/betaseries"
-	"subflux/internal/provider/embedded"
-	"subflux/internal/provider/gestdown"
-	"subflux/internal/provider/hdbits"
-	"subflux/internal/provider/mock"
-	"subflux/internal/provider/opensubtitles"
-	"subflux/internal/provider/subdl"
-	"subflux/internal/provider/subsource"
-	"subflux/internal/provider/yifysubtitles"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/animetosho"
+	"github.com/cplieger/subflux/internal/provider/betaseries"
+	"github.com/cplieger/subflux/internal/provider/embedded"
+	"github.com/cplieger/subflux/internal/provider/gestdown"
+	"github.com/cplieger/subflux/internal/provider/hdbits"
+	"github.com/cplieger/subflux/internal/provider/mock"
+	"github.com/cplieger/subflux/internal/provider/opensubtitles"
+	"github.com/cplieger/subflux/internal/provider/subdl"
+	"github.com/cplieger/subflux/internal/provider/subsource"
+	"github.com/cplieger/subflux/internal/provider/yifysubtitles"
 )
 
 // Provider name constants are sourced from api.ProviderName* (single source of truth).
@@ -59,43 +59,65 @@ var providerEntries = []providerEntry{
 	{
 		name: api.ProviderNameEmbedded, label: "Embedded", factory: embedded.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: "ignore_pgs", Label: "Ignore PGS", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Exclude PGS bitmap subs from search results (Blu-ray). Still tracked in coverage."},
-			{Key: "ignore_vobsub", Label: "Ignore VobSub", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Exclude VobSub bitmap subs from search results (DVD). Still tracked in coverage."},
-			{Key: "ignore_ass", Label: "Ignore ASS", Type: fieldTypeBool, Default: fieldDefaultFalse,
-				Help: "Skip ASS/SSA styled subs (anime)"},
+			{
+				Key: "ignore_pgs", Label: "Ignore PGS", Type: fieldTypeBool, Default: fieldDefaultTrue,
+				Help: "Exclude PGS bitmap subs from search results (Blu-ray). Still tracked in coverage.",
+			},
+			{
+				Key: "ignore_vobsub", Label: "Ignore VobSub", Type: fieldTypeBool, Default: fieldDefaultTrue,
+				Help: "Exclude VobSub bitmap subs from search results (DVD). Still tracked in coverage.",
+			},
+			{
+				Key: "ignore_ass", Label: "Ignore ASS", Type: fieldTypeBool, Default: fieldDefaultFalse,
+				Help: "Skip ASS/SSA styled subs (anime)",
+			},
 		},
 	},
 	{
 		name: api.ProviderNameHDBits, label: "HDBits", factory: hdbits.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
-				Help: "hdbits.org account"},
-			{Key: "passkey", Label: "Passkey", Type: fieldTypeSecret, Secret: true,
-				Help: "From hdbits.org user settings"},
+			{
+				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
+				Help: "hdbits.org account",
+			},
+			{
+				Key: "passkey", Label: "Passkey", Type: fieldTypeSecret, Secret: true,
+				Help: "From hdbits.org user settings",
+			},
 		},
 	},
 	{
 		name: api.ProviderNameOpenSubtitles, label: "OpenSubtitles", factory: opensubtitles.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
-				Help: "opensubtitles.com account"},
-			{Key: "password", Label: "Password", Type: fieldTypeSecret, Secret: true,
-				Help: "opensubtitles.com password"},
-			{Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
-				Help: "From opensubtitles.com/consumers"},
-			{Key: "use_hash", Label: "Use Hash", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Match by file hash (fast, exact)"},
-			{Key: "include_ai_translated", Label: "Include AI Translated", Type: fieldTypeBool,
-				Default: fieldDefaultFalse, Help: "Include AI/machine-translated subs"},
+			{
+				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
+				Help: "opensubtitles.com account",
+			},
+			{
+				Key: "password", Label: "Password", Type: fieldTypeSecret, Secret: true,
+				Help: "opensubtitles.com password",
+			},
+			{
+				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
+				Help: "From opensubtitles.com/consumers",
+			},
+			{
+				Key: "use_hash", Label: "Use Hash", Type: fieldTypeBool, Default: fieldDefaultTrue,
+				Help: "Match by file hash (fast, exact)",
+			},
+			{
+				Key: "include_ai_translated", Label: "Include AI Translated", Type: fieldTypeBool,
+				Default: fieldDefaultFalse, Help: "Include AI/machine-translated subs",
+			},
 		},
 	},
 	{
 		name: api.ProviderNameBetaSeries, label: "BetaSeries", factory: betaseries.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: "token", Label: "Token", Type: fieldTypeSecret, Secret: true,
-				Help: "From betaseries.com/en/account/api"},
+			{
+				Key: "token", Label: "Token", Type: fieldTypeSecret, Secret: true,
+				Help: "From betaseries.com/en/account/api",
+			},
 		},
 	},
 	{
@@ -105,22 +127,28 @@ var providerEntries = []providerEntry{
 	{
 		name: api.ProviderNameSubSource, label: "SubSource", factory: subsource.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
-				Help: "From subsource.net API registration"},
+			{
+				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
+				Help: "From subsource.net API registration",
+			},
 		},
 	},
 	{
 		name: api.ProviderNameSubDL, label: "SubDL", factory: subdl.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
-				Help: "From subdl.com API registration"},
+			{
+				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
+				Help: "From subdl.com API registration",
+			},
 		},
 	},
 	{
 		name: api.ProviderNameAnimeTosho, label: "AnimeTosho", factory: animetosho.Factory,
 		fields: []api.ProviderSchemaField{
-			{Key: "anidb_client_key", Label: "AniDB Client Key", Type: fieldTypeSecret,
-				Secret: true, Help: "Optional; enables AniDB episode ID search"},
+			{
+				Key: "anidb_client_key", Label: "AniDB Client Key", Type: fieldTypeSecret,
+				Secret: true, Help: "Optional; enables AniDB episode ID search",
+			},
 		},
 	},
 	{

@@ -9,8 +9,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"subflux/internal/api"
-
+	"github.com/cplieger/subflux/internal/api"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // SearchFlowStore is the narrow store interface for search flow operations:

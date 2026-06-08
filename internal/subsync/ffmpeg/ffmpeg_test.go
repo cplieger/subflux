@@ -2,8 +2,9 @@ package ffmpeg
 
 import (
 	"context"
-	"subflux/internal/provider/classify"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 var testLangMapper LangMapper = classify.Alpha2FromAlpha3

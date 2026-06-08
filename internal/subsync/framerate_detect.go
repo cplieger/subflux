@@ -6,8 +6,8 @@ import (
 	"math"
 	"time"
 
-	"subflux/internal/subsync/ffmpeg"
-	"subflux/internal/subsync/framerate"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subsync/framerate"
 )
 
 // framerateConfig consolidates all framerate detection tuning parameters.

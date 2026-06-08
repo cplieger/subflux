@@ -9,9 +9,8 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
 )
 
 // RegistryErrorKind categorizes registry loading failures.

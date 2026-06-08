@@ -7,10 +7,9 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/store/migrations"
 	sqlite "modernc.org/sqlite"
 	sqlitelib "modernc.org/sqlite/lib"
-
-	"subflux/internal/store/migrations"
 )
 
 // applySchema executes the DDL and runs any necessary migrations.

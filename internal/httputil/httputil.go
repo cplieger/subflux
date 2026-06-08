@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // UserAgent is the default User-Agent header sent by all providers.
@@ -149,7 +148,8 @@ func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duratio
 
 // RetryWithBackoff retries fn with jittered exponential backoff.
 func RetryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time.Duration,
-	label string, fn func(ctx context.Context) (T, error)) (T, error) {
+	label string, fn func(ctx context.Context) (T, error),
+) (T, error) {
 	return httpx.RetryWithBackoff(ctx, maxRetries, baseDelay, label, func(ctx context.Context) (T, error) {
 		result, err := fn(ctx)
 		if err == nil {

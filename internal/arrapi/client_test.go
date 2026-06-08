@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- Test helpers ---
@@ -90,7 +90,6 @@ func TestRefreshSeries_sends_correct_command(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	err := c.RefreshSeries(context.Background(), 99)
-
 	if err != nil {
 		t.Fatalf("RefreshSeries() unexpected error: %v", err)
 	}
@@ -117,7 +116,6 @@ func TestRefreshMovie_sends_correct_command(t *testing.T) {
 
 	c := newTestClient(t, srv)
 	err := c.RefreshMovie(context.Background(), 42)
-
 	if err != nil {
 		t.Fatalf("RefreshMovie() unexpected error: %v", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzSortByTitleIdempotent verifies the idempotence invariant:

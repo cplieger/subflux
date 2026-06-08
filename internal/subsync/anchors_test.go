@@ -3,8 +3,7 @@ package subsync
 import (
 	"testing"
 
-	"subflux/internal/subsync/crosslang"
-
+	"github.com/cplieger/subflux/internal/subsync/crosslang"
 	"pgregory.net/rapid"
 )
 

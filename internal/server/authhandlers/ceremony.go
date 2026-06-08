@@ -13,8 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/auth"
-
+	"github.com/cplieger/subflux/internal/auth"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 

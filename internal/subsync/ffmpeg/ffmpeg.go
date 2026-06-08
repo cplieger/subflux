@@ -15,8 +15,6 @@ const MaxExtractBytes = 50 * 1024 * 1024
 // LangMapper maps ISO 639-3 language codes to ISO 639-1.
 type LangMapper func(string) string
 
-
-
 // CommandRunner abstracts subprocess execution for testability. The default
 // implementation uses exec.CommandContext. Test code can inject a mock runner
 // to exercise parsing/selection logic without real ffmpeg binaries.

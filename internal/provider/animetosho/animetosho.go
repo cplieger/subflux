@@ -15,15 +15,14 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/provider/anidb"
-	"subflux/internal/provider/archive"
-	"subflux/internal/provider/classify"
 	"github.com/cplieger/ssrf"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/provider/anidb"
+	"github.com/cplieger/subflux/internal/provider/archive"
+	"github.com/cplieger/subflux/internal/provider/classify"
+	"golang.org/x/sync/errgroup"
 )
 
 // Compile-time assertion that Provider implements api.Provider.
@@ -259,8 +258,8 @@ type feedEntry struct {
 // per-episode entries and season packs. Returns only complete entries,
 // capped at maxSearchEntries.
 func (p *Provider) searchEntries(ctx context.Context,
-	title string, season int) ([]feedEntry, error) {
-
+	title string, season int,
+) ([]feedEntry, error) {
 	query := fmt.Sprintf("%s S%02d", title, season)
 	slog.Debug("animetosho searching entries", "query", query)
 
@@ -282,8 +281,8 @@ func (p *Provider) searchEntries(ctx context.Context,
 // episode is used.
 func (p *Provider) getSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
-	season, episode int) ([]api.Subtitle, error) {
-
+	season, episode int,
+) ([]api.Subtitle, error) {
 	slog.Debug("animetosho fetching entry subtitles", "entry_id", entryID)
 
 	var result entryDetail
@@ -341,8 +340,8 @@ func filterCompleteEntries(entries []feedEntry) []feedEntry {
 // used. For single-file entries, all subtitle attachments are returned.
 // Pure function extracted from getSubtitlesForEntry for testability.
 func filterAttachments(result entryDetail, languages []string,
-	season, episode int) []api.Subtitle {
-
+	season, episode int,
+) []api.Subtitle {
 	files := matchFiles(result.Files, season, episode)
 
 	var subs []api.Subtitle

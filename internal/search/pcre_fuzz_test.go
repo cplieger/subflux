@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/search/release"
 )
 
 func FuzzPcreTranslate(f *testing.F) {

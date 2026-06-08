@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *AuthDB implements the OIDC state sub-interface.
@@ -51,7 +51,7 @@ func (a *AuthDB) ConsumeOIDCState(ctx context.Context, state string) (nonce, cod
 	if err == nil {
 		slog.Debug("oidc state consumed", "state_prefix", state[:min(8, len(state))])
 	}
-	return
+	return nonce, codeVerifier, redirectURI, err
 }
 
 // CleanupExpiredOIDCStates removes OIDC state entries older than maxAge.

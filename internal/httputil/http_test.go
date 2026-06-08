@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestCheckHTTPStatus(t *testing.T) {

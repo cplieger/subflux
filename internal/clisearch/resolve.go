@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/arrapi"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrapi"
 )
 
 // resolveItems queries Sonarr and Radarr to find media items matching the
@@ -16,8 +16,8 @@ import (
 // for movies if no items were found.
 func resolveItems(ctx context.Context, cfg api.ConfigProvider,
 	imdbID, tmdbID, title string,
-	seasonFilter, episodeFilter int) []searchItem {
-
+	seasonFilter, episodeFilter int,
+) []searchItem {
 	resolveCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
@@ -54,8 +54,8 @@ func resolveItems(ctx context.Context, cfg api.ConfigProvider,
 
 func resolveFromSonarr(ctx context.Context, client *arrapi.Client,
 	imdbID, title string,
-	seasonFilter, episodeFilter int) []searchItem {
-
+	seasonFilter, episodeFilter int,
+) []searchItem {
 	var items []searchItem
 	allSeries, err := client.GetSeries(ctx)
 	if err != nil {
@@ -83,8 +83,8 @@ func matchSeries(s *api.Series, imdbID, title string) bool {
 }
 
 func episodesForSeries(series *api.Series, episodes []api.Episode,
-	seasonFilter, episodeFilter int) []searchItem {
-
+	seasonFilter, episodeFilter int,
+) []searchItem {
 	var items []searchItem
 	for _, ep := range episodes {
 		if !ep.HasFile || ep.EpisodeFile == nil {
@@ -108,8 +108,8 @@ func episodesForSeries(series *api.Series, episodes []api.Episode,
 }
 
 func resolveFromRadarr(ctx context.Context, client *arrapi.Client,
-	imdbID, tmdbID, title string) []searchItem {
-
+	imdbID, tmdbID, title string,
+) []searchItem {
 	tmdbInt := parseTmdbID(tmdbID)
 	allMovies, err := client.GetMovies(ctx)
 	if err != nil {

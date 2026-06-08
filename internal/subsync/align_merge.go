@@ -52,7 +52,7 @@ outer:
 	})
 
 	var derivative, rating, bestRating float64
-	var bestOffset = minOffset
+	bestOffset := minOffset
 
 	for i := range events {
 		derivative += events[i].delta

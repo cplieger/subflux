@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/subsync/crosslang"
+	"github.com/cplieger/subflux/internal/subsync/crosslang"
 )
 
 // Compile-time assertion: crosslang.MinCuesForSync must equal subsync.MinCuesForSync.

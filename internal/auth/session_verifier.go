@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // SessionVerifier authenticates requests via session cookie.

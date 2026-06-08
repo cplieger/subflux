@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // --- EventBus.Subscribe ---

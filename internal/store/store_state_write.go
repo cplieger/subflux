@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *DB satisfies api.DownloadStore.
@@ -15,7 +15,8 @@ var _ api.DownloadStore = (*DB)(nil)
 
 // saveManualDownload inserts a new manual download row (acts as the lock).
 func saveManualDownload(ctx context.Context, tx *sql.Tx,
-	rec *api.DownloadRecord, m *api.DownloadMeta) error {
+	rec *api.DownloadRecord, m *api.DownloadMeta,
+) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO subtitle_state
 			(media_type, media_id, language, provider, release_name, score, path,
@@ -30,7 +31,8 @@ func saveManualDownload(ctx context.Context, tx *sql.Tx,
 // saveAutoDownload updates an existing auto row (preserving media_imported),
 // or inserts a new one if no auto row exists.
 func saveAutoDownload(ctx context.Context, tx *sql.Tx,
-	rec *api.DownloadRecord, m *api.DownloadMeta) error {
+	rec *api.DownloadRecord, m *api.DownloadMeta,
+) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE subtitle_state
 		SET provider = ?, release_name = ?, score = ?, path = ?,
@@ -66,7 +68,6 @@ func saveAutoDownload(ctx context.Context, tx *sql.Tx,
 // one. For manual downloads, always inserts a new row (acts as the lock).
 // Clears adaptive backoff on success.
 func (d *DB) SaveDownload(ctx context.Context, rec *api.DownloadRecord) error {
-
 	slog.Debug("SaveDownload",
 		"media_type", rec.MediaType, "media_id", rec.MediaID,
 		"lang", rec.Language, "provider", rec.ProviderName,

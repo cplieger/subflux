@@ -3,7 +3,7 @@ package clisearch
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestParseTmdbID(t *testing.T) {

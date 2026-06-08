@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertions: *Config satisfies all config sub-interfaces.

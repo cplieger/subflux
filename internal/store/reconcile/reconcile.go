@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
 )
 
 // DBTX is the narrow database interface required by the reconcile package.

@@ -8,7 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *CoverageDB satisfies api.CoverageStore.

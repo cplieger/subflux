@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 // validateScoreRange checks that a score value is within [defaults.MinScoreValue, defaults.MaxScoreValue].

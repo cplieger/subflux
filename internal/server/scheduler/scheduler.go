@@ -8,12 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/httputil"
-	"subflux/internal/provider"
-	"subflux/internal/server/scanning"
-	"subflux/internal/server/serveradapter"
-	"subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/server/showskip"
 )
 
 // StartupDelay is the delay before the first scan after startup.

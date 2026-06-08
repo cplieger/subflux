@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Compile-time assertion: *DB satisfies api.MaintStore.
@@ -84,8 +84,8 @@ func (d *DB) DeleteStateByPaths(ctx context.Context, videoPaths []string) (api.C
 // collectAffectedState queries subtitle paths and media keys for rows
 // matching the given video paths within the transaction.
 func collectAffectedState(ctx context.Context, tx *sql.Tx,
-	inClause string, args []any) ([]string, []MediaKey, error) {
-
+	inClause string, args []any,
+) ([]string, []MediaKey, error) {
 	var subPaths []string
 	var keys []MediaKey
 	rows, err := tx.QueryContext(ctx,

@@ -112,8 +112,8 @@ func pickWinner(clusters []voteCluster) SyncResult {
 //  3. Apply hard validation: reject clusters with unreasonable offsets
 //  4. Return the highest-weighted cluster's best member
 func voteOnCandidates(candidates []SyncResult,
-	reference, incorrect []Cue) SyncResult {
-
+	reference, incorrect []Cue,
+) SyncResult {
 	if len(candidates) == 1 {
 		return candidates[0]
 	}

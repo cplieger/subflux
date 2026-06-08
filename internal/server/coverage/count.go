@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"subflux/internal/api"
-	"subflux/internal/search"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
 )
 
 // CountMissing returns the total number of missing subtitle targets across

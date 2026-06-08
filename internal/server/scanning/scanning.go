@@ -10,9 +10,9 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/api"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/showskip"
 )
 
 // Deps holds the narrow dependencies the scan orchestration needs from

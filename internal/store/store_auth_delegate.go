@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- User delegation ---

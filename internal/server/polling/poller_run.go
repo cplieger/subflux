@@ -6,13 +6,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/cache"
+	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"golang.org/x/sync/errgroup"
-
-	"subflux/internal/api"
-	"subflux/internal/cache"
-	"subflux/internal/httputil"
-	"subflux/internal/server/activity"
-	"subflux/internal/server/events"
 )
 
 // PollerMetrics is the narrow metrics interface consumed by the poller.
@@ -165,8 +164,8 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 // getExcludeTagIDs returns cached tag IDs if still valid, otherwise resolves
 // them from the arr client and caches with singleflight deduplication.
 func (p *Poller) getExcludeTagIDs(ctx context.Context, client HistoryPoller, cacheKey string,
-	tags []string, _ time.Duration) map[int]struct{} {
-
+	tags []string, _ time.Duration,
+) map[int]struct{} {
 	ids, err := p.tagCache.GetOrFetchCtx(ctx, cacheKey, func(ctx context.Context) (map[int]struct{}, error) {
 		return client.ResolveExcludeTagIDs(ctx, tags, false), nil
 	})

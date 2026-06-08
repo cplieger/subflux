@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // --- Target state building ---
@@ -115,8 +115,8 @@ func (e *Engine) shouldSkipLang(ctx context.Context, mediaType api.MediaType, me
 func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 	targets []api.SubtitleTarget, existing *existingSubs,
 	searchCfg *api.SearchConfig, mediaType api.MediaType, mediaID, lang, label string,
-	upgradeCutoff time.Time) ([]targetState, bool) {
-
+	upgradeCutoff time.Time,
+) ([]targetState, bool) {
 	states := make([]targetState, len(targets))
 	anyNeedsSearch := false
 
@@ -151,8 +151,8 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 // it's an upgrade. This is a pure decision function extracted for testability.
 func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *api.SearchConfig,
 	e *Engine, mediaType api.MediaType, mediaID, lang string,
-	variant api.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool) (needsSearch, isUpgrade bool, currentScore int) {
-
+	variant api.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool,
+) (needsSearch, isUpgrade bool, currentScore int) {
 	if !existing.hasSubtitle(lang, variant) {
 		return true, false, 0
 	}

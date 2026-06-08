@@ -3,7 +3,7 @@ package scorer
 import (
 	"testing"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // tierRank maps tiers to ordinal values for comparison.

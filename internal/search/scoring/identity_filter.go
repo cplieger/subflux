@@ -1,6 +1,6 @@
 package scoring
 
-import "subflux/internal/api"
+import "github.com/cplieger/subflux/internal/api"
 
 // FilterByIdentity drops results that don't match the requested
 // season/episode or show title. Returns the kept results and the

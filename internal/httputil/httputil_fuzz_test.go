@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/httpx"
-
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzIsTransient exercises IsTransient with synthesized errors across the

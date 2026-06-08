@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"subflux/internal/api"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 func TestDeleteStateByPaths(t *testing.T) {
@@ -40,9 +40,11 @@ func TestDeleteStateByPaths(t *testing.T) {
 		{
 			name: "removes_matching_records",
 			seedDownloads: []api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-GRP", Path: "/p/movie.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/movie.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/media/movie.mkv"},
+				},
 			},
 			seedAttempts: []struct {
 				mediaType               api.MediaType
@@ -58,15 +60,21 @@ func TestDeleteStateByPaths(t *testing.T) {
 		{
 			name: "multiple_video_paths",
 			seedDownloads: []api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt111", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt111", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie1", Path: "/p/1.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/movie1.mkv"}},
-				{MediaType: "movie", MediaID: "tt222", Language: "fr", ProviderName: "os",
+					Meta: &api.DownloadMeta{VideoPath: "/media/movie1.mkv"},
+				},
+				{
+					MediaType: "movie", MediaID: "tt222", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie2", Path: "/p/2.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/movie2.mkv"}},
-				{MediaType: "movie", MediaID: "tt333", Language: "fr", ProviderName: "os",
+					Meta: &api.DownloadMeta{VideoPath: "/media/movie2.mkv"},
+				},
+				{
+					MediaType: "movie", MediaID: "tt333", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie3", Path: "/p/3.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/movie3.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/media/movie3.mkv"},
+				},
 			},
 			videoPaths:    []string{"/media/movie1.mkv", "/media/movie3.mkv"},
 			wantPaths:     2,
@@ -84,15 +92,21 @@ func TestDeleteStateByPaths(t *testing.T) {
 		{
 			name: "clears_attempts_for_each_affected_media",
 			seedDownloads: []api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt111", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt111", Language: "fr", ProviderName: "os",
 					ReleaseName: "M1", Path: "/p/1.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/v1.mkv"}},
-				{MediaType: "movie", MediaID: "tt222", Language: "en", ProviderName: "os",
+					Meta: &api.DownloadMeta{VideoPath: "/media/v1.mkv"},
+				},
+				{
+					MediaType: "movie", MediaID: "tt222", Language: "en", ProviderName: "os",
 					ReleaseName: "M2", Path: "/p/2.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/v2.mkv"}},
-				{MediaType: "movie", MediaID: "tt333", Language: "fr", ProviderName: "os",
+					Meta: &api.DownloadMeta{VideoPath: "/media/v2.mkv"},
+				},
+				{
+					MediaType: "movie", MediaID: "tt333", Language: "fr", ProviderName: "os",
 					ReleaseName: "M3", Path: "/p/3.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/v3.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/media/v3.mkv"},
+				},
 			},
 			seedAttempts: []struct {
 				mediaType               api.MediaType
@@ -110,9 +124,11 @@ func TestDeleteStateByPaths(t *testing.T) {
 		{
 			name: "preserves_unrelated_attempts",
 			seedDownloads: []api.DownloadRecord{
-				{MediaType: "movie", MediaID: "ttA", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "ttA", Language: "fr", ProviderName: "os",
 					ReleaseName: "MA", Path: "/p/a.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/media/a.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/media/a.mkv"},
+				},
 			},
 			seedAttempts: []struct {
 				mediaType               api.MediaType
@@ -129,9 +145,11 @@ func TestDeleteStateByPaths(t *testing.T) {
 		{
 			name: "returns_subtitle_paths",
 			seedDownloads: []api.DownloadRecord{
-				{MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
+				{
+					MediaType: "movie", MediaID: "tt123", Language: "fr", ProviderName: "os",
 					ReleaseName: "Movie-GRP", Path: "/subs/movie.fr.srt", Score: 100,
-					Meta: &api.DownloadMeta{VideoPath: "/video/movie.mkv"}},
+					Meta: &api.DownloadMeta{VideoPath: "/video/movie.mkv"},
+				},
 			},
 			videoPaths:    []string{"/video/movie.mkv"},
 			wantPaths:     1,
@@ -194,8 +212,10 @@ func TestDeleteStateByPaths_cleans_orphaned_subtitle_files(t *testing.T) {
 	db := openTestDB(t)
 
 	if err := db.UpsertSubtitleFile(context.Background(), "movie", "tt123",
-		&api.SubtitleFile{Language: "fr", Variant: "standard", Source: "external",
-			Codec: "subrip", Path: "/p/fr.srt"}); err != nil {
+		&api.SubtitleFile{
+			Language: "fr", Variant: "standard", Source: "external",
+			Codec: "subrip", Path: "/p/fr.srt",
+		}); err != nil {
 		t.Fatalf("UpsertSubtitleFile(): %v", err)
 	}
 	if err := db.RecordScanState(context.Background(), &api.ScanRecord{
@@ -255,8 +275,10 @@ func TestDeleteStateByPaths_preserves_coverage_when_state_remains(t *testing.T) 
 	}
 
 	if err := db.UpsertSubtitleFile(context.Background(), "movie", "tt123",
-		&api.SubtitleFile{Language: "fr", Variant: "standard", Source: "external",
-			Codec: "subrip", Path: "/p/fr.srt"}); err != nil {
+		&api.SubtitleFile{
+			Language: "fr", Variant: "standard", Source: "external",
+			Codec: "subrip", Path: "/p/fr.srt",
+		}); err != nil {
 		t.Fatalf("UpsertSubtitleFile(): %v", err)
 	}
 	if err := db.RecordScanState(context.Background(), &api.ScanRecord{

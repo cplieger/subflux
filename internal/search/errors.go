@@ -10,5 +10,3 @@ var (
 	// ErrInvalidContent indicates the provider returned non-subtitle content.
 	ErrInvalidContent = errors.New("provider returned invalid data")
 )
-
-

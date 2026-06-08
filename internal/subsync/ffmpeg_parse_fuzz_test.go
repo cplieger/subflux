@@ -3,7 +3,7 @@ package subsync_test
 import (
 	"testing"
 
-	"subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
 func FuzzParseFfprobeOutput(f *testing.F) {

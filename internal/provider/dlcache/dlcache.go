@@ -111,6 +111,7 @@ func (h *entryHeap) Push(x any) {
 	e.index = len(*h)
 	*h = append(*h, e)
 }
+
 func (h *entryHeap) Pop() any {
 	old := *h
 	n := len(old)

@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/store/authdb"
-	"subflux/internal/store/coveragedb"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/authdb"
+	"github.com/cplieger/subflux/internal/store/coveragedb"
 )
 
 // DB wraps the SQLite database.

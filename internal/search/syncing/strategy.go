@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"subflux/internal/api"
-	"subflux/internal/subsync"
-	"subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
 // SyncAgainstReference aligns subtitle timing against an embedded reference
