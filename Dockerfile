@@ -102,8 +102,14 @@ RUN apk add --no-cache ca-certificates curl
 
 # renovate: datasource=npm depName=@typescript/native-preview
 ARG TSGO_VERSION=7.0.0-dev.20260527.2
-RUN curl -fsSL \
-      "https://registry.npmjs.org/@typescript/native-preview-linux-x64/-/native-preview-linux-x64-${TSGO_VERSION}.tgz" \
+# Arch-aware fetch: native per-arch runners build arm64 on real arm64
+# hardware, so the tsgo binary must match the build arch. This is an Alpine
+# builder, so use `uname -m` (aarch64/x86_64); tsgo's npm platform package
+# uses arm64/x64. A hardcoded x64 breaks the arm64 build — the x64 binary
+# can't execute on aarch64.
+RUN TSGO_ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo "x64") && \
+    curl -fsSL \
+      "https://registry.npmjs.org/@typescript/native-preview-linux-${TSGO_ARCH}/-/native-preview-linux-${TSGO_ARCH}-${TSGO_VERSION}.tgz" \
     | tar -xz -C /tmp
 
 WORKDIR /src/static-src
