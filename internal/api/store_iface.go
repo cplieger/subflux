@@ -45,7 +45,7 @@ type HistoryStore interface {
 type CoverageStore interface {
 	RecordSubtitleFiles(ctx context.Context, mediaType MediaType, mediaID string, files []SubtitleFile) (bool, error)
 	UpsertSubtitleFile(ctx context.Context, mediaType MediaType, mediaID string, f *SubtitleFile) error
-	GetSubtitleFiles(ctx context.Context, mediaType MediaType, mediaIDPrefix string) ([]SubtitleFileRow, error)
+	GetSubtitleFiles(ctx context.Context, mediaType MediaType, mediaIDPrefix string) ([]SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant, source SubtitleSource, path string) error
 	RecordScanState(ctx context.Context, rec *ScanRecord) error
 	GetScanStates(ctx context.Context, mediaType MediaType, mediaIDPrefix string) ([]ScanStateRow, error)

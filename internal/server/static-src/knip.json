@@ -8,6 +8,7 @@
     "**/*.fuzz.test.ts",
     "**/*.property.test.ts"
   ],
+  "ignore": ["wire/*.gen.ts"],
   "project": ["**/*.ts", "!**/*.d.ts", "!node_modules/**"],
   "ignoreDependencies": [
     "eslint",

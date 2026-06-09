@@ -16,7 +16,7 @@ const (
 // --- API response types ---
 
 // StateStatsResponse is the JSON response for GET /api/stats.
-type StateStatsResponse struct {
+type Stats struct {
 	LastScan            string `json:"last_scan"`
 	Downloads           int    `json:"downloads"`
 	Attempts            int64  `json:"attempts"`
@@ -29,7 +29,7 @@ type StateStatsResponse struct {
 }
 
 // ScorePreviewResponse is the JSON response for POST /api/score/preview.
-type ScorePreviewResponse struct {
+type ScorePreview struct {
 	Tier        ScoreTier `json:"tier"`
 	Score       int       `json:"score"`
 	ScoreNoHash int       `json:"score_no_hash"`
@@ -45,7 +45,7 @@ type SearchTarget struct {
 }
 
 // SearchTargetsResponse is the JSON response for GET /api/search/targets.
-type SearchTargetsResponse struct {
+type SearchTargets struct {
 	OrigLang   string         `json:"orig_lang"`
 	AudioLangs []string       `json:"audio_langs"`
 	Targets    []SearchTarget `json:"targets"`
@@ -53,6 +53,6 @@ type SearchTargetsResponse struct {
 
 // ProvidersResponse is the JSON response for GET /api/providers/timeout.
 type ProvidersResponse struct {
-	Providers map[ProviderID]TimeoutStatus `json:"providers"`
-	Enabled   bool                         `json:"enabled"`
+	Providers map[ProviderID]ProviderStatus `json:"providers"`
+	Enabled   bool                          `json:"enabled"`
 }

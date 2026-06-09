@@ -19,11 +19,12 @@ import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js"
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
 import { el, dialog, onBackdropClose, patch, $ } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { apiGet, apiGetArray } from "./api-client.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 import { STATUS_POLL_MS } from "./constants.js";
-import type { MovieItem, SubtitleEntry } from "./api-types.js";
+import type { MovieItem } from "./api-types.js";
+import { decodeSubtitleEntry, decodeMovieItem } from "./wire/decoders.gen.js";
 
 // Initialize store.
 store.batch(() => {
@@ -58,14 +59,14 @@ function refreshCurrentPage(): void {
   // refreshCurrentPage re-fetches data and passes it to detail renderers.
   if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
     void Promise.all([
-      apiGet<SubtitleEntry[]>(`/api/coverage/series/${ctx.tvdbId}`),
+      apiGetArray(`/api/coverage/series/${ctx.tvdbId}`, decodeSubtitleEntry),
       apiGet<string[]>(`/api/state/ids?type=episode&prefix=tvdb-${ctx.tvdbId}-`),
     ]).then(([subFiles, historyIDs]) => {
       renderSeriesDetail(ctx.series, ctx.seasons, subFiles ?? [], new Set(historyIDs ?? []));
     });
   } else if (ctx && "movie" in ctx && ctx.movie) {
     // Movie detail: re-fetch coverage and re-render.
-    void apiGet<MovieItem[]>("/api/coverage/movies").then((movies) => {
+    void apiGetArray("/api/coverage/movies", decodeMovieItem).then((movies) => {
       if (!movies) {
         return;
       }

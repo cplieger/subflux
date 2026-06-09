@@ -122,7 +122,7 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.WriteJSON(w, api.SetupStatusResponse{
+	api.WriteJSON(w, api.SetupStatus{
 		SetupRequired: count == 0,
 		ConfigValid:   h.Configured(),
 	})
@@ -221,7 +221,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		canLinkOIDC = false
 	}
 
-	api.WriteJSON(w, api.UserMeResponse{
+	api.WriteJSON(w, api.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,

@@ -80,7 +80,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 		displayName = user.Username
 	}
 
-	api.WriteJSON(w, api.WebAuthnSignalDataResponse{
+	api.WriteJSON(w, api.SignalData{
 		RPID:          h.WebAuthn.Config.RPID,
 		UserID:        userID,
 		CredentialIDs: credIDs,
@@ -226,7 +226,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	slog.Info("security: passkey registered",
 		"username", user.Username, "name", friendlyName, "ip", ClientIP(r))
 
-	api.WriteJSON(w, api.PasskeyRegisteredResponse{
+	api.WriteJSON(w, api.PasskeyRegistered{
 		ID:        passkey.ID,
 		Name:      passkey.Name,
 		Transport: passkey.Transport,

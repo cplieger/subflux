@@ -119,9 +119,9 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 	if err != nil {
 		slog.Warn("login response: passkey count", "error", err)
 	}
-	api.WriteJSON(w, api.LoginSuccessResponse{
+	api.WriteJSON(w, api.LoginSuccess{
 		Redirect: "/",
-		User: api.UserMeResponse{
+		User: api.MeResponse{
 			ID:          user.ID,
 			Username:    user.Username,
 			Role:        user.Role,

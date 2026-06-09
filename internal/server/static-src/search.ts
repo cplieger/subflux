@@ -4,11 +4,12 @@ import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
 import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from "./dom.js";
-import { apiGet, apiGetRaw } from "./api-client.js";
+import { apiGetArray, apiGetRaw } from "./api-client.js";
+import { decodeActivityEntry } from "./wire/decoders.gen.js";
 import { apiAction, type ActionError, retryNetwork, registerCleanup } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from "./constants.js";
-import type { Activity, MediaType } from "./api-types.js";
+import type { ActivityEntry, MediaType } from "./api-types.js";
 
 /** Data-driven error-code-to-message mapping for search popup errors. */
 const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
@@ -510,7 +511,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       btn.setAttribute("data-tip", "Download timed out");
       return;
     }
-    const acts = await apiGet<Activity[]>("/api/activity", signal);
+    const acts = await apiGetArray("/api/activity", decodeActivityEntry, signal);
     if (!acts) {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (!signal.aborted) {
@@ -518,7 +519,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       }
       return;
     }
-    const act: Activity | undefined = acts.find((a: Activity) => a.id === actID);
+    const act: ActivityEntry | undefined = acts.find((a: ActivityEntry) => a.id === actID);
     if (act) {
       seenActivity = true;
     }

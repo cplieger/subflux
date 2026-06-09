@@ -1,6 +1,7 @@
 // wizard.ts — Setup wizard extracted from login.ts. Invoked via startConfigWizard().
 
-import { apiGet } from "./api-client.js";
+import { apiGetArray } from "./api-client.js";
+import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
   defineAction,
   ActionError,
@@ -13,7 +14,7 @@ import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
 import { el, option } from "./dom.js";
 import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT } from "./constants.js";
-import type { ProviderSchema, ConfigSchema } from "./api-types.js";
+import type { ProviderSchema, SchemaSection } from "./api-types.js";
 import { buildProvidersStep } from "./wizard-providers.js";
 import { buildLanguagesStep } from "./wizard-languages.js";
 import {
@@ -41,7 +42,7 @@ interface SetupDraft {
   mediaRoots: string[];
 }
 
-let fullSchema: ConfigSchema[] = [];
+let fullSchema: SchemaSection[] = [];
 let wizardSteps: WizardStep[] = [];
 let wizardIndex = 0;
 export let wizardValues: Record<string, Record<string, string>> = {};
@@ -50,8 +51,8 @@ export let langRules: { audio: string; code: string; variant: string }[] = [];
 export let langDefault: { code: string; variant: string }[] = [];
 export let mediaRoots: string[] = [];
 
-export function schemaByKey(key: string): ConfigSchema | undefined {
-  return fullSchema.find((s: ConfigSchema) => s.key === key);
+export function schemaByKey(key: string): SchemaSection | undefined {
+  return fullSchema.find((s: SchemaSection) => s.key === key);
 }
 
 const DRAFT_KEY = "subflux-setup-draft";
@@ -172,7 +173,7 @@ export function variantSelect(id: string, value: string): HTMLElement {
 }
 
 export async function startConfigWizard(): Promise<void> {
-  const schema = await apiGet<ConfigSchema[]>("/api/config/schema");
+  const schema = await apiGetArray("/api/config/schema", decodeSchemaSection);
   if (!schema) {
     window.location.href = "/";
     return;

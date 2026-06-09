@@ -32,6 +32,6 @@ func countMovieCoverage(subs map[coverage.Key]*coverage.Status, targets []api.Su
 	return coverage.CountMovieCoverage(subs, targets)
 }
 
-func deduplicateFileRows(rows []api.SubtitleFileRow) []api.SubtitleFileRow {
+func deduplicateFileRows(rows []api.SubtitleEntry) []api.SubtitleEntry {
 	return coverage.DeduplicateFileRows(rows)
 }

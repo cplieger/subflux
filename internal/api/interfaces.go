@@ -72,7 +72,7 @@ type ScoreSimulator interface {
 
 // ProviderTimeoutManager manages provider timeout state.
 type ProviderTimeoutManager interface {
-	ProviderTimeouts() (status map[ProviderID]TimeoutStatus, enabled bool)
+	ProviderTimeouts() (status map[ProviderID]ProviderStatus, enabled bool)
 	ResetTimeouts()
 }
 

@@ -4,7 +4,8 @@ import * as store from "./store.js";
 import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
 import { el, dialog, closeDialog, patch, $ } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { apiGet, apiGetArray } from "./api-client.js";
+import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
   apiAction,
   defineAction,
@@ -17,7 +18,7 @@ import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
 import { YAML_TIMEOUT_MS } from "./constants.js";
 import { parseYAMLSections } from "./config-yaml.js";
-import type { SchemaField, ConfigSchema } from "./api-types.js";
+import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
 import { renderProvidersSection, renderEmbeddedSection, genProviders } from "./config-providers.js";
 import {
@@ -28,7 +29,7 @@ import {
 } from "./config-renderers.js";
 
 let config = "";
-let configSchema: ConfigSchema[] | null = null;
+let configSchema: SchemaSection[] | null = null;
 const cfgDlg: HTMLDialogElement = dialog("configDialog");
 
 // --- Config drawer ---
@@ -65,7 +66,7 @@ export async function loadConfig(): Promise<void> {
     const [rawRes, parsed, schema] = await Promise.all([
       fetch("/api/config", { signal: cfgSignal }),
       apiGet<ParsedConfig>("/api/config/parsed", cfgSignal),
-      apiGet<ConfigSchema[]>("/api/config/schema", cfgSignal),
+      apiGetArray("/api/config/schema", decodeSchemaSection, cfgSignal),
     ]);
     // Don't throw on raw config failure; render with defaults so the
     // user can fix a broken or unreadable config via the UI.
@@ -344,7 +345,7 @@ function markRequiredFields(): void {
     if (!(grp in groupFilled)) {
       groupFilled[grp] = false;
     }
-    const allFilled = schema.fields
+    const allFilled = (schema.fields ?? [])
       .filter((f: SchemaField) => f.required)
       .every((f: SchemaField) => {
         const inp = body.querySelector<HTMLInputElement>(
@@ -365,7 +366,7 @@ function markRequiredFields(): void {
   }
 
   for (const schema of configSchema) {
-    for (const field of schema.fields) {
+    for (const field of (schema.fields ?? [])) {
       if (!field.required) {
         continue;
       }
@@ -427,7 +428,7 @@ function buildConfigFromForm(): void {
   config = `${parts.join("\n\n")}\n`;
 }
 
-function genFields(schema: ConfigSchema): string {
+function genFields(schema: SchemaSection): string {
   const lines: string[] = [`${schema.key}:`];
   if (schema.enable_key) {
     const t = document.getElementById(
@@ -435,7 +436,7 @@ function genFields(schema: ConfigSchema): string {
     ) as HTMLInputElement | null;
     lines.push(`  ${schema.enable_key}: ${t ? String(t.checked) : "true"}`);
   }
-  for (const field of schema.fields) {
+  for (const field of (schema.fields ?? [])) {
     if (field.key === schema.enable_key) {
       continue;
     }
@@ -468,16 +469,16 @@ function genFields(schema: ConfigSchema): string {
   return lines.join("\n");
 }
 
-function genScoring(schema: ConfigSchema): string {
+function genScoring(schema: SchemaSection): string {
   const lines: string[] = ["scoring:", "  weights:"];
-  for (const field of schema.fields) {
+  for (const field of (schema.fields ?? [])) {
     const f = document.getElementById(fieldId(schema.key, field.key)) as HTMLInputElement | null;
     lines.push(`    ${field.key}: ${f ? f.value : (field.default ?? "0")}`);
   }
   return lines.join("\n");
 }
 
-function genList(schema: ConfigSchema): string {
+function genList(schema: SchemaSection): string {
   const listEl = document.getElementById(`${schema.key}-list`);
   const lines: string[] = [`${schema.key}:`];
   if (listEl) {

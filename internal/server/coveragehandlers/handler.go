@@ -22,7 +22,7 @@ var (
 
 // CoverageStore documents the api.Store methods used by coverage handlers.
 type CoverageStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleFileRow, error)
+	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	GetScanStates(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error)
 }
 
@@ -63,7 +63,7 @@ func NewHandler(deps Deps) *Handler {
 }
 
 // SeriesCoverage is the coverage summary for one TV series.
-type SeriesCoverage struct {
+type SeriesItem struct {
 	Title      string                    `json:"title"`
 	ImdbID     string                    `json:"imdb_id,omitempty"`
 	FirstAired string                    `json:"first_aired,omitempty"`
@@ -79,7 +79,7 @@ type SeriesCoverage struct {
 }
 
 // MovieCoverage is the coverage summary for one movie.
-type MovieCoverage struct {
+type MovieItem struct {
 	Title          string                    `json:"title"`
 	ImdbID         string                    `json:"imdb_id,omitempty"`
 	Path           string                    `json:"path,omitempty"`
@@ -89,7 +89,7 @@ type MovieCoverage struct {
 	AudioLang      string                    `json:"audio_lang"`
 	Rule           string                    `json:"rule"`
 	Targets        []coverage.TargetCoverage `json:"targets"`
-	Subs           []api.SubtitleFileRow     `json:"subs"`
+	Subs           []api.SubtitleEntry       `json:"subs"`
 	Tags           []int                     `json:"tags,omitempty"`
 	TmdbID         int                       `json:"tmdb_id"`
 	ID             int                       `json:"id"`
@@ -108,7 +108,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
-		api.WriteJSON(w, []SeriesCoverage{})
+		api.WriteJSON(w, []SeriesItem{})
 		return
 	}
 
@@ -144,7 +144,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	out := make([]SeriesCoverage, 0, len(allSeries))
+	out := make([]SeriesItem, 0, len(allSeries))
 	for i := range allSeries {
 		ser := &allSeries[i]
 		epCount := 0
@@ -161,7 +161,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 
 		tCov := coverage.CountEpisodeCoverageGrouped(grouped[i], targets, epCount)
 
-		out = append(out, SeriesCoverage{
+		out = append(out, SeriesItem{
 			ID:         ser.ID,
 			Title:      ser.Title,
 			Year:       ser.Year,
@@ -190,7 +190,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	}
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
-		api.WriteJSON(w, []MovieCoverage{})
+		api.WriteJSON(w, []MovieItem{})
 		return
 	}
 
@@ -207,12 +207,12 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 
 	ignoredCodecs := search.IgnoredCodecsFromConfig(ls.Cfg)
 	movieSubs := coverage.IndexSubStatus(allFiles, ignoredCodecs)
-	movieFiles := make(map[string][]api.SubtitleFileRow)
+	movieFiles := make(map[string][]api.SubtitleEntry)
 	for i := range allFiles {
 		movieFiles[allFiles[i].MediaID] = append(movieFiles[allFiles[i].MediaID], allFiles[i])
 	}
 
-	out := make([]MovieCoverage, 0, len(allMovies))
+	out := make([]MovieItem, 0, len(allMovies))
 	for i := range allMovies {
 		m := &allMovies[i]
 		if !m.HasFile {
@@ -235,7 +235,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			sceneName = m.MovieFile.SceneName
 		}
 
-		out = append(out, MovieCoverage{
+		out = append(out, MovieItem{
 			ID:             m.ID,
 			Title:          m.Title,
 			Year:           m.Year,
@@ -314,7 +314,7 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 // fetchCoverageSeriesData fetches series, exclude tags, and subtitle files concurrently.
 //
 //nolint:dupl // type-specific wrappers around shared fetchCoverageData
-func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) ([]api.Series, map[int]struct{}, []api.SubtitleFileRow, error) {
+func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) ([]api.Series, map[int]struct{}, []api.SubtitleEntry, error) {
 	var allSeries []api.Series
 	excludeIDs, allFiles, err := h.fetchCoverageData(ctx, ls.Sonarr, api.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
@@ -333,7 +333,7 @@ func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) ([
 // fetchCoverageMoviesData fetches movies, exclude tags, and subtitle files concurrently.
 //
 //nolint:dupl // type-specific wrappers around shared fetchCoverageData
-func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) ([]api.Movie, map[int]struct{}, []api.SubtitleFileRow, error) {
+func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) ([]api.Movie, map[int]struct{}, []api.SubtitleEntry, error) {
 	var allMovies []api.Movie
 	excludeIDs, allFiles, err := h.fetchCoverageData(ctx, ls.Radarr, api.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
@@ -350,10 +350,10 @@ func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) ([
 }
 
 // fetchCoverageData is the shared concurrent fetch pattern for coverage handlers.
-func (h *Handler) fetchCoverageData(ctx context.Context, client ArrClient, mediaType api.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []api.SubtitleFileRow, error) {
+func (h *Handler) fetchCoverageData(ctx context.Context, client ArrClient, mediaType api.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []api.SubtitleEntry, error) {
 	var (
 		excludeIDs map[int]struct{}
-		allFiles   []api.SubtitleFileRow
+		allFiles   []api.SubtitleEntry
 	)
 
 	g, gctx := errgroup.WithContext(ctx)

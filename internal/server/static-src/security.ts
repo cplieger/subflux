@@ -15,6 +15,7 @@ import {
 import { reconcile } from "@cplieger/reactive";
 import {
   apiGet,
+  apiGetTyped,
   apiPost,
   apiPostRaw,
   apiPut,
@@ -23,7 +24,8 @@ import {
   apiDeleteRaw,
 } from "./api-client.js";
 import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./webauthn-utils.js";
-import type { MeResponse } from "./api-types.js";
+import type { MeResponse, KeyGenerated } from "./api-types.js";
+import { decodeMeResponse } from "./wire/decoders.gen.js";
 
 // --- Inline interfaces for API response shapes ---
 
@@ -41,9 +43,6 @@ interface APIKeyItem {
   created_at: string;
 }
 
-interface APIKeyCreateResponse {
-  key: string;
-}
 
 /** Wrap an async click handler with disabled + aria-busy lifecycle. The
  *  button is disabled and announced as busy while the handler runs;
@@ -98,7 +97,7 @@ async function openSecurity(): Promise<void> {
 
 async function renderSections(body: HTMLElement): Promise<void> {
   const [me, passkeys, oidcAvailable] = await Promise.all([
-    apiGet<MeResponse>("/api/auth/me"),
+    apiGetTyped("/api/auth/me", decodeMeResponse),
     apiGet<PasskeyItem[]>("/api/auth/passkeys"),
     detectOIDC(),
   ]);
@@ -416,7 +415,7 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
         if (label === null) {
           return;
         }
-        const r = await apiPostRaw<APIKeyCreateResponse>("/api/auth/apikeys", { label });
+        const r = await apiPostRaw<KeyGenerated>("/api/auth/apikeys", { label });
         if (r.ok && r.data) {
           showNewAPIKey(sec, r.data.key);
         } else {

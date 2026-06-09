@@ -82,7 +82,7 @@ func (*NopStore) UpsertSubtitleFile(context.Context, api.MediaType, string, *api
 	return nil
 }
 
-func (*NopStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleFileRow, error) {
+func (*NopStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleEntry, error) {
 	return nil, nil
 }
 

@@ -21,7 +21,7 @@ func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // computeStateStats does the actual stats query work.
-func (h *Handler) computeStateStats(ctx context.Context) api.StateStatsResponse {
+func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
 	downloads, dbAttempts, err := h.queryDB.Stats(ctx)
 	if err != nil {
 		slog.Warn("Stats query failed", "error", err)
@@ -50,7 +50,7 @@ func (h *Handler) computeStateStats(ctx context.Context) api.StateStatsResponse 
 		"total_series", len(allSeries), "total_movies", len(allMovies),
 		"missing_subs", missing, "total_subs", totalSubs)
 
-	return api.StateStatsResponse{
+	return api.Stats{
 		Downloads:           downloads,
 		Attempts:            searches,
 		LastScan:            lastScan,

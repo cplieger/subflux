@@ -15,7 +15,7 @@ type ProviderHealth interface {
 	IsTimedOut(provider api.ProviderID) bool
 	RecordSuccess(provider api.ProviderID)
 	RecordFailure(provider api.ProviderID, err error)
-	Status() map[api.ProviderID]api.TimeoutStatus
+	Status() map[api.ProviderID]api.ProviderStatus
 	Reset()
 }
 
@@ -148,13 +148,13 @@ func (it *tracker) Reset() {
 	slog.Info("provider timeouts reset, all providers re-enabled")
 }
 
-func (it *tracker) Status() map[api.ProviderID]api.TimeoutStatus {
+func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
 	now := it.now()
 	cutoff := now.Add(-it.window)
-	out := make(map[api.ProviderID]api.TimeoutStatus, len(it.failures)+len(it.tripped))
+	out := make(map[api.ProviderID]api.ProviderStatus, len(it.failures)+len(it.tripped))
 
 	for prov, times := range it.failures {
 		count := 0
@@ -163,7 +163,7 @@ func (it *tracker) Status() map[api.ProviderID]api.TimeoutStatus {
 				count++
 			}
 		}
-		s := api.TimeoutStatus{RecentFailures: count, Threshold: it.threshold, LastError: it.lastError[prov]}
+		s := api.ProviderStatus{RecentFailures: count, Threshold: it.threshold, LastError: it.lastError[prov]}
 		if trippedAt, ok := it.tripped[prov]; ok {
 			remaining := it.cooldown - now.Sub(trippedAt)
 			if remaining > 0 {
@@ -180,7 +180,7 @@ func (it *tracker) Status() map[api.ProviderID]api.TimeoutStatus {
 		}
 		remaining := it.cooldown - now.Sub(trippedAt)
 		if remaining > 0 {
-			out[prov] = api.TimeoutStatus{
+			out[prov] = api.ProviderStatus{
 				TimedOut:          true,
 				Threshold:         it.threshold,
 				CooldownRemaining: remaining,

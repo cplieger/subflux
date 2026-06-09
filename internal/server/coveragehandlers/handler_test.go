@@ -12,11 +12,11 @@ import (
 // mockCoverageStore implements CoverageStore for testing.
 type mockCoverageStore struct {
 	err           error
-	subtitleFiles []api.SubtitleFileRow
+	subtitleFiles []api.SubtitleEntry
 	scanStates    []api.ScanStateRow
 }
 
-func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return m.subtitleFiles, m.err
 }
 

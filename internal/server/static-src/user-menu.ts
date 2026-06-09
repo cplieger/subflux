@@ -3,7 +3,8 @@
 import * as bus from "./bus.js";
 import * as theme from "./theme.js";
 import { el, icon } from "./dom.js";
-import { apiGet, apiPost } from "./api-client.js";
+import { apiGetTyped, apiPost } from "./api-client.js";
+import { decodeMeResponse } from "./wire/decoders.gen.js";
 import { openConfig } from "./config.js";
 import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
@@ -18,7 +19,7 @@ export function initUserMenu(): void {
 }
 
 async function fetchMe(): Promise<void> {
-  const data = await apiGet<MeResponse>("/api/auth/me");
+  const data = await apiGetTyped("/api/auth/me", decodeMeResponse);
   if (data) {
     userInfo = data;
     store.set("isAdmin", data.role === "admin");

@@ -1,7 +1,7 @@
 import { el, option, icon } from "./dom.js";
 import { extractYAMLValue, extractYAMLBlock, formatDurationCfg } from "./config-yaml.js";
 import { prettyLabel } from "./utils.js";
-import type { SchemaField, ConfigSchema } from "./api-types.js";
+import type { SchemaField, SchemaSection } from "./api-types.js";
 import type { ParsedConfig } from "./store.js";
 
 export function fieldId(sectionKey: string, fieldKey: string): string {
@@ -67,7 +67,7 @@ export function resolveFieldValue(
 }
 
 export function renderFieldsSection(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   sections: Record<string, string>,
   pc: ParsedConfig,
   configText: string,
@@ -117,11 +117,11 @@ export function renderFieldsSection(
 
 // wireShowWhen sets up show_when visibility toggling for fields.
 function wireShowWhen(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of schema.fields) {
+  for (const field of (schema.fields ?? [])) {
     if (!field.show_when) {
       continue;
     }
@@ -148,11 +148,11 @@ function wireShowWhen(
 // wireRequires disables fields and forces them off when their
 // dependency is unmet.
 function wireRequires(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of schema.fields) {
+  for (const field of (schema.fields ?? [])) {
     if (!field.requires) {
       continue;
     }
@@ -190,7 +190,7 @@ function wireRequires(
 // and show_when visibility.
 function renderFieldsInto(
   container: HTMLElement,
-  schema: ConfigSchema,
+  schema: SchemaSection,
   sections: Record<string, string>,
   pc: ParsedConfig,
   configText: string,
@@ -199,7 +199,7 @@ function renderFieldsInto(
   // Collect unique groups for sub-headers.
   const seenGroups = new Set<string>();
 
-  for (const field of schema.fields) {
+  for (const field of (schema.fields ?? [])) {
     // Skip the enable_key field; it's rendered as the header toggle.
     if (field.key === schema.enable_key) {
       continue;
@@ -291,7 +291,7 @@ export function renderField(id: string, field: SchemaField, value: string): HTML
 }
 
 export function renderListSection(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   sections: Record<string, string>,
 ): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
@@ -315,7 +315,7 @@ export function renderListSection(
 
   function addItem(value: string): void {
     const row = el("div", { className: "cfg-list" });
-    const fieldSchema: SchemaField | undefined = schema.fields[0];
+    const fieldSchema: SchemaField | undefined = schema.fields?.[0];
     const inp = el("input", {
       type: "text",
       value: value || "",

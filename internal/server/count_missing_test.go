@@ -9,12 +9,12 @@ import (
 
 // countMissingStore returns configurable subtitle files for countMissing tests.
 type countMissingStore struct {
-	episodeFiles []api.SubtitleFileRow
-	movieFiles   []api.SubtitleFileRow
+	episodeFiles []api.SubtitleEntry
+	movieFiles   []api.SubtitleEntry
 	qhMockStore
 }
 
-func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	if mediaType == api.MediaTypeEpisode {
 		return m.episodeFiles, nil
 	}
@@ -95,7 +95,7 @@ func TestCountMissingSeries_all_episodes_covered(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e03", Language: "fr", Variant: "standard"},
@@ -117,7 +117,7 @@ func TestCountMissingSeries_some_episodes_missing(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -141,7 +141,7 @@ func TestCountMissingSeries_multiple_targets(t *testing.T) {
 		},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard"},
 		},
@@ -179,7 +179,7 @@ func TestCountMissingSeries_different_series_isolated(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-100-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -202,7 +202,7 @@ func TestCountMissingSeries_variant_matching(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "en", Variant: "hi"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			// Has standard variant, not hi.
 			{MediaID: "tvdb-81189-s01e01", Language: "en", Variant: "standard"},
 		},
@@ -253,7 +253,7 @@ func TestCountMissingMovies_movie_fully_covered(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -292,7 +292,7 @@ func TestCountMissingMovies_multiple_targets(t *testing.T) {
 		},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -313,7 +313,7 @@ func TestCountMissingMovies_variant_matching(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "en", Variant: "hi"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "en", Variant: "standard"},
 		},
 	}
@@ -350,7 +350,7 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-100", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -371,7 +371,7 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 // countMissingErrorStore returns an error from GetSubtitleFiles.
 type countMissingErrorStore struct{ qhMockStore }
 
-func (m *countMissingErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *countMissingErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -415,7 +415,7 @@ func TestCountMissingSeries_ignored_codec_counts_as_missing(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			// Only an ignored-codec embedded sub exists.
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 		},
@@ -437,7 +437,7 @@ func TestCountMissingSeries_usable_sub_not_missing(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
 	}
@@ -457,7 +457,7 @@ func TestCountMissingMovies_ignored_codec_counts_as_missing(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "embedded", Codec: "vobsub"},
 		},
 	}
@@ -478,7 +478,7 @@ func TestCountMissingMovies_usable_overrides_ignored(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleFileRow{
+		movieFiles: []api.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
@@ -518,10 +518,10 @@ func TestCountMissing_sums_series_and_movies(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleFileRow{
+		episodeFiles: []api.SubtitleEntry{
 			{MediaID: "tvdb-100-s01e01", Language: "fr", Variant: "standard"},
 		},
-		movieFiles: []api.SubtitleFileRow{},
+		movieFiles: []api.SubtitleEntry{},
 	}
 	series := []api.Series{
 		{TvdbID: 100, Statistics: &api.SeriesStatistics{EpisodeFileCount: 2}},

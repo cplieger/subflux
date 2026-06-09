@@ -339,7 +339,7 @@ func (m *historyIDsResultStore) HistoryMediaIDs(_ context.Context, _ api.MediaTy
 
 type listFilesErrorStore struct{ qhMockStore }
 
-func (m *listFilesErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *listFilesErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -366,18 +366,18 @@ func TestHandleListFiles_db_error_returns_500(t *testing.T) {
 }
 
 type listFilesDataStore struct {
-	rows []api.SubtitleFileRow
+	rows []api.SubtitleEntry
 	qhMockStore
 }
 
-func (m *listFilesDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *listFilesDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return m.rows, nil
 }
 
 func TestHandleListFiles_returns_file_entries(t *testing.T) {
 	t.Parallel()
 	db := &listFilesDataStore{
-		rows: []api.SubtitleFileRow{
+		rows: []api.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",
@@ -541,7 +541,7 @@ func TestHandleDeleteFile_default_variant_is_standard(t *testing.T) {
 
 type bulkDeleteDBErrorStore struct{ qhMockStore }
 
-func (m *bulkDeleteDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *bulkDeleteDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -593,7 +593,7 @@ func TestDeleteExternalFile_skips_embedded_source(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	row := &api.SubtitleFileRow{
+	row := &api.SubtitleEntry{
 		Source: "embedded",
 		Path:   "/media/movie.srt",
 	}
@@ -607,7 +607,7 @@ func TestDeleteExternalFile_skips_empty_path(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	row := &api.SubtitleFileRow{
+	row := &api.SubtitleEntry{
 		Source: "external",
 		Path:   "",
 	}
@@ -622,7 +622,7 @@ func TestDeleteExternalFile_skips_invalid_path(t *testing.T) {
 	cfg := &pathValidationErrorConfig{}
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	row := &api.SubtitleFileRow{
+	row := &api.SubtitleEntry{
 		Source: "external",
 		Path:   "/etc/passwd",
 	}
@@ -644,7 +644,7 @@ func TestDeleteExternalFile_succeeds_for_nonexistent_file(t *testing.T) {
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
-	row := &api.SubtitleFileRow{
+	row := &api.SubtitleEntry{
 		MediaID:  "tmdb-123",
 		Language: "en",
 		Variant:  "standard",
@@ -665,11 +665,11 @@ func TestDeleteExternalFile_succeeds_for_nonexistent_file(t *testing.T) {
 
 type bulkDeleteDataStore struct {
 	deletedPath string
-	rows        []api.SubtitleFileRow
+	rows        []api.SubtitleEntry
 	qhMockStore
 }
 
-func (m *bulkDeleteDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *bulkDeleteDataStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return m.rows, nil
 }
 
@@ -689,7 +689,7 @@ func (m *bulkDeleteDataStore) ClearManualLock(_ context.Context, _ api.MediaType
 func TestHandleBulkDeleteFiles_deletes_external_skips_embedded(t *testing.T) {
 	t.Parallel()
 	db := &bulkDeleteDataStore{
-		rows: []api.SubtitleFileRow{
+		rows: []api.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",
@@ -772,7 +772,7 @@ func TestHandleListFiles_populates_size_for_valid_path(t *testing.T) {
 
 	cfg := &qhMockConfig{}
 	db := &listFilesDataStore{
-		rows: []api.SubtitleFileRow{
+		rows: []api.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",

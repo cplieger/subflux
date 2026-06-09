@@ -100,11 +100,11 @@ func WithTimeout(h timeout.ProviderHealth) Option { return func(e *Engine) { e.t
 // noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}
 
-func (noopHealth) IsTimedOut(api.ProviderID) bool               { return false }
-func (noopHealth) RecordSuccess(api.ProviderID)                 {}
-func (noopHealth) RecordFailure(api.ProviderID, error)          {}
-func (noopHealth) Status() map[api.ProviderID]api.TimeoutStatus { return nil }
-func (noopHealth) Reset()                                       {}
+func (noopHealth) IsTimedOut(api.ProviderID) bool                { return false }
+func (noopHealth) RecordSuccess(api.ProviderID)                  {}
+func (noopHealth) RecordFailure(api.ProviderID, error)           {}
+func (noopHealth) Status() map[api.ProviderID]api.ProviderStatus { return nil }
+func (noopHealth) Reset()                                        {}
 
 // fsutilWriter is the default FileWriter that delegates to fsutil.AtomicWriteFile.
 type fsutilWriter struct{}
@@ -197,7 +197,7 @@ func (e *Engine) HashFile(ctx context.Context, path string) (hash string, size i
 
 // ProviderTimeouts returns a snapshot of all provider timeout states.
 // Returns (status, true) if timeouts are enabled, (nil, false) otherwise.
-func (e *Engine) ProviderTimeouts() (map[api.ProviderID]api.TimeoutStatus, bool) {
+func (e *Engine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
 	s := e.timeout.Status()
 	if s == nil {
 		return nil, false

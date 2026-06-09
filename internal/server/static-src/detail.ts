@@ -2,7 +2,8 @@
 
 import * as store from "./store.js";
 import { $, el, icon, patch, emptyDiv, errDiv, pad, insertNavButton } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { apiGet, apiGetArray } from "./api-client.js";
+import { decodeSubtitleEntry } from "./wire/decoders.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { fmtEpisode, tvdbMediaId, langName, fmtLangVariant } from "./utils.js";
 import { DEFAULT_VARIANT, EMBEDDED_PROVIDER } from "./constants.js";
@@ -160,7 +161,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
 
   Promise.all([
     apiGet<SeasonGroup[]>(`/api/media/series/${s.id}/episodes`, signal),
-    apiGet<SubtitleEntry[]>(`/api/coverage/series/${s.tvdb_id}`, signal),
+    apiGetArray(`/api/coverage/series/${s.tvdb_id}`, decodeSubtitleEntry, signal),
     apiGet<string[]>(`/api/state/ids?type=episode&prefix=tvdb-${s.tvdb_id}-`, signal),
   ])
     .then(([seasons, subFiles, historyIDs]) => {

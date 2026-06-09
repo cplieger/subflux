@@ -12,6 +12,7 @@ export type ScoreTier = "excellent" | "good" | "acceptable" | "minimal" | "none"
 
 export type Variant = "standard" | "hi" | "forced";
 
+/** Entry represents an ongoing or recent action. */
 export interface ActivityEntry {
   started_at: string;
   ended_at?: string;
@@ -27,6 +28,7 @@ export interface ActivityEntry {
   total?: number;
 }
 
+/** CoverageEvent is the data payload for coverage updates. */
 export interface CoverageEvent {
   media_type: MediaType;
   media_id: string;
@@ -36,6 +38,7 @@ export interface CoverageEvent {
   path?: string;
 }
 
+/** TargetCoverage tracks coverage for a single expected subtitle target. */
 export interface CoverageTarget {
   language: string;
   variant: string;
@@ -44,6 +47,7 @@ export interface CoverageTarget {
   total: number;
 }
 
+/** KeyGeneratedResponse is the JSON response after generating an API key. */
 export interface KeyGenerated {
   created_at: string;
   key: string;
@@ -53,11 +57,13 @@ export interface KeyGenerated {
   id: number;
 }
 
+/** LoginSuccessResponse is the JSON response after successful login. */
 export interface LoginSuccess {
   redirect: string;
   user: MeResponse;
 }
 
+/** UserMeResponse is the JSON response for GET /api/auth/me. */
 export interface MeResponse {
   username: string;
   role: Role;
@@ -68,6 +74,7 @@ export interface MeResponse {
   can_link_oidc: boolean;
 }
 
+/** MovieCoverage is the coverage summary for one movie. */
 export interface MovieItem {
   title: string;
   imdb_id?: string;
@@ -87,11 +94,13 @@ export interface MovieItem {
   excluded?: boolean;
 }
 
+/** NotifyEvent is the data payload for toast notifications pushed to the UI. */
 export interface NotifyEvent {
   level: NotifyLevel;
   text: string;
 }
 
+/** PasskeyRegisteredResponse is the JSON response after successful passkey registration. */
 export interface PasskeyRegistered {
   created_at: string;
   name: string;
@@ -99,6 +108,7 @@ export interface PasskeyRegistered {
   id: number;
 }
 
+/** ProviderSchema describes a single provider's settings fields. */
 export interface ProviderSchema {
   name: string;
   label: string;
@@ -106,6 +116,7 @@ export interface ProviderSchema {
   always_enabled?: boolean;
 }
 
+/** TimeoutStatus is the state of a single provider's timeout. */
 export interface ProviderStatus {
   last_error?: string;
   cooldown_remaining?: number;
@@ -114,11 +125,19 @@ export interface ProviderStatus {
   timed_out: boolean;
 }
 
+/** ProvidersResponse is the JSON response for GET /api/providers/timeout. */
 export interface ProvidersResponse {
   providers?: Record<string, ProviderStatus>;
   enabled: boolean;
 }
 
+/**
+ * ScanEvent is the data payload for scan:start and scan:done. Action and
+ * Detail mirror the activity log entry (e.g. "Full Scan" / "Searching
+ * library for missing subtitles"). Source is "scheduled" or "manual".
+ * Succeeded is meaningful only on scan:done; false indicates the scan
+ * ended via activity.fail rather than activity.end.
+ */
 export interface ScanEvent {
   action: string;
   detail: string;
@@ -126,6 +145,7 @@ export interface ScanEvent {
   succeeded?: boolean;
 }
 
+/** SchemaField describes a single configuration field for the UI. */
 export interface SchemaField {
   key: string;
   label: string;
@@ -144,11 +164,13 @@ export interface SchemaField {
   required?: boolean;
 }
 
+/** SchemaOption is a value+label pair for select fields. */
 export interface SchemaOption {
   value: string;
   label: string;
 }
 
+/** SchemaSection describes a top-level config section. */
 export interface SchemaSection {
   key: string;
   title: string;
@@ -161,12 +183,14 @@ export interface SchemaSection {
   providers?: ProviderSchema[];
 }
 
+/** ScorePreviewResponse is the JSON response for POST /api/score/preview. */
 export interface ScorePreview {
   tier: ScoreTier;
   score: number;
   score_no_hash: number;
 }
 
+/** SearchTarget describes a single subtitle search target in the API response. */
 export interface SearchTarget {
   min_score?: number;
   code: string;
@@ -175,12 +199,14 @@ export interface SearchTarget {
   exclude?: string[];
 }
 
+/** SearchTargetsResponse is the JSON response for GET /api/search/targets. */
 export interface SearchTargets {
   orig_lang: string;
   audio_langs: string[];
   targets: SearchTarget[];
 }
 
+/** SeriesCoverage is the coverage summary for one TV series. */
 export interface SeriesItem {
   title: string;
   imdb_id?: string;
@@ -196,11 +222,13 @@ export interface SeriesItem {
   excluded?: boolean;
 }
 
+/** SetupStatusResponse is the JSON response for GET /api/auth/setup. */
 export interface SetupStatus {
   setup_required: boolean;
   config_valid: boolean;
 }
 
+/** WebAuthnSignalDataResponse is the JSON response for GET /api/auth/webauthn/signal-data. */
 export interface SignalData {
   rp_id: string;
   user_id: string;
@@ -209,6 +237,7 @@ export interface SignalData {
   credential_ids: string[];
 }
 
+/** StateEntry represents a subtitle state record for API responses. */
 export interface StateEntry {
   media_imported: string;
   title: string;
@@ -226,6 +255,7 @@ export interface StateEntry {
   manual: boolean;
 }
 
+/** StateStatsResponse is the JSON response for GET /api/stats. */
 export interface Stats {
   last_scan: string;
   downloads: number;
@@ -238,6 +268,7 @@ export interface Stats {
   partial: boolean;
 }
 
+/** SubtitleFileRow is the JSON shape returned by coverage queries. */
 export interface SubtitleEntry {
   media_id: string;
   language: string;
