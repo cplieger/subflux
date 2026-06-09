@@ -792,7 +792,7 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
     src: trackUrl,
     srclang: "en",
     label: "Subtitles",
-    default: "",
+    default: true,
   }) as HTMLTrackElement;
   video.appendChild(track);
   // Safari needs the track to be explicitly set to showing after load.
