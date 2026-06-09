@@ -201,10 +201,6 @@ if (titleLink) {
     navigate("/");
   });
 }
-const themeBtn = document.getElementById("themeBtn");
-if (themeBtn) {
-  themeBtn.addEventListener("click", theme.cycle);
-}
 $.historyBtn.addEventListener("click", () => {
   if (store.get("currentPage") === "history") {
     navigate("/");

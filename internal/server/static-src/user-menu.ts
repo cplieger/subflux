@@ -37,6 +37,16 @@ function wireUserButton(): void {
   // Remove the standalone header buttons to avoid duplicate controls.
   document.getElementById("configBtn")?.remove();
   document.getElementById("themeBtn")?.remove();
+
+  // Rebuild menu content each time the popover opens so the theme
+  // label/icon reflect the live data-theme. Auto-mode (matchMedia) can
+  // flip data-theme while the menu is closed, leaving a stale label.
+  const popup = document.getElementById("userMenuPopup");
+  popup?.addEventListener("toggle", (e: Event) => {
+    if ((e as ToggleEvent).newState === "open") {
+      buildMenuContent();
+    }
+  });
 }
 
 function buildMenuContent(): void {
