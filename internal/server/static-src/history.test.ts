@@ -22,7 +22,7 @@ describe("history: renderItems", () => {
 
   it.todo("renders table with thead and tbody");
 
-  it.todo("rows are keyed by media_id-media_imported");
+  it.todo("rows are keyed by unique subtitle_state id");
 
   it.todo("each row shows time, media label, language, provider, mode, release");
 

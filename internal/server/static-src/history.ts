@@ -13,6 +13,7 @@ import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
 import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 
 interface HistoryEntry {
+  id: number; // unique subtitle_state row id (stable collection key)
   media_id: string;
   media_type: string;
   language: string;
@@ -27,13 +28,23 @@ interface HistoryEntry {
 
 const PAGE_SIZE = 50;
 
-const historyKey = (e: HistoryEntry): string => `${e.media_id}-${e.media_imported}`;
+// Key on the server's unique row id. media_id+media_imported is NOT unique
+// (one row per language + a new row per manual download, and media_imported is
+// a second-precision timestamp), so it collided — the collection dropped rows
+// and reconcile mounted duplicates.
+const historyKey = (e: HistoryEntry): string => String(e.id);
 const history = createCollection<HistoryEntry>(historyKey);
 
 // Whether the server has more pages beyond what's loaded (drives "show more").
 const hasMore = signal(false);
-// Reentrancy guard for reload/loadMore (not rendered, so not a signal).
-let loading = false;
+// Render tick so the filter-aware empty-state effect re-runs after every load
+// even when the id list is unchanged (empty -> empty on a filter change, where
+// setAll's shallow-equal order signal doesn't fire).
+const renderTick = signal(0);
+// Monotonic token: the latest reload/loadMore wins. A stale in-flight fetch
+// (e.g. a filter-change reload superseding an in-flight show-more) is discarded
+// on return, so the two never interleave into the collection.
+let gen = 0;
 
 function buildApiUrl(offset: number, limit: number): string {
   const params = new URLSearchParams();
@@ -165,6 +176,13 @@ function anyFilterActive(): boolean {
 
 let bindings: (() => void)[] = [];
 
+function disposeBindings(): void {
+  for (const dispose of bindings) {
+    dispose();
+  }
+  bindings = [];
+}
+
 function ensureMounted(): void {
   const out = document.getElementById("historyContent");
   if (!out) {
@@ -173,10 +191,7 @@ function ensureMounted(): void {
   if (out.querySelector("table.history") !== null) {
     return;
   }
-  for (const dispose of bindings) {
-    dispose();
-  }
-  bindings = [];
+  disposeBindings();
 
   const tbody = el("tbody");
   const thead = el(
@@ -212,6 +227,7 @@ function ensureMounted(): void {
   bindings.push(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
   bindings.push(
     effect(() => {
+      void renderTick.value;
       const empty = history.ids.value.length === 0;
       const filtered = anyFilterActive();
       emptyNoData.hidden = !(empty && !filtered);
@@ -222,48 +238,55 @@ function ensureMounted(): void {
   );
 }
 
-async function reload(): Promise<void> {
-  if (loading) {
-    return;
+function showError(e: unknown): void {
+  disposeBindings();
+  const out = document.getElementById("historyContent");
+  if (out) {
+    patch(out, errDiv(e instanceof Error ? e.message : String(e)));
   }
-  loading = true;
+}
+
+async function reload(): Promise<void> {
+  const g = ++gen;
   try {
     const page = await fetchPage(0, PAGE_SIZE);
+    if (g !== gen) {
+      return; // superseded by a newer reload/loadMore
+    }
     history.setAll(page.items);
     hasMore.value = page.hasMore;
     updateHistoryFilters(history.items());
     ensureMounted();
+    renderTick.value += 1;
   } catch (e: unknown) {
-    const out = document.getElementById("historyContent");
-    if (out) {
-      patch(out, errDiv(e instanceof Error ? e.message : String(e)));
+    if (g === gen) {
+      showError(e);
     }
-  } finally {
-    loading = false;
   }
 }
 
 async function loadMore(): Promise<void> {
-  if (loading || !hasMore.value) {
+  if (!hasMore.value) {
     return;
   }
-  loading = true;
+  const g = ++gen;
   const scrollPos = window.scrollY;
   try {
     const page = await fetchPage(history.size, PAGE_SIZE);
+    if (g !== gen) {
+      return; // superseded (e.g. a filter-change reload won)
+    }
     for (const entry of page.items) {
       history.upsert(entry);
     }
     hasMore.value = page.hasMore;
     updateHistoryFilters(history.items());
+    renderTick.value += 1;
     window.scrollTo(0, scrollPos);
   } catch (e: unknown) {
-    const out = document.getElementById("historyContent");
-    if (out) {
-      patch(out, errDiv(e instanceof Error ? e.message : String(e)));
+    if (g === gen) {
+      showError(e);
     }
-  } finally {
-    loading = false;
   }
 }
 
