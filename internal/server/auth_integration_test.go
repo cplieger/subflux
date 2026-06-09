@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/store"
 )
 
@@ -49,7 +49,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	// Extract session cookie.
 	var sessionCookie *http.Cookie
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == auth.CookieNameHTTP || c.Name == auth.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
 			sessionCookie = c
 			break
 		}
@@ -263,7 +263,7 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 
 	// 6. Admin endpoint with user role → 403.
 	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/config", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: userToken})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: userToken})
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("user config request: %v", err)
@@ -275,7 +275,7 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 
 	// 7. Admin endpoint with admin role → 200 (or 503 if not configured, which is fine).
 	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/config", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: adminToken})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: adminToken})
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("admin config request: %v", err)
@@ -289,7 +289,7 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 	// 8. Admin-only endpoint with user role → 403 (other admin groups).
 	// /api/auth/users → admin group (requireAuth + requireRole).
 	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/auth/users", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: userToken})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: userToken})
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("user /api/auth/users request: %v", err)
@@ -303,7 +303,7 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 	// /api/scan → adminConfigured group (requireAuth + requireRole + requireConfigured).
 	// The role check runs first, so a user always gets 403 regardless of config state.
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/api/scan", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: userToken})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: userToken})
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("user /api/scan request: %v", err)
@@ -319,7 +319,7 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/api/auth/apikeys",
 		strings.NewReader(`{"label":"test","password":"correct-horse-battery-staple"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: adminToken})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: adminToken})
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("authed /api/auth/apikeys request: %v", err)
@@ -558,7 +558,7 @@ func TestSecurity_DisabledUserRejection(t *testing.T) {
 
 	// Verify session works while user is enabled.
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: token})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: token})
 	_, _, err := s.authenticator.Authenticate(req)
 	if err != nil {
 		t.Fatalf("should authenticate while enabled: %v", err)
@@ -572,7 +572,7 @@ func TestSecurity_DisabledUserRejection(t *testing.T) {
 
 	// Verify session is now rejected.
 	req = httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
-	req.AddCookie(&http.Cookie{Name: auth.CookieNameHTTP, Value: token})
+	req.AddCookie(&http.Cookie{Name: authhandlers.CookieNameHTTP, Value: token})
 	_, _, err = s.authenticator.Authenticate(req)
 	if err == nil {
 		t.Error("disabled user should not authenticate")
@@ -584,17 +584,17 @@ func TestSecurity_CookieFallback(t *testing.T) {
 
 	// Request over HTTP → cookie name is sfx_session (no __Host- prefix).
 	httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", http.NoBody)
-	httpName := auth.SessionCookieName(httpReq)
-	if httpName != auth.CookieNameHTTP {
-		t.Errorf("HTTP cookie name = %q, want %q", httpName, auth.CookieNameHTTP)
+	httpName := authhandlers.SessionCookieName(httpReq)
+	if httpName != authhandlers.CookieNameHTTP {
+		t.Errorf("HTTP cookie name = %q, want %q", httpName, authhandlers.CookieNameHTTP)
 	}
 
 	// Verify SetSessionCookie over HTTP produces the right cookie.
 	rec := httptest.NewRecorder()
-	auth.SetSessionCookie(rec, httpReq, "test-token", 0)
+	authhandlers.SetSessionCookie(rec, httpReq, "test-token", 0)
 	httpCookies := rec.Result().Cookies()
 	for _, c := range httpCookies {
-		if c.Name == auth.CookieNameHTTP {
+		if c.Name == authhandlers.CookieNameHTTP {
 			if c.Secure {
 				t.Error("HTTP cookie should not have Secure flag")
 			}
@@ -604,17 +604,17 @@ func TestSecurity_CookieFallback(t *testing.T) {
 	// Request with TLS → cookie name is __Host-sfx_session.
 	tlsReq := httptest.NewRequest(http.MethodGet, "https://localhost/", http.NoBody)
 	tlsReq.Header.Set("X-Forwarded-Proto", "https")
-	tlsName := auth.SessionCookieName(tlsReq)
-	if tlsName != auth.CookieNameSecure {
-		t.Errorf("TLS cookie name = %q, want %q", tlsName, auth.CookieNameSecure)
+	tlsName := authhandlers.SessionCookieName(tlsReq)
+	if tlsName != authhandlers.CookieNameSecure {
+		t.Errorf("TLS cookie name = %q, want %q", tlsName, authhandlers.CookieNameSecure)
 	}
 
 	rec = httptest.NewRecorder()
-	auth.SetSessionCookie(rec, tlsReq, "test-token", 0)
+	authhandlers.SetSessionCookie(rec, tlsReq, "test-token", 0)
 	tlsCookies := rec.Result().Cookies()
 	foundSecure := false
 	for _, c := range tlsCookies {
-		if c.Name == auth.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameSecure {
 			foundSecure = true
 			if !c.Secure {
 				t.Error("TLS cookie should have Secure flag")

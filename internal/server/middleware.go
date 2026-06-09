@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
+	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- Request middleware ---
@@ -115,7 +115,7 @@ func (s *Server) requireRole(role api.Role) middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			user := api.UserFromContext(r.Context())
-			if !auth.HasRole(user, role) {
+			if !authlib.HasRole(user, role) {
 				api.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
 				return
 			}

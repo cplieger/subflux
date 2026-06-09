@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
+	authlib "github.com/cplieger/auth"
+	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -45,7 +45,7 @@ func testAuthServer(t *testing.T) (*Server, *store.DB) {
 			secDB:       db,
 			oidcDB:      db,
 			rateLimiter: rl,
-			authenticator: &auth.Authenticator{
+			authenticator: &authhandlers.Authenticator{
 				Store:       db,
 				IdleTimeout: 24 * time.Hour,
 				AbsTimeout:  7 * 24 * time.Hour,
@@ -95,7 +95,7 @@ func (c *authTestConfig) WebAuthnRPID() string { return "" }
 // createTestUser creates a user in the DB with the given username and password.
 func createTestUser(t *testing.T, db *store.DB, username, password string) *api.User {
 	t.Helper()
-	hash, err := auth.HashPassword(password)
+	hash, err := authlib.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func createTestUser(t *testing.T, db *store.DB, username, password string) *api.
 // plaintext token.
 func createTestSession(t *testing.T, db *store.DB, userID int64) string {
 	t.Helper()
-	token, hash, err := auth.GenerateSessionToken()
+	token, hash, err := authlib.GenerateSessionToken()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestLogin_ValidCredentials(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	found := false
 	for _, c := range cookies {
-		if c.Name == auth.CookieNameHTTP || c.Name == auth.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
 			found = true
 			if !c.HttpOnly {
 				t.Error("session cookie missing HttpOnly flag")
@@ -328,7 +328,7 @@ func TestSetup_Create(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	found := false
 	for _, c := range cookies {
-		if c.Name == auth.CookieNameHTTP || c.Name == auth.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
 			found = true
 		}
 	}
@@ -391,7 +391,7 @@ func TestLogout_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", http.NoBody)
 	req.AddCookie(&http.Cookie{
-		Name:  auth.CookieNameHTTP,
+		Name:  authhandlers.CookieNameHTTP,
 		Value: token,
 	})
 	rec := httptest.NewRecorder()
@@ -402,7 +402,7 @@ func TestLogout_Success(t *testing.T) {
 	}
 
 	// Verify session was deleted from DB.
-	hash := auth.SessionHash(token)
+	hash := authlib.SessionHash(token)
 	sess, err := db.GetSessionByHash(context.Background(), hash)
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +413,7 @@ func TestLogout_Success(t *testing.T) {
 
 	// Verify cookie was cleared (MaxAge < 0).
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == auth.CookieNameHTTP || c.Name == auth.CookieNameSecure {
+		if c.Name == authhandlers.CookieNameHTTP || c.Name == authhandlers.CookieNameSecure {
 			if c.MaxAge >= 0 {
 				t.Errorf("cookie MaxAge = %d, want < 0 (cleared)", c.MaxAge)
 			}
@@ -452,7 +452,7 @@ func TestChangePassword_Success(t *testing.T) {
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	// Add session cookie so the handler can identify the current session.
 	req.AddCookie(&http.Cookie{
-		Name:  auth.CookieNameHTTP,
+		Name:  authhandlers.CookieNameHTTP,
 		Value: token,
 	})
 	rec := httptest.NewRecorder()
@@ -467,7 +467,7 @@ func TestChangePassword_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := auth.VerifyPassword("new-password-is-here-now", updated.PasswordHash)
+	ok, err := authlib.VerifyPassword("new-password-is-here-now", updated.PasswordHash)
 	if err != nil || !ok {
 		t.Error("new password verification failed")
 	}
@@ -583,7 +583,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	user := createTestUser(t, db, "karl", "correct-horse-battery-staple")
 
 	// Generate a key first.
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey()
+	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -645,7 +645,7 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 
 	// Hash a new password and update the user (same logic as CLI).
 	newPassword := "new-password-for-reset"
-	hash, err := auth.HashPassword(newPassword)
+	hash, err := authlib.HashPassword(newPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -664,13 +664,13 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := auth.VerifyPassword(newPassword, updated.PasswordHash)
+	ok, err := authlib.VerifyPassword(newPassword, updated.PasswordHash)
 	if err != nil || !ok {
 		t.Error("new password verification failed after reset")
 	}
 
 	// Verify old password no longer works.
-	ok, err = auth.VerifyPassword("old-password-for-reset", updated.PasswordHash)
+	ok, err = authlib.VerifyPassword("old-password-for-reset", updated.PasswordHash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -685,7 +685,7 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 	user := createTestUser(t, db, "nancy", "correct-horse-battery-staple")
 
 	// Generate an API key (same logic as CLI).
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey()
+	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1341,7 +1341,7 @@ func TestListAPIKeys_WithData(t *testing.T) {
 	user := createTestUser(t, db, "listkeys-data", "correct-horse-battery-staple")
 
 	for i := range 2 {
-		_, hash, prefix, suffix, err := auth.GenerateAPIKey()
+		_, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
 		if err != nil {
 			t.Fatal(err)
 		}

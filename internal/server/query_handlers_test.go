@@ -14,13 +14,13 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/provider/embedded"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/testsupport"
@@ -163,7 +163,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		// authenticator keeps the Server invariant (auth is always wired)
 		// without requiring each test to stand up real auth state.
 		authDeps: authDeps{
-			authenticator: &auth.Authenticator{Bypass: func() bool { return true }},
+			authenticator: &authhandlers.Authenticator{Bypass: func() bool { return true }},
 		},
 	}
 	s.configured.Store(true)

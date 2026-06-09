@@ -13,13 +13,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/subflux/internal/auth"
+	authwebauthn "github.com/cplieger/auth/webauthn"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 const (
 	// CeremonyTTL is the maximum age for pending TOTP and WebAuthn sessions.
-	CeremonyTTL = auth.CeremonyTimeout
+	CeremonyTTL = authwebauthn.CeremonyTimeout
 
 	// MaxCeremonySessions caps the in-memory ceremony maps to prevent OOM
 	// from unauthenticated flooding of /api/auth/login or /api/auth/webauthn/login/begin.

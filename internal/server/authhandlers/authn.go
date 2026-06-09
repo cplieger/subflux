@@ -1,0 +1,128 @@
+package authhandlers
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"time"
+
+	authlib "github.com/cplieger/auth"
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
+)
+
+// SessionStore is the narrow store interface the Authenticator needs to
+// resolve a request to a user via session cookie or API key.
+type SessionStore interface {
+	GetSessionByHash(ctx context.Context, tokenHash string) (*api.Session, error)
+	GetUserByID(ctx context.Context, id int64) (*api.User, error)
+	GetAPIKeyByHash(ctx context.Context, hash string) (*api.Key, error)
+}
+
+// Compile-time assertion: the composite authstore satisfies SessionStore.
+var _ SessionStore = authstore.AuthStore(nil)
+
+// Authenticator resolves an HTTP request to an authenticated user. It chains a
+// subflux session-cookie verifier with the library's API-key verifier.
+type Authenticator struct {
+	Store SessionStore
+	// Bypass reports whether all authentication is disabled (nil means never).
+	Bypass      func() bool
+	IdleTimeout time.Duration
+	AbsTimeout  time.Duration
+}
+
+// syntheticAdminUser is injected when Bypass returns true (auth.disable_auth).
+var syntheticAdminUser = &api.User{
+	ID:       0,
+	Username: "admin",
+	Role:     api.RoleAdmin,
+	Enabled:  true,
+}
+
+// Authenticate checks session cookie first, then API key. Returns the user and
+// session hash, or [authlib.ErrUnauthenticated].
+func (a *Authenticator) Authenticate(r *http.Request) (user *api.User, sessHash string, err error) {
+	if a.Bypass != nil && a.Bypass() {
+		return syntheticAdminUser, "", nil
+	}
+	ctx := r.Context()
+	for _, v := range a.verifiers() {
+		user, hash, err := v.Verify(ctx, r)
+		if err != nil {
+			return nil, "", err
+		}
+		if user != nil {
+			return user, hash, nil
+		}
+	}
+	return nil, "", authlib.ErrUnauthenticated
+}
+
+// RequireAuth checks authentication and returns the user. If not authenticated
+// it writes the appropriate response (401 JSON for API clients, 302 to /login
+// for browsers) and returns ok=false.
+func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (user *api.User, sessHash string, ok bool) {
+	user, sessHash, err := a.Authenticate(r)
+	if err != nil {
+		if authlib.IsBrowserRequest(r) {
+			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
+		} else {
+			api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, authlib.ErrUnauthenticated.Error())
+		}
+		return nil, "", false
+	}
+	return user, sessHash, true
+}
+
+// verifiers returns the ordered credential verifiers: subflux session cookie,
+// then the library's API-key verifier.
+func (a *Authenticator) verifiers() []authlib.CredentialVerifier {
+	return []authlib.CredentialVerifier{
+		&sessionVerifier{store: a.Store, idleTimeout: a.IdleTimeout, absTimeout: a.AbsTimeout},
+		authlib.NewAPIKeyVerifier(a.Store),
+	}
+}
+
+// sessionVerifier authenticates via subflux's session cookie. It differs from
+// the library's session verifier in two ways: it reads subflux's per-request
+// HTTP/HTTPS dual-name cookie, and it does not update session activity inline
+// (the server batches activity writes via sessionActivityBatcher).
+type sessionVerifier struct {
+	store       SessionStore
+	idleTimeout time.Duration
+	absTimeout  time.Duration
+}
+
+// Verify checks the session cookie and returns the user if valid.
+func (v *sessionVerifier) Verify(ctx context.Context, r *http.Request) (user *api.User, sessHash string, err error) {
+	token := ReadSessionCookie(r)
+	if token == "" {
+		return nil, "", nil
+	}
+	hash := authlib.SessionHash(token)
+	sess, err := v.store.GetSessionByHash(ctx, hash)
+	if err != nil {
+		slog.Debug("auth: session lookup failed", "error", err)
+		return nil, "", nil
+	}
+	if sess == nil {
+		return nil, "", nil
+	}
+	if authlib.ValidateSession(sess, v.idleTimeout, v.absTimeout, time.Now()) != nil {
+		return nil, "", nil
+	}
+	user, err = v.store.GetUserByID(ctx, sess.UserID)
+	if err != nil {
+		slog.Debug("auth: user lookup failed", "user_id", sess.UserID, "error", err)
+		return nil, "", nil
+	}
+	if user == nil || !user.Enabled {
+		if user != nil {
+			slog.Debug("auth: disabled user attempted session auth", "user_id", sess.UserID)
+		}
+		return nil, "", nil
+	}
+	return user, hash, nil
+}

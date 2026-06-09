@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	authlib "github.com/cplieger/auth"
+	authwebauthn "github.com/cplieger/auth/webauthn"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- GET /api/auth/passkeys ---
@@ -62,7 +63,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	webauthnUser, err := auth.NewWebAuthnUser(user, nil)
+	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, nil)
 	if err != nil {
 		slog.Error("webauthn info: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -123,11 +124,12 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
 		return
 	}
-	if okPass, perr := auth.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
+	if okPass, perr := authlib.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
 		h.RateLimiter.Record(ip, user.Username)
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid password")
 		return
 	}
+	h.RateLimiter.Reset(ip, user.Username)
 
 	ctx := r.Context()
 	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
@@ -137,14 +139,14 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	webauthnUser, err := auth.NewWebAuthnUser(user, creds)
+	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	creation, sessionData, err := auth.BeginRegistration(h.WebAuthn, webauthnUser)
+	creation, sessionData, err := authwebauthn.BeginRegistration(h.WebAuthn, webauthnUser)
 	if err != nil {
 		slog.Error("webauthn register: begin", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -195,14 +197,14 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	webauthnUser, err := auth.NewWebAuthnUser(user, creds)
+	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register finish: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	credential, err := auth.FinishRegistration(h.WebAuthn, webauthnUser, sessData, r)
+	credential, err := authwebauthn.FinishRegistration(h.WebAuthn, webauthnUser, sessData, r)
 	if err != nil {
 		slog.Warn("webauthn register finish: failed", "error", err)
 		api.BadRequestC(w, r, api.CodeWebAuthnRegisterFailed, "registration failed")
@@ -213,9 +215,9 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	for i := range creds {
 		existingNames[i] = creds[i].Name
 	}
-	friendlyName := auth.PasskeyFriendlyName(credential.Authenticator.AAGUID, existingNames)
+	friendlyName := authwebauthn.PasskeyFriendlyName(credential.Authenticator.AAGUID, existingNames)
 
-	passkey := auth.WebAuthnCredentialToAPI(credential, user.ID, friendlyName)
+	passkey := authwebauthn.CredentialToAPI(credential, user.ID, friendlyName)
 	passkey.CreatedAt = time.Now()
 	if err := h.SecDB.CreatePasskey(ctx, passkey); err != nil {
 		slog.Error("webauthn register finish: store credential", "error", err)
@@ -257,7 +259,7 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	hasPassword := user.PasswordHash != ""
 	oidcLinked := user.OIDCSub != ""
 
-	if !auth.CanDisableAuthMethod(api.MethodPasskey, hasPassword, passkeyCount-1, cfg.OIDCEnabled(), oidcLinked) {
+	if !authlib.CanDisableAuthMethod(api.MethodPasskey, hasPassword, passkeyCount-1, cfg.OIDCEnabled(), oidcLinked) {
 		api.ConflictC(w, r, api.CodeConflict, "cannot remove last authentication method")
 		return
 	}

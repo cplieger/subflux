@@ -22,12 +22,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	authoidc "github.com/cplieger/auth/oidc"
+	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httputil"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -123,7 +123,7 @@ func (s *Server) authBypass() bool {
 }
 
 // SetAuth configures authentication dependencies on the server.
-func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *webauthn.WebAuthn, oidc *auth.OIDCProvider) {
+func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *webauthn.WebAuthn, oidc *authoidc.Provider) {
 	s.authStore = store
 	s.adminDB = store
 	s.secDB = store
@@ -138,7 +138,7 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *we
 		idle = ls.cfg.SessionIdleTimeout()
 		abs = ls.cfg.SessionAbsoluteTimeout()
 	}
-	s.authenticator = &auth.Authenticator{
+	s.authenticator = &authhandlers.Authenticator{
 		Store:       store,
 		IdleTimeout: idle,
 		AbsTimeout:  abs,
@@ -168,6 +168,18 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *we
 // SetOIDCLazy stores the OIDC config for lazy provider initialization.
 func (s *Server) SetOIDCLazy(cfg api.OIDCConfig) {
 	s.oidcCfg = &cfg
+}
+
+// toAuthOIDCConfig adapts subflux's api.OIDCConfig to the auth/oidc package's
+// Config type (structurally identical, distinct named types).
+func toAuthOIDCConfig(c api.OIDCConfig) authoidc.Config {
+	return authoidc.Config{
+		IssuerURL:    c.IssuerURL,
+		ClientID:     c.ClientID,
+		ClientSecret: c.ClientSecret,
+		RedirectURI:  c.RedirectURI,
+		AutoRedirect: c.AutoRedirect,
+	}
 }
 
 // Start initializes providers and starts the HTTP server and scheduler.
@@ -245,7 +257,7 @@ func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
 }
 
 // getOIDC returns the OIDC provider, lazily initializing it on first call.
-func (s *Server) getOIDC() *auth.OIDCProvider {
+func (s *Server) getOIDC() *authoidc.Provider {
 	if s.oidcProvider != nil {
 		return s.oidcProvider
 	}
@@ -266,7 +278,7 @@ func (s *Server) getOIDC() *auth.OIDCProvider {
 	}
 
 	s.oidcInit.lastAttempt.Store(time.Now().UnixNano())
-	p, err := auth.NewOIDCProvider(s.ctx, *s.oidcCfg)
+	p, err := authoidc.NewProvider(s.ctx, toAuthOIDCConfig(*s.oidcCfg))
 	if err != nil {
 		slog.Error("lazy OIDC provider initialization failed (will retry after backoff)",
 			"error", err, "retry_after", oidcRetryBackoff)

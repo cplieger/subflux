@@ -12,10 +12,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/cplieger/auth/ratelimit"
+	authwebauthn "github.com/cplieger/auth/webauthn"
 	"github.com/cplieger/health"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrapi"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
@@ -24,7 +25,6 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/provider/embedded"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -333,7 +333,7 @@ func runConfiguredServer(cfg *config.Config) int {
 	var wa *webauthn.WebAuthn
 	if rpID := cfg.WebAuthnRPID(); rpID != "" {
 		var err error
-		wa, err = auth.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
+		wa, err = authwebauthn.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
 		if err != nil {
 			slog.Warn("WebAuthn initialization failed", "error", err)
 		}
