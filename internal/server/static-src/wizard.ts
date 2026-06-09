@@ -1,5 +1,6 @@
 // wizard.ts — Setup wizard extracted from login.ts. Invoked via startConfigWizard().
 
+import { patch } from "@cplieger/reactive";
 import { apiGetArray } from "./api-client.js";
 import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
@@ -260,12 +261,14 @@ function renderWizardProgress(): void {
   if (!container) {
     return;
   }
-  container.replaceChildren();
-  for (let i = 0; i < wizardSteps.length; i++) {
+  // Keyed by step index so a step change only flips the changed dots' class
+  // (patch syncs className) instead of recreating every dot.
+  const dots = wizardSteps.map((_, i) => {
     const cls =
       i === wizardIndex ? "wizard-dot active" : i < wizardIndex ? "wizard-dot done" : "wizard-dot";
-    container.appendChild(el("div", { className: cls }));
-  }
+    return el("div", { className: cls, "data-col": String(i) });
+  });
+  patch(container, ...dots);
 }
 
 function updateWizardNav(): void {
