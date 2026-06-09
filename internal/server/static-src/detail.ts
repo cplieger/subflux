@@ -329,7 +329,8 @@ function epSig(
   } else {
     parts = `subs:${Object.keys(subs).length}`;
   }
-  return `${parts}#h:${hasHistory ? 1 : 0}`;
+  const ic = [...store.get("ignoredCodecs")].sort().join(",");
+  return `${parts}#h:${hasHistory ? 1 : 0}#i:${ic}`;
 }
 
 // Column header labels (recreated per season since DOM nodes can only appear
@@ -835,7 +836,8 @@ interface MovieRow {
 /** Content signature for a movie language row: the entries' source/codec/score
  *  (everything the coverage badges render). */
 function movieSig(entries: SubtitleEntry[]): string {
-  return entries.map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}`).join(",");
+  const ic = [...store.get("ignoredCodecs")].sort().join(",");
+  return `${entries.map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}`).join(",")}#i:${ic}`;
 }
 
 /** Coverage-cell children for a movie row (codec-grouped badges, or the empty
