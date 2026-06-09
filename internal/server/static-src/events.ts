@@ -3,6 +3,7 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { patchCoverageBadge, fetchAndMergeCoverage } from "./coverage.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { coverageMediaId } from "./utils.js";
@@ -68,11 +69,11 @@ export function connect(): void {
           }
         })
         .catch(() => {
-          store.set("needsRefresh", true);
+          emit(BusEvent.DataInvalidate);
         });
       return;
     }
-    store.set("needsRefresh", true);
+    emit(BusEvent.DataInvalidate);
   });
 
   eventSource.addEventListener("notify", (e: MessageEvent) => {

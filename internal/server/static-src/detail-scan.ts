@@ -10,6 +10,7 @@
 // with the inline icon-on-button pattern (we set `error: false`).
 
 import * as store from "./store.js";
+import { emit, BusEvent } from "./bus.js";
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import type { SeriesItem, MovieDetail } from "./api-types.js";
 
@@ -64,7 +65,7 @@ export async function triggerScan(
       if (store.get("refreshPending")) {
         store.batch(() => {
           store.set("refreshPending", false);
-          store.set("needsRefresh", true);
+          emit(BusEvent.DataInvalidate);
         });
       }
     },

@@ -3,6 +3,7 @@
 import { initActions } from "./actions-boot.js";
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { on, BusEvent } from "./bus.js";
 
 // Wire @cplieger/actions notifier + API layer before any action is created.
 initActions();
@@ -83,17 +84,14 @@ function refreshCurrentPage(): void {
   }
 }
 
-// Any module can trigger a refresh by setting needsRefresh to true.
+// Any module can trigger a refresh by emitting BusEvent.DataInvalidate.
 // Defer refresh while a scan button is active (prevents DOM replacement
 // from detaching the button reference mid-animation).
-store.subscribe("needsRefresh", (_val) => {
-  if (_val) {
-    if (store.get("scanInFlight")) {
-      store.set("refreshPending", true);
-    } else {
-      refreshCurrentPage();
-    }
-    store.set("needsRefresh", false);
+on(BusEvent.DataInvalidate, () => {
+  if (store.get("scanInFlight")) {
+    store.set("refreshPending", true);
+  } else {
+    refreshCurrentPage();
   }
 });
 

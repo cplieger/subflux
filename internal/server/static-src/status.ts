@@ -2,6 +2,7 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { el, text, icon, $ } from "./dom.js";
 import { apiGet, apiGetArray, apiGetTyped } from "./api-client.js";
 import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
@@ -152,7 +153,7 @@ function processActivitySideEffects(
   const wasActive = btn.dataset["wasActive"] === "true";
   btn.dataset["wasActive"] = String(isActive);
   if (wasActive && !isActive) {
-    store.set("needsRefresh", true);
+    emit(BusEvent.DataInvalidate);
   }
 
   if (Array.isArray(activities)) {
@@ -417,7 +418,9 @@ function buildPopupItems(
 
   if (!isActive && stats?.last_scan) {
     let scanLabel = "";
-    const lastDone = activities.filter((a: ActivityEntry) => a.done && a.action === "Full Scan").pop();
+    const lastDone = activities
+      .filter((a: ActivityEntry) => a.done && a.action === "Full Scan")
+      .pop();
     if (lastDone?.ended_at) {
       scanLabel = timeAgo(new Date(lastDone.ended_at));
     }

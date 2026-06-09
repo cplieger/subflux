@@ -3,6 +3,7 @@
 import * as store from "./store.js";
 import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { el, dialog, closeDialog, $ } from "./dom.js";
 import { patch } from "@cplieger/reactive";
 import { apiGet, apiGetArray } from "./api-client.js";
@@ -104,7 +105,7 @@ export async function saveConfig(): Promise<void> {
     return;
   }
   void initLanguages();
-  store.set("needsRefresh", true);
+  emit(BusEvent.DataInvalidate);
   await loadConfig();
   if (wasUnconfigured && !store.get("isUnconfigured")) {
     notify.success("Subflux is now configured and running");

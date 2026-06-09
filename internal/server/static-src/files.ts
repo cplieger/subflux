@@ -84,7 +84,7 @@ async function loadFiles(): Promise<void> {
     },
   });
 
-  // Mark as files view so needsRefresh reloads files, not library.
+  // Mark as files view so data:invalidate reloads files, not library.
   store.set("detailCtx", { files: true });
 
   patch(

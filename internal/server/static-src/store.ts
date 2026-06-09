@@ -43,7 +43,6 @@ export interface StoreMap {
   currentPage: string;
   scanInFlight: boolean;
   refreshPending: boolean;
-  needsRefresh: boolean;
   isUnconfigured: boolean;
   isReady: boolean;
   isAdmin: boolean;

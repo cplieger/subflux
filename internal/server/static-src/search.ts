@@ -2,6 +2,7 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
 import { el, option, icon, dialog, closeDialog, emptyDiv, errDiv } from "./dom.js";
 import { patch } from "@cplieger/reactive";
@@ -542,7 +543,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
       } else {
         btn.dataset["status"] = "ok";
         patch(btn, icon("check"));
-        store.set("needsRefresh", true);
+        emit(BusEvent.DataInvalidate);
       }
       btn.removeAttribute("data-tip");
     } else {
