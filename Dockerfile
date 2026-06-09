@@ -7,7 +7,7 @@ ARG FFMPEG_VERSION=8.1
 ARG X264_COMMIT=4613ac3c
 
 # --- Source downloads (cached independently) ---
-FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS sources
+FROM alpine:3.24.0@sha256:660e0827bd401543d81323d4886abbd08fda0fe3ba84337837d0b11a67251283 AS sources
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 ARG FFMPEG_VERSION=8.1
@@ -33,7 +33,7 @@ RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
 # Produces ~5MB ffmpeg + ~2MB ffprobe. No network, no HW accel.
-FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ffmpeg-builder
+FROM alpine:3.24.0@sha256:660e0827bd401543d81323d4886abbd08fda0fe3ba84337837d0b11a67251283 AS ffmpeg-builder
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
@@ -98,7 +98,7 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
 # Plain alpine here (not golang-alpine) because nothing in this stage needs
 # Go — tsgo is a self-contained native binary. See .github/renovate.json
 # for the followTag rule.
-FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ts-builder
+FROM alpine:3.24.0@sha256:660e0827bd401543d81323d4886abbd08fda0fe3ba84337837d0b11a67251283 AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018
