@@ -2,7 +2,7 @@
 
 import * as notify from "./notify.js";
 import * as store from "./store.js";
-import { $, el, icon, patch, emptyDiv, errDiv, confirm } from "./dom.js";
+import { $, el, icon, emptyDiv, errDiv, confirm } from "./dom.js";
 import { apiGet } from "./api-client.js";
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { fmtEpisode, langName } from "./utils.js";
@@ -10,7 +10,7 @@ import { DEFAULT_VARIANT } from "./constants.js";
 import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
 import type { MediaType } from "./api-types.js";
-import { reconcile } from "@cplieger/reactive";
+import { reconcile, patch } from "@cplieger/reactive";
 
 // --- API response shapes ---
 

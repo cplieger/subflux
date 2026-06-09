@@ -1,7 +1,8 @@
 // Client-side routing: URL-driven page navigation with view transitions.
 
 import * as store from "./store.js";
-import { $, el, icon, input, patch, select } from "./dom.js";
+import { $, el, icon, input, select } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { apiGet } from "./api-client.js";
 import { openConfig } from "./config.js";
 import { loadCoverage, configurePanel, renderCoverage } from "./coverage.js";

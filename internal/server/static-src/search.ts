@@ -3,7 +3,8 @@
 import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
-import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from "./dom.js";
+import { el, option, icon, dialog, closeDialog, emptyDiv, errDiv } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { apiGetArray, apiGetRaw } from "./api-client.js";
 import { decodeActivityEntry } from "./wire/decoders.gen.js";
 import { apiAction, type ActionError, retryNetwork, registerCleanup } from "@cplieger/actions";

@@ -2,17 +2,8 @@
 
 import * as bus from "./bus.js";
 import * as notify from "./notify.js";
-import {
-  el,
-  icon,
-  dialog,
-  closeDialog,
-  dialogHead,
-  onBackdropClose,
-  patch,
-  confirm,
-} from "./dom.js";
-import { reconcile } from "@cplieger/reactive";
+import { el, icon, dialog, closeDialog, dialogHead, onBackdropClose, confirm } from "./dom.js";
+import { reconcile, patch } from "@cplieger/reactive";
 import {
   apiGet,
   apiGetTyped,
@@ -42,7 +33,6 @@ interface APIKeyItem {
   label: string;
   created_at: string;
 }
-
 
 /** Wrap an async click handler with disabled + aria-busy lifecycle. The
  *  button is disabled and announced as busy while the handler runs;

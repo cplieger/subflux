@@ -1,7 +1,7 @@
 // coverage.ts — library coverage view with filtering, sorting, and badges
 
 import * as store from "./store.js";
-import { $, el, text, icon, patch, errDiv, input, select, insertNavButton } from "./dom.js";
+import { $, el, text, icon, errDiv, input, select, insertNavButton } from "./dom.js";
 import { apiGetTyped } from "./api-client.js";
 import { registerCleanup } from "@cplieger/actions";
 import { decodeSeriesItem, decodeMovieItem } from "./wire/decoders.gen.js";
@@ -12,7 +12,7 @@ import type { DetailConfig } from "./bus.js";
 import { createPagedList } from "./paged-list.js";
 import type { PagedList, Page } from "./paged-list.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
-import { reconcile } from "@cplieger/reactive";
+import { reconcile, patch } from "@cplieger/reactive";
 
 // --- Coverage view ---
 

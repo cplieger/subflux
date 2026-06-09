@@ -1,7 +1,7 @@
 // detail.ts — series and movie detail drilldown views
 
 import * as store from "./store.js";
-import { $, el, icon, patch, emptyDiv, errDiv, pad, insertNavButton } from "./dom.js";
+import { $, el, icon, emptyDiv, errDiv, pad, insertNavButton } from "./dom.js";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { decodeSubtitleEntry } from "./wire/decoders.gen.js";
 import { registerCleanup } from "@cplieger/actions";
@@ -15,7 +15,7 @@ import { triggerSeriesScan, triggerSeasonScan, triggerMovieScan } from "./detail
 import { confirmSeasonSync } from "./detail-season-sync.js";
 import type { SeasonSyncEpisode } from "./detail-season-sync.js";
 import type { SubtitleEntry, MovieDetail, Episode, SeasonGroup, SeriesItem } from "./api-types.js";
-import { reconcile } from "@cplieger/reactive";
+import { reconcile, patch } from "@cplieger/reactive";
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
 // on internal navigation (each new openSeriesDetail/openMovieDetail aborts

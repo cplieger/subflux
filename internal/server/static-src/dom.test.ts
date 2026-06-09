@@ -4,7 +4,6 @@ import {
   el as _el,
   text as _text,
   icon as _icon,
-  patch as _patch,
   option as _option,
   emptyDiv as _emptyDiv,
   errDiv as _errDiv,
@@ -27,26 +26,6 @@ describe("dom: el()", () => {
   it.todo("appends Node children directly");
 
   it.todo("skips null/undefined children");
-});
-
-describe("dom: patch()", () => {
-  it.todo("replaces text content in existing text node");
-
-  it.todo("patches attributes on matching elements");
-
-  it.todo("removes attributes not present in new element");
-
-  it.todo("adds new children when new list is longer");
-
-  it.todo("removes excess children when new list is shorter");
-
-  it.todo("reuses keyed elements (data-col, *-id attributes)");
-
-  it.todo("replaces element when tag name differs");
-
-  it.todo("handles DocumentFragment children by flattening");
-
-  it.todo("patches on* handlers via WeakMap tracking");
 });
 
 describe("dom: confirm()", () => {

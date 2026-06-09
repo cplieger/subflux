@@ -3,7 +3,8 @@
 import * as store from "./store.js";
 import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
-import { el, dialog, closeDialog, patch, $ } from "./dom.js";
+import { el, dialog, closeDialog, $ } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
@@ -366,7 +367,7 @@ function markRequiredFields(): void {
   }
 
   for (const schema of configSchema) {
-    for (const field of (schema.fields ?? [])) {
+    for (const field of schema.fields ?? []) {
       if (!field.required) {
         continue;
       }
@@ -436,7 +437,7 @@ function genFields(schema: SchemaSection): string {
     ) as HTMLInputElement | null;
     lines.push(`  ${schema.enable_key}: ${t ? String(t.checked) : "true"}`);
   }
-  for (const field of (schema.fields ?? [])) {
+  for (const field of schema.fields ?? []) {
     if (field.key === schema.enable_key) {
       continue;
     }
@@ -471,7 +472,7 @@ function genFields(schema: SchemaSection): string {
 
 function genScoring(schema: SchemaSection): string {
   const lines: string[] = ["scoring:", "  weights:"];
-  for (const field of (schema.fields ?? [])) {
+  for (const field of schema.fields ?? []) {
     const f = document.getElementById(fieldId(schema.key, field.key)) as HTMLInputElement | null;
     lines.push(`    ${field.key}: ${f ? f.value : (field.default ?? "0")}`);
   }

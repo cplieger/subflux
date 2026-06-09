@@ -8,7 +8,8 @@
 // The module manages: accumulating items across pages, "show more" button,
 // reset on filter change, and loading/error states.
 
-import { el, patch, emptyDiv, errDiv } from "./dom.js";
+import { el, emptyDiv, errDiv } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 
 /** A single page of results from the data source. */
 export interface Page<T> {

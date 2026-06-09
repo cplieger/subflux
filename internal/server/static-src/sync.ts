@@ -1,7 +1,8 @@
 // sync.ts — Subtitle sync dialog: audio sync, manual offset, video preview, timecode controls.
 
 import * as notify from "./notify.js";
-import { el, text, option, icon, dialog, closeDialog, onBackdropClose, patch } from "./dom.js";
+import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
 import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { langName } from "./utils.js";

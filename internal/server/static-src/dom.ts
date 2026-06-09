@@ -1,10 +1,7 @@
 // DOM utility functions. All UI construction goes through these helpers
 // to ensure DOM-safety (no innerHTML) and CSP compliance.
 
-// Track which on* handler keys were set on each element. Prototype
-// setters don't create own properties, so Object.keys() can't see
-// them. A WeakMap avoids leaking memory when elements are GC'd.
-const handlerKeysMap = new WeakMap<HTMLElement, Set<string>>();
+import { trackHandler } from "@cplieger/reactive";
 
 // Attribute value types accepted by el(). Covers event handlers, booleans,
 // numbers, strings, and null (to skip an attribute).
@@ -28,12 +25,7 @@ export function el(
         e.className = v as string;
       } else if (k.startsWith("on")) {
         (e as unknown as Record<string, unknown>)[k] = v;
-        let keys = handlerKeysMap.get(e);
-        if (!keys) {
-          keys = new Set();
-          handlerKeysMap.set(e, keys);
-        }
-        keys.add(k);
+        trackHandler(e, k);
       } else if (k === "hidden") {
         e.hidden = v as boolean;
       } else if (k === "disabled") {
@@ -81,154 +73,6 @@ export function emptyDiv(msg: string): HTMLElement {
 
 export function errDiv(msg: string): HTMLElement {
   return el("div", { className: "empty", "data-status": "err" }, msg);
-}
-
-// Diff-patch: reconcile parent's children against new content.
-export function patch(
-  parent: Node,
-  ...children: (string | Node | DocumentFragment | null | undefined)[]
-): void {
-  const newChildren: Node[] = [];
-  for (const child of children) {
-    if (child == null) {
-      continue;
-    }
-    if ((child as Node).nodeType === 11) {
-      newChildren.push(...Array.from((child as Node).childNodes));
-    } else if (typeof child === "string") {
-      newChildren.push(document.createTextNode(child));
-    } else {
-      newChildren.push(child);
-    }
-  }
-  reconcileChildren(parent, newChildren);
-}
-
-function reconcileChildren(parent: Node, newChildren: Node[]): void {
-  const oldChildren = Array.from(parent.childNodes);
-
-  const oldByKey = new Map<string, Node>();
-  for (const child of oldChildren) {
-    const key = nodeKey(child);
-    if (key) {
-      oldByKey.set(key, child);
-    }
-  }
-
-  let oldIdx = 0;
-  for (let i = 0; i < newChildren.length; i++) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
-    const newChild = newChildren[i]!;
-    const newKey = nodeKey(newChild);
-
-    let matched = newKey ? (oldByKey.get(newKey) ?? null) : null;
-    if (matched) {
-      oldByKey.delete(newKey);
-    } else if (!newKey) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
-      while (oldIdx < oldChildren.length && nodeKey(oldChildren[oldIdx]!)) {
-        oldIdx++;
-      }
-      if (oldIdx < oldChildren.length) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bounds checked
-        matched = oldChildren[oldIdx]!;
-        oldIdx++;
-      }
-    }
-
-    if (!matched) {
-      const ref = parent.childNodes.item(i);
-      parent.insertBefore(newChild, ref);
-      continue;
-    }
-
-    if (!canPatch(matched, newChild)) {
-      parent.replaceChild(newChild, matched);
-      continue;
-    }
-
-    const ref = parent.childNodes.item(i);
-    if (ref !== matched) {
-      parent.insertBefore(matched, ref);
-    }
-
-    if (matched.nodeType === 3) {
-      if (matched.textContent !== newChild.textContent) {
-        matched.textContent = newChild.textContent;
-      }
-    } else if (matched.nodeType === 1) {
-      patchAttrs(matched as HTMLElement, newChild as HTMLElement);
-      reconcileChildren(matched, Array.from(newChild.childNodes));
-    }
-  }
-
-  while (parent.childNodes.length > newChildren.length) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length > 0 guarantees lastChild
-    parent.lastChild!.remove();
-  }
-}
-
-function canPatch(oldNode: Node, newNode: Node): boolean {
-  if (oldNode.nodeType !== newNode.nodeType) {
-    return false;
-  }
-  if (oldNode.nodeType === 3) {
-    return true;
-  }
-  if (oldNode.nodeType !== 1) {
-    return false;
-  }
-  return oldNode.nodeName === newNode.nodeName;
-}
-
-function nodeKey(node: Node): string {
-  if (node.nodeType !== 1) {
-    return "";
-  }
-  for (const attr of (node as Element).attributes) {
-    if (attr.name === "data-col" || attr.name.endsWith("-id")) {
-      return `${attr.name}=${attr.value}`;
-    }
-  }
-  return "";
-}
-
-function patchAttrs(oldEl: HTMLElement, newEl: HTMLElement): void {
-  for (const attr of newEl.attributes) {
-    if (oldEl.getAttribute(attr.name) !== attr.value) {
-      oldEl.setAttribute(attr.name, attr.value);
-    }
-  }
-  for (const attr of Array.from(oldEl.attributes)) {
-    if (!newEl.hasAttribute(attr.name)) {
-      oldEl.removeAttribute(attr.name);
-    }
-  }
-  if (oldEl.hidden !== newEl.hidden) {
-    oldEl.hidden = newEl.hidden;
-  }
-
-  const newKeys = handlerKeysMap.get(newEl);
-  const oldKeys = handlerKeysMap.get(oldEl);
-  // Remove handlers that the new element doesn't have.
-  if (oldKeys) {
-    for (const key of oldKeys) {
-      if (!newKeys?.has(key)) {
-        (oldEl as unknown as Record<string, unknown>)[key] = null;
-      }
-    }
-  }
-  // Copy handlers from new to old and update tracked keys.
-  if (newKeys) {
-    const oldRec = oldEl as unknown as Record<string, unknown>;
-    const newRec = newEl as unknown as Record<string, unknown>;
-    for (const key of newKeys) {
-      oldRec[key] = newRec[key];
-    }
-    handlerKeysMap.set(oldEl, new Set(newKeys));
-  } else if (oldKeys) {
-    handlerKeysMap.delete(oldEl);
-  }
 }
 
 export function pad(n: number): string {

@@ -28,7 +28,7 @@
     "vitest": "4.1.8"
   },
   "dependencies": {
-    "@cplieger/actions": "1.1.3",
-    "@cplieger/reactive": "1.0.4"
+    "@cplieger/actions": "1.2.0",
+    "@cplieger/reactive": "1.1.0"
   }
 }

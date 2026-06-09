@@ -1,6 +1,7 @@
 // detail-season-sync.ts — Season audio sync dialog extracted from detail.ts.
 
-import { el, patch, dialog, closeDialog, onBackdropClose, dialogHead, pad } from "./dom.js";
+import { el, dialog, closeDialog, onBackdropClose, dialogHead, pad } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { audioSyncAction } from "./sync-actions.js";
 import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
 
