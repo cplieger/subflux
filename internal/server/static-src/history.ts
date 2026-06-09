@@ -1,7 +1,7 @@
 // history.ts — download history page (server-side paginated).
 //
-// The accumulated entries live in a createCollection keyed by
-// media_id+media_imported; bindList renders them. "Reload" (filter change)
+// The accumulated entries live in a createCollection keyed by the server's
+// unique row id; bindList renders them. "Reload" (filter change)
 // is setAll(page 0); "show more" fetches the next server page and upserts it
 // (appended). The collection IS the bindList ListSource — no per-row updates
 // (history is append-only display), so only the structure tier does work.
