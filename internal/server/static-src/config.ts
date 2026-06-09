@@ -303,7 +303,7 @@ function renderConfigForm(): void {
 
   // Mark required fields only for first-time setup.
   if (isFirstSetup) {
-    markRequiredFields();
+    markRequiredFields(configSchema, body);
   }
 }
 
@@ -323,23 +323,27 @@ function updateFieldValidation(inp: HTMLInputElement, field: SchemaField): void 
   }
 }
 
+// Force-clear the required styling (red border + "Required" message) on a
+// field regardless of whether it is empty. Used when a required_group is
+// satisfied by another member, so still-empty members must not be flagged.
+function clearFieldValidation(inp: HTMLInputElement): void {
+  inp.classList.remove("cfg-required");
+  const msg = inp.closest(".cfg-field")?.querySelector(".cfg-error");
+  if (msg) {
+    msg.remove();
+  }
+}
+
 // markRequiredFields adds a red border to empty required fields.
 // For "required_group" sections (sonarr/radarr), at least one group
 // member must have its required fields filled. If neither does, both
-// get red borders.
-function markRequiredFields(): void {
-  if (!configSchema) {
-    return;
-  }
-  const body = document.getElementById("configBody");
-  if (!body) {
-    return;
-  }
-
+// get red borders. Dependencies are injected so the pass is a pure
+// function of (schema, DOM) and directly testable.
+export function markRequiredFields(sections: SchemaSection[], body: HTMLElement): void {
   // Collect required_group state: which groups have at least one
   // member with all required fields filled?
   const groupFilled: Record<string, boolean> = {};
-  for (const schema of configSchema) {
+  for (const schema of sections) {
     if (!schema.required_group) {
       continue;
     }
@@ -367,7 +371,7 @@ function markRequiredFields(): void {
     }
   }
 
-  for (const schema of configSchema) {
+  for (const schema of sections) {
     for (const field of schema.fields ?? []) {
       if (!field.required) {
         continue;
@@ -379,21 +383,25 @@ function markRequiredFields(): void {
         continue;
       }
 
-      // For group members, only mark if no member in the group is filled.
-      if (schema.required_group) {
-        if (groupFilled[schema.required_group]) {
-          inp.classList.remove("cfg-required");
-          continue;
-        }
+      // When the group IS satisfied (by any member), force-clear the
+      // required styling on this member even if it is still empty.
+      if (schema.required_group && groupFilled[schema.required_group]) {
+        clearFieldValidation(inp);
+        continue;
       }
 
       updateFieldValidation(inp, field);
 
-      // Clear the red border when the user types.
+      // Re-run the full marking pass when the user types so that satisfying
+      // a required_group via one member clears the styling on its sibling
+      // members instead of re-flagging an empty one on every keystroke. The
+      // listener captures the same sections+body it was wired with; wiring is
+      // guarded by data-required-wired and the pass only reads values and
+      // toggles classes (no input events are dispatched, so no recursion).
       if (!inp.dataset["requiredWired"]) {
         inp.dataset["requiredWired"] = "true";
         inp.addEventListener("input", () => {
-          updateFieldValidation(inp, field);
+          markRequiredFields(sections, body);
         });
       }
     }
