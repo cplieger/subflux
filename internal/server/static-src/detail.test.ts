@@ -1,71 +1,269 @@
 // @vitest-environment happy-dom
-import { describe, it, vi, beforeEach } from "vitest";
+import { describe, it, vi, beforeEach, expect } from "vitest";
 
-vi.mock("./api-client.js", () => ({ apiGet: vi.fn().mockResolvedValue(null) }));
-vi.mock("@cplieger/actions", () => ({
-  registerCleanup: vi.fn(),
-  apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue(null) })),
-  retryNetwork: vi.fn((fn: unknown) => fn),
-  RETRY_STANDARD: {},
+// CRITICAL: vitest.config has clearMocks/mockReset/restoreMocks=true, which
+// strips a vi.fn's implementation before each test. Any mock whose behavior
+// must persist across tests (resolved values, factory shapes, no-op handlers
+// called at module load) MUST be a PLAIN function, not a vi.fn().
+vi.mock("./api-client.js", () => ({
+  apiGet: () => Promise.resolve(null),
+  apiGetArray: () => Promise.resolve([]),
 }));
+vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
 vi.mock("./bus.js", () => ({
-  on: vi.fn(() => () => {
-    /* noop */
-  }),
-  emit: vi.fn(),
+  on: () => () => undefined,
+  emit: () => undefined,
   BusEvent: {
     PanelConfigure: "panel:configure",
     NavHistory: "nav:history",
     OpenSeries: "open:series",
     OpenMovie: "open:movie",
+    ScanSeries: "scan:series",
+    ScanMovie: "scan:movie",
   },
 }));
-vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
-vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
-vi.mock("./files.js", () => ({ openFileManager: vi.fn() }));
+vi.mock("./search.js", () => ({ openSearchPopup: () => undefined }));
+vi.mock("./sync.js", () => ({ openSyncDialog: () => undefined }));
+vi.mock("./files.js", () => ({ openFileManager: () => undefined }));
 vi.mock("./detail-scan.js", () => ({
-  triggerSeriesScan: vi.fn(),
-  triggerSeasonScan: vi.fn(),
-  triggerMovieScan: vi.fn(),
+  triggerSeriesScan: () => undefined,
+  triggerSeasonScan: () => undefined,
+  triggerMovieScan: () => undefined,
 }));
-vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: vi.fn() }));
+vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: () => undefined }));
+vi.mock("./store.js", () => ({
+  get: (k: string): unknown => {
+    if (k === "ignoredCodecs") {
+      return new Set<string>();
+    }
+    if (k === "isAdmin") {
+      return false;
+    }
+    return null;
+  },
+  set: () => undefined,
+}));
 
-import * as store from "./store.js";
+import { renderSeriesDetail, openMovieDetail } from "./detail.js";
+import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
+
+const STAR = "\u2605"; // ★ — score prefix in coverage badge detail
+const DASH = "\u2014"; // — — empty coverage badge
+
+// --- Fixtures (hardcoded, DAMP) ---
+
+function makeSeries(tvdbId: number, title: string): SeriesItem {
+  return {
+    title,
+    audio_lang: "en",
+    rule: "en",
+    id: tvdbId,
+    year: 2020,
+    tvdb_id: tvdbId,
+    episodes: 3,
+    targets: [{ language: "en", variant: "standard", have: 0, total: 3, have_ignored: 0 }],
+  };
+}
+
+function makeSeasons(t1: string, t2: string, t3: string): SeasonGroup[] {
+  return [
+    {
+      season: 1,
+      episodes: [
+        { episode: 1, title: t1, has_file: true, path: "/tv/s01e01.mkv" },
+        { episode: 2, title: t2, has_file: true, path: "/tv/s01e02.mkv" },
+      ],
+    },
+    {
+      season: 2,
+      episodes: [{ episode: 1, title: t3, has_file: true, path: "/tv/s02e01.mkv" }],
+    },
+  ];
+}
+
+function epSub(mediaId: string, score: number, path: string): SubtitleEntry {
+  return {
+    media_id: mediaId,
+    language: "en",
+    variant: "standard",
+    source: "external",
+    codec: "srt",
+    score,
+    path,
+  };
+}
+
+function makeMovie(tmdbId: number, subs: SubtitleEntry[]): MovieDetail {
+  return {
+    title: `Movie ${tmdbId}`,
+    audio_lang: "en",
+    rule: "en",
+    targets: [
+      { language: "en", variant: "standard", have: 0, total: 1, have_ignored: 0 },
+      { language: "fr", variant: "standard", have: 0, total: 1, have_ignored: 0 },
+    ],
+    subs,
+    tmdb_id: tmdbId,
+    id: tmdbId,
+    year: 2021,
+    has_file: true,
+  };
+}
+
+function movieSub(language: string, score: number, path: string): SubtitleEntry {
+  return {
+    media_id: "tmdb-50",
+    language,
+    variant: "standard",
+    source: "external",
+    codec: "srt",
+    score,
+    path,
+  };
+}
+
+function seriesTbody(): HTMLTableSectionElement {
+  const tb = document.querySelector<HTMLTableSectionElement>("table.series-detail tbody");
+  if (!tb) {
+    throw new Error("series tbody not mounted");
+  }
+  return tb;
+}
+
+function movieTbody(): HTMLTableSectionElement {
+  const tb = document.querySelector<HTMLTableSectionElement>("table.movie-detail tbody");
+  if (!tb) {
+    throw new Error("movie tbody not mounted");
+  }
+  return tb;
+}
+
+function covText(row: Element | null): string {
+  if (!(row instanceof HTMLElement)) {
+    throw new Error("row missing");
+  }
+  return row.querySelector("td.ep-coverage")?.textContent ?? "";
+}
 
 describe("detail: renderSeriesDetail", () => {
   beforeEach(() => {
+    // The real dom.js `$.coverageContent` getter reads #coverageContent; the
+    // Files button (admin-gated, off here) targets #coveragePanel .card-head.
+    // Wiping innerHTML between tests detaches any previously-bound <tbody>, so
+    // the isConnected/contains guard correctly forces a REBUILD next render.
     document.body.innerHTML =
-      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div><div id="coverageContent"></div></div>';
-    store.set("detailCtx", null);
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
   });
 
-  it.todo("renders season headers with correct labels");
+  it("initial render builds season heads, column headers, and episode rows", () => {
+    const series = makeSeries(100, "Show A");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    const subs = [epSub("tvdb-100-s01e01", 80, "/tv/s01e01.en.srt")];
 
-  it.todo("renders episode rows keyed by tvdbMediaId");
+    renderSeriesDetail(series, seasons, subs, new Set());
 
-  it.todo("skips episodes without has_file");
+    const tbody = seriesTbody();
+    // S1 -> head, cols, ep01, ep02 ; S2 -> gap, head, cols, ep01 = 8 rows.
+    expect(tbody.children.length).toBe(8);
+    // children[2] is S01E01, which has one en external srt @ score 80.
+    expect(covText(tbody.children.item(2))).toBe(`ensrt: ext ${STAR}80`);
+    // children[3] is S01E02, uncovered -> empty split badge "en" + dash.
+    expect(covText(tbody.children.item(3))).toBe(`en${DASH}`);
+  });
 
-  it.todo("shows season gap spacer between seasons");
+  it("coverage refresh repaints only the changed episode and keeps row node identity", () => {
+    const series = makeSeries(101, "Show B");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
 
-  it.todo("renders coverage badges per target language");
+    // Initial: only S01E01 covered.
+    renderSeriesDetail(series, seasons, [epSub("tvdb-101-s01e01", 80, "/a.srt")], new Set());
 
-  it.todo("season search button triggers triggerSeasonScan");
+    const tbody = seriesTbody();
+    const e1Before = tbody.children.item(2); // S01E01 — covered, will NOT change
+    const e2Before = tbody.children.item(3); // S01E02 — uncovered, WILL change
+    if (!(e1Before instanceof HTMLElement) || !(e2Before instanceof HTMLElement)) {
+      throw new Error("episode rows missing");
+    }
+    const e1CovBefore = covText(e1Before);
+    const e2CovBefore = covText(e2Before);
+    expect(e2CovBefore).toBe(`en${DASH}`); // confirm S01E02 starts empty
 
-  it.todo("season sync button only appears when syncable episodes exist");
+    // Refresh (same series + seasons objects): S01E02 now covered, S01E01 same.
+    renderSeriesDetail(
+      series,
+      seasons,
+      [epSub("tvdb-101-s01e01", 80, "/a.srt"), epSub("tvdb-101-s01e02", 70, "/b.srt")],
+      new Set(),
+    );
 
-  it.todo("season history button only appears when history entries exist");
+    // REUSE: the <tbody> node is the SAME (no table rebuild).
+    expect(seriesTbody()).toBe(tbody);
+    // (a) Changed row is the SAME DOM node, but its coverage cell changed.
+    expect(tbody.children.item(3)).toBe(e2Before);
+    expect(covText(e2Before)).not.toBe(e2CovBefore);
+    expect(covText(e2Before)).toBe(`ensrt: ext ${STAR}70`);
+    // (b) Unchanged row is the SAME DOM node, coverage cell unchanged.
+    expect(tbody.children.item(2)).toBe(e1Before);
+    expect(covText(e1Before)).toBe(e1CovBefore);
+  });
 
-  it.todo("absolute episode numbering shown when hasAbsOrder is true");
+  it("switching to a different series rebuilds the table", () => {
+    const a = makeSeries(200, "Series A");
+    renderSeriesDetail(a, makeSeasons("Pilot", "Second", "Return"), [], new Set());
+    const tbodyA = seriesTbody();
+    const aRow = tbodyA.children.item(2); // S01E01 of A ("Pilot")
+    expect(aRow instanceof HTMLElement).toBe(true);
 
-  it.todo("reconcile preserves existing episode rows on re-render");
+    const b = makeSeries(201, "Series B");
+    renderSeriesDetail(b, makeSeasons("Bravo One", "Bravo Two", "Bravo Three"), [], new Set());
+    const tbodyB = seriesTbody();
+
+    // Different series id -> REBUILD: new <tbody>, A's rows gone, B's present.
+    expect(tbodyB).not.toBe(tbodyA);
+    expect(document.body.contains(aRow as Node)).toBe(false);
+    expect(tbodyB.textContent).toContain("Bravo One");
+    expect(tbodyB.textContent).not.toContain("Pilot");
+  });
 });
 
 describe("detail: openMovieDetail", () => {
-  it.todo("sets detailCtx with movie=true and tmdbId");
+  beforeEach(() => {
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
 
-  it.todo("emits PanelConfigure with title and info");
+  it("coverage refresh repaints only the changed language row and keeps row identity", () => {
+    // Initial: en covered, fr uncovered.
+    openMovieDetail(makeMovie(50, [movieSub("en", 90, "/m.en.srt")]));
 
-  it.todo("renders subtitle badges for movie targets");
+    const tbody = movieTbody();
+    expect(tbody.children.length).toBe(2); // en, fr (target order)
+    const enBefore = tbody.children.item(0); // en — will NOT change
+    const frBefore = tbody.children.item(1); // fr — WILL change
+    if (!(enBefore instanceof HTMLElement) || !(frBefore instanceof HTMLElement)) {
+      throw new Error("movie rows missing");
+    }
+    const enCovBefore = covText(enBefore);
+    const frCovBefore = covText(frBefore);
+    expect(enCovBefore).toBe(`srt: ext ${STAR}90`);
+    expect(frCovBefore).toBe(DASH); // movie empty badge has no lang prefix
 
-  it.todo("shows search button per target language");
+    // Refresh (new movie object, same tmdb_id): fr now covered, en unchanged.
+    openMovieDetail(
+      makeMovie(50, [movieSub("en", 90, "/m.en.srt"), movieSub("fr", 85, "/m.fr.srt")]),
+      true,
+    );
+
+    // REUSE: same <tbody> node.
+    expect(movieTbody()).toBe(tbody);
+    // Changed fr row: SAME node, coverage changed.
+    expect(tbody.children.item(1)).toBe(frBefore);
+    expect(covText(frBefore)).not.toBe(frCovBefore);
+    expect(covText(frBefore)).toBe(`srt: ext ${STAR}85`);
+    // Unchanged en row: SAME node, coverage unchanged.
+    expect(tbody.children.item(0)).toBe(enBefore);
+    expect(covText(enBefore)).toBe(enCovBefore);
+  });
 });
