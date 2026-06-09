@@ -130,7 +130,7 @@ async function withMovie(
 async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
   const lang = m[2] ?? null;
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       openSearchPopup("episode", s, null, null, lang);
     }, ROUTE_TRANSITION_MS);
@@ -139,7 +139,7 @@ async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
 
 async function handleSeriesSync(m: RegExpMatchArray): Promise<void> {
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
@@ -172,14 +172,14 @@ async function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
 
 async function handleSeriesDetail(m: RegExpMatchArray): Promise<void> {
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
   });
 }
 
 async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
   const lang = m[2] ?? null;
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       openSearchPopup("movie", mv, null, null, lang);
     }, ROUTE_TRANSITION_MS);
@@ -188,7 +188,7 @@ async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
 
 async function handleMovieSync(m: RegExpMatchArray): Promise<void> {
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
@@ -217,7 +217,7 @@ async function handleMovieFiles(m: RegExpMatchArray): Promise<void> {
 
 async function handleMovieDetail(m: RegExpMatchArray): Promise<void> {
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
   });
 }
 

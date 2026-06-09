@@ -1,56 +1,13 @@
 // DOM utility functions. All UI construction goes through these helpers
 // to ensure DOM-safety (no innerHTML) and CSP compliance.
 
-import { trackHandler } from "@cplieger/reactive";
+// The CSP-safe element factory now lives in @cplieger/reactive (paired with
+// reconcile/patch). Re-export it so existing `import { el } from "./dom.js"`
+// call sites are unchanged.
+import { el } from "@cplieger/reactive";
 
-// Attribute value types accepted by el(). Covers event handlers, booleans,
-// numbers, strings, and null (to skip an attribute).
-// Event handlers use a broad function signature to accept MouseEvent, KeyboardEvent, etc.
-// without requiring callers to widen their parameter types.
-type AttrValue = string | number | boolean | null | undefined | ((...args: never[]) => unknown);
-
-// Create an element with attributes and children.
-export function el(
-  tag: string,
-  attrs?: Record<string, AttrValue> | null,
-  ...children: (string | Node | null | undefined)[]
-): HTMLElement {
-  const e = document.createElement(tag);
-  if (attrs) {
-    for (const [k, v] of Object.entries(attrs)) {
-      if (v == null) {
-        continue;
-      }
-      if (k === "className") {
-        e.className = v as string;
-      } else if (k.startsWith("on")) {
-        (e as unknown as Record<string, unknown>)[k] = v;
-        trackHandler(e, k);
-      } else if (k === "hidden") {
-        e.hidden = v as boolean;
-      } else if (k === "disabled") {
-        (e as unknown as HTMLButtonElement).disabled = v as boolean;
-      } else if (k === "checked") {
-        (e as unknown as HTMLInputElement).checked = v as boolean;
-      } else if (k === "value") {
-        (e as unknown as HTMLInputElement).value = v as string;
-      } else if (k === "colSpan") {
-        (e as unknown as HTMLTableCellElement).colSpan = v as number;
-      } else if (k === "default") {
-        (e as unknown as HTMLTrackElement).default = true;
-      } else {
-        e.setAttribute(k, String(v));
-      }
-    }
-  }
-  for (const child of children) {
-    if (child == null) {
-      continue;
-    }
-    e.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
-  }
-  return e;
-}
+export { el };
+export type { AttrValue } from "@cplieger/reactive";
 
 export function text(s: string): Text {
   return document.createTextNode(s);

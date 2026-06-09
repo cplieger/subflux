@@ -328,7 +328,7 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
         "data-tip": "Auto: scan and download missing subtitles",
         onclick: (e: MouseEvent) => {
           e.stopPropagation();
-          emit(scanEvent, item, e.currentTarget as HTMLButtonElement | null);
+          emit(scanEvent, { item, btn: e.currentTarget as HTMLButtonElement | null });
         },
       },
       icon("search"),
@@ -338,10 +338,10 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
 
   const openDetail = isSeries
     ? () => {
-        emit(BusEvent.OpenSeries, item);
+        emit(BusEvent.OpenSeries, { item });
       }
     : () => {
-        emit(BusEvent.OpenMovie, item);
+        emit(BusEvent.OpenMovie, { item });
       };
 
   return clickableRow(
@@ -446,6 +446,6 @@ function applyFilters(data: CoverageItem[] | null | undefined): CoverageItem[] {
 }
 
 // --- Bus handler: detail.js emits panel:configure ---
-on(BusEvent.PanelConfigure, (visible, detail) => {
+on(BusEvent.PanelConfigure, ({ visible, detail }) => {
   configurePanel(visible, detail);
 });

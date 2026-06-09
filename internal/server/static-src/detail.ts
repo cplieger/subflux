@@ -143,12 +143,15 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
   const info = `${s.episodes} ep \u00B7 audio: ${langName(
     s.rule || "default",
   )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
-  emit(BusEvent.PanelConfigure, false, {
-    title: s.title,
-    info,
-    backPath: "/",
-    arrLink: buildArrLink(s),
-    arrName: "Sonarr",
+  emit(BusEvent.PanelConfigure, {
+    visible: false,
+    detail: {
+      title: s.title,
+      info,
+      backPath: "/",
+      arrLink: buildArrLink(s),
+      arrName: "Sonarr",
+    },
   });
   const out = $.coverageContent;
   const skel = document.createDocumentFragment();
@@ -651,24 +654,27 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
   const subs = m.subs;
   const hasExtSubs = subs.some((s) => s.source !== EMBEDDED_PROVIDER && s.path);
-  emit(BusEvent.PanelConfigure, false, {
-    title: m.title,
-    info,
-    backPath: "/",
-    arrLink: buildRadarrLink(m),
-    arrName: "Radarr",
-    filesAction: hasExtSubs
-      ? () => {
-          openFileManager(
-            "movie",
-            `tmdb-${m.tmdb_id}`,
-            m.title,
-            `/movie/${m.tmdb_id}`,
-            new Map([["", m.path ?? ""]]),
-            m.id,
-          );
-        }
-      : null,
+  emit(BusEvent.PanelConfigure, {
+    visible: false,
+    detail: {
+      title: m.title,
+      info,
+      backPath: "/",
+      arrLink: buildRadarrLink(m),
+      arrName: "Radarr",
+      filesAction: hasExtSubs
+        ? () => {
+            openFileManager(
+              "movie",
+              `tmdb-${m.tmdb_id}`,
+              m.title,
+              `/movie/${m.tmdb_id}`,
+              new Map([["", m.path ?? ""]]),
+              m.id,
+            );
+          }
+        : null,
+    },
   });
 
   // Check history async and add button if found.
@@ -804,15 +810,15 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
 }
 
 // --- Bus handlers: coverage.js emits these ---
-on(BusEvent.OpenSeries, (item, skipPush) => {
+on(BusEvent.OpenSeries, ({ item, skipPush }) => {
   openSeriesDetail(item as SeriesItem, skipPush);
 });
-on(BusEvent.OpenMovie, (item, skipPush) => {
+on(BusEvent.OpenMovie, ({ item, skipPush }) => {
   openMovieDetail(item as MovieDetail, skipPush);
 });
-on(BusEvent.ScanSeries, (item, btn) => {
+on(BusEvent.ScanSeries, ({ item, btn }) => {
   void triggerSeriesScan(item as SeriesItem, btn);
 });
-on(BusEvent.ScanMovie, (item, btn) => {
+on(BusEvent.ScanMovie, ({ item, btn }) => {
   void triggerMovieScan(item as MovieDetail, btn);
 });

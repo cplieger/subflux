@@ -75,10 +75,13 @@ export function openFileManager(
 async function loadFiles(): Promise<void> {
   const out = $.coverageContent;
 
-  emit(BusEvent.PanelConfigure, false, {
-    title: currentTitle,
-    info: "Subtitle Files",
-    backPath: currentBackPath,
+  emit(BusEvent.PanelConfigure, {
+    visible: false,
+    detail: {
+      title: currentTitle,
+      info: "Subtitle Files",
+      backPath: currentBackPath,
+    },
   });
 
   // Mark as files view so needsRefresh reloads files, not library.
