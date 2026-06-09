@@ -1,12 +1,16 @@
-// history.ts — download history page (server-side paginated)
+// history.ts — download history page (server-side paginated).
+//
+// The accumulated entries live in a createCollection keyed by
+// media_id+media_imported; bindList renders them. "Reload" (filter change)
+// is setAll(page 0); "show more" fetches the next server page and upserts it
+// (appended). The collection IS the bindList ListSource — no per-row updates
+// (history is append-only display), so only the structure tier does work.
 
-import { el, input, select, option } from "./dom.js";
+import { el, input, select, option, errDiv } from "./dom.js";
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { on, emit, BusEvent } from "./bus.js";
-import { fmtDateTime, fmtEpisode, clickableRow } from "./utils.js";
-import { createPagedList } from "./paged-list.js";
-import type { PagedList, Page } from "./paged-list.js";
-import { reconcile } from "@cplieger/reactive";
+import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
+import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 
 interface HistoryEntry {
   media_id: string;
@@ -22,7 +26,14 @@ interface HistoryEntry {
 }
 
 const PAGE_SIZE = 50;
-let list: PagedList | null = null;
+
+const historyKey = (e: HistoryEntry): string => `${e.media_id}-${e.media_imported}`;
+const history = createCollection<HistoryEntry>(historyKey);
+
+// Whether the server has more pages beyond what's loaded (drives "show more").
+const hasMore = signal(false);
+// Reentrancy guard for reload/loadMore (not rendered, so not a signal).
+let loading = false;
 
 function buildApiUrl(offset: number, limit: number): string {
   const params = new URLSearchParams();
@@ -61,7 +72,10 @@ const loadHistoryAction = apiAction<string, HistoryEntry[]>({
   error: false,
 });
 
-async function fetchPage(offset: number, limit: number): Promise<Page<HistoryEntry>> {
+async function fetchPage(
+  offset: number,
+  limit: number,
+): Promise<{ items: HistoryEntry[]; hasMore: boolean }> {
   const items = (await loadHistoryAction.dispatch(buildApiUrl(offset, limit))) ?? [];
   return { items, hasMore: items.length >= limit };
 }
@@ -77,34 +91,6 @@ function historyMediaHref(entry: HistoryEntry): string {
     return `/series/${tv[1] ?? ""}`;
   }
   return "";
-}
-
-function renderItems(items: HistoryEntry[]): DocumentFragment {
-  const frag = document.createDocumentFragment();
-  const thead = el(
-    "thead",
-    null,
-    el(
-      "tr",
-      null,
-      el("th", null, "Time"),
-      el("th", null, "Media"),
-      el("th", null, "Lang"),
-      el("th", null, "Provider"),
-      el("th", null, "Mode"),
-      el("th", null, "Release"),
-    ),
-  );
-  const tbody = el("tbody");
-
-  reconcile(tbody, items, {
-    key: (entry) => `${entry.media_id}-${entry.media_imported}`,
-    mount: (entry) => buildHistoryRow(entry),
-  });
-
-  frag.appendChild(el("table", { className: "history" }, thead, tbody));
-  updateHistoryFilters(items);
-  return frag;
 }
 
 function buildHistoryRow(entry: HistoryEntry): HTMLElement {
@@ -166,32 +152,125 @@ function updateHistoryFilters(data: HistoryEntry[]): void {
   }
 }
 
-function ensureList(): PagedList {
-  if (!list) {
-    const container = document.getElementById("historyContent");
-    if (!container) {
-      throw new Error("historyContent not found");
-    }
-    list = createPagedList<HistoryEntry>({
-      container,
-      fetchPage,
-      renderItems,
-      pageSize: PAGE_SIZE,
-      emptyMessage: "No downloads matching filter.",
-      emptyNoData: "No downloads yet.",
-    });
-  }
-  return list;
+function anyFilterActive(): boolean {
+  return Boolean(
+    select("h-type").value ||
+    select("h-lang").value ||
+    select("h-provider").value ||
+    input("h-filter").value.trim(),
+  );
 }
 
-async function loadHistory(): Promise<void> {
-  await ensureList().reload();
+// --- Render: build the table shell once, bind the tbody, react for the rest ---
+
+let bindings: (() => void)[] = [];
+
+function ensureMounted(): void {
+  const out = document.getElementById("historyContent");
+  if (!out) {
+    throw new Error("historyContent not found");
+  }
+  if (out.querySelector("table.history") !== null) {
+    return;
+  }
+  for (const dispose of bindings) {
+    dispose();
+  }
+  bindings = [];
+
+  const tbody = el("tbody");
+  const thead = el(
+    "thead",
+    null,
+    el(
+      "tr",
+      null,
+      el("th", null, "Time"),
+      el("th", null, "Media"),
+      el("th", null, "Lang"),
+      el("th", null, "Provider"),
+      el("th", null, "Mode"),
+      el("th", null, "Release"),
+    ),
+  );
+  const tbl = el("table", { className: "history" }, thead, tbody);
+  const emptyNoData = emptyState("No downloads yet.");
+  const emptyFiltered = emptyState("No downloads matching filter.");
+  const showMore = el(
+    "button",
+    {
+      type: "button",
+      className: "more-btn",
+      onclick: () => {
+        void loadMore();
+      },
+    },
+    "Show more\u2026",
+  );
+  patch(out, el("div", { className: "hist-list" }, emptyNoData, emptyFiltered, tbl, showMore));
+
+  bindings.push(bindList(tbody, history, { mount: (entry) => buildHistoryRow(entry) }));
+  bindings.push(
+    effect(() => {
+      const empty = history.ids.value.length === 0;
+      const filtered = anyFilterActive();
+      emptyNoData.hidden = !(empty && !filtered);
+      emptyFiltered.hidden = !(empty && filtered);
+      tbl.hidden = empty;
+      showMore.hidden = empty || !hasMore.value;
+    }),
+  );
+}
+
+async function reload(): Promise<void> {
+  if (loading) {
+    return;
+  }
+  loading = true;
+  try {
+    const page = await fetchPage(0, PAGE_SIZE);
+    history.setAll(page.items);
+    hasMore.value = page.hasMore;
+    updateHistoryFilters(history.items());
+    ensureMounted();
+  } catch (e: unknown) {
+    const out = document.getElementById("historyContent");
+    if (out) {
+      patch(out, errDiv(e instanceof Error ? e.message : String(e)));
+    }
+  } finally {
+    loading = false;
+  }
+}
+
+async function loadMore(): Promise<void> {
+  if (loading || !hasMore.value) {
+    return;
+  }
+  loading = true;
+  const scrollPos = window.scrollY;
+  try {
+    const page = await fetchPage(history.size, PAGE_SIZE);
+    for (const entry of page.items) {
+      history.upsert(entry);
+    }
+    hasMore.value = page.hasMore;
+    updateHistoryFilters(history.items());
+    window.scrollTo(0, scrollPos);
+  } catch (e: unknown) {
+    const out = document.getElementById("historyContent");
+    if (out) {
+      patch(out, errDiv(e instanceof Error ? e.message : String(e)));
+    }
+  } finally {
+    loading = false;
+  }
 }
 
 export function reloadHistory(): void {
-  void ensureList().reload();
+  void reload();
 }
 
 on(BusEvent.LoadHistory, () => {
-  void loadHistory();
+  void reload();
 });
