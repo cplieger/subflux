@@ -34,7 +34,6 @@ store.batch(() => {
   store.set("configChecked", false);
   store.set("ignoredCodecs", new Set<string>());
   store.set("detailCtx", null);
-  store.set("coverageData", null);
   store.set("currentPage", "library");
   store.set("scanInFlight", false);
   store.set("refreshPending", false);

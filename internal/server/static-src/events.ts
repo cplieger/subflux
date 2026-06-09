@@ -4,12 +4,10 @@
 import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
-import { patchCoverageBadge, fetchAndMergeCoverage } from "./coverage.js";
+import { fetchAndMergeCoverage } from "./coverage.js";
 import { pollStatus, abortPoll } from "./status.js";
-import { coverageMediaId } from "./utils.js";
 import { registerCleanup } from "@cplieger/actions";
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
-import type { CoverageItem } from "./api-types.js";
 import { decodeCoverageEvent, decodeNotifyEvent, decodeScanEvent } from "./wire/decoders.gen.js";
 import type { Decoder } from "./validators.js";
 
@@ -53,24 +51,11 @@ export function connect(): void {
     const mediaId = payload?.media_id ?? "";
 
     if (mediaId && store.get("currentPage") === "library" && !store.get("detailCtx")) {
-      fetchAndMergeCoverage()
-        .then((fresh) => {
-          const item = fresh.find((i: CoverageItem) => {
-            const id = coverageMediaId(i);
-            // Episode events use "tvdb-{id}-s01e01" while the series row
-            // uses "tvdb-{id}". Use prefix match for series.
-            if (i._type === "series") {
-              return mediaId.startsWith(id);
-            }
-            return id === mediaId;
-          });
-          if (item) {
-            patchCoverageBadge(coverageMediaId(item), item.targets);
-          }
-        })
-        .catch(() => {
-          emit(BusEvent.DataInvalidate);
-        });
+      // Refetch + setAll updates the affected row's signal reactively (bindList
+      // repaints just that row); no manual per-badge DOM patching.
+      void fetchAndMergeCoverage().catch(() => {
+        emit(BusEvent.DataInvalidate);
+      });
       return;
     }
     emit(BusEvent.DataInvalidate);

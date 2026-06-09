@@ -1,7 +1,7 @@
 // Reactive state container — backed by @cplieger/reactive store.
 // API is unchanged: get, set, batch, subscribe, effect, computed.
 
-import type { CoverageItem, SeriesItem, SeasonGroup } from "./api-types.js";
+import type { SeriesItem, SeasonGroup } from "./api-types.js";
 import { createStore } from "@cplieger/reactive";
 
 // --- Typed store key registry ---
@@ -39,7 +39,6 @@ export interface StoreMap {
   configChecked: boolean;
   ignoredCodecs: Set<string>;
   detailCtx: DetailCtx;
-  coverageData: CoverageItem[] | null;
   currentPage: string;
   scanInFlight: boolean;
   refreshPending: boolean;

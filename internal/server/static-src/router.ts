@@ -5,7 +5,13 @@ import { $, el, icon, input, select } from "./dom.js";
 import { patch } from "@cplieger/reactive";
 import { apiGet } from "./api-client.js";
 import { openConfig } from "./config.js";
-import { loadCoverage, configurePanel, renderCoverage } from "./coverage.js";
+import {
+  loadCoverage,
+  configurePanel,
+  renderCoverage,
+  coverageLoaded,
+  coverageItems,
+} from "./coverage.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
@@ -288,7 +294,7 @@ function showPage(page: string, skipRender?: boolean): void {
   if (page === "library") {
     configurePanel(true);
     // Re-render from cache if available; otherwise fetch fresh data.
-    if (store.get("coverageData")) {
+    if (coverageLoaded()) {
       renderCoverage();
     } else {
       void loadCoverage();
@@ -335,17 +341,14 @@ async function findCoverageItem(
   idField: "tvdb_id" | "tmdb_id",
   id: number,
 ): Promise<CoverageItem | null> {
-  if (!store.get("coverageData")) {
+  if (!coverageLoaded()) {
     try {
       await loadCoverage();
     } catch {
       /* fall through */
     }
   }
-  const data = store.get("coverageData");
-  if (!data) {
-    return null;
-  }
+  const data = coverageItems();
   return data.find((item: CoverageItem) => item._type === type && item[idField] === id) ?? null;
 }
 
