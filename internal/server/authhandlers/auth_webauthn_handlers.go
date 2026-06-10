@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	authwebauthn "github.com/cplieger/auth/webauthn"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -26,9 +26,9 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 		err         error
 	)
 	if r.URL.Query().Get("mediation") == "conditional" {
-		assertion, sessionData, err = auth.BeginConditionalLogin(h.WebAuthn)
+		assertion, sessionData, err = authwebauthn.BeginConditionalLogin(h.WebAuthn)
 	} else {
-		assertion, sessionData, err = auth.BeginLogin(h.WebAuthn)
+		assertion, sessionData, err = authwebauthn.BeginLogin(h.WebAuthn)
 	}
 	if err != nil {
 		slog.Error("webauthn: begin login", "error", err)
@@ -88,10 +88,10 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 			return nil, errors.New("get passkeys failed")
 		}
 
-		return auth.NewWebAuthnUser(user, creds)
+		return authwebauthn.NewWebAuthnUser(user, creds)
 	}
 
-	resolvedUser, cred, err := auth.FinishLogin(h.WebAuthn, sessData, r, userFinder)
+	resolvedUser, cred, err := authwebauthn.FinishLogin(h.WebAuthn, sessData, r, userFinder)
 	if err != nil {
 		slog.Warn("webauthn: finish login failed", "error", err)
 
@@ -117,13 +117,13 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		slog.Warn("webauthn: update credential after login", "error", errSC)
 	}
 
-	webauthnUser, ok := resolvedUser.(*auth.WebAuthnUser)
-	if !ok || webauthnUser.User == nil {
+	webauthnUser, ok := resolvedUser.(*authwebauthn.User)
+	if !ok || webauthnUser.AuthUser == nil {
 		slog.Error("webauthn: unexpected user type from passkey login")
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
-	user := webauthnUser.User
+	user := webauthnUser.AuthUser
 
 	if !user.Enabled {
 		api.ForbiddenC(w, r, api.CodeAuthAccountDisabled, "account disabled")

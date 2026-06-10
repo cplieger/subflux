@@ -50,7 +50,7 @@ func TestHandleListUsers_empty(t *testing.T) {
 	s := testAdminServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/admin/users", nil)
 	w := httptest.NewRecorder()
-	s.handleListUsers(w, req)
+	s.authH.HandleListUsers(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}

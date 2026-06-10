@@ -25,6 +25,8 @@ const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json
  *  for callers that don't pass an explicit AbortSignal. */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+import { decodeArray } from "./validators.js";
+
 // ApiResult is the raw result from a request. One of `data` or `error`
 // will be set on a 2xx/non-2xx respectively. Network failures produce
 // `{ok: false, status: 0, error: "..."}`.
@@ -44,8 +46,10 @@ interface ErrorEnvelope {
   request_id?: string;
 }
 
-/** A decoder validates an unknown parsed JSON body and returns T or throws. */
-export type Decoder<T> = (v: unknown) => T;
+/** Decoder<T> is owned by validators.ts (single source of truth); re-exported
+ *  here so callers can import it from api-client as well as validators. */
+export type { Decoder } from "./validators.js";
+import type { Decoder } from "./validators.js";
 
 async function parseJSONSafe(r: Response): Promise<unknown> {
   if (r.status === 204) {
@@ -199,6 +203,17 @@ export function apiGetTypedRaw<T>(
   signal?: AbortSignal,
 ): Promise<ApiResult<T>> {
   return requestRaw<T>("GET", path, undefined, signal, decoder);
+}
+
+// apiGetArray<T>(path, elem) → Promise<T[] | null>
+// Like apiGetTyped, but for endpoints that return a JSON array: validates
+// the array and every element via the generated element decoder.
+export function apiGetArray<T>(
+  path: string,
+  elem: Decoder<T>,
+  signal?: AbortSignal,
+): Promise<T[] | null> {
+  return request<T[]>("GET", path, undefined, signal, (v) => decodeArray(v, elem, "$"));
 }
 
 // --- Raw helpers that expose status + error envelope ---

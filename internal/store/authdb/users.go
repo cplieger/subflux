@@ -10,9 +10,6 @@ import (
 	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
-// Compile-time assertion: *AuthDB implements api.UserStore.
-var _ api.UserStore = (*AuthDB)(nil)
-
 var userScanner = txutil.TableScanner[api.User]{
 	Columns: `id, username, email, display_name, password_hash, role,
 	oidc_sub, oidc_issuer, enabled, created_at, updated_at`,

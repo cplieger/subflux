@@ -1,7 +1,8 @@
 // sync.ts — Subtitle sync dialog: audio sync, manual offset, video preview, timecode controls.
 
 import * as notify from "./notify.js";
-import { el, text, option, icon, dialog, closeDialog, onBackdropClose, patch } from "./dom.js";
+import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./dom.js";
+import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
 import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { langName } from "./utils.js";
@@ -16,7 +17,6 @@ const syncDlg: HTMLDialogElement = dialog("syncDialog");
 
 // Common fields shared across all sync states.
 interface SyncStateBase {
-  offsetMs: number;
   subtitlePath: string;
   videoPath: string;
   mediaType: MediaType | "";
@@ -43,7 +43,6 @@ interface LabeledEntry {
 
 let syncState: SyncState = {
   status: "idle",
-  offsetMs: 0,
   subtitlePath: "",
   videoPath: "",
   mediaType: "",
@@ -53,6 +52,13 @@ let syncState: SyncState = {
   previewBuffered: false,
   blobUrl: "",
 };
+
+// Single source of truth for the current manual offset (ms). Recreated per
+// openSyncDialog so each dialog instance gets a fresh signal; an effect
+// (created alongside the Reset button) toggles its visibility whenever the
+// offset crosses zero, replacing the scattered manual hidden-toggles.
+let offset = signal(0);
+let stopOffsetEffect: (() => void) | null = null;
 
 // Drain any in-flight ffmpeg stream + revoke blob URL on page unload.
 // Browsers handle this naturally on real navigation; the registration
@@ -144,9 +150,15 @@ export function openSyncDialog(
   }
 
   const initialOffset = entries[0]?.offset_ms ?? 0;
+  // Fresh offset signal for this dialog instance. Dispose any effect left
+  // over from a prior open that wasn't closed (reopen-without-close).
+  if (stopOffsetEffect) {
+    stopOffsetEffect();
+    stopOffsetEffect = null;
+  }
+  offset = signal(initialOffset);
   syncState = {
     status: "idle",
-    offsetMs: initialOffset,
     subtitlePath: "",
     videoPath: videoPath,
     mediaType: mediaType,
@@ -176,12 +188,8 @@ export function openSyncDialog(
       return;
     }
     syncState.subtitlePath = entry.sub.path ?? "";
-    syncState.offsetMs = entry.sub.offset_ms ?? 0;
-    updateTimecodeDisplay(syncState.offsetMs);
-    const rb = document.getElementById("sync-reset-btn");
-    if (rb) {
-      rb.hidden = syncState.offsetMs === 0;
-    }
+    offset.value = entry.sub.offset_ms ?? 0;
+    updateTimecodeDisplay(offset.peek());
     // Reload subtitle track on the video with the new language.
     if (syncState.status === "preview") {
       updatePreviewTrack();
@@ -254,12 +262,10 @@ export function openSyncDialog(
   }
 
   // Manual offset controls.
-  const timecode = buildTimecodeInput(syncState.offsetMs, (newMs: number) => {
-    syncState.offsetMs = newMs;
-    const rb = document.getElementById("sync-reset-btn");
-    if (rb) {
-      rb.hidden = newMs === 0;
-    }
+  const timecode = buildTimecodeInput(initialOffset, (newMs: number) => {
+    // Widget self-edited its own display; only sync the signal (an
+    // updateTimecodeDisplay call here would feed back into the widget).
+    offset.value = newMs;
     if (syncState.status === "preview") {
       updatePreviewTrack();
     }
@@ -285,13 +291,18 @@ export function openSyncDialog(
     {
       type: "button",
       className: "ghost",
-      id: "sync-reset-btn",
-      hidden: syncState.offsetMs === 0,
       onclick: resetSync,
     },
     "Reset",
   );
   footer.appendChild(resetBtn);
+
+  // Single source of truth for Reset-button visibility. The effect runs
+  // synchronously on creation (seeding from initialOffset) and re-runs on
+  // every offset change, replacing the scattered manual hidden-toggles.
+  stopOffsetEffect = effect(() => {
+    resetBtn.hidden = offset.value === 0;
+  });
 
   dlg.replaceChildren(header, body, footer);
   if (dlg.open) {
@@ -362,6 +373,11 @@ function buildVideoPreview(): HTMLElement | null {
 }
 
 function closeSyncDialog(): void {
+  // Dispose the Reset-button visibility effect for this dialog instance.
+  if (stopOffsetEffect) {
+    stopOffsetEffect();
+    stopOffsetEffect = null;
+  }
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
     syncState.ffmpegAbort.abort();
   }
@@ -401,10 +417,11 @@ async function applyManualOffset(): Promise<void> {
     notify.error("No subtitle selected");
     return;
   }
+  const currentOffset = offset.peek();
   const r = await saveManualOffsetAction.dispatch(
     {
       subtitle_path: syncState.subtitlePath,
-      offset_ms: syncState.offsetMs,
+      offset_ms: currentOffset,
     },
     { silent: true },
   );
@@ -414,10 +431,10 @@ async function applyManualOffset(): Promise<void> {
   // Update cached entries so reopening the dialog shows the new offset.
   for (const e of syncState.entries) {
     if (e.path === syncState.subtitlePath) {
-      e.offset_ms = syncState.offsetMs;
+      e.offset_ms = currentOffset;
     }
   }
-  notify.success(`Offset saved: ${formatOffsetMs(syncState.offsetMs)}`);
+  notify.success(`Offset saved: ${formatOffsetMs(currentOffset)}`);
   closeSyncDialog();
 }
 
@@ -446,12 +463,8 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
       resultDiv.textContent = `${formatOffsetMs(
         data.offset_ms,
       )} (${(data.confidence * 100).toFixed(0)}% confidence)`;
-      syncState.offsetMs = data.offset_ms;
+      offset.value = data.offset_ms;
       updateTimecodeDisplay(data.offset_ms);
-      const rb2 = document.getElementById("sync-reset-btn");
-      if (rb2) {
-        rb2.hidden = data.offset_ms === 0;
-      }
       if (syncState.status === "preview") {
         updatePreviewTrack();
       }
@@ -468,12 +481,8 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
 }
 
 function resetSync(): void {
-  syncState.offsetMs = 0;
+  offset.value = 0;
   updateTimecodeDisplay(0);
-  const rb = document.getElementById("sync-reset-btn");
-  if (rb) {
-    rb.hidden = true;
-  }
   if (syncState.status === "preview") {
     updatePreviewTrack();
   }
@@ -785,13 +794,13 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
 
   const trackUrl = `/api/preview/subtitle?path=${encodeURIComponent(
     syncState.subtitlePath,
-  )}&start=${syncState.previewStart || 0}&shift=${syncState.offsetMs || 0}`;
+  )}&start=${syncState.previewStart || 0}&shift=${offset.peek() || 0}`;
   const track = el("track", {
     kind: "subtitles",
     src: trackUrl,
     srclang: "en",
     label: "Subtitles",
-    default: "",
+    default: true,
   }) as HTMLTrackElement;
   video.appendChild(track);
   // Safari needs the track to be explicitly set to showing after load.

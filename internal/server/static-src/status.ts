@@ -2,10 +2,11 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { el, text, icon, $ } from "./dom.js";
-import { apiGet, apiGetTyped } from "./api-client.js";
+import { apiGet, apiGetArray, apiGetTyped } from "./api-client.js";
 import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
-import { decodeStats, decodeProvidersResponse } from "./wire/decoders.gen.js";
+import { decodeStats, decodeProvidersResponse, decodeActivityEntry } from "./wire/decoders.gen.js";
 import type {
   Stats as StatsType,
   ProvidersResponse as ProvidersResponseType,
@@ -13,7 +14,7 @@ import type {
 import { fmtTime } from "./utils.js";
 import { EMBEDDED_PROVIDER } from "./constants.js";
 import { hideTip } from "./tooltip.js";
-import type { Activity } from "./api-types.js";
+import type { ActivityEntry } from "./api-types.js";
 import { reconcile } from "@cplieger/reactive";
 
 interface Alert {
@@ -75,7 +76,7 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
   return el("div", { className: "pop-header" }, parts.join(" \u00B7 "));
 }
 
-// --- Activity & alerts polling ---
+// --- ActivityEntry & alerts polling ---
 
 /** Compute timed-out provider names (excluding embedded). */
 function timedOutProviders(providers: ProvidersResponse): string[] {
@@ -95,13 +96,13 @@ function updateStatusButton(
   btn: HTMLElement,
   providers: ProvidersResponse,
   alerts: Alert[],
-  activities: Activity[],
+  activities: ActivityEntry[],
   ongoing: string[],
 ): boolean {
   const hasOngoing = ongoing.length > 0;
   const hasAlerts = Array.isArray(alerts) && alerts.length > 0;
   const hasPersistent = hasAlerts && alerts.some((a: Alert) => a.kind === "persistent");
-  const isActive = Array.isArray(activities) && activities.some((a: Activity) => !a.done);
+  const isActive = Array.isArray(activities) && activities.some((a: ActivityEntry) => !a.done);
 
   const statusEl = document.getElementById("statusIcon");
   const statusLabel = btn.querySelector(".nav-label");
@@ -138,7 +139,7 @@ function updateStatusButton(
 /** Process activity side effects: seed toasted set, detect scan completion, show toasts. */
 function processActivitySideEffects(
   btn: HTMLElement,
-  activities: Activity[],
+  activities: ActivityEntry[],
   isActive: boolean,
 ): void {
   if (toastedActivities.size === 0 && Array.isArray(activities)) {
@@ -152,7 +153,7 @@ function processActivitySideEffects(
   const wasActive = btn.dataset["wasActive"] === "true";
   btn.dataset["wasActive"] = String(isActive);
   if (wasActive && !isActive) {
-    store.set("needsRefresh", true);
+    emit(BusEvent.DataInvalidate);
   }
 
   if (Array.isArray(activities)) {
@@ -188,7 +189,7 @@ export const pollStatusAction = defineAction<undefined, undefined>({
 
     // Always fetch alerts and activity.
     const alerts = (await apiGet<Alert[]>("/api/alerts", signal)) ?? [];
-    const activities = (await apiGet<Activity[]>("/api/activity", signal)) ?? [];
+    const activities = (await apiGetArray("/api/activity", decodeActivityEntry, signal)) ?? [];
 
     let providers: ProvidersResponse = { enabled: false };
     let stats: Stats | null = null;
@@ -241,7 +242,7 @@ export async function pollStatus(): Promise<void> {
 }
 
 // buildActivityItem constructs a single activity row for the status popup.
-function buildActivityItem(a: Activity): HTMLElement {
+function buildActivityItem(a: ActivityEntry): HTMLElement {
   let statusIcon: HTMLElement;
   if (a.done) {
     statusIcon = el("span", { className: "act-icon act-done" }, icon("check"));
@@ -348,7 +349,7 @@ interface PopupItem {
 function buildPopupItems(
   stats: Stats | null,
   providers: ProvidersResponse,
-  activities: Activity[],
+  activities: ActivityEntry[],
   alerts: Alert[],
   ongoing: string[],
   isActive: boolean,
@@ -362,7 +363,7 @@ function buildPopupItems(
 
   const autoActivities = Array.isArray(activities)
     ? activities.filter(
-        (a: Activity) =>
+        (a: ActivityEntry) =>
           a.action !== "Manual Search" &&
           a.action !== "Manual Download" &&
           !dismissedActivities.has(a.id),
@@ -417,7 +418,9 @@ function buildPopupItems(
 
   if (!isActive && stats?.last_scan) {
     let scanLabel = "";
-    const lastDone = activities.filter((a: Activity) => a.done && a.action === "Full Scan").pop();
+    const lastDone = activities
+      .filter((a: ActivityEntry) => a.done && a.action === "Full Scan")
+      .pop();
     if (lastDone?.ended_at) {
       scanLabel = timeAgo(new Date(lastDone.ended_at));
     }
@@ -454,7 +457,7 @@ function buildPopupItems(
 function renderPopup(
   stats: Stats | null,
   providers: ProvidersResponse,
-  activities: Activity[],
+  activities: ActivityEntry[],
   alerts: Alert[],
   ongoing: string[],
   isActive: boolean,

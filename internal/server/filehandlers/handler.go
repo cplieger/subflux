@@ -17,7 +17,7 @@ import (
 
 // FileStore is the narrow store interface used by file handlers.
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleFileRow, error)
+	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant, source api.SubtitleSource, path string) error
 	ManualSubtitlePaths(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]string, error)
 	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string) error
@@ -282,12 +282,12 @@ func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteExternalFile removes a single external subtitle file from disk and DB.
-func (h *Handler) DeleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleFileRow) bool {
+func (h *Handler) DeleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
 	return h.deleteExternalFile(ctx, cfg, mediaType, row)
 }
 
 // deleteExternalFile removes a single external subtitle file from disk and DB.
-func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleFileRow) bool {
+func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
 	if row.Source == string(api.ProviderNameEmbedded) || row.Path == "" {
 		return false
 	}

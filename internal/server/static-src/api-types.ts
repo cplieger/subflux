@@ -3,46 +3,20 @@
 // This file re-exports them and adds client-only narrowed types.
 
 export type {
-  ActivitySource,
   MediaType,
-  NotifyLevel,
-  Role,
-  ScoreTier,
-  Variant,
   ActivityEntry,
-  CoverageEvent,
   CoverageTarget,
   KeyGenerated,
-  LoginSuccess,
   MeResponse,
   MovieItem,
-  NotifyEvent,
-  PasskeyRegistered,
   ProviderSchema,
-  ProviderStatus,
-  ProvidersResponse,
-  ScanEvent,
   SchemaField,
-  SchemaOption,
   SchemaSection,
-  ScorePreview,
-  SearchTarget,
-  SearchTargets,
   SeriesItem,
-  SetupStatus,
-  SignalData,
-  StateEntry,
-  Stats,
   SubtitleEntry,
 } from "./wire/types.gen.js";
 
-import type {
-  MovieItem,
-  CoverageTarget,
-  SubtitleEntry,
-  SchemaField,
-  ProviderSchema,
-} from "./wire/types.gen.js";
+import type { MovieItem, CoverageTarget, SubtitleEntry } from "./wire/types.gen.js";
 
 // --- Client-only types ---
 
@@ -78,26 +52,6 @@ export interface CoverageItem {
 /** Narrowed MovieItem with required id+title for detail views and bus events. */
 export type MovieDetail = MovieItem & { id: number; title: string };
 
-/** Activity entry from the status API. */
-export interface Activity {
-  readonly id: string;
-  readonly action: string;
-  readonly detail: string;
-  readonly source: string;
-  readonly done: boolean;
-  readonly failed: boolean;
-  readonly queued: boolean;
-  readonly cancelled: boolean;
-  readonly started_at: string;
-  readonly ended_at: string | null;
-}
-
-/** App config from GET /api/config. */
-export interface AppConfig {
-  readonly languages?: string[];
-  readonly providers?: Record<string, unknown>;
-}
-
 /** Audio sync response from POST /api/sync. */
 export interface AudioSyncResponse {
   readonly applied: boolean;
@@ -118,22 +72,4 @@ export interface Episode {
 export interface SeasonGroup {
   season: number;
   episodes?: Episode[];
-}
-
-/** Config schema section (re-exported for settings UI). */
-export interface ConfigSchema {
-  key: string;
-  title: string;
-  type: string;
-  help?: string;
-  required_group?: string;
-  enable_key?: string;
-  fields: SchemaField[];
-  providers: ProviderSchema[];
-}
-
-/** Schema field option for select fields. */
-export interface SchemaFieldOption {
-  readonly value: string;
-  readonly label: string;
 }

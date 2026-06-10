@@ -12,10 +12,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/cplieger/auth/ratelimit"
+	authwebauthn "github.com/cplieger/auth/webauthn"
 	"github.com/cplieger/health"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrapi"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
@@ -24,7 +25,6 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/provider/embedded"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -237,7 +237,6 @@ func runServer() int {
 		defer cancel()
 		defer db.Close(ctx)
 
-		m.Set(false)
 		defer m.Cleanup()
 
 		reg := newProviderRegistry()
@@ -258,7 +257,7 @@ func runServer() int {
 		defer rateLimiter.Stop()
 		srv.SetAuth(db, rateLimiter, nil, nil)
 
-		serveAndWait(ctx, cancel, func() {
+		serveAndWait(ctx, cancel, m, func() {
 			srv.StartUnconfigured(ctx, func() { m.Set(true) })
 		})
 		return 0
@@ -286,9 +285,6 @@ func runConfiguredServer(cfg *config.Config) int {
 	defer db.Close(ctx)
 
 	m := ensureMarker()
-	// Remove stale health file from a previous run that may have crashed
-	// before its defer ran.
-	m.Set(false)
 	defer m.Cleanup()
 
 	// Create arr clients from config.
@@ -333,7 +329,7 @@ func runConfiguredServer(cfg *config.Config) int {
 	var wa *webauthn.WebAuthn
 	if rpID := cfg.WebAuthnRPID(); rpID != "" {
 		var err error
-		wa, err = auth.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
+		wa, err = authwebauthn.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
 		if err != nil {
 			slog.Warn("WebAuthn initialization failed", "error", err)
 		}
@@ -352,7 +348,7 @@ func runConfiguredServer(cfg *config.Config) int {
 		"oidc", cfg.OIDCEnabled(),
 		"password", true)
 
-	serveAndWait(ctx, cancel, func() {
+	serveAndWait(ctx, cancel, m, func() {
 		srv.Start(ctx, func() { m.Set(true) })
 	})
 	return 0
@@ -360,7 +356,7 @@ func runConfiguredServer(cfg *config.Config) int {
 
 // serveAndWait starts fn in a goroutine and blocks until ctx is cancelled
 // or fn returns early (e.g. port bind failure). Returns after fn completes.
-func serveAndWait(ctx context.Context, cancel context.CancelFunc, fn func()) {
+func serveAndWait(ctx context.Context, cancel context.CancelFunc, m *health.Marker, fn func()) {
 	done := make(chan struct{})
 	go func() {
 		fn()
@@ -377,9 +373,7 @@ func serveAndWait(ctx context.Context, cancel context.CancelFunc, fn func()) {
 		}
 	}
 
-	if marker != nil {
-		marker.Set(false)
-	}
+	m.Set(false)
 	<-done
 }
 

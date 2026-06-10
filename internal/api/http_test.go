@@ -370,7 +370,7 @@ func TestRequestLogger_attaches_id_and_echoes_header(t *testing.T) {
 		capturedID = RequestIDFromContext(r.Context())
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mw := RequestLogger(inner)
+	mw := RequestLogger(inner, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/x", http.NoBody)
@@ -392,7 +392,7 @@ func TestRequestLogger_reuses_inbound_valid_id(t *testing.T) {
 		capturedID = RequestIDFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
-	mw := RequestLogger(inner)
+	mw := RequestLogger(inner, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/x", http.NoBody)
@@ -412,7 +412,7 @@ func TestRequestLogger_rejects_malformed_inbound_id(t *testing.T) {
 		capturedID = RequestIDFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 	})
-	mw := RequestLogger(inner)
+	mw := RequestLogger(inner, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/x", http.NoBody)

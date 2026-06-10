@@ -22,7 +22,7 @@ type RateLimitError struct {
 func (e *RateLimitError) Error() string { return e.Msg }
 
 // TimeoutStatus is the state of a single provider's timeout.
-type TimeoutStatus struct {
+type ProviderStatus struct {
 	LastError         string        `json:"last_error,omitempty"`
 	CooldownRemaining time.Duration `json:"cooldown_remaining,omitempty"`
 	RecentFailures    int           `json:"recent_failures"`

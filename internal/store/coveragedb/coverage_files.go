@@ -87,7 +87,7 @@ func (d *CoverageDB) DeleteSubtitleFile(ctx context.Context, mediaType api.Media
 
 // GetSubtitleFiles returns all subtitle_files rows matching the given type
 // and optional media_id prefix.
-func (d *CoverageDB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) (out []api.SubtitleFileRow, err error) {
+func (d *CoverageDB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) (out []api.SubtitleEntry, err error) {
 	if mediaIDPrefix != "" && !strings.HasSuffix(mediaIDPrefix, "-") {
 		rows, queryErr := d.stmtGetSubFilesExact.QueryContext(ctx, mediaType, mediaIDPrefix)
 		if queryErr != nil {
@@ -95,7 +95,7 @@ func (d *CoverageDB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaTy
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var r api.SubtitleFileRow
+			var r api.SubtitleEntry
 			if scanErr := rows.Scan(&r.MediaID, &r.Language, &r.Variant, &r.Source, &r.Codec, &r.Path, &r.Score, &r.OffsetMs, &r.VideoPath); scanErr != nil {
 				return nil, scanErr
 			}
@@ -125,7 +125,7 @@ func (d *CoverageDB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaTy
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var r api.SubtitleFileRow
+		var r api.SubtitleEntry
 		if scanErr := rows.Scan(&r.MediaID, &r.Language, &r.Variant, &r.Source, &r.Codec, &r.Path, &r.Score, &r.OffsetMs, &r.VideoPath); scanErr != nil {
 			return nil, scanErr
 		}

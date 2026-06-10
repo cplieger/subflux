@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // serveAndWait binds the HTTP listener, starts the server, and blocks
@@ -35,7 +35,7 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// auto-populate the `request_id` field of the JSON envelope.
 	// securityHeaders runs innermost so headers are set on every
 	// response, including 4xx error envelopes that consume the id.
-	handler := http.NewCrossOriginProtection().Handler(api.RequestLogger(securityHeaders(mux)))
+	handler := http.NewCrossOriginProtection().Handler(api.RequestLogger(securityHeaders(mux), s.metrics.RecordHTTP))
 	srv := newHTTPServer(handler)
 
 	var lc net.ListenConfig
@@ -190,11 +190,11 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, _, err := s.authenticator.Authenticate(r); err != nil {
-		if auth.IsBrowserRequest(r) {
+		if authlib.IsBrowserRequest(r) {
 			http.ServeFileFS(w, r, staticSub, "login.html")
 			return
 		}
-		api.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
+		api.UnauthorizedC(w, r, api.CodeUnauthorized, authlib.ErrUnauthenticated.Error())
 		return
 	}
 

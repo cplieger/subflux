@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
+	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/clisearch"
 	"github.com/cplieger/subflux/internal/config"
@@ -90,14 +90,14 @@ func doResetPassword(username string) error {
 	}
 	password := scanner.Text()
 
-	if errLen := auth.ValidatePasswordLength(password, true); errLen != nil {
+	if errLen := authlib.ValidatePasswordLength(password, true); errLen != nil {
 		return errLen
 	}
-	if errCtx := auth.ValidatePasswordContext(password, username); errCtx != nil {
+	if errCtx := authlib.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
 		return errCtx
 	}
 
-	hash, err := auth.HashPassword(password)
+	hash, err := authlib.HashPassword(password)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -145,7 +145,7 @@ func doGenerateAPIKey(username, label string) error {
 		return fmt.Errorf("user not found: %s", username)
 	}
 
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey()
+	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
 	if err != nil {
 		return fmt.Errorf("failed to generate API key: %w", err)
 	}

@@ -15,8 +15,8 @@ func TestStatsCache(t *testing.T) {
 	t.Run("returns_computed_value", func(t *testing.T) {
 		t.Parallel()
 		var c statsCache
-		resp := c.get(context.Background(), func(_ context.Context) api.StateStatsResponse {
-			return api.StateStatsResponse{Downloads: 42}
+		resp := c.get(context.Background(), func(_ context.Context) api.Stats {
+			return api.Stats{Downloads: 42}
 		})
 		if resp.Downloads != 42 {
 			t.Errorf("Downloads = %d, want 42", resp.Downloads)
@@ -27,9 +27,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.StateStatsResponse {
+		fn := func(_ context.Context) api.Stats {
 			calls.Add(1)
-			return api.StateStatsResponse{Downloads: 10}
+			return api.Stats{Downloads: 10}
 		}
 		c.get(context.Background(), fn)
 		c.get(context.Background(), fn)
@@ -43,9 +43,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.StateStatsResponse {
+		fn := func(_ context.Context) api.Stats {
 			n := calls.Add(1)
-			return api.StateStatsResponse{Downloads: int(n) * 10}
+			return api.Stats{Downloads: int(n) * 10}
 		}
 		resp1 := c.get(context.Background(), fn)
 		c.invalidate()
@@ -62,9 +62,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.StateStatsResponse {
+		fn := func(_ context.Context) api.Stats {
 			calls.Add(1)
-			return api.StateStatsResponse{Downloads: 5}
+			return api.Stats{Downloads: 5}
 		}
 		c.get(context.Background(), fn)
 		// Manually expire the entry by backdating storedAt.

@@ -30,7 +30,7 @@ const RuleNoTargets = "no targets"
 // IndexSubStatus builds a media_id → Key → Status index from subtitle
 // file rows. A subtitle is "usable" if it's external or embedded with a
 // non-ignored codec.
-func IndexSubStatus(files []api.SubtitleFileRow, ignoredCodecs map[string]bool) map[string]map[Key]*Status {
+func IndexSubStatus(files []api.SubtitleEntry, ignoredCodecs map[string]bool) map[string]map[Key]*Status {
 	idx := make(map[string]map[Key]*Status, len(files))
 	for i := range files {
 		f := &files[i]
@@ -138,10 +138,10 @@ func CountMovieCoverage(
 
 // DeduplicateFileRows collapses multiple rows with the same
 // (media_id, language, variant, source) into one row for display.
-func DeduplicateFileRows(rows []api.SubtitleFileRow) []api.SubtitleFileRow {
+func DeduplicateFileRows(rows []api.SubtitleEntry) []api.SubtitleEntry {
 	type key struct{ mediaID, lang, variant, source string }
 	seen := make(map[key]bool, len(rows))
-	out := make([]api.SubtitleFileRow, 0, len(rows))
+	out := make([]api.SubtitleEntry, 0, len(rows))
 	for i := range rows {
 		k := key{rows[i].MediaID, rows[i].Language, rows[i].Variant, rows[i].Source}
 		if seen[k] {

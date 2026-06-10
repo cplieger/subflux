@@ -3,32 +3,23 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
-import { patchCoverageBadge, fetchAndMergeCoverage } from "./coverage.js";
+import { emit, BusEvent } from "./bus.js";
+import { fetchAndMergeCoverage } from "./coverage.js";
 import { pollStatus, abortPoll } from "./status.js";
-import { coverageMediaId } from "./utils.js";
 import { registerCleanup } from "@cplieger/actions";
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
-import type { CoverageItem } from "./api-types.js";
+import { decodeCoverageEvent, decodeNotifyEvent, decodeScanEvent } from "./wire/decoders.gen.js";
+import type { Decoder } from "./validators.js";
 
 // --- Typed SSE event payloads ---
 
-interface CoverageEvent {
-  data?: { media_id?: string };
-  media_id?: string;
-}
-
-interface NotifyEvent {
-  data?: { level: string; text: string };
-}
-
-interface ScanStartEvent {
-  data?: { action?: string; detail?: string; source?: string; succeeded?: boolean };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- caller specifies T for type narrowing
-function parseSSE<T>(e: MessageEvent): T | null {
+// SSE frames arrive as { type, data: <event> }. Decode the inner payload
+// through the generated wire decoders (validates shape; returns null on a
+// malformed frame so a bad event can't throw out of a listener).
+function decodeSSE<T>(e: MessageEvent, decoder: Decoder<T>): T | null {
   try {
-    return JSON.parse(e.data as string) as T;
+    const env = JSON.parse(e.data as string) as { data?: unknown };
+    return decoder(env.data);
   } catch {
     return null;
   }
@@ -56,48 +47,31 @@ export function connect(): void {
   });
 
   eventSource.addEventListener("coverage", (e: MessageEvent) => {
-    const payload = parseSSE<CoverageEvent>(e);
-    const mediaId = payload?.data?.media_id ?? payload?.media_id ?? "";
+    const payload = decodeSSE(e, decodeCoverageEvent);
+    const mediaId = payload?.media_id ?? "";
 
     if (mediaId && store.get("currentPage") === "library" && !store.get("detailCtx")) {
-      fetchAndMergeCoverage()
-        .then((fresh) => {
-          const item = fresh.find((i: CoverageItem) => {
-            const id = coverageMediaId(i);
-            // Episode events use "tvdb-{id}-s01e01" while the series row
-            // uses "tvdb-{id}". Use prefix match for series.
-            if (i._type === "series") {
-              return mediaId.startsWith(id);
-            }
-            return id === mediaId;
-          });
-          if (item) {
-            patchCoverageBadge(coverageMediaId(item), item.targets);
-          }
-        })
-        .catch(() => {
-          store.set("needsRefresh", true);
-        });
+      // Refetch + setAll updates the affected row's signal reactively (bindList
+      // repaints just that row); no manual per-badge DOM patching.
+      void fetchAndMergeCoverage().catch(() => {
+        emit(BusEvent.DataInvalidate);
+      });
       return;
     }
-    store.set("needsRefresh", true);
+    emit(BusEvent.DataInvalidate);
   });
 
   eventSource.addEventListener("notify", (e: MessageEvent) => {
-    const payload = parseSSE<NotifyEvent>(e);
+    const payload = decodeSSE(e, decodeNotifyEvent);
     if (!payload) {
       return;
     }
-    const msg = payload.data;
-    if (!msg) {
-      return;
-    }
-    if (msg.level === "error") {
-      notify.error(msg.text || "");
-    } else if (msg.level === "success") {
-      notify.success(msg.text || "");
+    if (payload.level === "error") {
+      notify.error(payload.text || "");
+    } else if (payload.level === "success") {
+      notify.success(payload.text || "");
     } else {
-      notify.info(msg.text || "");
+      notify.info(payload.text || "");
     }
   });
 
@@ -106,15 +80,11 @@ export function connect(): void {
   // we only surface a short toast — useful for scheduled scans the user
   // did not initiate.
   eventSource.addEventListener("scan:start", (e: MessageEvent) => {
-    const payload = parseSSE<ScanStartEvent>(e);
+    const payload = decodeSSE(e, decodeScanEvent);
     if (!payload) {
       return;
     }
-    const data = payload.data;
-    if (!data) {
-      return;
-    }
-    const label = data.detail ?? data.action ?? "Scan";
+    const label = payload.detail || payload.action || "Scan";
     notify.info(`Scan started: ${label}`);
   });
 

@@ -21,7 +21,7 @@ func (d *DB) DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, me
 	return d.coverageDB.DeleteSubtitleFile(ctx, mediaType, mediaID, language, variant, source, path)
 }
 
-func (d *DB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleFileRow, error) {
+func (d *DB) GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error) {
 	return d.coverageDB.GetSubtitleFiles(ctx, mediaType, mediaIDPrefix)
 }
 

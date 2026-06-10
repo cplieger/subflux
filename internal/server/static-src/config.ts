@@ -3,8 +3,11 @@
 import * as store from "./store.js";
 import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
-import { el, dialog, closeDialog, patch, $ } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { emit, BusEvent } from "./bus.js";
+import { el, dialog, closeDialog, $ } from "./dom.js";
+import { patch } from "@cplieger/reactive";
+import { apiGet, apiGetArray } from "./api-client.js";
+import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
   apiAction,
   defineAction,
@@ -17,7 +20,7 @@ import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
 import { YAML_TIMEOUT_MS } from "./constants.js";
 import { parseYAMLSections } from "./config-yaml.js";
-import type { SchemaField, ConfigSchema } from "./api-types.js";
+import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
 import { renderProvidersSection, renderEmbeddedSection, genProviders } from "./config-providers.js";
 import {
@@ -28,7 +31,7 @@ import {
 } from "./config-renderers.js";
 
 let config = "";
-let configSchema: ConfigSchema[] | null = null;
+let configSchema: SchemaSection[] | null = null;
 const cfgDlg: HTMLDialogElement = dialog("configDialog");
 
 // --- Config drawer ---
@@ -65,7 +68,7 @@ export async function loadConfig(): Promise<void> {
     const [rawRes, parsed, schema] = await Promise.all([
       fetch("/api/config", { signal: cfgSignal }),
       apiGet<ParsedConfig>("/api/config/parsed", cfgSignal),
-      apiGet<ConfigSchema[]>("/api/config/schema", cfgSignal),
+      apiGetArray("/api/config/schema", decodeSchemaSection, cfgSignal),
     ]);
     // Don't throw on raw config failure; render with defaults so the
     // user can fix a broken or unreadable config via the UI.
@@ -102,7 +105,7 @@ export async function saveConfig(): Promise<void> {
     return;
   }
   void initLanguages();
-  store.set("needsRefresh", true);
+  emit(BusEvent.DataInvalidate);
   await loadConfig();
   if (wasUnconfigured && !store.get("isUnconfigured")) {
     notify.success("Subflux is now configured and running");
@@ -300,7 +303,7 @@ function renderConfigForm(): void {
 
   // Mark required fields only for first-time setup.
   if (isFirstSetup) {
-    markRequiredFields();
+    markRequiredFields(configSchema, body);
   }
 }
 
@@ -320,23 +323,27 @@ function updateFieldValidation(inp: HTMLInputElement, field: SchemaField): void 
   }
 }
 
+// Force-clear the required styling (red border + "Required" message) on a
+// field regardless of whether it is empty. Used when a required_group is
+// satisfied by another member, so still-empty members must not be flagged.
+function clearFieldValidation(inp: HTMLInputElement): void {
+  inp.classList.remove("cfg-required");
+  const msg = inp.closest(".cfg-field")?.querySelector(".cfg-error");
+  if (msg) {
+    msg.remove();
+  }
+}
+
 // markRequiredFields adds a red border to empty required fields.
 // For "required_group" sections (sonarr/radarr), at least one group
 // member must have its required fields filled. If neither does, both
-// get red borders.
-function markRequiredFields(): void {
-  if (!configSchema) {
-    return;
-  }
-  const body = document.getElementById("configBody");
-  if (!body) {
-    return;
-  }
-
+// get red borders. Dependencies are injected so the pass is a pure
+// function of (schema, DOM) and directly testable.
+export function markRequiredFields(sections: SchemaSection[], body: HTMLElement): void {
   // Collect required_group state: which groups have at least one
   // member with all required fields filled?
   const groupFilled: Record<string, boolean> = {};
-  for (const schema of configSchema) {
+  for (const schema of sections) {
     if (!schema.required_group) {
       continue;
     }
@@ -344,7 +351,7 @@ function markRequiredFields(): void {
     if (!(grp in groupFilled)) {
       groupFilled[grp] = false;
     }
-    const allFilled = schema.fields
+    const allFilled = (schema.fields ?? [])
       .filter((f: SchemaField) => f.required)
       .every((f: SchemaField) => {
         const inp = body.querySelector<HTMLInputElement>(
@@ -364,8 +371,8 @@ function markRequiredFields(): void {
     }
   }
 
-  for (const schema of configSchema) {
-    for (const field of schema.fields) {
+  for (const schema of sections) {
+    for (const field of schema.fields ?? []) {
       if (!field.required) {
         continue;
       }
@@ -376,21 +383,25 @@ function markRequiredFields(): void {
         continue;
       }
 
-      // For group members, only mark if no member in the group is filled.
-      if (schema.required_group) {
-        if (groupFilled[schema.required_group]) {
-          inp.classList.remove("cfg-required");
-          continue;
-        }
+      // When the group IS satisfied (by any member), force-clear the
+      // required styling on this member even if it is still empty.
+      if (schema.required_group && groupFilled[schema.required_group]) {
+        clearFieldValidation(inp);
+        continue;
       }
 
       updateFieldValidation(inp, field);
 
-      // Clear the red border when the user types.
+      // Re-run the full marking pass when the user types so that satisfying
+      // a required_group via one member clears the styling on its sibling
+      // members instead of re-flagging an empty one on every keystroke. The
+      // listener captures the same sections+body it was wired with; wiring is
+      // guarded by data-required-wired and the pass only reads values and
+      // toggles classes (no input events are dispatched, so no recursion).
       if (!inp.dataset["requiredWired"]) {
         inp.dataset["requiredWired"] = "true";
         inp.addEventListener("input", () => {
-          updateFieldValidation(inp, field);
+          markRequiredFields(sections, body);
         });
       }
     }
@@ -427,7 +438,7 @@ function buildConfigFromForm(): void {
   config = `${parts.join("\n\n")}\n`;
 }
 
-function genFields(schema: ConfigSchema): string {
+function genFields(schema: SchemaSection): string {
   const lines: string[] = [`${schema.key}:`];
   if (schema.enable_key) {
     const t = document.getElementById(
@@ -435,7 +446,7 @@ function genFields(schema: ConfigSchema): string {
     ) as HTMLInputElement | null;
     lines.push(`  ${schema.enable_key}: ${t ? String(t.checked) : "true"}`);
   }
-  for (const field of schema.fields) {
+  for (const field of schema.fields ?? []) {
     if (field.key === schema.enable_key) {
       continue;
     }
@@ -468,16 +479,16 @@ function genFields(schema: ConfigSchema): string {
   return lines.join("\n");
 }
 
-function genScoring(schema: ConfigSchema): string {
+function genScoring(schema: SchemaSection): string {
   const lines: string[] = ["scoring:", "  weights:"];
-  for (const field of schema.fields) {
+  for (const field of schema.fields ?? []) {
     const f = document.getElementById(fieldId(schema.key, field.key)) as HTMLInputElement | null;
     lines.push(`    ${field.key}: ${f ? f.value : (field.default ?? "0")}`);
   }
   return lines.join("\n");
 }
 
-function genList(schema: ConfigSchema): string {
+function genList(schema: SchemaSection): string {
   const listEl = document.getElementById(`${schema.key}-list`);
   const lines: string[] = [`${schema.key}:`];
   if (listEl) {

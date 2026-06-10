@@ -22,7 +22,7 @@ type SubtitleFile struct {
 }
 
 // SubtitleFileRow is the JSON shape returned by coverage queries.
-type SubtitleFileRow struct {
+type SubtitleEntry struct {
 	MediaID   string `json:"media_id"`
 	Language  string `json:"language"`
 	Variant   string `json:"variant"`

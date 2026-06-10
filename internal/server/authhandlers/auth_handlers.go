@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- POST /api/auth/login ---
@@ -49,7 +49,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
+		_, _ = authlib.VerifyPassword(req.Password, authlib.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
@@ -58,7 +58,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.Enabled {
-		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
+		_, _ = authlib.VerifyPassword(req.Password, authlib.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
@@ -66,7 +66,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	passOK, err := auth.VerifyPassword(req.Password, user.PasswordHash)
+	passOK, err := authlib.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !passOK {
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
@@ -75,7 +75,9 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Password verified: create session directly.
+	// Password verified: clear failure counters (anti soft-lockout, OWASP
+	// ASVS 2.2.1) and create session directly.
+	h.RateLimiter.Reset(ip, req.Username)
 	if err := h.createSessionAndRespond(w, r, user, api.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -93,19 +95,19 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// fail (invalid cookie, race against expiry) — emit the audit event
 	// with empty user in that case rather than skip it.
 	user := ""
-	token := auth.ReadSessionCookie(r)
+	token := ReadSessionCookie(r)
 	if token != "" {
-		if sess, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && sess != nil {
+		if sess, err := h.Store.GetSessionByHash(r.Context(), authlib.SessionHash(token)); err == nil && sess != nil {
 			if u, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && u != nil {
 				user = u.Username
 			}
 		}
-		if err := h.Store.DeleteSession(r.Context(), auth.SessionHash(token)); err != nil {
+		if err := h.Store.DeleteSession(r.Context(), authlib.SessionHash(token)); err != nil {
 			slog.Warn("logout: delete session", "error", err)
 		}
 	}
 
-	auth.ClearSessionCookie(w, r)
+	ClearSessionCookie(w, r)
 	api.Ok(w)
 	Audit(r, slog.LevelInfo, AuditLogout, true, user)
 }
@@ -122,7 +124,7 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.WriteJSON(w, api.SetupStatusResponse{
+	api.WriteJSON(w, api.SetupStatus{
 		SetupRequired: count == 0,
 		ConfigValid:   h.Configured(),
 	})
@@ -221,7 +223,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		canLinkOIDC = false
 	}
 
-	api.WriteJSON(w, api.UserMeResponse{
+	api.WriteJSON(w, api.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,

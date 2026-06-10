@@ -1,30 +1,23 @@
-package auth
+package authhandlers
 
-import (
-	"net/http"
+import "net/http"
 
-	authlib "github.com/cplieger/auth"
-)
-
-// Session cookie names.
+// Session cookie names. Subflux supports both HTTP (LAN, ip:port) and HTTPS
+// (behind Caddy) access from a single instance, so the cookie name and Secure
+// flag are chosen per request rather than fixed at deploy time. This is why
+// the library's deploy-time CookieConfig posture is not used here.
 const (
 	CookieNameSecure = "__Host-sfx_session"
 	CookieNameHTTP   = "sfx_session"
 )
 
-// IsBrowserRequest returns true if the request appears to be from a browser
-// (Accept header contains text/html and no X-API-Key header).
-func IsBrowserRequest(r *http.Request) bool {
-	return authlib.IsBrowserRequest(r)
-}
-
-// isHTTPS returns true if the request arrived over HTTPS.
+// isHTTPS reports whether the request arrived over HTTPS, honoring the
+// X-Forwarded-Proto header set by the reverse proxy.
 func isHTTPS(r *http.Request) bool {
 	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
-// SessionCookieName returns the appropriate cookie name based on whether
-// the request arrived over HTTPS.
+// SessionCookieName returns the cookie name appropriate for the request scheme.
 func SessionCookieName(r *http.Request) string {
 	if isHTTPS(r) {
 		return CookieNameSecure
@@ -32,7 +25,8 @@ func SessionCookieName(r *http.Request) string {
 	return CookieNameHTTP
 }
 
-// SetSessionCookie sets the session cookie on the response.
+// SetSessionCookie sets the session cookie on the response, selecting the
+// __Host- prefixed Secure cookie over HTTPS and the bare cookie over HTTP.
 func SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, maxAge int) {
 	secure := isHTTPS(r)
 	name := CookieNameHTTP
@@ -55,7 +49,7 @@ func ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	SetSessionCookie(w, r, "", -1)
 }
 
-// ReadSessionCookie reads the session token from the cookie.
+// ReadSessionCookie reads the session token from the request cookie.
 func ReadSessionCookie(r *http.Request) string {
 	c, err := r.Cookie(SessionCookieName(r))
 	if err != nil {

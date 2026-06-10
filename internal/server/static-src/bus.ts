@@ -1,10 +1,11 @@
-// Lightweight event bus for decoupling cross-module navigation
-// and actions. Breaks circular import chains between coverage,
-// detail, router, and history modules.
+// Typed event bus for cross-module navigation and actions, backed by
+// @cplieger/reactive's createBus. Single source of truth for event names and
+// payloads; breaks circular import chains between coverage, detail, router,
+// and history. Events, not state — durable state lives in store.ts.
+
+import { createBus } from "@cplieger/reactive";
 
 import type { CoverageItem, SeriesItem, MovieDetail } from "./api-types.js";
-
-// --- Typed event map: single source of truth for event names and payloads ---
 
 export interface DetailConfig {
   title: string;
@@ -16,16 +17,21 @@ export interface DetailConfig {
   filesAction?: (() => void) | null;
 }
 
+// Single-payload event map (one payload object per event). Events whose
+// payload type is `undefined` are emitted with no payload argument.
 export interface EventMap {
-  "open:series": [item: CoverageItem | SeriesItem, skipPush?: boolean];
-  "open:movie": [item: CoverageItem | MovieDetail, skipPush?: boolean];
-  "panel:configure": [visible: boolean, detail?: DetailConfig];
-  "nav:route": [path: string];
-  "nav:history": [filter?: string];
-  "load:history": [];
-  "scan:series": [item: CoverageItem | SeriesItem, btn: HTMLButtonElement | null];
-  "scan:movie": [item: CoverageItem | MovieDetail, btn: HTMLButtonElement | null];
-  "open:security": [];
+  "open:series": { item: CoverageItem | SeriesItem; skipPush?: boolean };
+  "open:movie": { item: CoverageItem | MovieDetail; skipPush?: boolean };
+  "panel:configure": { visible: boolean; detail?: DetailConfig };
+  "nav:route": string;
+  "nav:history": string | undefined;
+  "load:history": undefined;
+  "scan:series": { item: CoverageItem | SeriesItem; btn: HTMLButtonElement | null };
+  "scan:movie": { item: CoverageItem | MovieDetail; btn: HTMLButtonElement | null };
+  "open:security": undefined;
+  // Request a refresh of the current view (replaces the old needsRefresh
+  // store pulse — this is an event, not state).
+  "data:invalidate": undefined;
 }
 
 // Event name constants — use these instead of string literals.
@@ -39,37 +45,9 @@ export const BusEvent = {
   ScanSeries: "scan:series",
   ScanMovie: "scan:movie",
   OpenSecurity: "open:security",
+  DataInvalidate: "data:invalidate",
 } as const;
 
-type Listener<K extends keyof EventMap> = (...args: EventMap[K]) => void;
+const bus = createBus<EventMap>();
 
-const listeners = new Map<string, ((...args: unknown[]) => void)[]>();
-
-// Subscribe to an event. Returns an unsubscribe function.
-export function on<K extends keyof EventMap>(event: K, fn: Listener<K>): () => void {
-  if (!listeners.has(event)) {
-    listeners.set(event, []);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by has() check above
-  listeners.get(event)!.push(fn as (...args: unknown[]) => void);
-  return () => {
-    const list = listeners.get(event);
-    if (list) {
-      listeners.set(
-        event,
-        list.filter((f) => f !== fn),
-      );
-    }
-  };
-}
-
-// Emit an event to all subscribers.
-export function emit<K extends keyof EventMap>(event: K, ...args: EventMap[K]): void {
-  for (const fn of listeners.get(event) ?? []) {
-    try {
-      fn(...args);
-    } catch (e) {
-      console.error("bus listener error:", e);
-    }
-  }
-}
+export const { on, emit } = bus;

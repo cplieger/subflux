@@ -6,10 +6,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	authoidc "github.com/cplieger/auth/oidc"
+	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/authstore"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -59,7 +59,7 @@ type authDeps struct {
 	authenticator sessionAuthenticator
 	rateLimiter   ratelimit.Checker
 	webauthn      *webauthn.WebAuthn
-	oidcProvider  *auth.OIDCProvider
+	oidcProvider  *authoidc.Provider
 	oidcCfg       *api.OIDCConfig
 	ceremonies    *authhandlers.CeremonyStore
 	sessDebounce  *sessionActivityDebouncer

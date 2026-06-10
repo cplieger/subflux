@@ -1,27 +1,19 @@
 // config-providers.ts — Provider-section renderers extracted from config.ts.
 
 import { el } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { apiGetTyped } from "./api-client.js";
 import { extractYAMLValue, extractYAMLBlock, parseProviderBlocks } from "./config-yaml.js";
-import type { ProviderSchema, ConfigSchema } from "./api-types.js";
+import type { ProviderSchema, SchemaSection } from "./api-types.js";
+import { decodeProvidersResponse } from "./wire/decoders.gen.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
 import { EMBEDDED_PROVIDER } from "./constants.js";
 
 // --- Inline interfaces for provider API shapes ---
 
-interface ProviderHealthStatus {
-  timed_out: boolean;
-  last_error?: string;
-}
-
-interface ProviderHealthResponse {
-  providers?: Record<string, ProviderHealthStatus>;
-}
-
 // --- Provider section renderers ---
 
 export function renderProvidersSection(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   sections: Record<string, string>,
 ): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
@@ -29,7 +21,7 @@ export function renderProvidersSection(
   const raw = sections["providers"] ?? "";
   const blocks = parseProviderBlocks(raw);
 
-  for (const prov of schema.providers) {
+  for (const prov of schema.providers ?? []) {
     if (prov.name === EMBEDDED_PROVIDER) {
       continue;
     }
@@ -82,8 +74,8 @@ export function renderProvidersSection(
   }
 
   // Async: fetch provider health and show status badges.
-  apiGet<ProviderHealthResponse>("/api/providers/timeout")
-    .then((data: ProviderHealthResponse | null) => {
+  apiGetTyped("/api/providers/timeout", decodeProvidersResponse)
+    .then((data) => {
       if (!data?.providers) {
         return;
       }
@@ -124,7 +116,7 @@ export function renderProvidersSection(
 // Render embedded subtitle settings as a standalone section with
 // simple toggles (not a provider card).
 export function renderEmbeddedSection(
-  schema: ConfigSchema,
+  schema: SchemaSection,
   sections: Record<string, string>,
 ): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
@@ -132,7 +124,9 @@ export function renderEmbeddedSection(
 
   const raw = sections["providers"] ?? "";
   const blocks = parseProviderBlocks(raw);
-  const embProv = schema.providers.find((p: ProviderSchema) => p.name === EMBEDDED_PROVIDER);
+  const embProv = (schema.providers ?? []).find(
+    (p: ProviderSchema) => p.name === EMBEDDED_PROVIDER,
+  );
   if (!embProv?.settings) {
     return sec;
   }
@@ -151,9 +145,9 @@ export function renderEmbeddedSection(
   return sec;
 }
 
-export function genProviders(schema: ConfigSchema): string {
+export function genProviders(schema: SchemaSection): string {
   const lines: string[] = ["providers:"];
-  for (const prov of schema.providers) {
+  for (const prov of schema.providers ?? []) {
     lines.push(`  ${prov.name}:`);
     if (!prov.always_enabled) {
       const enEl = document.getElementById(

@@ -1,9 +1,11 @@
 // user-menu.ts — User menu popover: username, security, settings, theme, logout.
 
+import { apiAction } from "@cplieger/actions";
 import * as bus from "./bus.js";
 import * as theme from "./theme.js";
 import { el, icon } from "./dom.js";
-import { apiGet, apiPost } from "./api-client.js";
+import { apiGetTyped } from "./api-client.js";
+import { decodeMeResponse } from "./wire/decoders.gen.js";
 import { openConfig } from "./config.js";
 import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
@@ -18,7 +20,7 @@ export function initUserMenu(): void {
 }
 
 async function fetchMe(): Promise<void> {
-  const data = await apiGet<MeResponse>("/api/auth/me");
+  const data = await apiGetTyped("/api/auth/me", decodeMeResponse);
   if (data) {
     userInfo = data;
     store.set("isAdmin", data.role === "admin");
@@ -36,6 +38,16 @@ function wireUserButton(): void {
   // Remove the standalone header buttons to avoid duplicate controls.
   document.getElementById("configBtn")?.remove();
   document.getElementById("themeBtn")?.remove();
+
+  // Rebuild menu content each time the popover opens so the theme
+  // label/icon reflect the live data-theme. Auto-mode (matchMedia) can
+  // flip data-theme while the menu is closed, leaving a stale label.
+  const popup = document.getElementById("userMenuPopup");
+  popup?.addEventListener("toggle", (e: Event) => {
+    if ((e as ToggleEvent).newState === "open") {
+      buildMenuContent();
+    }
+  });
 }
 
 function buildMenuContent(): void {
@@ -145,8 +157,21 @@ function themeIcon(): string {
   return active === "dark" ? "sun" : "moon";
 }
 
+/** Logout. Best-effort: the redirect below runs regardless of the server
+ *  response, so there is no success toast, no error toast (error: false),
+ *  and no retry. dedupe protects against a double-click firing two logouts
+ *  mid-redirect (no args ⇒ constant key). */
+const logoutAction = apiAction<undefined>({
+  name: "auth.logout",
+  request: () => ({ method: "POST", path: "/api/auth/logout" }),
+  dedupe: true, // double-click protection
+  error: false, // best-effort; redirect happens regardless of outcome
+});
+
 async function doLogout(): Promise<void> {
-  // Best-effort; redirect regardless of server response.
-  await apiPost("/api/auth/logout");
+  // Best-effort; redirect regardless of server response. The apiAction
+  // dispatch resolves (null on failure) rather than rejecting, so the
+  // redirect always runs; identical semantics to the previous apiPost.
+  await logoutAction.dispatch(undefined);
   window.location.href = "/login";
 }

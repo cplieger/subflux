@@ -220,7 +220,7 @@ func TestHandleCoverageDetail_db_error_returns_500(t *testing.T) {
 // coverageDetailErrorStore returns an error from GetSubtitleFiles.
 type coverageDetailErrorStore struct{ qhMockStore }
 
-func (m *coverageDetailErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *coverageDetailErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -558,7 +558,7 @@ func TestIndexSubStatus(t *testing.T) {
 		checkKey     covKey
 		name         string
 		checkMediaID string
-		files        []api.SubtitleFileRow
+		files        []api.SubtitleEntry
 		wantMediaIDs int
 		wantUsable   bool
 		wantIgnored  bool
@@ -571,7 +571,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "external_sub_is_usable",
-			files:        []api.SubtitleFileRow{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
+			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
 			ignored:      nil,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -581,7 +581,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_ignored_codec",
-			files:        []api.SubtitleFileRow{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
+			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -591,7 +591,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_non_ignored_codec",
-			files:        []api.SubtitleFileRow{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
+			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -601,7 +601,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "usable_overrides_ignored",
-			files: []api.SubtitleFileRow{
+			files: []api.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 			},
@@ -614,7 +614,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "ignored_does_not_override_usable",
-			files: []api.SubtitleFileRow{
+			files: []api.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 			},
@@ -627,7 +627,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "multiple_media_ids",
-			files: []api.SubtitleFileRow{
+			files: []api.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep2", Language: "en", Variant: "hi", Source: "embedded", Codec: "pgs"},
 			},
@@ -707,7 +707,7 @@ func TestResolveRuleName_no_targets_returns_no_targets(t *testing.T) {
 
 func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleFileRow{
+	rows := []api.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/a.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/b.srt"},
 		{MediaID: "ep1", Language: "en", Variant: "hi", Source: "embedded"},
@@ -720,7 +720,7 @@ func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleFileRow{
+	rows := []api.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded"},
 		{MediaID: "ep1", Language: "en", Variant: "standard", Source: "external"},
@@ -734,7 +734,7 @@ func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 
 func TestDeduplicateFileRows_empty_input(t *testing.T) {
 	t.Parallel()
-	got := deduplicateFileRows([]api.SubtitleFileRow{})
+	got := deduplicateFileRows([]api.SubtitleEntry{})
 	if len(got) != 0 {
 		t.Errorf("deduplicateFileRows(empty) returned %d rows, want 0", len(got))
 	}
@@ -742,7 +742,7 @@ func TestDeduplicateFileRows_empty_input(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_order(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleFileRow{
+	rows := []api.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/first.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/second.srt"},
 	}
@@ -785,8 +785,8 @@ func (c coverageSeriesArrClient) GetSeries(_ context.Context) ([]api.Series, err
 // coverageSeriesStore returns subtitle files for coverage series tests.
 type coverageSeriesStore struct{ qhMockStore }
 
-func (m *coverageSeriesStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
-	return []api.SubtitleFileRow{
+func (m *coverageSeriesStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+	return []api.SubtitleEntry{
 		{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 	}, nil
@@ -898,7 +898,7 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 // coverageSeriesDBErrorStore returns an error from GetSubtitleFiles.
 type coverageSeriesDBErrorStore struct{ qhMockStore }
 
-func (m *coverageSeriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *coverageSeriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -1049,8 +1049,8 @@ func (c coverageMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, erro
 // coverageMoviesStore returns subtitle files for coverage movie tests.
 type coverageMoviesStore struct{ qhMockStore }
 
-func (m *coverageMoviesStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
-	return []api.SubtitleFileRow{
+func (m *coverageMoviesStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+	return []api.SubtitleEntry{
 		{MediaID: "tmdb-12345", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 	}, nil
 }
@@ -1155,7 +1155,7 @@ func TestHandleCoverageMovies_get_movies_error_returns_502(t *testing.T) {
 // coverageMoviesDBErrorStore returns an error from GetSubtitleFiles.
 type coverageMoviesDBErrorStore struct{ qhMockStore }
 
-func (m *coverageMoviesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleFileRow, error) {
+func (m *coverageMoviesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
 	return nil, errMock
 }
 

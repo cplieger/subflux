@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- GET /api/auth/apikeys ---
@@ -62,7 +62,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey()
+	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
 	if err != nil {
 		slog.Error("generate api key: generate", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -88,7 +88,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	slog.Info("security: API key generated",
 		"username", user.Username, "label", req.Label, "ip", ClientIP(r))
 
-	api.WriteJSON(w, api.KeyGeneratedResponse{
+	api.WriteJSON(w, api.KeyGenerated{
 		ID:        apiKey.ID,
 		Key:       plaintext,
 		KeyPrefix: prefix,

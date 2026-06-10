@@ -65,7 +65,10 @@ func NewMapper(clientKey string) *Mapper {
 		// response header) plus per-request context.WithTimeout at each
 		// call site. The client-level Timeout is intentionally omitted so
 		// large XML bodies aren't clipped mid-stream.
-		client:       provider.NewHTTPClientNoClientTimeout(),
+		// 443: the github anime-list mapping (https). 9001: the AniDB HTTP API
+		// (plaintext, non-standard port) — a known public host, so ssrf's IP
+		// validation still applies; only the default 443-port allowlist is widened.
+		client:       provider.NewHTTPClientNoClientTimeout(443, 9001),
 		clientKey:    clientKey,
 		episodeCache: make(map[string]int),
 		rateCh:       rateCh,

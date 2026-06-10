@@ -1,8 +1,8 @@
 // webauthn-utils.ts — Shared WebAuthn helpers (base64url encoding, Signal API).
 // Single source of truth; imported by login.ts and security.ts.
 
-import { apiGet } from "./api-client.js";
-import type { SignalData } from "./api-types.js";
+import { apiGetTyped } from "./api-client.js";
+import { decodeSignalData } from "./wire/decoders.gen.js";
 
 export function base64urlToBuffer(b64: string): ArrayBuffer {
   const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
@@ -29,7 +29,7 @@ export async function sendWebAuthnSignals(): Promise<void> {
     if (!window.PublicKeyCredential) {
       return;
     }
-    const data = await apiGet<SignalData>("/api/auth/webauthn/signal-data");
+    const data = await apiGetTyped("/api/auth/webauthn/signal-data", decodeSignalData);
     if (!data) {
       return;
     }

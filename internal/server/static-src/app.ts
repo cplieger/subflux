@@ -3,6 +3,7 @@
 import { initActions } from "./actions-boot.js";
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { on, BusEvent } from "./bus.js";
 
 // Wire @cplieger/actions notifier + API layer before any action is created.
 initActions();
@@ -18,12 +19,14 @@ import { reloadHistory } from "./history.js";
 import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js";
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
-import { el, dialog, onBackdropClose, patch, $ } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { el, dialog, onBackdropClose, $ } from "./dom.js";
+import { patch } from "@cplieger/reactive";
+import { apiGet, apiGetArray } from "./api-client.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 import { STATUS_POLL_MS } from "./constants.js";
-import type { MovieItem, SubtitleEntry } from "./api-types.js";
+import type { MovieItem } from "./api-types.js";
+import { decodeSubtitleEntry, decodeMovieItem } from "./wire/decoders.gen.js";
 
 // Initialize store.
 store.batch(() => {
@@ -31,7 +34,6 @@ store.batch(() => {
   store.set("configChecked", false);
   store.set("ignoredCodecs", new Set<string>());
   store.set("detailCtx", null);
-  store.set("coverageData", null);
   store.set("currentPage", "library");
   store.set("scanInFlight", false);
   store.set("refreshPending", false);
@@ -58,14 +60,14 @@ function refreshCurrentPage(): void {
   // refreshCurrentPage re-fetches data and passes it to detail renderers.
   if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
     void Promise.all([
-      apiGet<SubtitleEntry[]>(`/api/coverage/series/${ctx.tvdbId}`),
+      apiGetArray(`/api/coverage/series/${ctx.tvdbId}`, decodeSubtitleEntry),
       apiGet<string[]>(`/api/state/ids?type=episode&prefix=tvdb-${ctx.tvdbId}-`),
     ]).then(([subFiles, historyIDs]) => {
       renderSeriesDetail(ctx.series, ctx.seasons, subFiles ?? [], new Set(historyIDs ?? []));
     });
   } else if (ctx && "movie" in ctx && ctx.movie) {
     // Movie detail: re-fetch coverage and re-render.
-    void apiGet<MovieItem[]>("/api/coverage/movies").then((movies) => {
+    void apiGetArray("/api/coverage/movies", decodeMovieItem).then((movies) => {
       if (!movies) {
         return;
       }
@@ -81,17 +83,14 @@ function refreshCurrentPage(): void {
   }
 }
 
-// Any module can trigger a refresh by setting needsRefresh to true.
+// Any module can trigger a refresh by emitting BusEvent.DataInvalidate.
 // Defer refresh while a scan button is active (prevents DOM replacement
 // from detaching the button reference mid-animation).
-store.subscribe("needsRefresh", (_val) => {
-  if (_val) {
-    if (store.get("scanInFlight")) {
-      store.set("refreshPending", true);
-    } else {
-      refreshCurrentPage();
-    }
-    store.set("needsRefresh", false);
+on(BusEvent.DataInvalidate, () => {
+  if (store.get("scanInFlight")) {
+    store.set("refreshPending", true);
+  } else {
+    refreshCurrentPage();
   }
 });
 
@@ -201,10 +200,6 @@ if (titleLink) {
     e.preventDefault();
     navigate("/");
   });
-}
-const themeBtn = document.getElementById("themeBtn");
-if (themeBtn) {
-  themeBtn.addEventListener("click", theme.cycle);
 }
 $.historyBtn.addEventListener("click", () => {
   if (store.get("currentPage") === "history") {

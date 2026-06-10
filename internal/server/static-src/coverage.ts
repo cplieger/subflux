@@ -1,7 +1,14 @@
-// coverage.ts — library coverage view with filtering, sorting, and badges
+// coverage.ts — library coverage view with filtering, sorting, and badges.
+//
+// Two-tier reactive model: coverage rows live in a `createCollection` keyed by
+// media id (per-row signals); the table is rendered once via `bindList` over a
+// computed `visibleIds` view (filter + sort + pagination as a sliced id list).
+// A per-row SSE update repaints just that row; a filter/sort/page change
+// recomputes the view and reconciles structure. No paged-list, no manual
+// per-badge DOM patching.
 
 import * as store from "./store.js";
-import { $, el, text, icon, patch, errDiv, input, select, insertNavButton } from "./dom.js";
+import { $, el, text, icon, errDiv, input, select, insertNavButton } from "./dom.js";
 import { apiGetTyped } from "./api-client.js";
 import { registerCleanup } from "@cplieger/actions";
 import { decodeSeriesItem, decodeMovieItem } from "./wire/decoders.gen.js";
@@ -9,14 +16,35 @@ import { decodeArray } from "./validators.js";
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from "./utils.js";
 import { on, emit, BusEvent } from "./bus.js";
 import type { DetailConfig } from "./bus.js";
-import { createPagedList } from "./paged-list.js";
-import type { PagedList, Page } from "./paged-list.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
-import { reconcile } from "@cplieger/reactive";
+import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 
 // --- Coverage view ---
 
 const COV_PAGE_SIZE = 50;
+
+// The reactive coverage collection (per-row signals + structure signal).
+const coverage = createCollection<CoverageItem>(coverageMediaId);
+
+// View state. `filterTick` bumps whenever a filter/sort control changes so the
+// `visible` computed re-reads the (DOM-backed) filter inputs; `pageLimit` is
+// the "show more" window.
+const filterTick = signal(0);
+const pageLimit = signal(COV_PAGE_SIZE);
+
+// Filtered + sorted full list (reactive on the collection + filter changes).
+const filteredItems = computed(() => {
+  void filterTick.value; // dep: re-run when a filter/sort control changes
+  return applyFilters(coverage.items());
+});
+
+// Paged id list — the structure tier `bindList` renders. Shallow-equal so a
+// per-row content update (badge change) does not trigger a structural
+// reconcile unless the visible set/order actually changes.
+const visibleIds = computed<readonly string[]>(
+  () => filteredItems.value.slice(0, pageLimit.value).map(coverageMediaId),
+  { equals: (a, b) => a.length === b.length && a.every((x, i) => x === b[i]) },
+);
 
 // Per-fetch AbortController so rapid view switches abort the previous
 // in-flight coverage load instead of patching stale DOM. Registered with
@@ -27,42 +55,45 @@ registerCleanup(() => {
   coverageAbort = null;
 });
 
-/** Fetch series and movies coverage, merge with _type discriminant, and store.
- *  Aborts any prior in-flight fetch — only the latest call wins. */
+/** Whether any coverage rows have been loaded. */
+export function coverageLoaded(): boolean {
+  return coverage.size > 0;
+}
+
+/** Snapshot of the current coverage rows (for non-reactive lookups). */
+export function coverageItems(): CoverageItem[] {
+  return coverage.items();
+}
+
+/** Fetch series and movies coverage, merge with _type discriminant, and load
+ *  the collection. Aborts any prior in-flight fetch — only the latest wins. */
 export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   coverageAbort?.abort();
   coverageAbort = new AbortController();
-  const { signal } = coverageAbort;
+  const { signal: sig } = coverageAbort;
   const decodeSeriesList = (v: unknown) => decodeArray(v, decodeSeriesItem, "$.series");
   const decodeMovieList = (v: unknown) => decodeArray(v, decodeMovieItem, "$.movies");
   const [series, movies] = await Promise.all([
-    apiGetTyped("/api/coverage/series", decodeSeriesList, signal),
-    apiGetTyped("/api/coverage/movies", decodeMovieList, signal),
+    apiGetTyped("/api/coverage/series", decodeSeriesList, sig),
+    apiGetTyped("/api/coverage/movies", decodeMovieList, sig),
   ]);
-  if (signal.aborted) {
-    return store.get("coverageData") ?? [];
+  if (sig.aborted) {
+    return coverage.items();
   }
   const merged: CoverageItem[] = [
     ...(series ?? []).map((s) => ({ ...s, _type: "series" as const })),
     ...(movies ?? []).map((m) => ({ ...m, _type: "movie" as const })),
   ];
-  store.set("coverageData", merged);
+  coverage.setAll(merged);
   return merged;
 }
-
-let list: PagedList | null = null;
-
-// Cache the last filtered+sorted result so fetchPage can slice from it.
-let filteredCache: CoverageItem[] = [];
-let filterVersion = 0;
-let cachedFilterVersion = -1;
 
 export async function loadCoverage(silent?: boolean): Promise<void> {
   if (store.get("isUnconfigured")) {
     return;
   }
   const out = $.coverageContent;
-  if (!silent) {
+  if (!silent && coverage.size === 0) {
     const skel = document.createDocumentFragment();
     for (let i = 0; i < 8; i++) {
       skel.appendChild(
@@ -73,8 +104,7 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
   }
   try {
     await fetchAndMergeCoverage();
-    filterVersion++;
-    await ensureList().reload();
+    ensureMounted();
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!silent) {
@@ -224,82 +254,6 @@ function buildBadges(targets: CoverageTarget[]): DocumentFragment {
   return frag;
 }
 
-// Patch a single item's coverage badges in the DOM without full re-render.
-// Returns true if the patch was applied, false if the element wasn't found.
-export function patchCoverageBadge(mediaId: string, targets: CoverageTarget[]): boolean {
-  const cell = document.querySelector(`[data-cov-id="${CSS.escape(mediaId)}"]`);
-  if (!cell) {
-    return false;
-  }
-  cell.replaceChildren(buildBadges(targets));
-  // Also update the in-memory store so the next full render is consistent.
-  const data = store.get("coverageData");
-  if (data) {
-    const item = data.find((i: CoverageItem) => coverageMediaId(i) === mediaId);
-    if (item) {
-      item.targets = targets;
-    }
-  }
-  return true;
-}
-
-/** Fetch a page from the in-memory filtered coverage data. */
-function fetchCoveragePage(offset: number, limit: number): Promise<Page<CoverageItem>> {
-  if (cachedFilterVersion !== filterVersion) {
-    filteredCache = applyFilters(store.get("coverageData"));
-    cachedFilterVersion = filterVersion;
-  }
-  const slice = filteredCache.slice(offset, offset + limit);
-  return Promise.resolve({ items: slice, hasMore: offset + limit < filteredCache.length });
-}
-
-/** Render accumulated coverage items into a table fragment. */
-function renderCoverageItems(items: CoverageItem[]): DocumentFragment {
-  const covData = store.get("coverageData");
-  if (items.length === 0 && (!covData || covData.length === 0)) {
-    const frag = document.createDocumentFragment();
-    frag.appendChild(
-      emptyState("No media found. Data will appear after the first scheduled scan."),
-    );
-    return frag;
-  }
-
-  const thead = el(
-    "thead",
-    null,
-    el(
-      "tr",
-      null,
-      el("th", null, "Title"),
-      el("th", null, "Year"),
-      el("th", { "data-tip": "Primary audio language" }, "Audio"),
-      el("th", null, "Subtitles"),
-      el("th"),
-    ),
-  );
-  const tbody = el("tbody");
-
-  reconcile(tbody, items, {
-    key: (item) => coverageMediaId(item),
-    mount: (item) => buildCoverageRow(item),
-    update: (row, item) => {
-      updateCoverageRow(row, item);
-    },
-  });
-
-  const frag = document.createDocumentFragment();
-  const tbl = el("table", { className: "library" }, thead, tbody);
-  const source = filteredCache.length > 0 ? filteredCache : items;
-  const avgLen = Math.ceil(
-    (source.reduce((sum: number, i: CoverageItem) => sum + i.title.length, 0) /
-      (source.length || 1)) *
-      2,
-  );
-  tbl.style.setProperty("--title-w", `${avgLen}ch`);
-  frag.appendChild(tbl);
-  return frag;
-}
-
 function buildCoverageRow(item: CoverageItem): HTMLElement {
   const isSeries = item._type === "series";
   const targets = item.targets;
@@ -328,7 +282,7 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
         "data-tip": "Auto: scan and download missing subtitles",
         onclick: (e: MouseEvent) => {
           e.stopPropagation();
-          emit(scanEvent, item, e.currentTarget as HTMLButtonElement | null);
+          emit(scanEvent, { item, btn: e.currentTarget as HTMLButtonElement | null });
         },
       },
       icon("search"),
@@ -338,10 +292,10 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
 
   const openDetail = isSeries
     ? () => {
-        emit(BusEvent.OpenSeries, item);
+        emit(BusEvent.OpenSeries, { item });
       }
     : () => {
-        emit(BusEvent.OpenMovie, item);
+        emit(BusEvent.OpenMovie, { item });
       };
 
   return clickableRow(
@@ -362,35 +316,107 @@ function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
   }
 }
 
-function ensureList(): PagedList {
-  list ??= createPagedList<CoverageItem>({
-    container: $.coverageContent,
-    fetchPage: fetchCoveragePage,
-    renderItems: renderCoverageItems,
-    pageSize: COV_PAGE_SIZE,
-    emptyMessage: "No matching items.",
-    emptyNoData: "No media found. Data will appear after the first scheduled scan.",
-  });
-  return list;
+// --- Render: build the table shell once, bind the tbody, react for the rest ---
+
+let bindings: (() => void)[] = [];
+
+function ensureMounted(): void {
+  const out = $.coverageContent;
+  // Already mounted and still in the DOM (detail navigation replaces the
+  // container, so re-mount when the table is gone).
+  if (out.querySelector("table.library") !== null) {
+    return;
+  }
+  for (const dispose of bindings) {
+    dispose();
+  }
+  bindings = [];
+
+  const tbody = el("tbody");
+  const thead = el(
+    "thead",
+    null,
+    el(
+      "tr",
+      null,
+      el("th", null, "Title"),
+      el("th", null, "Year"),
+      el("th", { "data-tip": "Primary audio language" }, "Audio"),
+      el("th", null, "Subtitles"),
+      el("th"),
+    ),
+  );
+  const tbl = el("table", { className: "library" }, thead, tbody);
+  const emptyEl = emptyState("No media found. Data will appear after the first scheduled scan.");
+  const noMatchEl = emptyState("No matching items.");
+  const showMore = el(
+    "button",
+    {
+      type: "button",
+      className: "ghost cov-show-more",
+      onclick: () => {
+        pageLimit.value += COV_PAGE_SIZE;
+      },
+    },
+    "Show more",
+  );
+  patch(out, el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
+
+  // Content + structure tiers: per-row repaint on entity change, structural
+  // reconcile on visibleIds change.
+  bindings.push(
+    bindList(
+      tbody,
+      { ids: visibleIds, signalFor: (id: string) => coverage.signalFor(id) },
+      {
+        mount: (item) => buildCoverageRow(item),
+        update: (row, item) => {
+          updateCoverageRow(row, item);
+        },
+      },
+    ),
+  );
+
+  // Empty-state / show-more / title-width, all derived from the collection +
+  // filtered view.
+  bindings.push(
+    effect(() => {
+      const hasData = coverage.ids.value.length > 0;
+      const filtered = filteredItems.value;
+      const visibleCount = visibleIds.value.length;
+      emptyEl.hidden = hasData;
+      noMatchEl.hidden = !(hasData && filtered.length === 0);
+      const tableEmpty = !hasData || filtered.length === 0;
+      tbl.hidden = tableEmpty;
+      showMore.hidden = tableEmpty || visibleCount >= filtered.length;
+      if (!tableEmpty) {
+        const avgLen = Math.ceil(
+          (filtered.reduce((sum, i) => sum + i.title.length, 0) / (filtered.length || 1)) * 2,
+        );
+        tbl.style.setProperty("--title-w", `${avgLen}ch`);
+      }
+    }),
+  );
 }
 
 export function renderCoverage(): void {
   configurePanel(true);
-  void ensureList().reload();
+  ensureMounted();
 }
 
+/** Called by the filter/sort controls — recompute the view from page 0. */
 export function filterCoverage(): void {
-  filterVersion++;
-  void ensureList().reload();
+  pageLimit.value = COV_PAGE_SIZE;
+  filterTick.value += 1;
 }
 
-function applyFilters(data: CoverageItem[] | null | undefined): CoverageItem[] {
+function applyFilters(data: CoverageItem[]): CoverageItem[] {
   const filter = input("cov-filter").value.toLowerCase();
   const missingOnly = input("cov-missing").checked;
   const typeFilter = select("cov-type-filter").value;
   const sortBy = select("cov-sort").value;
 
-  let filtered: CoverageItem[] = data ?? [];
+  let filtered: CoverageItem[] = data;
   if (typeFilter === "series") {
     filtered = filtered.filter((item: CoverageItem) => item._type === "series");
   } else if (typeFilter === "movies") {
@@ -446,6 +472,6 @@ function applyFilters(data: CoverageItem[] | null | undefined): CoverageItem[] {
 }
 
 // --- Bus handler: detail.js emits panel:configure ---
-on(BusEvent.PanelConfigure, (visible, detail) => {
+on(BusEvent.PanelConfigure, ({ visible, detail }) => {
   configurePanel(visible, detail);
 });

@@ -91,7 +91,7 @@ func (*panicStore) UpsertSubtitleFile(context.Context, api.MediaType, string, *a
 	panic("not implemented")
 }
 
-func (*panicStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleFileRow, error) {
+func (*panicStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleEntry, error) {
 	panic("not implemented")
 }
 

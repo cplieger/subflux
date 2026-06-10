@@ -82,7 +82,7 @@ func (s *Server) handleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	s.mediaH.HandleMediaEpisodes(w, r)
 }
 
-func (s *Server) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleFileRow) bool { //nolint:unparam // mediaType varies in production via filehandlers
+func (s *Server) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool { //nolint:unparam // mediaType varies in production via filehandlers
 	s.ensureFileH()
 	return s.fileH.DeleteExternalFile(ctx, cfg, mediaType, row)
 }
@@ -102,7 +102,7 @@ func (s *Server) ensureFileH() {
 // fileStoreProxy delegates to s.stores.file, allowing tests to swap the store.
 type fileStoreProxy struct{ s *Server }
 
-func (p *fileStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleFileRow, error) {
+func (p *fileStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleEntry, error) {
 	return p.s.stores.file.GetSubtitleFiles(ctx, mt, prefix)
 }
 
@@ -137,8 +137,8 @@ func (s *Server) ensureMediaH() {
 
 // Type aliases for test compatibility with extracted handler packages.
 type (
-	seriesCoverage = coveragehandlers.SeriesCoverage
-	movieCoverage  = coveragehandlers.MovieCoverage
+	seriesCoverage = coveragehandlers.SeriesItem
+	movieCoverage  = coveragehandlers.MovieItem
 	fileEntry      = filehandlers.FileEntry
 	seriesItem     = mediahandlers.SeriesItem
 	movieItem      = mediahandlers.MovieItem
@@ -148,7 +148,7 @@ type (
 // covStoreProxy delegates to s.stores.cov, allowing tests to swap the store.
 type covStoreProxy struct{ s *Server }
 
-func (p *covStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleFileRow, error) {
+func (p *covStoreProxy) GetSubtitleFiles(ctx context.Context, mt api.MediaType, prefix string) ([]api.SubtitleEntry, error) {
 	return p.s.stores.cov.GetSubtitleFiles(ctx, mt, prefix)
 }
 

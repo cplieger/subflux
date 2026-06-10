@@ -1,7 +1,8 @@
 // login.ts — Standalone login page logic. Only imports leaf modules.
 
-import { apiGet, apiPost, apiPostRaw } from "./api-client.js";
+import { apiGetTyped, apiPost, apiPostRaw } from "./api-client.js";
 import type { ApiResult } from "./api-client.js";
+import { decodeSetupStatus } from "./wire/decoders.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
 import { startConfigWizard } from "./wizard.js";
@@ -9,11 +10,6 @@ import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./web
 import { hasCode, ErrorCode } from "./error_codes.js";
 
 // --- Inline interfaces for API response shapes ---
-
-interface SetupResponse {
-  setup_required: boolean;
-  config_valid: boolean;
-}
 
 interface LoginResponse {
   redirect?: string;
@@ -56,7 +52,7 @@ async function init(): Promise<void> {
     return;
   }
 
-  const data = await apiGet<SetupResponse>("/api/auth/setup");
+  const data = await apiGetTyped("/api/auth/setup", decodeSetupStatus);
   if (!data) {
     showError("loginError", "Failed to initialize");
     showPage("loginPage");

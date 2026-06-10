@@ -1,10 +1,17 @@
 // Client-side routing: URL-driven page navigation with view transitions.
 
 import * as store from "./store.js";
-import { $, el, icon, input, patch, select } from "./dom.js";
+import { $, el, icon, input, select } from "./dom.js";
+import { patch } from "@cplieger/reactive";
 import { apiGet } from "./api-client.js";
 import { openConfig } from "./config.js";
-import { loadCoverage, configurePanel, renderCoverage } from "./coverage.js";
+import {
+  loadCoverage,
+  configurePanel,
+  renderCoverage,
+  coverageLoaded,
+  coverageItems,
+} from "./coverage.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
@@ -129,7 +136,7 @@ async function withMovie(
 async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
   const lang = m[2] ?? null;
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       openSearchPopup("episode", s, null, null, lang);
     }, ROUTE_TRANSITION_MS);
@@ -138,7 +145,7 @@ async function handleSeriesSearch(m: RegExpMatchArray): Promise<void> {
 
 async function handleSeriesSync(m: RegExpMatchArray): Promise<void> {
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
@@ -171,14 +178,14 @@ async function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
 
 async function handleSeriesDetail(m: RegExpMatchArray): Promise<void> {
   await withSeries(m, (s) => {
-    emit(BusEvent.OpenSeries, s, true);
+    emit(BusEvent.OpenSeries, { item: s, skipPush: true });
   });
 }
 
 async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
   const lang = m[2] ?? null;
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       openSearchPopup("movie", mv, null, null, lang);
     }, ROUTE_TRANSITION_MS);
@@ -187,7 +194,7 @@ async function handleMovieSearch(m: RegExpMatchArray): Promise<void> {
 
 async function handleMovieSync(m: RegExpMatchArray): Promise<void> {
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
     setTimeout(() => {
       const btn = document.querySelector<HTMLElement>('[data-nav="sync"]');
       if (btn) {
@@ -216,7 +223,7 @@ async function handleMovieFiles(m: RegExpMatchArray): Promise<void> {
 
 async function handleMovieDetail(m: RegExpMatchArray): Promise<void> {
   await withMovie(m, (mv) => {
-    emit(BusEvent.OpenMovie, mv, true);
+    emit(BusEvent.OpenMovie, { item: mv, skipPush: true });
   });
 }
 
@@ -287,7 +294,7 @@ function showPage(page: string, skipRender?: boolean): void {
   if (page === "library") {
     configurePanel(true);
     // Re-render from cache if available; otherwise fetch fresh data.
-    if (store.get("coverageData")) {
+    if (coverageLoaded()) {
       renderCoverage();
     } else {
       void loadCoverage();
@@ -334,17 +341,14 @@ async function findCoverageItem(
   idField: "tvdb_id" | "tmdb_id",
   id: number,
 ): Promise<CoverageItem | null> {
-  if (!store.get("coverageData")) {
+  if (!coverageLoaded()) {
     try {
       await loadCoverage();
     } catch {
       /* fall through */
     }
   }
-  const data = store.get("coverageData");
-  if (!data) {
-    return null;
-  }
+  const data = coverageItems();
   return data.find((item: CoverageItem) => item._type === type && item[idField] === id) ?? null;
 }
 

@@ -223,7 +223,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		"matched_by", req.MatchedBy,
 		"score", result.Score, "score_no_hash", result.ScoreNoHash)
 
-	api.WriteJSON(w, api.ScorePreviewResponse(result))
+	api.WriteJSON(w, api.ScorePreview(result))
 }
 
 // HandleSearchTargets resolves subtitle targets for a media item
@@ -266,7 +266,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 			MinScore:  t.MinScore,
 		})
 	}
-	api.WriteJSON(w, api.SearchTargetsResponse{
+	api.WriteJSON(w, api.SearchTargets{
 		OrigLang:   origLang,
 		AudioLangs: audioLangs,
 		Targets:    out,

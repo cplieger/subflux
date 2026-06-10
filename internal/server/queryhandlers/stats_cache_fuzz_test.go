@@ -19,9 +19,9 @@ func FuzzStatsCacheGetAfterInvalidate(f *testing.F) {
 		ctx := context.Background()
 
 		computeCalls := 0
-		compute := func(_ context.Context) api.StateStatsResponse {
+		compute := func(_ context.Context) api.Stats {
 			computeCalls++
-			return api.StateStatsResponse{
+			return api.Stats{
 				Downloads: downloads,
 				Attempts:  attempts,
 			}

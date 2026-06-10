@@ -47,20 +47,3 @@ type OIDCStore interface {
 
 // Compile-time assertion: the full AuthStore satisfies OIDCStore.
 var _ OIDCStore = authstore.AuthStore(nil)
-
-// AuthHandlerStore is the narrow interface consumed by login, registration,
-// and session creation flows. Documented for discoverability;
-// the Handler struct uses the full authstore.AuthStore directly.
-type AuthHandlerStore interface {
-	GetUserByUsername(ctx context.Context, username string) (*api.User, error)
-	GetUserByID(ctx context.Context, id int64) (*api.User, error)
-	UpdateUser(ctx context.Context, user *api.User) error
-	UserCount(ctx context.Context) (int, error)
-	CreateUser(ctx context.Context, user *api.User) error
-	CreateSession(ctx context.Context, sess *api.Session) error
-	DeleteSession(ctx context.Context, tokenHash string) error
-	PasskeyCountForUser(ctx context.Context, userID int64) (int, error)
-}
-
-// Compile-time assertion: authstore.AuthStore satisfies AuthHandlerStore.
-var _ AuthHandlerStore = authstore.AuthStore(nil)

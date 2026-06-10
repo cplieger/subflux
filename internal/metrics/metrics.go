@@ -4,55 +4,54 @@ package metrics
 
 import (
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
-	extmetrics "github.com/cplieger/metrics"
+	extmetrics "github.com/cplieger/metrics/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// BucketBounds are the histogram boundaries in seconds. Tuned for the
-// observed range of provider search durations (cache hits ~50-200ms,
-// normal queries 0.5-2s, slow API calls 2-10s, near-timeout 10-30s).
-var BucketBounds = [8]float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0}
-
 // Metrics holds all application metrics.
 type Metrics struct {
-	scansTotal  *extmetrics.Counter
-	errors      *extmetrics.LabeledCounter
-	downloads   *extmetrics.LabeledCounter
-	dlErrors    *extmetrics.LabeledCounter
-	durations   *extmetrics.LabeledHistogram
-	imports     *extmetrics.LabeledCounter
-	searches    *extmetrics.LabeledCounter
-	scanItems   *extmetrics.Counter
-	scanFound   *extmetrics.Counter
-	scanDur     *extmetrics.Gauge
-	adaptSkips  *extmetrics.Counter
-	registry    *extmetrics.Registry
-	totalSearch atomic.Int64
+	scansTotal   *extmetrics.Counter
+	errors       *extmetrics.LabeledCounter
+	downloads    *extmetrics.LabeledCounter
+	dlErrors     *extmetrics.LabeledCounter
+	durations    *extmetrics.LabeledHistogram
+	imports      *extmetrics.LabeledCounter
+	searches     *extmetrics.LabeledCounter
+	scanItems    *extmetrics.Counter
+	scanFound    *extmetrics.Counter
+	scanDur      *extmetrics.Gauge
+	adaptSkips   *extmetrics.Counter
+	httpRequests *extmetrics.LabeledCounter
+	httpDuration *extmetrics.Histogram
+	registry     *extmetrics.Registry
+	totalSearch  atomic.Int64
 }
 
 // New creates a new Metrics instance.
 func New() *Metrics {
 	labels := []string{"provider"}
-	buckets := BucketBounds[:]
 
 	m := &Metrics{
-		searches:   extmetrics.NewLabeledCounter("subflux_searches_total", "Total subtitle searches by provider", labels),
-		errors:     extmetrics.NewLabeledCounter("subflux_search_errors_total", "Total search errors by provider", labels),
-		downloads:  extmetrics.NewLabeledCounter("subflux_downloads_total", "Total subtitle downloads by provider", labels),
-		dlErrors:   extmetrics.NewLabeledCounter("subflux_download_errors_total", "Total download errors by provider", labels),
-		durations:  extmetrics.NewLabeledHistogram("subflux_search_duration_seconds", "Search duration", labels, extmetrics.WithBuckets(buckets)),
-		imports:    extmetrics.NewLabeledCounter("subflux_imports_detected_total", "Total imports detected by source", []string{"source"}),
-		scansTotal: extmetrics.NewCounter("subflux_scans_total", "Total full scans completed"),
-		scanItems:  extmetrics.NewCounter("subflux_scan_items_total", "Total items scanned"),
-		scanFound:  extmetrics.NewCounter("subflux_scan_found_total", "Total subtitles found during scans"),
-		scanDur:    extmetrics.NewGauge("subflux_scan_duration_seconds", "Last scan duration in seconds"),
-		adaptSkips: extmetrics.NewCounter("subflux_adaptive_skips_total", "Total items skipped by adaptive search"),
+		searches:     extmetrics.NewLabeledCounter("searches_total", "Total subtitle searches by provider", labels),
+		errors:       extmetrics.NewLabeledCounter("search_errors_total", "Total search errors by provider", labels),
+		downloads:    extmetrics.NewLabeledCounter("downloads_total", "Total subtitle downloads by provider", labels),
+		dlErrors:     extmetrics.NewLabeledCounter("download_errors_total", "Total download errors by provider", labels),
+		durations:    extmetrics.NewLabeledHistogram("search_duration_seconds", "Search duration", labels, extmetrics.WithBuckets(extmetrics.APIBuckets)),
+		imports:      extmetrics.NewLabeledCounter("imports_detected_total", "Total imports detected by source", []string{"source"}),
+		scansTotal:   extmetrics.NewCounter("scans_total", "Total full scans completed"),
+		scanItems:    extmetrics.NewCounter("scan_items_total", "Total items scanned"),
+		scanFound:    extmetrics.NewCounter("scan_found_total", "Total subtitles found during scans"),
+		scanDur:      extmetrics.NewGauge("scan_duration_seconds", "Last scan duration in seconds"),
+		adaptSkips:   extmetrics.NewCounter("adaptive_skips_total", "Total items skipped by adaptive search"),
+		httpRequests: extmetrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
+		httpDuration: extmetrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
 	}
 
-	m.registry = extmetrics.NewRegistry("")
+	m.registry = extmetrics.NewRegistry("subflux")
 	m.registry.RegisterLabeledCounter(m.searches)
 	m.registry.RegisterLabeledCounter(m.errors)
 	m.registry.RegisterLabeledCounter(m.downloads)
@@ -64,6 +63,8 @@ func New() *Metrics {
 	m.registry.RegisterCounter(m.scanFound)
 	m.registry.RegisterGauge(m.scanDur)
 	m.registry.RegisterCounter(m.adaptSkips)
+	m.registry.RegisterLabeledCounter(m.httpRequests)
+	m.registry.RegisterHistogram(m.httpDuration)
 
 	return m
 }
@@ -100,6 +101,11 @@ func (m *Metrics) RecordScan(items, found int, dur time.Duration) {
 	m.scanItems.Add(int64(items))
 	m.scanFound.Add(int64(found))
 	m.scanDur.Set(dur.Seconds())
+}
+
+// RecordHTTP records one HTTP request (method, path, status, duration).
+func (m *Metrics) RecordHTTP(method, path string, status int, d time.Duration) {
+	extmetrics.RecordHTTP(m.httpRequests, m.httpDuration, d, method, path, strconv.Itoa(status))
 }
 
 // AdaptiveSkip records an item skipped by adaptive search.

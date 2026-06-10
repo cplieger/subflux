@@ -102,7 +102,7 @@ func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ st
 	return m.result, m.err
 }
 
-func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.TimeoutStatus, bool) {
+func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
 	return nil, false
 }
 func (m *mockEngine) ResetTimeouts() {}

@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"time"
 
+	authlib "github.com/cplieger/auth"
+	authoidc "github.com/cplieger/auth/oidc"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 )
 
 // --- GET /api/auth/oidc ---
@@ -22,28 +23,28 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := auth.GenerateOIDCState()
+	state, err := authoidc.GenerateState()
 	if err != nil {
 		slog.Error("oidc: generate state", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	nonce, err := auth.GenerateOIDCState()
+	nonce, err := authoidc.GenerateState()
 	if err != nil {
 		slog.Error("oidc: generate nonce", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	verifier, challenge, err := auth.GeneratePKCE()
+	verifier, challenge, err := authoidc.GeneratePKCE()
 	if err != nil {
 		slog.Error("oidc: generate PKCE", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	redirectURI := auth.ValidateRedirectURI(r.URL.Query().Get("redirect"))
+	redirectURI := authlib.ValidateRedirectURI(r.URL.Query().Get("redirect"))
 
 	ctx := r.Context()
 	if err := h.OidcDB.CreateOIDCState(ctx, state, nonce, verifier, redirectURI); err != nil {
@@ -136,7 +137,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectURI = auth.ValidateRedirectURI(redirectURI)
+	redirectURI = authlib.ValidateRedirectURI(redirectURI)
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
 		slog.String("method", string(api.MethodOIDC)))
 	http.Redirect(w, r, redirectURI, http.StatusFound) //nolint:gosec // G710: redirectURI validated above
@@ -155,7 +156,7 @@ var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordles
 //
 // Email and username are never used to auto-link; that is an account-takeover
 // vector. A username collision triggers an explicit, password-proven link.
-func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *auth.OIDCClaims) (*api.User, string, error) {
+func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *api.User, linkToken string, err error) {
 	bySub, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by sub: %w", err)
@@ -192,7 +193,7 @@ func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *auth.OIDCClaims
 	}
 
 	// No sub match and no username collision → JIT-provision a new user.
-	newUser, _ := auth.ResolveOIDCUser(claims, nil)
+	newUser, _ := authoidc.ResolveUser(claims, nil)
 	now := time.Now()
 	newUser.CreatedAt = now
 	newUser.UpdatedAt = now
@@ -239,7 +240,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
+	okPass, err := authlib.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !okPass {
 		h.RateLimiter.Record(ip, user.Username)
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
@@ -247,6 +248,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
+	h.RateLimiter.Reset(ip, user.Username)
 
 	// Link-on-login is a MIGRATION to SSO governance: it removes the local
 	// password and passkeys so the IdP becomes the sole control point. Never

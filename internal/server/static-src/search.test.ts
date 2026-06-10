@@ -6,6 +6,7 @@ vi.mock("@cplieger/actions", () => ({
   apiAction: vi.fn(() => ({ dispatch: vi.fn().mockResolvedValue(null) })),
   retryNetwork: vi.fn((fn: unknown) => fn),
   RETRY_STANDARD: {},
+  pollUntil: () => Promise.resolve({ status: "aborted" }),
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./bus.js", () => ({

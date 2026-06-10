@@ -2,13 +2,22 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
+import { emit, BusEvent } from "./bus.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
-import { el, option, icon, dialog, closeDialog, patch, emptyDiv, errDiv } from "./dom.js";
-import { apiGet, apiGetRaw } from "./api-client.js";
-import { apiAction, type ActionError, retryNetwork, registerCleanup } from "@cplieger/actions";
+import { el, option, icon, dialog, closeDialog, emptyDiv, errDiv } from "./dom.js";
+import { patch } from "@cplieger/reactive";
+import { apiGetArray, apiGetRaw } from "./api-client.js";
+import { decodeActivityEntry } from "./wire/decoders.gen.js";
+import {
+  apiAction,
+  type ActionError,
+  retryNetwork,
+  registerCleanup,
+  pollUntil,
+} from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from "./constants.js";
-import type { Activity, MediaType } from "./api-types.js";
+import type { ActivityEntry, MediaType } from "./api-types.js";
 
 /** Data-driven error-code-to-message mapping for search popup errors. */
 const SEARCH_ERROR_MAP: readonly { code: ErrorCode; msg: string; empty?: boolean }[] = [
@@ -89,6 +98,15 @@ interface DownloadArgs {
   score: number;
   hearing_impaired: boolean;
   forced: boolean;
+}
+
+/** Polled state for the post-download activity poll. `act` is the matching
+ *  activity entry (undefined once it is evicted from the activity list);
+ *  `seen` latches true once the entry has appeared, so an eviction after the
+ *  entry was seen counts as completion (matches the old seenActivity flag). */
+interface DownloadPollState {
+  act: ActivityEntry | undefined;
+  seen: boolean;
 }
 
 /** Download a subtitle. Server returns 202 + activity_id; the caller
@@ -499,56 +517,53 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
   const abort = new AbortController();
   const timeout = AbortSignal.timeout(DOWNLOAD_DEADLINE_MS);
   const signal = AbortSignal.any([abort.signal, timeout]);
-  let seenActivity = false;
+  let seen = false;
   activePolls.add(abort);
 
-  async function pollDownload(): Promise<void> {
-    if (signal.aborted) {
-      activePolls.delete(abort);
+  // pollUntil drives the wait-then-poll loop. The step latches `seen` when the
+  // activity entry appears; `until` is terminal when the entry is done OR was
+  // seen and then evicted. timeoutMs mirrors the old AbortSignal.timeout
+  // deadline, and the combined abort+timeout signal still cancels the in-flight
+  // /api/activity fetch on deadline or teardown (cleanup aborts via activePolls).
+  const outcome = await pollUntil<DownloadPollState>(
+    async (sig: AbortSignal): Promise<DownloadPollState | null> => {
+      const acts = await apiGetArray("/api/activity", decodeActivityEntry, sig);
+      if (!acts) {
+        return null;
+      }
+      const act: ActivityEntry | undefined = acts.find((a: ActivityEntry) => a.id === actID);
+      if (act) {
+        seen = true;
+      }
+      return { act, seen };
+    },
+    {
+      intervalMs: DOWNLOAD_POLL_MS,
+      timeoutMs: DOWNLOAD_DEADLINE_MS,
+      until: (s) => (s.act?.done ?? false) || (s.act === undefined && s.seen),
+      signal,
+    },
+  );
+
+  if (outcome.status === "done") {
+    // Either act.done is true, or the entry was evicted after being seen.
+    activePolls.delete(abort);
+    abort.abort();
+    if (outcome.result.act?.failed) {
       btn.dataset["status"] = "err";
       patch(btn, icon("close"));
-      btn.setAttribute("data-tip", "Download timed out");
-      return;
-    }
-    const acts = await apiGet<Activity[]>("/api/activity", signal);
-    if (!acts) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
-      if (!signal.aborted) {
-        setTimeout(pollDownload, DOWNLOAD_POLL_MS);
-      }
-      return;
-    }
-    const act: Activity | undefined = acts.find((a: Activity) => a.id === actID);
-    if (act) {
-      seenActivity = true;
-    }
-    if (act && !act.done) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
-      if (!signal.aborted) {
-        setTimeout(pollDownload, DOWNLOAD_POLL_MS);
-      }
-      return;
-    }
-    // Done: either act.done is true, or the entry was evicted
-    // (seenActivity was true but act is now gone).
-    if (act || seenActivity) {
-      activePolls.delete(abort);
-      abort.abort();
-      if (act?.failed) {
-        btn.dataset["status"] = "err";
-        patch(btn, icon("close"));
-      } else {
-        btn.dataset["status"] = "ok";
-        patch(btn, icon("check"));
-        store.set("needsRefresh", true);
-      }
-      btn.removeAttribute("data-tip");
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
-      if (!signal.aborted) {
-        setTimeout(pollDownload, DOWNLOAD_POLL_MS);
-      }
+      btn.dataset["status"] = "ok";
+      patch(btn, icon("check"));
+      emit(BusEvent.DataInvalidate);
     }
+    btn.removeAttribute("data-tip");
+  } else {
+    // timeout (deadline reached) or aborted (cleanup / page unload): matches
+    // the old signal-aborted branch — flag the button and stop tracking.
+    activePolls.delete(abort);
+    btn.dataset["status"] = "err";
+    patch(btn, icon("close"));
+    btn.setAttribute("data-tip", "Download timed out");
   }
-  setTimeout(pollDownload, DOWNLOAD_POLL_MS);
 }

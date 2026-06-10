@@ -12,10 +12,11 @@ import (
 	"sync"
 	"time"
 
+	authlib "github.com/cplieger/auth"
+	authoidc "github.com/cplieger/auth/oidc"
+	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/auth"
 	"github.com/cplieger/subflux/internal/authstore"
-	"github.com/cplieger/subflux/internal/ratelimit"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -36,7 +37,7 @@ type Handler struct {
 	OidcDB       OIDCStore
 	RateLimiter  ratelimit.Checker
 	WebAuthn     *webauthn.WebAuthn // may be nil
-	OIDCResolver func() *auth.OIDCProvider
+	OIDCResolver func() *authoidc.Provider
 	Ceremonies   *CeremonyStore
 	Config       func() AuthConfig // returns current config (hot-reloadable)
 	Configured   func() bool       // returns whether server has valid config
@@ -91,7 +92,7 @@ func dbCtx(ctx context.Context) (context.Context, context.CancelFunc) {
 func (h *Handler) createAndSetSession(w http.ResponseWriter, r *http.Request,
 	user *api.User, authMethod api.AuthMethod, oidcExpiry *time.Time,
 ) error {
-	token, hash, err := auth.GenerateSessionToken()
+	token, hash, err := authlib.GenerateSessionToken()
 	if err != nil {
 		return fmt.Errorf("generate token: %w", err)
 	}
@@ -108,7 +109,7 @@ func (h *Handler) createAndSetSession(w http.ResponseWriter, r *http.Request,
 	if err := h.Store.CreateSession(r.Context(), sess); err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
-	auth.SetSessionCookie(w, r, token, 0)
+	SetSessionCookie(w, r, token, 0)
 	slog.Info("login successful", "username", user.Username, "method", authMethod, "ip", sess.IPAddress)
 	return nil
 }
@@ -119,9 +120,9 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 	if err != nil {
 		slog.Warn("login response: passkey count", "error", err)
 	}
-	api.WriteJSON(w, api.LoginSuccessResponse{
+	api.WriteJSON(w, api.LoginSuccess{
 		Redirect: "/",
-		User: api.UserMeResponse{
+		User: api.MeResponse{
 			ID:          user.ID,
 			Username:    user.Username,
 			Role:        user.Role,
@@ -146,14 +147,14 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 // passwords that contain the username or app name), checks against breach
 // databases (if checkBreach is true), and returns the Argon2id hash.
 func ValidateAndHashPassword(ctx context.Context, password, username string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
-	if errLen := auth.ValidatePasswordLength(password, passwordOnly); errLen != nil {
+	if errLen := authlib.ValidatePasswordLength(password, passwordOnly); errLen != nil {
 		return "", errLen.Error(), nil
 	}
-	if errCtx := auth.ValidatePasswordContext(password, username); errCtx != nil {
+	if errCtx := authlib.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
 		return "", errCtx.Error(), nil
 	}
 	if checkBreach {
-		breached, errBreach := auth.CheckBreachedPassword(ctx, client, password)
+		breached, errBreach := authlib.CheckBreachedPassword(ctx, client, password)
 		if errBreach != nil {
 			slog.Warn("breached password check error", "error", errBreach)
 		}
@@ -161,7 +162,7 @@ func ValidateAndHashPassword(ctx context.Context, password, username string, pas
 			return "", msgBreachedPassword, nil
 		}
 	}
-	h, err := auth.HashPassword(password)
+	h, err := authlib.HashPassword(password)
 	if err != nil {
 		return "", "", err
 	}

@@ -129,7 +129,7 @@ func (d *DB) GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry,
 		query += " AND title LIKE ? ESCAPE '\\'"
 		args = append(args, "%"+likeEscaper.Replace(q.Search)+"%")
 	}
-	query += " ORDER BY media_imported DESC"
+	query += " ORDER BY media_imported DESC, id DESC"
 	limit := q.Limit
 	if limit > 0 {
 		query += " LIMIT ?"

@@ -10,9 +10,6 @@ import (
 	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
-// Compile-time assertion: *AuthDB implements session sub-interface.
-var _ api.SessionPersister = (*AuthDB)(nil)
-
 var sessionScanner = txutil.TableScanner[api.Session]{
 	Columns: `token_hash, user_id, auth_method, ip_address,
 	created_at, last_activity, oidc_expiry`,
