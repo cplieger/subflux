@@ -100,7 +100,7 @@ func New(db api.Store, reg api.ProviderRegistry, opts ...Option) *Server {
 		},
 		previewDeps: previewDeps{
 			ffmpegSem:    semaphore.NewWeighted(3),
-			posterClient: &http.Client{Timeout: 30 * time.Second},
+			posterClient: newPosterClient(),
 		},
 		ctx: context.Background(),
 	}

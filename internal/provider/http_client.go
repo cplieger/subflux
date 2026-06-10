@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -44,7 +45,7 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 func NewHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout:       timeout,
-		Transport:     &userAgentTransport{base: ssrf.SafeTransport(), ua: httputil.UserAgent},
+		Transport:     &userAgentTransport{base: ssrf.SafeTransport(ssrf.WithLogger(slog.Default())), ua: httputil.UserAgent},
 		CheckRedirect: ssrf.SafeRedirectPolicy(nil),
 	}
 }
@@ -56,7 +57,7 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 // clip mid-stream.
 func NewHTTPClientNoClientTimeout() *http.Client {
 	return &http.Client{
-		Transport:     &userAgentTransport{base: ssrf.SafeTransport(), ua: httputil.UserAgent},
+		Transport:     &userAgentTransport{base: ssrf.SafeTransport(ssrf.WithLogger(slog.Default())), ua: httputil.UserAgent},
 		CheckRedirect: ssrf.SafeRedirectPolicy(nil),
 	}
 }
