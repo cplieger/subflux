@@ -121,7 +121,7 @@ function wireShowWhen(
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of (schema.fields ?? [])) {
+  for (const field of schema.fields ?? []) {
     if (!field.show_when) {
       continue;
     }
@@ -152,7 +152,7 @@ function wireRequires(
   fieldEls: Record<string, HTMLElement>,
   container: HTMLElement,
 ): void {
-  for (const field of (schema.fields ?? [])) {
+  for (const field of schema.fields ?? []) {
     if (!field.requires) {
       continue;
     }
@@ -199,7 +199,7 @@ function renderFieldsInto(
   // Collect unique groups for sub-headers.
   const seenGroups = new Set<string>();
 
-  for (const field of (schema.fields ?? [])) {
+  for (const field of schema.fields ?? []) {
     // Skip the enable_key field; it's rendered as the header toggle.
     if (field.key === schema.enable_key) {
       continue;

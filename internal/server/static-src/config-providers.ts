@@ -10,8 +10,6 @@ import { EMBEDDED_PROVIDER } from "./constants.js";
 
 // --- Inline interfaces for provider API shapes ---
 
-
-
 // --- Provider section renderers ---
 
 export function renderProvidersSection(
@@ -23,7 +21,7 @@ export function renderProvidersSection(
   const raw = sections["providers"] ?? "";
   const blocks = parseProviderBlocks(raw);
 
-  for (const prov of (schema.providers ?? [])) {
+  for (const prov of schema.providers ?? []) {
     if (prov.name === EMBEDDED_PROVIDER) {
       continue;
     }
@@ -126,7 +124,9 @@ export function renderEmbeddedSection(
 
   const raw = sections["providers"] ?? "";
   const blocks = parseProviderBlocks(raw);
-  const embProv = (schema.providers ?? []).find((p: ProviderSchema) => p.name === EMBEDDED_PROVIDER);
+  const embProv = (schema.providers ?? []).find(
+    (p: ProviderSchema) => p.name === EMBEDDED_PROVIDER,
+  );
   if (!embProv?.settings) {
     return sec;
   }
@@ -147,7 +147,7 @@ export function renderEmbeddedSection(
 
 export function genProviders(schema: SchemaSection): string {
   const lines: string[] = ["providers:"];
-  for (const prov of (schema.providers ?? [])) {
+  for (const prov of schema.providers ?? []) {
     lines.push(`  ${prov.name}:`);
     if (!prov.always_enabled) {
       const enEl = document.getElementById(

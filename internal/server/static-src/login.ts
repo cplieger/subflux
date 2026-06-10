@@ -11,7 +11,6 @@ import { hasCode, ErrorCode } from "./error_codes.js";
 
 // --- Inline interfaces for API response shapes ---
 
-
 interface LoginResponse {
   redirect?: string;
   error?: string;

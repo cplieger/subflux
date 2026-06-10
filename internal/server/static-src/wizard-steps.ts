@@ -72,7 +72,7 @@ function renderArrGroup(
   const header = el("div", { className: "wiz-arr-header" }, el("span", null, name));
   const group = el("div", { className: "wiz-arr-group" }, header);
   const saved = wizardValues[key] ?? {};
-  for (const field of (section.fields ?? [])) {
+  for (const field of section.fields ?? []) {
     group.appendChild(
       wizField(
         "wiz-" + key + "-" + field.key,
@@ -93,7 +93,7 @@ function collectArrValues(key: string): void {
     return;
   }
   const values: Record<string, string> = {};
-  for (const field of (section.fields ?? [])) {
+  for (const field of section.fields ?? []) {
     const inp = $("wiz-" + key + "-" + field.key) as HTMLInputElement | null;
     if (inp) {
       values[field.key] = inp.value;
@@ -414,7 +414,7 @@ export function buildPostProcessStep(): WizardStep {
         return;
       }
       const saved = wizardValues["post_processing"] ?? {};
-      for (const field of (section.fields ?? [])) {
+      for (const field of section.fields ?? []) {
         const savedVal = saved[field.key];
         if (field.type === "bool") {
           const checked = savedVal !== undefined ? savedVal === "true" : field.default === "true";
@@ -453,7 +453,7 @@ export function buildPostProcessStep(): WizardStep {
         return;
       }
       const values: Record<string, string> = {};
-      for (const field of (section.fields ?? [])) {
+      for (const field of section.fields ?? []) {
         const inp = $("wiz-pp-" + field.key);
         if (!inp) {
           continue;
