@@ -14,4 +14,4 @@ permissions:
 
 jobs:
   codeql:
-    uses: cplieger/ci/.github/workflows/codeql.yaml@f1b45aee4cfb0ab5575e7901944c6dc0c20014b0 # v2
+    uses: cplieger/ci/.github/workflows/codeql.yaml@2a1a6602f9d06ef47a10312e768ccf91cee2a545 # v2
