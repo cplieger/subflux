@@ -35,7 +35,7 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// auto-populate the `request_id` field of the JSON envelope.
 	// securityHeaders runs innermost so headers are set on every
 	// response, including 4xx error envelopes that consume the id.
-	handler := http.NewCrossOriginProtection().Handler(api.RequestLogger(securityHeaders(mux)))
+	handler := http.NewCrossOriginProtection().Handler(api.RequestLogger(securityHeaders(mux), s.metrics.RecordHTTP))
 	srv := newHTTPServer(handler)
 
 	var lc net.ListenConfig

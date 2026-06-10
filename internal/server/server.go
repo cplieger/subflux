@@ -58,6 +58,7 @@ type Metrics interface {
 	AdaptiveSkip()
 	RecordScan(items, found int, dur time.Duration)
 	RecordImport(source api.PollKey)
+	RecordHTTP(method, path string, status int, d time.Duration)
 	TotalSearches() int64
 	Handler() http.HandlerFunc
 }

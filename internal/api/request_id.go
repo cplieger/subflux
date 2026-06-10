@@ -85,7 +85,7 @@ func (sr *statusRecorder) WriteHeader(code int) {
 // 16-byte hex id is minted. The id is echoed back via the response
 // header so a reverse proxy / client can correlate without parsing
 // logs.
-func RequestLogger(next http.Handler) http.Handler {
+func RequestLogger(next http.Handler, record func(method, path string, status int, d time.Duration)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(HeaderXRequestID)
 		if !validRequestID(id) {
@@ -98,12 +98,16 @@ func RequestLogger(next http.Handler) http.Handler {
 		sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sr, r.WithContext(ctx))
 
+		dur := time.Since(start)
 		slog.Info("http request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sr.status,
-			"latency", time.Since(start),
+			"latency", dur,
 			"request_id", id,
 		)
+		if record != nil {
+			record(r.Method, r.URL.Path, sr.status, dur)
+		}
 	})
 }

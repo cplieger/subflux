@@ -160,6 +160,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 type noopMetrics struct{}
 
 func (noopMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) {}
+func (noopMetrics) RecordHTTP(_, _ string, _ int, _ time.Duration)          {}
 func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
 func (noopMetrics) AdaptiveSkip()                                           {}
 func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
