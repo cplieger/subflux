@@ -237,7 +237,6 @@ func runServer() int {
 		defer cancel()
 		defer db.Close(ctx)
 
-		m.Set(false)
 		defer m.Cleanup()
 
 		reg := newProviderRegistry()
@@ -258,7 +257,7 @@ func runServer() int {
 		defer rateLimiter.Stop()
 		srv.SetAuth(db, rateLimiter, nil, nil)
 
-		serveAndWait(ctx, cancel, func() {
+		serveAndWait(ctx, cancel, m, func() {
 			srv.StartUnconfigured(ctx, func() { m.Set(true) })
 		})
 		return 0
@@ -286,9 +285,6 @@ func runConfiguredServer(cfg *config.Config) int {
 	defer db.Close(ctx)
 
 	m := ensureMarker()
-	// Remove stale health file from a previous run that may have crashed
-	// before its defer ran.
-	m.Set(false)
 	defer m.Cleanup()
 
 	// Create arr clients from config.
@@ -352,7 +348,7 @@ func runConfiguredServer(cfg *config.Config) int {
 		"oidc", cfg.OIDCEnabled(),
 		"password", true)
 
-	serveAndWait(ctx, cancel, func() {
+	serveAndWait(ctx, cancel, m, func() {
 		srv.Start(ctx, func() { m.Set(true) })
 	})
 	return 0
@@ -360,7 +356,7 @@ func runConfiguredServer(cfg *config.Config) int {
 
 // serveAndWait starts fn in a goroutine and blocks until ctx is cancelled
 // or fn returns early (e.g. port bind failure). Returns after fn completes.
-func serveAndWait(ctx context.Context, cancel context.CancelFunc, fn func()) {
+func serveAndWait(ctx context.Context, cancel context.CancelFunc, m *health.Marker, fn func()) {
 	done := make(chan struct{})
 	go func() {
 		fn()
@@ -377,9 +373,7 @@ func serveAndWait(ctx context.Context, cancel context.CancelFunc, fn func()) {
 		}
 	}
 
-	if marker != nil {
-		marker.Set(false)
-	}
+	m.Set(false)
 	<-done
 }
 
