@@ -5,13 +5,18 @@
 //   - retry on transient network failures (retryNetwork)
 //   - dedupe protection against rapid-click double-scans
 //
-// The custom UI feedback (icon swap: spinner → check/close) is preserved
-// via onSuccess/onError callbacks since framework toasts would clash
-// with the inline icon-on-button pattern (we set `error: false`).
+// The on-button UI feedback (icon swap: spinner → check/close) is provided by
+// @cplieger/actions' withAsyncFeedback in single-slot `target` mode: it
+// replaces ONLY the icon <span> (the " Search" label sibling is untouched),
+// disables the button (+ aria-busy + sr-only announce) during the scan, and
+// with `resetMs: 0` PERSISTS the ✓/✗ glyph (no auto-revert) until a coverage
+// SSE re-renders the row. The action keeps `error: false` so the framework
+// toast doesn't clash with the on-button glyph.
 
 import * as store from "./store.js";
 import { emit, BusEvent } from "./bus.js";
-import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
+import { apiAction, retryNetwork, RETRY_STANDARD, withAsyncFeedback } from "@cplieger/actions";
+import { el } from "./dom.js";
 import type { SeriesItem, MovieDetail } from "./api-types.js";
 
 interface ScanResponse {
@@ -30,7 +35,7 @@ const scanAction = apiAction<string, ScanResponse>({
 /**
  * Trigger a scan and update the button icon with the result.
  * @param url - API endpoint to POST
- * @param btn - button element (icon swapped to spinner/check/close)
+ * @param btn - button element (icon slot swapped to spinner/check/close)
  * @param onOk - optional callback with parsed JSON on success
  */
 export async function triggerScan(
@@ -38,40 +43,56 @@ export async function triggerScan(
   btn: HTMLButtonElement | null,
   onOk?: (data: ScanResponse) => void,
 ): Promise<void> {
-  const iconEl = btn ? btn.querySelector(".icon, .spinner") : null;
-  if (btn && iconEl) {
-    btn.disabled = true;
-    iconEl.className = "spinner";
-  }
   store.set("scanInFlight", true);
-  const data = await scanAction.dispatch(url, {
-    onSuccess: (result) => {
-      if (btn && iconEl) {
-        iconEl.className = "icon icon-check";
-        btn.disabled = false;
-      }
-      if (onOk) {
-        onOk(result);
-      }
-    },
-    onError: () => {
-      if (btn && iconEl) {
-        iconEl.className = "icon icon-close";
-        btn.disabled = false;
-      }
-    },
-    onSettled: () => {
-      store.set("scanInFlight", false);
-      if (store.get("refreshPending")) {
-        store.batch(() => {
-          store.set("refreshPending", false);
-          emit(BusEvent.DataInvalidate);
-        });
-      }
-    },
-  });
-  // Suppress unused-var warning; result handling is in onSuccess above.
-  void data;
+
+  // dispatch() resolves the parsed body on success or `null` on error/cancel
+  // (error: false ⇒ it never rejects). onSuccess runs onOk; onSettled clears
+  // the in-flight flag and flushes any coverage refresh deferred during the
+  // scan — both preserved verbatim from the prior hand-rolled version.
+  const dispatchScan = (): Promise<ScanResponse | null> =>
+    scanAction.dispatch(url, {
+      onSuccess: (result) => {
+        if (onOk) {
+          onOk(result);
+        }
+      },
+      onSettled: () => {
+        store.set("scanInFlight", false);
+        if (store.get("refreshPending")) {
+          store.batch(() => {
+            store.set("refreshPending", false);
+            emit(BusEvent.DataInvalidate);
+          });
+        }
+      },
+    });
+
+  const iconEl = btn ? btn.querySelector<HTMLElement>(".icon, .spinner") : null;
+  if (btn && iconEl) {
+    // withAsyncFeedback picks ✓/✗ from resolve/reject; since dispatch resolves
+    // `null` (never throws) on failure, throw on null to surface the ✗ glyph.
+    // `target` swaps only the icon <span>; `resetMs: 0` persists the glyph
+    // until a coverage SSE re-renders (and replaces) the row.
+    await withAsyncFeedback(
+      btn,
+      async () => {
+        if ((await dispatchScan()) === null) {
+          throw new Error("scan failed");
+        }
+      },
+      {
+        target: iconEl,
+        resetMs: 0,
+        renderPending: () => el("span", { className: "spinner" }),
+        renderSuccess: () => el("span", { className: "icon icon-check" }),
+        renderError: () => el("span", { className: "icon icon-close" }),
+        announce: false,
+      },
+    );
+  } else {
+    // No button/icon slot to drive — run the scan for its side effects only.
+    await dispatchScan();
+  }
 }
 
 export async function triggerSeriesScan(
