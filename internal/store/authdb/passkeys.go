@@ -10,9 +10,6 @@ import (
 	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
-// Compile-time assertion: *AuthDB implements api.PasskeyStore.
-var _ api.PasskeyStore = (*AuthDB)(nil)
-
 var passkeyScanner = txutil.TableScanner[api.PasskeyCredential]{
 	Columns: `id, user_id, credential_id, public_key, aaguid,
 	attestation_type, transport, sign_count, name, backup_eligible,

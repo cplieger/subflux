@@ -32,7 +32,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	body := `{"username":"admin","password":"super-secure-password-here"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("setup: status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
@@ -41,7 +41,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		loginBody("admin", "super-secure-password-here"))
 	rec = httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("login: status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
@@ -71,7 +71,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 		s.authStore.UpdateSessionActivity(req.Context(), sessHash, time.Now())
 	}
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
-	s.handleAuthMe(rec, req)
+	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("me: status = %d, want %d", rec.Code, http.StatusOK)
 	}
@@ -86,7 +86,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 		strings.NewReader(`{"label":"integration-test","password":"super-secure-password-here"}`))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
-	s.handleGenerateAPIKey(rec, req)
+	s.authH.HandleGenerateAPIKey(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("generate api key: status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
@@ -106,7 +106,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 		t.Fatalf("api key auth: %v", err)
 	}
 	req = req.WithContext(api.NewUserContext(req.Context(), apiUser))
-	s.handleAuthMe(rec, req)
+	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("api key me: status = %d, want %d", rec.Code, http.StatusOK)
 	}
@@ -121,7 +121,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 		"/api/auth/apikeys/"+strconv.FormatInt(keyID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
-	s.handleRevokeAPIKey(rec, req)
+	s.authH.HandleRevokeAPIKey(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("revoke api key: status = %d, want %d", rec.Code, http.StatusOK)
 	}
@@ -138,7 +138,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/logout", http.NoBody)
 	req.AddCookie(sessionCookie)
 	rec = httptest.NewRecorder()
-	s.handleLogout(rec, req)
+	s.authH.HandleLogout(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logout: status = %d, want %d", rec.Code, http.StatusOK)
 	}
@@ -440,7 +440,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	// 2. GET /api/auth/setup → config_valid=false.
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/setup", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleSetupStatus(rec, req)
+	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("setup status: %d", rec.Code)
 	}
@@ -456,7 +456,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	// 4. GET /api/auth/setup → config_valid=true.
 	req = httptest.NewRequest(http.MethodGet, "/api/auth/setup", http.NoBody)
 	rec = httptest.NewRecorder()
-	s.handleSetupStatus(rec, req)
+	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("setup status: %d", rec.Code)
 	}
@@ -486,7 +486,7 @@ func TestSecurity_SetupRaceCondition(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/auth/setup",
 				strings.NewReader(body))
 			rec := httptest.NewRecorder()
-			s.handleSetupCreate(rec, req)
+			s.authH.HandleSetupCreate(rec, req)
 			if rec.Code == http.StatusOK {
 				successCount.Add(1)
 			}
@@ -521,7 +521,7 @@ func TestSecurity_TimingEqualization(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 			loginBody("timing-user", "wrong-password-here-now"))
 		rec := httptest.NewRecorder()
-		s.handleLogin(rec, req)
+		s.authH.HandleLogin(rec, req)
 		existingTotal += time.Since(start)
 	}
 
@@ -532,7 +532,7 @@ func TestSecurity_TimingEqualization(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 			loginBody("nonexistent-user", "wrong-password-here-now"))
 		rec := httptest.NewRecorder()
-		s.handleLogin(rec, req)
+		s.authH.HandleLogin(rec, req)
 		nonExistingTotal += time.Since(start)
 	}
 

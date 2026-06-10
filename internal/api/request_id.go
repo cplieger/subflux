@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	extmetrics "github.com/cplieger/metrics/v2"
 )
 
 type ctxKey struct{}
@@ -63,19 +65,6 @@ func validRequestID(s string) bool {
 	return true
 }
 
-// statusRecorder wraps http.ResponseWriter to capture the status code
-// written by the handler. Defaults to 200 if WriteHeader is never called.
-type statusRecorder struct {
-	http.ResponseWriter
-
-	status int
-}
-
-func (sr *statusRecorder) WriteHeader(code int) {
-	sr.status = code
-	sr.ResponseWriter.WriteHeader(code)
-}
-
 // RequestLogger wraps next with method/path/status/latency/request-id
 // logging at slog.Info, and threads a request id through r.Context()
 // so handlers can pull it via RequestIDFromContext (or implicitly via
@@ -85,6 +74,12 @@ func (sr *statusRecorder) WriteHeader(code int) {
 // 16-byte hex id is minted. The id is echoed back via the response
 // header so a reverse proxy / client can correlate without parsing
 // logs.
+//
+// Wraps the writer in extmetrics.StatusRecorder so downstream handlers
+// can still type-assert to http.Flusher / http.Hijacker (via
+// http.ResponseController's Unwrap chain) — the previous local
+// statusRecorder lacked Unwrap and broke SSE streaming under the
+// middleware.
 func RequestLogger(next http.Handler, record func(method, path string, status int, d time.Duration)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(HeaderXRequestID)
@@ -95,19 +90,20 @@ func RequestLogger(next http.Handler, record func(method, path string, status in
 		ctx := WithRequestID(r.Context(), id)
 
 		start := time.Now()
-		sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(sr, r.WithContext(ctx))
+		rec := extmetrics.NewStatusRecorder(w)
+		next.ServeHTTP(rec, r.WithContext(ctx))
 
 		dur := time.Since(start)
+		status := rec.Status()
 		slog.Info("http request",
 			"method", r.Method,
 			"path", r.URL.Path,
-			"status", sr.status,
+			"status", status,
 			"latency", dur,
 			"request_id", id,
 		)
 		if record != nil {
-			record(r.Method, r.URL.Path, sr.status, dur)
+			record(r.Method, r.URL.Path, status, dur)
 		}
 	})
 }

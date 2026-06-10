@@ -1,30 +1,28 @@
-// Package authstore defines the composite store interface used by the
-// authentication subsystem (auth/, server/) and implemented by the
-// authdb/ persistence layer.
+// Package authstore re-exports the composite store interface from the
+// standalone github.com/cplieger/auth library so subflux call sites can
+// continue to refer to authstore.AuthStore without depending on the
+// library's import path directly.
 //
-// This tiny package exists to break a test-time import cycle:
+// The auth library publishes a structurally identical AuthStore composed of
+// UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore.
+// Subflux's domain types (api.User, api.Session, api.Key,
+// api.PasskeyCredential) are type aliases of the library's types
+// (see internal/api/auth_types.go), so AuthDB satisfies this interface
+// directly with zero adapter glue.
+//
+// This tiny package also keeps the historical role of breaking a test-time
+// import cycle:
 //
 //	auth/_test → store/ → store/authdb/ → authstore/
 //
-// vs the prior arrangement where store/authdb/'s compile-time assertion
-// referenced auth.AuthStore, which created the cycle when auth/_test
-// transitively pulled in store/authdb/. authstore/ is leaf and
-// only imports api/ for the sub-interface symbols, breaking the cycle.
-//
-// The composite interface is defined here. The narrower per-call-site
-// interfaces (auth.SessionStore, server.authHandlerStore, etc.) remain
-// at their consumer packages; authstore.AuthStore is specifically the
-// "passes one thing that satisfies all of them" composition type.
+// authstore/ remains leaf and only imports the auth library.
 package authstore
 
-import "github.com/cplieger/subflux/internal/api"
+import authlibstore "github.com/cplieger/auth/store"
 
-// AuthStore is the composite store interface implemented by the
-// concrete authdb persistence layer and consumed by auth/ and server/.
-type AuthStore interface {
-	api.UserStore
-	api.SessionPersister
-	api.PasskeyStore
-	api.KeyStore
-	api.OIDCStateStore
-}
+// AuthStore is the composite store interface implemented by the concrete
+// authdb persistence layer and consumed by auth/ and server/.
+//
+// This is a type alias of github.com/cplieger/auth/store.AuthStore — the
+// library is the single source of truth for the contract.
+type AuthStore = authlibstore.AuthStore

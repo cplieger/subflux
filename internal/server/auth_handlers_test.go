@@ -162,7 +162,7 @@ func TestLogin_ValidCredentials(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		loginBody("alice", "correct-horse-battery-staple"))
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -206,7 +206,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		loginBody("bob", "wrong-password-here-now"))
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -226,7 +226,7 @@ func TestLogin_UnknownUser(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		loginBody("nonexistent", "some-password-here"))
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -251,7 +251,7 @@ func TestLogin_RateLimited(t *testing.T) {
 			loginBody("dave", "wrong-password-attempt"))
 		req.RemoteAddr = "10.0.0.1:12345"
 		rec := httptest.NewRecorder()
-		s.handleLogin(rec, req)
+		s.authH.HandleLogin(rec, req)
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: status = %d, want %d", i+1, rec.Code, http.StatusUnauthorized)
 		}
@@ -262,7 +262,7 @@ func TestLogin_RateLimited(t *testing.T) {
 		loginBody("dave", "wrong-password-attempt"))
 	req.RemoteAddr = "10.0.0.1:12345"
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("11th attempt: status = %d, want %d", rec.Code, http.StatusTooManyRequests)
@@ -282,7 +282,7 @@ func TestSetup_Required(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/setup", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleSetupStatus(rec, req)
+	s.authH.HandleSetupStatus(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -306,7 +306,7 @@ func TestSetup_Create(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup",
 		strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -346,7 +346,7 @@ func TestSetup_AlreadyDone(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup",
 		strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
@@ -363,7 +363,7 @@ func TestSetup_ConfigValid(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/setup", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleSetupStatus(rec, req)
+	s.authH.HandleSetupStatus(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -395,7 +395,7 @@ func TestLogout_Success(t *testing.T) {
 		Value: token,
 	})
 	rec := httptest.NewRecorder()
-	s.handleLogout(rec, req)
+	s.authH.HandleLogout(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -427,7 +427,7 @@ func TestLogout_NoCookie(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleLogout(rec, req)
+	s.authH.HandleLogout(rec, req)
 
 	// Should succeed (idempotent).
 	if rec.Code != http.StatusOK {
@@ -456,7 +456,7 @@ func TestChangePassword_Success(t *testing.T) {
 		Value: token,
 	})
 	rec := httptest.NewRecorder()
-	s.handleChangePassword(rec, req)
+	s.authH.HandleChangePassword(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -483,7 +483,7 @@ func TestChangePassword_WrongCurrent(t *testing.T) {
 		strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleChangePassword(rec, req)
+	s.authH.HandleChangePassword(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -504,7 +504,7 @@ func TestListPasskeys_Empty(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/passkeys", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleListPasskeys(rec, req)
+	s.authH.HandleListPasskeys(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -525,7 +525,7 @@ func TestListAPIKeys_Empty(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/apikeys", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleListAPIKeys(rec, req)
+	s.authH.HandleListAPIKeys(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -548,7 +548,7 @@ func TestGenerateAPIKey_Success(t *testing.T) {
 		strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleGenerateAPIKey(rec, req)
+	s.authH.HandleGenerateAPIKey(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -615,7 +615,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 		"/api/auth/apikeys/"+strconv.FormatInt(keyID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRevokeAPIKey(rec, req)
+	s.authH.HandleRevokeAPIKey(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -744,7 +744,7 @@ func TestListUsers_AdminOnly(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/users", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleListUsers(rec, req)
+	s.authH.HandleListUsers(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleListUsers(admin) status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -768,7 +768,7 @@ func TestCreateUser_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleCreateUser(rec, req)
+	s.authH.HandleCreateUser(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleCreateUser status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -804,7 +804,7 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleCreateUser(rec, req)
+	s.authH.HandleCreateUser(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleCreateUser(invalid role) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -822,7 +822,7 @@ func TestCreateUser_EmptyUsername(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleCreateUser(rec, req)
+	s.authH.HandleCreateUser(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleCreateUser(empty username) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -842,7 +842,7 @@ func TestDeleteUser_Success(t *testing.T) {
 		"/api/auth/users/"+strconv.FormatInt(victim.ID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleDeleteUser(rec, req)
+	s.authH.HandleDeleteUser(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleDeleteUser status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -869,7 +869,7 @@ func TestDeleteUser_CannotDeleteSelf(t *testing.T) {
 		"/api/auth/users/"+strconv.FormatInt(admin.ID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleDeleteUser(rec, req)
+	s.authH.HandleDeleteUser(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("handleDeleteUser(self) status = %d, want %d", rec.Code, http.StatusConflict)
@@ -886,7 +886,7 @@ func TestDeleteUser_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/abc", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleDeleteUser(rec, req)
+	s.authH.HandleDeleteUser(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleDeleteUser(invalid id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -925,7 +925,7 @@ func TestRenamePasskey_Success(t *testing.T) {
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRenamePasskey(rec, req)
+	s.authH.HandleRenamePasskey(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleRenamePasskey status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -941,7 +941,7 @@ func TestRenamePasskey_EmptyName(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/1", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRenamePasskey(rec, req)
+	s.authH.HandleRenamePasskey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleRenamePasskey(empty name) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -957,7 +957,7 @@ func TestRenamePasskey_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/abc", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRenamePasskey(rec, req)
+	s.authH.HandleRenamePasskey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleRenamePasskey(invalid id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -972,7 +972,7 @@ func TestDeletePasskey_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/passkeys/xyz", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleDeletePasskey(rec, req)
+	s.authH.HandleDeletePasskey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleDeletePasskey(invalid id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -987,7 +987,7 @@ func TestDeletePasskey_MissingID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/passkeys/", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleDeletePasskey(rec, req)
+	s.authH.HandleDeletePasskey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleDeletePasskey(missing id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1123,7 +1123,7 @@ func TestLogin_DisabledUser(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		loginBody("disabled", "correct-horse-battery-staple"))
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("handleLogin(disabled user) status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -1143,7 +1143,7 @@ func TestLogin_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login",
 		strings.NewReader("not json"))
 	rec := httptest.NewRecorder()
-	s.handleLogin(rec, req)
+	s.authH.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleLogin(invalid json) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1157,7 +1157,7 @@ func TestSetup_ShortPassword(t *testing.T) {
 	body := `{"username":"admin","password":"short"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleSetupCreate(short password) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1171,7 +1171,7 @@ func TestSetup_EmptyUsername(t *testing.T) {
 	body := `{"username":"","password":"super-secure-password-here"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleSetupCreate(empty username) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1187,7 +1187,7 @@ func TestChangePassword_ShortNewPassword(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/password", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleChangePassword(rec, req)
+	s.authH.HandleChangePassword(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleChangePassword(short) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1225,7 +1225,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleDeletePasskey(rec, req)
+	s.authH.HandleDeletePasskey(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleDeletePasskey status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
@@ -1280,7 +1280,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleDeletePasskey(rec, req)
+	s.authH.HandleDeletePasskey(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("handleDeletePasskey(last method) status = %d, want %d", rec.Code, http.StatusConflict)
@@ -1319,7 +1319,7 @@ func TestListPasskeys_WithData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/passkeys", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleListPasskeys(rec, req)
+	s.authH.HandleListPasskeys(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleListPasskeys status = %d, want %d", rec.Code, http.StatusOK)
@@ -1361,7 +1361,7 @@ func TestListAPIKeys_WithData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/apikeys", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleListAPIKeys(rec, req)
+	s.authH.HandleListAPIKeys(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleListAPIKeys status = %d, want %d", rec.Code, http.StatusOK)
@@ -1394,7 +1394,7 @@ func TestGenerateAPIKey_LabelTooLong(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/apikeys", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleGenerateAPIKey(rec, req)
+	s.authH.HandleGenerateAPIKey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleGenerateAPIKey(long label) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1415,7 +1415,7 @@ func TestRevokeAPIKey_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/apikeys/abc", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRevokeAPIKey(rec, req)
+	s.authH.HandleRevokeAPIKey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleRevokeAPIKey(invalid id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1430,7 +1430,7 @@ func TestRevokeAPIKey_MissingID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/apikeys/", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRevokeAPIKey(rec, req)
+	s.authH.HandleRevokeAPIKey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleRevokeAPIKey(missing id) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1449,7 +1449,7 @@ func TestSetup_UsernameTooLong(t *testing.T) {
 	body := `{"username":"` + longName + `","password":"super-secure-password-here"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleSetupCreate(rec, req)
+	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleSetupCreate(long username) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1482,7 +1482,7 @@ func TestAuthMe_WithPasskeys(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleAuthMe(rec, req)
+	s.authH.HandleAuthMe(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleAuthMe status = %d, want %d", rec.Code, http.StatusOK)
@@ -1505,7 +1505,7 @@ func TestRenamePasskey_NameTooLong(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/1", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
-	s.handleRenamePasskey(rec, req)
+	s.authH.HandleRenamePasskey(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleRenamePasskey(long name) status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -1530,7 +1530,7 @@ func TestCreateUser_UsernameTooLong(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
-	s.handleCreateUser(rec, req)
+	s.authH.HandleCreateUser(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("handleCreateUser(long username) status = %d, want %d", rec.Code, http.StatusBadRequest)

@@ -10,9 +10,6 @@ import (
 	"github.com/cplieger/subflux/internal/store/txutil"
 )
 
-// Compile-time assertion: *AuthDB implements api.KeyStore.
-var _ api.KeyStore = (*AuthDB)(nil)
-
 var apiKeyScanner = txutil.TableScanner[api.Key]{
 	Columns:  `id, user_id, key_hash, key_prefix, key_suffix, label, created_at`,
 	Scan:     scanAPIKey,

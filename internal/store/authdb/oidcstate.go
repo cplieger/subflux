@@ -7,12 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
-
-	"github.com/cplieger/subflux/internal/api"
 )
-
-// Compile-time assertion: *AuthDB implements the OIDC state sub-interface.
-var _ api.OIDCStateStore = (*AuthDB)(nil)
 
 // ErrOIDCStateNotFound is returned when ConsumeOIDCState cannot find the
 // requested state entry (expired or never existed).
