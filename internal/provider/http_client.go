@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -45,7 +44,7 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 func NewHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout:       timeout,
-		Transport:     &userAgentTransport{base: ssrf.SafeTransport(ssrf.WithLogger(slog.Default())), ua: httputil.UserAgent},
+		Transport:     &userAgentTransport{base: ssrf.SafeTransport(), ua: httputil.UserAgent},
 		CheckRedirect: ssrf.SafeRedirectPolicy(nil),
 	}
 }
@@ -61,7 +60,7 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 // for a known public endpoint on a non-standard port (e.g. the AniDB HTTP API on
 // 9001); omit it for the https/443 default.
 func NewHTTPClientNoClientTimeout(allowedPorts ...uint16) *http.Client {
-	opts := []ssrf.Option{ssrf.WithLogger(slog.Default())}
+	var opts []ssrf.Option
 	if len(allowedPorts) > 0 {
 		opts = append(opts, ssrf.WithAllowedPorts(allowedPorts...))
 	}
