@@ -8,14 +8,6 @@
       "followTag": "latest",
       "commitMessageSuffix": " [skip-build]",
       "ignoreUnstable": false
-    },
-    {
-      "description": "Group npm dev-deps weekly",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
-      "groupName": "npm dev dependencies",
-      "schedule": ["before 6am on monday"],
-      "automerge": true
     }
   ],
   "customManagers": [
