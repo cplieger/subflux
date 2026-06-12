@@ -1,21 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>cplieger/.github"],
-  "packageRules": [
-    {
-      "description": "tsgo / TypeScript 7 native preview. Currently in active prerelease (versions are all 7.0.0-dev.<date>); the latest dist-tag is the only one with up-to-date Go-stdlib CVE fixes, so we follow it and suppress per-bump Docker rebuilds via the [skip-build] suffix. CLEANUP WHEN TS 7 IS STABLE: drop followTag, drop commitMessageSuffix, restore default release cadence; @typescript/native-preview is expected to ship a stable major eventually (track https://github.com/microsoft/typescript-go/milestones). Also remove the matching if-guard in .github/workflows/build.yaml.",
-      "matchPackageNames": ["@typescript/native-preview"],
-      "followTag": "latest",
-      "commitMessageSuffix": " [skip-build]",
-      "ignoreUnstable": false
-    }
+  "extends": [
+    "github>cplieger/.github"
   ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "FFmpeg version (n-prefixed tags)",
-      "managerFilePatterns": ["/Dockerfile$/"],
-      "matchStrings": ["ARG\\s+FFMPEG_VERSION=(?<currentValue>\\S+)"],
+      "managerFilePatterns": [
+        "/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "ARG\\s+FFMPEG_VERSION=(?<currentValue>\\S+)"
+      ],
       "depNameTemplate": "FFmpeg/FFmpeg",
       "datasourceTemplate": "github-tags",
       "extractVersionTemplate": "^n(?<version>\\d+\\.\\d+(?:\\.\\d+)?)$",
