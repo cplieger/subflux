@@ -7,7 +7,7 @@ require (
 	github.com/cplieger/health v1.1.1
 	github.com/cplieger/httpx v1.0.4
 	github.com/cplieger/metrics/v2 v2.0.0
-	github.com/cplieger/ssrf v1.0.2
+	github.com/cplieger/ssrf/v2 v2.0.1
 	github.com/cplieger/wiregen v1.1.1
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.3

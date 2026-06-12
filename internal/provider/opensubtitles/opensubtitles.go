@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/ssrf"
+	"github.com/cplieger/ssrf/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
