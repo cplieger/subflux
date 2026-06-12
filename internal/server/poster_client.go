@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/ssrf"
+	"github.com/cplieger/ssrf/v2"
 )
 
 // posterMaxRedirects caps the redirect chain the poster proxy will follow.

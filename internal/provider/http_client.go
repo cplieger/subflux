@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/ssrf"
+	"github.com/cplieger/ssrf/v2"
 	"github.com/cplieger/subflux/internal/httputil"
 )
 
