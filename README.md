@@ -13,11 +13,11 @@ A fast, low-memory subtitle search and download engine for Sonarr/Radarr librari
 
 Subflux finds, scores, downloads, and time-syncs subtitles for your Plex/Sonarr/Radarr library. It watches the *arr import history in real time and runs scheduled full-library scans, querying multiple providers concurrently, ranking results by release quality, and syncing subtitle timing to the video before saving.
 
-It was born from diagnosing Bazarr's 15–20 GB memory consumption on a 52k-episode library (CPython arena fragmentation during long Sonarr sync loops). Subflux processes items in a batch-fetch-then-iterate model with bounded goroutine pools and no Python runtime — a single ~5 MB static binary in a distroless image.
+It was born from diagnosing Bazarr's 15–20 GB memory consumption on a 52k-episode library (CPython arena fragmentation during long Sonarr sync loops). Subflux processes items in a batch-fetch-then-iterate model with bounded goroutine pools and no Python runtime — a single static binary in a distroless image.
 
 ## Features
 
-- **9 providers** — OpenSubtitles, Gestdown, embedded (ffprobe), SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits — behind one interface, each registered declaratively.
+- **Providers** — OpenSubtitles, Gestdown, embedded (ffprobe), SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits — behind one interface, each registered declaratively.
 - **Two-phase scoring** — an identity gate (IMDB/TVDB/TMDB + season/episode + title validation) followed by a 0–100 release-quality score for ranking and upgrades.
 - **Audio-language-based language rules** — map detected audio to subtitle targets, with `standard`/`forced`/`hi` variants and per-target provider/min-score overrides.
 - **Subtitle sync** — a Go port of the alass algorithm plus cross-language anchor alignment, framerate correction, split-aware DP, and GMM audio VAD, with confidence-scored voting.
@@ -52,7 +52,7 @@ All settings are editable in the web UI (schema-driven form) and persist to `con
 
 ## Security
 
-Distroless `gcr.io/distroless/static-debian13:nonroot` (UID 65534, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.
+Distroless `gcr.io/distroless/static:nonroot` (UID 65534, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.
 
 ## License
 

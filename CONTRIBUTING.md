@@ -14,7 +14,7 @@ concrete implementations:
 - `providers.go` — table-driven provider registration.
 
 Everything else lives under `internal/`. Dependencies flow one way: the
-composition roots import `internal/server/` (split into ~20 subpackages) and
+composition roots import `internal/server/` (split into subpackages) and
 the domain packages (`search`, `store`, `config`, `provider`, `subsync`, …),
 which in turn depend only on `internal/api/` (interface contracts + pure
 types). There are no reverse imports. `cmd/wire-codegen/` is a build-time-only
@@ -81,8 +81,7 @@ frontend edits.
 
 ## Functional tests
 
-`tests/functional/run.sh` drives a live instance over the HTTP API (~150
-assertions across 27 sections). It needs `jq`, a reachable subflux with auth
+`tests/functional/run.sh` drives a live instance over the HTTP API. It needs `jq`, a reachable subflux with auth
 disabled or an API key configured, and reachable Sonarr/Radarr. It saves and
 restores the config around the run.
 
