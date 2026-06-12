@@ -1,22 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "github>cplieger/.github"
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "FFmpeg version (n-prefixed tags)",
-      "managerFilePatterns": [
-        "/Dockerfile$/"
-      ],
-      "matchStrings": [
-        "ARG\\s+FFMPEG_VERSION=(?<currentValue>\\S+)"
-      ],
-      "depNameTemplate": "FFmpeg/FFmpeg",
-      "datasourceTemplate": "github-tags",
-      "extractVersionTemplate": "^n(?<version>\\d+\\.\\d+(?:\\.\\d+)?)$",
-      "versioningTemplate": "semver"
-    }
-  ]
+  "extends": ["github>cplieger/.github"]
 }
