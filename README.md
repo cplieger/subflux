@@ -6,6 +6,8 @@
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/subflux/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/subflux)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/coverage.json)](https://github.com/cplieger/subflux/actions/workflows/coverage.yml)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13221/badge)](https://www.bestpractices.dev/projects/13221)
 
 A fast, low-memory subtitle search and download engine for Sonarr/Radarr libraries — a Go-based Bazarr replacement.
 
