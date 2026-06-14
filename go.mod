@@ -6,11 +6,11 @@ require (
 	github.com/cplieger/auth v1.0.6
 	github.com/cplieger/health v1.1.1
 	github.com/cplieger/httpx v1.0.4
-	github.com/cplieger/metrics/v2 v2.0.0
+	github.com/cplieger/metrics/v2 v2.1.0
 	github.com/cplieger/ssrf/v2 v2.0.1
 	github.com/cplieger/wiregen v1.1.1
 	github.com/go-webauthn/webauthn v0.17.4
-	github.com/nwaples/rardecode/v2 v2.2.3
+	github.com/nwaples/rardecode/v2 v2.2.5
 	github.com/ulikunitz/xz v0.5.15
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/sync v0.21.0
@@ -28,7 +28,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -39,7 +39,7 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/tools v0.46.0 // indirect
-	modernc.org/libc v1.72.3 // indirect
+	modernc.org/libc v1.73.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
