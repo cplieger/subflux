@@ -39,9 +39,12 @@ func detectSplits(offsets []perCueOffset, penalty float64) []int {
 		}
 	}
 
-	// Trace back to find split points.
+	// Trace back to find split points. parent is strictly decreasing for a
+	// valid DP solution (parent[i] < i), so the chain visits at most n nodes;
+	// the length guard stops a corrupted parent array (cycle / non-decreasing
+	// entry) from turning this into an unbounded append that exhausts memory.
 	var splits []int
-	for i := n; i > 0; i = parent[i] {
+	for i := n; i > 0 && len(splits) <= n; i = parent[i] {
 		splits = append(splits, parent[i])
 	}
 	slices.Reverse(splits)
