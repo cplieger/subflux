@@ -48,7 +48,7 @@ func globEscape(s string) string {
 	// rewrite each invalid byte as U+FFFD — corrupting the pattern so it
 	// no longer matches the real filename. The glob metacharacters are all
 	// ASCII, so byte-wise escaping is both correct and lossless.
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		switch c {
 		case '*', '?', '[', '\\':
