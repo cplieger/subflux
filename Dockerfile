@@ -190,7 +190,8 @@ RUN set -eu; \
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 \
-    go build -trimpath -ldflags="-s -w" -o /subflux .
+    go build -trimpath -ldflags="-s -w" -o /subflux . \
+    && mkdir -p /config-skel
 
 # --- Final image ---
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:963fa6c544fe5ce420f1f54fb88b6fb01479f054c8056d0f74cc2c6000df5240
@@ -198,6 +199,11 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:963fa6c544fe5ce420f1f54fb8
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
 COPY --from=builder --chmod=755 /subflux /subflux
+# Ship an empty, nonroot-owned /config so the image starts standalone (e.g. the
+# CI image smoke test) with no mount; subflux writes its default config + DB
+# there on first run. In production /config is a bind mount. 65532 is the
+# distroless nonroot uid/gid.
+COPY --from=builder --chown=65532:65532 /config-skel /config
 USER nonroot:nonroot
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
     CMD ["/subflux", "health"]
