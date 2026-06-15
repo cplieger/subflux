@@ -1,12 +1,1 @@
-{
-  "extends": ["github>cplieger/.github"],
-  "packageRules": [
-    {
-      "description": "Block the modernc.org/libc v1->v2 'major' jump. libc is an indirect dependency whose version is pinned by modernc.org/sqlite (v1 line). The v2 module path (modernc.org/libc/v2) is a separate, dormant line (v2.1.30, frozen 2024-02) that nothing in the build graph imports; Renovate's 'major' PR only adds a phantom require that go mod tidy strips. Let sqlite drive libc. v1 minor/patch updates still flow.",
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["modernc.org/libc", "modernc.org/libc/v2"],
-      "matchUpdateTypes": ["major"],
-      "enabled": false
-    }
-  ]
-}
+{ "extends": ["github>cplieger/.github"] }
