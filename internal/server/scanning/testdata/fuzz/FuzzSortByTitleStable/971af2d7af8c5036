@@ -1,0 +1,10 @@
+go test fuzz v1
+string("\xd8")
+int(1)
+int(14)
+string("0")
+int(2)
+int(2)
+string("\xd60")
+int(3)
+int(3)

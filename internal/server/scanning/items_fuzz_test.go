@@ -2,6 +2,7 @@ package scanning
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -77,26 +78,11 @@ func FuzzSortByTitleStable(f *testing.F) {
 	})
 }
 
+// compareCI mirrors SortByTitle's ordering exactly: production lowercases
+// titles with strings.ToLower (Unicode-aware) before comparing, so the test
+// must too. A byte-wise ASCII fold would diverge on invalid-UTF-8 titles
+// (strings.ToLower rewrites invalid bytes to U+FFFD), making a correctly
+// sorted slice look unsorted.
 func compareCI(a, b string) int {
-	la := toLower(a)
-	lb := toLower(b)
-	if la < lb {
-		return -1
-	}
-	if la > lb {
-		return 1
-	}
-	return 0
-}
-
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := range s {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }

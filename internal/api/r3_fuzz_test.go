@@ -1,9 +1,16 @@
 package api
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
+
+// episodeIDSuffixRe matches the "-s<season>e<episode>" suffix that
+// BuildEpisodeID appends. A movie ID is either "tmdb-<n>" or the raw IMDB
+// fallback and must never carry this suffix; a bare "-s" in a garbage IMDB
+// value is not an episode marker.
+var episodeIDSuffixRe = regexp.MustCompile(`-s\d+e\d+$`)
 
 func FuzzBuildMediaID(f *testing.F) {
 	f.Add("movie", 100, 0, "tt1234567", 0, 0)
@@ -49,10 +56,13 @@ func FuzzBuildMediaID(f *testing.F) {
 			t.Error("BuildMediaID(nil) should return empty")
 		}
 
-		// Consistency: movie IDs never contain season/episode markers
+		// Consistency: a movie ID never carries an episode "-sNNeNN" suffix.
+		// (The raw IMDB fallback is passed through verbatim, so check for the
+		// real episode-suffix shape rather than a bare "-s" substring, which
+		// a garbage IMDB value can legitimately contain.)
 		if MediaType(mediaType) == MediaTypeMovie && result != "" {
-			if strings.Contains(result, "-s") {
-				t.Errorf("movie ID %q contains season marker", result)
+			if episodeIDSuffixRe.MatchString(result) {
+				t.Errorf("movie ID %q contains episode marker", result)
 			}
 		}
 	})

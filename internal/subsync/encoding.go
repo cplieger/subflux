@@ -46,21 +46,32 @@ func NormalizeEncoding(data []byte) []byte {
 	if len(data) == 0 {
 		return data
 	}
+	out := decodeToUTF8(data)
+	// Strip a leading UTF-8 BOM from the FINAL result, not just the raw
+	// input: a UTF-16 decode can surface a U+FEFF (e.g. a redundant BOM as
+	// the first post-BOM code unit) that re-encodes to EF BB BF. The
+	// caller's contract is BOM-free UTF-8, and stripping here keeps the
+	// function idempotent (a second pass finds no BOM to strip).
+	return bytes.TrimPrefix(out, bomUTF8)
+}
 
-	// UTF-8 BOM: strip and return.
-	if bytes.HasPrefix(data, bomUTF8) {
-		return data[len(bomUTF8):]
-	}
-
-	// UTF-16 BE BOM.
+// decodeToUTF8 converts data to UTF-8 by detecting its encoding. The
+// leading-UTF-8-BOM strip is applied by NormalizeEncoding on the result.
+func decodeToUTF8(data []byte) []byte {
+	// UTF-16 BOMs fully determine the encoding: decode and return.
 	if bytes.HasPrefix(data, bomUTF16BE) {
 		return decodeUTF16BE(data[len(bomUTF16BE):])
 	}
-
-	// UTF-16 LE BOM.
 	if bytes.HasPrefix(data, bomUTF16LE) {
 		return decodeUTF16LE(data[len(bomUTF16LE):])
 	}
+
+	// UTF-8 BOM: strip it, then fall through to validate the remainder.
+	// A UTF-8 BOM followed by non-UTF-8 bytes (e.g. a stray Windows-1252
+	// byte) is contradictory input; returning it verbatim would leave
+	// invalid bytes that a second pass then re-detects as Windows-1252,
+	// breaking idempotency. Falling through normalizes the remainder now.
+	data = bytes.TrimPrefix(data, bomUTF8)
 
 	// Heuristic for UTF-16 without BOM.
 	if decoded, ok := detectBOMlessUTF16(data); ok {
