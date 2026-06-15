@@ -1,9 +1,9 @@
 github.com/coreos/go-oidc/v3 v3.18.0 h1:V9orjXynvu5wiC9SemFTWnG4F45v403aIcjWo0d41+A=
 github.com/coreos/go-oidc/v3 v3.18.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/auth v1.0.6 h1:AxFqnX3e/gbhyDp1Wjydw0HkxgsNq5HvbOx25980i08=
-github.com/cplieger/auth v1.0.6/go.mod h1:nL8r9p7w4Yu8wUyVMNrjdMinyFKZj2i/SDuQd3bYWs8=
-github.com/cplieger/health v1.1.1 h1:3FiPlrT5w8td3tqHdBaNN0r3JVpwlmuQrg01y01JsNI=
-github.com/cplieger/health v1.1.1/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
+github.com/cplieger/auth v1.0.7 h1:Mrs2krwaH2qcBbrg3pF5ODmtmEK7wn8cL6ATgf6rkOE=
+github.com/cplieger/auth v1.0.7/go.mod h1:nL8r9p7w4Yu8wUyVMNrjdMinyFKZj2i/SDuQd3bYWs8=
+github.com/cplieger/health v1.1.2 h1:FskL5oUhfB11X0lLd2Kr0YVAcQmln86iFvnw3aiXg6Q=
+github.com/cplieger/health v1.1.2/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/cplieger/httpx v1.0.4 h1:tiOkXqoJcs78W4rl0GNBHwXRRu6f1npGPx57iIanxSY=
 github.com/cplieger/httpx v1.0.4/go.mod h1:luKty8jqtz5JiZQG4JEQiEPGbqXdo1m12BMSQ4XleA8=
 github.com/cplieger/metrics/v2 v2.1.0 h1:xpNQzyN78Kxwg/elS+FmaJgKLgdZhRJtlnhAHPf7OVM=
