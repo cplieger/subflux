@@ -38,7 +38,11 @@ func FuzzTitlesMatchSymmetric(f *testing.F) {
 }
 
 // FuzzIsSeasonPackImpliesSeason verifies that if IsSeasonPack returns true,
-// ExtractReleaseSeason returns a positive season number.
+// ExtractReleaseSeason returns a non-negative season number. Season 0
+// (specials) is a legitimate pack — the codebase treats 0 as "unspecified /
+// non-constraining" (see scoring.identity_filter, which only applies a
+// season constraint when ExtractReleaseSeason > 0), so the guarantee is
+// non-negativity, not positivity.
 func FuzzIsSeasonPackImpliesSeason(f *testing.F) {
 	f.Add("Show.S01.1080p.BluRay")
 	f.Add("Show.S02E01.720p")
@@ -49,7 +53,7 @@ func FuzzIsSeasonPackImpliesSeason(f *testing.F) {
 	f.Fuzz(func(t *testing.T, releaseName string) {
 		if IsSeasonPack(releaseName) {
 			season := ExtractReleaseSeason(releaseName)
-			if season <= 0 {
+			if season < 0 {
 				t.Fatalf("IsSeasonPack(%q)=true but ExtractReleaseSeason=%d", releaseName, season)
 			}
 		}

@@ -46,10 +46,14 @@ func FuzzParseArgs(f *testing.F) {
 				t.Error("empty key in params")
 			}
 		}
-		// download flag consistency
-		found := slices.Contains(args, "--download")
-		if found != dl {
-			t.Errorf("download mismatch: found=%v dl=%v", found, dl)
+		// download flag consistency. The parser pairs `--key value` greedily,
+		// so a "--download" token immediately after another flag is consumed
+		// as that flag's value (a deliberate contract — see clisearch's
+		// TestParseArgs_preserves_all_key_value_pairs). The honest invariant
+		// is therefore one-directional: the parser must never report
+		// download=true unless the token is actually present.
+		if dl && !slices.Contains(args, "--download") {
+			t.Errorf("download set but --download absent from args: %q", args)
 		}
 	})
 }

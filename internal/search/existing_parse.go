@@ -43,12 +43,18 @@ func globEscape(s string) string {
 	}
 	var b strings.Builder
 	b.Grow(len(s) + 4)
-	for _, c := range s {
+	// Iterate over bytes, not runes: paths on Linux are arbitrary byte
+	// strings that may not be valid UTF-8, and ranging by rune would
+	// rewrite each invalid byte as U+FFFD — corrupting the pattern so it
+	// no longer matches the real filename. The glob metacharacters are all
+	// ASCII, so byte-wise escaping is both correct and lossless.
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		switch c {
 		case '*', '?', '[', '\\':
 			b.WriteByte('\\')
 		}
-		b.WriteRune(c)
+		b.WriteByte(c)
 	}
 	return b.String()
 }

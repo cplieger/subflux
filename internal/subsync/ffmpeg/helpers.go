@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -130,7 +131,7 @@ func parseFrameRate(s string) float64 {
 	num, den, ok := strings.Cut(s, "/")
 	if !ok {
 		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
+		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 			return 0
 		}
 		return f
@@ -140,5 +141,12 @@ func parseFrameRate(s string) float64 {
 	if err1 != nil || err2 != nil || d == 0 {
 		return 0
 	}
-	return n / d
+	// Guard against NaN/Inf results: ParseFloat accepts "NaN"/"Inf" (so a
+	// fraction like "NaN/1" or "1e999/1" slips past the d==0 check), and a
+	// frame rate that isn't a finite number is meaningless to callers.
+	r := n / d
+	if math.IsNaN(r) || math.IsInf(r, 0) {
+		return 0
+	}
+	return r
 }

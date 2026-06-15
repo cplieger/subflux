@@ -1,0 +1,7 @@
+go test fuzz v1
+string("movie")
+int(0)
+int(27)
+string("-s")
+int(0)
+int(-47)

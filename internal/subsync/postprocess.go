@@ -117,7 +117,18 @@ func stripHI(text string) string {
 	text = reBrackets.ReplaceAllString(text, "")
 	text = reParens.ReplaceAllString(text, "")
 	text = reMusic.ReplaceAllString(text, "")
-	text = reSpeaker.ReplaceAllString(text, "")
+	// Strip stacked speaker labels to a fixed point. The `(?m)^` anchor
+	// only matches one label per line-start per ReplaceAll pass, so an
+	// input like "JOHN: MARY: line" would drop one label per PostProcess
+	// call and never stabilize. Looping until no change makes stripHI
+	// idempotent regardless of how many labels are stacked.
+	for {
+		out := reSpeaker.ReplaceAllString(text, "")
+		if out == text {
+			break
+		}
+		text = out
+	}
 
 	// Process line by line to remove music-only lines.
 	var kept []string
@@ -135,9 +146,18 @@ func stripHI(text string) string {
 // reHTMLTag matches common subtitle HTML tags.
 var reHTMLTag = regexp.MustCompile(`</?(?:i|b|u|font)[^>]*>`)
 
-// stripTags removes HTML-like formatting tags from subtitle text.
+// stripTags removes HTML-like formatting tags from subtitle text. It
+// iterates to a fixed point because removing an inner tag can splice
+// surrounding fragments into a new tag (e.g. "</<b0>b>" → "</b>" after the
+// first pass), which a single ReplaceAll would leave behind.
 func stripTags(text string) string {
-	return reHTMLTag.ReplaceAllString(text, "")
+	for {
+		out := reHTMLTag.ReplaceAllString(text, "")
+		if out == text {
+			return out
+		}
+		text = out
+	}
 }
 
 // --- Whitespace cleaning ---
