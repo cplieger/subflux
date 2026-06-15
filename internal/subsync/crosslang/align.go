@@ -409,8 +409,14 @@ func dpAlign(pairs []CuePair) []CuePair {
 		}
 	}
 
+	// idx walks the parent chain back to a root. For a valid alignment the
+	// chain is strictly decreasing (parent[i] < i, or -1 at a root), so it
+	// visits at most n nodes. The `len(path) < n` guard makes that bound
+	// explicit: a corrupted parent array (e.g. a sentinel that is not -1, or
+	// any value that forms a cycle) can no longer turn this into an unbounded
+	// append that exhausts memory and takes the whole process down.
 	var path []CuePair
-	for idx := bestIdx; idx >= 0; idx = parent[idx] {
+	for idx := bestIdx; idx >= 0 && len(path) < n; idx = parent[idx] {
 		path = append(path, pairs[idx])
 	}
 	slices.Reverse(path)
