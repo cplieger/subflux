@@ -14,7 +14,7 @@ Container crash-loops with errors like:
 
 in the container logs.
 
-### Procedure
+### Recovery procedure
 
 1. Stop the container:
 
@@ -72,7 +72,7 @@ bbolt reuses free pages internally but never shrinks the file. Monitor the Prome
 
 Under normal operation, compaction is rarely needed. It becomes relevant only after sustained high-churn workloads (mass reconcile + re-scan cycles, bulk library reorganization).
 
-### Procedure
+### Compaction procedure
 
 1. Stop the container:
 
