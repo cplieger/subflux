@@ -3,15 +3,15 @@ package authstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
-	"go.etcd.io/bbolt"
-
 	"github.com/cplieger/auth"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"go.etcd.io/bbolt"
 )
 
 // This file holds the UserStore half of AuthStore: the durable auth_users
@@ -125,7 +125,7 @@ func userOIDCIndexKey(issuer, sub string) []byte {
 // sequences pass through unchanged.
 func asciiFold(s string) string {
 	var changed bool
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if c := s[i]; c >= 'A' && c <= 'Z' {
 			changed = true
 			break
@@ -176,7 +176,7 @@ func idxDelete(tx *bbolt.Tx, bucket string, key []byte) error {
 // UpdatedAt is set equal to it, mirroring the SQLite CURRENT_TIMESTAMP defaults.
 func (s *Store) CreateUser(_ context.Context, user *auth.User) error {
 	if user == nil {
-		return fmt.Errorf("authstore: CreateUser: nil user")
+		return errors.New("authstore: CreateUser: nil user")
 	}
 	err := s.update(func(tx *bbolt.Tx) error {
 		ub, ok := authBucket(tx, bucketAuthUsers)
@@ -375,7 +375,7 @@ func (s *Store) ListUsers(_ context.Context) ([]auth.User, error) {
 // affects zero rows.
 func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 	if user == nil {
-		return fmt.Errorf("authstore: UpdateUser: nil user")
+		return errors.New("authstore: UpdateUser: nil user")
 	}
 	return s.update(func(tx *bbolt.Tx) error {
 		ub, ok := authBucket(tx, bucketAuthUsers)
@@ -426,28 +426,43 @@ func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 			return fmt.Errorf("authstore: put user: %w", err)
 		}
 
-		if nameChanged {
-			if err := idxDelete(tx, bucketIxUserName, oldNameKey); err != nil {
-				return err
-			}
-			if err := idxPut(tx, bucketIxUserName, newNameKey, key); err != nil {
-				return err
-			}
+		if err := reindexUserName(tx, nameChanged, oldNameKey, newNameKey, key); err != nil {
+			return err
 		}
-		if oidcChanged {
-			if oldOIDCKey != nil {
-				if err := idxDelete(tx, bucketIxUserOIDC, oldOIDCKey); err != nil {
-					return err
-				}
-			}
-			if newOIDCKey != nil {
-				if err := idxPut(tx, bucketIxUserOIDC, newOIDCKey, key); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		return reindexUserOIDC(tx, oidcChanged, oldOIDCKey, newOIDCKey, key)
 	})
+}
+
+// reindexUserName rewrites the ix_user_name entry when the username changed:
+// it deletes the old fold-key and adds the new one pointing at the user's
+// primary key. A no-op (nil) when the username did not change.
+func reindexUserName(tx *bbolt.Tx, changed bool, oldKey, newKey, primaryKey []byte) error {
+	if !changed {
+		return nil
+	}
+	if err := idxDelete(tx, bucketIxUserName, oldKey); err != nil {
+		return err
+	}
+	return idxPut(tx, bucketIxUserName, newKey, primaryKey)
+}
+
+// reindexUserOIDC rewrites the ix_user_oidc entry when the (issuer, sub)
+// changed: it drops the old entry (when one existed) and adds the new one (when
+// the user still has an OIDC identity), both pointing at the user's primary
+// key. A no-op (nil) when the identity did not change.
+func reindexUserOIDC(tx *bbolt.Tx, changed bool, oldKey, newKey, primaryKey []byte) error {
+	if !changed {
+		return nil
+	}
+	if oldKey != nil {
+		if err := idxDelete(tx, bucketIxUserOIDC, oldKey); err != nil {
+			return err
+		}
+	}
+	if newKey != nil {
+		return idxPut(tx, bucketIxUserOIDC, newKey, primaryKey)
+	}
+	return nil
 }
 
 // DeleteUser removes the user and cascades to its passkeys, API keys, and

@@ -5,19 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"go.etcd.io/bbolt"
 )
 
 // Compile-time assertion: *Store implements the composite AuthStore interface
 // (UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore).
 var _ AuthStore = (*Store)(nil)
-
-// errNotImplemented is returned by the durable-bucket and ephemeral-map stubs
-// that later tasks (8.x) replace with real implementations.
-var errNotImplemented = errors.New("authstore: not implemented")
 
 // oidcRec is an in-flight OIDC login state held only in memory. It is never
 // persisted: an in-progress login that does not survive a restart simply
@@ -102,13 +97,13 @@ func New(db *bbolt.DB) *Store {
 // that by asserting every name here exists in a boltstore-opened file.
 const (
 	bucketAuthUsers    = "auth_users"    // be64(id) -> userRec
-	bucketAuthPasskeys = "auth_passkeys" // credential_id -> pkRec
-	bucketAuthAPIKeys  = "auth_api_keys" // key_hash -> keyRec
+	bucketAuthPasskeys = "auth_passkeys" //nolint:gosec // G101: bbolt bucket name, not a credential
+	bucketAuthAPIKeys  = "auth_api_keys" //nolint:gosec // G101: bbolt bucket name, not a credential
 
 	bucketIxUserName    = "ix_user_name"    // lower(username) -> be64(user_id)
 	bucketIxUserOIDC    = "ix_user_oidc"    // issuer 0x00 sub -> be64(user_id)
 	bucketIxPasskeyUser = "ix_passkey_user" // be64(user_id) 0x00 credential_id -> (empty)
-	bucketIxAPIKeyUser  = "ix_apikey_user"  // be64(user_id) 0x00 key_hash -> (empty)
+	bucketIxAPIKeyUser  = "ix_apikey_user"  //nolint:gosec // G101: bbolt bucket name, not a credential
 )
 
 // authBuckets lists every auth primary and index bucket the core store

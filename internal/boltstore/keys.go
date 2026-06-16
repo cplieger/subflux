@@ -22,8 +22,8 @@ const (
 	bucketSyncOffsets    = "sync_offsets"    // syncOffsetKey(path) -> be64(offset_ms)
 	bucketPollState      = "poll_state"      // pollStateKey -> RFC3339 timestamp
 	bucketAuthUsers      = "auth_users"      // be64(id) -> userRec
-	bucketAuthPasskeys   = "auth_passkeys"   // credential_id -> pkRec
-	bucketAuthAPIKeys    = "auth_api_keys"   // key_hash -> keyRec
+	bucketAuthPasskeys   = "auth_passkeys"   //nolint:gosec // G101: bbolt bucket name, not a credential
+	bucketAuthAPIKeys    = "auth_api_keys"   //nolint:gosec // G101: bbolt bucket name, not a credential
 	bucketMeta           = "meta"            // schema versions + O(1) counters
 )
 
@@ -42,7 +42,7 @@ const (
 	bucketIxUserName    = "ix_user_name"    // lower(username) -> be64(user_id)
 	bucketIxUserOIDC    = "ix_user_oidc"    // issuer 0x00 sub -> be64(user_id)
 	bucketIxPasskeyUser = "ix_passkey_user" // be64(user_id) 0x00 credential_id
-	bucketIxAPIKeyUser  = "ix_apikey_user"  // be64(user_id) 0x00 key_hash
+	bucketIxAPIKeyUser  = "ix_apikey_user"  //nolint:gosec // G101: bbolt bucket name, not a credential
 )
 
 // coreBuckets and authBuckets list every bucket the core store bootstraps. Kept

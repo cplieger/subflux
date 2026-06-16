@@ -161,19 +161,20 @@ func testUniqueness(t *testing.T, h Harness) {
 	}
 
 	// (oidc_issuer, oidc_sub).
+	const issuer = "https://idp"
 	oidc1 := mkUser("oidc1")
-	oidc1.OIDCIssuer, oidc1.OIDCSub = "https://idp", "sub-1"
+	oidc1.OIDCIssuer, oidc1.OIDCSub = issuer, "sub-1"
 	if err := s.CreateUser(ctx, oidc1); err != nil {
 		t.Fatalf("CreateUser(oidc1): %v", err)
 	}
 	dupOIDC := mkUser("oidc2")
-	dupOIDC.OIDCIssuer, dupOIDC.OIDCSub = "https://idp", "sub-1"
+	dupOIDC.OIDCIssuer, dupOIDC.OIDCSub = issuer, "sub-1"
 	if err := s.CreateUser(ctx, dupOIDC); err == nil {
 		t.Errorf("CreateUser duplicate (issuer,sub): err = nil, want non-nil")
 	}
 	// A distinct sub under the same issuer is allowed.
 	distinct := mkUser("oidc3")
-	distinct.OIDCIssuer, distinct.OIDCSub = "https://idp", "sub-2"
+	distinct.OIDCIssuer, distinct.OIDCSub = issuer, "sub-2"
 	if err := s.CreateUser(ctx, distinct); err != nil {
 		t.Errorf("CreateUser(distinct sub) = %v, want nil", err)
 	}
@@ -252,8 +253,19 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 		t.Fatalf("DeleteUser(victim): %v", err)
 	}
 
+	assertVictimCascaded(t, s, victim.ID, vCred)
+	assertKeepUserIntact(t, s, keep.ID)
+}
+
+// assertVictimCascaded verifies the deleted user is gone, its username is
+// freed, and its passkeys, API keys, and sessions were all cascaded away
+// (Requirement 9.4).
+func assertVictimCascaded(t *testing.T, s authlibstore.AuthStore, victimID int64, vCred []byte) {
+	t.Helper()
+	ctx := context.Background()
+
 	// Victim user gone, username freed.
-	if got, _ := s.GetUserByID(ctx, victim.ID); got != nil {
+	if got, _ := s.GetUserByID(ctx, victimID); got != nil {
 		t.Errorf("victim still present after delete: %+v", got)
 	}
 	if got, _ := s.GetUserByUsername(ctx, "victim"); got != nil {
@@ -264,24 +276,30 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 	}
 
 	// Victim's children gone.
-	if n, _ := s.PasskeyCountForUser(ctx, victim.ID); n != 0 {
+	if n, _ := s.PasskeyCountForUser(ctx, victimID); n != 0 {
 		t.Errorf("victim passkeys not cascaded: count = %d, want 0", n)
 	}
 	if got, _ := s.GetPasskeyByCredentialID(ctx, vCred); got != nil {
 		t.Errorf("victim passkey still resolvable by credential id after cascade")
 	}
-	if keys, _ := s.ListAPIKeysByUserID(ctx, victim.ID); len(keys) != 0 {
+	if keys, _ := s.ListAPIKeysByUserID(ctx, victimID); len(keys) != 0 {
 		t.Errorf("victim api keys not cascaded: count = %d, want 0", len(keys))
 	}
 	if got, _ := s.GetSessionByHash(ctx, "victim-sess"); got != nil {
 		t.Errorf("victim session not cleared on cascade")
 	}
+}
 
-	// Keep user fully intact.
-	if got, _ := s.GetUserByID(ctx, keep.ID); got == nil {
+// assertKeepUserIntact verifies the unrelated user and all its records survive
+// another user's delete cascade (Requirement 9.4 isolation).
+func assertKeepUserIntact(t *testing.T, s authlibstore.AuthStore, keepID int64) {
+	t.Helper()
+	ctx := context.Background()
+
+	if got, _ := s.GetUserByID(ctx, keepID); got == nil {
 		t.Errorf("keep user collaterally deleted")
 	}
-	if n, _ := s.PasskeyCountForUser(ctx, keep.ID); n != 1 {
+	if n, _ := s.PasskeyCountForUser(ctx, keepID); n != 1 {
 		t.Errorf("keep passkey collaterally deleted: count = %d, want 1", n)
 	}
 	if got, _ := s.GetAPIKeyByHash(ctx, "keep-hash"); got == nil {
@@ -340,63 +358,79 @@ func testCredentialOwnership(t *testing.T, h Harness) {
 		t.Fatalf("CreateUser(other): %v", err)
 	}
 
+	assertPasskeyOwnership(t, s, owner.ID, other.ID)
+	assertAPIKeyOwnership(t, s, owner.ID, other.ID)
+}
+
+// assertPasskeyOwnership verifies a non-owner can neither rename nor delete a
+// passkey while the owner can (Requirement 16.4).
+func assertPasskeyOwnership(t *testing.T, s authlibstore.AuthStore, ownerID, otherID int64) {
+	t.Helper()
+	ctx := context.Background()
+
 	cred := []byte("owner-cred")
-	if err := s.CreatePasskey(ctx, mkPasskey(owner.ID, cred, "original")); err != nil {
+	if err := s.CreatePasskey(ctx, mkPasskey(ownerID, cred, "original")); err != nil {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
-	pks, err := s.GetPasskeysByUserID(ctx, owner.ID)
-	if err != nil || len(pks) != 1 {
-		t.Fatalf("GetPasskeysByUserID(owner) = (%d, %v), want (1, nil)", len(pks), err)
+	pks, perr := s.GetPasskeysByUserID(ctx, ownerID)
+	if perr != nil || len(pks) != 1 {
+		t.Fatalf("GetPasskeysByUserID(owner) = (%d, %v), want (1, nil)", len(pks), perr)
 	}
 	pkID := pks[0].ID
 
 	// Non-owner rename is a no-op: the name is unchanged.
-	if err := s.RenamePasskey(ctx, pkID, other.ID, "hijacked"); err != nil {
+	if err := s.RenamePasskey(ctx, pkID, otherID, "hijacked"); err != nil {
 		t.Fatalf("RenamePasskey(non-owner): %v", err)
 	}
-	if pks, _ := s.GetPasskeysByUserID(ctx, owner.ID); len(pks) != 1 || pks[0].Name != "original" {
+	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "original" {
 		t.Errorf("non-owner rename mutated passkey: %+v", pks)
 	}
 	// Non-owner delete is a no-op: the passkey survives.
-	if err := s.DeletePasskey(ctx, pkID, other.ID); err != nil {
+	if err := s.DeletePasskey(ctx, pkID, otherID); err != nil {
 		t.Fatalf("DeletePasskey(non-owner): %v", err)
 	}
-	if n, _ := s.PasskeyCountForUser(ctx, owner.ID); n != 1 {
+	if n, _ := s.PasskeyCountForUser(ctx, ownerID); n != 1 {
 		t.Errorf("non-owner delete removed passkey: count = %d, want 1", n)
 	}
 	// Owner rename and delete take effect.
-	if err := s.RenamePasskey(ctx, pkID, owner.ID, "renamed"); err != nil {
+	if err := s.RenamePasskey(ctx, pkID, ownerID, "renamed"); err != nil {
 		t.Fatalf("RenamePasskey(owner): %v", err)
 	}
-	if pks, _ := s.GetPasskeysByUserID(ctx, owner.ID); len(pks) != 1 || pks[0].Name != "renamed" {
+	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "renamed" {
 		t.Errorf("owner rename did not take effect: %+v", pks)
 	}
-	if err := s.DeletePasskey(ctx, pkID, owner.ID); err != nil {
+	if err := s.DeletePasskey(ctx, pkID, ownerID); err != nil {
 		t.Fatalf("DeletePasskey(owner): %v", err)
 	}
-	if n, _ := s.PasskeyCountForUser(ctx, owner.ID); n != 0 {
+	if n, _ := s.PasskeyCountForUser(ctx, ownerID); n != 0 {
 		t.Errorf("owner delete did not remove passkey: count = %d, want 0", n)
 	}
+}
 
-	// API-key ownership.
-	if err := s.CreateAPIKey(ctx, mkAPIKey(owner.ID, "owner-keyhash", "k")); err != nil {
+// assertAPIKeyOwnership verifies a non-owner cannot delete an API key while the
+// owner can (Requirement 16.4).
+func assertAPIKeyOwnership(t *testing.T, s authlibstore.AuthStore, ownerID, otherID int64) {
+	t.Helper()
+	ctx := context.Background()
+
+	if err := s.CreateAPIKey(ctx, mkAPIKey(ownerID, "owner-keyhash", "k")); err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
-	keys, err := s.ListAPIKeysByUserID(ctx, owner.ID)
-	if err != nil || len(keys) != 1 {
-		t.Fatalf("ListAPIKeysByUserID(owner) = (%d, %v), want (1, nil)", len(keys), err)
+	keys, kerr := s.ListAPIKeysByUserID(ctx, ownerID)
+	if kerr != nil || len(keys) != 1 {
+		t.Fatalf("ListAPIKeysByUserID(owner) = (%d, %v), want (1, nil)", len(keys), kerr)
 	}
 	keyID := keys[0].ID
-	if err := s.DeleteAPIKey(ctx, keyID, other.ID); err != nil {
+	if err := s.DeleteAPIKey(ctx, keyID, otherID); err != nil {
 		t.Fatalf("DeleteAPIKey(non-owner): %v", err)
 	}
-	if keys, _ := s.ListAPIKeysByUserID(ctx, owner.ID); len(keys) != 1 {
+	if keys, _ := s.ListAPIKeysByUserID(ctx, ownerID); len(keys) != 1 {
 		t.Errorf("non-owner delete removed api key: count = %d, want 1", len(keys))
 	}
-	if err := s.DeleteAPIKey(ctx, keyID, owner.ID); err != nil {
+	if err := s.DeleteAPIKey(ctx, keyID, ownerID); err != nil {
 		t.Fatalf("DeleteAPIKey(owner): %v", err)
 	}
-	if keys, _ := s.ListAPIKeysByUserID(ctx, owner.ID); len(keys) != 0 {
+	if keys, _ := s.ListAPIKeysByUserID(ctx, ownerID); len(keys) != 0 {
 		t.Errorf("owner delete did not remove api key: count = %d, want 0", len(keys))
 	}
 }

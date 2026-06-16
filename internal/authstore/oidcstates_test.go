@@ -133,17 +133,15 @@ func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 		gotNonce  atomic.Value // string, set by the single winner
 	)
 	start := make(chan struct{})
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			<-start // maximize contention: all goroutines race from the same instant
 			nonce, _, _, err := s.ConsumeOIDCState(ctx, "race-state")
 			if err == nil {
 				successes.Add(1)
 				gotNonce.Store(nonce)
 			}
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()

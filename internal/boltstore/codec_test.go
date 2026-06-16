@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // sampleRecords returns one fully-populated value of each core-domain record

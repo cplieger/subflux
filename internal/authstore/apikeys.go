@@ -3,15 +3,15 @@ package authstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
-	"go.etcd.io/bbolt"
-
 	"github.com/cplieger/auth"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"go.etcd.io/bbolt"
 )
 
 // This file holds the KeyStore half of AuthStore: the durable auth_api_keys
@@ -110,10 +110,10 @@ func apiKeyUserIndexKey(userID int64, hash string) []byte {
 // commit (Requirements 9.1, 9.2); on a conflict nothing is written.
 func (s *Store) CreateAPIKey(_ context.Context, key *auth.Key) error {
 	if key == nil {
-		return fmt.Errorf("authstore: CreateAPIKey: nil key")
+		return errors.New("authstore: CreateAPIKey: nil key")
 	}
 	if key.KeyHash == "" {
-		return fmt.Errorf("authstore: CreateAPIKey: empty key hash")
+		return errors.New("authstore: CreateAPIKey: empty key hash")
 	}
 	err := s.update(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)

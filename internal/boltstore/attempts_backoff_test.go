@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"pgregory.net/rapid"
-
 	"github.com/cplieger/subflux/internal/api"
+	"pgregory.net/rapid"
 )
 
 // This file covers the task-3.2 backoff listing behaviour: GetBackoffItems
@@ -201,7 +200,7 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 		}
 		var inserted []row
 		n := rapid.IntRange(0, 12).Draw(rt, "rows")
-		for i := 0; i < n; i++ {
+		for range n {
 			mid := rapid.SampledFrom(byPrefixPool).Draw(rt, "mid")
 			prov := rapid.SampledFrom(providerSetPool).Draw(rt, "prov")
 			offsetMin := rapid.IntRange(0, 600).Draw(rt, "offsetMin")

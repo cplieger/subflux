@@ -1,6 +1,7 @@
 package boltkv
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -67,7 +68,7 @@ func DecodeOrHandle(mode DecodeMode, bucket string, key, data []byte, v any) (sk
 	if derr := Decode(data, v); derr != nil {
 		if mode == TolerantSkip {
 			slog.Warn("boltkv: skipping undecodable record",
-				"bucket", bucket, "key", fmt.Sprintf("%x", key), "error", derr)
+				"bucket", bucket, "key", hex.EncodeToString(key), "error", derr)
 			return true, nil
 		}
 		return false, fmt.Errorf("boltkv: decode %s record: %w", bucket, derr)

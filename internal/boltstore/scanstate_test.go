@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file covers the task-5.2 scan_state domain: RecordScanState upsert with

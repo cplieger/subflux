@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"pgregory.net/rapid"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"pgregory.net/rapid"
 )
 
 // This file holds the standalone key-encoding and codec PROPERTIES required by

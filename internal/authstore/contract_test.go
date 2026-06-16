@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/auth"
 	authlibstore "github.com/cplieger/auth/store"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/authstore/authstoretest"
 	"github.com/cplieger/subflux/internal/boltstore"
+	bolt "go.etcd.io/bbolt"
 )
 
 // boltHarness drives the engine-agnostic authstore contract suite against the

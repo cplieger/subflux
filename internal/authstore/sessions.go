@@ -131,22 +131,18 @@ func (s *Store) DeleteUserSessions(_ context.Context, userID int64, exceptHash s
 }
 
 // deleteUserSessionsExcept drops every in-memory session belonging to userID
-// whose hash is not exceptHash, and returns the number removed. It is the
-// single locked implementation shared by the public DeleteUserSessions
-// (keep-one) and the DeleteUser cascade (exceptHash=""), so the
-// guarded-map-walk pattern lives in exactly one place. The sessions map is
-// ephemeral and guarded by s.mu.
-func (s *Store) deleteUserSessionsExcept(userID int64, exceptHash string) int {
+// whose hash is not exceptHash. It is the single locked implementation shared
+// by the public DeleteUserSessions (keep-one) and the DeleteUser cascade
+// (exceptHash=""), so the guarded-map-walk pattern lives in exactly one place.
+// The sessions map is ephemeral and guarded by s.mu.
+func (s *Store) deleteUserSessionsExcept(userID int64, exceptHash string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	n := 0
 	for hash, sess := range s.sessions {
 		if sess != nil && sess.UserID == userID && hash != exceptHash {
 			delete(s.sessions, hash)
-			n++
 		}
 	}
-	return n
 }
 
 // CleanupExpiredSessions evicts every session past its idle OR absolute timeout

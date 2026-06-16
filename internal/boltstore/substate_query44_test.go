@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file covers task-4.4: GetState (filter by type/language/provider,
@@ -36,7 +35,7 @@ func putStateRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, sr st
 		if err != nil {
 			return err
 		}
-		sr.ID = int64(seq) //nolint:gosec // G115: surrogate id from NextSequence
+		sr.ID = int64(seq)
 		id = sr.ID
 		return putState(tx, mt, mid, lang, &sr)
 	}); err != nil {
@@ -229,13 +228,13 @@ func TestGetState_defaultThousandRowCap(t *testing.T) {
 	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
-		for i := 0; i < total; i++ {
+		for i := range total {
 			seq, _, err := boltkv.NextID(sb)
 			if err != nil {
 				return err
 			}
 			sr := stateRec{
-				ID:            int64(seq), //nolint:gosec // G115: surrogate id
+				ID:            int64(seq),
 				Title:         "Bulk",
 				MediaImported: base.Add(time.Duration(i) * time.Second),
 			}
@@ -310,7 +309,7 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 
 	base := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 	ids := make([]int64, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		// Later index -> newer import, so the DESC order is ids[4],ids[3],...,ids[0].
 		ids[i] = putStateRow(t, db, api.MediaTypeMovie, "m-"+itoa(i), "en",
 			stateRec{Title: "P", MediaImported: base.Add(time.Duration(i) * time.Hour)})

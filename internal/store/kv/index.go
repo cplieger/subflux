@@ -31,10 +31,10 @@ type IndexSpec[T any] struct {
 // serve from a live count. A zero Delta is treated as 1. Counters never go
 // below zero.
 type CounterSpec struct {
-	// Key is the counter's key within Bucket.
-	Key []byte
 	// Bucket holds the counter (typically the meta bucket).
 	Bucket string
+	// Key is the counter's key within Bucket.
+	Key []byte
 	// Delta is added on insert and subtracted on delete; zero means 1.
 	Delta int64
 }
@@ -191,8 +191,6 @@ func adjustCounter(tx *bolt.Tx, c *CounterSpec, sign int64) error {
 		delta = 1
 	}
 	next := ReadCounter(b, c.Key) + delta*sign
-	if next < 0 {
-		next = 0
-	}
-	return PutUint64(b, c.Key, uint64(next)) //nolint:gosec // G115: clamped non-negative above
+	next = max(next, 0)
+	return PutUint64(b, c.Key, uint64(next))
 }

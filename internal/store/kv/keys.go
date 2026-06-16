@@ -73,7 +73,7 @@ func Split(key []byte) []string {
 // for the post-epoch timestamps this store deals with.
 func TimeIndexKey(t time.Time, primary []byte) []byte {
 	buf := make([]byte, 0, 8+1+len(primary))
-	buf = append(buf, Be64(uint64(t.UnixNano()))...) //nolint:gosec // G115: post-epoch unixnano fits, ordering is the goal
+	buf = append(buf, Be64(uint64(t.UnixNano()))...)
 	buf = append(buf, Sep)
 	buf = append(buf, primary...)
 	return buf

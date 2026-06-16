@@ -41,6 +41,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -51,6 +52,8 @@ const (
 	langEng = "eng"
 	langFra = "fra"
 	provOS  = api.ProviderID("opensubtitles")
+
+	codecSubrip = "subrip"
 )
 
 // TB is the subset of *testing.T the reusable behavioural assertions need. Real
@@ -189,8 +192,8 @@ func testBackoffEligibility(t *testing.T, s api.Store) {
 		t.Fatalf("BackedOffProviders (fresh) = %v, want empty (no row means eligible)", backed)
 	}
 
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-bo-1", langEng, provOS, defaultBackoff()); err != nil {
-		t.Fatalf("RecordNoResult: %v", err)
+	if rerr := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-bo-1", langEng, provOS, defaultBackoff()); rerr != nil {
+		t.Fatalf("RecordNoResult: %v", rerr)
 	}
 
 	// next_retry is in the future, so the provider is backed off under the
@@ -212,12 +215,7 @@ func testBackoffEligibility(t *testing.T, s api.Store) {
 }
 
 func containsProvider(list []api.ProviderID, p api.ProviderID) bool {
-	for _, v := range list {
-		if v == p {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, p)
 }
 
 // testSaveAutoRoundtrip asserts an auto download is retrievable via CurrentScore
@@ -287,8 +285,8 @@ func testAutoUpsertPreservesImported(t *testing.T, s api.Store) {
 		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Second", Score: 90, Path: "/m/up.eng.srt",
 	}
-	if err := s.SaveDownload(ctx, second); err != nil {
-		t.Fatalf("SaveDownload(second): %v", err)
+	if serr := s.SaveDownload(ctx, second); serr != nil {
+		t.Fatalf("SaveDownload(second): %v", serr)
 	}
 
 	score2, imported2, found2, err := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langEng)
@@ -330,11 +328,11 @@ func testSaveClearsBackoff(t *testing.T, s api.Store) {
 		t.Fatalf("attempts before save = %d, want 1", attempts)
 	}
 
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
+	if serr := s.SaveDownload(ctx, &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Got.It", Score: 70, Path: "/m/cb.eng.srt",
-	}); err != nil {
-		t.Fatalf("SaveDownload: %v", err)
+	}); serr != nil {
+		t.Fatalf("SaveDownload: %v", serr)
 	}
 
 	downloads, attempts, err := s.Stats(ctx)
@@ -385,8 +383,8 @@ func AssertClearManualLockNonDestructive(t TB, s api.Store) {
 		t.Fatalf("GetState before clear = %d rows, want 1", len(before))
 	}
 
-	if err := s.ClearManualLock(ctx, api.MediaTypeMovie, mid, langEng); err != nil {
-		t.Fatalf("ClearManualLock: %v", err)
+	if cerr := s.ClearManualLock(ctx, api.MediaTypeMovie, mid, langEng); cerr != nil {
+		t.Fatalf("ClearManualLock: %v", cerr)
 	}
 
 	locked, err = s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langEng)
@@ -485,8 +483,8 @@ func testPollTimestamp(t *testing.T, s api.Store) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	if err := s.SetPollTimestamp(ctx, api.PollKeySonarr, now); err != nil {
-		t.Fatalf("SetPollTimestamp: %v", err)
+	if serr := s.SetPollTimestamp(ctx, api.PollKeySonarr, now); serr != nil {
+		t.Fatalf("SetPollTimestamp: %v", serr)
 	}
 	got, err = s.GetPollTimestamp(ctx, api.PollKeySonarr)
 	if err != nil {
@@ -510,7 +508,7 @@ func testSyncOffset(t *testing.T, s api.Store) {
 	ctx := context.Background()
 	const path = "/media/show/episode.eng.srt"
 	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeEpisode, "tvdb-so-1", []api.SubtitleFile{
-		{Language: langEng, Variant: "standard", Source: api.SourceExternal, Path: path, Codec: "subrip"},
+		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: path, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
@@ -533,7 +531,7 @@ func testCoverageFiles(t *testing.T, s api.Store) {
 	t.Helper()
 	ctx := context.Background()
 	files := []api.SubtitleFile{
-		{Language: langEng, Variant: "standard", Source: api.SourceExternal, Path: "/m/cov.eng.srt", Codec: "subrip"},
+		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: "/m/cov.eng.srt", Codec: codecSubrip},
 	}
 
 	changed, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-cov-1", files)
@@ -665,7 +663,9 @@ func testGetStateQuery(t *testing.T, s api.Store) {
 	page1 := assertCount("limit=2,offset=0", &api.StateQuery{Limit: 2, Offset: 0}, 2)
 	page2 := assertCount("limit=2,offset=2", &api.StateQuery{Limit: 2, Offset: 2}, 2)
 	seen := map[string]bool{}
-	for _, e := range append(append([]api.StateEntry{}, page1...), page2...) {
+	union := append(append([]api.StateEntry{}, page1...), page2...)
+	for i := range union {
+		e := &union[i]
 		if seen[e.MediaID] {
 			t.Fatalf("paginated pages overlap on media_id %q", e.MediaID)
 		}
@@ -685,17 +685,18 @@ func testDeleteStateByPaths(t *testing.T, s api.Store) {
 	ctx := context.Background()
 	const video = "/media/del/movie.mkv"
 	const mid = "tt-del-1"
+	const subPath = "/media/del/movie.eng.srt"
 
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Movie-GRP", Score: 80,
-		Path: "/media/del/movie.eng.srt",
+		Path: subPath,
 		Meta: &api.DownloadMeta{VideoPath: video},
 	}); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, mid, []api.SubtitleFile{
-		{Language: langEng, Variant: "standard", Source: api.SourceExternal, Path: "/media/del/movie.eng.srt", Codec: "subrip"},
+		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: subPath, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
@@ -712,8 +713,8 @@ func testDeleteStateByPaths(t *testing.T, s api.Store) {
 	if err != nil {
 		t.Fatalf("DeleteStateByPaths: %v", err)
 	}
-	if len(result.Paths) != 1 || result.Paths[0] != "/media/del/movie.eng.srt" {
-		t.Fatalf("DeleteStateByPaths paths = %v, want [/media/del/movie.eng.srt]", result.Paths)
+	if len(result.Paths) != 1 || result.Paths[0] != subPath {
+		t.Fatalf("DeleteStateByPaths paths = %v, want [%s]", result.Paths, subPath)
 	}
 
 	downloads, attempts, err := s.Stats(ctx)
@@ -782,8 +783,8 @@ func testCleanupDriftRemoved(t *testing.T, s api.Store) {
 	}
 
 	// Remove provider subdl: the (eng,subdl) row goes, leaving (eng,os).
-	if err := s.CleanupDrift(ctx, api.ConfigDrift{RemovedProviders: []api.ProviderID{api.ProviderID("subdl")}}); err != nil {
-		t.Fatalf("CleanupDrift(removed provider subdl): %v", err)
+	if cerr := s.CleanupDrift(ctx, api.ConfigDrift{RemovedProviders: []api.ProviderID{api.ProviderID("subdl")}}); cerr != nil {
+		t.Fatalf("CleanupDrift(removed provider subdl): %v", cerr)
 	}
 	remaining, err = s.GetBackoffByPrefix(ctx, api.MediaTypeMovie, mid)
 	if err != nil {
@@ -855,7 +856,7 @@ func testReconcileVideoGone(t *testing.T, s api.Store) {
 		t.Fatalf("SaveDownload(gone): %v", err)
 	}
 	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-gone", []api.SubtitleFile{
-		{Language: langEng, Variant: "standard", Source: api.SourceExternal, Path: goneSub, Codec: "subrip"},
+		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: goneSub, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles(gone): %v", err)
 	}
@@ -999,8 +1000,8 @@ func testReconcileAllSubsGone(t *testing.T, s api.Store) {
 	dir := t.TempDir()
 
 	video := filepath.Join(dir, "movie.mkv")
-	writeFile(t, video) // video present
-	autoSub := filepath.Join(dir, "movie.fr.srt")    // never created
+	writeFile(t, video)                               // video present
+	autoSub := filepath.Join(dir, "movie.fr.srt")     // never created
 	manualSub := filepath.Join(dir, "movie.fr.1.srt") // never created
 
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{

@@ -3,16 +3,16 @@ package boltstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the subtitle_state domain: the DownloadStore, ManualLockStore,
@@ -115,7 +115,7 @@ func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta) erro
 func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, manual bool, imported time.Time) error {
 	sb := tx.Bucket([]byte(bucketSubtitleState))
 	if sb == nil {
-		return fmt.Errorf("boltstore: subtitle_state bucket not found")
+		return errors.New("boltstore: subtitle_state bucket not found")
 	}
 	id, _, err := boltkv.NextID(sb)
 	if err != nil {
@@ -148,11 +148,11 @@ func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, m
 func collectTripleRows(tx *bolt.Tx, mt api.MediaType, mid, lang string) ([]stateRec, error) {
 	idx := tx.Bucket([]byte(bucketIxStateTriple))
 	if idx == nil {
-		return nil, fmt.Errorf("boltstore: ix_state_triple bucket not found")
+		return nil, errors.New("boltstore: ix_state_triple bucket not found")
 	}
 	sb := tx.Bucket([]byte(bucketSubtitleState))
 	if sb == nil {
-		return nil, fmt.Errorf("boltstore: subtitle_state bucket not found")
+		return nil, errors.New("boltstore: subtitle_state bucket not found")
 	}
 	prefix := triplePrefix(mt, mid, lang)
 	var out []stateRec
@@ -184,7 +184,7 @@ func collectTripleRows(tx *bolt.Tx, mt api.MediaType, mid, lang string) ([]state
 func clearTripleBackoff(tx *bolt.Tx, mt api.MediaType, mid, lang string) error {
 	b := tx.Bucket([]byte(bucketSearchAttempts))
 	if b == nil {
-		return fmt.Errorf("boltstore: search_attempts bucket not found")
+		return errors.New("boltstore: search_attempts bucket not found")
 	}
 	prefix := triplePrefix(mt, mid, lang)
 	var providers []api.ProviderID
@@ -317,7 +317,7 @@ func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, l
 func walkTripleProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, fn func(manual bool, score int, provider api.ProviderID)) error {
 	idx := tx.Bucket([]byte(bucketIxStateTriple))
 	if idx == nil {
-		return fmt.Errorf("boltstore: ix_state_triple bucket not found")
+		return errors.New("boltstore: ix_state_triple bucket not found")
 	}
 	prefix := triplePrefix(mt, mid, lang)
 	c := idx.Cursor()
@@ -530,7 +530,7 @@ func splitStateTripleKey(key []byte) (mt api.MediaType, mid, lang string, id int
 func buildStateTripleMap(tx *bolt.Tx) (map[int64]stateTripleInfo, error) {
 	idx := tx.Bucket([]byte(bucketIxStateTriple))
 	if idx == nil {
-		return nil, fmt.Errorf("boltstore: ix_state_triple bucket not found")
+		return nil, errors.New("boltstore: ix_state_triple bucket not found")
 	}
 	out := make(map[int64]stateTripleInfo)
 	err := idx.ForEach(func(k, _ []byte) error {
@@ -551,7 +551,7 @@ func buildStateTripleMap(tx *bolt.Tx) (map[int64]stateTripleInfo, error) {
 // LIKE case folding (which folds only ASCII, not the full Unicode range).
 func asciiLower(s string) string {
 	var changed bool
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= 'A' && s[i] <= 'Z' {
 			changed = true
 			break
@@ -613,6 +613,54 @@ func stateEntryFrom(tr stateTripleInfo, sr *stateRec) api.StateEntry {
 	}
 }
 
+// matchStateRow resolves one ix_state_imported entry (indexKey) to its
+// api.StateEntry and applies the query's triple- and primary-borne filters. It
+// returns matched=false to skip the row on any index/primary drift, a
+// filtered-out row, or a tolerated decode skip; derr is non-nil only on a
+// fail-closed decode error. Extracted from GetState so the reverse-walk loop
+// stays a thin offset/limit pager over the matched rows.
+func (d *DB) matchStateRow(sb *bolt.Bucket, triples map[int64]stateTripleInfo, q *api.StateQuery, indexKey []byte) (entry api.StateEntry, matched bool, derr error) {
+	_, primary, ok := boltkv.SplitTimeIndexKey(indexKey)
+	if !ok {
+		return api.StateEntry{}, false, nil
+	}
+	id, ok := parseStateKey(primary)
+	if !ok {
+		return api.StateEntry{}, false, nil
+	}
+	tr, ok := triples[id]
+	if !ok {
+		return api.StateEntry{}, false, nil // index drift: no triple for this id
+	}
+	// Triple-borne filters (cheap; no primary deref needed yet).
+	if q.MediaType != "" && tr.mt != q.MediaType {
+		return api.StateEntry{}, false, nil
+	}
+	if q.Language != "" && tr.lang != q.Language {
+		return api.StateEntry{}, false, nil
+	}
+	raw := sb.Get(primary)
+	if raw == nil {
+		return api.StateEntry{}, false, nil // index/primary drift
+	}
+	var sr stateRec
+	skip, err := decodeRecord(bucketDecodeMode(bucketSubtitleState), bucketSubtitleState, primary, raw, &sr)
+	if err != nil {
+		return api.StateEntry{}, false, err
+	}
+	if skip {
+		return api.StateEntry{}, false, nil
+	}
+	// Primary-borne filters.
+	if q.Provider != "" && sr.Provider != q.Provider {
+		return api.StateEntry{}, false, nil
+	}
+	if q.Search != "" && !asciiContainsFold(sr.Title, q.Search) {
+		return api.StateEntry{}, false, nil
+	}
+	return stateEntryFrom(tr, &sr), true, nil
+}
+
 // GetState returns subtitle-state rows matching the query, most-recently-
 // imported first. It mirrors the old SQLite GetState (Requirement 8.4, 15.1,
 // 15.2, 15.3):
@@ -649,10 +697,7 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 	if limit <= 0 {
 		limit = defaultQueryLimit
 	}
-	offset := q.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(q.Offset, 0)
 
 	// Preallocate a fixed, modest capacity instead of one derived from the
 	// user-supplied limit: append grows the slice if limit exceeds it, and a
@@ -666,11 +711,11 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 		}
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
-			return fmt.Errorf("boltstore: subtitle_state bucket not found")
+			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 		imp := tx.Bucket([]byte(bucketIxStateImported))
 		if imp == nil {
-			return fmt.Errorf("boltstore: ix_state_imported bucket not found")
+			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
 
 		skipped := 0
@@ -681,42 +726,11 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 			if len(out) >= limit {
 				break
 			}
-			_, primary, ok := boltkv.SplitTimeIndexKey(k)
-			if !ok {
-				continue
-			}
-			id, ok := parseStateKey(primary)
-			if !ok {
-				continue
-			}
-			tr, ok := triples[id]
-			if !ok {
-				continue // index drift: no triple for this id
-			}
-			// Triple-borne filters (cheap; no primary deref needed yet).
-			if q.MediaType != "" && tr.mt != q.MediaType {
-				continue
-			}
-			if q.Language != "" && tr.lang != q.Language {
-				continue
-			}
-			raw := sb.Get(primary)
-			if raw == nil {
-				continue // index/primary drift
-			}
-			var sr stateRec
-			skip, derr := decodeRecord(bucketDecodeMode(bucketSubtitleState), bucketSubtitleState, primary, raw, &sr)
+			entry, matched, derr := d.matchStateRow(sb, triples, q, k)
 			if derr != nil {
 				return derr
 			}
-			if skip {
-				continue
-			}
-			// Primary-borne filters.
-			if q.Provider != "" && sr.Provider != q.Provider {
-				continue
-			}
-			if q.Search != "" && !asciiContainsFold(sr.Title, q.Search) {
+			if !matched {
 				continue
 			}
 			// Matched: apply the numeric offset, then collect up to limit.
@@ -724,7 +738,7 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 				skipped++
 				continue
 			}
-			out = append(out, stateEntryFrom(tr, &sr))
+			out = append(out, entry)
 		}
 		return nil
 	})
@@ -754,7 +768,7 @@ func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateTriple))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_state_triple bucket not found")
+			return errors.New("boltstore: ix_state_triple bucket not found")
 		}
 		// cur points at the entry being accumulated. ix_state_triple is sorted
 		// by (mt, mid, lang, id), so all rows of a triple are contiguous and we
@@ -835,7 +849,7 @@ func (d *DB) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, mediaID
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateTriple))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_state_triple bucket not found")
+			return errors.New("boltstore: ix_state_triple bucket not found")
 		}
 		return idx.ForEach(func(k, _ []byte) error {
 			mt, mid, _, _, ok := splitStateTripleKey(k)

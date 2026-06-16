@@ -85,7 +85,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 	}
 
 	slog.Info("admin bootstrap: password reset", "username", username, "ip", clientIPFromReq(r))
-	api.WriteJSON(w, map[string]string{"status": "ok", "username": username})
+	api.WriteJSON(w, map[string]string{keyStatus: "ok", "username": username})
 }
 
 func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request, username, label string) {
@@ -129,7 +129,7 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 
 	slog.Info("admin bootstrap: API key generated",
 		"username", username, "label", label, "ip", clientIPFromReq(r))
-	api.WriteJSON(w, map[string]string{"status": "ok", "key": plaintext})
+	api.WriteJSON(w, map[string]string{keyStatus: "ok", "key": plaintext})
 }
 
 // requireLocalhost is a middleware that rejects requests not originating from

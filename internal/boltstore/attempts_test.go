@@ -3,15 +3,14 @@ package boltstore
 import (
 	"context"
 	"math"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-	"pgregory.net/rapid"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
+	"pgregory.net/rapid"
 )
 
 // This file covers the task-3.1 backoff behaviour: next_retry computation from
@@ -164,7 +163,7 @@ func TestRecordNoResult_nextRetryFormula(t *testing.T) {
 		}
 		k := rapid.IntRange(1, 6).Draw(rt, "calls")
 
-		for i := 0; i < k; i++ {
+		for range k {
 			if err := db.RecordNoResult(context.Background(), testMT, testMID, testLang, testProv, bp); err != nil {
 				rt.Fatalf("RecordNoResult: %v", err)
 			}
@@ -382,10 +381,7 @@ func TestBackedOffProviders_predicate(t *testing.T) {
 		}
 
 		// Reference predicate, mirroring the documented semantics.
-		maxAttempts := rawMax
-		if maxAttempts < 0 {
-			maxAttempts = 0
-		}
+		maxAttempts := max(rawMax, 0)
 		var want []api.ProviderID
 		for _, p := range providerSetPool {
 			s := specs[p]
@@ -424,8 +420,8 @@ func sameProviderSet(a, b []api.ProviderID) bool {
 	}
 	as := append([]api.ProviderID(nil), a...)
 	bs := append([]api.ProviderID(nil), b...)
-	sort.Slice(as, func(i, j int) bool { return as[i] < as[j] })
-	sort.Slice(bs, func(i, j int) bool { return bs[i] < bs[j] })
+	slices.Sort(as)
+	slices.Sort(bs)
 	for i := range as {
 		if as[i] != bs[i] {
 			return false
