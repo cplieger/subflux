@@ -154,7 +154,7 @@ RUN /tmp/package/lib/tsgo --project tsconfig.json && \
         node_modules/@cplieger/reactive/src/*.ts
 
 # --- Go build ---
-FROM golang:1.26-alpine@sha256:7a3e50096189ad57c9f9f865e7e4aa8585ed1585248513dc5cda498e2f41812c AS builder
+FROM golang:1.26-alpine@sha256:f1ddd9fe14fffc091dd98cb4bfa999f32c5fc77d2f2305ea9f0e2595c5437c14 AS builder
 ENV GOTOOLCHAIN=auto
 
 WORKDIR /src
