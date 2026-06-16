@@ -654,11 +654,10 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 		offset = 0
 	}
 
-	capHint := limit
-	if capHint > preallocCap {
-		capHint = preallocCap
-	}
-	out := make([]api.StateEntry, 0, capHint)
+	// Preallocate a fixed, modest capacity instead of one derived from the
+	// user-supplied limit: append grows the slice if limit exceeds it, and a
+	// constant cap keeps the allocation independent of untrusted query input.
+	out := make([]api.StateEntry, 0, preallocCap)
 
 	err := d.db.View(func(tx *bolt.Tx) error {
 		triples, err := buildStateTripleMap(tx)
