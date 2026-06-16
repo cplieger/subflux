@@ -7,9 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/fsutil"
+	bolt "go.etcd.io/bbolt"
 )
 
 // BackupInto writes a single consistent hot snapshot of the entire bbolt file

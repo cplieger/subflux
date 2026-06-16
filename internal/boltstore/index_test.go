@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
-
-	"github.com/cplieger/subflux/internal/api"
 )
 
 // This file proves the secondary-index maintenance invariant for the boltstore
@@ -148,7 +147,7 @@ func TestIndexHelpers_indexEqualsRescan(t *testing.T) {
 		db := openPropDB(rt)
 
 		n := rapid.IntRange(0, 80).Draw(rt, "ops")
-		for i := 0; i < n; i++ {
+		for range n {
 			drawAndApplyOp(rt, db)
 		}
 
@@ -263,8 +262,7 @@ func verifyStateIndexes(rt *rapid.T, tx *bolt.Tx) {
 			return nil
 		}
 		tr := tripleFor(id)
-		wantTriple[string(stateTripleKey(tr.mt, tr.mid, tr.lang, id))] =
-			string(encodeStateProjection(rec.Manual, rec.Score, rec.Provider))
+		wantTriple[string(stateTripleKey(tr.mt, tr.mid, tr.lang, id))] = string(encodeStateProjection(rec.Manual, rec.Score, rec.Provider))
 		wantImported[string(stateImportedKey(rec.MediaImported, id))] = ""
 		wantVideo[string(stateVideoKey(rec.VideoPath, id))] = ""
 		return nil

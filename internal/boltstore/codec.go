@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file owns the bbolt record value structs for the core domain, the
@@ -39,19 +38,19 @@ type attemptRec struct {
 // Together they reconstruct an api.StateEntry. Provider is api.ProviderID to
 // match api.DownloadRecord.ProviderName / api.StateEntry.Provider exactly.
 type stateRec struct {
-	ID            int64          `json:"id"` // NextSequence surrogate
+	MediaImported time.Time      `json:"media_imported"`
 	Provider      api.ProviderID `json:"provider"`
 	ReleaseName   string         `json:"release_name"`
 	Path          string         `json:"path"`
 	Title         string         `json:"title"`
 	ImdbID        string         `json:"imdb_id"`
 	ReleaseTag    string         `json:"release_tag"`
+	VideoPath     string         `json:"video_path"`
+	ID            int64          `json:"id"` // NextSequence surrogate
 	Score         int            `json:"score"`
 	Season        int            `json:"season"`
 	Episode       int            `json:"episode"`
 	Manual        bool           `json:"manual"`
-	VideoPath     string         `json:"video_path"`
-	MediaImported time.Time      `json:"media_imported"`
 }
 
 // fileRec is the subtitle_files value. The media_type, media_id, language,
@@ -59,20 +58,20 @@ type stateRec struct {
 // key-only prefix walk), leaving only these fields in the value. With the key
 // components they reconstruct an api.SubtitleEntry.
 type fileRec struct {
+	UpdatedAt time.Time `json:"updated_at"`
 	Codec     string    `json:"codec"`
 	OffsetMs  int64     `json:"offset_ms"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // scanRec is the scan_state value, one row per (media_type, media_id) carried
 // in the key. With the key components these fields reconstruct an
 // api.ScanStateRow / mirror an api.ScanRecord.
 type scanRec struct {
+	ScannedAt time.Time `json:"scanned_at"`
 	Title     string    `json:"title"`
 	AudioLang string    `json:"audio_lang"`
 	Season    int       `json:"season"`
 	Episode   int       `json:"episode"`
-	ScannedAt time.Time `json:"scanned_at"`
 }
 
 // sync_offsets stores a bare be64(offset_ms) value (keyed by path) and

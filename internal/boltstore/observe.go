@@ -1,9 +1,10 @@
 package boltstore
 
 import (
+	"errors"
 	"os"
 
-	bolt "go.etcd.io/bbolt"
+	bolterrors "go.etcd.io/bbolt/errors"
 )
 
 // StoreFileStats returns the current database file size and reclaimable freelist
@@ -15,7 +16,7 @@ import (
 //
 // If the store is not open or a stat error occurs, it returns zeros without
 // error (metrics should degrade gracefully, not block scrapes).
-func (d *DB) StoreFileStats() (fileBytes int64, freelistBytes int64) {
+func (d *DB) StoreFileStats() (fileBytes, freelistBytes int64) {
 	if d == nil || d.db == nil {
 		return 0, 0
 	}
@@ -58,7 +59,7 @@ func IsDiskFullError(err error) bool {
 	}
 	// bbolt.ErrDatabaseNotOpen can surface when the file handle is lost
 	// due to I/O errors; treat it as a potential disk issue.
-	if err == bolt.ErrDatabaseNotOpen {
+	if errors.Is(err, bolterrors.ErrDatabaseNotOpen) {
 		return true
 	}
 	return false

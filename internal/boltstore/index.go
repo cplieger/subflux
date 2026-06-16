@@ -1,10 +1,9 @@
 package boltstore
 
 import (
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file is the boltstore-specific WIRING layer over the generic

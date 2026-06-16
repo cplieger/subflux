@@ -3,13 +3,13 @@ package boltstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the scan_state half of CoverageStore: the scan_state bucket
@@ -68,7 +68,7 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketScanState))
 		if b == nil {
-			return fmt.Errorf("boltstore: scan_state bucket not found")
+			return errors.New("boltstore: scan_state bucket not found")
 		}
 		c := b.Cursor()
 		for key, v := c.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, v = c.Next() {
@@ -111,13 +111,13 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 // primary key (mt 0x00 mid); like the SQL query it keys the result set by
 // media id alone, independent of media type.
 func (d *DB) RecentlyScanned(_ context.Context, cutoff time.Time) (map[string]bool, error) {
-	seek := boltkv.Be64(uint64(cutoff.UnixNano())) //nolint:gosec // G115: post-epoch unixnano, ordering preserved (mirrors TimeIndexKey)
+	seek := boltkv.Be64(uint64(cutoff.UnixNano()))
 
 	out := make(map[string]bool)
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxScanAt))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_scan_at bucket not found")
+			return errors.New("boltstore: ix_scan_at bucket not found")
 		}
 		c := idx.Cursor()
 		for k, _ := c.Seek(seek); k != nil; k, _ = c.Next() {
@@ -150,7 +150,7 @@ func (d *DB) LastScanTime(_ context.Context) (string, error) {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxScanAt))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_scan_at bucket not found")
+			return errors.New("boltstore: ix_scan_at bucket not found")
 		}
 		k, _ := idx.Cursor().Last()
 		if k == nil {

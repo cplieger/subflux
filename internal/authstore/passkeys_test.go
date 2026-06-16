@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/auth"
+	bolt "go.etcd.io/bbolt"
 )
 
 // newPasskeyStore opens a freshly bootstrapped bbolt file as a shared handle

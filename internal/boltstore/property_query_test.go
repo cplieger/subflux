@@ -11,9 +11,8 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the remaining task-9.3 test categories that complement the
@@ -252,7 +251,6 @@ func TestReconcileConvergence(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup: build a reproducible state with 4 subtitle rows across 2 videos.
-	type setupFn func(db *DB, dir string)
 	setup := func(db *DB, dir string) {
 		video1 := filepath.Join(dir, "v1.mkv")
 		video2 := filepath.Join(dir, "v2.mkv")
@@ -472,16 +470,14 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 	iterations := 50
 
 	// Goroutine 1: poller SaveDownload loop.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
 				panicked.Add(1)
 				t.Errorf("SaveDownload goroutine panicked: %v", r)
 			}
 		}()
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			tr := triples[i%len(triples)]
 			sub := filepath.Join(dir, fmt.Sprintf("%s.%s.srt", tr.mid, tr.lang))
 			subFilesMu.Lock()
@@ -494,22 +490,20 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 				Meta: &api.DownloadMeta{VideoPath: tr.video, Title: "T"},
 			})
 		}
-	}()
+	})
 
 	// Goroutine 2: ReconcileState loop.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
 				panicked.Add(1)
 				t.Errorf("ReconcileState goroutine panicked: %v", r)
 			}
 		}()
-		for i := 0; i < iterations/5; i++ {
+		for range iterations / 5 {
 			_, _ = db.ReconcileState(ctx)
 		}
-	}()
+	})
 
 	wg.Wait()
 

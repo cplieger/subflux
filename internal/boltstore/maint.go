@@ -10,10 +10,9 @@ import (
 	"sort"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the maintenance domain (MaintStore). DeleteStateByPaths
@@ -66,10 +65,7 @@ func (d *DB) DeleteStateByPaths(_ context.Context, videoPaths []string) (api.Cle
 
 	var subPaths []string
 	for start := 0; start < len(videoPaths); start += deletePathBatchSize {
-		end := start + deletePathBatchSize
-		if end > len(videoPaths) {
-			end = len(videoPaths)
-		}
+		end := min(start+deletePathBatchSize, len(videoPaths))
 		batchPaths, err := d.deletePathsBatch(videoPaths[start:end])
 		if err != nil {
 			return api.CleanupResult{}, err
@@ -100,7 +96,7 @@ func (d *DB) deletePathsBatch(paths []string) ([]string, error) {
 		}
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
-			return fmt.Errorf("boltstore: subtitle_state bucket not found")
+			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 
 		affectedTriples := make(map[stateTripleInfo]struct{})
@@ -162,7 +158,7 @@ func (d *DB) deletePathsBatch(paths []string) ([]string, error) {
 func collectVideoPathIDs(tx *bolt.Tx, videoPath string) ([]int64, error) {
 	idx := tx.Bucket([]byte(bucketIxStateVideo))
 	if idx == nil {
-		return nil, fmt.Errorf("boltstore: ix_state_video bucket not found")
+		return nil, errors.New("boltstore: ix_state_video bucket not found")
 	}
 	prefix := videoPrefix(videoPath)
 	var ids []int64
@@ -185,7 +181,7 @@ func collectVideoPathIDs(tx *bolt.Tx, videoPath string) ([]int64, error) {
 func mediaHasState(tx *bolt.Tx, mt api.MediaType, mid string) (bool, error) {
 	idx := tx.Bucket([]byte(bucketIxStateTriple))
 	if idx == nil {
-		return false, fmt.Errorf("boltstore: ix_state_triple bucket not found")
+		return false, errors.New("boltstore: ix_state_triple bucket not found")
 	}
 	prefix := mediaPrefix(mt, mid)
 	c := idx.Cursor()
@@ -201,7 +197,7 @@ func mediaHasState(tx *bolt.Tx, mt api.MediaType, mid string) (bool, error) {
 func deleteSubtitleFilesByMedia(tx *bolt.Tx, mt api.MediaType, mid string) error {
 	b := tx.Bucket([]byte(bucketSubtitleFiles))
 	if b == nil {
-		return fmt.Errorf("boltstore: subtitle_files bucket not found")
+		return errors.New("boltstore: subtitle_files bucket not found")
 	}
 	prefix := mediaPrefix(mt, mid)
 	var keys [][]byte
@@ -271,7 +267,7 @@ func (d *DB) CleanupDrift(_ context.Context, drift api.ConfigDrift) error {
 	return d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
-			return fmt.Errorf("boltstore: search_attempts bucket not found")
+			return errors.New("boltstore: search_attempts bucket not found")
 		}
 
 		// Adaptive disabled clears all backoff and subsumes the per-language /
@@ -386,10 +382,10 @@ const reconcileResetBatchSize = 500
 // filesystem stats happen outside any bbolt transaction (design "Transactions
 // and concurrency": never hold a read txn open while doing filesystem I/O).
 type reconcileEntry struct {
-	id        int64
 	tr        stateTripleInfo
 	subPath   string
 	videoPath string
+	id        int64
 	manual    bool
 }
 
@@ -483,11 +479,11 @@ func (d *DB) loadReconcileEntries() ([]reconcileEntry, error) {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateTriple))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_state_triple bucket not found")
+			return errors.New("boltstore: ix_state_triple bucket not found")
 		}
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
-			return fmt.Errorf("boltstore: subtitle_state bucket not found")
+			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 		return idx.ForEach(func(k, _ []byte) error {
 			mt, mid, lang, id, ok := splitStateTripleKey(k)
@@ -661,7 +657,7 @@ func (d *DB) reconcileResetBatch(
 	err := d.db.Update(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
-			return fmt.Errorf("boltstore: subtitle_state bucket not found")
+			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 		for _, tr := range keys {
 			missing := subMissing[tr]

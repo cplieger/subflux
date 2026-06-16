@@ -5,10 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/storetest"
+	bolt "go.etcd.io/bbolt"
 )
 
 // TestBoltStoreContract runs the engine-agnostic api.Store behavioral contract

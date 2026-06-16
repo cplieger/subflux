@@ -2,12 +2,12 @@ package boltstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the poll_state domain (PollStore): the poll_state bucket
@@ -42,7 +42,7 @@ func (d *DB) GetPollTimestamp(_ context.Context, key api.PollKey) (time.Time, er
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketPollState))
 		if b == nil {
-			return fmt.Errorf("boltstore: poll_state bucket not found")
+			return errors.New("boltstore: poll_state bucket not found")
 		}
 		v := b.Get(pollStateKey(key))
 		if v == nil {
@@ -74,7 +74,7 @@ func (d *DB) SetPollTimestamp(_ context.Context, key api.PollKey, t time.Time) e
 	return d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketPollState))
 		if b == nil {
-			return fmt.Errorf("boltstore: poll_state bucket not found")
+			return errors.New("boltstore: poll_state bucket not found")
 		}
 		return b.Put(pollStateKey(key), []byte(t.Format(pollTimeLayout)))
 	})

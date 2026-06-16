@@ -3,15 +3,15 @@ package authstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
-	"go.etcd.io/bbolt"
-
 	"github.com/cplieger/auth"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"go.etcd.io/bbolt"
 )
 
 // This file holds the PasskeyStore half of AuthStore: the durable
@@ -141,10 +141,10 @@ func passkeyUserIndexKey(userID int64, credID []byte) []byte {
 // commit (Requirements 9.1, 9.2).
 func (s *Store) CreatePasskey(_ context.Context, cred *auth.PasskeyCredential) error {
 	if cred == nil {
-		return fmt.Errorf("authstore: CreatePasskey: nil credential")
+		return errors.New("authstore: CreatePasskey: nil credential")
 	}
 	if len(cred.CredentialID) == 0 {
-		return fmt.Errorf("authstore: CreatePasskey: empty credential id")
+		return errors.New("authstore: CreatePasskey: empty credential id")
 	}
 	err := s.update(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)

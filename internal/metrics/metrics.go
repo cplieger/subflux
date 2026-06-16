@@ -28,7 +28,6 @@ type Metrics struct {
 	httpRequests *extmetrics.LabeledCounter
 	httpDuration *extmetrics.Histogram
 	registry     *extmetrics.Registry
-	totalSearch  atomic.Int64
 
 	// Store observability (Requirement 17).
 	storeFileBytes     *extmetrics.Gauge
@@ -38,6 +37,8 @@ type Metrics struct {
 	reconcileReset     *extmetrics.Counter
 	backupLastSuccess  *extmetrics.Gauge
 	backupDuration     *extmetrics.Gauge
+
+	totalSearch atomic.Int64
 }
 
 // New creates a new Metrics instance.

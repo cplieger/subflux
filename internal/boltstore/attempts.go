@@ -3,16 +3,16 @@ package boltstore
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"sort"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the adaptive-backoff domain (search_attempts bucket plus the
@@ -56,7 +56,7 @@ func (d *DB) RecordNoResult(_ context.Context, mediaType api.MediaType, mediaID,
 	err := d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
-			return fmt.Errorf("boltstore: search_attempts bucket not found")
+			return errors.New("boltstore: search_attempts bucket not found")
 		}
 		key := attemptKey(mediaType, mediaID, language, providerName)
 
@@ -109,7 +109,7 @@ func (d *DB) BackedOffProviders(_ context.Context, mediaType api.MediaType, medi
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
-			return fmt.Errorf("boltstore: search_attempts bucket not found")
+			return errors.New("boltstore: search_attempts bucket not found")
 		}
 		c := b.Cursor()
 		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
@@ -198,11 +198,11 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
-			return fmt.Errorf("boltstore: search_attempts bucket not found")
+			return errors.New("boltstore: search_attempts bucket not found")
 		}
 		idx := tx.Bucket([]byte(bucketIxAttemptsDue))
 		if idx == nil {
-			return fmt.Errorf("boltstore: ix_attempts_due bucket not found")
+			return errors.New("boltstore: ix_attempts_due bucket not found")
 		}
 		c := idx.Cursor()
 		for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -250,7 +250,7 @@ func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, medi
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
-			return fmt.Errorf("boltstore: search_attempts bucket not found")
+			return errors.New("boltstore: search_attempts bucket not found")
 		}
 		c := b.Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {

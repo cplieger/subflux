@@ -35,9 +35,8 @@ import (
 	"os"
 	"time"
 
-	"go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
+	"go.etcd.io/bbolt"
 )
 
 // Compile-time assertion: *DB implements the composite api.Store interface.

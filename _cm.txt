@@ -1,0 +1,10 @@
+style: satisfy golangci-lint gate across the bbolt store packages
+
+Behavior-preserving cleanup so the go-validate CI gate passes: gofumpt/gci
+formatting, fieldalignment struct reordering (JSON-by-name, wire format
+unchanged), perfsprint (errors.New / hex.EncodeToString), stdlib modernization
+(min/max, slices, range-over-int, sync.WaitGroup.Go), complexity extraction in
+UpdateUser/GetState and the contract helpers, goconst extraction, shadowed-err
+renames, and removal of dead code and stale nolint directives. The gosec G101
+hits on bbolt bucket-name constants are suppressed as documented false
+positives. No test was weakened; the full suite stays green under -race.

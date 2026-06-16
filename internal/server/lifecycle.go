@@ -117,6 +117,10 @@ func securityHeaders(next http.Handler) http.Handler {
 
 // --- Top-level handlers ---
 
+// keyStatus is the JSON response key shared by the health envelope and the
+// admin-bootstrap responses ({"status":"ok"} / {"status":"unready",...}).
+const keyStatus = "status"
+
 // handleHealth returns the liveness+readiness status. Emits the
 // canonical JSON envelope shared across the homelab's custom Go apps
 // (vibekit, vibecli, subflux, registry-stats, plex-exporter): 200 with
@@ -133,13 +137,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"status": "unready",
-			"reason": "starting up or shutting down",
+			keyStatus: "unready",
+			"reason":  "starting up or shutting down",
 		})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]string{keyStatus: "ok"})
 }
 
 // asyncActionResponse is the typed 202 Accepted response for async actions.

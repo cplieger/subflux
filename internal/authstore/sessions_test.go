@@ -275,11 +275,11 @@ func TestSessions_concurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Creators / updaters.
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			for i := 0; i < iters; i++ {
+			for i := range iters {
 				h := fmt.Sprintf("w%d-%d", w, i)
 				_ = s.CreateSession(ctx, mkSession(h, int64(w), now, now))
 				_ = s.UpdateSessionActivity(ctx, h, now.Add(time.Duration(i)*time.Second))
@@ -288,21 +288,19 @@ func TestSessions_concurrentAccess(t *testing.T) {
 		}(w)
 	}
 	// Sweepers.
-	for w := 0; w < 2; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < iters; i++ {
+	for range 2 {
+		wg.Go(func() {
+			for range iters {
 				_, _ = s.CleanupExpiredSessions(ctx, time.Now(), time.Hour, 24*time.Hour)
 			}
-		}()
+		})
 	}
 	// Batch updaters and per-user deleters.
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			for i := 0; i < iters; i++ {
+			for i := range iters {
 				_ = s.BatchUpdateSessionActivity(ctx, []string{fmt.Sprintf("w%d-%d", w, i)}, now)
 				_ = s.DeleteUserSessions(ctx, int64(w), fmt.Sprintf("w%d-0", w))
 			}

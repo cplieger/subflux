@@ -10,7 +10,7 @@ import (
 // from the database. The concrete *boltstore.DB satisfies this; the server
 // type-asserts s.db to check availability.
 type storeStatsProvider interface {
-	StoreFileStats() (fileBytes int64, freelistBytes int64)
+	StoreFileStats() (fileBytes, freelistBytes int64)
 }
 
 // storeMetricsInterval is how often the store file-size and freelist gauges are

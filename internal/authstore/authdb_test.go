@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/boltstore"
+	bolt "go.etcd.io/bbolt"
 )
 
 // bootstrappedFile returns the path to a bbolt file that has been opened (and

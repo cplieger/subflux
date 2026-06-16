@@ -5,11 +5,10 @@ import (
 	"context"
 	"testing"
 
-	bolt "go.etcd.io/bbolt"
-	"pgregory.net/rapid"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
+	"pgregory.net/rapid"
 )
 
 // This file covers the task-5.1 subtitle_files domain: RecordSubtitleFiles
@@ -516,7 +515,7 @@ func TestRecordSubtitleFiles_property_convergence(t *testing.T) {
 		genFiles := func(rt *rapid.T) []api.SubtitleFile {
 			n := rapid.IntRange(0, 4).Draw(rt, "n")
 			out := make([]api.SubtitleFile, 0, n)
-			for i := 0; i < n; i++ {
+			for range n {
 				lang := rapid.SampledFrom(langs).Draw(rt, "lang")
 				variant := rapid.SampledFrom(variants).Draw(rt, "variant")
 				external := rapid.Bool().Draw(rt, "external")
@@ -533,7 +532,7 @@ func TestRecordSubtitleFiles_property_convergence(t *testing.T) {
 		}
 
 		ops := rapid.IntRange(1, 8).Draw(rt, "ops")
-		for op := 0; op < ops; op++ {
+		for range ops {
 			mid := rapid.SampledFrom(mediaPool).Draw(rt, "mid")
 			files := genFiles(rt)
 

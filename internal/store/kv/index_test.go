@@ -30,7 +30,7 @@ func tagIndex() []IndexSpec[idxRec] {
 			return TimeIndexKeyless(v.Tag, pk)
 		},
 		Value: func(_ []byte, v *idxRec) []byte {
-			return Be64(uint64(v.N)) //nolint:gosec // test value
+			return Be64(uint64(v.N))
 		},
 	}}
 }
@@ -212,7 +212,7 @@ func TestPutIndexed_indexEqualsPrimaryRescan(t *testing.T) {
 				return derr
 			}
 			rows++
-			want[string(TimeIndexKeyless(r.Tag, k))] = uint64(r.N) //nolint:gosec // test value
+			want[string(TimeIndexKeyless(r.Tag, k))] = uint64(r.N)
 			return nil
 		}); ferr != nil {
 			return ferr

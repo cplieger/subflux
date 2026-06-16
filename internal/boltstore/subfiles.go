@@ -3,15 +3,16 @@ package boltstore
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
-
 	"github.com/cplieger/subflux/internal/api"
 	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the subtitle_files half of CoverageStore plus the
@@ -129,7 +130,7 @@ func (d *DB) putFileRow(tx *bolt.Tx, mediaType api.MediaType, mediaID string, k 
 func loadFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string) (map[subFileKey]fileRec, error) {
 	b := tx.Bucket([]byte(bucketSubtitleFiles))
 	if b == nil {
-		return nil, fmt.Errorf("boltstore: subtitle_files bucket not found")
+		return nil, errors.New("boltstore: subtitle_files bucket not found")
 	}
 	have := make(map[subFileKey]fileRec)
 	prefix := mediaPrefix(mediaType, mediaID)
@@ -142,7 +143,7 @@ func loadFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string) (map[sub
 		var fr fileRec
 		if derr := boltkv.Decode(v, &fr); derr != nil {
 			slog.Warn("boltstore: undecodable subtitle_files value, treating as replaceable",
-				"key", fmt.Sprintf("%x", key), "error", derr)
+				"key", hex.EncodeToString(key), "error", derr)
 			// Leave fr zero: a codec mismatch forces a rewrite if still wanted,
 			// or the stale-row delete removes it.
 		}
@@ -174,7 +175,7 @@ func (d *DB) UpsertSubtitleFile(_ context.Context, mediaType api.MediaType, medi
 	return d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSubtitleFiles))
 		if b == nil {
-			return fmt.Errorf("boltstore: subtitle_files bucket not found")
+			return errors.New("boltstore: subtitle_files bucket not found")
 		}
 		var offset int64
 		if old := b.Get(key); old != nil {
@@ -225,15 +226,15 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, mediaI
 	// rows of a triple are contiguous in cursor order, but caching keeps the
 	// join O(rows) even across non-adjacent repeats.
 	type autoInfo struct {
-		score     int
 		videoPath string
+		score     int
 	}
 	autoCache := make(map[string]autoInfo)
 
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSubtitleFiles))
 		if b == nil {
-			return fmt.Errorf("boltstore: subtitle_files bucket not found")
+			return errors.New("boltstore: subtitle_files bucket not found")
 		}
 		c := b.Cursor()
 		for key, v := c.Seek(scanPrefix); key != nil && bytes.HasPrefix(key, scanPrefix); key, v = c.Next() {
@@ -384,7 +385,7 @@ func (d *DB) SetSyncOffset(_ context.Context, path string, offsetMs int64) error
 	return d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSyncOffsets))
 		if b == nil {
-			return fmt.Errorf("boltstore: sync_offsets bucket not found")
+			return errors.New("boltstore: sync_offsets bucket not found")
 		}
 		return b.Put(syncOffsetKey(path), boltkv.Be64(uint64(offsetMs))) //nolint:gosec // G115: bit-preserving round-trip, no ordering on this bucket
 	})
@@ -400,7 +401,7 @@ func (d *DB) GetSyncOffset(_ context.Context, path string) (int64, error) {
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSyncOffsets))
 		if b == nil {
-			return fmt.Errorf("boltstore: sync_offsets bucket not found")
+			return errors.New("boltstore: sync_offsets bucket not found")
 		}
 		v := b.Get(syncOffsetKey(path))
 		if v == nil {

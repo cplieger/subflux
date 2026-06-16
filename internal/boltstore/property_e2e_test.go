@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/subflux/internal/api"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
-
-	"github.com/cplieger/subflux/internal/api"
 )
 
 // This file holds the END-TO-END index-equals-rescan property (task 9.3,
@@ -97,6 +96,7 @@ type statEnv struct {
 // pubAutoPath / pubManualPath build the subtitle paths SaveDownload stores, so
 // the ReconcileState op can mark them gone to drive the subtitle-missing branch.
 func pubAutoPath(mid, lang string) string { return fmt.Sprintf("/m/%s.%s.srt", mid, lang) }
+
 func pubManualPath(mid, lang string, ord int) string {
 	return fmt.Sprintf("/m/%s.%s.%d.srt", mid, lang, ord)
 }
@@ -134,7 +134,7 @@ func TestPublicStore_indexEqualsRescan(t *testing.T) {
 		}
 
 		n := rapid.IntRange(0, 60).Draw(rt, "ops")
-		for i := 0; i < n; i++ {
+		for range n {
 			applyPublicOp(rt, db, ctx, env)
 		}
 
@@ -202,7 +202,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 		m := rapid.SampledFrom(pubScanMedia).Draw(rt, "filesMedia")
 		k := rapid.IntRange(0, 3).Draw(rt, "fileCount")
 		var files []api.SubtitleFile
-		for i := 0; i < k; i++ {
+		for i := range k {
 			lang := rapid.SampledFrom([]string{"en", "fr"}).Draw(rt, "fileLang")
 			files = append(files, api.SubtitleFile{
 				Language: lang,
