@@ -21,3 +21,6 @@ internal/cache/testdata/rapid/
 **/.judgement/
 **/.refactor/
 **/.steering-maintenance/
+
+# Kiro specs, steering, and working artifacts
+.kiro/
