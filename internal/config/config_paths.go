@@ -15,8 +15,9 @@ import (
 const (
 	// DefaultConfigPath is the container-internal config file path.
 	DefaultConfigPath = "/config/config.yaml"
-	// DefaultDBPath is the container-internal database file path.
-	DefaultDBPath = "/config/subflux.db"
+	// DefaultDBPath is the container-internal bbolt database file path.
+	// Core and auth buckets live in the same file; no separate auth path.
+	DefaultDBPath = "/config/subflux.bolt"
 )
 
 // ErrPathNotAllowed is returned when a path is not under any configured media_roots.

@@ -2,19 +2,15 @@ package server
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
-// authCleanupInterval is how often expired sessions and stale auth state
-// are purged from the database.
+// authCleanupInterval is how often auth ceremonies and session debounce
+// state are pruned.
 const authCleanupInterval = scheduler.AuthCleanupInterval
-
-// oidcStateTTL is how long an OIDC authorization flow can remain pending.
-const oidcStateTTL = scheduler.OIDCStateTTL
 
 // runScheduler runs the periodic scan and upgrade tickers until ctx is cancelled.
 func (s *Server) runScheduler(ctx context.Context) {
@@ -31,12 +27,13 @@ func (s *Server) runFullScan(ctx context.Context) {
 // schedulerDeps builds the scheduler.Deps from Server fields.
 func (s *Server) schedulerDeps() *scheduler.Deps {
 	return &scheduler.Deps{
-		DB:            s.db,
-		Metrics:       s.metrics,
-		Events:        &serveradapter.ScanEventAdapter{E: s.events},
-		Activity:      &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:        &serveradapter.AlertAdapter{A: s.alerts},
-		ShowSkipCache: s.showSkipCache,
+		DB:               s.db,
+		Metrics:          s.metrics,
+		ReconcileMetrics: s.metrics,
+		Events:           &serveradapter.ScanEventAdapter{E: s.events},
+		Activity:         &serveradapter.ActivityAdapter{A: s.activity},
+		Alerts:           &serveradapter.AlertAdapter{A: s.alerts},
+		ShowSkipCache:    s.showSkipCache,
 		StateFunc: func() *scheduler.LiveState {
 			ls := s.state()
 			return &scheduler.LiveState{
@@ -52,8 +49,10 @@ func (s *Server) schedulerDeps() *scheduler.Deps {
 	}
 }
 
-// runAuthCleanup runs periodic cleanup of auth ceremonies, expired sessions,
-// and expired OIDC states.
+// runAuthCleanup runs periodic cleanup of auth ceremonies and the session
+// activity debouncer. Expired sessions and OIDC states are now evicted by
+// the auth store's built-in sweeper (internal/authstore/sweeper.go), so
+// this goroutine only handles the non-auth-store concerns.
 func (s *Server) runAuthCleanup(ctx context.Context) {
 	ticker := time.NewTicker(authCleanupInterval)
 	defer ticker.Stop()
@@ -61,20 +60,6 @@ func (s *Server) runAuthCleanup(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			s.ceremonies.Cleanup()
-			if s.authStore == nil {
-				continue
-			}
-			cfg := s.state().cfg
-			if cfg == nil {
-				continue
-			}
-			if _, err := s.authStore.CleanupExpiredSessions(ctx, time.Now(),
-				cfg.SessionIdleTimeout(), cfg.SessionAbsoluteTimeout()); err != nil {
-				slog.Debug("session cleanup failed", "error", err)
-			}
-			if _, err := s.authStore.CleanupExpiredOIDCStates(ctx, time.Now(), oidcStateTTL); err != nil {
-				slog.Debug("oidc state cleanup failed", "error", err)
-			}
 			s.sessDebounce.prune(time.Now())
 		case <-ctx.Done():
 			return

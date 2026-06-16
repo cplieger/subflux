@@ -16,37 +16,44 @@ import (
 	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
-	"github.com/cplieger/subflux/internal/store"
 )
 
 // --- Test helpers ---
 
-// testAuthServer creates a minimal Server backed by a real SQLite database
+// testAuthServer creates a minimal Server backed by a real bbolt database
 // for auth handler testing.
-func testAuthServer(t *testing.T) (*Server, *store.DB) {
+func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "test.db")
-	db, err := store.Open(context.Background(), path)
+	path := filepath.Join(t.TempDir(), "test.bolt")
+	db, err := boltstore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close(context.Background()) })
+
+	authDB := authstore.New(db.BoltDB())
+	if err := authDB.Open(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { authDB.Close() })
 
 	rl := ratelimit.NewRateLimiter(context.Background(), ratelimit.DefaultConfig())
 	t.Cleanup(func() { rl.Stop() })
 
 	s := &Server{
 		authDeps: authDeps{
-			authStore:   db,
-			adminDB:     db,
-			secDB:       db,
-			oidcDB:      db,
+			authStore:   authDB,
+			adminDB:     authDB,
+			secDB:       authDB,
+			oidcDB:      authDB,
 			rateLimiter: rl,
 			authenticator: &authhandlers.Authenticator{
-				Store:       db,
+				Store:       authDB,
 				IdleTimeout: 24 * time.Hour,
 				AbsTimeout:  7 * 24 * time.Hour,
 			},
@@ -57,10 +64,10 @@ func testAuthServer(t *testing.T) (*Server, *store.DB) {
 	}
 	s.live.Store(&liveState{cfg: &authTestConfig{}})
 	s.authH = &authhandlers.Handler{
-		Store:       db,
-		AdminDB:     db,
-		SecDB:       db,
-		OidcDB:      db,
+		Store:       authDB,
+		AdminDB:     authDB,
+		SecDB:       authDB,
+		OidcDB:      authDB,
 		RateLimiter: rl,
 		Ceremonies:  s.ceremonies,
 		Config:      func() authhandlers.AuthConfig { return s.state().cfg },
@@ -70,7 +77,7 @@ func testAuthServer(t *testing.T) (*Server, *store.DB) {
 		Configured: func() bool { return s.configured.Load() },
 		ConfigPath: func() string { return cfgFilePath },
 	})
-	return s, db
+	return s, authDB
 }
 
 // authTestConfig implements api.ConfigProvider for auth tests.
@@ -93,7 +100,7 @@ func (c *authTestConfig) SessionAbsoluteTimeout() time.Duration {
 func (c *authTestConfig) WebAuthnRPID() string { return "" }
 
 // createTestUser creates a user in the DB with the given username and password.
-func createTestUser(t *testing.T, db *store.DB, username, password string) *api.User {
+func createTestUser(t *testing.T, db *authstore.Store, username, password string) *api.User {
 	t.Helper()
 	hash, err := authlib.HashPassword(password)
 	if err != nil {
@@ -116,7 +123,7 @@ func createTestUser(t *testing.T, db *store.DB, username, password string) *api.
 
 // createTestSession creates a session for the given user and returns the
 // plaintext token.
-func createTestSession(t *testing.T, db *store.DB, userID int64) string {
+func createTestSession(t *testing.T, db *authstore.Store, userID int64) string {
 	t.Helper()
 	token, hash, err := authlib.GenerateSessionToken()
 	if err != nil {

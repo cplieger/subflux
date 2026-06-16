@@ -61,26 +61,29 @@ func (s *Server) runOneBackup(ctx context.Context) {
 		slog.Warn("backup: create directory failed", "dir", dir, "error", err)
 		return
 	}
-	dest := filepath.Join(dir, "subflux-"+time.Now().Format("20060102-150405")+".db")
+	dest := filepath.Join(dir, "subflux-"+time.Now().Format("20060102-150405")+".bolt")
+	start := time.Now()
 	if err := bs.BackupInto(ctx, dest); err != nil {
 		slog.Error("backup failed", "dest", dest, "error", err)
 		return
 	}
+	dur := time.Since(start)
 	if err := os.Chmod(dest, 0o600); err != nil {
 		slog.Warn("backup: chmod failed", "dest", dest, "error", err)
 	}
-	slog.Info("database backup written", "dest", dest)
+	slog.Info("database backup written", "dest", dest, "duration", dur.Round(time.Millisecond).String())
+	s.metrics.RecordBackupSuccess(dur)
 	pruneBackups(dir, cfg.BackupRetention())
 }
 
 // pruneBackups keeps the newest `keep` timestamped backups in dir and removes
 // the rest. Timestamped names sort chronologically, so lexical order is age
-// order; the glob excludes the live subflux.db (no dash).
+// order; the glob excludes the live subflux.bolt (no dash).
 func pruneBackups(dir string, keep int) {
 	if keep < 1 {
 		keep = 1
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, "subflux-*.db"))
+	matches, err := filepath.Glob(filepath.Join(dir, "subflux-*.bolt"))
 	if err != nil || len(matches) <= keep {
 		return
 	}

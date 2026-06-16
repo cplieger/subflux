@@ -16,8 +16,9 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
-	"github.com/cplieger/subflux/internal/store"
 )
 
 // =============================================================================
@@ -172,6 +173,10 @@ func (noopMetrics) Handler() http.HandlerFunc {
 		fmt.Fprint(w, "metrics ok")
 	}
 }
+func (noopMetrics) RecordStoreFileSize(_ int64)                  {}
+func (noopMetrics) RecordStoreFreelistBytes(_ int64)             {}
+func (noopMetrics) RecordReconcile(_ int, _ int64, _ time.Duration) {}
+func (noopMetrics) RecordBackupSuccess(_ time.Duration)          {}
 
 func TestIntegration_MiddlewareChain(t *testing.T) {
 	t.Parallel()
@@ -339,17 +344,23 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 
 func TestIntegration_DatabaseMigration(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), "migration.db")
-	db, err := store.Open(context.Background(), path)
+	path := filepath.Join(t.TempDir(), "migration.bolt")
+	coreDB, err := boltstore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close(context.Background())
+	defer coreDB.Close(context.Background())
+
+	db := authstore.New(coreDB.BoltDB())
+	if err := db.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
 
 	ctx := context.Background()
 
-	// 1. Verify all auth tables exist by exercising each one.
-	// If any table is missing, the operations below will fail.
+	// 1. Verify all auth buckets exist by exercising each one.
+	// If any bucket is missing, the operations below will fail.
 	now := time.Now()
 	user := &api.User{
 		Username:     "migration-test",
@@ -360,7 +371,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		UpdatedAt:    now,
 	}
 	if err := db.CreateUser(ctx, user); err != nil {
-		t.Fatalf("auth_users table: %v", err)
+		t.Fatalf("auth_users bucket: %v", err)
 	}
 	if _, err := db.UserCount(ctx); err != nil {
 		t.Fatalf("auth_users count: %v", err)
@@ -372,7 +383,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		CreatedAt: now, LastActivity: now,
 	}
 	if err := db.CreateSession(ctx, sess); err != nil {
-		t.Fatalf("auth_sessions table: %v", err)
+		t.Fatalf("auth_sessions: %v", err)
 	}
 
 	apiKey := &api.Key{
@@ -381,20 +392,28 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		Label: "migration-key", CreatedAt: now,
 	}
 	if err := db.CreateAPIKey(ctx, apiKey); err != nil {
-		t.Fatalf("auth_api_keys table: %v", err)
+		t.Fatalf("auth_api_keys bucket: %v", err)
 	}
 
 	if err := db.CreateOIDCState(ctx, "state1", "nonce1", "verifier1", "/"); err != nil {
-		t.Fatalf("auth_oidc_states table: %v", err)
+		t.Fatalf("auth_oidc_states: %v", err)
 	}
 
-	// 2. Close and re-open the database; verify data is preserved.
-	db.Close(context.Background())
-	db, err = store.Open(context.Background(), path)
+	// 2. Close and re-open the database; verify durable data is preserved.
+	db.Close()
+	coreDB.Close(context.Background())
+
+	coreDB, err = boltstore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close(context.Background())
+	defer coreDB.Close(context.Background())
+
+	db = authstore.New(coreDB.BoltDB())
+	if err := db.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
 
 	// Verify auth user survived re-open.
 	u, err := db.GetUserByUsername(ctx, "migration-test")
@@ -402,17 +421,10 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		t.Fatal("auth user not preserved after re-open")
 	}
 
-	// 3. Foreign key cascades: delete user → sessions, API keys deleted.
+	// 3. Foreign key cascades: delete user → API keys deleted; sessions are
+	// ephemeral (in-memory), so they don't survive the re-open anyway.
 	if err := db.DeleteUser(ctx, u.ID); err != nil {
 		t.Fatal(err)
-	}
-
-	s2, err := db.GetSessionByHash(ctx, "migration-sess-hash")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s2 != nil {
-		t.Error("session not cascade-deleted when user was deleted")
 	}
 
 	k, err := db.GetAPIKeyByHash(ctx, "migration-key-hash")

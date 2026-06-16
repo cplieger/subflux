@@ -3,7 +3,7 @@
 // continue to refer to authstore.AuthStore without depending on the
 // library's import path directly.
 //
-// The auth library publishes a structurally identical AuthStore composed of
+// The auth library publishes store.AuthStore, composed of
 // UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore.
 // Subflux's domain types (api.User, api.Session, api.Key,
 // api.PasskeyCredential) are type aliases of the library's types

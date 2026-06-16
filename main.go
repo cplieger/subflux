@@ -18,6 +18,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrapi"
 	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
@@ -29,15 +30,14 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server"
-	"github.com/cplieger/subflux/internal/store"
 	"github.com/cplieger/subflux/internal/wiring"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // Compile-time interface satisfaction checks.
 var (
-	_ api.Store           = (*store.DB)(nil)
-	_ authstore.AuthStore = (*store.DB)(nil)
+	_ api.Store           = (*boltstore.DB)(nil)
+	_ authstore.AuthStore = (*authstore.Store)(nil)
 	_ api.ConfigProvider  = (*config.Config)(nil)
 	_ api.Scorer          = (*scorer.Engine)(nil)
 	_ api.ArrClient       = (*arrapi.Client)(nil)
@@ -227,7 +227,7 @@ func runServer() int {
 			"config_path", configPath)
 
 		// Open the database so config saves work.
-		db, dbErr := store.Open(context.Background(), dbPath)
+		db, dbErr := boltstore.Open(dbPath)
 		if dbErr != nil {
 			slog.Error("failed to open database", "error", dbErr)
 			return 1
@@ -236,6 +236,14 @@ func runServer() int {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 		defer db.Close(ctx)
+
+		// Build auth store over the shared bbolt handle and start its sweeper.
+		authDB := authstore.New(db.BoltDB())
+		if err := authDB.Open(); err != nil {
+			slog.Error("failed to start auth sweeper", "error", err)
+			return 1
+		}
+		defer authDB.Close()
 
 		defer m.Cleanup()
 
@@ -255,7 +263,7 @@ func runServer() int {
 		// Auth setup (unconfigured mode: no WebAuthn or OIDC).
 		rateLimiter := ratelimit.NewRateLimiter(ctx, ratelimit.DefaultConfig())
 		defer rateLimiter.Stop()
-		srv.SetAuth(db, rateLimiter, nil, nil)
+		srv.SetAuth(authDB, rateLimiter, nil, nil)
 
 		serveAndWait(ctx, cancel, m, func() {
 			srv.StartUnconfigured(ctx, func() { m.Set(true) })
@@ -277,12 +285,20 @@ func runConfiguredServer(cfg *config.Config) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := store.Open(ctx, dbPath)
+	db, err := boltstore.Open(dbPath)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		return 1
 	}
 	defer db.Close(ctx)
+
+	// Build auth store over the shared bbolt handle and start its sweeper.
+	authDB := authstore.New(db.BoltDB())
+	if err := authDB.Open(); err != nil {
+		slog.Error("failed to start auth sweeper", "error", err)
+		return 1
+	}
+	defer authDB.Close()
 
 	m := ensureMarker()
 	defer m.Cleanup()
@@ -341,7 +357,7 @@ func runConfiguredServer(cfg *config.Config) int {
 		srv.SetOIDCLazy(oidcCfg)
 	}
 
-	srv.SetAuth(db, rateLimiter, wa, nil)
+	srv.SetAuth(authDB, rateLimiter, wa, nil)
 
 	slog.Info("authentication configured",
 		"webauthn", wa != nil,
