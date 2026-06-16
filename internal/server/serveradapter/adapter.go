@@ -4,7 +4,10 @@
 package serveradapter
 
 import (
+	"log/slog"
+
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -44,6 +47,26 @@ type AlertAdapter struct{ A *activity.AlertLog }
 func (a *AlertAdapter) Record(category, msg string)   { a.A.Record(category, msg) }
 func (a *AlertAdapter) RecordInfo(msg string)         { a.A.RecordInfo(msg) }
 func (a *AlertAdapter) RecordWarn(source, msg string) { a.A.RecordWarn(source, msg) }
+
+// RecordStoreWriteError checks whether the error indicates a disk-full or
+// unrecoverable I/O condition and raises a persistent alert so operators are
+// notified before the system crash-loops. Non-disk-full write errors are logged
+// at ERROR level with a distinctive message for Loki/Alertmanager matching.
+func (a *AlertAdapter) RecordStoreWriteError(err error) {
+	if err == nil {
+		return
+	}
+	if boltstore.IsDiskFullError(err) {
+		slog.Error("store write failed: disk full or I/O error — persistent alert raised",
+			"error", err)
+		a.A.RecordPersistent("store",
+			"Database write failed (disk full or I/O error): "+err.Error()+
+				". Free disk space or check filesystem permissions to resume normal operation.")
+		return
+	}
+	// Non-disk-full write error: log distinctively for monitoring.
+	slog.Error("store write failed", "error", err)
+}
 
 // ScanEventAdapter bridges events.EventBus to scanning.EventPublisher.
 type ScanEventAdapter struct{ E *events.EventBus }

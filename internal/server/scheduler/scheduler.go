@@ -36,10 +36,17 @@ type Store interface {
 // Compile-time assertion: api.Store satisfies Store.
 var _ Store = api.Store(nil)
 
+// ReconcileMetrics is the narrow observability interface for reconcile passes.
+// The concrete *metrics.Metrics satisfies this via structural typing.
+type ReconcileMetrics interface {
+	RecordReconcile(deleted int, reset int64, dur time.Duration)
+}
+
 // Deps holds all dependencies for the scheduler.
 type Deps struct {
 	DB                  api.Store
 	Metrics             scanning.ScanMetrics
+	ReconcileMetrics    ReconcileMetrics // nil-safe; omit to skip reconcile metrics
 	Events              *serveradapter.ScanEventAdapter
 	Activity            *serveradapter.ActivityAdapter
 	Alerts              *serveradapter.AlertAdapter
@@ -144,11 +151,22 @@ func RunDBMaintenance(ctx context.Context, deps *Deps) {
 	result, err := deps.DB.ReconcileState(ctx)
 	if err != nil {
 		slog.Warn("db maintenance: reconcile failed", "error", err)
+		// Surface a persistent alert on disk-full or repeated write failure
+		// so operators are notified before the system crash-loops.
+		if deps.Alerts != nil {
+			deps.Alerts.RecordStoreWriteError(err)
+		}
 	} else if len(result.Deleted.Paths) > 0 || result.ResetCount > 0 {
 		slog.Info("db maintenance: reconciled stale entries",
 			"deleted", len(result.Deleted.Paths), "reset", result.ResetCount,
 			"duration", time.Since(start).Round(time.Millisecond).String())
 	}
+
+	// Record reconcile metrics (nil-safe).
+	if deps.ReconcileMetrics != nil {
+		deps.ReconcileMetrics.RecordReconcile(len(result.Deleted.Paths), result.ResetCount, time.Since(start))
+	}
+
 	deps.DeleteSubtitleFiles(result.Deleted.Paths, "reconcile")
 
 	downloads, attempts, err := deps.DB.Stats(ctx)

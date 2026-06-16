@@ -2,19 +2,19 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
-	"time"
 
-	authlib "github.com/cplieger/auth"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/clisearch"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/fsutil"
-	"github.com/cplieger/subflux/internal/store"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -29,7 +29,7 @@ func runCLISearch() int {
 		return 1
 	}
 
-	db, dbErr := store.Open(context.Background(), dbPath)
+	db, dbErr := boltstore.Open(dbPath)
 	if dbErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: database unavailable: %v\n", dbErr)
 	}
@@ -63,23 +63,6 @@ func runCLIResetPassword() int {
 }
 
 func doResetPassword(username string) error {
-	db, err := store.Open(context.Background(), dbPath)
-	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	defer db.Close(ctx)
-
-	user, err := db.GetUserByUsername(ctx, username)
-	if err != nil {
-		return fmt.Errorf("database error: %w", err)
-	}
-	if user == nil {
-		return fmt.Errorf("user not found: %s", username)
-	}
-
 	fmt.Fprint(os.Stderr, "New password: ")
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
@@ -90,25 +73,21 @@ func doResetPassword(username string) error {
 	}
 	password := scanner.Text()
 
-	if errLen := authlib.ValidatePasswordLength(password, true); errLen != nil {
-		return errLen
-	}
-	if errCtx := authlib.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
-		return errCtx
-	}
-
-	hash, err := authlib.HashPassword(password)
+	body, err := json.Marshal(map[string]string{
+		"action":   "reset-password",
+		"username": username,
+		"password": password,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	user.PasswordHash = hash
-	if err := db.UpdateUser(ctx, user); err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+	data, status, ok := cliRequest(http.MethodPost, "/api/admin/bootstrap", bytes.NewReader(body))
+	if !ok {
+		return errors.New("failed to connect to server")
 	}
-
-	if err := db.DeleteUserSessions(ctx, user.ID, ""); err != nil {
-		return fmt.Errorf("failed to invalidate sessions: %w", err)
+	if status >= 300 {
+		return fmt.Errorf("server error (%d): %s", status, string(data))
 	}
 
 	fmt.Fprintf(os.Stderr, "Password reset for %s\n", username)
@@ -128,40 +107,31 @@ func runCLIGenerateAPIKey() int {
 }
 
 func doGenerateAPIKey(username, label string) error {
-	db, err := store.Open(context.Background(), dbPath)
+	body, err := json.Marshal(map[string]string{
+		"action":   "generate-api-key",
+		"username": username,
+		"label":    label,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	defer db.Close(ctx)
-
-	user, err := db.GetUserByUsername(ctx, username)
-	if err != nil {
-		return fmt.Errorf("database error: %w", err)
+	data, status, ok := cliRequest(http.MethodPost, "/api/admin/bootstrap", bytes.NewReader(body))
+	if !ok {
+		return errors.New("failed to connect to server")
 	}
-	if user == nil {
-		return fmt.Errorf("user not found: %s", username)
+	if status >= 300 {
+		return fmt.Errorf("server error (%d): %s", status, string(data))
 	}
 
-	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
-	if err != nil {
-		return fmt.Errorf("failed to generate API key: %w", err)
+	var resp struct {
+		Key string `json:"key"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	apiKey := &api.Key{
-		UserID:    user.ID,
-		KeyHash:   hash,
-		KeyPrefix: prefix,
-		KeySuffix: suffix,
-		Label:     label,
-	}
-	if err := db.CreateAPIKey(ctx, apiKey); err != nil {
-		return fmt.Errorf("failed to store API key: %w", err)
-	}
-
-	fmt.Println(plaintext)
+	fmt.Println(resp.Key)
 	return nil
 }
 

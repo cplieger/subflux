@@ -29,6 +29,15 @@ type Metrics struct {
 	httpDuration *extmetrics.Histogram
 	registry     *extmetrics.Registry
 	totalSearch  atomic.Int64
+
+	// Store observability (Requirement 17).
+	storeFileBytes     *extmetrics.Gauge
+	storeFreelistBytes *extmetrics.Gauge
+	reconcileDuration  *extmetrics.Gauge
+	reconcileDeleted   *extmetrics.Counter
+	reconcileReset     *extmetrics.Counter
+	backupLastSuccess  *extmetrics.Gauge
+	backupDuration     *extmetrics.Gauge
 }
 
 // New creates a new Metrics instance.
@@ -49,6 +58,15 @@ func New() *Metrics {
 		adaptSkips:   extmetrics.NewCounter("adaptive_skips_total", "Total items skipped by adaptive search"),
 		httpRequests: extmetrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
 		httpDuration: extmetrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
+
+		// Store observability.
+		storeFileBytes:     extmetrics.NewGauge("store_file_bytes", "Current bbolt database file size in bytes"),
+		storeFreelistBytes: extmetrics.NewGauge("store_freelist_bytes", "Reclaimable freelist bytes in the bbolt database"),
+		reconcileDuration:  extmetrics.NewGauge("reconcile_duration_seconds", "Duration of last reconcile pass in seconds"),
+		reconcileDeleted:   extmetrics.NewCounter("reconcile_deleted_total", "Total subtitle paths deleted by reconciliation"),
+		reconcileReset:     extmetrics.NewCounter("reconcile_reset_total", "Total triples reset by reconciliation"),
+		backupLastSuccess:  extmetrics.NewGauge("backup_last_success_timestamp", "Unix timestamp of last successful backup"),
+		backupDuration:     extmetrics.NewGauge("backup_duration_seconds", "Duration of last successful backup in seconds"),
 	}
 
 	m.registry = extmetrics.NewRegistry("subflux")
@@ -65,6 +83,13 @@ func New() *Metrics {
 	m.registry.RegisterCounter(m.adaptSkips)
 	m.registry.RegisterLabeledCounter(m.httpRequests)
 	m.registry.RegisterHistogram(m.httpDuration)
+	m.registry.RegisterGauge(m.storeFileBytes)
+	m.registry.RegisterGauge(m.storeFreelistBytes)
+	m.registry.RegisterGauge(m.reconcileDuration)
+	m.registry.RegisterCounter(m.reconcileDeleted)
+	m.registry.RegisterCounter(m.reconcileReset)
+	m.registry.RegisterGauge(m.backupLastSuccess)
+	m.registry.RegisterGauge(m.backupDuration)
 
 	return m
 }
@@ -121,4 +146,29 @@ func (m *Metrics) TotalSearches() int64 {
 // Handler returns an HTTP handler that serves Prometheus metrics.
 func (m *Metrics) Handler() http.HandlerFunc {
 	return m.registry.Handler()
+}
+
+// --- Store observability (Requirement 17) ---
+
+// RecordStoreFileSize records the current bbolt database file size.
+func (m *Metrics) RecordStoreFileSize(bytes int64) {
+	m.storeFileBytes.Set(float64(bytes))
+}
+
+// RecordStoreFreelistBytes records the reclaimable freelist bytes.
+func (m *Metrics) RecordStoreFreelistBytes(bytes int64) {
+	m.storeFreelistBytes.Set(float64(bytes))
+}
+
+// RecordReconcile records metrics from a reconcile pass.
+func (m *Metrics) RecordReconcile(deleted int, reset int64, dur time.Duration) {
+	m.reconcileDuration.Set(dur.Seconds())
+	m.reconcileDeleted.Add(int64(deleted))
+	m.reconcileReset.Add(reset)
+}
+
+// RecordBackupSuccess records a successful backup's timestamp and duration.
+func (m *Metrics) RecordBackupSuccess(dur time.Duration) {
+	m.backupLastSuccess.Set(float64(time.Now().Unix()))
+	m.backupDuration.Set(dur.Seconds())
 }

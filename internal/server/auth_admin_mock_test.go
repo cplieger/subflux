@@ -8,25 +8,33 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
-	"github.com/cplieger/subflux/internal/store"
 )
 
 func testAdminServer(t *testing.T) *Server {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "test.db")
-	db, err := store.Open(context.Background(), path)
+	path := filepath.Join(t.TempDir(), "test.bolt")
+	db, err := boltstore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close(context.Background()) })
+
+	authDB := authstore.New(db.BoltDB())
+	if err := authDB.Open(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { authDB.Close() })
+
 	s := &Server{
 		authDeps: authDeps{
-			authStore:  db,
-			adminDB:    db,
-			secDB:      db,
-			oidcDB:     db,
+			authStore:  authDB,
+			adminDB:    authDB,
+			secDB:      authDB,
+			oidcDB:     authDB,
 			ceremonies: authhandlers.NewCeremonyStore(),
 		},
 		activity: activity.New(10),
@@ -34,10 +42,10 @@ func testAdminServer(t *testing.T) *Server {
 	}
 	s.live.Store(&liveState{cfg: &authTestConfig{}})
 	s.authH = &authhandlers.Handler{
-		Store:      db,
-		AdminDB:    db,
-		SecDB:      db,
-		OidcDB:     db,
+		Store:      authDB,
+		AdminDB:    authDB,
+		SecDB:      authDB,
+		OidcDB:     authDB,
 		Ceremonies: s.ceremonies,
 		Config:     func() authhandlers.AuthConfig { return s.state().cfg },
 		Configured: func() bool { return s.configured.Load() },

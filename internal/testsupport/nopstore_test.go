@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/store/storetest"
 )
 
 // TestNopStoreContract verifies that NopStore satisfies the same basic
@@ -99,13 +98,5 @@ func TestNopStoreContract(t *testing.T) {
 		if dl != 0 || att != 0 {
 			t.Errorf("Stats = (%d, %d), want (0, 0)", dl, att)
 		}
-	})
-}
-
-// TestNopStore_storetest_Suite runs the shared contract suite from storetest.
-func TestNopStore_storetest_Suite(t *testing.T) {
-	t.Parallel()
-	storetest.Suite(t, func(t *testing.T) api.Store {
-		return &NopStore{}
 	})
 }

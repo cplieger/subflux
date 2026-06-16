@@ -61,6 +61,12 @@ type Metrics interface {
 	RecordHTTP(method, path string, status int, d time.Duration)
 	TotalSearches() int64
 	Handler() http.HandlerFunc
+
+	// Store observability (Requirement 17).
+	RecordStoreFileSize(bytes int64)
+	RecordStoreFreelistBytes(bytes int64)
+	RecordReconcile(deleted int, reset int64, dur time.Duration)
+	RecordBackupSuccess(dur time.Duration)
 }
 
 // sleepCtx pauses for d, returning early if ctx is cancelled.
@@ -222,10 +228,11 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 	addr := fmt.Sprintf(":%d", ls.cfg.ServerPort())
 
 	if s.configured.Load() {
-		s.bgWg.Add(3)
+		s.bgWg.Add(4)
 		go func() { defer s.bgWg.Done(); s.runScheduler(ctx) }()
 		go func() { defer s.bgWg.Done(); s.runPoller(ctx) }()
 		go func() { defer s.bgWg.Done(); s.runBackup(ctx) }()
+		go func() { defer s.bgWg.Done(); s.runStoreMetrics(ctx) }()
 	}
 
 	if cfg, ok := s.state().cfg.(*config.Config); ok && cfg.AuthDisabled() {

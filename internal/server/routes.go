@@ -222,6 +222,16 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Provider timeout reset.
 	adminConfigured.Add("POST /api/providers/timeout/reset", s.queryH.HandleProviderTimeoutReset)
 
+	// --- Admin bootstrap (localhost-only, no auth) ---
+	//
+	// CLI auth commands (reset-password, generate-api-key) route through this
+	// endpoint instead of opening the bbolt file directly. bbolt's exclusive
+	// OS lock prevents multi-process access (a regression from SQLite WAL).
+	// Guarded by requireLocalhost: only loopback (127.0.0.1/::1) is accepted,
+	// so docker exec and same-host CLI can reach it without credentials.
+	localhost := newRouteGroup(mux, s.requireLocalhost)
+	localhost.Add("POST /api/admin/bootstrap", s.handleAdminBootstrap)
+
 	// --- Web UI ---
 	//
 	// Static assets and the SPA shell live behind the same catch-all.
