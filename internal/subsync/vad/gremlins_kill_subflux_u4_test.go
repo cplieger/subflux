@@ -57,7 +57,8 @@ func gk_subflux_u4_setAll(a *[vadTableSize]int16, val int16) {
 // the two GMM mean arrays that the separation/clamp block mutates.
 func gk_subflux_u4_assertModel(t *testing.T, name string,
 	gotFlag int16, gotLLR float64, gotFC int32, gotNM, gotSM [vadTableSize]int16,
-	wantFlag int16, wantLLR float64, wantFC int32, wantNM, wantSM [vadTableSize]int16) {
+	wantFlag int16, wantLLR float64, wantFC int32, wantNM, wantSM [vadTableSize]int16,
+) {
 	t.Helper()
 	if gotFlag != wantFlag {
 		t.Errorf("%s: flag = %d, want %d", name, gotFlag, wantFlag)

@@ -57,10 +57,11 @@ func gk_subflux_u27_runState(t *testing.T, rawQuery string) *api.StateQuery {
 
 // A non-empty, valid, positive limit must be applied verbatim (default is 50).
 // Mutants that would break this:
-//   28:28 (v!="" -> v==""): block skipped, Limit stays 50.
-//   29:37 (err==nil -> err!=nil): parse-success rejected, Limit stays 50.
-//   29:49 negation (n>0 -> n<=0): 7<=0 false, Limit stays 50.
-//   33:11 negation (limit>10000 -> limit<=10000): 7<=10000 true, capped to 10000.
+//
+//	28:28 (v!="" -> v==""): block skipped, Limit stays 50.
+//	29:37 (err==nil -> err!=nil): parse-success rejected, Limit stays 50.
+//	29:49 negation (n>0 -> n<=0): 7<=0 false, Limit stays 50.
+//	33:11 negation (limit>10000 -> limit<=10000): 7<=10000 true, capped to 10000.
 func TestGk_subflux_u27_HandleState_limitApplied(t *testing.T) {
 	t.Parallel()
 	q := gk_subflux_u27_runState(t, "limit=7")
@@ -71,8 +72,9 @@ func TestGk_subflux_u27_HandleState_limitApplied(t *testing.T) {
 
 // limit=0 must NOT override the default of 50: the guard is `n > 0`.
 // Mutants that would break this (both accept 0 -> Limit=0):
-//   29:49 boundary (n>0 -> n>=0): 0>=0 true.
-//   29:49 negation (n>0 -> n<=0): 0<=0 true.
+//
+//	29:49 boundary (n>0 -> n>=0): 0>=0 true.
+//	29:49 negation (n>0 -> n<=0): 0<=0 true.
 func TestGk_subflux_u27_HandleState_limitZeroIgnored(t *testing.T) {
 	t.Parallel()
 	q := gk_subflux_u27_runState(t, "limit=0")

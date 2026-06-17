@@ -34,8 +34,8 @@ func gk_subflux_u24_newStore(t *testing.T) *Store {
 // gk_subflux_u24_logRec is one captured slog record: its message plus a copy of
 // its attributes (keyed by name) so a test can inspect attribute values.
 type gk_subflux_u24_logRec struct {
-	msg   string
 	attrs map[string]slog.Value
+	msg   string
 }
 
 // gk_subflux_u24_capHandler is a slog.Handler that records every log line into a

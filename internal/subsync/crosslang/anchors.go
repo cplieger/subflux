@@ -71,7 +71,7 @@ func extractWords(a *anchor, cleaned string) {
 		words := strings.Fields(line)
 		a.WordCount += len(words)
 		for i, w := range words {
-			atStart := i == 0 || (i > 0 && endsWithSentence(words[i-1]))
+			atStart := i == 0 || endsWithSentence(words[i-1])
 			classifyWord(a, w, atStart)
 		}
 	}

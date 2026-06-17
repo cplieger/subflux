@@ -56,7 +56,7 @@ func Test_gk_subflux_u15_looksLikeSubtitle_nontext_ratio_boundary(t *testing.T) 
 		t.Fatalf("probe length = %d, want 10 (test setup)", len(probe))
 	}
 	if !LooksLikeSubtitle(probe) {
-		t.Errorf("LooksLikeSubtitle(nonText*10 == len, with signature) = false, "+
+		t.Errorf("LooksLikeSubtitle(nonText*10 == len, with signature) = false, " +
 			"want true (boundary nonText*10 > len must be strict)")
 	}
 }

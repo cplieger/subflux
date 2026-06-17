@@ -21,10 +21,7 @@ func (r *gk_subflux_u28_chunkReader) Read(p []byte) (int, error) {
 	if r.pos >= len(r.data) {
 		return 0, io.EOF
 	}
-	end := r.pos + r.chunk
-	if end > len(r.data) {
-		end = len(r.data)
-	}
+	end := min(r.pos+r.chunk, len(r.data))
 	n := copy(p, r.data[r.pos:end])
 	r.pos += n
 	return n, nil

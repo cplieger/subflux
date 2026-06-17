@@ -27,13 +27,13 @@ const gk_subflux_u22_ttlProbeDelay = 5 * time.Millisecond
 // --- log capture (for slog.Warn-only observable branches) ---
 
 type gk_subflux_u22_logLine struct {
-	level slog.Level
 	msg   string
+	level slog.Level
 }
 
 type gk_subflux_u22_logSink struct {
-	mu    sync.Mutex
 	lines []gk_subflux_u22_logLine
+	mu    sync.Mutex
 }
 
 func (s *gk_subflux_u22_logSink) Enabled(context.Context, slog.Level) bool { return true }
@@ -92,8 +92,8 @@ func (gk_subflux_u22_noopStore) DeleteStateByPaths(_ context.Context, paths []st
 // configurable result. It embeds *mockHistoryPoller for the other 6 methods.
 type gk_subflux_u22_fakePoller struct {
 	*mockHistoryPoller
-	calls  atomic.Int32
 	result map[int]struct{}
+	calls  atomic.Int32
 }
 
 func (f *gk_subflux_u22_fakePoller) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {

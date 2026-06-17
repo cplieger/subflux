@@ -6,6 +6,7 @@ package activity
 // operator at the targeted line. Helpers are prefixed gk_subflux_u23_.
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -21,12 +22,7 @@ func gk_subflux_u23_ids(es []Entry) []string {
 }
 
 func gk_subflux_u23_has(ss []string, want string) bool {
-	for _, v := range ss {
-		if v == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ss, want)
 }
 
 func gk_subflux_u23_doneEntry(id string, endedAt time.Time) Entry {

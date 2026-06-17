@@ -45,7 +45,8 @@ func (c *gk_subflux_u1_seqCtx) Err() error {
 // gk_subflux_u1_assertState pins the full post-call model state of a vadInst.
 func gk_subflux_u1_assertState(t *testing.T, name string, v *vadInst, flag int16, llr float64,
 	wantFlag int16, wantLLR float64, wantFC int32,
-	wantNM, wantSM, wantNS, wantSS [vadTableSize]int16) {
+	wantNM, wantSM, wantNS, wantSS [vadTableSize]int16,
+) {
 	t.Helper()
 	if flag != wantFlag {
 		t.Errorf("%s: flag = %d, want %d", name, flag, wantFlag)
@@ -72,7 +73,7 @@ func gk_subflux_u1_assertState(t *testing.T, name string, v *vadInst, flag int16
 
 // Crafted feature vectors (input<<3 sits near the noise/speech Gaussian means).
 var (
-	gk_subflux_u1_fnNoise  = [vadNumCh]int16{842, 611, 883, 839, 846, 421}     // -> vadflag 0
+	gk_subflux_u1_fnNoise  = [vadNumCh]int16{842, 611, 883, 839, 846, 421}      // -> vadflag 0
 	gk_subflux_u1_fsSpeech = [vadNumCh]int16{1038, 1261, 1260, 1478, 1480, 789} // -> vadflag 1
 	gk_subflux_u1_fnUnif   = [vadNumCh]int16{50, 50, 50, 50, 50, 50}            // -> vadflag 0
 )
@@ -221,11 +222,13 @@ func TestGkU1_GlobalThresholdBoundary(t *testing.T) {
 // ---- vad_classifier.go : adaptive model-update state pins ---------------
 
 // Noise-path pin (vadflag==0). Kills:
-//   95:57 (/->* ngprvec[ch]), 96:34 (- -> + / invert ngprvec[ch+6]),
-//   119:16 & 125:16 (g index + -> - : negative-index panic),
-//   120:43 (* -> / noiseGlobal), 133:16 (== -> != vadflag test),
-//   135:17 (+ -> -) and 135:37 (* -> /) noise-mean delt update,
-//   139:32 (- -> + long-term noise correction).
+//
+//	95:57 (/->* ngprvec[ch]), 96:34 (- -> + / invert ngprvec[ch+6]),
+//	119:16 & 125:16 (g index + -> - : negative-index panic),
+//	120:43 (* -> / noiseGlobal), 133:16 (== -> != vadflag test),
+//	135:17 (+ -> -) and 135:37 (* -> /) noise-mean delt update,
+//	139:32 (- -> + long-term noise correction).
+//
 // Each mutation changes the pinned noiseMeans (verified by exhaustive
 // re-implementation diff) or panics on a negative slice index.
 func TestGkU1_NoisePathStatePin(t *testing.T) {
@@ -241,7 +244,9 @@ func TestGkU1_NoisePathStatePin(t *testing.T) {
 }
 
 // Speech-path pin (vadflag==1). Kills:
-//   102:57 (/->* sgprvec[ch]), 103:34 (- -> + / invert sgprvec[ch+6]).
+//
+//	102:57 (/->* sgprvec[ch]), 103:34 (- -> + / invert sgprvec[ch+6]).
+//
 // Both mutations change the pinned speechMeans / speechStds.
 func TestGkU1_SpeechPathStatePin(t *testing.T) {
 	v := newVADInst(ModeQuality)

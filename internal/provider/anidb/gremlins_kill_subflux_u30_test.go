@@ -7,11 +7,11 @@ import (
 
 // Kills the three mutants on anidb_mapping.go:21, the gzip-detection guard
 //
-//	len(data) < 2  ||  data[0] != 0x1f  ||  data[1] != 0x8b
+//		len(data) < 2  ||  data[0] != 0x1f  ||  data[1] != 0x8b
 //
-//   - 21:15 CONDITIONALS_BOUNDARY (< -> <=)
-//   - 21:30 CONDITIONALS_NEGATION (!= -> ==) on data[0]
-//   - 21:49 CONDITIONALS_NEGATION (!= -> ==) on data[1]
+//	  - 21:15 CONDITIONALS_BOUNDARY (< -> <=)
+//	  - 21:30 CONDITIONALS_NEGATION (!= -> ==) on data[0]
+//	  - 21:49 CONDITIONALS_NEGATION (!= -> ==) on data[1]
 //
 // The guard returns the bytes unchanged when the input is NOT a gzip stream.
 // Each row pins the original behaviour so exactly one mutation flips it.

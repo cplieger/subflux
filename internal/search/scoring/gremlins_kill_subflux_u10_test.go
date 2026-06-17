@@ -88,11 +88,11 @@ func Test_gk_subflux_u10_titlesMatch_equality(t *testing.T) {
 func Test_gk_subflux_u10_matchBreakdown_zeroWeightExcluded(t *testing.T) {
 	tests := []struct {
 		name         string
-		scores       api.Scores
-		matches      api.MatchSet
-		wantLen      int
 		wantKey      string
+		scores       api.Scores
+		wantLen      int
 		wantKeyVal   int
+		matches      api.MatchSet
 		wantKeyThere bool
 	}{
 		{

@@ -64,7 +64,7 @@ func FFT(x []complex128) []complex128 {
 		}
 		j ^= bit
 		if i < j {
-			x[i], x[j] = x[j], x[i]
+			x[i], x[j] = x[j], x[i] //nolint:gosec // G602: bit-reversal permutation, i,j < n == len(x) (n is power of two)
 		}
 	}
 	for size := 2; size <= n; size <<= 1 {
