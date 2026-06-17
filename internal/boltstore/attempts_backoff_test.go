@@ -194,9 +194,9 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 		base := time.Now()
 
 		type row struct {
+			next     time.Time
 			mid      string
 			provider api.ProviderID
-			next     time.Time
 		}
 		var inserted []row
 		n := rapid.IntRange(0, 12).Draw(rt, "rows")

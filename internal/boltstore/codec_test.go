@@ -113,14 +113,14 @@ func TestCheckSchemaVersion(t *testing.T) {
 	cases := []struct {
 		name    string
 		stored  uint64
-		present bool
 		current uint64
+		present bool
 		wantErr bool
 	}{
-		{"fresh-file", 0, false, 1, false},
-		{"equal", 1, true, 1, false},
-		{"older-additive", 1, true, 2, false},
-		{"newer-breaking", 2, true, 1, true},
+		{name: "fresh-file", stored: 0, present: false, current: 1, wantErr: false},
+		{name: "equal", stored: 1, present: true, current: 1, wantErr: false},
+		{name: "older-additive", stored: 1, present: true, current: 2, wantErr: false},
+		{name: "newer-breaking", stored: 2, present: true, current: 1, wantErr: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

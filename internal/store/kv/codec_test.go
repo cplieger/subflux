@@ -6,9 +6,9 @@ import (
 )
 
 type codecRec struct {
+	Imported time.Time `json:"imported"`
 	Title    string    `json:"title"`
 	Tags     []string  `json:"tags"`
-	Imported time.Time `json:"imported"`
 	Score    int       `json:"score"`
 	Manual   bool      `json:"manual"`
 }

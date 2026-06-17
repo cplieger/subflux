@@ -174,19 +174,19 @@ func TestGetState_titleSearchTreatsWildcardsLiterally(t *testing.T) {
 	putStateRow(t, db, api.MediaTypeMovie, "m-bsl", "en", stateRec{Title: `back\slash`})
 
 	cases := []struct {
+		wantMIDs map[string]bool
 		name     string
 		search   string
-		wantMIDs map[string]bool
 	}{
 		// '%' is literal: matches "100% Complete" but NOT "1000 Leagues"
 		// (which a real SQL wildcard would match).
-		{"percent literal", "100%", map[string]bool{"m-pct": true}},
+		{name: "percent literal", search: "100%", wantMIDs: map[string]bool{"m-pct": true}},
 		// '_' is literal: matches "a_b matched" but NOT "axb other".
-		{"underscore literal", "a_b", map[string]bool{"m-und": true}},
+		{name: "underscore literal", search: "a_b", wantMIDs: map[string]bool{"m-und": true}},
 		// backslash is literal.
-		{"backslash literal", `back\slash`, map[string]bool{"m-bsl": true}},
+		{name: "backslash literal", search: `back\slash`, wantMIDs: map[string]bool{"m-bsl": true}},
 		// plain contains, case-insensitive.
-		{"case insensitive", "COMPLETE", map[string]bool{"m-pct": true}},
+		{name: "case insensitive", search: "COMPLETE", wantMIDs: map[string]bool{"m-pct": true}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
