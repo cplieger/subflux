@@ -3,9 +3,9 @@ module github.com/cplieger/subflux
 go 1.26.4
 
 require (
-	github.com/cplieger/auth v1.0.9
+	github.com/cplieger/auth v1.1.0
 	github.com/cplieger/health v1.1.3
-	github.com/cplieger/httpx v1.0.7
+	github.com/cplieger/httpx v1.1.0
 	github.com/cplieger/metrics/v2 v2.2.0
 	github.com/cplieger/ssrf/v2 v2.0.3
 	github.com/cplieger/wiregen v1.2.0
