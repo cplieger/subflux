@@ -6,7 +6,7 @@ require (
 	github.com/cplieger/auth v1.1.0
 	github.com/cplieger/health v1.1.3
 	github.com/cplieger/httpx v1.1.0
-	github.com/cplieger/metrics/v2 v2.2.0
+	github.com/cplieger/metrics/v2 v2.2.1
 	github.com/cplieger/ssrf/v2 v2.0.3
 	github.com/cplieger/wiregen v1.2.0
 	github.com/go-webauthn/webauthn v0.17.4
