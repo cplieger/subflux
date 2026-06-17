@@ -1,5 +1,5 @@
 // Package authstoretest provides a shared, engine-agnostic behavioral contract
-// suite for the composite auth store (cplieger/auth/store.AuthStore). It
+// suite for the composite auth store (cplieger/auth/store.Composite). It
 // depends ONLY on the cplieger/auth library (the domain types and the store
 // interface), so it can be driven against any concrete engine — the legacy
 // SQLite authdb.AuthDB and the new bbolt authstore.Store — without importing
@@ -68,13 +68,13 @@ import (
 // the SQLite store over a file-backed database.
 type Harness interface {
 	// Store returns the live store to exercise.
-	Store() authlibstore.AuthStore
+	Store() authlibstore.Composite
 	// Reopen simulates a process restart: it closes the current store and
 	// reopens durable state from the same backing file, returning a fresh
 	// store. Durable records (users, passkeys, API keys) MUST survive; whether
 	// ephemeral records (sessions, OIDC states) survive is engine-specific and
 	// is not asserted by the shared suite.
-	Reopen(t *testing.T) authlibstore.AuthStore
+	Reopen(t *testing.T) authlibstore.Composite
 }
 
 // Suite runs the engine-agnostic behavioural contract against any AuthStore
@@ -260,7 +260,7 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 // assertVictimCascaded verifies the deleted user is gone, its username is
 // freed, and its passkeys, API keys, and sessions were all cascaded away
 // (Requirement 9.4).
-func assertVictimCascaded(t *testing.T, s authlibstore.AuthStore, victimID int64, vCred []byte) {
+func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64, vCred []byte) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -292,7 +292,7 @@ func assertVictimCascaded(t *testing.T, s authlibstore.AuthStore, victimID int64
 
 // assertKeepUserIntact verifies the unrelated user and all its records survive
 // another user's delete cascade (Requirement 9.4 isolation).
-func assertKeepUserIntact(t *testing.T, s authlibstore.AuthStore, keepID int64) {
+func assertKeepUserIntact(t *testing.T, s authlibstore.Composite, keepID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -364,7 +364,7 @@ func testCredentialOwnership(t *testing.T, h Harness) {
 
 // assertPasskeyOwnership verifies a non-owner can neither rename nor delete a
 // passkey while the owner can (Requirement 16.4).
-func assertPasskeyOwnership(t *testing.T, s authlibstore.AuthStore, ownerID, otherID int64) {
+func assertPasskeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -409,7 +409,7 @@ func assertPasskeyOwnership(t *testing.T, s authlibstore.AuthStore, ownerID, oth
 
 // assertAPIKeyOwnership verifies a non-owner cannot delete an API key while the
 // owner can (Requirement 16.4).
-func assertAPIKeyOwnership(t *testing.T, s authlibstore.AuthStore, ownerID, otherID int64) {
+func assertAPIKeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
 

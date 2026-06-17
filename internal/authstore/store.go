@@ -3,7 +3,7 @@
 // continue to refer to authstore.AuthStore without depending on the
 // library's import path directly.
 //
-// The auth library publishes store.AuthStore, composed of
+// The auth library publishes store.Composite, composed of
 // UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore.
 // Subflux's domain types (api.User, api.Session, api.Key,
 // api.PasskeyCredential) are type aliases of the library's types
@@ -23,6 +23,6 @@ import authlibstore "github.com/cplieger/auth/store"
 // AuthStore is the composite store interface implemented by the concrete
 // authdb persistence layer and consumed by auth/ and server/.
 //
-// This is a type alias of github.com/cplieger/auth/store.AuthStore — the
+// This is a type alias of github.com/cplieger/auth/store.Composite — the
 // library is the single source of truth for the contract.
-type AuthStore = authlibstore.AuthStore
+type AuthStore = authlibstore.Composite
