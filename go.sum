@@ -1,5 +1,5 @@
-github.com/coreos/go-oidc/v3 v3.18.0 h1:V9orjXynvu5wiC9SemFTWnG4F45v403aIcjWo0d41+A=
-github.com/coreos/go-oidc/v3 v3.18.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
+github.com/coreos/go-oidc/v3 v3.19.0 h1:F/xyOi3x1UnG1U27YVnM1N6bHiL1K2upi6U/0qr8r+I=
+github.com/coreos/go-oidc/v3 v3.19.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
 github.com/cplieger/auth v1.1.0 h1:STdV3osd7q2VnBZUjPdtnNweLclXcF8Sf9g9xI/A7gk=
 github.com/cplieger/auth v1.1.0/go.mod h1:nL8r9p7w4Yu8wUyVMNrjdMinyFKZj2i/SDuQd3bYWs8=
 github.com/cplieger/health v1.1.3 h1:QmTkK2sH5IPSAxAQGPC974jHVO3rGaqwekf+omQ20E4=
