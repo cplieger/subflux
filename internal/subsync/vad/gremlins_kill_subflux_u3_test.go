@@ -51,7 +51,8 @@ func gk_subflux_u3_setAll(a *[vadTableSize]int16, val int16) {
 // std-update arithmetic produced. The targeted mutants cannot touch
 // flag / frameCounter / means, so any change they make lands in wantStd.
 func gk_subflux_u3_assertStd(t *testing.T, name string, gotFlag, wantFlag int16,
-	gotFC, wantFC int32, gotStd, wantStd [vadTableSize]int16) {
+	gotFC, wantFC int32, gotStd, wantStd [vadTableSize]int16,
+) {
 	t.Helper()
 	if gotFlag != wantFlag {
 		t.Errorf("%s: flag = %d, want %d (wrong vadflag branch taken)", name, gotFlag, wantFlag)

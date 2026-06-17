@@ -51,8 +51,8 @@ func Test_gk_subflux_u14_SuggestName_returnsClosestWithinDistanceTwo(t *testing.
 	cases := []struct {
 		name       string
 		input      string
-		candidates []string
 		wantName   string
+		candidates []string
 		wantOK     bool
 	}{
 		{

@@ -19,10 +19,11 @@ import (
 
 // --- flexint.go: ParseFlexInt conditional-negation mutants ---
 // Targets:
-//   flexint.go:16:42 (err==nil on the number-unmarshal branch)
-//   flexint.go:21:42 (err!=nil on the string-unmarshal branch)
-//   flexint.go:24:7  (s=="" empty-string branch)
-//   flexint.go:28:9  (err!=nil on the Atoi branch)
+//
+//	flexint.go:16:42 (err==nil on the number-unmarshal branch)
+//	flexint.go:21:42 (err!=nil on the string-unmarshal branch)
+//	flexint.go:24:7  (s=="" empty-string branch)
+//	flexint.go:28:9  (err!=nil on the Atoi branch)
 //
 // Each input below is chosen so that flipping the operator at exactly one of
 // those branches changes the observable (value, error) pair.
@@ -96,8 +97,8 @@ func TestGk_subflux_u27_SettingInt_minIntBoundary(t *testing.T) {
 //   retry.go:88:50 ARITHMETIC_BASE        (attempt+1 -> "attempt" in retrying-warn log)
 
 type gk_subflux_u27_logRec struct {
-	msg   string
 	attrs map[string]any
+	msg   string
 }
 
 type gk_subflux_u27_capHandler struct {
@@ -184,7 +185,8 @@ func TestGk_subflux_u27_Retry_noRecoveredLogOnFirstAttempt(t *testing.T) {
 // attempts == attempt+1 == 2, and exactly one "retrying" warn with
 // attempt == attempt+1 == 1.
 // (kills 71:15 negation [recovered must be present at attempt 1],
-//  73:53 [attempt+1 -> attempts=2], 88:50 [attempt+1 -> attempt=1])
+//
+//	73:53 [attempt+1 -> attempts=2], 88:50 [attempt+1 -> attempt=1])
 func TestGk_subflux_u27_Retry_recoverOnSecondAttemptLogs(t *testing.T) {
 	recs := gk_subflux_u27_captureLogs(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{

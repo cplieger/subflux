@@ -160,13 +160,7 @@ func (st *seasonTracker) recordOutcome(imdbID string, season int, lang string, o
 	if s.earlyStop {
 		return
 	}
-	threshold := 3
-	if seasonEpCount > 0 {
-		pct := seasonEpCount * seasonEarlyStopPct / 100
-		if pct > threshold {
-			threshold = pct
-		}
-	}
+	threshold := max(3, seasonEpCount*seasonEarlyStopPct/100)
 	if s.noResults >= threshold {
 		s.earlyStop = true
 		slog.Info("season early termination: too many consecutive no-results",

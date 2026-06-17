@@ -103,7 +103,10 @@ func SettingInt(settings map[string]any, key SettingKey, def int) int {
 		}
 		return int(n)
 	case float64:
-		if n != math.Trunc(n) || n < math.MinInt || n > math.MaxInt {
+		// float64(math.MaxInt) rounds up to 2^63, which is NOT representable
+		// as an int (int64 max is 2^63-1); int(n) would yield a garbage value.
+		// Use >= to reject that boundary as out of range.
+		if n != math.Trunc(n) || n < math.MinInt || n >= math.MaxInt {
 			return def
 		}
 		return int(n)

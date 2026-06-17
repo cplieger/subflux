@@ -12,7 +12,7 @@ func gk_subflux_u25_lines(ss ...string) [][]byte {
 	return out
 }
 
-// secrets.go:71:58 CONDITIONALS_NEGATION — the `string(val) == "''"` check in
+// secrets.go:71:58 CONDITIONALS_NEGATION — the `string(val) == "”"` check in
 // RedactSecrets. An empty single-quoted secret value must be left UNREDACTED;
 // flipping == to != would make it get redacted. The double-quoted-empty and
 // real-secret rows guard the surrounding branch behavior.
@@ -57,10 +57,10 @@ func Test_gk_subflux_u25_ExtractSecretValuesEmptyCheck(t *testing.T) {
 func Test_gk_subflux_u25_SecretContextKey(t *testing.T) {
 	cases := []struct {
 		name    string
-		lines   [][]byte
-		lineIdx int
 		key     string
 		want    string
+		lines   [][]byte
+		lineIdx int
 	}{
 		// Kills:
 		//  164:19 (lineIdx-1: '-'->'+' starts at lineIdx+1 -> lines[2] panic),

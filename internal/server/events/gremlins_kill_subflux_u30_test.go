@@ -17,7 +17,7 @@ func Test_gk_subflux_u30_NextSkipToLatestCursor(t *testing.T) {
 	sub, unsub := eb.Subscribe() // readAt = writeAt = 0
 	defer unsub()
 
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		eb.Publish(Event{})
 	}
 

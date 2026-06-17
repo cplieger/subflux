@@ -34,7 +34,8 @@ import "testing"
 // the returned flag/llr, the frame counter, and all four 12-element GMM arrays.
 func gk_subflux_u2_assertState(t *testing.T, name string, v *vadInst,
 	flag int16, llr float64, wantFlag int16, wantLLR float64, wantFC int32,
-	wantNM, wantSM, wantNS, wantSS [vadTableSize]int16) {
+	wantNM, wantSM, wantNS, wantSS [vadTableSize]int16,
+) {
 	t.Helper()
 	if flag != wantFlag {
 		t.Errorf("%s: flag = %d, want %d", name, flag, wantFlag)
@@ -127,8 +128,8 @@ func TestGkU2_SpeechBranchStatePin(t *testing.T) {
 func TestGkU2_LowClampArithmetic(t *testing.T) {
 	v := newVADInst(ModeQuality)
 	v.globalThresh = -32768 // force vadflag == 1 (sumLLR >= globalThresh always)
-	v.noiseMeans[0] = 0      // nmk2 for channel 0, gaussian 0
-	v.noiseMeans[6] = 16000  // raises nGlobalQ8 so the long-term correction is small
+	v.noiseMeans[0] = 0     // nmk2 for channel 0, gaussian 0
+	v.noiseMeans[6] = 16000 // raises nGlobalQ8 so the long-term correction is small
 	flag, llr := v.gmmProbabilityLLR(gk_subflux_u2_fsSpeech, 100)
 	gk_subflux_u2_assertState(t, "loclamp", v, flag, llr,
 		1, 1614, 1,

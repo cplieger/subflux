@@ -67,9 +67,7 @@ func PrintHelp(w io.Writer, s *Spec) {
 	fmt.Fprintln(w, "Flags:")
 	maxSig := 0
 	for _, f := range s.Flags {
-		if n := len(flagSignature(f)); n > maxSig {
-			maxSig = n
-		}
+		maxSig = max(maxSig, len(flagSignature(f)))
 	}
 	for _, f := range s.Flags {
 		desc := f.Help
@@ -243,9 +241,7 @@ func editDistance(a, b string) int {
 func minInt(values ...int) int {
 	m := values[0]
 	for _, v := range values[1:] {
-		if v < m {
-			m = v
-		}
+		m = min(m, v)
 	}
 	return m
 }

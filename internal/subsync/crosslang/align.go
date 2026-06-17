@@ -388,12 +388,12 @@ func dpAlign(pairs []CuePair) []CuePair {
 	}
 
 	for i := range n {
-		dp[i] = pairs[i].Score
+		dp[i] = pairs[i].Score //nolint:gosec // G602: i in [0,n), n == len(pairs)
 		start := max(0, i-dpMaxPredecessors)
 		for j := i - 1; j >= start; j-- {
-			if pairs[j].IncIdx < pairs[i].IncIdx &&
-				pairs[j].RefIdx < pairs[i].RefIdx {
-				candidate := dp[j] + pairs[i].Score
+			if pairs[j].IncIdx < pairs[i].IncIdx && //nolint:gosec // G602: i in [0,n), n == len(pairs)
+				pairs[j].RefIdx < pairs[i].RefIdx { //nolint:gosec // G602: i in [0,n), n == len(pairs)
+				candidate := dp[j] + pairs[i].Score //nolint:gosec // G602: i in [0,n), n == len(pairs)
 				if candidate > dp[i] {
 					dp[i] = candidate
 					parent[i] = j

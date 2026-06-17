@@ -34,8 +34,8 @@ type gk_subflux_u21_logRec struct {
 }
 
 type gk_subflux_u21_capHandler struct {
-	mu   sync.Mutex
 	recs []gk_subflux_u21_logRec
+	mu   sync.Mutex
 }
 
 func (h *gk_subflux_u21_capHandler) Enabled(context.Context, slog.Level) bool { return true }
@@ -165,6 +165,7 @@ func Test_gk_subflux_u21_NewClientClampsNegativeMaxRetries(t *testing.T) {
 //   - 89:18 negation `>= 100ms`: 50ms >= 100ms is false -> no clamp -> stays 50ms.
 //   - 89:23 arithmetic `100/time.Millisecond` == 0 -> guard becomes `< 0`:
 //     50ms < 0 is false -> no clamp -> stays 50ms.
+//
 // Both leave 50ms; asserting 100ms kills both.
 // (The 89:18 CONDITIONALS_BOUNDARY `<` -> `<=` is equivalent: the clamp target
 // equals the boundary 100ms, so at retryDelay==100ms both yield 100ms.)
@@ -187,6 +188,7 @@ func Test_gk_subflux_u21_NewClientClampsLowRetryDelay(t *testing.T) {
 //   - 50:34 NEGATION (`cl > 0` -> `cl <= 0`): skips block -> nil -> cap grows to 4.
 //   - 51:19 ARITHMETIC (`/` -> `*`): hint=2000*200 -> cap 400000.
 //   - 52:11 NEGATION (`hint > 0` -> `hint <= 0`): skips make -> nil -> cap 4.
+//
 // (The 50:34 and 52:11 CONDITIONALS_BOUNDARY `>` -> `>=` mutants are
 // equivalent: at cl/hint == 0 the extra entry computes hint 0 / makes a cap-0
 // slice, producing an identical decoded result.)
