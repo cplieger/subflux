@@ -16,15 +16,15 @@ outbound provider fetches, archive extraction, authentication, and file writes.
 
 ## Threats and mitigations
 
-| Threat | Mitigation | Evidence |
-|---|---|---|
-| SSRF via attacker-influenced provider URLs | every provider URL is validated and the connected IP re-checked via the `ssrf` library, wired through `internal/provider/http_client.go` | ssrf integration, provider tests |
-| Malicious subtitle archives (zip/rar bombs, path traversal, season-pack mismatch) | episode-matched extraction with no "first file" fallback; multi-episode false-positive guards | `internal/provider/archive`, archive tests |
-| Path traversal on subtitle writes | path sanitisation + atomic writes in `internal/fsutil` (CodeQL-friendly sanitiser) | `fsutil`, tests |
-| Auth bypass / weak auth | the `auth` library (Argon2id, passkeys/WebAuthn, OIDC+PKCE, API keys, rate limiting); see [auth's assurance case](https://github.com/cplieger/auth/blob/main/docs/assurance-case.md) | `internal/server/authhandlers`, auth integration tests |
-| Secret leakage via the config API | secret fields redacted in `GET /api/config`; empty secrets merged server-side on save | `server/confighandlers/secrets.go`, `TestSecretKeysCoverProviderSchemas` |
-| Stale/empty embedded web UI shipped | the build embeds compiled assets; a CI image smoke test starts the container and asserts it serves | image smoke test (CI docker job) |
-| Resource exhaustion / parser bugs | extensive property-based + fuzz suite (300+ test files, 100+ fuzz targets) | weekly fuzz + gremlins |
+| Threat                                                                            | Mitigation                                                                                                                                                                           | Evidence                                                                 |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| SSRF via attacker-influenced provider URLs                                        | every provider URL is validated and the connected IP re-checked via the `ssrf` library, wired through `internal/provider/http_client.go`                                             | ssrf integration, provider tests                                         |
+| Malicious subtitle archives (zip/rar bombs, path traversal, season-pack mismatch) | episode-matched extraction with no "first file" fallback; multi-episode false-positive guards                                                                                        | `internal/provider/archive`, archive tests                               |
+| Path traversal on subtitle writes                                                 | path sanitisation + atomic writes in `internal/fsutil` (CodeQL-friendly sanitiser)                                                                                                   | `fsutil`, tests                                                          |
+| Auth bypass / weak auth                                                           | the `auth` library (Argon2id, passkeys/WebAuthn, OIDC+PKCE, API keys, rate limiting); see [auth's assurance case](https://github.com/cplieger/auth/blob/main/docs/assurance-case.md) | `internal/server/authhandlers`, auth integration tests                   |
+| Secret leakage via the config API                                                 | secret fields redacted in `GET /api/config`; empty secrets merged server-side on save                                                                                                | `server/confighandlers/secrets.go`, `TestSecretKeysCoverProviderSchemas` |
+| Stale/empty embedded web UI shipped                                               | the build embeds compiled assets; a CI image smoke test starts the container and asserts it serves                                                                                   | image smoke test (CI docker job)                                         |
+| Resource exhaustion / parser bugs                                                 | extensive property-based + fuzz suite (300+ test files, 100+ fuzz targets)                                                                                                           | weekly fuzz + gremlins                                                   |
 
 ## Residual risks
 

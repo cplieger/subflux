@@ -14,7 +14,7 @@ A fast, low-memory subtitle search and download engine for Sonarr/Radarr librari
 
 ## What it does
 
-Subflux finds, scores, downloads, and time-syncs subtitles for your Plex/Sonarr/Radarr library. It watches the *arr import history in real time and runs scheduled full-library scans, querying multiple providers concurrently, ranking results by release quality, and syncing subtitle timing to the video before saving.
+Subflux finds, scores, downloads, and time-syncs subtitles for your Plex/Sonarr/Radarr library. It watches the \*arr import history in real time and runs scheduled full-library scans, querying multiple providers concurrently, ranking results by release quality, and syncing subtitle timing to the video before saving.
 
 It was born from diagnosing Bazarr's 15–20 GB memory consumption on a 52k-episode library (CPython arena fragmentation during long Sonarr sync loops). Subflux processes items in a batch-fetch-then-iterate model with bounded goroutine pools and no Python runtime — a single static binary in a distroless image.
 
