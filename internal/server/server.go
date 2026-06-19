@@ -67,6 +67,9 @@ type Metrics interface {
 	RecordStoreFreelistBytes(bytes int64)
 	RecordReconcile(deleted int, reset int64, dur time.Duration)
 	RecordBackupSuccess(dur time.Duration)
+
+	// Mode observability: 1 when a valid configuration is active, 0 unconfigured.
+	SetConfigured(ok bool)
 }
 
 // sleepCtx pauses for d, returning early if ctx is cancelled.
@@ -241,6 +244,11 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 			"Authentication is DISABLED (auth.disable_auth): all requests are treated as admin. Remove this setting to restore login.")
 	}
 
+	// Report configured state for the subflux_configured gauge. wire() above may
+	// have failed and left the server in unconfigured fallback mode, so mirror
+	// the same s.configured predicate that gates the background goroutines.
+	s.metrics.SetConfigured(s.configured.Load())
+
 	s.serveAndWait(ctx, addr, mux, onReady)
 }
 
@@ -255,6 +263,7 @@ func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
 		"scans and searches are disabled until a valid configuration is saved")
 	s.alerts.RecordPersistent("startup",
 		"No valid configuration. Open Settings to configure Subflux.")
+	s.metrics.SetConfigured(false)
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)

@@ -177,6 +177,7 @@ func (noopMetrics) RecordStoreFileSize(_ int64)                     {}
 func (noopMetrics) RecordStoreFreelistBytes(_ int64)                {}
 func (noopMetrics) RecordReconcile(_ int, _ int64, _ time.Duration) {}
 func (noopMetrics) RecordBackupSuccess(_ time.Duration)             {}
+func (noopMetrics) SetConfigured(_ bool)                            {}
 
 func TestIntegration_MiddlewareChain(t *testing.T) {
 	t.Parallel()

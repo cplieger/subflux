@@ -208,6 +208,28 @@ func TestAdaptiveSkip_increments(t *testing.T) {
 	}
 }
 
+// --- SetConfigured ---
+
+func TestSetConfigured_toggles_gauge(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Default (never set) is the unconfigured zero-state.
+	if body := renderMetrics(t, m); !strings.Contains(body, "subflux_configured 0") {
+		t.Errorf("expected subflux_configured 0 by default\nbody:\n%s", body)
+	}
+
+	m.SetConfigured(true)
+	if body := renderMetrics(t, m); !strings.Contains(body, "subflux_configured 1") {
+		t.Error("expected subflux_configured 1 after SetConfigured(true)")
+	}
+
+	m.SetConfigured(false)
+	if body := renderMetrics(t, m); !strings.Contains(body, "subflux_configured 0") {
+		t.Error("expected subflux_configured 0 after SetConfigured(false)")
+	}
+}
+
 // --- TotalSearches ---
 
 func TestTotalSearches_sums_across_providers(t *testing.T) {

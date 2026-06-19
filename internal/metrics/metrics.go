@@ -38,6 +38,9 @@ type Metrics struct {
 	backupLastSuccess  *extmetrics.Gauge
 	backupDuration     *extmetrics.Gauge
 
+	// Mode observability.
+	configured *extmetrics.Gauge
+
 	totalSearch atomic.Int64
 }
 
@@ -68,6 +71,9 @@ func New() *Metrics {
 		reconcileReset:     extmetrics.NewCounter("reconcile_reset_total", "Total triples reset by reconciliation"),
 		backupLastSuccess:  extmetrics.NewGauge("backup_last_success_timestamp", "Unix timestamp of last successful backup"),
 		backupDuration:     extmetrics.NewGauge("backup_duration_seconds", "Duration of last successful backup in seconds"),
+
+		// Mode observability.
+		configured: extmetrics.NewGauge("configured", "1 when a valid configuration is active, 0 in unconfigured mode"),
 	}
 
 	m.registry = extmetrics.NewRegistry("subflux")
@@ -91,6 +97,7 @@ func New() *Metrics {
 	m.registry.RegisterCounter(m.reconcileReset)
 	m.registry.RegisterGauge(m.backupLastSuccess)
 	m.registry.RegisterGauge(m.backupDuration)
+	m.registry.RegisterGauge(m.configured)
 
 	return m
 }
@@ -172,4 +179,16 @@ func (m *Metrics) RecordReconcile(deleted int, reset int64, dur time.Duration) {
 func (m *Metrics) RecordBackupSuccess(dur time.Duration) {
 	m.backupLastSuccess.Set(float64(time.Now().Unix()))
 	m.backupDuration.Set(dur.Seconds())
+}
+
+// SetConfigured records whether a valid configuration is active. It sets the
+// subflux_configured gauge to 1 when configured (background automation running)
+// and 0 in unconfigured mode (scheduler/poller/backup goroutines skipped),
+// enabling a level-triggered "stuck unconfigured" alert.
+func (m *Metrics) SetConfigured(ok bool) {
+	v := 0.0
+	if ok {
+		v = 1.0
+	}
+	m.configured.Set(v)
 }
