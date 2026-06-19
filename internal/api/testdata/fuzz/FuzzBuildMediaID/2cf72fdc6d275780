@@ -1,0 +1,7 @@
+go test fuzz v1
+string("movie")
+int(0)
+int(42)
+string("-s0e0")
+int(-98)
+int(-150)

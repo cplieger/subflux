@@ -56,13 +56,16 @@ func FuzzBuildMediaID(f *testing.F) {
 			t.Error("BuildMediaID(nil) should return empty")
 		}
 
-		// Consistency: a movie ID never carries an episode "-sNNeNN" suffix.
-		// (The raw IMDB fallback is passed through verbatim, so check for the
-		// real episode-suffix shape rather than a bare "-s" substring, which
-		// a garbage IMDB value can legitimately contain.)
-		if MediaType(mediaType) == MediaTypeMovie && result != "" {
+		// Consistency: BuildMediaID's movie path must never APPEND an episode
+		// "-sNNeNN" suffix. A movie ID is either the constructed "tmdb-<n>"
+		// form or the IMDB fallback passed through verbatim (a contract locked
+		// by FuzzBuildMovieID). The verbatim fallback can be arbitrary garbage
+		// that happens to match the episode-suffix shape (the fuzzer found
+		// "-s0e0"), so only assert the invariant on the form this package
+		// actually constructs, not on passthrough input.
+		if MediaType(mediaType) == MediaTypeMovie && result != "" && result != imdbID {
 			if episodeIDSuffixRe.MatchString(result) {
-				t.Errorf("movie ID %q contains episode marker", result)
+				t.Errorf("constructed movie ID %q contains episode marker", result)
 			}
 		}
 	})

@@ -116,7 +116,18 @@ var (
 func stripHI(text string) string {
 	text = reBrackets.ReplaceAllString(text, "")
 	text = reParens.ReplaceAllString(text, "")
-	text = reMusic.ReplaceAllString(text, "")
+	// Strip music spans to a fixed point. Removing a "♪...♪" span can splice
+	// the surrounding bytes into a NEW span: an incomplete leading "\xe2\x99"
+	// and a trailing "\xaa" become adjacent and form another ♪ (E2 99 AA), so
+	// a single ReplaceAll pass leaves a residual span that a second
+	// PostProcess call would strip, breaking idempotency. Loop until stable.
+	for {
+		out := reMusic.ReplaceAllString(text, "")
+		if out == text {
+			break
+		}
+		text = out
+	}
 	// Strip stacked speaker labels to a fixed point. The `(?m)^` anchor
 	// only matches one label per line-start per ReplaceAll pass, so an
 	// input like "JOHN: MARY: line" would drop one label per PostProcess
