@@ -78,6 +78,7 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 	// starts in unconfigured mode and the user saves a valid config.
 	wasUnconfigured := !s.configured.Load()
 	s.configured.Store(true)
+	s.metrics.SetConfigured(true)
 
 	slog.Info("hot reload complete",
 		"providers", len(providers),
