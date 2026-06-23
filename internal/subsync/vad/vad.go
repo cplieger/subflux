@@ -81,6 +81,7 @@ const (
 // Mode represents the VAD aggressiveness level (WebRTC modes 0-3).
 type Mode int
 
+// Mode constants for the supported WebRTC VAD aggressiveness levels.
 const (
 	ModeQuality        Mode = 0 // Most permissive, fewest false negatives
 	ModeLowBitrate     Mode = 1 // Low bitrate

@@ -57,8 +57,11 @@ type Provider struct {
 	anidbMapper *anidb.Mapper
 }
 
+// Name returns the provider identifier for AnimeTosho.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// Search queries AnimeTosho for subtitles matching req. Tries AniDB episode ID
+// lookup first (more precise for anime), then falls back to title+season search.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
 	if req.MediaType != api.MediaTypeEpisode {
 		slog.Debug("animetosho: not an episode, skipping",
@@ -104,6 +107,8 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 	return results, nil
 }
 
+// Download fetches the subtitle content for the given search result.
+// The download URL is validated against SSRF before the request is made.
 func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {

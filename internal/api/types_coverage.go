@@ -21,7 +21,7 @@ type SubtitleFile struct {
 	Path     string         // file path for external; empty for embedded
 }
 
-// SubtitleFileRow is the JSON shape returned by coverage queries.
+// SubtitleEntry is the JSON shape returned by coverage queries.
 type SubtitleEntry struct {
 	MediaID   string `json:"media_id"`
 	Language  string `json:"language"`

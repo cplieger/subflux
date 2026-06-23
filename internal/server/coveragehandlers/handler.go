@@ -62,7 +62,7 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{deps: deps}
 }
 
-// SeriesCoverage is the coverage summary for one TV series.
+// SeriesItem is the coverage summary for one TV series.
 type SeriesItem struct {
 	Title      string                    `json:"title"`
 	ImdbID     string                    `json:"imdb_id,omitempty"`
@@ -78,7 +78,7 @@ type SeriesItem struct {
 	Excluded   bool                      `json:"excluded,omitempty"`
 }
 
-// MovieCoverage is the coverage summary for one movie.
+// MovieItem is the coverage summary for one movie.
 type MovieItem struct {
 	Title          string                    `json:"title"`
 	ImdbID         string                    `json:"imdb_id,omitempty"`

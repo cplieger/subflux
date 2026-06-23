@@ -15,6 +15,7 @@ import (
 
 // --- GET /api/auth/passkeys ---
 
+// HandleListPasskeys handles GET /api/auth/passkeys — lists passkeys for the current user.
 func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 
@@ -49,6 +50,8 @@ func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/auth/webauthn/signal-data ---
 
+// HandleWebAuthnSignalData handles GET /api/auth/webauthn/signal-data — returns
+// the WebAuthn signal data needed by the browser for credential management.
 func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Request) {
 	if !h.requireWebAuthn(w) {
 		return
@@ -97,6 +100,9 @@ func Base64URLEncode(data []byte) string {
 
 // --- POST /api/auth/webauthn/register/begin ---
 
+// HandleWebAuthnRegisterBegin handles POST /api/auth/webauthn/register/begin —
+// initiates passkey registration. Requires password verification before issuing
+// the creation challenge to prevent unauthorized credential provisioning.
 func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Request) {
 	if !h.requireWebAuthn(w) {
 		return
@@ -177,6 +183,8 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 
 // --- POST /api/auth/webauthn/register/finish ---
 
+// HandleWebAuthnRegisterFinish handles POST /api/auth/webauthn/register/finish —
+// completes passkey registration, stores the new credential, and emits an audit record.
 func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	if !h.requireWebAuthn(w) {
 		return
@@ -241,6 +249,8 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 
 // --- DELETE /api/auth/passkeys/{id} ---
 
+// HandleDeletePasskey handles DELETE /api/auth/passkeys/{id} — removes a passkey.
+// Refuses when deleting would leave the account with no authentication method.
 func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 
@@ -280,6 +290,7 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 
 // --- PUT /api/auth/passkeys/{id} ---
 
+// HandleRenamePasskey handles PUT /api/auth/passkeys/{id} — renames a passkey.
 func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 

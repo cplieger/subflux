@@ -15,7 +15,7 @@ const (
 
 // --- API response types ---
 
-// StateStatsResponse is the JSON response for GET /api/stats.
+// Stats is the JSON response for GET /api/stats.
 type Stats struct {
 	LastScan            string `json:"last_scan"`
 	Downloads           int    `json:"downloads"`
@@ -28,7 +28,7 @@ type Stats struct {
 	Partial             bool   `json:"partial"`
 }
 
-// ScorePreviewResponse is the JSON response for POST /api/score/preview.
+// ScorePreview is the JSON response for POST /api/score/preview.
 type ScorePreview struct {
 	Tier        ScoreTier `json:"tier"`
 	Score       int       `json:"score"`
@@ -44,7 +44,7 @@ type SearchTarget struct {
 	Exclude   []string `json:"exclude,omitempty"`
 }
 
-// SearchTargetsResponse is the JSON response for GET /api/search/targets.
+// SearchTargets is the JSON response for GET /api/search/targets.
 type SearchTargets struct {
 	OrigLang   string         `json:"orig_lang"`
 	AudioLangs []string       `json:"audio_langs"`

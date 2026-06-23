@@ -16,6 +16,8 @@ import (
 
 // --- GET /api/auth/oidc ---
 
+// HandleOIDCRedirect handles GET /api/auth/oidc — initiates the OIDC authorization
+// code flow by generating state, nonce, and PKCE and redirecting to the provider.
 func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 	oidcProv := h.OIDCResolver()
 	if oidcProv == nil {
@@ -59,6 +61,9 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/auth/oidc/callback ---
 
+// HandleOIDCCallback handles GET /api/auth/oidc/callback — completes the OIDC
+// authorization code exchange, resolves or JIT-provisions the user, and creates
+// a session. Redirects to /login.html when a link ceremony is required.
 func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	oidcProv := h.OIDCResolver()
 	if oidcProv == nil {

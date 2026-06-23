@@ -15,6 +15,9 @@ import (
 
 // --- POST /api/auth/webauthn/login/begin ---
 
+// HandleWebAuthnLoginBegin handles POST /api/auth/webauthn/login/begin —
+// issues a WebAuthn assertion challenge. Supports both standard and
+// conditional (passkey autofill) mediation modes.
 func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Request) {
 	if !h.requireWebAuthn(w) {
 		return
@@ -60,6 +63,9 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 
 // --- POST /api/auth/webauthn/login/finish ---
 
+// HandleWebAuthnLoginFinish handles POST /api/auth/webauthn/login/finish —
+// verifies the assertion response, updates the credential sign count, and
+// creates a session for the authenticated user.
 func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if !h.requireWebAuthn(w) {
 		return

@@ -52,6 +52,7 @@ type Provider struct {
 	dlBaseURL string // download base URL; defaults to dlBaseURL const
 }
 
+// Name returns the provider identifier for SubDL.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
 // Search finds subtitles matching the request via IMDB/TMDB ID or title.

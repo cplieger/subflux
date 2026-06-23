@@ -2,13 +2,13 @@ package api
 
 import "time"
 
-// SetupStatusResponse is the JSON response for GET /api/auth/setup.
+// SetupStatus is the JSON response for GET /api/auth/setup.
 type SetupStatus struct {
 	SetupRequired bool `json:"setup_required"`
 	ConfigValid   bool `json:"config_valid"`
 }
 
-// UserMeResponse is the JSON response for GET /api/auth/me.
+// MeResponse is the JSON response for GET /api/auth/me.
 type MeResponse struct {
 	Username    string `json:"username"`
 	Role        Role   `json:"role"`
@@ -19,7 +19,7 @@ type MeResponse struct {
 	CanLinkOIDC bool   `json:"can_link_oidc"`
 }
 
-// LoginSuccessResponse is the JSON response after successful login.
+// LoginSuccess is the JSON response after successful login.
 type LoginSuccess struct {
 	Redirect string     `json:"redirect"`
 	User     MeResponse `json:"user"`
@@ -31,7 +31,7 @@ type WebAuthnUnknownCredentialResponse struct {
 	Signal string `json:"signal"`
 }
 
-// WebAuthnSignalDataResponse is the JSON response for GET /api/auth/webauthn/signal-data.
+// SignalData is the JSON response for GET /api/auth/webauthn/signal-data.
 type SignalData struct {
 	RPID          string   `json:"rp_id"`
 	UserID        string   `json:"user_id"`
@@ -40,7 +40,7 @@ type SignalData struct {
 	CredentialIDs []string `json:"credential_ids"`
 }
 
-// PasskeyRegisteredResponse is the JSON response after successful passkey registration.
+// PasskeyRegistered is the JSON response after successful passkey registration.
 type PasskeyRegistered struct {
 	CreatedAt time.Time `json:"created_at"`
 	Name      string    `json:"name"`
@@ -48,7 +48,7 @@ type PasskeyRegistered struct {
 	ID        int64     `json:"id"`
 }
 
-// KeyGeneratedResponse is the JSON response after generating an API key.
+// KeyGenerated is the JSON response after generating an API key.
 type KeyGenerated struct {
 	CreatedAt time.Time `json:"created_at"`
 	Key       string    `json:"key"`

@@ -46,8 +46,11 @@ type Provider struct {
 	client *http.Client
 }
 
+// Name returns the provider identifier for YIFY Subtitles.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// Search finds movie subtitles by scraping the YIFY Subtitles HTML page for the
+// given IMDB ID. Only movie requests are handled; episodes are skipped.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
 	if req.MediaType != api.MediaTypeMovie || req.ImdbID == "" {
 		slog.Debug("yifysubtitles: not a movie or no IMDB ID, skipping")
@@ -76,6 +79,8 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 	return results, nil
 }
 
+// Download fetches the subtitle archive for the given search result by first
+// loading the subtitle detail page to extract the real download link.
 func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
 	// Validate subtitle page URL to prevent SSRF.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {

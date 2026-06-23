@@ -12,6 +12,7 @@ import (
 
 // --- POST /api/auth/login ---
 
+// HandleLogin handles POST /api/auth/login — authenticates with username and password.
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if cfg := h.Config(); cfg != nil && !cfg.BasicAuthEnabled() {
 		api.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
@@ -89,6 +90,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 // --- POST /api/auth/logout ---
 
+// HandleLogout handles POST /api/auth/logout — invalidates the current session cookie.
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// Best-effort: pull the session subject if available so the audit
 	// record carries the user that logged out. The session lookup might
@@ -114,6 +116,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/auth/setup ---
 
+// HandleSetupStatus handles GET /api/auth/setup — returns whether initial setup is required.
 func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	dbCtx, dbCancel := dbCtx(r.Context())
 	count, err := h.Store.UserCount(dbCtx)
@@ -132,6 +135,8 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 
 // --- POST /api/auth/setup ---
 
+// HandleSetupCreate handles POST /api/auth/setup — creates the initial admin account.
+// Only succeeds when no users exist; subsequent calls return 409.
 func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeAuthBody[struct {
 		Username string `json:"username"`
@@ -206,6 +211,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/auth/me ---
 
+// HandleAuthMe handles GET /api/auth/me — returns profile information for the current user.
 func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 

@@ -12,6 +12,7 @@ import (
 
 // --- GET /api/auth/apikeys ---
 
+// HandleListAPIKeys handles GET /api/auth/apikeys — lists API keys for the current user.
 func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 
@@ -46,6 +47,7 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 
 // --- POST /api/auth/apikeys ---
 
+// HandleGenerateAPIKey handles POST /api/auth/apikeys — generates a new API key for the current user.
 func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 
@@ -103,6 +105,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 // --- DELETE /api/auth/apikeys/{id} ---
 
+// HandleRevokeAPIKey handles DELETE /api/auth/apikeys/{id} — revokes an API key owned by the current user.
 func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 

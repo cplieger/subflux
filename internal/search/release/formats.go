@@ -116,6 +116,8 @@ const sonarrReleaseGroupRegex = `-([a-z0-9]+(-[a-z0-9]+)?(?!.+?(?:480p|576p|720p
 
 const sonarrAnimeReleaseGroupRegex = `^\[(\S.+?\S)\](?:_|-|\s|\.)?`
 
+// CompiledReleaseGroup is the compiled PCRE pattern for extracting release group
+// tags from release names (e.g. "-GROUP" or ".[GROUP]").
 var (
 	CompiledReleaseGroup      *Pattern
 	CompiledAnimeReleaseGroup *regexp.Regexp
