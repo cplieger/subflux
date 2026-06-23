@@ -47,7 +47,7 @@ export interface CoverageTarget {
   total: number;
 }
 
-/** KeyGeneratedResponse is the JSON response after generating an API key. */
+/** KeyGenerated is the JSON response after generating an API key. */
 export interface KeyGenerated {
   created_at: string;
   key: string;
@@ -57,13 +57,13 @@ export interface KeyGenerated {
   id: number;
 }
 
-/** LoginSuccessResponse is the JSON response after successful login. */
+/** LoginSuccess is the JSON response after successful login. */
 export interface LoginSuccess {
   redirect: string;
   user: MeResponse;
 }
 
-/** UserMeResponse is the JSON response for GET /api/auth/me. */
+/** MeResponse is the JSON response for GET /api/auth/me. */
 export interface MeResponse {
   username: string;
   role: Role;
@@ -74,7 +74,7 @@ export interface MeResponse {
   can_link_oidc: boolean;
 }
 
-/** MovieCoverage is the coverage summary for one movie. */
+/** MovieItem is the coverage summary for one movie. */
 export interface MovieItem {
   title: string;
   imdb_id?: string;
@@ -100,7 +100,7 @@ export interface NotifyEvent {
   text: string;
 }
 
-/** PasskeyRegisteredResponse is the JSON response after successful passkey registration. */
+/** PasskeyRegistered is the JSON response after successful passkey registration. */
 export interface PasskeyRegistered {
   created_at: string;
   name: string;
@@ -116,7 +116,7 @@ export interface ProviderSchema {
   always_enabled?: boolean;
 }
 
-/** TimeoutStatus is the state of a single provider's timeout. */
+/** ProviderStatus is the state of a single provider's timeout. */
 export interface ProviderStatus {
   last_error?: string;
   cooldown_remaining?: number;
@@ -183,7 +183,7 @@ export interface SchemaSection {
   providers?: ProviderSchema[];
 }
 
-/** ScorePreviewResponse is the JSON response for POST /api/score/preview. */
+/** ScorePreview is the JSON response for POST /api/score/preview. */
 export interface ScorePreview {
   tier: ScoreTier;
   score: number;
@@ -199,14 +199,14 @@ export interface SearchTarget {
   exclude?: string[];
 }
 
-/** SearchTargetsResponse is the JSON response for GET /api/search/targets. */
+/** SearchTargets is the JSON response for GET /api/search/targets. */
 export interface SearchTargets {
   orig_lang: string;
   audio_langs: string[];
   targets: SearchTarget[];
 }
 
-/** SeriesCoverage is the coverage summary for one TV series. */
+/** SeriesItem is the coverage summary for one TV series. */
 export interface SeriesItem {
   title: string;
   imdb_id?: string;
@@ -222,13 +222,13 @@ export interface SeriesItem {
   excluded?: boolean;
 }
 
-/** SetupStatusResponse is the JSON response for GET /api/auth/setup. */
+/** SetupStatus is the JSON response for GET /api/auth/setup. */
 export interface SetupStatus {
   setup_required: boolean;
   config_valid: boolean;
 }
 
-/** WebAuthnSignalDataResponse is the JSON response for GET /api/auth/webauthn/signal-data. */
+/** SignalData is the JSON response for GET /api/auth/webauthn/signal-data. */
 export interface SignalData {
   rp_id: string;
   user_id: string;
@@ -255,7 +255,7 @@ export interface StateEntry {
   manual: boolean;
 }
 
-/** StateStatsResponse is the JSON response for GET /api/stats. */
+/** Stats is the JSON response for GET /api/stats. */
 export interface Stats {
   last_scan: string;
   downloads: number;
@@ -268,7 +268,7 @@ export interface Stats {
   partial: boolean;
 }
 
-/** SubtitleFileRow is the JSON shape returned by coverage queries. */
+/** SubtitleEntry is the JSON shape returned by coverage queries. */
 export interface SubtitleEntry {
   media_id: string;
   language: string;
