@@ -1,3 +1,4 @@
+// Package config loads, validates, and hot-reloads the subflux YAML configuration.
 package config
 
 import (

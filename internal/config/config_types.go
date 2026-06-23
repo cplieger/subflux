@@ -175,6 +175,7 @@ type yamlAdaptiveConfig struct {
 // LogLevel is a typed string for log verbosity levels.
 type LogLevel = api.LogLevel
 
+// LogLevel constants for the supported log verbosity levels.
 const (
 	LogLevelError LogLevel = "error"
 	LogLevelWarn  LogLevel = "warn"
@@ -194,6 +195,7 @@ func ValidLogLevel(l LogLevel) bool {
 // LogFormat is a typed string for log output formats.
 type LogFormat = api.LogFormat
 
+// LogFormat constants for the supported log output formats.
 const (
 	LogFormatJSON LogFormat = "json"
 	LogFormatText LogFormat = "text"

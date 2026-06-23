@@ -100,6 +100,7 @@ type Provider struct {
 	includeAI  bool
 }
 
+// Name returns the provider identifier for OpenSubtitles.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
 // Search queries OpenSubtitles for subtitles matching the request. For episodes
@@ -219,6 +220,8 @@ func (p *Provider) CountShowSubtitles(ctx context.Context, imdbID, lang string) 
 	return resp.TotalCount, nil
 }
 
+// Download requests a download link from OpenSubtitles and fetches the subtitle
+// file. The /download endpoint always uses the default base URL, not the VIP host.
 func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
 	if err := p.ensureToken(ctx); err != nil {
 		return nil, fmt.Errorf("auth: %w", err)

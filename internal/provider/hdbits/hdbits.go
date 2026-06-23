@@ -105,8 +105,11 @@ var (
 
 // --- Provider API (Name, Search, Download) ---
 
+// Name returns the provider identifier for HDBits.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// Search finds subtitles for the given request by resolving torrent IDs via the
+// HDBits API and inspecting each torrent's subtitle metadata.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
 	slog.Debug("hdbits searching",
 		"media_type", req.MediaType, "title", req.Title,

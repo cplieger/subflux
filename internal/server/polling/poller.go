@@ -55,6 +55,7 @@ const (
 	PollSourceRadarr PollSource = "radarr"
 )
 
+// ImportResult holds the resolved search parameters for a single arr import event.
 type ImportResult struct {
 	Req       *api.SearchRequest
 	Source    PollSource

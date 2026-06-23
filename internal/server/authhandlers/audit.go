@@ -40,6 +40,7 @@ const AuditEventKind = "auth"
 // audit trail. Add new events here when introducing new auth flows.
 type AuditEvent string
 
+// AuditEvent constants enumerate the security-relevant events captured in the audit trail.
 const (
 	AuditLoginSuccess     AuditEvent = "login.success"
 	AuditLoginFailure     AuditEvent = "login.failure"

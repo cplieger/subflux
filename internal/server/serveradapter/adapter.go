@@ -29,23 +29,39 @@ var (
 // manualops.ActivityTracker (superset of methods).
 type ActivityAdapter struct{ A *activity.Log }
 
+// Start begins a new activity entry and returns its ID.
 func (a *ActivityAdapter) Start(action, detail string, source activity.ActivitySource) string {
 	return a.A.Start(action, detail, source)
 }
-func (a *ActivityAdapter) End(id string)  { a.A.End(id) }
+
+// End marks the activity with the given ID as successfully completed.
+func (a *ActivityAdapter) End(id string) { a.A.End(id) }
+
+// Fail marks the activity with the given ID as failed.
 func (a *ActivityAdapter) Fail(id string) { a.A.Fail(id) }
+
+// Progress updates the progress counters and message for an activity.
 func (a *ActivityAdapter) Progress(id string, current, total int, msg string) {
 	a.A.Progress(id, current, total, msg)
 }
+
+// SetQueued marks an activity as queued or active.
 func (a *ActivityAdapter) SetQueued(id string, queued bool) { a.A.SetQueued(id, queued) }
-func (a *ActivityAdapter) IsCancelled(id string) bool       { return a.A.IsCancelled(id) }
+
+// IsCancelled reports whether the activity with the given ID has been cancelled.
+func (a *ActivityAdapter) IsCancelled(id string) bool { return a.A.IsCancelled(id) }
 
 // AlertAdapter bridges activity.AlertLog to scanning.AlertRecorder and
 // activity.WarnRecorder (superset of methods).
 type AlertAdapter struct{ A *activity.AlertLog }
 
-func (a *AlertAdapter) Record(category, msg string)   { a.A.Record(category, msg) }
-func (a *AlertAdapter) RecordInfo(msg string)         { a.A.RecordInfo(msg) }
+// Record emits an alert with the given category and message.
+func (a *AlertAdapter) Record(category, msg string) { a.A.Record(category, msg) }
+
+// RecordInfo emits an informational alert message.
+func (a *AlertAdapter) RecordInfo(msg string) { a.A.RecordInfo(msg) }
+
+// RecordWarn emits a warning alert with the given source and message.
 func (a *AlertAdapter) RecordWarn(source, msg string) { a.A.RecordWarn(source, msg) }
 
 // RecordStoreWriteError checks whether the error indicates a disk-full or
@@ -71,6 +87,7 @@ func (a *AlertAdapter) RecordStoreWriteError(err error) {
 // ScanEventAdapter bridges events.EventBus to scanning.EventPublisher.
 type ScanEventAdapter struct{ E *events.EventBus }
 
+// PublishCoverageUpdate publishes a coverage-update SSE event for a media item.
 func (a *ScanEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaID string) {
 	a.E.Publish(events.Event{
 		Type: events.CoverageUpdate,
@@ -78,6 +95,7 @@ func (a *ScanEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaI
 	})
 }
 
+// PublishScanStart publishes a scan-start SSE event.
 func (a *ScanEventAdapter) PublishScanStart(action, detail string, source activity.ActivitySource) {
 	a.E.Publish(events.Event{
 		Type: events.ScanStart,
@@ -85,6 +103,7 @@ func (a *ScanEventAdapter) PublishScanStart(action, detail string, source activi
 	})
 }
 
+// PublishScanDone publishes a scan-done SSE event with success or failure status.
 func (a *ScanEventAdapter) PublishScanDone(action, detail string, source activity.ActivitySource, ok bool) {
 	a.E.Publish(events.Event{
 		Type: events.ScanDone,
@@ -95,10 +114,13 @@ func (a *ScanEventAdapter) PublishScanDone(action, detail string, source activit
 // ManualEventAdapter bridges events.EventBus to manualops.EventPublisher.
 type ManualEventAdapter struct{ E *events.EventBus }
 
+// PublishNotify publishes a user-facing notification SSE event at the given severity level.
 func (a *ManualEventAdapter) PublishNotify(level events.NotifyLevel, text string) {
 	a.E.Publish(events.Event{Type: events.Notify, Data: events.NotifyEvent{Level: level, Text: text}})
 }
 
+// PublishCoverageUpdate publishes a coverage-update SSE event carrying the full
+// subtitle file path for the manual download case.
 func (a *ManualEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source, path string) {
 	a.E.Publish(events.Event{
 		Type: events.CoverageUpdate,

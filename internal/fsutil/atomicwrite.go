@@ -49,6 +49,7 @@ func validateAbsClean(path string) (string, error) {
 // WritePhase identifies which step of an atomic write failed.
 type WritePhase int
 
+// WritePhase constants identify which step of an atomic write failed.
 const (
 	PhaseTempCreate WritePhase = iota + 1
 	PhaseTempWrite

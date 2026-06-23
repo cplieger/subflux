@@ -49,8 +49,11 @@ type Provider struct {
 	token  string // API key for X-BetaSeries-Key header.
 }
 
+// Name returns the provider identifier for BetaSeries.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// Search queries BetaSeries for TV episode subtitles using the TVDB ID.
+// Only episode requests are handled; movies are skipped.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
 	if req.MediaType != api.MediaTypeEpisode {
 		slog.Debug("betaseries: not an episode, skipping",
@@ -105,6 +108,8 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 	return results, nil
 }
 
+// Download fetches the subtitle content for the given search result.
+// Archives are extracted automatically via provider.ExtractAndValidate.
 func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {

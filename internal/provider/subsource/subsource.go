@@ -55,6 +55,7 @@ type Provider struct {
 	apiKey     string
 }
 
+// Name returns the provider identifier for SubSource.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
 // Search finds subtitles matching the request via IMDB ID lookup.

@@ -21,6 +21,9 @@ func FilterByIdentity(results []api.Subtitle, req *api.SearchRequest) (kept []ap
 	return kept, dropped
 }
 
+// IdentityOK reports whether a subtitle passes the identity check for the given
+// request. Hash-matched subtitles always pass. Subtitles with season/episode
+// metadata are validated against the request's expected episode and title.
 func IdentityOK(sub *api.Subtitle, req *api.SearchRequest) bool {
 	if sub.MatchedBy == api.MatchByHash {
 		return true
@@ -62,6 +65,9 @@ func validateNoMetadata(sub *api.Subtitle, req *api.SearchRequest) bool {
 	return true
 }
 
+// IdentityTitleOK reports whether the subtitle's title metadata is consistent
+// with the search request. Subtitles matched by a stable ID (TVDB, IMDB, hash)
+// skip title validation; title-matched subtitles must pass AnyTitleMatches.
 func IdentityTitleOK(sub *api.Subtitle, req *api.SearchRequest) bool {
 	if sub.MatchedBy != "" && sub.MatchedBy != api.MatchByTitle {
 		return true

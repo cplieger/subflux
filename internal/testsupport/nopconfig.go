@@ -19,14 +19,31 @@ type NopConfig struct {
 	ProviderPrio int
 }
 
-func (n *NopConfig) Scores() api.Scores                       { return api.DefaultScores }
-func (n *NopConfig) Search() api.SearchConfig                 { return n.SearchConfig }
-func (n *NopConfig) Adaptive() api.AdaptiveConfig             { return n.AdaptiveCfg }
-func (n *NopConfig) SyncConfig() api.SyncConfig               { return n.Sync }
+// Scores returns the default scoring weights.
+func (n *NopConfig) Scores() api.Scores { return api.DefaultScores }
+
+// Search returns the configured search settings.
+func (n *NopConfig) Search() api.SearchConfig { return n.SearchConfig }
+
+// Adaptive returns the configured adaptive backoff settings.
+func (n *NopConfig) Adaptive() api.AdaptiveConfig { return n.AdaptiveCfg }
+
+// SyncConfig returns the configured subtitle sync settings.
+func (n *NopConfig) SyncConfig() api.SyncConfig { return n.Sync }
+
+// PostProcessConfig returns the configured post-processing settings.
 func (n *NopConfig) PostProcessConfig() api.PostProcessConfig { return n.PostProcess }
+
+// ProvidersForTarget returns all providers unchanged (no include/exclude filtering).
 func (n *NopConfig) ProvidersForTarget(_ *api.SubtitleTarget, all []api.ProviderID) []api.ProviderID {
 	return all
 }
+
+// MinScoreForTarget returns the configured minimum score.
 func (n *NopConfig) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) int { return n.MinScore }
-func (n *NopConfig) ProviderPriority(_ api.ProviderID) int                        { return n.ProviderPrio }
-func (n *NopConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg          { return n.ProviderCfgs }
+
+// ProviderPriority returns the configured provider priority value.
+func (n *NopConfig) ProviderPriority(_ api.ProviderID) int { return n.ProviderPrio }
+
+// ProviderConfigs returns the configured provider configuration map.
+func (n *NopConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg { return n.ProviderCfgs }

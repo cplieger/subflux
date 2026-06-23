@@ -8,6 +8,8 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
+// AnyTitleMatches reports whether candidate matches the primary title or any
+// alternative title in the request after normalization.
 func AnyTitleMatches(req *api.SearchRequest, candidate string) bool {
 	if TitlesMatch(req.Title, candidate) {
 		return true
@@ -20,6 +22,8 @@ func AnyTitleMatches(req *api.SearchRequest, candidate string) bool {
 	return false
 }
 
+// AnyReleaseNameMatches reports whether releaseName contains any of the request's
+// titles (primary or alternatives) after stripping release group tags.
 func AnyReleaseNameMatches(req *api.SearchRequest, releaseName string) bool {
 	cleaned := groupTagRe.ReplaceAllString(releaseName, "")
 	normalizedCleaned := NormalizeTitle(cleaned)
@@ -35,6 +39,8 @@ func AnyReleaseNameMatches(req *api.SearchRequest, releaseName string) bool {
 	return false
 }
 
+// EpisodeNumberMatch reports whether the subtitle's season/episode pair matches
+// the request, including scene and absolute episode numbering alternatives.
 func EpisodeNumberMatch(subSeason, subEpisode int, req *api.SearchRequest) bool {
 	if matchesPair(subSeason, subEpisode, req.Season, req.Episode) {
 		return true
@@ -66,11 +72,14 @@ func matchesPair(subSeason, subEpisode, candSeason, candEpisode int) bool {
 	return seasonOK && episodeOK
 }
 
+// SeasonEpRe matches S##E## episode markers in release names (e.g. S01E03).
 var (
 	SeasonEpRe   = regexp.MustCompile(`(?i)S\d{1,2}E\d{1,3}`)
 	SeasonOnlyRe = regexp.MustCompile(`(?i)S(\d{1,2})(?:E\d{1,3})?`)
 )
 
+// ExtractReleaseSeason extracts the season number from a release name via the
+// S##E## or S## pattern. Returns 0 if no season marker is found.
 func ExtractReleaseSeason(releaseName string) int {
 	m := SeasonOnlyRe.FindStringSubmatch(releaseName)
 	if m == nil {

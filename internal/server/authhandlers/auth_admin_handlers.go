@@ -10,6 +10,7 @@ import (
 
 // --- GET /api/auth/users ---
 
+// HandleListUsers handles GET /api/auth/users — lists all user accounts.
 func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.AdminDB.ListUsers(r.Context())
 	if err != nil {
@@ -44,6 +45,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 
 // --- POST /api/auth/users ---
 
+// HandleCreateUser handles POST /api/auth/users — creates a new user account.
 func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	admin := api.UserFromContext(r.Context())
 
@@ -119,6 +121,8 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 // --- DELETE /api/auth/users/{id} ---
 
+// HandleDeleteUser handles DELETE /api/auth/users/{id} — deletes a user account.
+// Refuses to delete the caller's own account or the last admin.
 func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	admin := api.UserFromContext(r.Context())
 

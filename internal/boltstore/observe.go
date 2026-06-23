@@ -37,10 +37,9 @@ func (d *DB) StoreFileStats() (fileBytes, freelistBytes int64) {
 	return fileBytes, freelistBytes
 }
 
-// DiskFullError wraps a bbolt write error that indicates the underlying
-// storage is full (ENOSPC) or otherwise unable to accept writes. The server
-// uses this to decide whether to raise a persistent alert instead of
-// crash-looping.
+// IsDiskFullError reports whether err indicates the underlying storage is full
+// (ENOSPC) or otherwise unable to accept writes. The server uses this to decide
+// whether to raise a persistent alert instead of crash-looping.
 func IsDiskFullError(err error) bool {
 	if err == nil {
 		return false

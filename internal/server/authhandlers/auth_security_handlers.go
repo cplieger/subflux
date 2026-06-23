@@ -12,6 +12,8 @@ import (
 
 // --- PUT /api/auth/password ---
 
+// HandleChangePassword handles PUT /api/auth/password — changes the current user's
+// password after verifying the existing one, then invalidates all other sessions.
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 

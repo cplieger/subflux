@@ -47,6 +47,7 @@ func Factory(_ context.Context, _ map[string]any) (api.Provider, error) {
 	}, nil
 }
 
+// Name returns the provider identifier for Gestdown.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
