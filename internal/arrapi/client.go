@@ -22,8 +22,8 @@ import (
 // context has no deadline. Covers large JSON responses from big libraries.
 const defaultRequestTimeout = 120 * time.Second
 
-// defaultMaxRetries is the number of retry attempts for transient failures.
-const defaultMaxRetries = 3
+// defaultMaxAttempts is the total number of attempts (including the first) for transient failures.
+const defaultMaxAttempts = 3
 
 // defaultRetryDelay is the base delay between retry attempts.
 const defaultRetryDelay = 5 * time.Second
@@ -55,7 +55,7 @@ type Client struct {
 	httpClient     *http.Client
 	baseURL        string
 	apiKey         string
-	maxRetries     int
+	maxAttempts    int
 	retryDelay     time.Duration
 	defaultTimeout time.Duration
 }
@@ -76,15 +76,15 @@ func NewClient(baseURL, apiKey string, opts ...ClientOption) (*Client, error) {
 		httpClient:     &http.Client{Transport: defaultTransport(), Timeout: safetyTimeout},
 		baseURL:        strings.TrimRight(baseURL, "/"),
 		apiKey:         apiKey,
-		maxRetries:     defaultMaxRetries,
+		maxAttempts:    defaultMaxAttempts,
 		retryDelay:     defaultRetryDelay,
 		defaultTimeout: defaultRequestTimeout,
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
-	if c.maxRetries < 0 {
-		c.maxRetries = 0
+	if c.maxAttempts < 0 {
+		c.maxAttempts = 0
 	}
 	if c.retryDelay < 100*time.Millisecond {
 		c.retryDelay = 100 * time.Millisecond

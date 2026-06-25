@@ -18,11 +18,11 @@ import (
 func newTestClient(t *testing.T, srv *httptest.Server) *Client {
 	t.Helper()
 	return &Client{
-		httpClient: srv.Client(),
-		baseURL:    srv.URL,
-		apiKey:     "test-key",
-		maxRetries: 3,
-		retryDelay: time.Millisecond, // Fast retries for tests.
+		httpClient:  srv.Client(),
+		baseURL:     srv.URL,
+		apiKey:      "test-key",
+		maxAttempts: 3,
+		retryDelay:  time.Millisecond, // Fast retries for tests.
 	}
 }
 

@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/cplieger/auth v1.1.2
 	github.com/cplieger/health v1.1.4
-	github.com/cplieger/httpx v1.1.0
+	github.com/cplieger/httpx/v2 v2.0.0
 	github.com/cplieger/metrics/v2 v2.2.1
 	github.com/cplieger/ssrf/v2 v2.0.4
 	github.com/cplieger/wiregen v1.2.1

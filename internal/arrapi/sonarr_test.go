@@ -601,11 +601,11 @@ func TestGetEpisodesWithRetry_context_cancelled_during_delay(t *testing.T) {
 
 	// Use a long retry delay so the context cancellation fires during the select.
 	c := &Client{
-		httpClient: srv.Client(),
-		baseURL:    srv.URL,
-		apiKey:     "test-key",
-		maxRetries: 3,
-		retryDelay: 10 * time.Second, // Long delay — context cancel will fire first.
+		httpClient:  srv.Client(),
+		baseURL:     srv.URL,
+		apiKey:      "test-key",
+		maxAttempts: 3,
+		retryDelay:  10 * time.Second, // Long delay — context cancel will fire first.
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()

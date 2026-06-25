@@ -1,5 +1,5 @@
 // Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx; this package
+// Behavioral logic is delegated to github.com/cplieger/httpx/v2; this package
 // retains application-specific constants and thin adapters that bridge httpx
 // error types to the internal api.* error types used across the codebase.
 package httputil
@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/httpx"
+	"github.com/cplieger/httpx/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -147,10 +147,10 @@ func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duratio
 }
 
 // RetryWithBackoff retries fn with jittered exponential backoff.
-func RetryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time.Duration,
+func RetryWithBackoff[T any](ctx context.Context, maxAttempts int, baseDelay time.Duration,
 	label string, fn func(ctx context.Context) (T, error),
 ) (T, error) {
-	return httpx.RetryWithBackoff(ctx, maxRetries, baseDelay, label, func(ctx context.Context) (T, error) {
+	return httpx.RetryWithBackoff(ctx, maxAttempts, baseDelay, label, func(ctx context.Context) (T, error) {
 		result, err := fn(ctx)
 		if err == nil {
 			return result, nil
