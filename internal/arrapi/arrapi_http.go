@@ -52,7 +52,7 @@ func (e *StatusError) IsTransient() bool {
 // brief arr restarts and overload windows. Single-resource GETs are
 // idempotent so retry is safe.
 func (c *Client) fetchByID(ctx context.Context, path, label string, id int, dst any) error {
-	_, err := retryWithBackoff(ctx, c.maxRetries, c.retryDelay,
+	_, err := retryWithBackoff(ctx, c.maxAttempts, c.retryDelay,
 		fmt.Sprintf("%s %d", label, id),
 		func(ctx context.Context) (struct{}, error) {
 			resp, err := c.get(ctx, path) //nolint:bodyclose // closed by decodeJSON
@@ -103,8 +103,8 @@ func (c *Client) get(ctx context.Context, path string) (*http.Response, error) {
 }
 
 // retryWithBackoff delegates to httputil.RetryWithBackoff for shared retry logic.
-func retryWithBackoff[T any](ctx context.Context, maxRetries int, baseDelay time.Duration,
+func retryWithBackoff[T any](ctx context.Context, maxAttempts int, baseDelay time.Duration,
 	label string, fn func(ctx context.Context) (T, error),
 ) (T, error) {
-	return httputil.RetryWithBackoff(ctx, maxRetries, baseDelay, label, fn)
+	return httputil.RetryWithBackoff(ctx, maxAttempts, baseDelay, label, fn)
 }

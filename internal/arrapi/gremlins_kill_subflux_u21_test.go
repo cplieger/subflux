@@ -141,20 +141,20 @@ func Test_gk_subflux_u21_IdPathCapacity(t *testing.T) {
 	}
 }
 
-// --- client.go:86:18 CONDITIONALS_NEGATION (maxRetries clamp) ---
+// --- client.go:86:18 CONDITIONALS_NEGATION (maxAttempts clamp) ---
 
-// `if c.maxRetries < 0 { c.maxRetries = 0 }`. A negative maxRetries must clamp
+// `if c.maxAttempts < 0 { c.maxAttempts = 0 }`. A negative maxAttempts must clamp
 // to 0; the negation `>= 0` leaves it at -5.
 // (The 86:18 CONDITIONALS_BOUNDARY `<` -> `<=` is equivalent: the clamp target
-// is 0, so at maxRetries==0 both branches yield 0 and no input distinguishes.)
-func Test_gk_subflux_u21_NewClientClampsNegativeMaxRetries(t *testing.T) {
+// is 0, so at maxAttempts==0 both branches yield 0 and no input distinguishes.)
+func Test_gk_subflux_u21_NewClientClampsNegativeMaxAttempts(t *testing.T) {
 	t.Parallel()
-	c, err := NewClient("http://localhost", "k", func(c *Client) { c.maxRetries = -5 })
+	c, err := NewClient("http://localhost", "k", func(c *Client) { c.maxAttempts = -5 })
 	if err != nil {
 		t.Fatalf("NewClient() unexpected error: %v", err)
 	}
-	if c.maxRetries != 0 {
-		t.Errorf("NewClient(maxRetries=-5).maxRetries = %d, want 0", c.maxRetries)
+	if c.maxAttempts != 0 {
+		t.Errorf("NewClient(maxAttempts=-5).maxAttempts = %d, want 0", c.maxAttempts)
 	}
 }
 

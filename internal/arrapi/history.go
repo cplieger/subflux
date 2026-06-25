@@ -27,7 +27,7 @@ func (c *Client) GetHistorySince(ctx context.Context, since time.Time, eventType
 	params.Set("includeEpisode", "false")
 	path := apiPrefix + "/history/since?" + params.Encode()
 
-	return retryWithBackoff(ctx, c.maxRetries, c.retryDelay, "history/since",
+	return retryWithBackoff(ctx, c.maxAttempts, c.retryDelay, "history/since",
 		func(ctx context.Context) ([]api.HistoryEntry, error) {
 			resp, err := c.get(ctx, path) //nolint:bodyclose // closed by decodeJSONSlice
 			if err != nil {

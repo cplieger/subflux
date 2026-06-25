@@ -26,7 +26,7 @@ const fetchAllAvgItemSize = 200
 // brief arr restarts and overload windows. GETs are idempotent so this
 // is safe; POST commands intentionally bypass retry via postCommand.
 func fetchAll[T any](ctx context.Context, c *Client, path string) ([]T, error) {
-	return retryWithBackoff(ctx, c.maxRetries, c.retryDelay, "fetchAll "+path,
+	return retryWithBackoff(ctx, c.maxAttempts, c.retryDelay, "fetchAll "+path,
 		func(ctx context.Context) ([]T, error) {
 			resp, err := c.get(ctx, path) //nolint:bodyclose // closed by decodeJSONSlice
 			if err != nil {
