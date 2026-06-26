@@ -6,8 +6,8 @@ github.com/cplieger/health v1.1.4 h1:q/6QEffGp+TdJ3tBet5cfIIQH1mDHcyCVBxXkKbDDwg
 github.com/cplieger/health v1.1.4/go.mod h1:INjkN9qJnR14X5AFqX6ymFaHvx51djYgk2oQb/gJ9u8=
 github.com/cplieger/httpx/v2 v2.0.0 h1:I8h4W2WTi7pf9x2dzSFbow5L2mmLJo+BvNf2c0JT2Ow=
 github.com/cplieger/httpx/v2 v2.0.0/go.mod h1:DffGCIJihiQhVjn481ZYnA2HU26Qpvhd5swi+2rXdck=
-github.com/cplieger/metrics/v2 v2.2.1 h1:IE608anJ9jVhqi8Mj32BON4KZcR0vTLTjVPV+IzhfEA=
-github.com/cplieger/metrics/v2 v2.2.1/go.mod h1:92d0LHn9dLuEuw/FcsO1ZHHrMtMcj2kAfuZiHt5ghZQ=
+github.com/cplieger/metrics/v2 v2.2.2 h1:h5uS59t0abqIIFNe2KBkYI9QGfSuFxYwLwogZTqRzlk=
+github.com/cplieger/metrics/v2 v2.2.2/go.mod h1:92d0LHn9dLuEuw/FcsO1ZHHrMtMcj2kAfuZiHt5ghZQ=
 github.com/cplieger/ssrf/v2 v2.0.4 h1:RwCSoj+L+RogQchCRuAsbuHIalp7hUrTjfe6aWIDfz0=
 github.com/cplieger/ssrf/v2 v2.0.4/go.mod h1:duZRnvl1FAdozPbF48iZbMkwYZU5XtT/1rUfdcG7EZs=
 github.com/cplieger/wiregen v1.2.2 h1:cx+Mg2uGtQUGIRQqLZ/2KV/nNKAaFwZs1LUs9PLSGoA=
