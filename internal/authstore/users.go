@@ -183,53 +183,67 @@ func (s *Store) CreateUser(_ context.Context, user *auth.User) error {
 		if !ok {
 			return fmt.Errorf("authstore: %q bucket not found", bucketAuthUsers)
 		}
-
-		nameKey := userNameIndexKey(user.Username)
-		if err := uniqueCheck(tx, bucketIxUserName, nameKey); err != nil {
+		if err := checkCreateUserUniqueness(tx, user); err != nil {
 			return err
 		}
-		var oidcKey []byte
-		if user.OIDCSub != "" {
-			oidcKey = userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub)
-			if err := uniqueCheck(tx, bucketIxUserOIDC, oidcKey); err != nil {
-				return err
-			}
-		}
-
-		id, err := nextAuthID(ub)
-		if err != nil {
-			return err
-		}
-		now := time.Now().UTC()
-		if user.CreatedAt.IsZero() {
-			user.CreatedAt = now
-		}
-		user.UpdatedAt = user.CreatedAt
-		user.ID = id
-
-		rec := toUserRec(user)
-		enc, err := boltkv.Encode(&rec)
-		if err != nil {
-			return err
-		}
-		key := userKey(id)
-		if err := ub.Put(key, enc); err != nil {
-			return fmt.Errorf("authstore: put user: %w", err)
-		}
-		if err := idxPut(tx, bucketIxUserName, nameKey, key); err != nil {
-			return err
-		}
-		if oidcKey != nil {
-			if err := idxPut(tx, bucketIxUserOIDC, oidcKey, key); err != nil {
-				return err
-			}
-		}
-		return nil
+		return insertUser(tx, ub, user)
 	})
 	if err != nil {
 		return err
 	}
 	slog.Info("user created", "username", user.Username, "role", user.Role)
+	return nil
+}
+
+// checkCreateUserUniqueness enforces case-insensitive username uniqueness and,
+// when the user carries an OIDC identity, (issuer, sub) uniqueness against the
+// index buckets before any write, yielding errConflict on a duplicate
+// (Requirement 9.3).
+func checkCreateUserUniqueness(tx *bbolt.Tx, user *auth.User) error {
+	if err := uniqueCheck(tx, bucketIxUserName, userNameIndexKey(user.Username)); err != nil {
+		return err
+	}
+	if user.OIDCSub != "" {
+		if err := uniqueCheck(tx, bucketIxUserOIDC, userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// insertUser allocates the surrogate id, stamps CreatedAt (when zero) and
+// UpdatedAt, encodes the record, and writes the user row plus its ix_user_name
+// and (when present) ix_user_oidc entries within tx. CreatedAt defaults to now
+// and UpdatedAt is set equal to it, mirroring the SQLite CURRENT_TIMESTAMP
+// defaults. Callers run checkCreateUserUniqueness first so the index puts cannot
+// clobber another user's entry.
+func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
+	id, err := nextAuthID(ub)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = now
+	}
+	user.UpdatedAt = user.CreatedAt
+	user.ID = id
+
+	rec := toUserRec(user)
+	enc, err := boltkv.Encode(&rec)
+	if err != nil {
+		return err
+	}
+	key := userKey(id)
+	if err := ub.Put(key, enc); err != nil {
+		return fmt.Errorf("authstore: put user: %w", err)
+	}
+	if err := idxPut(tx, bucketIxUserName, userNameIndexKey(user.Username), key); err != nil {
+		return err
+	}
+	if user.OIDCSub != "" {
+		return idxPut(tx, bucketIxUserOIDC, userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub), key)
+	}
 	return nil
 }
 
@@ -392,27 +406,9 @@ func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 			return err
 		}
 
-		newNameKey := userNameIndexKey(user.Username)
-		oldNameKey := userNameIndexKey(oldRec.Username)
-		nameChanged := !bytes.Equal(newNameKey, oldNameKey)
-		if nameChanged {
-			if err := uniqueCheck(tx, bucketIxUserName, newNameKey); err != nil {
-				return err
-			}
-		}
-
-		var oldOIDCKey, newOIDCKey []byte
-		if oldRec.OIDCSub != "" {
-			oldOIDCKey = userOIDCIndexKey(oldRec.OIDCIssuer, oldRec.OIDCSub)
-		}
-		if user.OIDCSub != "" {
-			newOIDCKey = userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub)
-		}
-		oidcChanged := !bytes.Equal(oldOIDCKey, newOIDCKey)
-		if newOIDCKey != nil && oidcChanged {
-			if err := uniqueCheck(tx, bucketIxUserOIDC, newOIDCKey); err != nil {
-				return err
-			}
+		idx, err := checkUpdateUserUniqueness(tx, user, &oldRec)
+		if err != nil {
+			return err
 		}
 
 		user.CreatedAt = oldRec.CreatedAt
@@ -426,11 +422,55 @@ func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 			return fmt.Errorf("authstore: put user: %w", err)
 		}
 
-		if err := reindexUserName(tx, nameChanged, oldNameKey, newNameKey, key); err != nil {
+		if err := reindexUserName(tx, idx.nameChanged, idx.oldNameKey, idx.newNameKey, key); err != nil {
 			return err
 		}
-		return reindexUserOIDC(tx, oidcChanged, oldOIDCKey, newOIDCKey, key)
+		return reindexUserOIDC(tx, idx.oidcChanged, idx.oldOIDCKey, idx.newOIDCKey, key)
 	})
+}
+
+// userIndexUpdate is the index re-keying plan computed for an UpdateUser:
+// whether the username and/or OIDC identity changed, plus the old/new index
+// keys to delete/add. A nil OIDC key means "no OIDC identity on that side".
+type userIndexUpdate struct {
+	oldNameKey  []byte
+	newNameKey  []byte
+	oldOIDCKey  []byte
+	newOIDCKey  []byte
+	nameChanged bool
+	oidcChanged bool
+}
+
+// checkUpdateUserUniqueness computes the index re-keying plan for an update and
+// enforces uniqueness for a newly-taken username or (issuer, sub) before any
+// write: a username whose fold changed, or a new OIDC identity, is checked
+// against its index and yields errConflict on a collision (Requirement 9.3). An
+// unchanged username/identity is not re-checked, so a user keeps its own keys.
+func checkUpdateUserUniqueness(tx *bbolt.Tx, user *auth.User, oldRec *userRec) (userIndexUpdate, error) {
+	idx := userIndexUpdate{
+		newNameKey: userNameIndexKey(user.Username),
+		oldNameKey: userNameIndexKey(oldRec.Username),
+	}
+	idx.nameChanged = !bytes.Equal(idx.newNameKey, idx.oldNameKey)
+	if idx.nameChanged {
+		if err := uniqueCheck(tx, bucketIxUserName, idx.newNameKey); err != nil {
+			return userIndexUpdate{}, err
+		}
+	}
+
+	if oldRec.OIDCSub != "" {
+		idx.oldOIDCKey = userOIDCIndexKey(oldRec.OIDCIssuer, oldRec.OIDCSub)
+	}
+	if user.OIDCSub != "" {
+		idx.newOIDCKey = userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub)
+	}
+	idx.oidcChanged = !bytes.Equal(idx.oldOIDCKey, idx.newOIDCKey)
+	if idx.newOIDCKey != nil && idx.oidcChanged {
+		if err := uniqueCheck(tx, bucketIxUserOIDC, idx.newOIDCKey); err != nil {
+			return userIndexUpdate{}, err
+		}
+	}
+	return idx, nil
 }
 
 // reindexUserName rewrites the ix_user_name entry when the username changed:
@@ -487,33 +527,10 @@ func (s *Store) DeleteUser(_ context.Context, id int64) error {
 		if err := decodeAuthRecord(bucketAuthUsers, key, data, &rec); err != nil {
 			return err
 		}
-
-		// Delete the user row and its uniqueness-index entries. A leftover
-		// ix_user_name entry would block recreating the same admin username,
-		// breaking the documented clean-break recovery path.
-		if err := ub.Delete(key); err != nil {
-			return fmt.Errorf("authstore: delete user: %w", err)
-		}
-		if err := idxDelete(tx, bucketIxUserName, userNameIndexKey(rec.Username)); err != nil {
+		if err := deleteUserAndIndexes(tx, ub, key, &rec); err != nil {
 			return err
 		}
-		if rec.OIDCSub != "" {
-			if err := idxDelete(tx, bucketIxUserOIDC, userOIDCIndexKey(rec.OIDCIssuer, rec.OIDCSub)); err != nil {
-				return err
-			}
-		}
-
-		// Cascade to the durable child records (passkeys, API keys). The full
-		// passkey/API-key accessors land in tasks 8.3/8.4; the cascade only
-		// needs to delete each child primary plus its user-scoped index entry,
-		// which it does by walking the index prefix directly.
-		if err := cascadeDeleteByUser(tx, bucketIxPasskeyUser, bucketAuthPasskeys, id); err != nil {
-			return err
-		}
-		if err := cascadeDeleteByUser(tx, bucketIxAPIKeyUser, bucketAuthAPIKeys, id); err != nil {
-			return err
-		}
-		return nil
+		return cascadeUserChildren(tx, id)
 	})
 	if err != nil {
 		return err
@@ -522,6 +539,34 @@ func (s *Store) DeleteUser(_ context.Context, id int64) error {
 	s.deleteUserSessions(id)
 	slog.Info("user deleted", "user_id", id)
 	return nil
+}
+
+// deleteUserAndIndexes removes the user row and its uniqueness-index entries
+// (ix_user_name always, ix_user_oidc when the user had an OIDC identity) within
+// tx. A leftover ix_user_name entry would block recreating the same admin
+// username, breaking the documented clean-break recovery path, so the index
+// entries must go with the row.
+func deleteUserAndIndexes(tx *bbolt.Tx, ub *bbolt.Bucket, key []byte, rec *userRec) error {
+	if err := ub.Delete(key); err != nil {
+		return fmt.Errorf("authstore: delete user: %w", err)
+	}
+	if err := idxDelete(tx, bucketIxUserName, userNameIndexKey(rec.Username)); err != nil {
+		return err
+	}
+	if rec.OIDCSub != "" {
+		return idxDelete(tx, bucketIxUserOIDC, userOIDCIndexKey(rec.OIDCIssuer, rec.OIDCSub))
+	}
+	return nil
+}
+
+// cascadeUserChildren deletes the user's durable child records — passkeys and
+// API keys, each with its user-scoped index entry — within tx, walking each
+// index prefix directly via cascadeDeleteByUser.
+func cascadeUserChildren(tx *bbolt.Tx, userID int64) error {
+	if err := cascadeDeleteByUser(tx, bucketIxPasskeyUser, bucketAuthPasskeys, userID); err != nil {
+		return err
+	}
+	return cascadeDeleteByUser(tx, bucketIxAPIKeyUser, bucketAuthAPIKeys, userID)
 }
 
 // cascadeDeleteByUser deletes every child record owned by userID and its

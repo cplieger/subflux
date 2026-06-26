@@ -153,3 +153,40 @@ func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 		t.Errorf("winner nonce = %q, want %q", v, "nonce-win")
 	}
 }
+
+// TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted pins the log guard: the
+// "expired oidc states cleaned" line is emitted only when something is actually
+// evicted — never on a sweep that evicts nothing.
+func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
+	s := newOIDCStore(t)
+	ctx := context.Background()
+	logs := captureLogs(t)
+	now := time.Now().UTC()
+	maxAge := 10 * time.Minute
+
+	// No expired states -> nothing evicted -> no log line.
+	putOIDC(s, "live", now)
+	n, err := s.CleanupExpiredOIDCStates(ctx, now, maxAge)
+	if err != nil {
+		t.Fatalf("CleanupExpiredOIDCStates(none expired): %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("evicted = %d, want 0", n)
+	}
+	if got := countMsg(logs(), "expired oidc states cleaned"); got != 0 {
+		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
+	}
+
+	// One expired state -> one eviction -> exactly one log line.
+	putOIDC(s, "expired", now.Add(-time.Hour))
+	n, err = s.CleanupExpiredOIDCStates(ctx, now, maxAge)
+	if err != nil {
+		t.Fatalf("CleanupExpiredOIDCStates(one expired): %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("evicted = %d, want 1", n)
+	}
+	if got := countMsg(logs(), "expired oidc states cleaned"); got != 1 {
+		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)
+	}
+}

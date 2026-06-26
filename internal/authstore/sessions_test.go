@@ -308,3 +308,45 @@ func TestSessions_concurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestCleanupExpiredSessions_logsOnlyWhenEvicted pins the log guard: the
+// "expired sessions cleaned" line is emitted only when something is actually
+// evicted — never on a sweep that evicts nothing.
+func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
+	s := newSessionStore(t)
+	ctx := context.Background()
+	logs := captureLogs(t)
+	now := time.Now().UTC()
+	idle := time.Hour
+	abs := 24 * time.Hour
+
+	// A live session only -> nothing evicted -> no log line.
+	if err := s.CreateSession(ctx, mkSession("live", 1, now, now)); err != nil {
+		t.Fatalf("CreateSession(live): %v", err)
+	}
+	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	if err != nil {
+		t.Fatalf("CleanupExpiredSessions(none expired): %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("evicted = %d, want 0", n)
+	}
+	if got := countMsg(logs(), "expired sessions cleaned"); got != 0 {
+		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
+	}
+
+	// Add an idle-expired session -> one eviction -> exactly one log line.
+	if err := s.CreateSession(ctx, mkSession("expired", 1, now.Add(-2*time.Hour), now.Add(-2*time.Hour))); err != nil {
+		t.Fatalf("CreateSession(expired): %v", err)
+	}
+	n, err = s.CleanupExpiredSessions(ctx, now, idle, abs)
+	if err != nil {
+		t.Fatalf("CleanupExpiredSessions(one expired): %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("evicted = %d, want 1", n)
+	}
+	if got := countMsg(logs(), "expired sessions cleaned"); got != 1 {
+		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)
+	}
+}
