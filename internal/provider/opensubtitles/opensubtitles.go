@@ -103,6 +103,12 @@ type Provider struct {
 // Name returns the provider identifier for OpenSubtitles.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// numberingResult holds the outcome of searching one numbering scheme.
+type numberingResult struct {
+	err     error
+	results []api.Subtitle
+}
+
 // Search queries OpenSubtitles for subtitles matching the request. For episodes
 // with alternate numbering (scene, absolute), it searches each scheme and merges
 // deduplicated results.
@@ -117,15 +123,31 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		return p.searchNumbering(ctx, req, req.Season, req.Episode)
 	}
 
-	// Search numbering schemes concurrently. The rate limiter serializes
-	// actual HTTP calls, but errgroup overlaps response parsing with the
-	// next request's rate-limit wait, saving ~30-50% wall-clock time.
-	type numberingResult struct {
-		err     error
-		results []api.Subtitle
-	}
-	perScheme := make([]numberingResult, len(numberings))
+	perScheme := p.searchNumberingsConcurrent(ctx, req, numberings)
+	merged, lastErr := mergeNumberingResults(perScheme)
 
+	// If all numbering schemes failed with errors and we got no results,
+	// propagate the last error so the caller doesn't penalize the provider
+	// with adaptive backoff for a transient API failure.
+	if len(merged) == 0 && lastErr != nil {
+		return nil, fmt.Errorf("all numbering schemes failed: %w", lastErr)
+	}
+
+	slog.Info("opensubtitles multi-numbering search complete",
+		"results", len(merged), "schemes", len(numberings),
+		"media", req.Title)
+	return merged, nil
+}
+
+// searchNumberingsConcurrent searches each numbering scheme concurrently. The
+// rate limiter serializes the actual HTTP calls, but errgroup overlaps response
+// parsing with the next request's rate-limit wait, saving ~30-50% wall-clock
+// time. The returned slice is index-aligned with numberings; a failed scheme
+// carries its error and never aborts the group.
+func (p *Provider) searchNumberingsConcurrent(ctx context.Context,
+	req *api.SearchRequest, numberings []numbering,
+) []numberingResult {
+	perScheme := make([]numberingResult, len(numberings))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(len(numberings))
 	for i, n := range numberings {
@@ -143,8 +165,13 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		})
 	}
 	_ = g.Wait()
+	return perScheme
+}
 
-	// Merge and dedup (single-threaded after collection).
+// mergeNumberingResults merges per-scheme results into a single slice
+// deduplicated by subtitle ID, returning the last error seen (if any) so the
+// caller can distinguish "no results" from "all schemes errored".
+func mergeNumberingResults(perScheme []numberingResult) ([]api.Subtitle, error) {
 	seen := make(map[string]bool)
 	var merged []api.Subtitle
 	var lastErr error
@@ -160,18 +187,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 			}
 		}
 	}
-
-	// If all numbering schemes failed with errors and we got no results,
-	// propagate the last error so the caller doesn't penalize the provider
-	// with adaptive backoff for a transient API failure.
-	if len(merged) == 0 && lastErr != nil {
-		return nil, fmt.Errorf("all numbering schemes failed: %w", lastErr)
-	}
-
-	slog.Info("opensubtitles multi-numbering search complete",
-		"results", len(merged), "schemes", len(numberings),
-		"media", req.Title)
-	return merged, nil
+	return merged, lastErr
 }
 
 // CountShowSubtitles returns the total number of subtitles available for a

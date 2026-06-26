@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"pgregory.net/rapid"
@@ -389,6 +390,95 @@ func TestMatchesEpisode(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("MatchesEpisode(%q, %d, %d) = %v, want %v",
 					tt.path, tt.season, tt.episode, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestExtractFromZip_accepts_exactly_max_entries verifies the inclusive
+// central-directory cap: a zip with exactly maxZipEntries valid entries must
+// still be processed (the guard rejects only len > maxZipEntries).
+func TestExtractFromZip_accepts_exactly_max_entries(t *testing.T) {
+	t.Parallel()
+	first := []byte("first subtitle\n")
+	entries := make([]zipEntry, maxZipEntries)
+	entries[0] = zipEntry{name: "sub_0000.srt", content: first}
+	for i := 1; i < maxZipEntries; i++ {
+		entries[i] = zipEntry{name: fmt.Sprintf("sub_%04d.srt", i), content: []byte("x\n")}
+	}
+	data := makeZip(t, entries...)
+
+	got := ExtractFromZip(data, 0, 0)
+	if !bytes.Equal(got, first) {
+		t.Fatalf("ExtractFromZip(%d-entry zip) = %q, want %q "+
+			"(exactly maxZipEntries entries must be accepted)", maxZipEntries, got, first)
+	}
+}
+
+// TestIsValidSubtitleEntry_size_guards covers the decompression-bomb size
+// guards: a zero compressed size with positive uncompressed is rejected, a
+// compression ratio above 50 is rejected, while the inclusive ratio boundary
+// (exactly 50) and an empty entry (both sizes zero, which must not divide by
+// zero) are accepted.
+func TestIsValidSubtitleEntry_size_guards(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name         string
+		comp, uncomp uint64
+		want         bool
+	}{
+		{"zero compressed with positive uncompressed rejected", 0, 10, false},
+		{"both sizes zero accepted", 0, 0, true},
+		{"ratio exactly 50 accepted", 1, 50, true},
+		{"ratio over 50 rejected", 1, 1000, false},
+		{"normal entry accepted", 100, 200, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := &zip.File{FileHeader: zip.FileHeader{
+				Name:               "a.srt",
+				CompressedSize64:   tc.comp,
+				UncompressedSize64: tc.uncomp,
+			}}
+			if got := IsValidSubtitleEntry(f); got != tc.want {
+				t.Errorf("IsValidSubtitleEntry(comp=%d, uncomp=%d) = %v, want %v",
+					tc.comp, tc.uncomp, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatchesMultiEpisodeRange(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		file    string
+		episode int
+		want    bool
+	}{
+		{"in range", "Show.S01E01-E05.srt", 3, true},
+		{"out of range", "Show.S01E01-E05.srt", 6, false},
+		{"start of range", "Show.S01E01-E05.srt", 1, true},
+		{"end of range", "Show.S01E01-E05.srt", 5, true},
+		{"not a range", "Show.S01E05.srt", 5, false},
+
+		// Every range in the name is scanned, not just the first: episode 6
+		// lies only in the second range [5,8].
+		{"episode in second of two ranges", "Show.E01E02.and.E05E08.srt", 6, true},
+		{"episode in first of two ranges", "Show.E01E02.and.E05E08.srt", 1, true},
+
+		// ep2 == 999 is the inclusive top of the accepted range (the year/range
+		// guard rejects only ep2 > 999); ep2 == 1000 exceeds the cap.
+		{"ep2 exactly 999 accepted", "E950E999", 975, true},
+		{"ep2 1000 exceeds cap rejected", "E950E1000", 975, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := MatchesMultiEpisodeRange(tt.file, tt.episode); got != tt.want {
+				t.Errorf("MatchesMultiEpisodeRange(%q, %d) = %v, want %v",
+					tt.file, tt.episode, got, tt.want)
 			}
 		})
 	}
