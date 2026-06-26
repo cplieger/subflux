@@ -125,34 +125,38 @@ func (s *Store) CreateAPIKey(_ context.Context, key *auth.Key) error {
 		if kb.Get(hashKey) != nil {
 			return errConflict
 		}
-
-		id, err := nextAuthID(kb)
-		if err != nil {
-			return err
-		}
-		if key.CreatedAt.IsZero() {
-			key.CreatedAt = time.Now().UTC()
-		}
-		key.ID = id
-
-		rec := toKeyRec(key)
-		enc, err := boltkv.Encode(&rec)
-		if err != nil {
-			return err
-		}
-		if err := kb.Put(hashKey, enc); err != nil {
-			return fmt.Errorf("authstore: put api key: %w", err)
-		}
-		if err := idxPut(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(key.UserID, key.KeyHash), nil); err != nil {
-			return err
-		}
-		return nil
+		return insertAPIKey(tx, kb, key, hashKey)
 	})
 	if err != nil {
 		return err
 	}
 	slog.Info("api key created", "user_id", key.UserID, "label", key.Label)
 	return nil
+}
+
+// insertAPIKey allocates the surrogate id, stamps CreatedAt when zero, encodes,
+// and writes the key row (primary-keyed by hashKey) plus its ix_apikey_user
+// entry within tx. CreatedAt defaults to now, mirroring the SQLite
+// CURRENT_TIMESTAMP default.
+func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte) error {
+	id, err := nextAuthID(kb)
+	if err != nil {
+		return err
+	}
+	if key.CreatedAt.IsZero() {
+		key.CreatedAt = time.Now().UTC()
+	}
+	key.ID = id
+
+	rec := toKeyRec(key)
+	enc, err := boltkv.Encode(&rec)
+	if err != nil {
+		return err
+	}
+	if err := kb.Put(hashKey, enc); err != nil {
+		return fmt.Errorf("authstore: put api key: %w", err)
+	}
+	return idxPut(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(key.UserID, key.KeyHash), nil)
 }
 
 // GetAPIKeyByHash looks up an API key by its hash (the API-auth hot path),
@@ -187,29 +191,9 @@ func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, erro
 func (s *Store) ListAPIKeysByUserID(_ context.Context, userID int64) ([]auth.Key, error) {
 	var out []auth.Key
 	err := s.view(func(tx *bbolt.Tx) error {
-		ib, ok := authBucket(tx, bucketIxAPIKeyUser)
-		if !ok {
-			return nil
-		}
-		kb, ok := authBucket(tx, bucketAuthAPIKeys)
-		if !ok {
-			return nil
-		}
-		prefix := apiKeyUserPrefix(userID)
-		c := ib.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			hashKey := k[len(prefix):]
-			data := kb.Get(hashKey)
-			if data == nil {
-				continue // dangling index entry; treat as absent
-			}
-			var rec keyRec
-			if err := decodeAuthRecord(bucketAuthAPIKeys, hashKey, data, &rec); err != nil {
-				return err
-			}
-			out = append(out, *rec.toKey())
-		}
-		return nil
+		var ferr error
+		out, ferr = collectAPIKeysByUser(tx, userID)
+		return ferr
 	})
 	if err != nil {
 		return nil, err
@@ -220,6 +204,37 @@ func (s *Store) ListAPIKeysByUserID(_ context.Context, userID int64) ([]auth.Key
 		}
 		return out[i].ID > out[j].ID
 	})
+	return out, nil
+}
+
+// collectAPIKeysByUser walks ix_apikey_user for userID and returns the decoded
+// keys in index order (unsorted). A dangling index entry is skipped; decoding
+// fails closed (auth bucket); an absent bucket yields no keys (empty first
+// boot).
+func collectAPIKeysByUser(tx *bbolt.Tx, userID int64) ([]auth.Key, error) {
+	ib, ok := authBucket(tx, bucketIxAPIKeyUser)
+	if !ok {
+		return nil, nil
+	}
+	kb, ok := authBucket(tx, bucketAuthAPIKeys)
+	if !ok {
+		return nil, nil
+	}
+	var out []auth.Key
+	prefix := apiKeyUserPrefix(userID)
+	c := ib.Cursor()
+	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+		hashKey := k[len(prefix):]
+		data := kb.Get(hashKey)
+		if data == nil {
+			continue // dangling index entry; treat as absent
+		}
+		var rec keyRec
+		if err := decodeAuthRecord(bucketAuthAPIKeys, hashKey, data, &rec); err != nil {
+			return nil, err
+		}
+		out = append(out, *rec.toKey())
+	}
 	return out, nil
 }
 

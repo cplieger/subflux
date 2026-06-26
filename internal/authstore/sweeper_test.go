@@ -2,6 +2,7 @@ package authstore
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -182,5 +183,56 @@ func TestSweeper_doubleOpenStartsOneGoroutine(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Close did not return; a double Open likely started a second goroutine")
+	}
+}
+
+// TestSweepOnce_noSpuriousFailureLogsOnHealthySweep pins that a healthy sweep
+// logs no failure: the in-memory cleanups always succeed, so neither the
+// session nor the OIDC "cleanup failed" line may appear.
+func TestSweepOnce_noSpuriousFailureLogsOnHealthySweep(t *testing.T) {
+	logs := captureLogs(t)
+	s := newSweeperStore(t, time.Hour) // interval unused; sweepOnce is called directly
+
+	s.sweepOnce(time.Now()) // healthy sweep: both cleanups succeed (return nil)
+
+	recs := logs()
+	if n := countMsg(recs, "auth sweeper: session cleanup failed"); n != 0 {
+		t.Errorf("session cleanup failure logged %d times on a healthy sweep, want 0", n)
+	}
+	if n := countMsg(recs, "auth sweeper: oidc cleanup failed"); n != 0 {
+		t.Errorf("oidc cleanup failure logged %d times on a healthy sweep, want 0", n)
+	}
+}
+
+// TestSweeper_zeroIntervalUsesDefault pins the non-positive-interval fallback: a
+// zero configured sweepInterval is replaced by defaultSweepInterval, and the
+// started-sweeper log records that default rather than 0.
+func TestSweeper_zeroIntervalUsesDefault(t *testing.T) {
+	s := newSweeperStore(t, 0)
+	logs := captureLogs(t)
+	if err := s.Open(); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+
+	var found bool
+	for _, r := range logs() {
+		if r.msg != "auth sweeper started" {
+			continue
+		}
+		found = true
+		iv, ok := r.attrs["interval"]
+		if !ok {
+			t.Fatal(`"auth sweeper started" log has no "interval" attribute`)
+		}
+		if iv.Kind() != slog.KindDuration {
+			t.Fatalf(`"interval" attribute kind = %v, want Duration`, iv.Kind())
+		}
+		if iv.Duration() != defaultSweepInterval {
+			t.Errorf("sweeper started with interval %v, want default %v", iv.Duration(), defaultSweepInterval)
+		}
+	}
+	if !found {
+		t.Fatal(`no "auth sweeper started" log captured`)
 	}
 }

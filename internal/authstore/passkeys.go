@@ -155,34 +155,38 @@ func (s *Store) CreatePasskey(_ context.Context, cred *auth.PasskeyCredential) e
 		if pb.Get(cred.CredentialID) != nil {
 			return errConflict
 		}
-
-		id, err := nextAuthID(pb)
-		if err != nil {
-			return err
-		}
-		if cred.CreatedAt.IsZero() {
-			cred.CreatedAt = time.Now().UTC()
-		}
-		cred.ID = id
-
-		rec := toPasskeyRec(cred)
-		enc, err := boltkv.Encode(&rec)
-		if err != nil {
-			return err
-		}
-		if err := pb.Put(cred.CredentialID, enc); err != nil {
-			return fmt.Errorf("authstore: put passkey: %w", err)
-		}
-		if err := idxPut(tx, bucketIxPasskeyUser, passkeyUserIndexKey(cred.UserID, cred.CredentialID), nil); err != nil {
-			return err
-		}
-		return nil
+		return insertPasskey(tx, pb, cred)
 	})
 	if err != nil {
 		return err
 	}
 	slog.Info("passkey registered", "user_id", cred.UserID, "name", cred.Name)
 	return nil
+}
+
+// insertPasskey allocates the surrogate id, stamps CreatedAt when zero, encodes,
+// and writes the credential row (primary-keyed by credential id) plus its
+// ix_passkey_user entry within tx. CreatedAt defaults to now, mirroring the
+// SQLite CURRENT_TIMESTAMP default.
+func insertPasskey(tx *bbolt.Tx, pb *bbolt.Bucket, cred *auth.PasskeyCredential) error {
+	id, err := nextAuthID(pb)
+	if err != nil {
+		return err
+	}
+	if cred.CreatedAt.IsZero() {
+		cred.CreatedAt = time.Now().UTC()
+	}
+	cred.ID = id
+
+	rec := toPasskeyRec(cred)
+	enc, err := boltkv.Encode(&rec)
+	if err != nil {
+		return err
+	}
+	if err := pb.Put(cred.CredentialID, enc); err != nil {
+		return fmt.Errorf("authstore: put passkey: %w", err)
+	}
+	return idxPut(tx, bucketIxPasskeyUser, passkeyUserIndexKey(cred.UserID, cred.CredentialID), nil)
 }
 
 // GetPasskeysByUserID returns all of a user's passkeys, ordered by creation
@@ -192,29 +196,9 @@ func (s *Store) CreatePasskey(_ context.Context, cred *auth.PasskeyCredential) e
 func (s *Store) GetPasskeysByUserID(_ context.Context, userID int64) ([]auth.PasskeyCredential, error) {
 	var out []auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
-		ib, ok := authBucket(tx, bucketIxPasskeyUser)
-		if !ok {
-			return nil
-		}
-		pb, ok := authBucket(tx, bucketAuthPasskeys)
-		if !ok {
-			return nil
-		}
-		prefix := passkeyUserPrefix(userID)
-		c := ib.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			credID := k[len(prefix):]
-			data := pb.Get(credID)
-			if data == nil {
-				continue // dangling index entry; treat as absent
-			}
-			var rec pkRec
-			if err := decodeAuthRecord(bucketAuthPasskeys, credID, data, &rec); err != nil {
-				return err
-			}
-			out = append(out, *rec.toPasskey())
-		}
-		return nil
+		var ferr error
+		out, ferr = collectPasskeysByUser(tx, userID)
+		return ferr
 	})
 	if err != nil {
 		return nil, err
@@ -225,6 +209,37 @@ func (s *Store) GetPasskeysByUserID(_ context.Context, userID int64) ([]auth.Pas
 		}
 		return out[i].ID < out[j].ID
 	})
+	return out, nil
+}
+
+// collectPasskeysByUser walks ix_passkey_user for userID and returns the decoded
+// credentials in index order (unsorted). A dangling index entry is skipped;
+// decoding fails closed (auth bucket); an absent bucket yields no credentials
+// (empty first boot).
+func collectPasskeysByUser(tx *bbolt.Tx, userID int64) ([]auth.PasskeyCredential, error) {
+	ib, ok := authBucket(tx, bucketIxPasskeyUser)
+	if !ok {
+		return nil, nil
+	}
+	pb, ok := authBucket(tx, bucketAuthPasskeys)
+	if !ok {
+		return nil, nil
+	}
+	var out []auth.PasskeyCredential
+	prefix := passkeyUserPrefix(userID)
+	c := ib.Cursor()
+	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+		credID := k[len(prefix):]
+		data := pb.Get(credID)
+		if data == nil {
+			continue // dangling index entry; treat as absent
+		}
+		var rec pkRec
+		if err := decodeAuthRecord(bucketAuthPasskeys, credID, data, &rec); err != nil {
+			return nil, err
+		}
+		out = append(out, *rec.toPasskey())
+	}
 	return out, nil
 }
 

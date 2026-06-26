@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth"
+	bolt "go.etcd.io/bbolt"
 )
 
 // newAPIKeyStore opens a freshly bootstrapped bbolt file as a shared handle and
@@ -236,5 +237,49 @@ func TestDeleteUser_cascadesRealAPIKeys(t *testing.T) {
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, keep.ID); len(keys) != 1 {
 		t.Errorf("keep api key count = %d, want 1", len(keys))
+	}
+}
+
+// seedCorruptAPIKey writes a user-scoped ix_apikey_user entry pointing at a
+// deliberately corrupt auth_api_keys record, so a user-scoped walk hits an
+// undecodable row and fails closed.
+func seedCorruptAPIKey(t *testing.T, s *Store, userID int64, hash string) {
+	t.Helper()
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		if err := tx.Bucket([]byte(bucketAuthAPIKeys)).Put([]byte(hash), []byte("{not valid json")); err != nil {
+			return err
+		}
+		return tx.Bucket([]byte(bucketIxAPIKeyUser)).Put(apiKeyUserIndexKey(userID, hash), nil)
+	}); err != nil {
+		t.Fatalf("seed corrupt api key: %v", err)
+	}
+}
+
+// TestDeleteAPIKey_logsDeletionOnSuccess pins the audit trail: a successful
+// owner delete emits the "api key deleted" line exactly once.
+func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
+	s := newAPIKeyStore(t)
+	ctx := context.Background()
+	key := sampleKey(1, "del-log-hash", "k")
+	if err := s.CreateAPIKey(ctx, key); err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	logs := captureLogs(t)
+	if err := s.DeleteAPIKey(ctx, key.ID, 1); err != nil {
+		t.Fatalf("DeleteAPIKey: %v", err)
+	}
+	if got := countMsg(logs(), "api key deleted"); got != 1 {
+		t.Errorf(`successful owner delete logged "api key deleted" %d times, want 1`, got)
+	}
+}
+
+// TestDeleteAPIKey_propagatesUpdateError pins that a real error from the delete
+// transaction is surfaced, not swallowed: a corrupt API-key record makes
+// findUserAPIKeyByID fail closed, and DeleteAPIKey must return that error.
+func TestDeleteAPIKey_propagatesUpdateError(t *testing.T) {
+	s := newAPIKeyStore(t)
+	seedCorruptAPIKey(t, s, 1, "corrupt-hash")
+	if err := s.DeleteAPIKey(context.Background(), 999, 1); err == nil {
+		t.Fatal("DeleteAPIKey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

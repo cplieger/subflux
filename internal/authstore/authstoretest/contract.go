@@ -146,10 +146,17 @@ func mkSession(hash string, userID int64, created, lastActivity time.Time) *auth
 // with a non-nil error and write nothing (Requirements 9.3, 16.1).
 func testUniqueness(t *testing.T, h Harness) {
 	t.Helper()
-	ctx := context.Background()
 	s := h.Store()
+	assertUsernameUniqueness(t, s)
+	assertOIDCUniqueness(t, s)
+	assertCredentialUniqueness(t, s)
+}
 
-	// Username, case-insensitive.
+// assertUsernameUniqueness asserts a duplicate username is rejected
+// case-insensitively with no partial write (Requirements 9.3, 16.1).
+func assertUsernameUniqueness(t *testing.T, s authlibstore.Composite) {
+	t.Helper()
+	ctx := context.Background()
 	if err := s.CreateUser(ctx, mkUser("Alice")); err != nil {
 		t.Fatalf("CreateUser(Alice): %v", err)
 	}
@@ -159,8 +166,13 @@ func testUniqueness(t *testing.T, h Harness) {
 	if n, err := s.UserCount(ctx); err != nil || n != 1 {
 		t.Errorf("UserCount after rejected duplicate = (%d, %v), want (1, nil) — no partial write", n, err)
 	}
+}
 
-	// (oidc_issuer, oidc_sub).
+// assertOIDCUniqueness asserts a duplicate (issuer, sub) is rejected while a
+// distinct sub under the same issuer is allowed (Requirement 9.3).
+func assertOIDCUniqueness(t *testing.T, s authlibstore.Composite) {
+	t.Helper()
+	ctx := context.Background()
 	const issuer = "https://idp"
 	oidc1 := mkUser("oidc1")
 	oidc1.OIDCIssuer, oidc1.OIDCSub = issuer, "sub-1"
@@ -178,12 +190,21 @@ func testUniqueness(t *testing.T, h Harness) {
 	if err := s.CreateUser(ctx, distinct); err != nil {
 		t.Errorf("CreateUser(distinct sub) = %v, want nil", err)
 	}
+}
 
-	// Passkey credential id (needs a real owner for the SQLite FK).
+// assertCredentialUniqueness asserts a duplicate passkey credential id and a
+// duplicate API-key hash are each rejected with no partial write. Both checks
+// need a real owner (the SQLite store has a NOT NULL FK), so this helper creates
+// one and exercises both (Requirements 9.3, 16.1).
+func assertCredentialUniqueness(t *testing.T, s authlibstore.Composite) {
+	t.Helper()
+	ctx := context.Background()
 	owner := mkUser("pk-owner")
 	if err := s.CreateUser(ctx, owner); err != nil {
 		t.Fatalf("CreateUser(pk-owner): %v", err)
 	}
+
+	// Passkey credential id.
 	credID := []byte("dup-cred")
 	if err := s.CreatePasskey(ctx, mkPasskey(owner.ID, credID, "first")); err != nil {
 		t.Fatalf("CreatePasskey(first): %v", err)

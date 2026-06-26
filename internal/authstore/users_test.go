@@ -394,3 +394,104 @@ func TestDeleteUser_absentIsNoOp(t *testing.T) {
 		t.Errorf("DeleteUser(absent) = %v, want nil", err)
 	}
 }
+
+// TestAsciiFold_uppercaseZ pins that the fold covers the top of the uppercase
+// ASCII range: 'Z' must lowercase to 'z' (a single-char case that also drives
+// the multi-byte lowercasing pass).
+func TestAsciiFold_uppercaseZ(t *testing.T) {
+	if got := asciiFold("Z"); got != "z" {
+		t.Errorf("asciiFold(%q) = %q, want %q", "Z", got, "z")
+	}
+	if got := asciiFold("AZ"); got != "az" {
+		t.Errorf("asciiFold(%q) = %q, want %q", "AZ", got, "az")
+	}
+}
+
+// TestCreateUser_errorsWhenOIDCIndexBucketMissing pins that an index-write
+// failure on the OIDC index aborts the whole create: with ix_user_oidc gone,
+// CreateUser must return a non-nil error rather than committing a user without
+// its OIDC index entry.
+func TestCreateUser_errorsWhenOIDCIndexBucketMissing(t *testing.T) {
+	s := newUserStore(t)
+	ctx := context.Background()
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.DeleteBucket([]byte(bucketIxUserOIDC))
+	}); err != nil {
+		t.Fatalf("drop %q: %v", bucketIxUserOIDC, err)
+	}
+	u := &auth.User{Username: "oidc-user", Role: auth.RoleUser, OIDCIssuer: "iss", OIDCSub: "sub"}
+	if err := s.CreateUser(ctx, u); err == nil {
+		t.Fatal("CreateUser with missing OIDC index bucket = nil, want a non-nil index error")
+	}
+}
+
+// TestUpdateUser_rejectsOIDCCollision pins that an update which sets a NEW OIDC
+// identity is uniqueness-checked: pointing one user at another user's already
+// registered (issuer, sub) must be rejected with errConflict.
+func TestUpdateUser_rejectsOIDCCollision(t *testing.T) {
+	s := newUserStore(t)
+	ctx := context.Background()
+	a := &auth.User{Username: "collide-a", Role: auth.RoleUser, OIDCIssuer: "iss", OIDCSub: "shared-sub"}
+	if err := s.CreateUser(ctx, a); err != nil {
+		t.Fatalf("CreateUser(a): %v", err)
+	}
+	b := &auth.User{Username: "collide-b", Role: auth.RoleUser}
+	if err := s.CreateUser(ctx, b); err != nil {
+		t.Fatalf("CreateUser(b): %v", err)
+	}
+	// Point b at a's (issuer, sub): a brand-new oidc identity that collides.
+	b.OIDCIssuer = "iss"
+	b.OIDCSub = "shared-sub"
+	if err := s.UpdateUser(ctx, b); !errors.Is(err, errConflict) {
+		t.Fatalf("UpdateUser into a colliding (issuer,sub) = %v, want errConflict", err)
+	}
+}
+
+// TestDeleteUser_freesOIDCIndexForReuse pins that deleting a user that HAS an
+// OIDC identity removes its ix_user_oidc entry, so the freed (issuer, sub) can
+// back a brand-new user (the clean-break recovery path).
+func TestDeleteUser_freesOIDCIndexForReuse(t *testing.T) {
+	s := newUserStore(t)
+	ctx := context.Background()
+	a := &auth.User{Username: "oidc-victim", Role: auth.RoleUser, OIDCIssuer: "iss-x", OIDCSub: "sub-x"}
+	if err := s.CreateUser(ctx, a); err != nil {
+		t.Fatalf("CreateUser(a): %v", err)
+	}
+	if err := s.DeleteUser(ctx, a.ID); err != nil {
+		t.Fatalf("DeleteUser(a): %v", err)
+	}
+	// The (issuer, sub) must be free now: recreating with it must succeed.
+	b := &auth.User{Username: "oidc-reuse", Role: auth.RoleUser, OIDCIssuer: "iss-x", OIDCSub: "sub-x"}
+	if err := s.CreateUser(ctx, b); err != nil {
+		t.Fatalf("CreateUser reusing the deleted user's (issuer,sub) = %v, want nil (stale index entry?)", err)
+	}
+}
+
+// TestDeleteUser_propagatesAPIKeyCascadeError pins that a failure inside the
+// durable API-key cascade is propagated (the whole delete tx rolls back) rather
+// than swallowed. A user-scoped index entry whose child key names a sub-bucket
+// makes the cascade's Bucket.Delete return ErrIncompatibleValue.
+func TestDeleteUser_propagatesAPIKeyCascadeError(t *testing.T) {
+	s := newUserStore(t)
+	ctx := context.Background()
+	u := &auth.User{Username: "cascade-user", Role: auth.RoleUser}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	const child = "cascade_subbkt"
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		// A sub-bucket inside auth_api_keys: deleting it via Bucket.Delete
+		// (which the cascade does) returns ErrIncompatibleValue.
+		if _, err := tx.Bucket([]byte(bucketAuthAPIKeys)).CreateBucket([]byte(child)); err != nil {
+			return err
+		}
+		// A user-scoped index entry whose child segment is that sub-bucket name,
+		// so the cascade walk targets it.
+		return tx.Bucket([]byte(bucketIxAPIKeyUser)).Put(apiKeyUserIndexKey(u.ID, child), nil)
+	}); err != nil {
+		t.Fatalf("seed cascade-poison entry: %v", err)
+	}
+	if err := s.DeleteUser(ctx, u.ID); err == nil {
+		t.Fatal("DeleteUser with a failing API-key cascade = nil, want a non-nil error")
+	}
+}

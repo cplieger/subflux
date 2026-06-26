@@ -379,3 +379,64 @@ func TestDeleteUser_cascadesRealPasskeys(t *testing.T) {
 		t.Errorf("keep passkey count = %d, want 1", n)
 	}
 }
+
+// seedCorruptPasskey writes a user-scoped ix_passkey_user entry pointing at a
+// deliberately corrupt auth_passkeys record, so a user-scoped walk hits an
+// undecodable row and fails closed.
+func seedCorruptPasskey(t *testing.T, s *Store, userID int64, credID []byte) {
+	t.Helper()
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		if err := tx.Bucket([]byte(bucketAuthPasskeys)).Put(credID, []byte("{not valid json")); err != nil {
+			return err
+		}
+		return tx.Bucket([]byte(bucketIxPasskeyUser)).Put(passkeyUserIndexKey(userID, credID), nil)
+	}); err != nil {
+		t.Fatalf("seed corrupt passkey: %v", err)
+	}
+}
+
+// TestCreatePasskey_errorsWhenIndexBucketMissing pins that an index-write
+// failure aborts the whole create: with ix_passkey_user gone, CreatePasskey
+// must return a non-nil error rather than committing a primary row with no
+// index entry.
+func TestCreatePasskey_errorsWhenIndexBucketMissing(t *testing.T) {
+	s := newPasskeyStore(t)
+	ctx := context.Background()
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.DeleteBucket([]byte(bucketIxPasskeyUser))
+	}); err != nil {
+		t.Fatalf("drop %q: %v", bucketIxPasskeyUser, err)
+	}
+	if err := s.CreatePasskey(ctx, sampleCred(1, []byte("cred-idx"), "k")); err == nil {
+		t.Fatal("CreatePasskey with missing index bucket = nil, want a non-nil index error")
+	}
+}
+
+// TestDeletePasskey_logsDeletionOnSuccess pins the audit trail: a successful
+// owner delete emits the "passkey deleted" line exactly once.
+func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
+	s := newPasskeyStore(t)
+	ctx := context.Background()
+	cred := sampleCred(1, []byte("del-pk-cred"), "k")
+	if err := s.CreatePasskey(ctx, cred); err != nil {
+		t.Fatalf("CreatePasskey: %v", err)
+	}
+	logs := captureLogs(t)
+	if err := s.DeletePasskey(ctx, cred.ID, 1); err != nil {
+		t.Fatalf("DeletePasskey: %v", err)
+	}
+	if got := countMsg(logs(), "passkey deleted"); got != 1 {
+		t.Errorf(`successful owner delete logged "passkey deleted" %d times, want 1`, got)
+	}
+}
+
+// TestDeletePasskey_propagatesUpdateError pins that a real error from the delete
+// transaction is surfaced, not swallowed: a corrupt passkey record makes
+// findUserPasskeyByID fail closed, and DeletePasskey must return that error.
+func TestDeletePasskey_propagatesUpdateError(t *testing.T) {
+	s := newPasskeyStore(t)
+	seedCorruptPasskey(t, s, 1, []byte("corrupt-cred"))
+	if err := s.DeletePasskey(context.Background(), 999, 1); err == nil {
+		t.Fatal("DeletePasskey over a corrupt record = nil, want a non-nil decode error")
+	}
+}
