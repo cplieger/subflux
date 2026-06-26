@@ -26,65 +26,73 @@ const (
 // to deduplicate concurrent login attempts (replaces the previous thundering
 // herd pattern where multiple goroutines could login simultaneously).
 func (p *Provider) ensureToken(ctx context.Context) error {
-	p.tokenMu.RLock()
-	if p.token != "" && time.Since(p.tokenTime) < tokenExpiry {
-		p.tokenMu.RUnlock()
+	if p.tokenValid() {
 		return nil
 	}
-	p.tokenMu.RUnlock()
 
 	_, err, _ := p.tokenSfg.Do("login", func() (any, error) {
-		// Double-check after winning the singleflight race.
-		p.tokenMu.RLock()
-		if p.token != "" && time.Since(p.tokenTime) < tokenExpiry {
-			p.tokenMu.RUnlock()
+		// Double-check after winning the singleflight race: another goroutine
+		// may have logged in while we waited.
+		if p.tokenValid() {
 			return nil, nil
 		}
-		p.tokenMu.RUnlock()
-
-		slog.Debug("opensubtitles logging in")
-		loginPayload, marshalErr := json.Marshal(map[string]string{
-			settingUsername: p.username, string(settingPassword): p.password,
-		})
-		if marshalErr != nil {
-			return nil, fmt.Errorf("marshal login: %w", marshalErr)
-		}
-		body, err := p.doPostUnauthed(ctx, "/login", bytes.NewReader(loginPayload))
-		if err != nil {
-			slog.Warn("opensubtitles login failed", "error", err)
-			return nil, fmt.Errorf("login: %w", err)
-		}
-		defer func() { httputil.DrainClose(body) }()
-
-		var resp loginResponse
-		if err := json.NewDecoder(body).Decode(&resp); err != nil {
-			slog.Warn("opensubtitles login response decode failed", "error", err)
-			return nil, fmt.Errorf("decode login: %w", err)
-		}
-
-		if resp.Token == "" {
-			return nil, errors.New("empty token in login response")
-		}
-
-		if resp.BaseURL != "" && !isValidServerHost(resp.BaseURL) {
-			slog.Warn("opensubtitles: rejecting suspicious server redirect",
-				"base_url", resp.BaseURL)
-			resp.BaseURL = ""
-		}
-
-		p.tokenMu.Lock()
-		p.token = resp.Token
-		p.serverHost = resp.BaseURL
-		p.vip = resp.User.VIP
-		p.tokenTime = time.Now()
-		host := p.serverHost
-		vip := p.vip
-		p.tokenMu.Unlock()
-
-		slog.Info("opensubtitles authenticated", "server", host, "vip", vip)
-		return nil, nil
+		return nil, p.login(ctx)
 	})
 	return err
+}
+
+// tokenValid reports whether a cached, unexpired token is present.
+func (p *Provider) tokenValid() bool {
+	p.tokenMu.RLock()
+	defer p.tokenMu.RUnlock()
+	return p.token != "" && time.Since(p.tokenTime) < tokenExpiry
+}
+
+// login performs the unauthenticated /login round trip and stores the returned
+// token, server host, and VIP status. A suspicious base_url redirect is dropped
+// so a compromised login response can't divert the Bearer token elsewhere.
+func (p *Provider) login(ctx context.Context) error {
+	slog.Debug("opensubtitles logging in")
+	loginPayload, marshalErr := json.Marshal(map[string]string{
+		settingUsername: p.username, string(settingPassword): p.password,
+	})
+	if marshalErr != nil {
+		return fmt.Errorf("marshal login: %w", marshalErr)
+	}
+	body, err := p.doPostUnauthed(ctx, "/login", bytes.NewReader(loginPayload))
+	if err != nil {
+		slog.Warn("opensubtitles login failed", "error", err)
+		return fmt.Errorf("login: %w", err)
+	}
+	defer func() { httputil.DrainClose(body) }()
+
+	var resp loginResponse
+	if err := json.NewDecoder(body).Decode(&resp); err != nil {
+		slog.Warn("opensubtitles login response decode failed", "error", err)
+		return fmt.Errorf("decode login: %w", err)
+	}
+
+	if resp.Token == "" {
+		return errors.New("empty token in login response")
+	}
+
+	if resp.BaseURL != "" && !isValidServerHost(resp.BaseURL) {
+		slog.Warn("opensubtitles: rejecting suspicious server redirect",
+			"base_url", resp.BaseURL)
+		resp.BaseURL = ""
+	}
+
+	p.tokenMu.Lock()
+	p.token = resp.Token
+	p.serverHost = resp.BaseURL
+	p.vip = resp.User.VIP
+	p.tokenTime = time.Now()
+	host := p.serverHost
+	vip := p.vip
+	p.tokenMu.Unlock()
+
+	slog.Info("opensubtitles authenticated", "server", host, "vip", vip)
+	return nil
 }
 
 func (p *Provider) serverURL() string {

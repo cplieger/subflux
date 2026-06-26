@@ -46,18 +46,29 @@ func findRARSubtitle(data []byte, season, episode int) []byte {
 		if episodeCtx && !MatchesEpisode(hdr.Name, season, episode) {
 			continue
 		}
-		content, err := io.ReadAll(io.LimitReader(r, MaxExtractSize+1))
-		if err != nil || len(content) == 0 || len(content) > MaxExtractSize {
-			if episodeCtx {
-				return nil
-			}
-			continue
+		if content := readRARContent(r); content != nil {
+			return content
 		}
-		return content
+		// Content was empty or oversized. With episode context the matching
+		// entry has already been found, so stop; otherwise keep scanning.
+		if episodeCtx {
+			return nil
+		}
 	}
 	slog.Debug("rar iteration stopped",
 		"episode_ctx", episodeCtx, "season", season, "episode", episode)
 	return nil
+}
+
+// readRARContent reads the current entry's content with the decompression-bomb
+// cap. Returns nil if the read fails or the content is empty or exceeds
+// MaxExtractSize.
+func readRARContent(r io.Reader) []byte {
+	content, err := io.ReadAll(io.LimitReader(r, MaxExtractSize+1))
+	if err != nil || len(content) == 0 || len(content) > MaxExtractSize {
+		return nil
+	}
+	return content
 }
 
 // IsValidRAREntry checks if a RAR header represents a valid subtitle file.

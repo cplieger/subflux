@@ -35,32 +35,44 @@ func ExtractFromZip(data []byte, season, episode int) []byte {
 		return nil
 	}
 
-	// Collect all valid subtitle entries.
-	var candidates []*zip.File
-	for _, f := range r.File {
-		if IsValidSubtitleEntry(f) {
-			candidates = append(candidates, f)
-		}
-	}
+	candidates := zipSubtitleCandidates(r.File)
 	if len(candidates) == 0 {
 		return nil
 	}
 
-	// If episode context provided, try to find a matching file.
+	// If episode context provided, return only a matching file (no fallback).
 	if season > 0 && episode > 0 {
-		for _, f := range candidates {
-			if MatchesEpisode(f.Name, season, episode) {
-				if content := ReadZipEntry(f); content != nil {
-					return content
-				}
-			}
-		}
-		// No episode match found.
-		return nil
+		return matchEpisodeInZip(candidates, season, episode)
 	}
 
 	// Fallback: first valid subtitle.
 	return ReadZipEntry(candidates[0])
+}
+
+// zipSubtitleCandidates returns the zip entries that pass the subtitle
+// extension, hidden-file, and zip-bomb checks.
+func zipSubtitleCandidates(files []*zip.File) []*zip.File {
+	var candidates []*zip.File
+	for _, f := range files {
+		if IsValidSubtitleEntry(f) {
+			candidates = append(candidates, f)
+		}
+	}
+	return candidates
+}
+
+// matchEpisodeInZip returns the content of the first candidate whose name
+// matches the target episode, or nil if none match (no fallback to unmatched
+// files, so season packs don't misextract).
+func matchEpisodeInZip(candidates []*zip.File, season, episode int) []byte {
+	for _, f := range candidates {
+		if MatchesEpisode(f.Name, season, episode) {
+			if content := ReadZipEntry(f); content != nil {
+				return content
+			}
+		}
+	}
+	return nil
 }
 
 // IsValidSubtitleEntry checks if a zip entry is a valid subtitle file,

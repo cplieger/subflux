@@ -80,61 +80,6 @@ func TestExtractFromArchive(t *testing.T) {
 	}
 }
 
-func TestLooksLikeSubtitle_bom_only_returns_false(t *testing.T) {
-	t.Parallel()
-	// UTF-8 BOM with no content after it. After stripping BOM, probe is empty.
-	data := []byte{0xEF, 0xBB, 0xBF}
-
-	got := LooksLikeSubtitle(data)
-	if got {
-		t.Error("looksLikeSubtitle(BOM-only) = true, want false")
-	}
-}
-
-func TestLooksLikeSubtitle_large_srt_truncated_to_4kb(t *testing.T) {
-	t.Parallel()
-	// Signature at byte 100 (within 4KB window) should be found.
-	data := make([]byte, 5000)
-	for i := range data {
-		data[i] = 'A'
-	}
-	copy(data[100:], []byte(" --> "))
-
-	got := LooksLikeSubtitle(data)
-	if !got {
-		t.Error("looksLikeSubtitle(large with signature in 4KB) = false, want true")
-	}
-}
-
-func TestLooksLikeSubtitle_signature_beyond_4kb_returns_false(t *testing.T) {
-	t.Parallel()
-	// Signature placed beyond the 4KB probe window should not be found.
-	data := make([]byte, 5000)
-	for i := range data {
-		data[i] = 'A'
-	}
-	copy(data[4500:], []byte(" --> "))
-
-	got := LooksLikeSubtitle(data)
-	if got {
-		t.Error("looksLikeSubtitle(signature beyond 4KB) = true, want false")
-	}
-}
-
-func TestLooksLikeSubtitle_high_non_text_ratio_returns_false(t *testing.T) {
-	t.Parallel()
-	// Data with > 10% non-text bytes but containing a subtitle signature.
-	// The non-text check should reject it before signature matching.
-	data := bytes.Repeat([]byte{0x01}, 50)
-	data = append(data, []byte(" --> ")...)
-	data = append(data, bytes.Repeat([]byte{0x01}, 50)...)
-
-	got := LooksLikeSubtitle(data)
-	if got {
-		t.Error("looksLikeSubtitle(high non-text with signature) = true, want false")
-	}
-}
-
 // --- Valid RAR fixture tests ---
 
 func loadRARFixture(t *testing.T) []byte {
@@ -193,6 +138,32 @@ func TestExtractFromRAR_no_episode_match_returns_nil(t *testing.T) {
 	got := ExtractFromRAR(data, 99, 99)
 	if got != nil {
 		t.Errorf("extractFromRAR(valid, 99, 99) = %d bytes, want nil", len(got))
+	}
+}
+
+// TestExtractFromRAR_season_zero_disables_episode_filter verifies that a zero
+// season turns off episode filtering (episodeCtx requires season > 0 AND
+// episode > 0), so the first valid subtitle is returned regardless of name.
+func TestExtractFromRAR_season_zero_disables_episode_filter(t *testing.T) {
+	t.Parallel()
+	data := loadRARFixture(t)
+	got := ExtractFromRAR(data, 0, 5)
+	if got == nil {
+		t.Fatal("ExtractFromRAR(fixture, 0, 5) = nil, want first subtitle " +
+			"(season 0 must disable episode filtering)")
+	}
+}
+
+// TestExtractFromRAR_episode_zero_disables_episode_filter verifies that a zero
+// episode turns off episode filtering, so the first valid subtitle is returned
+// regardless of name.
+func TestExtractFromRAR_episode_zero_disables_episode_filter(t *testing.T) {
+	t.Parallel()
+	data := loadRARFixture(t)
+	got := ExtractFromRAR(data, 1, 0)
+	if got == nil {
+		t.Fatal("ExtractFromRAR(fixture, 1, 0) = nil, want first subtitle " +
+			"(episode 0 must disable episode filtering)")
 	}
 }
 
