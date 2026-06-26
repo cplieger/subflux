@@ -228,3 +228,61 @@ func TestPing(t *testing.T) {
 		})
 	}
 }
+
+// --- defaultTransport ---
+
+func TestDefaultTransport(t *testing.T) {
+	t.Parallel()
+	tr := defaultTransport()
+	if tr.IdleConnTimeout != 90*time.Second {
+		t.Errorf("IdleConnTimeout = %v, want 90s", tr.IdleConnTimeout)
+	}
+	if tr.MaxIdleConns != 20 {
+		t.Errorf("MaxIdleConns = %d, want 20", tr.MaxIdleConns)
+	}
+	if tr.MaxIdleConnsPerHost != 5 {
+		t.Errorf("MaxIdleConnsPerHost = %d, want 5", tr.MaxIdleConnsPerHost)
+	}
+}
+
+// --- NewClient option clamping ---
+
+// NewClient defensively clamps out-of-range retry options so a misconfigured
+// option can't produce a negative attempt count or a tight retry loop.
+func TestNewClient_clampsOptions(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		opt             ClientOption
+		name            string
+		wantRetryDelay  time.Duration
+		wantMaxAttempts int
+	}{
+		{
+			name:            "negative_maxAttempts_clamped_to_zero",
+			opt:             func(c *Client) { c.maxAttempts = -5 },
+			wantMaxAttempts: 0,
+			wantRetryDelay:  defaultRetryDelay,
+		},
+		{
+			name:            "sub_floor_retryDelay_clamped_to_100ms",
+			opt:             func(c *Client) { c.retryDelay = 50 * time.Millisecond },
+			wantMaxAttempts: defaultMaxAttempts,
+			wantRetryDelay:  100 * time.Millisecond,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := NewClient("http://localhost", "k", tt.opt)
+			if err != nil {
+				t.Fatalf("NewClient() unexpected error: %v", err)
+			}
+			if c.maxAttempts != tt.wantMaxAttempts {
+				t.Errorf("maxAttempts = %d, want %d", c.maxAttempts, tt.wantMaxAttempts)
+			}
+			if c.retryDelay != tt.wantRetryDelay {
+				t.Errorf("retryDelay = %v, want %v", c.retryDelay, tt.wantRetryDelay)
+			}
+		})
+	}
+}

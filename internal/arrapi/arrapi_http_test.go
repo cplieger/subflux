@@ -132,3 +132,27 @@ func TestStatusError_IsTransient(t *testing.T) {
 		}
 	}
 }
+
+func TestIdPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		base   string
+		suffix string
+		want   string
+		id     int
+	}{
+		{name: "series_no_suffix", base: apiPrefix + "/series/", id: 42, suffix: "", want: apiPrefix + "/series/42"},
+		{name: "episode_with_query_suffix", base: apiPrefix + "/episode/", id: 100, suffix: "?includeEpisodeFile=true", want: apiPrefix + "/episode/100?includeEpisodeFile=true"},
+		{name: "empty_base", base: "", id: 7, suffix: "/x", want: "7/x"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := idPath(tt.base, tt.id, tt.suffix); got != tt.want {
+				t.Errorf("idPath(%q, %d, %q) = %q, want %q", tt.base, tt.id, tt.suffix, got, tt.want)
+			}
+		})
+	}
+}
