@@ -207,3 +207,110 @@ func TestProviderTimeout_providers_are_independent(t *testing.T) {
 		t.Error("b should not be timed out")
 	}
 }
+
+// --- Status: field-level reporting ---
+
+func TestProviderTimeout_status_counts_in_window_failures(t *testing.T) {
+	t.Parallel()
+	it := New(Config{Threshold: 5, Window: time.Hour, Cooldown: time.Hour})
+	it.RecordFailure("p", nil)
+	it.RecordFailure("p", nil)
+	s, ok := it.Status()["p"]
+	if !ok {
+		t.Fatal("expected status entry for p")
+	}
+	if s.RecentFailures != 2 {
+		t.Errorf("RecentFailures = %d, want 2", s.RecentFailures)
+	}
+	if s.TimedOut {
+		t.Error("should not be timed out below threshold")
+	}
+}
+
+func TestProviderTimeout_status_reports_cooldown_remaining(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	clock := clockAt(now)
+	// threshold=1 trips on the first failure; a long window keeps that failure
+	// in count while the clock advances inside the cooldown.
+	it := newTestTracker(1, 24*time.Hour, time.Hour, clock)
+	it.RecordFailure("p", nil)
+
+	*clock = func() time.Time { return now.Add(10 * time.Minute) }
+	s := it.Status()["p"]
+	if !s.TimedOut {
+		t.Error("should be timed out within cooldown")
+	}
+	if s.CooldownRemaining != 50*time.Minute {
+		t.Errorf("CooldownRemaining = %v, want %v", s.CooldownRemaining, 50*time.Minute)
+	}
+}
+
+func TestProviderTimeout_status_not_timed_out_at_cooldown_expiry(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	clock := clockAt(now)
+	it := newTestTracker(1, 24*time.Hour, time.Hour, clock)
+	it.RecordFailure("p", nil)
+
+	// Exactly one cooldown later: remaining == 0, which is not "> 0".
+	*clock = func() time.Time { return now.Add(time.Hour) }
+	s, ok := it.Status()["p"]
+	if !ok {
+		t.Fatal("expected status entry for p (failure still within window)")
+	}
+	if s.TimedOut {
+		t.Error("should not be timed out at exactly cooldown expiry (remaining == 0)")
+	}
+}
+
+// --- RecordFailure: failure-slice capacity management ---
+//
+// RecordFailure reuses a provider's backing slice and only reallocates it
+// smaller when it has grown well past need (cap strictly over 2*threshold) yet
+// holds fewer than threshold live failures. These two tests pin the boundaries
+// where that shrink must NOT happen. Capacity is not observable through the
+// public API, so they seed the concrete tracker directly.
+
+// newSeedableTracker returns the concrete *tracker so a test can pre-seed the
+// unexported failure map to set up a precise capacity scenario.
+func newSeedableTracker(threshold int, window, cooldown time.Duration, now time.Time) *tracker {
+	return New(Config{
+		Threshold: threshold,
+		Window:    window,
+		Cooldown:  cooldown,
+		Now:       func() time.Time { return now },
+	}).(*tracker)
+}
+
+func TestProviderTimeout_RecordFailure_keeps_capacity_when_cap_equals_twice_threshold(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	tr := newSeedableTracker(4, time.Hour, time.Hour, now)
+	// cap == 2*threshold (8), not strictly greater, so appending one failure
+	// (len 1 < threshold) must leave the capacity untouched.
+	tr.failures["pA"] = make([]time.Time, 0, 8)
+
+	tr.RecordFailure("pA", nil)
+
+	if got := cap(tr.failures["pA"]); got != 8 {
+		t.Errorf("cap(failures[pA]) = %d, want 8 (no shrink at cap boundary)", got)
+	}
+}
+
+func TestProviderTimeout_RecordFailure_keeps_capacity_when_live_count_equals_threshold(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	tr := newSeedableTracker(4, time.Hour, time.Hour, now)
+	// cap 16 (> 2*threshold) but the new failure brings the live count to
+	// exactly threshold (4), not below it, so no shrink happens.
+	seed := make([]time.Time, 3, 16)
+	seed[0], seed[1], seed[2] = now, now, now
+	tr.failures["pB"] = seed
+
+	tr.RecordFailure("pB", nil)
+
+	if got := cap(tr.failures["pB"]); got != 16 {
+		t.Errorf("cap(failures[pB]) = %d, want 16 (no shrink at length boundary)", got)
+	}
+}

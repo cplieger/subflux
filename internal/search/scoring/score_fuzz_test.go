@@ -60,3 +60,34 @@ func FuzzBuildMatches(f *testing.F) {
 		}
 	})
 }
+
+func FuzzMatchBreakdown(f *testing.F) {
+	f.Add(true, true, true, true, true, true, true, true)
+	f.Add(false, false, false, false, false, false, false, false)
+	f.Add(true, false, true, false, true, false, true, false)
+
+	f.Fuzz(func(t *testing.T, hash, src, rg, ss, vc, hdr, ed, sp bool) {
+		matches := api.MatchSet{
+			Hash:             hash,
+			Source:           src,
+			ReleaseGroup:     rg,
+			StreamingService: ss,
+			VideoCodec:       vc,
+			HDR:              hdr,
+			Edition:          ed,
+			SeasonPack:       sp,
+		}
+		scores := &api.DefaultScores
+		breakdown := MatchBreakdown(scores, matches)
+		// If hash is set, the breakdown must report the hash score.
+		if hash && breakdown["hash"] != scores.Hash {
+			t.Fatalf("MatchBreakdown: hash set but breakdown[hash]=%d, want %d", breakdown["hash"], scores.Hash)
+		}
+		// Every contribution must be non-negative.
+		for k, v := range breakdown {
+			if v < 0 {
+				t.Fatalf("MatchBreakdown: negative value for %q: %d", k, v)
+			}
+		}
+	})
+}

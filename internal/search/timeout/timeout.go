@@ -148,6 +148,17 @@ func (it *tracker) Reset() {
 	slog.Info("provider timeouts reset, all providers re-enabled")
 }
 
+// countAfter returns how many timestamps are strictly after cutoff.
+func countAfter(times []time.Time, cutoff time.Time) int {
+	count := 0
+	for _, t := range times {
+		if t.After(cutoff) {
+			count++
+		}
+	}
+	return count
+}
+
 func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -157,16 +168,13 @@ func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
 	out := make(map[api.ProviderID]api.ProviderStatus, len(it.failures)+len(it.tripped))
 
 	for prov, times := range it.failures {
-		count := 0
-		for _, t := range times {
-			if t.After(cutoff) {
-				count++
-			}
+		s := api.ProviderStatus{
+			RecentFailures: countAfter(times, cutoff),
+			Threshold:      it.threshold,
+			LastError:      it.lastError[prov],
 		}
-		s := api.ProviderStatus{RecentFailures: count, Threshold: it.threshold, LastError: it.lastError[prov]}
 		if trippedAt, ok := it.tripped[prov]; ok {
-			remaining := it.cooldown - now.Sub(trippedAt)
-			if remaining > 0 {
+			if remaining := it.cooldown - now.Sub(trippedAt); remaining > 0 {
 				s.TimedOut = true
 				s.CooldownRemaining = remaining
 			}
@@ -178,8 +186,7 @@ func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
 		if _, seen := out[prov]; seen {
 			continue
 		}
-		remaining := it.cooldown - now.Sub(trippedAt)
-		if remaining > 0 {
+		if remaining := it.cooldown - now.Sub(trippedAt); remaining > 0 {
 			out[prov] = api.ProviderStatus{
 				TimedOut:          true,
 				Threshold:         it.threshold,
