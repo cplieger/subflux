@@ -1,3 +1,6 @@
+// Package queryhandlers provides read-only HTTP query handlers: subtitle
+// state, backoff, manual locks, providers, parsed config, score simulation,
+// and dashboard stats.
 package queryhandlers
 
 import (

@@ -1,8 +1,11 @@
 package scanning
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -243,5 +246,44 @@ func TestResolveShowCounter_picks_first(t *testing.T) {
 	count, _ := st.counter.CountShowSubtitles(context.Background(), "tt1", "fr")
 	if count != 0 {
 		t.Fatalf("expected count 0 from first provider, got %d", count)
+	}
+}
+
+// showLevelSkip uses an inclusive threshold: a show is skipped when the
+// available subtitle count is at or below episodeCount * showSkipThresholdPct.
+// With 10 episodes the threshold is 2, so a count of exactly 2 still skips.
+func TestShowLevelSkip_count_equals_threshold(t *testing.T) {
+	t.Parallel()
+	mock := &mockShowCounter{counts: map[string]int{"tt1-en": 2}}
+	st := newSeasonTracker(mock, showskip.New(time.Hour))
+
+	got := st.showLevelSkip(context.Background(), "tt1", 10, "en")
+
+	if !got {
+		t.Errorf("showLevelSkip(count==threshold) = false, want true")
+	}
+}
+
+// The multi-language show-skip path runs per-language checks in an errgroup
+// whose goroutines never return an error, so it must not emit the
+// "show skip check error" warning on a clean run.
+func TestShouldSkipShow_no_spurious_errgroup_warn(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	defer slog.SetDefault(prev)
+
+	mock := &mockShowCounter{counts: map[string]int{"tt1-en": 100, "tt1-fr": 100}}
+	st := newSeasonTracker(mock, showskip.New(time.Hour))
+
+	// Two languages forces the concurrent errgroup branch that reaches the
+	// g.Wait() error check.
+	st.shouldSkipShow(context.Background(), "tt1", 10, []string{"en", "fr"})
+
+	const warnMsg = "show skip check error"
+	if strings.Contains(buf.String(), warnMsg) {
+		t.Errorf("shouldSkipShow emitted a spurious errgroup warning %q; log was:\n%s",
+			warnMsg, buf.String())
 	}
 }
