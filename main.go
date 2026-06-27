@@ -121,69 +121,86 @@ func suggestCommand(s string) string {
 	return ""
 }
 
+// cliDispatch maps each CLI subcommand to its runner. Every entry has
+// the uniform func() int shape: the arg-bearing remote commands (which
+// call runCLIRemote / runCLIAction with a fixed endpoint) are wrapped in
+// closures. handleCLI looks the command up here after the help-and-flag
+// preamble in validateCLIArgs.
+//
+// Keep this in sync with cliSpecs in cli_specs.go when adding a
+// subcommand. The two lists are intentionally decoupled: a command
+// present here but absent from cliSpecs simply dispatches without help
+// text or flag validation, and a command present only in cliSpecs falls
+// through to the "unknown command" path.
+var cliDispatch = map[string]func() int{
+	cmdSearch:    runCLISearch,
+	cmdStatus:    func() int { return runCLIRemote("/api/state/stats") },
+	cmdState:     runCLIState,
+	cmdBackoff:   func() int { return runCLIRemote("/api/backoff") },
+	cmdLocks:     func() int { return runCLIRemote("/api/locks") },
+	cmdProviders: func() int { return runCLIRemote("/api/providers") },
+	cmdUnlock:    runCLIUnlock,
+	cmdScan:      func() int { return runCLIAction("/api/scan", "scan started") },
+	cmdTimeouts:  func() int { return runCLIRemote("/api/providers/timeout") },
+	cmdTimeoutsReset: func() int {
+		return runCLIAction("/api/providers/timeout/reset",
+			"provider timeouts reset, all providers re-enabled")
+	},
+	cmdScore:          runCLIScore,
+	cmdResetPassword:  runCLIResetPassword,
+	cmdEnablePwLogin:  runCLIEnablePasswordLogin,
+	cmdGenerateAPIKey: runCLIGenerateAPIKey,
+}
+
 // handleCLI dispatches CLI subcommands. Returns (code, handled): code
 // is the exit code (0 on success, 1 on runtime failure, 2 on usage
 // error); handled is true when the subcommand was recognized. Caller
 // uses handled=false to surface its own "unknown command" message.
 //
-// Centralizes help and flag validation: when the subcommand is registered
-// in cliSpecs, this function (a) prints command-specific help on
-// --help/-h and returns code 0, (b) rejects unknown flags with a
-// Levenshtein suggestion and returns code 2, and (c) enforces required
-// flags and typed-flag parsing before the actual runCLIxxx executes.
-// The runCLIxxx functions can therefore trust that os.Args is
-// structurally valid and read flags directly from cliparse.ParseArgs
-// without redundant defensive checks.
+// Help and flag validation are centralized in validateCLIArgs: when the
+// subcommand is registered in cliSpecs, that helper (a) prints
+// command-specific help on --help/-h and returns code 0, (b) rejects
+// unknown flags with a Levenshtein suggestion and returns code 2, and
+// (c) enforces required flags and typed-flag parsing before the actual
+// runCLIxxx executes. The runCLIxxx functions can therefore trust that
+// os.Args is structurally valid and read flags directly from
+// cliparse.ParseArgs without redundant defensive checks.
 func handleCLI(cmd string) (code int, handled bool) {
-	spec, registered := cliSpecs[cmd]
-	if registered {
-		if cliparse.HelpRequested(os.Args[2:]) {
-			cliparse.PrintHelp(os.Stdout, &spec)
-			return 0, true
-		}
-		params, _ := cliparse.ParseArgs(os.Args[2:])
-		if err := cliparse.Validate(os.Args[2:], params, &spec); err != nil {
-			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintln(os.Stderr)
-			cliparse.PrintHelp(os.Stderr, &spec)
-			// POSIX exit code 2 for usage errors (missing required
-			// args, unknown flags, malformed typed values).
-			return 2, true
-		}
+	if c, done := validateCLIArgs(cmd); done {
+		return c, true
 	}
-	switch cmd {
-	case cmdSearch:
-		return runCLISearch(), true
-	case cmdStatus:
-		return runCLIRemote("/api/state/stats"), true
-	case cmdState:
-		return runCLIState(), true
-	case cmdBackoff:
-		return runCLIRemote("/api/backoff"), true
-	case cmdLocks:
-		return runCLIRemote("/api/locks"), true
-	case cmdProviders:
-		return runCLIRemote("/api/providers"), true
-	case cmdUnlock:
-		return runCLIUnlock(), true
-	case cmdScan:
-		return runCLIAction("/api/scan", "scan started"), true
-	case cmdTimeouts:
-		return runCLIRemote("/api/providers/timeout"), true
-	case cmdTimeoutsReset:
-		return runCLIAction("/api/providers/timeout/reset",
-			"provider timeouts reset, all providers re-enabled"), true
-	case cmdScore:
-		return runCLIScore(), true
-	case cmdResetPassword:
-		return runCLIResetPassword(), true
-	case cmdEnablePwLogin:
-		return runCLIEnablePasswordLogin(), true
-	case cmdGenerateAPIKey:
-		return runCLIGenerateAPIKey(), true
-	default:
+	if run, ok := cliDispatch[cmd]; ok {
+		return run(), true
+	}
+	return 0, false
+}
+
+// validateCLIArgs runs the help-and-flag-validation preamble for a
+// registered subcommand. Returns (code, done): done is true when the
+// preamble fully handled the invocation — either help was printed
+// (code 0) or flag validation failed (code 2, a POSIX usage error) — so
+// handleCLI should return (code, true) immediately. For an unregistered
+// command, or one whose flags validate cleanly, it returns (0, false)
+// and dispatch proceeds.
+func validateCLIArgs(cmd string) (code int, done bool) {
+	spec, registered := cliSpecs[cmd]
+	if !registered {
 		return 0, false
 	}
+	if cliparse.HelpRequested(os.Args[2:]) {
+		cliparse.PrintHelp(os.Stdout, &spec)
+		return 0, true
+	}
+	params, _ := cliparse.ParseArgs(os.Args[2:])
+	if err := cliparse.Validate(os.Args[2:], params, &spec); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		fmt.Fprintln(os.Stderr)
+		cliparse.PrintHelp(os.Stderr, &spec)
+		// POSIX exit code 2 for usage errors (missing required
+		// args, unknown flags, malformed typed values).
+		return 2, true
+	}
+	return 0, false
 }
 
 // --- Server ---
