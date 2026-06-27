@@ -125,24 +125,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 
 	ignoredCodecs := search.IgnoredCodecsFromConfig(ls.Cfg)
 	episodeSubs := coverage.IndexSubStatus(allFiles, ignoredCodecs)
-
-	prefixToIdx := make(map[string]int, len(allSeries))
-	seriesPrefixes := make([]string, len(allSeries))
-	for i := range allSeries {
-		p := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
-		seriesPrefixes[i] = p
-		if p != "" {
-			prefixToIdx[p] = i
-		}
-	}
-
-	grouped := make([][]map[coverage.Key]*coverage.Status, len(allSeries))
-	for epMediaID, subs := range episodeSubs {
-		p := coverage.ExtractSeriesPrefix(epMediaID)
-		if idx, ok := prefixToIdx[p]; ok {
-			grouped[idx] = append(grouped[idx], subs)
-		}
-	}
+	grouped := groupEpisodeSubsBySeries(allSeries, episodeSubs)
 
 	out := make([]SeriesItem, 0, len(allSeries))
 	for i := range allSeries {
@@ -178,6 +161,27 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("coverage: series computed", "count", len(out), "series_total", len(allSeries), "episode_files", len(allFiles))
 	api.WriteJSON(w, out)
+}
+
+// groupEpisodeSubsBySeries buckets indexed episode subtitle maps by their
+// owning series, returning a slice parallel to allSeries. Episode media IDs
+// whose series prefix doesn't match any series are dropped.
+func groupEpisodeSubsBySeries(allSeries []api.Series, episodeSubs map[string]map[coverage.Key]*coverage.Status) [][]map[coverage.Key]*coverage.Status {
+	prefixToIdx := make(map[string]int, len(allSeries))
+	for i := range allSeries {
+		p := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
+		if p != "" {
+			prefixToIdx[p] = i
+		}
+	}
+	grouped := make([][]map[coverage.Key]*coverage.Status, len(allSeries))
+	for epMediaID, subs := range episodeSubs {
+		p := coverage.ExtractSeriesPrefix(epMediaID)
+		if idx, ok := prefixToIdx[p]; ok {
+			grouped[idx] = append(grouped[idx], subs)
+		}
+	}
+	return grouped
 }
 
 // HandleCoverageMovies returns subtitle coverage for all movies.
