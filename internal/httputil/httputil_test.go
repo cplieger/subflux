@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -117,5 +118,43 @@ func TestIsTransient_suffixBypassFixed(t *testing.T) {
 		if !IsTransient(err) {
 			t.Errorf("IsTransient(HTTPStatusError{%d}) = false, want true", code)
 		}
+	}
+}
+
+// TestRetryOnRateLimit_retriesAPIRateLimitError verifies the api.RateLimitError
+// -> httpx.RateLimitError bridge: that conversion is the only reason an
+// api.RateLimitError drives httpx's retry loop. Without the bridge the error
+// would be returned on the first attempt instead of retried.
+func TestRetryOnRateLimit_retriesAPIRateLimitError(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	err := RetryOnRateLimit(context.Background(), 3, time.Millisecond, func() error {
+		calls++
+		return &api.RateLimitError{Msg: "429"}
+	})
+	if calls != 3 {
+		t.Errorf("fn called %d times, want 3 (api.RateLimitError must be bridged and retried up to maxAttempts)", calls)
+	}
+	if err == nil || err.Error() != "429" {
+		t.Errorf("RetryOnRateLimit returned %v, want the rate-limit error after exhausting retries", err)
+	}
+}
+
+// TestRetryOnRateLimit_passesThroughNonRateLimitError verifies the bridge is
+// scoped: a non-rate-limit error is not converted, so httpx returns it
+// immediately without retrying.
+func TestRetryOnRateLimit_passesThroughNonRateLimitError(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	sentinel := errors.New("boom")
+	err := RetryOnRateLimit(context.Background(), 3, time.Millisecond, func() error {
+		calls++
+		return sentinel
+	})
+	if calls != 1 {
+		t.Errorf("fn called %d times, want 1 (non-rate-limit errors must not be retried)", calls)
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("RetryOnRateLimit returned %v, want the original error unchanged", err)
 	}
 }

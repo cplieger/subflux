@@ -88,6 +88,35 @@ type WriteError struct {
 func (e *WriteError) Error() string { return e.Phase.String() + ": " + e.Err.Error() }
 func (e *WriteError) Unwrap() error { return e.Err }
 
+// removeTempFile deletes a leftover temp file, logging at debug (but never
+// failing) when the removal errors for a reason other than the file already
+// being gone. The error guard's polarity matters: on a clean removal nothing
+// is logged.
+func removeTempFile(name string) {
+	if rmErr := os.Remove(name); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) {
+		slog.Debug("atomic write: temp file cleanup failed",
+			"path", name, "error", rmErr)
+	}
+}
+
+// syncParentDir best-effort fsyncs dir so a completed rename survives a crash,
+// logging sync/close failures at debug rather than failing the write. A
+// successful sync and close emit no log.
+func syncParentDir(dir string) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	if syncErr := d.Sync(); syncErr != nil {
+		slog.Debug("atomic write: parent dir fsync failed",
+			"dir", dir, "error", syncErr)
+	}
+	if closeErr := d.Close(); closeErr != nil {
+		slog.Debug("atomic write: parent dir close failed",
+			"dir", dir, "error", closeErr)
+	}
+}
+
 // AtomicWriteFile writes data to a temp file and renames it to path,
 // preventing corruption on crash. The context allows early bailout between
 // expensive I/O steps when the caller has been cancelled.
@@ -111,12 +140,7 @@ func AtomicWriteFileMode(ctx context.Context, path string, data []byte, mode os.
 		return &WriteError{Phase: PhaseTempCreate, Err: err}
 	}
 	tmpName := tmp.Name()
-	cleanup := func() {
-		if rmErr := os.Remove(tmpName); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) {
-			slog.Debug("atomic write: temp file cleanup failed",
-				"path", tmpName, "error", rmErr)
-		}
-	}
+	cleanup := func() { removeTempFile(tmpName) }
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
 		cleanup()
@@ -150,16 +174,7 @@ func AtomicWriteFileMode(ctx context.Context, path string, data []byte, mode os.
 		cleanup()
 		return &WriteError{Phase: PhaseRename, Err: err}
 	}
-	if d, err := os.Open(dir); err == nil {
-		if syncErr := d.Sync(); syncErr != nil {
-			slog.Debug("atomic write: parent dir fsync failed",
-				"dir", dir, "error", syncErr)
-		}
-		if closeErr := d.Close(); closeErr != nil {
-			slog.Debug("atomic write: parent dir close failed",
-				"dir", dir, "error", closeErr)
-		}
-	}
+	syncParentDir(dir)
 	return nil
 }
 
@@ -179,12 +194,7 @@ func PrepareAtomicWrite(ctx context.Context, path string, data []byte) (tmpPath 
 		return "", nil, &WriteError{Phase: PhaseTempCreate, Err: err}
 	}
 	tmpName := tmp.Name()
-	doCleanup := func() {
-		if rmErr := os.Remove(tmpName); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) {
-			slog.Debug("atomic write: temp file cleanup failed",
-				"path", tmpName, "error", rmErr)
-		}
-	}
+	doCleanup := func() { removeTempFile(tmpName) }
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
 		doCleanup()
@@ -233,16 +243,7 @@ func CommitAtomicWrite(tmpPath, finalPath string) error {
 		return &WriteError{Phase: PhaseRename, Err: err}
 	}
 	dir := filepath.Dir(cleanFinal)
-	if d, err := os.Open(dir); err == nil {
-		if syncErr := d.Sync(); syncErr != nil {
-			slog.Debug("atomic write: parent dir fsync failed",
-				"dir", dir, "error", syncErr)
-		}
-		if closeErr := d.Close(); closeErr != nil {
-			slog.Debug("atomic write: parent dir close failed",
-				"dir", dir, "error", closeErr)
-		}
-	}
+	syncParentDir(dir)
 	return nil
 }
 

@@ -76,3 +76,28 @@ func BenchmarkHandler(b *testing.B) {
 		handler.ServeHTTP(rec, req)
 	}
 }
+
+func BenchmarkRender(b *testing.B) {
+	for _, nProviders := range []int{1, 5, 20} {
+		b.Run(fmt.Sprintf("providers_%d", nProviders), func(b *testing.B) {
+			m := New()
+			providers := make([]api.ProviderID, nProviders)
+			for i := range providers {
+				providers[i] = api.ProviderID(fmt.Sprintf("provider-%d", i))
+			}
+			for _, p := range providers {
+				for range 10 {
+					m.RecordSearch(p, 100*time.Millisecond, nil)
+				}
+			}
+
+			handler := m.Handler()
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+			b.ReportAllocs()
+			for b.Loop() {
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+			}
+		})
+	}
+}

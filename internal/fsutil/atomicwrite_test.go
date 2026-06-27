@@ -1,9 +1,12 @@
 package fsutil
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -212,5 +215,94 @@ func TestAtomicWriteFileMode_context_cancelled(t *testing.T) {
 	// File should not exist.
 	if _, statErr := os.Stat(path); statErr == nil {
 		t.Error("file should not exist after cancelled write")
+	}
+}
+
+// captureDebugLogs swaps the process default slog logger for a Debug-level
+// text handler writing into a buffer, runs fn, restores the original logger,
+// and returns everything logged during fn.
+//
+// Callers must NOT run in parallel: this mutates a process global. Go defers
+// t.Parallel tests until the package's sequential tests have finished, so a
+// non-parallel test that swaps and restores the default within its own body
+// never overlaps a parallel test.
+func captureDebugLogs(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	defer slog.SetDefault(orig)
+	fn()
+	return buf.String()
+}
+
+// TestAtomicWriteFileMode_successEmitsNoDirSyncLog pins the polarity of the
+// parent-dir fsync/close error guards: on a successful write the dir Sync and
+// Close succeed, so no failure log must be emitted. Negating either guard would
+// make the success path log a failure.
+func TestAtomicWriteFileMode_successEmitsNoDirSyncLog(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.txt")
+	logs := captureDebugLogs(t, func() {
+		if err := AtomicWriteFileMode(context.Background(), path, []byte("payload"), 0o644); err != nil {
+			t.Fatalf("AtomicWriteFileMode(%q) = %v, want nil", path, err)
+		}
+	})
+	if got, err := os.ReadFile(path); err != nil || string(got) != "payload" {
+		t.Fatalf("ReadFile(%q) = %q, %v; want %q, nil", path, got, err, "payload")
+	}
+	if strings.Contains(logs, "parent dir fsync failed") {
+		t.Errorf("success emitted %q; the dir fsync succeeded so the guard must stay false", "parent dir fsync failed")
+	}
+	if strings.Contains(logs, "parent dir close failed") {
+		t.Errorf("success emitted %q; the dir close succeeded so the guard must stay false", "parent dir close failed")
+	}
+}
+
+// TestCommitAtomicWrite_successEmitsNoDirSyncLog pins the same parent-dir
+// fsync/close guard polarity inside CommitAtomicWrite.
+func TestCommitAtomicWrite_successEmitsNoDirSyncLog(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "committed.txt")
+	tmpPath, cleanup, err := PrepareAtomicWrite(context.Background(), path, []byte("commit-payload"))
+	if err != nil {
+		t.Fatalf("PrepareAtomicWrite(%q) = %v, want nil", path, err)
+	}
+	_ = cleanup // CommitAtomicWrite renames the temp away; do not invoke cleanup.
+	logs := captureDebugLogs(t, func() {
+		if err := CommitAtomicWrite(tmpPath, path); err != nil {
+			t.Fatalf("CommitAtomicWrite(%q, %q) = %v, want nil", tmpPath, path, err)
+		}
+	})
+	if got, err := os.ReadFile(path); err != nil || string(got) != "commit-payload" {
+		t.Fatalf("ReadFile(%q) = %q, %v; want %q, nil", path, got, err, "commit-payload")
+	}
+	if strings.Contains(logs, "parent dir fsync failed") {
+		t.Errorf("success emitted %q; the dir fsync succeeded", "parent dir fsync failed")
+	}
+	if strings.Contains(logs, "parent dir close failed") {
+		t.Errorf("success emitted %q; the dir close succeeded", "parent dir close failed")
+	}
+}
+
+// TestPrepareAtomicWrite_cleanupEmitsNoLogOnSuccess pins the polarity of the
+// temp-file cleanup guard: removing an existing temp file succeeds, so cleanup
+// must emit no failure log.
+func TestPrepareAtomicWrite_cleanupEmitsNoLogOnSuccess(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "prepared.txt")
+	tmpPath, cleanup, err := PrepareAtomicWrite(context.Background(), path, []byte("x"))
+	if err != nil {
+		t.Fatalf("PrepareAtomicWrite(%q) = %v, want nil", path, err)
+	}
+	if _, statErr := os.Stat(tmpPath); statErr != nil {
+		t.Fatalf("temp file %q should exist before cleanup: %v", tmpPath, statErr)
+	}
+	logs := captureDebugLogs(t, func() { cleanup() })
+	if _, statErr := os.Stat(tmpPath); statErr == nil {
+		t.Errorf("temp file %q should be removed after cleanup()", tmpPath)
+	}
+	if strings.Contains(logs, "temp file cleanup failed") {
+		t.Errorf("successful cleanup emitted %q; the Remove of an existing temp succeeded", "temp file cleanup failed")
 	}
 }
