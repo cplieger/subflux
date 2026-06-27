@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -443,5 +445,126 @@ func BenchmarkRetryProvider(b *testing.B) {
 				_, _ = rp.Search(ctx, req)
 			}
 		})
+	}
+}
+
+// --- download retry logging ---
+//
+// The retry wrapper emits two slog records carrying human-facing (one-based)
+// attempt counts: a "recovered" info log only after at least one transient
+// failure, and a "retrying" warn log before each backoff. These tests capture
+// the default logger and assert on those records, so they must NOT run in
+// parallel (slog.Default is process-global).
+
+const (
+	msgDownloadRecovered = "download recovered after transient errors"
+	msgDownloadRetrying  = "download failed with transient error, retrying"
+)
+
+type capturedLog struct {
+	attrs map[string]any
+	msg   string
+}
+
+// logCapture is an slog.Handler that records every record in memory.
+type logCapture struct {
+	mu   *sync.Mutex
+	recs *[]capturedLog
+}
+
+func (h logCapture) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h logCapture) Handle(_ context.Context, r slog.Record) error {
+	m := make(map[string]any)
+	r.Attrs(func(a slog.Attr) bool {
+		m[a.Key] = a.Value.Any()
+		return true
+	})
+	h.mu.Lock()
+	*h.recs = append(*h.recs, capturedLog{msg: r.Message, attrs: m})
+	h.mu.Unlock()
+	return nil
+}
+
+func (h logCapture) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h logCapture) WithGroup(string) slog.Handler      { return h }
+
+// captureSlog redirects the default slog logger to an in-memory recorder for
+// the duration of the test, restoring it via t.Cleanup.
+func captureSlog(t *testing.T) *[]capturedLog {
+	t.Helper()
+	recs := &[]capturedLog{}
+	mu := &sync.Mutex{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(logCapture{mu: mu, recs: recs}))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return recs
+}
+
+func countLogMsg(recs []capturedLog, msg string) int {
+	n := 0
+	for _, r := range recs {
+		if r.msg == msg {
+			n++
+		}
+	}
+	return n
+}
+
+func firstLogAttr(recs []capturedLog, msg, key string) (any, bool) {
+	for _, r := range recs {
+		if r.msg == msg {
+			v, ok := r.attrs[key]
+			return v, ok
+		}
+	}
+	return nil, false
+}
+
+// A first-attempt success must not emit the "recovered" log, which is gated on
+// having already failed at least once.
+func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
+	recs := captureSlog(t)
+	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{{data: []byte("ok")}}}
+	p := WrapRetry(inner, 3, time.Millisecond)
+	data, err := p.Download(context.Background(), &api.Subtitle{})
+	if err != nil {
+		t.Fatalf("Download() error = %v, want nil", err)
+	}
+	if string(data) != "ok" {
+		t.Fatalf("Download() = %q, want %q", data, "ok")
+	}
+	if got := countLogMsg(*recs, msgDownloadRecovered); got != 0 {
+		t.Errorf("recovered-log count after first-attempt success = %d, want 0", got)
+	}
+}
+
+// Recovering on the second attempt must emit exactly one "recovered" log
+// reporting attempts=2 and exactly one "retrying" warn reporting attempt=1.
+func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
+	recs := captureSlog(t)
+	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{
+		{err: &httputil.HTTPStatusError{Code: 503}}, // transient: retried
+		{data: []byte("ok")},                        // success on the second attempt
+	}}
+	p := WrapRetry(inner, 3, time.Millisecond)
+	data, err := p.Download(context.Background(), &api.Subtitle{})
+	if err != nil {
+		t.Fatalf("Download() error = %v, want nil", err)
+	}
+	if string(data) != "ok" {
+		t.Fatalf("Download() = %q, want %q", data, "ok")
+	}
+	if got := countLogMsg(*recs, msgDownloadRecovered); got != 1 {
+		t.Fatalf("recovered-log count = %d, want 1", got)
+	}
+	if v, ok := firstLogAttr(*recs, msgDownloadRecovered, "attempts"); !ok || v != int64(2) {
+		t.Errorf("recovered-log attempts = %v (present=%v), want 2", v, ok)
+	}
+	if got := countLogMsg(*recs, msgDownloadRetrying); got != 1 {
+		t.Fatalf("retrying-warn count = %d, want 1", got)
+	}
+	if v, ok := firstLogAttr(*recs, msgDownloadRetrying, "attempt"); !ok || v != int64(1) {
+		t.Errorf("retrying-warn attempt = %v (present=%v), want 1", v, ok)
 	}
 }
