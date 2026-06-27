@@ -210,6 +210,29 @@ func TestCache_GetOrFetch_coalesces_concurrent(t *testing.T) {
 	}
 }
 
+// TestCache_GetOrFetchCtx_caches_result verifies a successful GetOrFetchCtx
+// result is cached, so a second lookup for the same key returns the cached
+// value without re-invoking the fetch function.
+func TestCache_GetOrFetchCtx_caches_result(t *testing.T) {
+	t.Parallel()
+	c := New[int](time.Minute)
+	calls := 0
+	fn := func(context.Context) (int, error) {
+		calls++
+		return 42, nil
+	}
+
+	if v, err := c.GetOrFetchCtx(context.Background(), "k", fn); err != nil || v != 42 {
+		t.Fatalf("first GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
+	}
+	if v, err := c.GetOrFetchCtx(context.Background(), "k", fn); err != nil || v != 42 {
+		t.Fatalf("second GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
+	}
+	if calls != 1 {
+		t.Errorf("fetch fn called %d times, want 1 (a successful result must be cached)", calls)
+	}
+}
+
 func BenchmarkCache_concurrent(b *testing.B) {
 	c := New[int](time.Hour)
 	for i := range 100 {

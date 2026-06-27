@@ -120,39 +120,69 @@ func PrintRootHelp(w io.Writer, specs []Spec) {
 // args is the raw argv slice (after the subcommand name, e.g.
 // os.Args[2:]); params is the result of clisearch.ParseArgs.
 func Validate(args []string, params map[string]string, spec *Spec) error {
+	if err := checkUnknownFlags(args, spec); err != nil {
+		return err
+	}
+	return checkRequiredAndTypes(params, spec)
+}
+
+// knownFlags indexes a spec's flags by name for O(1) lookup.
+func knownFlags(spec *Spec) map[string]Flag {
 	known := make(map[string]Flag, len(spec.Flags))
 	for _, f := range spec.Flags {
 		known[f.Name] = f
 	}
+	return known
+}
+
+// unknownFlagName reports whether arg is an unknown --flag and, if so, returns
+// its bare name (with any =value suffix stripped). It returns ok=false for
+// non-flag tokens, help tokens, the bare "--", and known flags.
+//
+// Only "--"-prefixed tokens are considered: ParseArgs pairs "--flag value"
+// greedily, so a value following a known flag is a bare token here and is
+// correctly treated as not-a-flag rather than an unknown flag.
+func unknownFlagName(arg string, known map[string]Flag) (string, bool) {
+	if arg == "--help" || arg == "-h" {
+		return "", false
+	}
+	name, ok := strings.CutPrefix(arg, "--")
+	if !ok {
+		return "", false
+	}
+	// Strip the --flag=value form down to the flag name.
+	if eq := strings.IndexByte(name, '='); eq >= 0 {
+		name = name[:eq]
+	}
+	if name == "" {
+		return "", false
+	}
+	if _, found := known[name]; found {
+		return "", false
+	}
+	return name, true
+}
+
+// checkUnknownFlags returns an error for the first --flag in args that is not
+// declared in spec, with a "did you mean" suggestion when a close match exists.
+func checkUnknownFlags(args []string, spec *Spec) error {
+	known := knownFlags(spec)
 	for _, a := range args {
-		if a == "--help" || a == "-h" {
-			continue
-		}
-		name, ok := strings.CutPrefix(a, "--")
+		name, ok := unknownFlagName(a, known)
 		if !ok {
 			continue
 		}
-		// Strip --flag=value form for the unknown-flag check
-		if eq := strings.IndexByte(name, '='); eq >= 0 {
-			name = name[:eq]
-		}
-		if name == "" {
-			continue
-		}
-		if _, ok := known[name]; ok {
-			continue
-		}
-		// Skip values that follow a known flag: ParseArgs treats arg[i+1]
-		// as the value for arg[i] when arg[i] is `--flag value`. We can't
-		// reconstruct that pairing without re-parsing, so we apply a
-		// heuristic: if the previous arg is a known --flag and this arg
-		// is not a --flag itself, it is probably a value. Skip below by
-		// only flagging args that start with --.
 		if msg := suggestion(name, spec.Flags); msg != "" {
 			return fmt.Errorf("unknown flag --%s%s", name, msg)
 		}
 		return fmt.Errorf("unknown flag --%s", name)
 	}
+	return nil
+}
+
+// checkRequiredAndTypes verifies that every required flag is present and that
+// each present typed flag parses cleanly.
+func checkRequiredAndTypes(params map[string]string, spec *Spec) error {
 	for _, f := range spec.Flags {
 		_, present := params[f.Name]
 		if f.Required && !present {
