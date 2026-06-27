@@ -63,42 +63,15 @@ func (d *DB) RecordSubtitleFiles(_ context.Context, mediaType api.MediaType, med
 		if err != nil {
 			return err
 		}
-
-		// Delete rows no longer on disk.
-		for k := range have {
-			if _, ok := want[k]; ok {
-				continue
-			}
-			key := subtitleFileKey(mediaType, mediaID, k.lang, api.Variant(k.variant), api.SubtitleSource(k.source), k.path)
-			existed, derr := deleteSubtitleFile(tx, key)
-			if derr != nil {
-				return derr
-			}
-			if existed {
-				changed = true
-			}
+		deleted, err := d.deleteStaleFileRows(tx, mediaType, mediaID, have, want)
+		if err != nil {
+			return err
 		}
-
-		// Insert new rows and update rows whose codec changed.
-		now := time.Now().UTC()
-		for k, codec := range want {
-			old, exists := have[k]
-			switch {
-			case !exists:
-				rec := fileRec{Codec: codec, OffsetMs: 0, UpdatedAt: now}
-				if perr := d.putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
-					return perr
-				}
-				changed = true
-			case old.Codec != codec:
-				// Codec changed: rewrite, preserving the cumulative offset_ms.
-				rec := fileRec{Codec: codec, OffsetMs: old.OffsetMs, UpdatedAt: now}
-				if perr := d.putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
-					return perr
-				}
-				changed = true
-			}
+		applied, err := d.applyWantedFileRows(tx, mediaType, mediaID, have, want)
+		if err != nil {
+			return err
 		}
+		changed = deleted || applied
 		return nil
 	})
 	if err != nil {
@@ -107,6 +80,55 @@ func (d *DB) RecordSubtitleFiles(_ context.Context, mediaType api.MediaType, med
 	if changed {
 		slog.Debug("RecordSubtitleFiles changed",
 			"media_type", mediaType, "media_id", mediaID, "files", len(want))
+	}
+	return changed, nil
+}
+
+// deleteStaleFileRows deletes the subtitle_files rows present in `have` but
+// absent from `want` (no longer on disk) through the deleteSubtitleFile
+// chokepoint, returning whether any row was actually removed.
+func (d *DB) deleteStaleFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
+	changed := false
+	for k := range have {
+		if _, ok := want[k]; ok {
+			continue
+		}
+		key := subtitleFileKey(mediaType, mediaID, k.lang, api.Variant(k.variant), api.SubtitleSource(k.source), k.path)
+		existed, derr := deleteSubtitleFile(tx, key)
+		if derr != nil {
+			return false, derr
+		}
+		if existed {
+			changed = true
+		}
+	}
+	return changed, nil
+}
+
+// applyWantedFileRows inserts the rows in `want` missing from `have` (offset_ms
+// 0) and rewrites rows whose codec changed (preserving the cumulative
+// offset_ms), through the putFileRow chokepoint. It returns whether any insert
+// or codec update happened.
+func (d *DB) applyWantedFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
+	changed := false
+	now := time.Now().UTC()
+	for k, codec := range want {
+		old, exists := have[k]
+		switch {
+		case !exists:
+			rec := fileRec{Codec: codec, OffsetMs: 0, UpdatedAt: now}
+			if perr := d.putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
+				return false, perr
+			}
+			changed = true
+		case old.Codec != codec:
+			// Codec changed: rewrite, preserving the cumulative offset_ms.
+			rec := fileRec{Codec: codec, OffsetMs: old.OffsetMs, UpdatedAt: now}
+			if perr := d.putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
+				return false, perr
+			}
+			changed = true
+		}
 	}
 	return changed, nil
 }
@@ -222,14 +244,7 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, mediaI
 	scanPrefix := filesScanPrefix(mediaType, mediaIDPrefix)
 
 	var out []api.SubtitleEntry
-	// Cache auto subtitle_state lookups per (media_id, language): consecutive
-	// rows of a triple are contiguous in cursor order, but caching keeps the
-	// join O(rows) even across non-adjacent repeats.
-	type autoInfo struct {
-		videoPath string
-		score     int
-	}
-	autoCache := make(map[string]autoInfo)
+	autoCache := make(map[string]autoStateJoin)
 
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSubtitleFiles))
@@ -238,43 +253,12 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, mediaI
 		}
 		c := b.Cursor()
 		for key, v := c.Seek(scanPrefix); key != nil && bytes.HasPrefix(key, scanPrefix); key, v = c.Next() {
-			parts := boltkv.Split(key)
-			if len(parts) < 6 {
-				continue // malformed key
-			}
-			mid, lang := parts[1], parts[2]
-			variant, source, path := parts[3], parts[4], parts[5]
-
-			var fr fileRec
-			skip, derr := decodeRecord(bucketDecodeMode(bucketSubtitleFiles), bucketSubtitleFiles, key, v, &fr)
+			entry, skip, derr := d.subtitleEntryFromRow(tx, mediaType, key, v, autoCache)
 			if derr != nil {
 				return derr
 			}
 			if skip {
 				continue
-			}
-
-			entry := api.SubtitleEntry{
-				MediaID:  mid,
-				Language: lang,
-				Variant:  variant,
-				Source:   source,
-				Codec:    fr.Codec,
-				Path:     path,
-				OffsetMs: fr.OffsetMs,
-			}
-			// The JOIN excludes embedded rows, so they keep the COALESCE
-			// defaults (score 0, empty video_path).
-			if source != string(api.SourceEmbedded) {
-				cacheKey := mid + string(boltkv.Sep) + lang
-				info, ok := autoCache[cacheKey]
-				if !ok {
-					score, vp := autoStateInfo(tx, mediaType, mid, lang)
-					info = autoInfo{score: score, videoPath: vp}
-					autoCache[cacheKey] = info
-				}
-				entry.Score = info.score
-				entry.VideoPath = info.videoPath
 			}
 			out = append(out, entry)
 		}
@@ -284,6 +268,70 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, mediaI
 		return nil, err
 	}
 	return out, nil
+}
+
+// autoStateJoin caches the subtitle_state auto-row join result (score and
+// video_path) for one (media_id, language) so GetSubtitleFiles stays O(rows)
+// even when a triple's rows are non-adjacent in cursor order.
+type autoStateJoin struct {
+	videoPath string
+	score     int
+}
+
+// subtitleEntryFromRow decodes one subtitle_files cursor row (key+value) into an
+// api.SubtitleEntry. MediaID/Language/Variant/Source/Path come from the KEY; only
+// Codec/OffsetMs come from the decoded value. For a non-embedded source it
+// applies the subtitle_state auto-row join (Score, VideoPath) via the per-(media
+// _id, language) cache; embedded rows keep the COALESCE defaults (score 0, empty
+// video_path). It returns skip=true for a malformed key or an undecodable
+// (tolerated, derived-bucket) value.
+func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType api.MediaType, key, v []byte, autoCache map[string]autoStateJoin) (api.SubtitleEntry, bool, error) {
+	parts := boltkv.Split(key)
+	if len(parts) < 6 {
+		return api.SubtitleEntry{}, true, nil // malformed key
+	}
+	mid, lang := parts[1], parts[2]
+	variant, source, path := parts[3], parts[4], parts[5]
+
+	var fr fileRec
+	skip, derr := decodeRecord(bucketDecodeMode(bucketSubtitleFiles), bucketSubtitleFiles, key, v, &fr)
+	if derr != nil {
+		return api.SubtitleEntry{}, false, derr
+	}
+	if skip {
+		return api.SubtitleEntry{}, true, nil
+	}
+
+	entry := api.SubtitleEntry{
+		MediaID:  mid,
+		Language: lang,
+		Variant:  variant,
+		Source:   source,
+		Codec:    fr.Codec,
+		Path:     path,
+		OffsetMs: fr.OffsetMs,
+	}
+	// The JOIN excludes embedded rows, so they keep the COALESCE defaults
+	// (score 0, empty video_path).
+	if source != string(api.SourceEmbedded) {
+		info := d.cachedAutoStateInfo(tx, mediaType, mid, lang, autoCache)
+		entry.Score = info.score
+		entry.VideoPath = info.videoPath
+	}
+	return entry, false, nil
+}
+
+// cachedAutoStateInfo returns the auto-row join (score, video_path) for the
+// (media_id, language) triple, memoizing the autoStateInfo lookup in cache.
+func (d *DB) cachedAutoStateInfo(tx *bolt.Tx, mediaType api.MediaType, mediaID, language string, cache map[string]autoStateJoin) autoStateJoin {
+	cacheKey := mediaID + string(boltkv.Sep) + language
+	info, ok := cache[cacheKey]
+	if !ok {
+		score, vp := autoStateInfo(tx, mediaType, mediaID, language)
+		info = autoStateJoin{score: score, videoPath: vp}
+		cache[cacheKey] = info
+	}
+	return info
 }
 
 // filesScanPrefix builds the bbolt cursor prefix for a GetSubtitleFiles query,
@@ -324,11 +372,19 @@ func autoStateInfo(tx *bolt.Tx, mediaType api.MediaType, mediaID, language strin
 	if idx == nil {
 		return 0, ""
 	}
+	bestID, score, found := bestAutoStateID(idx, mediaType, mediaID, language)
+	if !found {
+		return 0, ""
+	}
+	return score, stateVideoPath(tx, bestID)
+}
+
+// bestAutoStateID scans ix_state_triple for the triple and returns the surrogate
+// id and score of the highest-scored auto (manual=false) row. found is false
+// when the triple has no auto row. Only auto rows feed the GetSubtitleFiles
+// join; the highest-scored row is the representative, matching CurrentScore.
+func bestAutoStateID(idx *bolt.Bucket, mediaType api.MediaType, mediaID, language string) (id int64, score int, found bool) {
 	prefix := triplePrefix(mediaType, mediaID, language)
-	var (
-		found  bool
-		bestID int64
-	)
 	c := idx.Cursor()
 	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 		manual, s, _, ok := decodeStateProjection(v)
@@ -337,24 +393,32 @@ func autoStateInfo(tx *bolt.Tx, mediaType api.MediaType, mediaID, language strin
 		}
 		if !found || s > score {
 			score = s
-			if id, idok := stateTripleKeyID(k); idok {
-				bestID = id
+			if kid, idok := stateTripleKeyID(k); idok {
+				id = kid
 			}
 			found = true
 		}
 	}
-	if !found {
-		return 0, ""
+	return id, score, found
+}
+
+// stateVideoPath reads the video_path of the subtitle_state row with the given
+// surrogate id, returning "" when the row is absent or undecodable (tolerated
+// for this coverage read).
+func stateVideoPath(tx *bolt.Tx, id int64) string {
+	sb := tx.Bucket([]byte(bucketSubtitleState))
+	if sb == nil {
+		return ""
 	}
-	if sb := tx.Bucket([]byte(bucketSubtitleState)); sb != nil {
-		if raw := sb.Get(stateKey(bestID)); raw != nil {
-			var sr stateRec
-			if boltkv.Decode(raw, &sr) == nil {
-				videoPath = sr.VideoPath
-			}
-		}
+	raw := sb.Get(stateKey(id))
+	if raw == nil {
+		return ""
 	}
-	return score, videoPath
+	var sr stateRec
+	if boltkv.Decode(raw, &sr) != nil {
+		return ""
+	}
+	return sr.VideoPath
 }
 
 // TotalSubtitleFiles returns the total subtitle_files row count from the O(1)

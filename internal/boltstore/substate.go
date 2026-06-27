@@ -699,11 +699,7 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 	}
 	offset := max(q.Offset, 0)
 
-	// Preallocate a fixed, modest capacity instead of one derived from the
-	// user-supplied limit: append grows the slice if limit exceeds it, and a
-	// constant cap keeps the allocation independent of untrusted query input.
-	out := make([]api.StateEntry, 0, preallocCap)
-
+	var out []api.StateEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
 		triples, err := buildStateTripleMap(tx)
 		if err != nil {
@@ -717,35 +713,44 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 		if imp == nil {
 			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
-
-		skipped := 0
-		c := imp.Cursor()
-		// Reverse walk: ix_state_imported sorts ascending by (media_imported,
-		// id), so Last->Prev yields media_imported DESC, id DESC.
-		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
-			if len(out) >= limit {
-				break
-			}
-			entry, matched, derr := d.matchStateRow(sb, triples, q, k)
-			if derr != nil {
-				return derr
-			}
-			if !matched {
-				continue
-			}
-			// Matched: apply the numeric offset, then collect up to limit.
-			if skipped < offset {
-				skipped++
-				continue
-			}
-			out = append(out, entry)
-		}
-		return nil
+		out, err = d.collectStatePage(imp, sb, triples, q, limit, offset)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 	slog.Debug("GetState result", "count", len(out))
+	return out, nil
+}
+
+// collectStatePage performs a REVERSE walk of ix_state_imported (which sorts
+// ascending by (media_imported, id), so Last->Prev yields media_imported DESC,
+// id DESC), resolves each entry to an api.StateEntry through matchStateRow
+// (which applies the query's filters), skips the first `offset` matched rows,
+// and collects up to `limit` entries. It preallocates a fixed, modest capacity
+// rather than one derived from the untrusted limit; append grows it as needed.
+func (d *DB) collectStatePage(imp, sb *bolt.Bucket, triples map[int64]stateTripleInfo, q *api.StateQuery, limit, offset int) ([]api.StateEntry, error) {
+	out := make([]api.StateEntry, 0, preallocCap)
+	skipped := 0
+	c := imp.Cursor()
+	for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
+		if len(out) >= limit {
+			break
+		}
+		entry, matched, derr := d.matchStateRow(sb, triples, q, k)
+		if derr != nil {
+			return nil, derr
+		}
+		if !matched {
+			continue
+		}
+		// Matched: apply the numeric offset, then collect up to limit.
+		if skipped < offset {
+			skipped++
+			continue
+		}
+		out = append(out, entry)
+	}
 	return out, nil
 }
 
@@ -764,28 +769,11 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 // refinement of the old ORDER BY. As a lock-bearing read it FAILS CLOSED: an
 // undecodable projection aborts the read rather than silently dropping a lock.
 func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
-	var out []api.ManualLockEntry
+	var acc manualLockAccumulator
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateTriple))
 		if idx == nil {
 			return errors.New("boltstore: ix_state_triple bucket not found")
-		}
-		// cur points at the entry being accumulated. ix_state_triple is sorted
-		// by (mt, mid, lang, id), so all rows of a triple are contiguous and we
-		// can emit the previous triple's tally when the triple changes.
-		var (
-			haveCur bool
-			curMT   api.MediaType
-			curMID  string
-			curLang string
-			curCnt  int
-		)
-		flush := func() {
-			if haveCur && curCnt > 0 {
-				out = append(out, api.ManualLockEntry{
-					MediaType: curMT, MediaID: curMID, Language: curLang, Count: curCnt,
-				})
-			}
 		}
 		c := idx.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -797,21 +785,50 @@ func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 			if !pok {
 				return fmt.Errorf("boltstore: malformed ix_state_triple projection for %s/%s/%s", mt, mid, lang)
 			}
-			if !haveCur || mt != curMT || mid != curMID || lang != curLang {
-				flush()
-				haveCur, curMT, curMID, curLang, curCnt = true, mt, mid, lang, 0
-			}
-			if manual {
-				curCnt++
-			}
+			acc.add(mt, mid, lang, manual)
 		}
-		flush()
+		acc.flush()
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	return acc.out, nil
+}
+
+// manualLockAccumulator groups consecutive ix_state_triple entries (which are
+// sorted by (mt, mid, lang, id), so a triple's rows are contiguous) into one
+// api.ManualLockEntry per triple that has at least one manual row, carrying the
+// manual-row count.
+type manualLockAccumulator struct {
+	curMT   api.MediaType
+	curMID  string
+	curLang string
+	out     []api.ManualLockEntry
+	curCnt  int
+	haveCur bool
+}
+
+// flush emits the triple currently being accumulated, if it had any manual row.
+func (a *manualLockAccumulator) flush() {
+	if a.haveCur && a.curCnt > 0 {
+		a.out = append(a.out, api.ManualLockEntry{
+			MediaType: a.curMT, MediaID: a.curMID, Language: a.curLang, Count: a.curCnt,
+		})
+	}
+}
+
+// add folds one ix_state_triple entry into the accumulator: when the triple
+// changes it flushes the previous tally and starts a fresh one, then counts the
+// entry when it is a manual row.
+func (a *manualLockAccumulator) add(mt api.MediaType, mid, lang string, manual bool) {
+	if !a.haveCur || mt != a.curMT || mid != a.curMID || lang != a.curLang {
+		a.flush()
+		a.haveCur, a.curMT, a.curMID, a.curLang, a.curCnt = true, mt, mid, lang, 0
+	}
+	if manual {
+		a.curCnt++
+	}
 }
 
 // Stats returns the maintained O(1) download and attempt counters from the meta

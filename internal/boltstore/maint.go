@@ -103,41 +103,16 @@ func (d *DB) deletePathsBatch(paths []string) ([]string, error) {
 		affectedMedia := make(map[mediaRef]struct{})
 
 		for _, p := range paths {
-			ids, cerr := collectVideoPathIDs(tx, p)
-			if cerr != nil {
-				return cerr
+			batchPaths, perr := d.deleteStateRowsForPath(tx, triples, sb, p, affectedTriples, affectedMedia)
+			if perr != nil {
+				return perr
 			}
-			for _, id := range ids {
-				tr, ok := triples[id]
-				if !ok {
-					// ix_state_video entry with no ix_state_triple counterpart:
-					// the triple is unrecoverable, so this row cannot be routed
-					// through deleteState. A correctly maintained index never
-					// produces this; skip defensively rather than corrupt counters.
-					continue
-				}
-				// Capture the subtitle file path (non-empty only) before delete,
-				// matching the old `... AND path != ''` projection used for the
-				// returned CleanupResult.Paths.
-				if raw := sb.Get(stateKey(id)); raw != nil {
-					var sr stateRec
-					if boltkv.Decode(raw, &sr) == nil && sr.Path != "" {
-						subPaths = append(subPaths, sr.Path)
-					}
-				}
-				if _, derr := deleteState(tx, tr.mt, tr.mid, tr.lang, id); derr != nil {
-					return derr
-				}
-				affectedTriples[tr] = struct{}{}
-				affectedMedia[mediaRef{mt: tr.mt, mid: tr.mid}] = struct{}{}
-			}
+			subPaths = append(subPaths, batchPaths...)
 		}
 
 		// Success/removal clears the affected triples' adaptive backoff.
-		for tr := range affectedTriples {
-			if berr := clearTripleBackoff(tx, tr.mt, tr.mid, tr.lang); berr != nil {
-				return berr
-			}
+		if err := clearBackoffForTriples(tx, affectedTriples); err != nil {
+			return err
 		}
 
 		// Drop subtitle_files + scan_state for any affected media item left with
@@ -148,6 +123,64 @@ func (d *DB) deletePathsBatch(paths []string) ([]string, error) {
 		return nil, err
 	}
 	return subPaths, nil
+}
+
+// deleteStateRowsForPath deletes every subtitle_state row backed by videoPath
+// (collected from ix_state_video), routing each delete through the deleteState
+// chokepoint, and records the affected triples and media items in the shared
+// sets. It returns the non-empty subtitle file paths of the deleted rows (for
+// the caller's disk cleanup, matching the old `... AND path != ”` projection).
+// An ix_state_video entry with no ix_state_triple counterpart is skipped
+// defensively: its triple is unrecoverable, so the row cannot be routed through
+// deleteState; a correctly maintained index never produces this.
+func (d *DB) deleteStateRowsForPath(tx *bolt.Tx, triples map[int64]stateTripleInfo, sb *bolt.Bucket, videoPath string, affectedTriples map[stateTripleInfo]struct{}, affectedMedia map[mediaRef]struct{}) ([]string, error) {
+	ids, err := collectVideoPathIDs(tx, videoPath)
+	if err != nil {
+		return nil, err
+	}
+	var subPaths []string
+	for _, id := range ids {
+		tr, ok := triples[id]
+		if !ok {
+			continue
+		}
+		// Capture the subtitle file path (non-empty only) before delete.
+		if p := statePath(sb, id); p != "" {
+			subPaths = append(subPaths, p)
+		}
+		if _, derr := deleteState(tx, tr.mt, tr.mid, tr.lang, id); derr != nil {
+			return nil, derr
+		}
+		affectedTriples[tr] = struct{}{}
+		affectedMedia[mediaRef{mt: tr.mt, mid: tr.mid}] = struct{}{}
+	}
+	return subPaths, nil
+}
+
+// statePath returns the non-empty subtitle file path stored for the surrogate
+// id, or "" when the row is absent, undecodable, or has an empty path.
+func statePath(sb *bolt.Bucket, id int64) string {
+	raw := sb.Get(stateKey(id))
+	if raw == nil {
+		return ""
+	}
+	var sr stateRec
+	if boltkv.Decode(raw, &sr) != nil {
+		return ""
+	}
+	return sr.Path
+}
+
+// clearBackoffForTriples clears the adaptive backoff of every triple in the set
+// through the clearTripleBackoff chokepoint, so ix_attempts_due and the attempts
+// counter stay consistent.
+func clearBackoffForTriples(tx *bolt.Tx, triples map[stateTripleInfo]struct{}) error {
+	for tr := range triples {
+		if err := clearTripleBackoff(tx, tr.mt, tr.mid, tr.lang); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // collectVideoPathIDs prefix-scans ix_state_video for one video path and
@@ -271,57 +304,79 @@ func (d *DB) CleanupDrift(_ context.Context, drift api.ConfigDrift) error {
 		}
 
 		// Adaptive disabled clears all backoff and subsumes the per-language /
-		// per-provider cleanup, so it short-circuits like the old store's
-		// early return after the blanket DELETE.
+		// per-provider cleanup, so it short-circuits like the old store's early
+		// return after the blanket DELETE.
 		if drift.AdaptiveDisabled {
-			n, err := deleteAttemptsMatching(tx, b, func(string, api.ProviderID) bool { return true })
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				slog.Info("config drift: adaptive disabled, cleared all attempts", "rows", n)
-			}
-			return nil
+			return clearAllAttempts(tx, b)
 		}
-
-		if len(drift.RemovedLanguages) > 0 {
-			removed := make(map[string]struct{}, len(drift.RemovedLanguages))
-			for _, l := range drift.RemovedLanguages {
-				removed[l] = struct{}{}
-			}
-			n, err := deleteAttemptsMatching(tx, b, func(lang string, _ api.ProviderID) bool {
-				_, ok := removed[lang]
-				return ok
-			})
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				slog.Info("config drift: cleared attempts for removed language",
-					"values", drift.RemovedLanguages, "rows", n)
-			}
+		if err := clearAttemptsForLanguages(tx, b, drift.RemovedLanguages); err != nil {
+			return err
 		}
-
-		if len(drift.RemovedProviders) > 0 {
-			removed := make(map[api.ProviderID]struct{}, len(drift.RemovedProviders))
-			for _, p := range drift.RemovedProviders {
-				removed[p] = struct{}{}
-			}
-			n, err := deleteAttemptsMatching(tx, b, func(_ string, provider api.ProviderID) bool {
-				_, ok := removed[provider]
-				return ok
-			})
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				slog.Info("config drift: cleared attempts for removed provider",
-					"values", drift.RemovedProviders, "rows", n)
-			}
-		}
-
-		return nil
+		return clearAttemptsForProviders(tx, b, drift.RemovedProviders)
 	})
+}
+
+// clearAllAttempts deletes every search_attempts row (the adaptive-disabled
+// branch), logging the count when non-zero.
+func clearAllAttempts(tx *bolt.Tx, b *bolt.Bucket) error {
+	n, err := deleteAttemptsMatching(tx, b, func(string, api.ProviderID) bool { return true })
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		slog.Info("config drift: adaptive disabled, cleared all attempts", "rows", n)
+	}
+	return nil
+}
+
+// clearAttemptsForLanguages deletes the search_attempts rows whose language key
+// component is in the removed set, logging the count when non-zero. An empty set
+// is a no-op.
+func clearAttemptsForLanguages(tx *bolt.Tx, b *bolt.Bucket, languages []string) error {
+	if len(languages) == 0 {
+		return nil
+	}
+	removed := make(map[string]struct{}, len(languages))
+	for _, l := range languages {
+		removed[l] = struct{}{}
+	}
+	n, err := deleteAttemptsMatching(tx, b, func(lang string, _ api.ProviderID) bool {
+		_, ok := removed[lang]
+		return ok
+	})
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		slog.Info("config drift: cleared attempts for removed language",
+			"values", languages, "rows", n)
+	}
+	return nil
+}
+
+// clearAttemptsForProviders deletes the search_attempts rows whose provider key
+// component is in the removed set, logging the count when non-zero. An empty set
+// is a no-op.
+func clearAttemptsForProviders(tx *bolt.Tx, b *bolt.Bucket, providers []api.ProviderID) error {
+	if len(providers) == 0 {
+		return nil
+	}
+	removed := make(map[api.ProviderID]struct{}, len(providers))
+	for _, p := range providers {
+		removed[p] = struct{}{}
+	}
+	n, err := deleteAttemptsMatching(tx, b, func(_ string, provider api.ProviderID) bool {
+		_, ok := removed[provider]
+		return ok
+	})
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		slog.Info("config drift: cleared attempts for removed provider",
+			"values", providers, "rows", n)
+	}
+	return nil
 }
 
 // deleteAttemptsMatching deletes every search_attempts row whose (language,
@@ -486,31 +541,13 @@ func (d *DB) loadReconcileEntries() ([]reconcileEntry, error) {
 			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 		return idx.ForEach(func(k, _ []byte) error {
-			mt, mid, lang, id, ok := splitStateTripleKey(k)
-			if !ok {
-				return nil // malformed index key; a correct index never produces one
-			}
-			raw := sb.Get(stateKey(id))
-			if raw == nil {
-				return nil // index/primary drift: no primary for this access path
-			}
-			var sr stateRec
-			// subtitle_state is a derived bucket: tolerate-skip a bad record
-			// (the next scan rebuilds it) rather than abort the whole pass.
-			skip, derr := decodeRecord(bucketDecodeMode(bucketSubtitleState), bucketSubtitleState, stateKey(id), raw, &sr)
+			entry, ok, derr := reconcileEntryFromIndex(sb, k)
 			if derr != nil {
 				return derr
 			}
-			if skip || sr.VideoPath == "" {
-				return nil // matches the old `WHERE video_path != ''` filter
+			if ok {
+				entries = append(entries, entry)
 			}
-			entries = append(entries, reconcileEntry{
-				id:        id,
-				tr:        stateTripleInfo{mt: mt, mid: mid, lang: lang},
-				subPath:   sr.Path,
-				videoPath: sr.VideoPath,
-				manual:    sr.Manual,
-			})
 			return nil
 		})
 	})
@@ -518,6 +555,39 @@ func (d *DB) loadReconcileEntries() ([]reconcileEntry, error) {
 		return nil, err
 	}
 	return entries, nil
+}
+
+// reconcileEntryFromIndex resolves one ix_state_triple entry into a
+// reconcileEntry by reading and decoding its primary subtitle_state row. ok is
+// false (skip the entry) for a malformed index key, index/primary drift, a
+// tolerated bad derived record, or an empty video_path (matching the old
+// `WHERE video_path != ”` filter). A fail-closed decode error is returned.
+func reconcileEntryFromIndex(sb *bolt.Bucket, k []byte) (reconcileEntry, bool, error) {
+	mt, mid, lang, id, ok := splitStateTripleKey(k)
+	if !ok {
+		return reconcileEntry{}, false, nil // malformed index key; a correct index never produces one
+	}
+	raw := sb.Get(stateKey(id))
+	if raw == nil {
+		return reconcileEntry{}, false, nil // index/primary drift: no primary for this access path
+	}
+	var sr stateRec
+	// subtitle_state is a derived bucket: tolerate-skip a bad record (the next
+	// scan rebuilds it) rather than abort the whole pass.
+	skip, derr := decodeRecord(bucketDecodeMode(bucketSubtitleState), bucketSubtitleState, stateKey(id), raw, &sr)
+	if derr != nil {
+		return reconcileEntry{}, false, derr
+	}
+	if skip || sr.VideoPath == "" {
+		return reconcileEntry{}, false, nil // matches the old `WHERE video_path != ''` filter
+	}
+	return reconcileEntry{
+		id:        id,
+		tr:        stateTripleInfo{mt: mt, mid: mid, lang: lang},
+		subPath:   sr.Path,
+		videoPath: sr.VideoPath,
+		manual:    sr.Manual,
+	}, true, nil
 }
 
 // classifyReconcileEntries classifies each snapshotted row against the
@@ -660,23 +730,13 @@ func (d *DB) reconcileResetBatch(
 			return errors.New("boltstore: subtitle_state bucket not found")
 		}
 		for _, tr := range keys {
-			missing := subMissing[tr]
-			if subPresent[tr] {
-				// A sibling subtitle is still present: delete only the missing
-				// rows, preserving the rest (and any manual lock).
-				for _, e := range missing {
-					if _, derr := deleteState(tx, tr.mt, tr.mid, tr.lang, e.id); derr != nil {
-						return derr
-					}
-				}
-				continue
+			reset, rerr := reconcileTriple(tx, sb, tr, subMissing[tr], subPresent[tr])
+			if rerr != nil {
+				return rerr
 			}
-			// All subtitles for the triple are gone: reset auto rows, delete
-			// manual rows, clear backoff.
-			if err := reconcileResetTriple(tx, sb, tr, missing); err != nil {
-				return err
+			if reset {
+				resetCount++
 			}
-			resetCount++
 		}
 		return nil
 	})
@@ -684,6 +744,35 @@ func (d *DB) reconcileResetBatch(
 		return 0, err
 	}
 	return resetCount, nil
+}
+
+// reconcileTriple applies the missing-subtitle branches for one triple inside an
+// open Update. When a sibling subtitle is still present it deletes ONLY the
+// missing-subtitle rows (preserving the remaining rows and any manual lock,
+// clearing no backoff) and reports reset=false (Requirement 7.2). Otherwise all
+// subtitles for the triple are gone, so it resets the whole triple (delete
+// manual rows, reset auto rows in place, clear backoff) via reconcileResetTriple
+// and reports reset=true (Requirement 7.3).
+func reconcileTriple(tx *bolt.Tx, sb *bolt.Bucket, tr stateTripleInfo, missing []reconcileEntry, siblingPresent bool) (bool, error) {
+	if siblingPresent {
+		return false, deleteMissingRows(tx, tr, missing)
+	}
+	if err := reconcileResetTriple(tx, sb, tr, missing); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// deleteMissingRows deletes only the missing-subtitle rows of a triple (the
+// sibling-still-present branch) via the deleteState chokepoint, preserving the
+// remaining rows and any manual lock.
+func deleteMissingRows(tx *bolt.Tx, tr stateTripleInfo, missing []reconcileEntry) error {
+	for _, e := range missing {
+		if _, derr := deleteState(tx, tr.mt, tr.mid, tr.lang, e.id); derr != nil {
+			return derr
+		}
+	}
+	return nil
 }
 
 // reconcileResetTriple applies the all-subtitles-gone branch for a single
