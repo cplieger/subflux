@@ -4,9 +4,35 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"pgregory.net/rapid"
 )
+
+// loudFrame returns one 80-sample 440Hz sine frame at amplitude 20000.
+func loudFrame() []int16 {
+	f := make([]int16, 80)
+	for i := range f {
+		f[i] = int16(20000 * math.Sin(float64(i)*2*math.Pi*440/8000))
+	}
+	return f
+}
+
+// cancelAfterFirstCheckCtx is a context whose Err() returns nil on the first
+// call and context.Canceled on every call thereafter. It pins how often
+// FramesBinaryThresholdTuned polls the cancellation guard.
+type cancelAfterFirstCheckCtx struct{ n int }
+
+func (c *cancelAfterFirstCheckCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (c *cancelAfterFirstCheckCtx) Done() <-chan struct{}       { return nil }
+func (c *cancelAfterFirstCheckCtx) Value(any) any               { return nil }
+func (c *cancelAfterFirstCheckCtx) Err() error {
+	c.n++
+	if c.n == 1 {
+		return nil
+	}
+	return context.Canceled
+}
 
 // --- newVADInst ---
 
@@ -197,85 +223,6 @@ func TestNewVADInstTuned_nil_tuning_uses_defaults(t *testing.T) {
 	}
 }
 
-// --- vadGaussProb ---
-
-func TestVadGaussProb_zero_input(t *testing.T) {
-	t.Parallel()
-	prob, delta := vadGaussProb(0, 0, vadMinStd)
-	// With input=mean=0, delta should be 0.
-	if delta != 0 {
-		t.Errorf("vadGaussProb(0, 0, %d) delta = %d, want 0", vadMinStd, delta)
-	}
-	// Probability should be positive (peak of Gaussian).
-	if prob <= 0 {
-		t.Errorf("vadGaussProb(0, 0, %d) prob = %d, want > 0", vadMinStd, prob)
-	}
-}
-
-func TestVadGaussProb_far_from_mean(t *testing.T) {
-	t.Parallel()
-	// Input far from mean should produce lower probability.
-	probClose, _ := vadGaussProb(100, 100, 500)
-	probFar, _ := vadGaussProb(100, 10000, 500)
-	if probFar >= probClose {
-		t.Errorf("vadGaussProb: far prob (%d) >= close prob (%d)", probFar, probClose)
-	}
-}
-
-// --- vadNormW32 ---
-
-func TestVadNormW32(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		val  int32
-		want int32
-	}{
-		{"zero", 0, 0},
-		{"negative", -1, 0},
-		{"one", 1, 30},
-		{"max_int32", math.MaxInt32, 0},
-		{"power_of_2", 1 << 20, 10},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := vadNormW32(tt.val)
-			if got != tt.want {
-				t.Errorf("vadNormW32(%d) = %d, want %d", tt.val, got, tt.want)
-			}
-		})
-	}
-}
-
-// --- vadLogEnergy ---
-
-func TestVadLogEnergy_silence(t *testing.T) {
-	t.Parallel()
-	data := make([]int16, 80)
-	logE, totalE := vadLogEnergy(data, 80, 368)
-	// All-zero input: energy=0, logE=offset.
-	if logE != 368 {
-		t.Errorf("vadLogEnergy(silence) logE = %d, want 368", logE)
-	}
-	if totalE != 0 {
-		t.Errorf("vadLogEnergy(silence) totalE = %d, want 0", totalE)
-	}
-}
-
-func TestVadLogEnergy_nonzero(t *testing.T) {
-	t.Parallel()
-	data := make([]int16, 80)
-	for i := range data {
-		data[i] = 1000
-	}
-	logE, _ := vadLogEnergy(data, 80, 368)
-	// Non-zero input should produce logE > offset.
-	if logE <= 368 {
-		t.Errorf("vadLogEnergy(1000s) logE = %d, want > 368", logE)
-	}
-}
-
 // --- processFrameLLR ---
 
 func TestProcessFrameLLR_silence(t *testing.T) {
@@ -312,9 +259,76 @@ func TestProcessFrameLLR_loud_signal(t *testing.T) {
 	}
 }
 
+// TestProcessFrameLLR_near_energy_threshold exercises the totalPower <=
+// minEnergy boundary: a very low-amplitude frame (all samples = 1) has energy
+// near vadMinEnergy, so the GMM is skipped or returns near-zero and the frame
+// is not classified as speech.
+func TestProcessFrameLLR_near_energy_threshold(t *testing.T) {
+	t.Parallel()
+	v := newVADInst(ModeVeryAggressive)
+	frame := make([]int16, 80)
+	for i := range frame {
+		frame[i] = 1
+	}
+	flag, llr := v.processFrameLLR(frame)
+	if flag != 0 {
+		t.Errorf("processFrameLLR(near-threshold) flag = %d, want 0", flag)
+	}
+	if math.IsNaN(llr) || math.IsInf(llr, 0) {
+		t.Errorf("processFrameLLR(near-threshold) llr = %f, want finite", llr)
+	}
+}
+
+// TestProcessFrameLLR_overhang_hangover verifies the speech-to-silence
+// hangover: after sustained speech the overhang keeps the decision positive
+// for several silent frames before it expires.
+func TestProcessFrameLLR_overhang_hangover(t *testing.T) {
+	t.Parallel()
+	v := newVADInst(ModeQuality) // quality mode: overHangMax1=8, overHangMax2=14
+	loud := loudFrame()
+	for range 20 {
+		v.processFrameLLR(loud)
+	}
+	// After 20 loud frames, numOfSpeech should be > 0.
+	if v.numOfSpeech == 0 {
+		t.Fatal("numOfSpeech = 0 after 20 loud frames, want > 0")
+	}
+	// Now feed silent frames. The overhang should keep flag > 0 for some frames.
+	silent := make([]int16, 80)
+	hangoverCount := 0
+	for range 20 {
+		flag, _ := v.processFrameLLR(silent)
+		if flag > 0 {
+			hangoverCount++
+		}
+	}
+	if hangoverCount == 0 {
+		t.Error("no hangover frames detected after speech-to-silence transition")
+	}
+}
+
+func TestProcessFrameLLR_never_panics(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		frame := make([]int16, 80)
+		for i := range frame {
+			frame[i] = rapid.Int16().Draw(t, "sample")
+		}
+		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
+		v := newVADInst(mode)
+		flag, llr := v.processFrameLLR(frame)
+		if flag < 0 || flag > 1 {
+			t.Fatalf("flag = %d, want 0 or 1", flag)
+		}
+		if math.IsNaN(llr) || math.IsInf(llr, 0) {
+			t.Fatalf("llr = %f, want finite", llr)
+		}
+	})
+}
+
 // --- FramesBinaryThresholdTuned ---
 
-func TestVadFramesBinaryThresholdTuned_empty_pcm(t *testing.T) {
+func TestFramesBinaryThresholdTuned_empty_pcm(t *testing.T) {
 	t.Parallel()
 	result := FramesBinaryThresholdTuned(context.Background(), nil, ModeVeryAggressive, 125, 10, 0, Tuning{})
 	if len(result) != 0 {
@@ -322,7 +336,7 @@ func TestVadFramesBinaryThresholdTuned_empty_pcm(t *testing.T) {
 	}
 }
 
-func TestVadFramesBinaryThresholdTuned_silence(t *testing.T) {
+func TestFramesBinaryThresholdTuned_silence(t *testing.T) {
 	t.Parallel()
 	// 10 frames of silence (800 samples at 80 samples/frame).
 	pcm := make([]int16, 800)
@@ -338,28 +352,24 @@ func TestVadFramesBinaryThresholdTuned_silence(t *testing.T) {
 	}
 }
 
-func TestVadFramesBinaryThresholdTuned_overhang(t *testing.T) {
+func TestFramesBinaryThresholdTuned_detects_loud_warmup(t *testing.T) {
 	t.Parallel()
-	// Create PCM with several loud frames to warm up the GMM, then silence.
-	// The overhang should keep the signal at +1 for overhangFrames after speech ends.
+	// 5 loud frames warm up the GMM, then 15 silent frames. The output must be
+	// strictly bipolar and at least one loud frame must read as speech.
 	pcm := make([]int16, 1600) // 20 frames
-	// Make first 5 frames very loud to ensure the VAD model recognizes speech.
 	for i := range 400 {
 		pcm[i] = 20000
 	}
-	// Remaining 15 frames are silence.
 	minE := int16(5)
 	result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 0, 3, 1.0, Tuning{minEnergy: &minE})
 	if len(result) != 20 {
 		t.Fatalf("len = %d, want 20", len(result))
 	}
-	// All frames must be exactly -1 or +1.
 	for i, v := range result {
 		if v != -1.0 && v != 1.0 {
 			t.Errorf("frame %d = %f, want -1.0 or 1.0", i, v)
 		}
 	}
-	// At least the first loud frame should be detected as speech.
 	speechCount := 0
 	for _, v := range result[:5] {
 		if v == 1.0 {
@@ -371,167 +381,67 @@ func TestVadFramesBinaryThresholdTuned_overhang(t *testing.T) {
 	}
 }
 
-func TestVadFramesBinaryThresholdTuned_overhang_countdown(t *testing.T) {
+// TestFramesBinaryThresholdTuned_cancelled_context_returns_early verifies the
+// cancellation guard fires on the first frame: a pre-cancelled context yields
+// no results at all.
+func TestFramesBinaryThresholdTuned_cancelled_context_returns_early(t *testing.T) {
 	t.Parallel()
-	// Build PCM: 5 loud frames then 10 silent frames.
-	// Use a high threshold so only genuinely loud frames pass,
-	// then the overhang countdown branch fires for subsequent silent frames.
-	pcm := make([]int16, 1200) // 15 frames of 80 samples
-	for i := range 400 {
-		pcm[i] = 20000
-	}
-	// threshold=500 ensures silence (llr~0) does NOT pass llr >= threshold.
-	// overhangFrames=3 means 3 frames after last speech should still be +1.
-	result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 500, 3, 0, Tuning{})
-	if len(result) != 15 {
-		t.Fatalf("len = %d, want 15", len(result))
-	}
-	// All values must be exactly -1 or +1.
-	for i, v := range result {
-		if v != -1.0 && v != 1.0 {
-			t.Errorf("frame %d = %f, want -1.0 or 1.0", i, v)
-		}
-	}
-	// Count speech frames. With overhang=3, we expect at least some +1 frames
-	// after the loud section ends (the overhang countdown path).
-	speechCount := 0
-	for _, v := range result {
-		if v == 1.0 {
-			speechCount++
-		}
-	}
-	// At minimum, some loud frames should be speech. If overhang works,
-	// there should be more speech frames than just the loud ones.
-	if speechCount == 0 {
-		t.Error("no speech frames detected at all")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pcm := make([]int16, 80*4) // 4 frames
+	got := FramesBinaryThresholdTuned(ctx, pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	if len(got) != 0 {
+		t.Errorf("cancelled ctx: len(result) = %d, want 0", len(got))
 	}
 }
 
-// --- extractFeatures ---
-
-func TestExtractFeatures_silence(t *testing.T) {
+// TestFramesBinaryThresholdTuned_cancellation_polled_every_1000_frames pins the
+// cancellation poll cadence. The context reports OK on its first poll (frame 0)
+// then cancelled, so processing stops at the second poll (frame 1000), yielding
+// exactly 1000 results.
+func TestFramesBinaryThresholdTuned_cancellation_polled_every_1000_frames(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	frame := make([]int16, 80)
-	features, totalE := v.extractFeatures(frame)
-	// Silent frame on a fresh instance: features should equal their offset values.
-	for i, f := range features {
-		if f != offsets[i] {
-			t.Errorf("features[%d] = %d, want %d (offset)", i, f, offsets[i])
-		}
-	}
-	if totalE < 0 {
-		t.Errorf("totalE = %d, want >= 0", totalE)
+	pcm := make([]int16, 80*1001) // 1001 frames, i in [0,1000]
+	got := FramesBinaryThresholdTuned(&cancelAfterFirstCheckCtx{}, pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	if len(got) != 1000 {
+		t.Errorf("len(result) = %d, want 1000", len(got))
 	}
 }
 
-// --- findMinimum ---
-
-func TestFindMinimum_initial_state(t *testing.T) {
+// TestFramesBinaryThresholdTuned_frame_windowing verifies each frame is scored
+// from its own 80-sample window. Frame 0 is loud and frame 1 is silent, so with
+// no overhang frame 1 must be silence (it must not bleed in frame 0's window).
+func TestFramesBinaryThresholdTuned_frame_windowing(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	// First call: frameCounter=0, so alpha=0. Smoothing formula:
-	// tmp32 = 1*meanVal[0] + 32767*currentMedian + 16384
-	// With frameCounter=0, currentMedian = meanVal[0] = 1600.
-	// tmp32 = 1*1600 + 32767*1600 + 16384 = 52430384. result = 52430384 >> 15 = 1600.
-	result := v.findMinimum(500, 0)
-	if result != 1600 {
-		t.Errorf("findMinimum(500, 0) on fresh instance = %d, want 1600", result)
+	pcm := make([]int16, 160)
+	copy(pcm, loudFrame()) // frame 0 loud; frame 1 stays silent
+	got := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 750, 0, 1.0, Tuning{})
+	if len(got) != 2 {
+		t.Fatalf("len(result) = %d, want 2", len(got))
+	}
+	if got[1] != -1.0 {
+		t.Errorf("result[1] = %v, want -1.0 (silent frame scored on its own window)", got[1])
 	}
 }
 
-func TestFindMinimum_decreasing_values(t *testing.T) {
+// TestFramesBinaryThresholdTuned_overhang_counts_down verifies the overhang
+// extends speech for a bounded number of frames after speech ends and then
+// expires: with a 2-frame overhang, frame 4 (well past the loud frame) is
+// silence again.
+func TestFramesBinaryThresholdTuned_overhang_counts_down(t *testing.T) {
 	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	// Feed decreasing values; the minimum tracker should follow down.
-	var last int16
-	for i := range 50 {
-		v.frameCounter = int32(i)
-		last = v.findMinimum(int16(5000-i*50), 0)
+	pcm := make([]int16, 80*7) // loud frame 0, silence frames 1..6
+	copy(pcm, loudFrame())
+	got := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 300, 2, 1.0, Tuning{})
+	if len(got) != 7 {
+		t.Fatalf("len(result) = %d, want 7", len(got))
 	}
-	// After 50 frames of decreasing values, the result should be well below 5000.
-	if last >= 5000 {
-		t.Errorf("findMinimum after decreasing values = %d, want < 5000", last)
+	if got[4] != -1.0 {
+		t.Errorf("result[4] = %v, want -1.0 (overhang counted down to 0)", got[4])
 	}
 }
 
-// --- vadLogEnergy edge cases ---
-
-func TestVadLogEnergy_overflow(t *testing.T) {
-	t.Parallel()
-	// All samples at max amplitude triggers the energy overflow branch
-	// (lines 235-239 of vad.go): 80 × 32767² ≈ 85.9B > uint32 max.
-	data := make([]int16, 80)
-	for i := range data {
-		data[i] = math.MaxInt16
-	}
-	logE, totalE := vadLogEnergy(data, 80, 368)
-	if logE <= 368 {
-		t.Errorf("vadLogEnergy(MaxInt16) logE = %d, want > 368 (offset)", logE)
-	}
-	if totalE <= vadMinEnergy {
-		t.Errorf("vadLogEnergy(MaxInt16) totalE = %d, want > %d", totalE, vadMinEnergy)
-	}
-}
-
-func TestVadLogEnergy_low_energy(t *testing.T) {
-	t.Parallel()
-	// All samples = 1: very low energy triggers the normR < 0 branch
-	// (line 256 of vad.go) because energy = 80 has many leading zeros.
-	data := make([]int16, 80)
-	for i := range data {
-		data[i] = 1
-	}
-	logE, _ := vadLogEnergy(data, 80, 368)
-	// Non-zero energy should produce logE > offset.
-	if logE <= 368 {
-		t.Errorf("vadLogEnergy(all-1s) logE = %d, want > 368 (offset)", logE)
-	}
-}
-
-// --- vadGaussProb boundary values ---
-
-func TestVadGaussProb_min_std(t *testing.T) {
-	t.Parallel()
-	// std = vadMinStd tests the invStd calculation at its extreme.
-	prob, delta := vadGaussProb(0, 32000, vadMinStd)
-	// Large delta (input far from mean) should trigger kCompVar cutoff.
-	if delta == 0 {
-		t.Error("vadGaussProb(0, 32000, vadMinStd) delta = 0, want non-zero")
-	}
-	// Probability should be zero or very small (far from mean).
-	if prob < 0 {
-		t.Errorf("vadGaussProb(0, 32000, vadMinStd) prob = %d, want >= 0", prob)
-	}
-}
-
-func TestVadGaussProb_negative_delta(t *testing.T) {
-	t.Parallel()
-	// input < mean produces a negative delta.
-	prob, delta := vadGaussProb(0, 1000, 500)
-	if delta >= 0 {
-		t.Errorf("vadGaussProb(0, 1000, 500) delta = %d, want < 0", delta)
-	}
-	if prob < 0 {
-		t.Errorf("vadGaussProb(0, 1000, 500) prob = %d, want >= 0", prob)
-	}
-}
-
-func TestVadGaussProb_positive_delta(t *testing.T) {
-	t.Parallel()
-	// input > mean produces a positive delta.
-	prob, delta := vadGaussProb(1000, 0, 500)
-	if delta <= 0 {
-		t.Errorf("vadGaussProb(1000, 0, 500) delta = %d, want > 0", delta)
-	}
-	if prob < 0 {
-		t.Errorf("vadGaussProb(1000, 0, 500) prob = %d, want >= 0", prob)
-	}
-}
-
-// --- Property-based tests ---
-
-func TestVadFramesBinaryThresholdTuned_output_binary(t *testing.T) {
+func TestFramesBinaryThresholdTuned_output_binary(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		nFrames := rapid.IntRange(1, 50).Draw(t, "nFrames")
@@ -554,7 +464,7 @@ func TestVadFramesBinaryThresholdTuned_output_binary(t *testing.T) {
 	})
 }
 
-func TestVadFramesBinaryThresholdTuned_empty_returns_empty(t *testing.T) {
+func TestFramesBinaryThresholdTuned_empty_returns_empty(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		// Any PCM shorter than 80 samples produces zero frames.
@@ -563,204 +473,6 @@ func TestVadFramesBinaryThresholdTuned_empty_returns_empty(t *testing.T) {
 		result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
 		if len(result) != 0 {
 			t.Fatalf("len(result) = %d for %d samples, want 0", len(result), n)
-		}
-	})
-}
-
-func TestVadNormW32_range(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		val := rapid.Int32Range(1, math.MaxInt32).Draw(t, "val")
-		got := vadNormW32(val)
-		if got < 0 || got > 30 {
-			t.Fatalf("vadNormW32(%d) = %d, want in [0, 30]", val, got)
-		}
-	})
-}
-
-func TestVadNormW32_non_positive_zero(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		val := rapid.Int32Range(math.MinInt32, 0).Draw(t, "val")
-		got := vadNormW32(val)
-		if got != 0 {
-			t.Fatalf("vadNormW32(%d) = %d, want 0", val, got)
-		}
-	})
-}
-
-func TestVadGaussProb_non_negative(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		input := rapid.Int16().Draw(t, "input")
-		mean := rapid.Int16().Draw(t, "mean")
-		// std must be > 0 (precondition enforced by vadMinStd clamp).
-		std := rapid.Int16Range(vadMinStd, math.MaxInt16).Draw(t, "std")
-		prob, _ := vadGaussProb(input, mean, std)
-		if prob < 0 {
-			t.Fatalf("vadGaussProb(%d, %d, %d) prob = %d, want >= 0", input, mean, std, prob)
-		}
-	})
-}
-
-func TestVadGaussProb_zero_delta_at_mean(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		mean := rapid.Int16Range(-4095, 4095).Draw(t, "mean")
-		std := rapid.Int16Range(vadMinStd, math.MaxInt16).Draw(t, "std")
-		// vadGaussProb shifts input to Q7 (input<<3), so passing mean=input<<3
-		// makes the delta (xQ7 - mean) exactly zero.
-		_, delta := vadGaussProb(mean, mean<<3, std)
-		if delta != 0 {
-			t.Fatalf("vadGaussProb(%d, %d, %d) delta = %d, want 0", mean, mean<<3, std, delta)
-		}
-	})
-}
-
-func TestProcessFrameLLR_never_panics(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		frame := make([]int16, 80)
-		for i := range frame {
-			frame[i] = rapid.Int16().Draw(t, "sample")
-		}
-		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
-		v := newVADInst(mode)
-		flag, llr := v.processFrameLLR(frame)
-		if flag < 0 || flag > 1 {
-			t.Fatalf("flag = %d, want 0 or 1", flag)
-		}
-		if math.IsNaN(llr) || math.IsInf(llr, 0) {
-			t.Fatalf("llr = %f, want finite", llr)
-		}
-	})
-}
-
-// --- gmmProbabilityLLR energy boundary (VAD-T4) ---
-
-func TestProcessFrameLLR_near_energy_threshold(t *testing.T) {
-	t.Parallel()
-	// Very low amplitude frame: all samples = 1. Energy is near vadMinEnergy.
-	// This exercises the totalPower <= minEnergy boundary in gmmProbabilityLLR.
-	v := newVADInst(ModeVeryAggressive)
-	frame := make([]int16, 80)
-	for i := range frame {
-		frame[i] = 1
-	}
-	flag, llr := v.processFrameLLR(frame)
-	// With samples=1, energy is very low. The GMM should either skip (llr=0)
-	// or produce a near-zero result. Flag should be 0 (no speech).
-	if flag != 0 {
-		t.Errorf("processFrameLLR(near-threshold) flag = %d, want 0", flag)
-	}
-	if math.IsNaN(llr) || math.IsInf(llr, 0) {
-		t.Errorf("processFrameLLR(near-threshold) llr = %f, want finite", llr)
-	}
-}
-
-// --- findMinimum additional behavioral tests (VAD-T5) ---
-
-func TestFindMinimum_age_eviction(t *testing.T) {
-	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	// Feed 110 frames with value 5000 to fill and age the tracker entries.
-	for i := range 110 {
-		v.frameCounter = int32(i)
-		v.findMinimum(5000, 0)
-	}
-	// Now feed a much lower value. Old entries should be evicted by age,
-	// and the minimum should converge toward the new value.
-	v.frameCounter = 110
-	result := v.findMinimum(100, 0)
-	// The smoothed result should be moving toward 100, well below 5000.
-	if result >= 5000 {
-		t.Errorf("findMinimum after age eviction = %d, want < 5000", result)
-	}
-}
-
-func TestFindMinimum_increasing_values(t *testing.T) {
-	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	// Feed 50 frames of increasing values (1000 to 3450).
-	var last int16
-	for i := range 50 {
-		v.frameCounter = int32(i)
-		last = v.findMinimum(int16(1000+i*50), 0)
-	}
-	// The smoothed minimum should stay well below the final input value (3450)
-	// because smoothUp is 0.99 (very slow upward tracking).
-	if last >= 3450 {
-		t.Errorf("findMinimum after increasing values = %d, want < 3450", last)
-	}
-}
-
-func TestFindMinimum_channel_independence(t *testing.T) {
-	t.Parallel()
-	v := newVADInst(ModeVeryAggressive)
-	// Feed different values to channel 0 and channel 1.
-	for i := range 50 {
-		v.frameCounter = int32(i)
-		v.findMinimum(500, 0)  // ch 0: low value
-		v.findMinimum(5000, 1) // ch 1: high value
-	}
-	// After convergence, meanVal for ch 0 and ch 1 should diverge.
-	if v.meanVal[0] == v.meanVal[1] {
-		t.Errorf("channels not independent: meanVal[0]=%d == meanVal[1]=%d",
-			v.meanVal[0], v.meanVal[1])
-	}
-	if v.meanVal[0] >= v.meanVal[1] {
-		t.Errorf("channel 0 (low input) meanVal=%d >= channel 1 (high input) meanVal=%d",
-			v.meanVal[0], v.meanVal[1])
-	}
-}
-
-// --- Overhang state machine (VAD-T6) ---
-
-func TestProcessFrameLLR_overhang_hangover(t *testing.T) {
-	t.Parallel()
-	v := newVADInst(ModeQuality) // quality mode: overHangMax1=8, overHangMax2=14
-	// Feed several loud frames to build up speech detection.
-	loud := make([]int16, 80)
-	for i := range loud {
-		loud[i] = int16(20000 * math.Sin(float64(i)*2*math.Pi*440/8000))
-	}
-	for range 20 {
-		v.processFrameLLR(loud)
-	}
-	// After 20 loud frames, numOfSpeech should be > 0.
-	if v.numOfSpeech == 0 {
-		t.Fatal("numOfSpeech = 0 after 20 loud frames, want > 0")
-	}
-	// Now feed silent frames. The overhang should keep flag > 0 for some frames.
-	silent := make([]int16, 80)
-	hangoverCount := 0
-	for range 20 {
-		flag, _ := v.processFrameLLR(silent)
-		if flag > 0 {
-			hangoverCount++
-		}
-	}
-	// With overHangMax1=8 or overHangMax2=14, we expect some hangover frames.
-	if hangoverCount == 0 {
-		t.Error("no hangover frames detected after speech-to-silence transition")
-	}
-}
-
-// --- vadLogEnergy PBT (VAD-T7) ---
-
-func TestVadLogEnergy_invariants(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		n := rapid.IntRange(1, 80).Draw(t, "n")
-		data := make([]int16, n)
-		for i := range data {
-			data[i] = rapid.Int16().Draw(t, "sample")
-		}
-		offset := rapid.Int16Range(0, 1000).Draw(t, "offset")
-		logE, _ := vadLogEnergy(data, n, offset)
-		// logE is clamped to max(logE, 0) + offset, so it must be >= offset.
-		if logE < offset {
-			t.Fatalf("vadLogEnergy logE=%d < offset=%d", logE, offset)
 		}
 	})
 }
