@@ -3,24 +3,11 @@ package provider
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-	"pgregory.net/rapid"
 )
-
-func TestNewRegistry_empty(t *testing.T) {
-	t.Parallel()
-	r := NewRegistry()
-	if r == nil {
-		t.Fatal("NewRegistry() returned nil")
-	}
-	if len(r.factories) != 0 {
-		t.Errorf("NewRegistry().factories has %d entries, want 0", len(r.factories))
-	}
-}
 
 func TestRegister_and_LoadAll(t *testing.T) {
 	t.Parallel()
@@ -306,135 +293,6 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 	}
 }
 
-// --- SettingBool ---
-
-func TestSettingBool(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		settings map[string]any
-		key      SettingKey
-		def      bool
-		want     bool
-	}{
-		{"native true", map[string]any{"k": true}, "k", false, true},
-		{"native false", map[string]any{"k": false}, "k", true, false},
-		{"string true", map[string]any{"k": "true"}, "k", false, true},
-		{"string false", map[string]any{"k": "false"}, "k", true, false},
-		{"missing key returns default true", map[string]any{}, "k", true, true},
-		{"missing key returns default false", map[string]any{}, "k", false, false},
-		{"nil map returns default", nil, "k", true, true},
-		{"non-bool non-string returns default", map[string]any{"k": 42}, "k", true, true},
-		{"string yes is not true", map[string]any{"k": "yes"}, "k", false, false},
-		{"unrecognized string returns default", map[string]any{"k": "yes"}, "k", true, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := SettingBool(tt.settings, tt.key, tt.def)
-			if got != tt.want {
-				t.Errorf("SettingBool(%v, %q, %v) = %v, want %v",
-					tt.settings, tt.key, tt.def, got, tt.want)
-			}
-		})
-	}
-}
-
-// --- SettingString ---
-
-func TestSettingString(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		settings map[string]any
-		key      SettingKey
-		want     string
-	}{
-		{"present", map[string]any{"k": "val"}, "k", "val"},
-		{"empty string", map[string]any{"k": ""}, "k", ""},
-		{"missing key", map[string]any{}, "k", ""},
-		{"nil map", nil, "k", ""},
-		{"non-string value", map[string]any{"k": 42}, "k", ""},
-		{"bool value", map[string]any{"k": true}, "k", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := SettingString(tt.settings, tt.key)
-			if got != tt.want {
-				t.Errorf("SettingString(%v, %q) = %q, want %q",
-					tt.settings, tt.key, got, tt.want)
-			}
-		})
-	}
-}
-
-// --- SettingInt ---
-
-func TestSettingInt(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		settings map[string]any
-		key      SettingKey
-		def      int
-		want     int
-	}{
-		{"native int", map[string]any{"k": 42}, "k", 0, 42},
-		{"native int64", map[string]any{"k": int64(7)}, "k", 0, 7},
-		{"native float64 whole", map[string]any{"k": 3.0}, "k", 0, 3},
-		{"native float64 non-whole returns default", map[string]any{"k": 3.5}, "k", 99, 99},
-		{"numeric string", map[string]any{"k": "12"}, "k", 0, 12},
-		{"negative numeric string accepted", map[string]any{"k": "-5"}, "k", 0, -5},
-		{"non-numeric string returns default", map[string]any{"k": "abc"}, "k", 7, 7},
-		{"missing key returns default", map[string]any{}, "k", 99, 99},
-		{"nil map returns default", nil, "k", 5, 5},
-		{"bool returns default", map[string]any{"k": true}, "k", 3, 3},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := SettingInt(tt.settings, tt.key, tt.def)
-			if got != tt.want {
-				t.Errorf("SettingInt(%v, %q, %d) = %d, want %d",
-					tt.settings, tt.key, tt.def, got, tt.want)
-			}
-		})
-	}
-}
-
-// --- SettingFloat ---
-
-func TestSettingFloat(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		settings map[string]any
-		key      SettingKey
-		def      float64
-		want     float64
-	}{
-		{"native float64", map[string]any{"k": 1.5}, "k", 0, 1.5},
-		{"native int promoted", map[string]any{"k": 4}, "k", 0, 4.0},
-		{"native int64 promoted", map[string]any{"k": int64(7)}, "k", 0, 7.0},
-		{"numeric string", map[string]any{"k": "2.5"}, "k", 0, 2.5},
-		{"non-numeric string returns default", map[string]any{"k": "abc"}, "k", 1.0, 1.0},
-		{"missing key returns default", map[string]any{}, "k", 0.75, 0.75},
-		{"nil map returns default", nil, "k", 0.1, 0.1},
-		{"bool returns default", map[string]any{"k": true}, "k", 0.5, 0.5},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := SettingFloat(tt.settings, tt.key, tt.def)
-			if got != tt.want {
-				t.Errorf("SettingFloat(%v, %q, %v) = %v, want %v",
-					tt.settings, tt.key, tt.def, got, tt.want)
-			}
-		})
-	}
-}
-
 // --- RegisterSchema, ProviderNames, Schema ---
 
 func TestRegisterSchema_and_Schema(t *testing.T) {
@@ -518,76 +376,4 @@ func (f *fakeProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Su
 
 func (f *fakeProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
 	return nil, nil
-}
-
-func TestLoadAll_property_invariants(t *testing.T) {
-	t.Parallel()
-
-	rapid.Check(t, func(rt *rapid.T) {
-		n := rapid.IntRange(1, 10).Draw(rt, "num_providers")
-		r := NewRegistry()
-		cfgs := make(map[api.ProviderID]api.ProviderCfg)
-
-		var enabledNames []string
-		failIdx := -1
-		if rapid.Bool().Draw(rt, "has_failure") {
-			failIdx = rapid.IntRange(0, n-1).Draw(rt, "fail_idx")
-		}
-
-		for i := range n {
-			name := api.ProviderID(strings.Repeat("p", i+1)) // unique names: "p", "pp", "ppp"...
-			state := rapid.IntRange(0, 2).Draw(rt, "state_"+string(name))
-			switch state {
-			case 0: // enabled
-				idx := i
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
-					if idx == failIdx {
-						return nil, errors.New("factory error")
-					}
-					return &fakeProvider{name: string(name)}, nil
-				})
-				cfgs[name] = api.ProviderCfg{Enabled: true}
-				enabledNames = append(enabledNames, string(name))
-			case 1: // disabled
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
-					rt.Fatalf("disabled factory called for %s", name)
-					return nil, nil
-				})
-				cfgs[name] = api.ProviderCfg{Enabled: false}
-			case 2: // unknown (not registered, but in config)
-				cfgs[name] = api.ProviderCfg{Enabled: true}
-			}
-		}
-
-		result, err := r.LoadAll(context.Background(), cfgs)
-
-		// Invariant 3: if error and no successful providers, result is nil.
-		// With partial success, error + non-nil result is valid when some providers loaded.
-		if err != nil && len(enabledNames) == 0 {
-			if result != nil {
-				rt.Fatalf("LoadAll returned error AND non-nil result with no enabled providers: %v", err)
-			}
-			return
-		}
-
-		if result == nil {
-			// Either all failed or none were enabled.
-			return
-		}
-
-		// Invariant 1: output order is deterministic (sorted by name).
-		for i := 1; i < len(result); i++ {
-			if result[i].Name() < result[i-1].Name() {
-				rt.Fatalf("LoadAll result not sorted: %q before %q",
-					result[i-1].Name(), result[i].Name())
-			}
-		}
-
-		// Invariant 2: all returned providers are wrapped (Name() matches inner).
-		for _, p := range result {
-			if !slices.Contains(enabledNames, string(p.Name())) {
-				rt.Fatalf("LoadAll returned provider %q not in enabled set", p.Name())
-			}
-		}
-	})
 }

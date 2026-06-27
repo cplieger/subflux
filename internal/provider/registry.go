@@ -136,70 +136,14 @@ func (r *Registry) Schema(name api.ProviderID) (string, []api.ProviderSchemaFiel
 // specific cause (configured/disabled/unknown counts) so operators can
 // distinguish a typo from a deliberate all-disabled state.
 func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]api.Provider, error) {
-	type loadResult struct {
-		provider api.Provider
-		err      error
-		name     api.ProviderID
-	}
+	toLoad, disabled, unknown := r.classifyProviders(providers)
 
-	names := slices.Sorted(maps.Keys(providers))
-	var disabled, unknown int
-	var toLoad []api.ProviderID
-	for _, name := range names {
-		cfg := providers[name]
-		if !cfg.Enabled {
-			disabled++
-			slog.Debug("provider disabled, skipping", "provider", name)
-			continue
-		}
-		if _, ok := r.factories[name]; !ok {
-			unknown++
-			slog.Warn("unknown provider in config, skipping", "provider", name)
-			continue
-		}
-		toLoad = append(toLoad, name)
-	}
-
-	results := make([]loadResult, len(toLoad))
-	var g errgroup.Group
-	g.SetLimit(len(toLoad))
-	for i, name := range toLoad {
-		g.Go(func() error {
-			if ctx.Err() != nil {
-				results[i] = loadResult{name: name, err: ctx.Err()}
-				return nil // don't cancel siblings; partial success
-			}
-			p, err := r.factories[name](ctx, providers[name].Settings)
-			if err != nil {
-				results[i] = loadResult{name: name, err: err}
-			} else {
-				results[i] = loadResult{name: name, provider: p}
-			}
-			return nil // never return error; preserve partial success
-		})
-	}
-	_ = g.Wait()
-
-	// Collect successful providers and errors separately.
-	var result []api.Provider
-	var errs []error
-	for _, lr := range results {
-		if lr.err != nil {
-			regErr := &RegistryError{Kind: ErrProviderInit, Provider: lr.name, Err: lr.err}
-			errs = append(errs, regErr)
-			slog.Warn("provider init failed", "provider", lr.name, "error", lr.err)
-			continue
-		}
-		if lr.provider != nil {
-			result = append(result, lr.provider)
-		}
-	}
+	result, errs := partitionResults(r.buildProviders(ctx, toLoad, providers))
 
 	// Sort by name for deterministic ordering.
 	slices.SortFunc(result, func(a, b api.Provider) int {
 		return cmp.Compare(a.Name(), b.Name())
 	})
-
 	for _, p := range result {
 		slog.Debug("loaded provider", "provider", p.Name())
 	}
@@ -220,4 +164,77 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api
 		return result, errors.Join(errs...)
 	}
 	return result, nil
+}
+
+// loadResult is the outcome of building one provider during LoadAll: exactly
+// one of provider or err is set, and name identifies the entry either way.
+type loadResult struct {
+	provider api.Provider
+	err      error
+	name     api.ProviderID
+}
+
+// classifyProviders walks the configured providers in sorted order and splits
+// them into the names to load (enabled and registered) plus the counts of
+// disabled and unknown entries. Sorted iteration keeps logging deterministic.
+func (r *Registry) classifyProviders(providers map[api.ProviderID]api.ProviderCfg) (toLoad []api.ProviderID, disabled, unknown int) {
+	for _, name := range slices.Sorted(maps.Keys(providers)) {
+		cfg := providers[name]
+		if !cfg.Enabled {
+			disabled++
+			slog.Debug("provider disabled, skipping", "provider", name)
+			continue
+		}
+		if _, ok := r.factories[name]; !ok {
+			unknown++
+			slog.Warn("unknown provider in config, skipping", "provider", name)
+			continue
+		}
+		toLoad = append(toLoad, name)
+	}
+	return toLoad, disabled, unknown
+}
+
+// buildProviders constructs each named provider in parallel for reduced startup
+// latency. It never returns an error: a per-provider failure (factory error or
+// an already-cancelled context) is recorded on that entry so sibling providers
+// still load, preserving partial success.
+func (r *Registry) buildProviders(ctx context.Context, toLoad []api.ProviderID, providers map[api.ProviderID]api.ProviderCfg) []loadResult {
+	results := make([]loadResult, len(toLoad))
+	var g errgroup.Group
+	g.SetLimit(len(toLoad))
+	for i, name := range toLoad {
+		g.Go(func() error {
+			if ctx.Err() != nil {
+				results[i] = loadResult{name: name, err: ctx.Err()}
+				return nil // don't cancel siblings; partial success
+			}
+			p, err := r.factories[name](ctx, providers[name].Settings)
+			if err != nil {
+				results[i] = loadResult{name: name, err: err}
+			} else {
+				results[i] = loadResult{name: name, provider: p}
+			}
+			return nil // never return error; preserve partial success
+		})
+	}
+	_ = g.Wait()
+	return results
+}
+
+// partitionResults separates successfully built providers from initialization
+// failures, wrapping each failure in a typed RegistryError and logging it. The
+// input order is preserved so the joined error is deterministic.
+func partitionResults(results []loadResult) (providers []api.Provider, errs []error) {
+	for _, lr := range results {
+		if lr.err != nil {
+			errs = append(errs, &RegistryError{Kind: ErrProviderInit, Provider: lr.name, Err: lr.err})
+			slog.Warn("provider init failed", "provider", lr.name, "error", lr.err)
+			continue
+		}
+		if lr.provider != nil {
+			providers = append(providers, lr.provider)
+		}
+	}
+	return providers, errs
 }
