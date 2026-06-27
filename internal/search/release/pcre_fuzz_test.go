@@ -7,10 +7,9 @@ import (
 
 // FuzzSplitTopLevelAlternation exercises the manual regex alternation parser
 // with arbitrary pattern strings including unbalanced parens and escapes.
-//
-// Bug class: index-out-of-bounds panic on trailing backslash, unbalanced
-// brackets, or deeply nested groups; joining results with "|" must reconstruct
-// the original input.
+// The parser must never panic on out-of-range indexing (trailing backslash,
+// unbalanced brackets, deep nesting), and joining the parts with "|" must
+// reconstruct the original input exactly (round-trip).
 func FuzzSplitTopLevelAlternation(f *testing.F) {
 	f.Add("a|b|c")
 	f.Add("(a|b)|c")
@@ -25,8 +24,7 @@ func FuzzSplitTopLevelAlternation(f *testing.F) {
 		if len(parts) == 0 {
 			t.Fatal("result must have at least one element")
 		}
-		rejoined := strings.Join(parts, "|")
-		if rejoined != pattern {
+		if rejoined := strings.Join(parts, "|"); rejoined != pattern {
 			t.Fatalf("roundtrip failed: got %q, want %q", rejoined, pattern)
 		}
 	})

@@ -200,3 +200,55 @@ func TestMatchBreakdown(t *testing.T) {
 		})
 	}
 }
+
+// A matched category contributes to the breakdown only when its weight is
+// strictly positive; a matched-but-zero-weight category is excluded.
+func TestMatchBreakdown_excludes_zero_weight_match(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		scores  api.Scores
+		matches api.MatchSet
+		wantLen int
+		wantKey string
+		wantVal int
+		present bool
+	}{
+		{
+			name:    "zero weight matched category excluded",
+			scores:  api.Scores{Source: 0},
+			matches: api.MatchSet{Source: true},
+			wantLen: 0,
+			wantKey: "source",
+			present: false,
+		},
+		{
+			name:    "positive weight matched category included",
+			scores:  api.Scores{Source: 28},
+			matches: api.MatchSet{Source: true},
+			wantLen: 1,
+			wantKey: "source",
+			wantVal: 28,
+			present: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			scores := tc.scores
+			got := MatchBreakdown(&scores, tc.matches)
+			if len(got) != tc.wantLen {
+				t.Errorf("len(MatchBreakdown) = %d, want %d; got %v", len(got), tc.wantLen, got)
+			}
+			v, ok := got[tc.wantKey]
+			if ok != tc.present {
+				t.Errorf("MatchBreakdown key %q present = %v, want %v", tc.wantKey, ok, tc.present)
+			}
+			if tc.present && v != tc.wantVal {
+				t.Errorf("MatchBreakdown[%q] = %d, want %d", tc.wantKey, v, tc.wantVal)
+			}
+		})
+	}
+}

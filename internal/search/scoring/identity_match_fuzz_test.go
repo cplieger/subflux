@@ -6,7 +6,9 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-func FuzzNormalizeTitle(f *testing.F) {
+// FuzzNormalizeTitle_idempotent verifies NormalizeTitle is idempotent:
+// applying it twice yields the same result as applying it once.
+func FuzzNormalizeTitle_idempotent(f *testing.F) {
 	f.Add("Breaking Bad")
 	f.Add("the.office.us")
 	f.Add("Movie-Name_2024")
@@ -14,30 +16,33 @@ func FuzzNormalizeTitle(f *testing.F) {
 	f.Add("A:B:C")
 	f.Add("   spaces   everywhere   ")
 	f.Add("日本語タイトル")
+	f.Add("Attack-on_Titan: Final Season")
+	f.Add("  multiple   spaces  ")
+	f.Add("UPPER.case-MiXeD")
 
 	f.Fuzz(func(t *testing.T, s string) {
-		result := NormalizeTitle(s)
-		// Idempotent: normalizing again must yield the same result.
-		if NormalizeTitle(result) != result {
-			t.Fatalf("NormalizeTitle not idempotent for %q", s)
+		once := NormalizeTitle(s)
+		twice := NormalizeTitle(once)
+		if once != twice {
+			t.Fatalf("NormalizeTitle not idempotent: %q -> %q -> %q", s, once, twice)
 		}
 	})
 }
 
-func FuzzTitlesMatch(f *testing.F) {
+// FuzzTitlesMatch_symmetric verifies TitlesMatch is symmetric:
+// TitlesMatch(a,b) == TitlesMatch(b,a).
+func FuzzTitlesMatch_symmetric(f *testing.F) {
 	f.Add("Breaking Bad", "breaking bad")
 	f.Add("The Office", "the.office")
 	f.Add("", "anything")
 	f.Add("anything", "")
 	f.Add("", "")
 	f.Add("Show", "Show 2")
+	f.Add("Inception", "Inception 2010")
 
 	f.Fuzz(func(t *testing.T, a, b string) {
-		r1 := TitlesMatch(a, b)
-		r2 := TitlesMatch(b, a)
-		// Symmetry: TitlesMatch(a,b) == TitlesMatch(b,a).
-		if r1 != r2 {
-			t.Fatalf("TitlesMatch not symmetric: (%q,%q)=%v vs (%q,%q)=%v", a, b, r1, b, a, r2)
+		if TitlesMatch(a, b) != TitlesMatch(b, a) {
+			t.Fatalf("TitlesMatch not symmetric for (%q, %q)", a, b)
 		}
 	})
 }
@@ -86,8 +91,26 @@ func FuzzReleaseNameMatchesTitle(f *testing.F) {
 	f.Add("Show", "Show.II.S01E01")
 
 	f.Fuzz(func(t *testing.T, title, release string) {
-		// Must not panic.
+		// Manual index arithmetic over the release name must never panic.
 		_ = ReleaseNameMatchesTitle(title, release)
+	})
+}
+
+func FuzzAnyReleaseNameMatches(f *testing.F) {
+	f.Add("Breaking Bad", "Breaking.Bad.S01E01.720p.WEB-DL", "")
+	f.Add("The Office", "The.Office.US.S02E03.HDTV", "Office US")
+	f.Add("", "", "")
+	f.Add("Show", "Totally.Different.Release", "Alt Title")
+
+	f.Fuzz(func(t *testing.T, title, releaseName, altTitle string) {
+		req := &api.SearchRequest{
+			Title: title,
+		}
+		if altTitle != "" {
+			req.AlternativeTitles = []string{altTitle}
+		}
+		// Must not panic.
+		_ = AnyReleaseNameMatches(req, releaseName)
 	})
 }
 
@@ -106,14 +129,26 @@ func FuzzExtractReleaseSeason(f *testing.F) {
 	})
 }
 
-func FuzzIsSeasonPack(f *testing.F) {
-	f.Add("Show.S01.Complete.1080p")
-	f.Add("Show.S01E01.720p")
+// FuzzIsSeasonPackImpliesSeason verifies that if IsSeasonPack returns true,
+// ExtractReleaseSeason returns a non-negative season number. Season 0
+// (specials) is a legitimate pack — the codebase treats 0 as "unspecified /
+// non-constraining" (see scoring.identity_filter, which only applies a
+// season constraint when ExtractReleaseSeason > 0), so the guarantee is
+// non-negativity, not positivity. This also exercises IsSeasonPack for
+// panic-safety on every input.
+func FuzzIsSeasonPackImpliesSeason(f *testing.F) {
+	f.Add("Show.S01.1080p.BluRay")
+	f.Add("Show.S02E01.720p")
+	f.Add("random string")
 	f.Add("")
-	f.Add("S03")
+	f.Add("S99")
 
-	f.Fuzz(func(t *testing.T, name string) {
-		// Must not panic.
-		_ = IsSeasonPack(name)
+	f.Fuzz(func(t *testing.T, releaseName string) {
+		if IsSeasonPack(releaseName) {
+			season := ExtractReleaseSeason(releaseName)
+			if season < 0 {
+				t.Fatalf("IsSeasonPack(%q)=true but ExtractReleaseSeason=%d", releaseName, season)
+			}
+		}
 	})
 }
