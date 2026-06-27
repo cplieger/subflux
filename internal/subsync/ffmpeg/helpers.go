@@ -46,44 +46,12 @@ func IsTextSubtitleCodec(codec string) bool {
 
 // SelectBestSubTrack picks the best text subtitle track from ffprobe output.
 func SelectBestSubTrack(tracks []Track, lang, excludeLang string, mapper LangMapper) *Track {
-	var candidates []Track
-
-	for _, t := range tracks {
-		if !IsTextSubtitleCodec(t.CodecName) {
-			continue
-		}
-
-		trackLang := NormalizeFFprobeLang(t.Language, mapper)
-
-		if excludeLang != "" && trackLang == excludeLang {
-			continue
-		}
-
-		if lang != "" && trackLang != lang {
-			continue
-		}
-
-		candidates = append(candidates, t)
-	}
-
+	candidates := gatherTextCandidates(tracks, lang, excludeLang, mapper)
 	if len(candidates) == 0 {
 		return nil
 	}
 
-	// Prefer non-forced tracks.
-	var nonForced []Track
-	for _, c := range candidates {
-		if !c.Forced {
-			nonForced = append(nonForced, c)
-		}
-	}
-
-	afterForced := candidates
-	if len(nonForced) > 0 {
-		afterForced = nonForced
-	}
-
-	candidates = afterForced
+	candidates = preferNonForced(candidates)
 
 	// Prefer SRT/subrip over ASS/SSA.
 	for i := range candidates {
@@ -93,6 +61,41 @@ func SelectBestSubTrack(tracks []Track, lang, excludeLang string, mapper LangMap
 	}
 
 	return &candidates[0]
+}
+
+// gatherTextCandidates returns the text subtitle tracks that pass the language
+// include/exclude filters.
+func gatherTextCandidates(tracks []Track, lang, excludeLang string, mapper LangMapper) []Track {
+	var candidates []Track
+	for _, t := range tracks {
+		if !IsTextSubtitleCodec(t.CodecName) {
+			continue
+		}
+		trackLang := NormalizeFFprobeLang(t.Language, mapper)
+		if excludeLang != "" && trackLang == excludeLang {
+			continue
+		}
+		if lang != "" && trackLang != lang {
+			continue
+		}
+		candidates = append(candidates, t)
+	}
+	return candidates
+}
+
+// preferNonForced returns only the non-forced tracks when any exist, otherwise
+// the candidates unchanged.
+func preferNonForced(candidates []Track) []Track {
+	var nonForced []Track
+	for _, c := range candidates {
+		if !c.Forced {
+			nonForced = append(nonForced, c)
+		}
+	}
+	if len(nonForced) > 0 {
+		return nonForced
+	}
+	return candidates
 }
 
 // NormalizeFFprobeLang normalizes ffprobe language tags to ISO 639-1.

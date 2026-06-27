@@ -1,6 +1,9 @@
 package ffmpeg
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // FuzzNormalizeFFprobeLangUnd asserts that "und"/"undetermined" inputs
 // (regardless of case) always normalize to an empty string.
@@ -60,4 +63,28 @@ func lowerASCII(s string) string {
 		}
 	}
 	return string(b)
+}
+
+// FuzzParseFrameRate exercises the fractional frame-rate parser with arbitrary
+// strings, including division-by-zero and non-numeric input. The parser must
+// never return NaN or Inf (a non-finite rate is meaningless to callers and
+// would poison framerate-mismatch detection downstream).
+func FuzzParseFrameRate(f *testing.F) {
+	f.Add("24000/1001")
+	f.Add("30")
+	f.Add("0/0")
+	f.Add("")
+	f.Add("abc/def")
+	f.Add("1/0")
+	f.Add("-1/1")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		result := parseFrameRate(s)
+		if math.IsNaN(result) {
+			t.Fatalf("NaN returned for input %q", s)
+		}
+		if math.IsInf(result, 0) {
+			t.Fatalf("Inf returned for input %q", s)
+		}
+	})
 }
