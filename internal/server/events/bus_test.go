@@ -38,19 +38,22 @@ func TestEventBus_next_returns_false_when_caught_up(t *testing.T) {
 	}
 }
 
+// A subscriber that falls behind by more than the ring buffer skips to the
+// oldest still-buffered event, so it can read back exactly RingBufferSize
+// events regardless of how far ahead the publisher ran. The exact count pins
+// the skip-to-latest cursor (writeAt - RingBufferSize) through the public API.
 func TestEventBus_wraparound(t *testing.T) {
 	t.Parallel()
 	eb := New()
-	sub, unsub := eb.Subscribe()
+	sub, unsub := eb.Subscribe() // subscribes at writeAt == 0
 	defer unsub()
 
-	// Publish more than RingBufferSize events to trigger wrap-around.
-	for i := range RingBufferSize + 10 {
-		_ = i
+	// Publish well past the ring capacity to force the subscriber behind.
+	const published = RingBufferSize + 44
+	for range published {
 		eb.Publish(Event{Type: Notify, Data: NotifyEvent{Text: "wrap"}})
 	}
 
-	// Subscriber should skip to latest and still read events.
 	var count int
 	for {
 		_, ok := sub.Next()
@@ -59,11 +62,8 @@ func TestEventBus_wraparound(t *testing.T) {
 		}
 		count++
 	}
-	if count == 0 {
-		t.Error("expected at least some events after wrap-around")
-	}
-	if count > RingBufferSize {
-		t.Errorf("got %d events, should be <= %d", count, RingBufferSize)
+	if count != RingBufferSize {
+		t.Errorf("read %d events after wrap-around, want exactly %d (skip lands at writeAt-RingBufferSize)", count, RingBufferSize)
 	}
 }
 

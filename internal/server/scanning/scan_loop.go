@@ -170,23 +170,8 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 	outcome, foundLangs := ScanEpisode(ctx, deps, ls, series, ep)
 
 	seasonEpCount := series.SeasonEpisodeFileCount(ep.SeasonNumber)
-	if len(foundLangs) > 0 {
-		foundSet := make(map[string]struct{}, len(foundLangs))
-		for _, l := range foundLangs {
-			foundSet[l] = struct{}{}
-		}
-		for _, lang := range langs {
-			if _, ok := foundSet[lang]; ok {
-				tracker.recordOutcome(series.ImdbID, ep.SeasonNumber, lang, ScanFound, seasonEpCount)
-			} else {
-				tracker.recordOutcome(series.ImdbID, ep.SeasonNumber, lang, ScanNoResult, seasonEpCount)
-			}
-		}
-	} else {
-		for _, lang := range langs {
-			tracker.recordOutcome(series.ImdbID, ep.SeasonNumber, lang, outcome, seasonEpCount)
-		}
-	}
+	recordEpisodeOutcomes(tracker, series.ImdbID, ep.SeasonNumber,
+		langs, foundLangs, outcome, seasonEpCount)
 
 	switch outcome {
 	case ScanFound:
@@ -201,6 +186,33 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 	deps.Activity.Progress(actID, total, 0,
 		fmt.Sprintf("%d episodes, %d movies",
 			stats.EpisodesSearched, stats.MoviesSearched))
+}
+
+// recordEpisodeOutcomes records the per-language scan result for an episode's
+// season. When foundLangs is non-empty, each target language is recorded as
+// ScanFound when a subtitle was downloaded for it and ScanNoResult otherwise;
+// when no language had a subtitle, the raw scan outcome is recorded for every
+// target language.
+func recordEpisodeOutcomes(tracker *seasonTracker, imdbID string, season int,
+	langs, foundLangs []string, outcome ScanOutcome, seasonEpCount int,
+) {
+	if len(foundLangs) == 0 {
+		for _, lang := range langs {
+			tracker.recordOutcome(imdbID, season, lang, outcome, seasonEpCount)
+		}
+		return
+	}
+	foundSet := make(map[string]struct{}, len(foundLangs))
+	for _, l := range foundLangs {
+		foundSet[l] = struct{}{}
+	}
+	for _, lang := range langs {
+		if _, ok := foundSet[lang]; ok {
+			tracker.recordOutcome(imdbID, season, lang, ScanFound, seasonEpCount)
+		} else {
+			tracker.recordOutcome(imdbID, season, lang, ScanNoResult, seasonEpCount)
+		}
+	}
 }
 
 func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,

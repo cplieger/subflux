@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
@@ -31,16 +32,52 @@ func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
 		return 0
 	}
 
+	series, withFiles, ok := h.collectSeriesEpisodes(ctx, st, seriesID, label, filterEp)
+	if !ok {
+		return 0
+	}
+
+	action := label + " Search"
+	detail := fmt.Sprintf("%s (%d episodes)", series.Title, len(withFiles))
+	actID := h.startScanActivity(action, detail)
+	activityOK := true
+	defer func() { h.endScanActivity(actID, action, detail, activityOK) }()
+
+	if !h.acquireScanSlot(actID) {
+		slog.Debug("scan cancelled while queued",
+			"series_id", seriesID, "label", label)
+		return 0
+	}
+	defer h.deps.ScanGuard.Unlock()
+
+	scanDelay := st.Cfg.Search().ScanDelay
+	found, searched := h.runEpisodeScans(ctx, series, withFiles, actID, scanDelay)
+
+	slog.Info(label+" scan complete",
+		"series", series.Title, "searched", searched, "found", found)
+	h.deps.Activity.Progress(actID, len(withFiles), len(withFiles),
+		fmt.Sprintf("%s: %d/%d found", series.Title, found, searched))
+	return found
+}
+
+// collectSeriesEpisodes fetches the series and the episodes-with-files that
+// match filterEp. It returns ok=false (after logging, and recording an alert
+// where appropriate) when the scan should abort early: the series fetch
+// failed, the series was not found, the episode fetch failed, or no matching
+// episode has a file.
+func (h *Handler) collectSeriesEpisodes(ctx context.Context, st *HandlerState,
+	seriesID int, label string, filterEp func(*api.Episode) bool,
+) (*api.Series, []*api.Episode, bool) {
 	series, err := st.Sonarr.GetSeriesByID(ctx, seriesID)
 	if err != nil {
 		slog.Error("scan: failed to fetch series",
 			"id", seriesID, "error", err)
 		h.deps.Alerts.Record("scan", label+" scan failed: "+err.Error())
-		return 0
+		return nil, nil, false
 	}
 	if series == nil {
 		slog.Warn("scan: series not found", "id", seriesID)
-		return 0
+		return nil, nil, false
 	}
 
 	episodes, err := st.Sonarr.GetEpisodes(ctx, seriesID)
@@ -48,41 +85,56 @@ func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
 		slog.Error("scan: failed to fetch episodes",
 			"series", series.Title, "error", err)
 		h.deps.Alerts.Record("scan", label+" scan failed: "+err.Error())
-		return 0
+		return nil, nil, false
 	}
 
+	withFiles := filterEpisodesWithFiles(episodes, filterEp)
+	if len(withFiles) == 0 {
+		slog.Debug("scan: no episodes with files", "series", series.Title)
+		return nil, nil, false
+	}
+	return series, withFiles, true
+}
+
+// filterEpisodesWithFiles returns pointers to the episodes that match filterEp
+// and have a downloaded file.
+func filterEpisodesWithFiles(episodes []api.Episode,
+	filterEp func(*api.Episode) bool,
+) []*api.Episode {
 	var withFiles []*api.Episode
 	for i := range episodes {
 		if filterEp(&episodes[i]) && episodes[i].HasFile && episodes[i].EpisodeFile != nil {
 			withFiles = append(withFiles, &episodes[i])
 		}
 	}
-	if len(withFiles) == 0 {
-		slog.Debug("scan: no episodes with files", "series", series.Title)
-		return 0
-	}
+	return withFiles
+}
 
-	action := label + " Search"
-	detail := fmt.Sprintf("%s (%d episodes)", series.Title, len(withFiles))
-	actID := h.startScanActivity(action, detail)
-	ok := true
-	defer func() { h.endScanActivity(actID, action, detail, ok) }()
-
+// acquireScanSlot marks the activity queued, blocks on the scan guard so only
+// one manual scan runs at a time, then clears the queued flag. It returns
+// false when the activity was cancelled while queued; in that case the guard
+// has already been released and the caller must not proceed. On a true return
+// the caller owns the guard and must Unlock it.
+func (h *Handler) acquireScanSlot(actID string) bool {
 	h.deps.Activity.SetQueued(actID, true)
 	h.deps.ScanGuard.Lock()
-	defer h.deps.ScanGuard.Unlock()
 	h.deps.Activity.SetQueued(actID, false)
-
 	if h.deps.Activity.IsCancelled(actID) {
-		slog.Debug("scan cancelled while queued",
-			"series_id", seriesID, "label", label)
-		return 0
+		h.deps.ScanGuard.Unlock()
+		return false
 	}
+	return true
+}
 
-	scanDelay := st.Cfg.Search().ScanDelay
+// runEpisodeScans scans each episode in order, reporting progress and
+// honouring context cancellation and the inter-item scan delay. It returns
+// the number of episodes for which a subtitle was found and the number
+// searched.
+func (h *Handler) runEpisodeScans(ctx context.Context, series *api.Series,
+	withFiles []*api.Episode, actID string, scanDelay time.Duration,
+) (found, searched int) {
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
-	var found, searched int
 	for i, ep := range withFiles {
 		if ctx.Err() != nil {
 			break
@@ -102,12 +154,7 @@ func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
 			}
 		}
 	}
-
-	slog.Info(label+" scan complete",
-		"series", series.Title, "searched", searched, "found", found)
-	h.deps.Activity.Progress(actID, len(withFiles), len(withFiles),
-		fmt.Sprintf("%s: %d/%d found", series.Title, found, searched))
-	return found
+	return found, searched
 }
 
 // scanSingleEpisode scans a single episode asynchronously.
@@ -223,15 +270,11 @@ func (h *Handler) scanMovieSync(ctx context.Context, movieID int) (found, total 
 	actID := h.startScanActivity(action, label)
 	defer h.endScanActivity(actID, action, label, true)
 
-	h.deps.Activity.SetQueued(actID, true)
-	h.deps.ScanGuard.Lock()
-	defer h.deps.ScanGuard.Unlock()
-	h.deps.Activity.SetQueued(actID, false)
-
-	if h.deps.Activity.IsCancelled(actID) {
+	if !h.acquireScanSlot(actID) {
 		slog.Debug("movie scan cancelled while queued", "movie_id", movieID)
 		return 0, 0
 	}
+	defer h.deps.ScanGuard.Unlock()
 
 	origLang := movie.OriginalLangCode()
 	audioLangs := movie.MovieFile.AudioLanguages()

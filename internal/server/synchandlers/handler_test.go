@@ -156,6 +156,21 @@ func TestFindDialogueDenseStart(t *testing.T) {
 			t.Errorf("FindDialogueDenseStart(whitespace+real) = %d, want 110000", got)
 		}
 	})
+
+	t.Run("tie_keeps_earlier_anchor", func(t *testing.T) {
+		t.Parallel()
+		// Two equally dense, non-overlapping windows (cues 100s apart, identical
+		// text length). The strict ">" density comparison keeps the FIRST
+		// anchor, so the result is the 20s anchor minus the 10s lead-in.
+		cues := []api.SubtitleCue{
+			{Start: 20 * time.Second, End: 22 * time.Second, Text: "ab"},
+			{Start: 120 * time.Second, End: 122 * time.Second, Text: "ab"},
+		}
+		got := FindDialogueDenseStart(cues)
+		if got != 10_000 {
+			t.Errorf("FindDialogueDenseStart(tie) = %d, want 10000 (earlier anchor must win ties)", got)
+		}
+	})
 }
 
 // --- ShiftAndFilterCues ---

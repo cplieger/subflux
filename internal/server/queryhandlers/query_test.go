@@ -9,9 +9,12 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// mockQueryStore implements QueryStore for testing.
+// mockQueryStore implements QueryStore for testing. It records the last
+// *api.StateQuery passed to GetState so tests can assert the limit/offset
+// guards HandleState applies before querying.
 type mockQueryStore struct {
 	err          error
+	lastState    *api.StateQuery
 	stateEntries []api.StateEntry
 	backoffItems []api.BackoffEntry
 	manualLocks  []api.ManualLockEntry
@@ -19,7 +22,9 @@ type mockQueryStore struct {
 	attempts     int
 }
 
-func (m *mockQueryStore) GetState(_ context.Context, _ *api.StateQuery) ([]api.StateEntry, error) {
+func (m *mockQueryStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
+	cp := *q
+	m.lastState = &cp
 	return m.stateEntries, m.err
 }
 
@@ -68,12 +73,60 @@ func TestHandleState(t *testing.T) {
 
 	t.Run("caps_limit_at_10000", func(t *testing.T) {
 		t.Parallel()
-		h := New(Deps{QueryDB: &mockQueryStore{}})
+		store := &mockQueryStore{}
+		h := New(Deps{QueryDB: store})
 		req := httptest.NewRequest(http.MethodGet, "/api/state?limit=99999", nil)
 		w := httptest.NewRecorder()
 		h.HandleState(w, req)
 		if w.Code != http.StatusOK {
 			t.Errorf("status = %d, want 200", w.Code)
+		}
+		if store.lastState.Limit != 10000 {
+			t.Errorf("limit=99999 produced Limit=%d, want 10000 (capped)", store.lastState.Limit)
+		}
+	})
+
+	t.Run("applies_positive_limit", func(t *testing.T) {
+		t.Parallel()
+		store := &mockQueryStore{}
+		h := New(Deps{QueryDB: store})
+		req := httptest.NewRequest(http.MethodGet, "/api/state?limit=7", nil)
+		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState.Limit != 7 {
+			t.Errorf("limit=7 produced Limit=%d, want 7", store.lastState.Limit)
+		}
+	})
+
+	t.Run("zero_limit_uses_default", func(t *testing.T) {
+		t.Parallel()
+		store := &mockQueryStore{}
+		h := New(Deps{QueryDB: store})
+		req := httptest.NewRequest(http.MethodGet, "/api/state?limit=0", nil)
+		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState.Limit != 50 {
+			t.Errorf("limit=0 produced Limit=%d, want 50 (zero must not override default)", store.lastState.Limit)
+		}
+	})
+
+	t.Run("applies_positive_offset", func(t *testing.T) {
+		t.Parallel()
+		store := &mockQueryStore{}
+		h := New(Deps{QueryDB: store})
+		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=3", nil)
+		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState.Offset != 3 {
+			t.Errorf("offset=3 produced Offset=%d, want 3", store.lastState.Offset)
+		}
+	})
+
+	t.Run("negative_offset_uses_default", func(t *testing.T) {
+		t.Parallel()
+		store := &mockQueryStore{}
+		h := New(Deps{QueryDB: store})
+		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=-5", nil)
+		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState.Offset != 0 {
+			t.Errorf("offset=-5 produced Offset=%d, want 0 (only positive offsets apply)", store.lastState.Offset)
 		}
 	})
 

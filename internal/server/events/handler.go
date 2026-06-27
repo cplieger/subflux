@@ -21,40 +21,9 @@ const SSEKeepaliveInterval = 15 * time.Second
 // HandleEvents streams server-sent events to the browser.
 // maxClients is the configured limit (0 means use DefaultMaxSSEClients).
 func HandleEvents(bus *EventBus, maxClients int, w http.ResponseWriter, r *http.Request) {
-	limit := maxClients
-	if limit <= 0 {
-		limit = DefaultMaxSSEClients
-	}
-	if bus.ClientCount() >= limit {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprint(w, `{"error":"too many SSE clients"}`)
-		return
-	}
-
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := startSSEStream(bus, maxClients, w)
 	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, `{"error":"streaming not supported"}`)
 		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	// no-transform per RFC 7234 §5.2.2.4 prevents intermediaries (Caddy,
-	// nginx, ALB, Cloudflare) from wrapping the stream in gzip. Caddy's
-	// isEncodeAllowed in modules/caddyhttp/encode/encode.go checks for it.
-	// Without it a compressing proxy can buffer per-event flushes and break
-	// live event delivery.
-	w.Header().Set("Cache-Control", "no-cache, no-transform")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no") // disable nginx buffering
-
-	// Disable write deadline for this long-lived connection.
-	rc := http.NewResponseController(w)
-	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		slog.Warn("SSE: failed to clear write deadline", "error", err)
-	}
-	if err := rc.SetReadDeadline(time.Time{}); err != nil {
-		slog.Warn("SSE: failed to clear read deadline", "error", err)
 	}
 
 	sub, unsub := bus.Subscribe()
@@ -83,22 +52,9 @@ func HandleEvents(bus *EventBus, maxClients int, w http.ResponseWriter, r *http.
 	enc := json.NewEncoder(&buf)
 
 	for {
-		// Drain any pending events from the ring buffer.
-		for {
-			evt, ok := sub.Next()
-			if !ok {
-				break
-			}
-			buf.Reset()
-			if err := enc.Encode(evt); err != nil {
-				slog.Warn("SSE: failed to marshal event", "type", evt.Type, "error", err)
-				continue
-			}
-			// enc.Encode appends a newline; trim it for SSE data field.
-			data := bytes.TrimRight(buf.Bytes(), "\n")
-			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Type, data); err != nil {
-				return
-			}
+		// Drain any pending events; a failed client write ends the stream.
+		if !drainEvents(w, sub, enc, &buf) {
+			return
 		}
 		flusher.Flush()
 
@@ -112,6 +68,72 @@ func HandleEvents(bus *EventBus, maxClients int, w http.ResponseWriter, r *http.
 			flusher.Flush()
 		case <-bus.WaitCh():
 			// New event(s) available — loop back to drain.
+		}
+	}
+}
+
+// startSSEStream enforces the client limit, verifies streaming support, writes
+// the SSE response headers, and clears the connection deadlines. On success it
+// returns the flusher and true; on failure it has already written the error
+// response and returns false.
+func startSSEStream(bus *EventBus, maxClients int, w http.ResponseWriter) (http.Flusher, bool) {
+	limit := maxClients
+	if limit <= 0 {
+		limit = DefaultMaxSSEClients
+	}
+	if bus.ClientCount() >= limit {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, `{"error":"too many SSE clients"}`)
+		return nil, false
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"error":"streaming not supported"}`)
+		return nil, false
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	// no-transform per RFC 7234 §5.2.2.4 prevents intermediaries (Caddy,
+	// nginx, ALB, Cloudflare) from wrapping the stream in gzip. Caddy's
+	// isEncodeAllowed in modules/caddyhttp/encode/encode.go checks for it.
+	// Without it a compressing proxy can buffer per-event flushes and break
+	// live event delivery.
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // disable nginx buffering
+
+	// Disable write deadline for this long-lived connection.
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		slog.Warn("SSE: failed to clear write deadline", "error", err)
+	}
+	if err := rc.SetReadDeadline(time.Time{}); err != nil {
+		slog.Warn("SSE: failed to clear read deadline", "error", err)
+	}
+
+	return flusher, true
+}
+
+// drainEvents writes every pending event from the subscription to w as SSE
+// frames. It returns true when the subscriber is caught up, and false if a
+// write to the client failed (signalling the caller to stop streaming).
+func drainEvents(w http.ResponseWriter, sub *Subscription, enc *json.Encoder, buf *bytes.Buffer) bool {
+	for {
+		evt, ok := sub.Next()
+		if !ok {
+			return true
+		}
+		buf.Reset()
+		if err := enc.Encode(evt); err != nil {
+			slog.Warn("SSE: failed to marshal event", "type", evt.Type, "error", err)
+			continue
+		}
+		// enc.Encode appends a newline; trim it for SSE data field.
+		data := bytes.TrimRight(buf.Bytes(), "\n")
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Type, data); err != nil {
+			return false
 		}
 	}
 }

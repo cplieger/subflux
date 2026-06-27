@@ -77,3 +77,33 @@ func TestCache_concurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestCache_Prune_removes_expired(t *testing.T) {
+	t.Parallel()
+	c := New(time.Millisecond)
+	c.Set("a", true)
+	c.Set("b", false)
+	time.Sleep(5 * time.Millisecond)
+
+	c.Prune()
+
+	if len(c.entries) != 0 {
+		t.Errorf("after Prune of expired entries, len(entries) = %d, want 0", len(c.entries))
+	}
+}
+
+func TestCache_Prune_keeps_live(t *testing.T) {
+	t.Parallel()
+	c := New(time.Hour)
+	c.Set("a", true)
+	c.Set("b", false)
+
+	c.Prune()
+
+	if len(c.entries) != 2 {
+		t.Errorf("after Prune of live entries, len(entries) = %d, want 2", len(c.entries))
+	}
+	if skip, ok := c.Get("a"); !ok || !skip {
+		t.Errorf("Get(a) after Prune = (%v, %v), want (true, true)", skip, ok)
+	}
+}

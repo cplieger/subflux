@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-// FuzzExtractSegment verifies that extractSegment always returns either
-// an empty string or a substring of path that does not contain "/".
+// FuzzExtractSegment verifies that extractSegment always returns either an
+// empty string or a single substring of path that does not contain "/".
 //
-// Bug class: path traversal — if extractSegment returned a value containing
-// "/" or that was not part of the original path, downstream handlers could
-// resolve unintended filesystem or API paths.
+// Path-traversal guard: if extractSegment returned a value containing "/" or
+// one not drawn from the original path, downstream handlers could resolve
+// unintended filesystem or API paths.
 func FuzzExtractSegment(f *testing.F) {
 	f.Add("/api/scan/series/12345", "/api/scan/series/")
 	f.Add("/api/scan/movie/tt0903747", "/api/scan/movie/")
