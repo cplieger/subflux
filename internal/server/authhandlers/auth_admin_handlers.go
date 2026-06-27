@@ -137,14 +137,36 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Last-admin protection: never delete the only remaining admin account,
-	// which would leave the instance unmanageable.
 	users, listErr := h.AdminDB.ListUsers(r.Context())
 	if listErr != nil {
 		slog.Error("delete user: list users", "error", listErr)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
+	if msg := lastAdminDeletionBlock(users, userID); msg != "" {
+		api.ConflictC(w, r, api.CodeConflict, msg)
+		return
+	}
+
+	if err := h.AdminDB.DeleteUser(r.Context(), userID); err != nil {
+		slog.Error("delete user: db error", "error", err)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
+
+	slog.Info("admin: user deleted",
+		"admin", admin.Username, "deleted_user_id", userID, "ip", ClientIP(r))
+
+	api.Ok(w)
+}
+
+// lastAdminDeletionBlock reports why deleting userID must be refused by
+// last-admin protection, or "" when the deletion is allowed. It guards two
+// invariants: the instance must keep at least one admin account, and at least
+// one *local* (password-bearing, break-glass) admin so an SSO outage can't lock
+// everyone out. A non-admin target, or an admin target that leaves the guards
+// satisfied, returns "".
+func lastAdminDeletionBlock(users []api.User, userID int64) string {
 	var target *api.User
 	adminCount, localAdmins := 0, 0
 	for i := range users {
@@ -158,25 +180,14 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 			target = &users[i]
 		}
 	}
-	if target != nil && target.Role == api.RoleAdmin {
-		if adminCount <= 1 {
-			api.ConflictC(w, r, api.CodeConflict, "cannot delete the last admin account")
-			return
-		}
-		if target.PasswordHash != "" && localAdmins <= 1 {
-			api.ConflictC(w, r, api.CodeConflict, "cannot delete the last local (break-glass) admin account")
-			return
-		}
+	if target == nil || target.Role != api.RoleAdmin {
+		return ""
 	}
-
-	if err := h.AdminDB.DeleteUser(r.Context(), userID); err != nil {
-		slog.Error("delete user: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
+	if adminCount <= 1 {
+		return "cannot delete the last admin account"
 	}
-
-	slog.Info("admin: user deleted",
-		"admin", admin.Username, "deleted_user_id", userID, "ip", ClientIP(r))
-
-	api.Ok(w)
+	if target.PasswordHash != "" && localAdmins <= 1 {
+		return "cannot delete the last local (break-glass) admin account"
+	}
+	return ""
 }

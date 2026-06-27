@@ -30,11 +30,24 @@ type Batcher struct {
 	wg   sync.WaitGroup
 }
 
+const (
+	// maxBatch is the number of pending updates that forces an immediate flush.
+	maxBatch = 16
+	// flushFreq is how often a partial batch is flushed when the size
+	// threshold has not been reached.
+	flushFreq = 500 * time.Millisecond
+	// batchTimeout bounds a single batch write to the database.
+	batchTimeout = 5 * time.Second
+	// chanBuffer is the capacity of the pending-update channel; sends beyond it
+	// are dropped, since activity updates are best-effort.
+	chanBuffer = 64
+)
+
 // New creates and starts a Batcher that flushes pending updates every
 // 500ms or when 16 updates accumulate.
 func New(ctx context.Context, db BatchUpdater) *Batcher {
 	b := &Batcher{
-		ch:   make(chan update, 64),
+		ch:   make(chan update, chanBuffer),
 		done: make(chan struct{}),
 		db:   db,
 		ctx:  ctx,
@@ -59,60 +72,82 @@ func (b *Batcher) Stop() {
 }
 
 func (b *Batcher) run() {
-	const (
-		maxBatch  = 16
-		flushFreq = 500 * time.Millisecond
-	)
-
 	ticker := time.NewTicker(flushFreq)
 	defer ticker.Stop()
 
-	buf := make([]update, 0, maxBatch)
-
-	flush := func() {
-		if len(buf) == 0 {
-			return
-		}
-		hashes := make([]string, len(buf))
-		latest := buf[0].at
-		for i, u := range buf {
-			hashes[i] = u.hash
-			if u.at.After(latest) {
-				latest = u.at
-			}
-		}
-		ctx, cancel := context.WithTimeout(b.ctx, 5*time.Second)
-		defer cancel()
-		if err := b.db.BatchUpdateSessionActivity(ctx, hashes, latest); err != nil {
-			slog.Debug("session activity batch update failed", "error", err, "count", len(hashes))
-		}
-		buf = buf[:0]
-	}
+	f := &flusher{db: b.db, buf: make([]update, 0, maxBatch)}
 
 	for {
 		select {
 		case u, ok := <-b.ch:
 			if !ok {
-				flush()
+				f.flush(b.ctx)
 				return
 			}
-			buf = append(buf, u)
-			if len(buf) >= maxBatch {
-				flush()
+			f.add(u)
+			if f.full() {
+				f.flush(b.ctx)
 			}
 		case <-ticker.C:
-			flush()
+			f.flush(b.ctx)
 		case <-b.done:
-			// Drain remaining.
-			for {
-				select {
-				case u := <-b.ch:
-					buf = append(buf, u)
-				default:
-					flush()
-					return
-				}
-			}
+			f.drain(b.ctx, b.ch)
+			return
+		}
+	}
+}
+
+// flusher accumulates pending updates and writes them to the database as a
+// single batch. It is owned by the run goroutine and is not safe for concurrent
+// use.
+type flusher struct {
+	db  BatchUpdater
+	buf []update
+}
+
+// add appends a pending update to the current batch.
+func (f *flusher) add(u update) {
+	f.buf = append(f.buf, u)
+}
+
+// full reports whether the batch has reached the size threshold.
+func (f *flusher) full() bool {
+	return len(f.buf) >= maxBatch
+}
+
+// flush writes the buffered updates as one batch and resets the buffer. The
+// timestamp sent is the most recent activity time across the batch. An empty
+// batch is a no-op.
+func (f *flusher) flush(ctx context.Context) {
+	if len(f.buf) == 0 {
+		return
+	}
+	hashes := make([]string, len(f.buf))
+	latest := f.buf[0].at
+	for i, u := range f.buf {
+		hashes[i] = u.hash
+		if u.at.After(latest) {
+			latest = u.at
+		}
+	}
+	tctx, cancel := context.WithTimeout(ctx, batchTimeout)
+	defer cancel()
+	if err := f.db.BatchUpdateSessionActivity(tctx, hashes, latest); err != nil {
+		slog.Debug("session activity batch update failed", "error", err, "count", len(hashes))
+	}
+	f.buf = f.buf[:0]
+}
+
+// drain moves any updates still buffered in ch into the current batch and then
+// flushes, so no pending update is lost at shutdown.
+func (f *flusher) drain(ctx context.Context, ch <-chan update) {
+	for {
+		select {
+		case u := <-ch:
+			f.add(u)
+		default:
+			f.flush(ctx)
+			return
 		}
 	}
 }

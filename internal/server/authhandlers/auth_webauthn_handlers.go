@@ -1,6 +1,7 @@
 package authhandlers
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"log/slog"
@@ -78,26 +79,7 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 
 	ctx := r.Context()
 
-	userFinder := func(_, userHandle []byte) (webauthn.User, error) {
-		userID, _ := binary.Varint(userHandle)
-		if userID == 0 {
-			return nil, errors.New("invalid user handle")
-		}
-
-		user, err := h.Store.GetUserByID(ctx, userID)
-		if err != nil || user == nil {
-			return nil, errors.New("user not found")
-		}
-
-		creds, err := h.Store.GetPasskeysByUserID(ctx, user.ID)
-		if err != nil {
-			return nil, errors.New("get passkeys failed")
-		}
-
-		return authwebauthn.NewWebAuthnUser(user, creds)
-	}
-
-	resolvedUser, cred, err := authwebauthn.FinishLogin(h.WebAuthn, sessData, r, userFinder)
+	resolvedUser, cred, err := authwebauthn.FinishLogin(h.WebAuthn, sessData, r, h.webAuthnUserFinder(ctx))
 	if err != nil {
 		slog.Warn("webauthn: finish login failed", "error", err)
 
@@ -143,6 +125,31 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
 		slog.String("method", string(api.MethodPasskey)))
+}
+
+// webAuthnUserFinder returns the credential-lookup callback FinishLogin uses to
+// resolve the asserting user and their registered passkeys from the store. The
+// returned errors are deliberately generic so the assertion response never
+// reveals whether a particular user handle exists.
+func (h *Handler) webAuthnUserFinder(ctx context.Context) func(rawID, userHandle []byte) (webauthn.User, error) {
+	return func(_, userHandle []byte) (webauthn.User, error) {
+		userID, _ := binary.Varint(userHandle)
+		if userID == 0 {
+			return nil, errors.New("invalid user handle")
+		}
+
+		user, err := h.Store.GetUserByID(ctx, userID)
+		if err != nil || user == nil {
+			return nil, errors.New("user not found")
+		}
+
+		creds, err := h.Store.GetPasskeysByUserID(ctx, user.ID)
+		if err != nil {
+			return nil, errors.New("get passkeys failed")
+		}
+
+		return authwebauthn.NewWebAuthnUser(user, creds)
+	}
 }
 
 // --- passkey reauth handlers removed (reauth step-up dropped) ---

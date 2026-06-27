@@ -124,3 +124,61 @@ func TestAudit_unknown_user_records_empty_string(t *testing.T) {
 		t.Errorf("ip: got %v, want \"203.0.113.7\"", got)
 	}
 }
+
+func TestAudit_emits_all_extra_attributes(t *testing.T) {
+	// Audit must append every caller-supplied attribute verbatim. Passing
+	// more than six extra attrs also exercises the attrs-slice capacity
+	// calculation (6+len(kvs)): an under-allocation there makes a negative
+	// slice size and panics, so the recover converts that into a clean
+	// failure and the per-attr assertions prove every attr is emitted.
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req.RemoteAddr = "10.0.0.9:5555"
+
+	var records []map[string]any
+	func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				t.Fatalf("Audit panicked with 7 extra attrs: %v (capacity must be 6+len(kvs))", rec)
+			}
+		}()
+		records = captureSlog(t, func() {
+			Audit(req, slog.LevelInfo, AuditLoginSuccess, true, "alice",
+				slog.String("a", "1"), slog.String("b", "2"), slog.String("c", "3"),
+				slog.String("d", "4"), slog.String("e", "5"), slog.String("f", "6"),
+				slog.String("g", "7"))
+		})
+	}()
+
+	if got := len(records); got != 1 {
+		t.Fatalf("want 1 audit record, got %d", got)
+	}
+	rec := records[0]
+	if got := rec["a"]; got != "1" {
+		t.Errorf("attr a: got %v, want \"1\"", got)
+	}
+	if got := rec["d"]; got != "4" {
+		t.Errorf("attr d: got %v, want \"4\"", got)
+	}
+	if got := rec["g"]; got != "7" {
+		t.Errorf("attr g: got %v, want \"7\" (all extra attrs must be emitted)", got)
+	}
+}
+
+func TestAudit_accepts_raw_key_value_pairs(t *testing.T) {
+	// Audit's contract allows raw key/value pairs alongside slog.Attr values
+	// (documented: "raw kv pairs work too but lose type info"). Exercise that
+	// path through the public API and confirm the pair lands in the record.
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req.RemoteAddr = "10.0.0.2:4444"
+
+	records := captureSlog(t, func() {
+		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "bob", "reason", "locked_out")
+	})
+
+	if got := len(records); got != 1 {
+		t.Fatalf("want 1 audit record, got %d", got)
+	}
+	if got := records[0]["reason"]; got != "locked_out" {
+		t.Errorf("raw kv pair: reason = %v, want \"locked_out\"", got)
+	}
+}

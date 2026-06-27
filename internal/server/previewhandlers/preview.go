@@ -256,6 +256,13 @@ func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	writePosterResponse(w, r, resp, posterURL)
+}
+
+// writePosterResponse relays an upstream poster response to the client. A
+// non-200 upstream status becomes a 404, and a missing or non-image upstream
+// content type defaults to image/jpeg.
+func writePosterResponse(w http.ResponseWriter, r *http.Request, resp *http.Response, posterURL string) {
 	if resp.StatusCode != http.StatusOK {
 		slog.Debug("poster upstream error", "url", posterURL, "status", resp.StatusCode)
 		if _, drainErr := io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)); drainErr != nil {
