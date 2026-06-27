@@ -63,27 +63,11 @@ func Align(ctx context.Context, reference, incorrect []Cue) Result {
 		return noResult
 	}
 
-	refAnchors := make([]anchor, len(reference))
-	for i := range reference {
-		refAnchors[i] = extractAnchors(reference[i].Text)
-	}
-	incAnchors := make([]anchor, len(incorrect))
-	for i := range incorrect {
-		incAnchors[i] = extractAnchors(incorrect[i].Text)
-	}
+	refAnchors := extractAllAnchors(reference)
+	incAnchors := extractAllAnchors(incorrect)
 
-	refStrong := make([]bool, len(reference))
-	for i := range refAnchors {
-		refStrong[i] = hasAnyAnchor(&refAnchors[i])
-	}
-	incStrong := make([]bool, len(incorrect))
-	var incStrongCount int
-	for i := range incAnchors {
-		incStrong[i] = hasAnyAnchor(&incAnchors[i])
-		if incStrong[i] {
-			incStrongCount++
-		}
-	}
+	refStrong, _ := markStrong(refAnchors)
+	incStrong, incStrongCount := markStrong(incAnchors)
 
 	if incStrongCount < 3 {
 		slog.Debug("crosslang: too few anchored cues",
@@ -175,6 +159,28 @@ func Align(ctx context.Context, reference, incorrect []Cue) Result {
 	}
 }
 
+// extractAllAnchors extracts language-independent anchors for every cue.
+func extractAllAnchors(cues []Cue) []anchor {
+	anchors := make([]anchor, len(cues))
+	for i := range cues {
+		anchors[i] = extractAnchors(cues[i].Text)
+	}
+	return anchors
+}
+
+// markStrong flags each anchor that carries at least one matchable feature
+// (number, proper noun, or cognate) and returns how many were flagged.
+func markStrong(anchors []anchor) (strong []bool, count int) {
+	strong = make([]bool, len(anchors))
+	for i := range anchors {
+		strong[i] = hasAnyAnchor(&anchors[i])
+		if strong[i] {
+			count++
+		}
+	}
+	return strong, count
+}
+
 func shiftCues(cues []Cue, offset time.Duration) []Cue {
 	out := make([]Cue, len(cues))
 	for i, c := range cues {
@@ -233,15 +239,7 @@ func gatherCandidates(
 	inWindow windowFunc,
 	topK int,
 ) []CuePair {
-	var refs []strongRef
-	for j := range reference {
-		if refStrong[j] {
-			refs = append(refs, strongRef{startMs: reference[j].Start.Milliseconds(), origIdx: j})
-		}
-	}
-	slices.SortFunc(refs, func(a, b strongRef) int {
-		return cmp.Compare(a.startMs, b.startMs)
-	})
+	refs := collectStrongRefs(reference, refStrong)
 
 	var candidates []CuePair
 	for i := range incorrect {
@@ -252,39 +250,7 @@ func gatherCandidates(
 			continue
 		}
 		incStartMs := incorrect[i].Start.Milliseconds()
-
-		lo := findFirstGE(refs, incStartMs-estimateMaxWindowMs(refs, incStartMs, inWindow))
-		hi := findFirstGE(refs, incStartMs+estimateMaxWindowMs(refs, incStartMs, inWindow)+1)
-		hi = min(hi, len(refs))
-
-		var cands []scored
-		for k := lo; k < hi; k++ {
-			j := refs[k].origIdx
-			refStartMs := refs[k].startMs
-
-			ok, normDist := inWindow(incStartMs, refStartMs)
-			if !ok {
-				continue
-			}
-
-			s := anchorMatchScore(&incAnchors[i], &refAnchors[j])
-			if s < defaultAnchorScoreConfig.MinScore {
-				continue
-			}
-
-			posFactor := 1.0 - normDist
-			combined := s*(1.0-defaultAnchorScoreConfig.PositionBlend) + defaultAnchorScoreConfig.PositionBlend*posFactor
-
-			cands = append(cands, scored{j, combined, refStartMs - incStartMs})
-		}
-
-		slices.SortFunc(cands, func(a, b scored) int {
-			return cmp.Compare(b.score, a.score)
-		})
-		if len(cands) > topK {
-			cands = cands[:topK]
-		}
-		for _, c := range cands {
+		for _, c := range scoredCandidatesForCue(i, incStartMs, refs, incAnchors, refAnchors, inWindow, topK) {
 			candidates = append(candidates, CuePair{
 				IncIdx: i, RefIdx: c.refIdx,
 				Score: c.score, OffsetMs: c.offsetMs,
@@ -292,6 +258,59 @@ func gatherCandidates(
 		}
 	}
 	return candidates
+}
+
+// collectStrongRefs gathers the strongly-anchored reference cues sorted by
+// start time, ready for windowed binary search.
+func collectStrongRefs(reference []Cue, refStrong []bool) []strongRef {
+	var refs []strongRef
+	for j := range reference {
+		if refStrong[j] {
+			refs = append(refs, strongRef{startMs: reference[j].Start.Milliseconds(), origIdx: j})
+		}
+	}
+	slices.SortFunc(refs, func(a, b strongRef) int {
+		return cmp.Compare(a.startMs, b.startMs)
+	})
+	return refs
+}
+
+// scoredCandidatesForCue scores every in-window reference anchor against the
+// incorrect cue at index i and returns the top-K matches by combined score.
+func scoredCandidatesForCue(
+	i int,
+	incStartMs int64,
+	refs []strongRef,
+	incAnchors, refAnchors []anchor,
+	inWindow windowFunc,
+	topK int,
+) []scored {
+	span := estimateMaxWindowMs(refs, incStartMs, inWindow)
+	lo := findFirstGE(refs, incStartMs-span)
+	hi := min(findFirstGE(refs, incStartMs+span+1), len(refs))
+
+	var cands []scored
+	for k := lo; k < hi; k++ {
+		ok, normDist := inWindow(incStartMs, refs[k].startMs)
+		if !ok {
+			continue
+		}
+		s := anchorMatchScore(&incAnchors[i], &refAnchors[refs[k].origIdx])
+		if s < defaultAnchorScoreConfig.MinScore {
+			continue
+		}
+		posFactor := 1.0 - normDist
+		combined := s*(1.0-defaultAnchorScoreConfig.PositionBlend) + defaultAnchorScoreConfig.PositionBlend*posFactor
+		cands = append(cands, scored{refs[k].origIdx, combined, refs[k].startMs - incStartMs})
+	}
+
+	slices.SortFunc(cands, func(a, b scored) int {
+		return cmp.Compare(b.score, a.score)
+	})
+	if len(cands) > topK {
+		cands = cands[:topK]
+	}
+	return cands
 }
 
 func findFirstGE(refs []strongRef, target int64) int {
@@ -369,38 +388,14 @@ func weightedMedianOffset(pairs []CuePair) int64 {
 }
 
 func dpAlign(pairs []CuePair) []CuePair {
-	slices.SortFunc(pairs, func(a, b CuePair) int {
-		if a.IncIdx != b.IncIdx {
-			return cmp.Compare(a.IncIdx, b.IncIdx)
-		}
-		return cmp.Compare(a.RefIdx, b.RefIdx)
-	})
+	slices.SortFunc(pairs, compareCuePair)
 
 	n := len(pairs)
 	if n == 0 {
 		return nil
 	}
 
-	dp := make([]float64, n)
-	parent := make([]int, n)
-	for i := range parent {
-		parent[i] = -1
-	}
-
-	for i := range n {
-		dp[i] = pairs[i].Score //nolint:gosec // G602: i in [0,n), n == len(pairs)
-		start := max(0, i-dpMaxPredecessors)
-		for j := i - 1; j >= start; j-- {
-			if pairs[j].IncIdx < pairs[i].IncIdx && //nolint:gosec // G602: i in [0,n), n == len(pairs)
-				pairs[j].RefIdx < pairs[i].RefIdx { //nolint:gosec // G602: i in [0,n), n == len(pairs)
-				candidate := dp[j] + pairs[i].Score //nolint:gosec // G602: i in [0,n), n == len(pairs)
-				if candidate > dp[i] {
-					dp[i] = candidate
-					parent[i] = j
-				}
-			}
-		}
-	}
+	dp, parent := computeDP(pairs)
 
 	bestIdx := 0
 	for i := 1; i < n; i++ {
@@ -421,4 +416,37 @@ func dpAlign(pairs []CuePair) []CuePair {
 	}
 	slices.Reverse(path)
 	return path
+}
+
+// compareCuePair orders pairs by IncIdx, then RefIdx — the canonical order the
+// DP fill assumes.
+func compareCuePair(a, b CuePair) int {
+	if a.IncIdx != b.IncIdx {
+		return cmp.Compare(a.IncIdx, b.IncIdx)
+	}
+	return cmp.Compare(a.RefIdx, b.RefIdx)
+}
+
+// computeDP runs the longest-increasing-path DP over the sorted pairs and
+// returns the best accumulated score and the parent chain for each node. Each
+// node looks back only over a bounded predecessor window (dpMaxPredecessors).
+func computeDP(pairs []CuePair) (dp []float64, parent []int) {
+	n := len(pairs)
+	dp = make([]float64, n)
+	parent = make([]int, n)
+	for i := range n {
+		parent[i] = -1
+		dp[i] = pairs[i].Score
+		start := max(0, i-dpMaxPredecessors)
+		for j := i - 1; j >= start; j-- {
+			if pairs[j].IncIdx >= pairs[i].IncIdx || pairs[j].RefIdx >= pairs[i].RefIdx {
+				continue
+			}
+			if candidate := dp[j] + pairs[i].Score; candidate > dp[i] {
+				dp[i] = candidate
+				parent[i] = j
+			}
+		}
+	}
+	return dp, parent
 }

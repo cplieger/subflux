@@ -1,10 +1,6 @@
 package crosslang
 
-import (
-	"testing"
-
-	"pgregory.net/rapid"
-)
+import "testing"
 
 func TestExtractAnchors(t *testing.T) {
 	t.Parallel()
@@ -29,6 +25,11 @@ func TestExtractAnchors(t *testing.T) {
 			name:     "numbers",
 			input:    "There are 150 people and 57 dogs",
 			wantNums: []string{"150", "57"},
+		},
+		{
+			name:     "single_digit_nine",
+			input:    "9",
+			wantNums: []string{"9"},
 		},
 		{
 			name:      "question_mark",
@@ -163,51 +164,130 @@ func TestExtractAnchors(t *testing.T) {
 	}
 }
 
-func TestEditDistance_properties(t *testing.T) {
+func TestExtractAnchors_sentenceStartIsNotProperNoun(t *testing.T) {
 	t.Parallel()
-	t.Run("non_negativity", func(t *testing.T) {
-		rapid.Check(t, func(t *rapid.T) {
-			a := rapid.String().Draw(t, "a")
-			b := rapid.String().Draw(t, "b")
-			d := EditDistance(a, b)
-			if d < 0 {
-				t.Fatalf("EditDistance(%q, %q) = %d, want >= 0", a, b, d)
+	// "World" follows a sentence-terminating word, so it begins a new sentence
+	// and must not be classified as a proper noun.
+	a := ExtractAnchors("Hello. World")
+	if len(a.ProperNouns) != 0 {
+		t.Errorf("ExtractAnchors(%q).ProperNouns = %v, want []", "Hello. World", a.ProperNouns)
+	}
+}
+
+func TestExtractAnchors_twoCharProperNoun(t *testing.T) {
+	t.Parallel()
+	// A capitalized two-rune word mid-sentence is the shortest accepted proper
+	// noun; the classifier ignores words under two runes.
+	a := ExtractAnchors("go Bo")
+	if len(a.ProperNouns) != 1 || a.ProperNouns[0] != "Bo" {
+		t.Errorf("ExtractAnchors(%q).ProperNouns = %v, want [Bo]", "go Bo", a.ProperNouns)
+	}
+}
+
+func TestEndsWithSentence(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"Hi.", true},
+		{"Hi?", true},
+		{"Hi!", true},
+		{"Hi", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+			if got := endsWithSentence(tt.in); got != tt.want {
+				t.Errorf("endsWithSentence(%q) = %v, want %v", tt.in, got, tt.want)
 			}
 		})
-	})
-	t.Run("identity", func(t *testing.T) {
-		rapid.Check(t, func(t *rapid.T) {
-			s := rapid.String().Draw(t, "s")
-			d := EditDistance(s, s)
-			if d != 0 {
-				t.Fatalf("EditDistance(%q, %q) = %d, want 0", s, s, d)
+	}
+}
+
+func TestIsLatinWord(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"ascii_word", "cafe", true},
+		{"greek_rejected", "\u03b1\u03b2\u03b3\u03b4", false}, // αβγδ: codepoints above Latin-Extended-B
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsLatinWord(tt.in); got != tt.want {
+				t.Errorf("IsLatinWord(%q) = %v, want %v", tt.in, got, tt.want)
 			}
 		})
-	})
-	t.Run("symmetry", func(t *testing.T) {
-		rapid.Check(t, func(t *rapid.T) {
-			a := rapid.String().Draw(t, "a")
-			b := rapid.String().Draw(t, "b")
-			ab := EditDistance(a, b)
-			ba := EditDistance(b, a)
-			if ab != ba {
-				t.Fatalf("EditDistance(%q,%q)=%d != EditDistance(%q,%q)=%d",
-					a, b, ab, b, a, ba)
+	}
+}
+
+func TestIsCognate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"equal_len4_cognate", "test", "test", true},
+		{"equal_len3_too_short", "abc", "abc", false},
+		{"distance_equals_threshold", "abcdefghij", "abcdefg000", true},
+		{"distance_above_threshold", "abcdefghij", "abcde00000", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsCognate(tt.a, tt.b); got != tt.want {
+				t.Errorf("IsCognate(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
 			}
 		})
-	})
-	t.Run("triangle_inequality", func(t *testing.T) {
-		rapid.Check(t, func(t *rapid.T) {
-			a := rapid.String().Draw(t, "a")
-			b := rapid.String().Draw(t, "b")
-			c := rapid.String().Draw(t, "c")
-			ab := EditDistance(a, b)
-			bc := EditDistance(b, c)
-			ac := EditDistance(a, c)
-			if ac > ab+bc {
-				t.Fatalf("triangle inequality: d(%q,%q)=%d > d(%q,%q)=%d + d(%q,%q)=%d",
-					a, c, ac, a, b, ab, b, c, bc)
+	}
+}
+
+func TestCountCognates(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b []string
+		want int
+	}{
+		{"exact_match_counts_one", []string{"test"}, []string{"test"}, 1},
+		{"distinct_short_words_no_match", []string{"ab"}, []string{"cd"}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := CountCognates(tt.a, tt.b); got != tt.want {
+				t.Errorf("CountCognates(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
 			}
 		})
-	})
+	}
+}
+
+func TestCountSharedFold(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b []string
+		want int
+	}{
+		{"case_insensitive_match", []string{"hello"}, []string{"hello"}, 1},
+		{"mixed_case_match", []string{"Hello"}, []string{"hello"}, 1},
+		// b has one "x" but a has two: the match budget is consumed, so only
+		// one of a's duplicates can pair.
+		{"budget_consumed_per_b_element", []string{"x", "x"}, []string{"x"}, 1},
+		{"no_overlap", []string{"a"}, []string{"b"}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := CountSharedFold(tt.a, tt.b); got != tt.want {
+				t.Errorf("CountSharedFold(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
 }

@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -340,5 +341,37 @@ func TestParseProbeOutput(t *testing.T) {
 	}
 	if tr.Forced {
 		t.Error("expected Forced=false")
+	}
+}
+
+func TestNormalizeFFprobeLang_leadingDashNotTruncated(t *testing.T) {
+	t.Parallel()
+	// A tag beginning with '-' has no primary subtag before the dash, so it is
+	// returned verbatim rather than truncated to the empty string.
+	if got := NormalizeFFprobeLang("-en", nil); got != "-en" {
+		t.Errorf("NormalizeFFprobeLang(%q, nil) = %q, want %q", "-en", got, "-en")
+	}
+	// A normal BCP 47 tag still truncates at the dash.
+	if got := NormalizeFFprobeLang("en-US", nil); got != "en" {
+		t.Errorf("NormalizeFFprobeLang(%q, nil) = %q, want %q", "en-US", got, "en")
+	}
+}
+
+func TestParseProbeOutput_atSizeLimit(t *testing.T) {
+	t.Parallel()
+	// Exactly maxProbeOutputBytes is accepted (the limit is inclusive); only
+	// strictly larger input is rejected. The payload is an empty JSON object
+	// padded with whitespace to the exact limit.
+	n := maxProbeOutputBytes
+	data := bytes.Repeat([]byte(" "), n)
+	data[0] = '{'
+	data[n-1] = '}'
+
+	tracks, err := ParseProbeOutput(data)
+	if err != nil {
+		t.Fatalf("ParseProbeOutput(len==maxProbeOutputBytes) error = %v, want nil", err)
+	}
+	if len(tracks) != 0 {
+		t.Errorf("ParseProbeOutput(empty object) tracks = %d, want 0", len(tracks))
 	}
 }

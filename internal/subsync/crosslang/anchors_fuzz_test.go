@@ -1,6 +1,9 @@
 package crosslang
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // FuzzIsCognateSymmetric asserts the IsCognate relation is symmetric:
 // IsCognate(a,b) == IsCognate(b,a).
@@ -81,18 +84,32 @@ func FuzzIsLatinWordPureASCII(f *testing.F) {
 	})
 }
 
+// FuzzCountCognatesBounded asserts CountCognates' count is always within
+// [0, min(len(a), len(b))]: a greedy-matching or index-overflow bug could
+// produce a count exceeding the smaller list, pushing the downstream
+// cognates/total confidence ratio above 1.0 and corrupting alignment scoring.
+func FuzzCountCognatesBounded(f *testing.F) {
+	f.Add("hello,world", "hallo,welt")
+	f.Add("", "")
+	f.Add("a", "a")
+	f.Add("test,case,here", "TEST,CASE")
+	f.Add("café,naïve", "cafe,naive")
+	f.Add("x,y,z", "a,b,c")
+
+	f.Fuzz(func(t *testing.T, csvA, csvB string) {
+		a := splitCSV(csvA)
+		b := splitCSV(csvB)
+		got := CountCognates(a, b)
+		smaller := min(len(a), len(b))
+		if got < 0 || got > smaller {
+			t.Fatalf("CountCognates(%v, %v) = %d; want in [0, %d]", a, b, got, smaller)
+		}
+	})
+}
+
 func splitCSV(s string) []string {
 	if s == "" {
 		return nil
 	}
-	out := []string{""}
-	for i := range s {
-		c := s[i]
-		if c == ',' {
-			out = append(out, "")
-		} else {
-			out[len(out)-1] += string(c)
-		}
-	}
-	return out
+	return strings.Split(s, ",")
 }
