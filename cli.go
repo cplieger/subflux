@@ -152,23 +152,38 @@ func doEnablePasswordLogin() error {
 	if err != nil {
 		return fmt.Errorf("read config %s: %w", configPath, err)
 	}
-	var doc yaml.Node
-	if uerr := yaml.Unmarshal(data, &doc); uerr != nil {
-		return fmt.Errorf("parse config: %w", uerr)
-	}
-	if len(doc.Content) == 0 {
-		return errors.New("config is empty")
-	}
-	yamlSetBool(yamlChild(doc.Content[0], "auth"), "basic_enabled", true)
-	out, err := yaml.Marshal(&doc)
+	out, err := enablePasswordLoginYAML(data)
 	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
+		return err
 	}
 	if err := fsutil.AtomicWriteFileMode(context.Background(), configPath, out, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	fmt.Fprintln(os.Stderr, "Password login re-enabled (auth.basic_enabled: true). Restart subflux to apply.")
 	return nil
+}
+
+// enablePasswordLoginYAML parses config YAML and returns it with
+// auth.basic_enabled set to true, creating the auth mapping when it is
+// absent and coercing it from a non-mapping value (e.g. null). Sibling
+// keys and sections are preserved. This is the pure transform extracted
+// from doEnablePasswordLogin so the YAML rewrite is testable without
+// touching the on-disk config at the fixed container path. Returns an
+// error for malformed or empty YAML.
+func enablePasswordLoginYAML(data []byte) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	if len(doc.Content) == 0 {
+		return nil, errors.New("config is empty")
+	}
+	yamlSetBool(yamlChild(doc.Content[0], "auth"), "basic_enabled", true)
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal config: %w", err)
+	}
+	return out, nil
 }
 
 // yamlChild returns the mapping node for key under m, creating it if absent
