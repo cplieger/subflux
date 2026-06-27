@@ -2,22 +2,11 @@ package vad
 
 // Minimum value tracker ported from vad_core.c (WebRTC).
 
-// findMinimum: exact port of WebRtcVad_FindMinimum.
-// Maintains a sorted list of the 16 smallest values over the last 100 frames,
-// returns the smoothed median of the 5 smallest.
-//
-//nolint:gocyclo // numerical algorithm ported from WebRTC with inherent branching
-func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
-	const (
-		smoothDown int16 = 6553  // 0.2 in Q15
-		smoothUp   int16 = 32439 // 0.99 in Q15
-	)
-
-	off := ch << 4 // 16 values per channel
-	age := v.indexVec[off : off+16]
-	sv := v.lowValue[off : off+16]
-
-	// Age all values; remove those older than 100 frames.
+// ageMinValues increments the age of every tracked minimum and evicts any value
+// older than 100 frames, shifting the tail down and refilling the vacated top
+// slot with the 10000 sentinel. age and sv are the 16-entry per-channel views
+// into indexVec / lowValue.
+func ageMinValues(age, sv []int16) {
 	for i := range 16 {
 		if age[i] != 100 {
 			age[i]++
@@ -30,8 +19,18 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 			sv[15] = 10000
 		}
 	}
+}
 
-	// Binary search for insertion position.
+// insertSorted places featureVal into the ascending 16-entry minimum list sv
+// (with parallel ages in age) at its sorted position, shifting the tail right
+// and dropping the largest value; values not smaller than every entry are not
+// inserted. The position search is a verbatim port of WebRtcVad_FindMinimum's
+// hand-unrolled binary-search tree, kept as an explicit decision tree rather
+// than a loop so the fixed-point port stays byte-for-byte faithful to the C
+// source.
+//
+//nolint:gocyclo,gocognit // verbatim unrolled binary-search tree from the WebRTC port; flattening to a loop would diverge from the reference
+func insertSorted(sv, age []int16, featureVal int16) {
 	pos := -1
 	//nolint:gocritic // ifElseChain: binary search tree is a faithful port of WebRTC C code
 	if featureVal < sv[7] {
@@ -84,7 +83,6 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 		}
 	}
 
-	// Insert and shift.
 	if pos >= 0 {
 		for i := 15; i > pos; i-- {
 			sv[i] = sv[i-1]
@@ -93,8 +91,17 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 		sv[pos] = featureVal
 		age[pos] = 1
 	}
+}
 
-	// Get current median.
+// smoothMedian selects the current per-channel median from the sorted minimum
+// list and applies the fixed-point exponential smoothing (asymmetric: fast
+// down, slow up) that produces the returned long-term minimum estimate.
+func (v *vadInst) smoothMedian(ch int, sv []int16) int16 {
+	const (
+		smoothDown int16 = 6553  // 0.2 in Q15
+		smoothUp   int16 = 32439 // 0.99 in Q15
+	)
+
 	var currentMedian int16 = 1600
 	if v.frameCounter > 2 {
 		currentMedian = sv[2]
@@ -102,7 +109,6 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 		currentMedian = sv[0]
 	}
 
-	// Smooth the median.
 	var alpha int16
 	if v.frameCounter > 0 {
 		if currentMedian < v.meanVal[ch] {
@@ -116,4 +122,17 @@ func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
 	v.meanVal[ch] = int16(tmp32 >> 15) //nolint:gosec // G115: fixed-point DSP
 
 	return v.meanVal[ch]
+}
+
+// findMinimum: exact port of WebRtcVad_FindMinimum.
+// Maintains a sorted list of the 16 smallest values over the last 100 frames,
+// returns the smoothed median of the 5 smallest.
+func (v *vadInst) findMinimum(featureVal int16, ch int) int16 {
+	off := ch << 4 // 16 values per channel
+	age := v.indexVec[off : off+16]
+	sv := v.lowValue[off : off+16]
+
+	ageMinValues(age, sv)
+	insertSorted(sv, age, featureVal)
+	return v.smoothMedian(ch, sv)
 }
