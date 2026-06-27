@@ -19,29 +19,7 @@ type alignEvent struct {
 // them by offset, then sweeps through to find the offset with the highest
 // cumulative rating.
 func alignMergeSort(ctx context.Context, ref, inc []TimeSpan, minOffset int64) int64 {
-	capacity := min(int64(len(ref))*int64(len(inc))*4, maxAlignEvents)
-	events := make([]alignEvent, 0, capacity)
-
-outer:
-	for _, r := range ref {
-		for _, s := range inc {
-			score := spanScore(r, s)
-			if score == 0 {
-				continue
-			}
-			if int64(len(events))+4 > maxAlignEvents {
-				slog.Warn("alignment: event cap reached, truncating",
-					"events", len(events), "cap", maxAlignEvents)
-				break outer
-			}
-			events = append(events,
-				alignEvent{r.Start - s.End, score},
-				alignEvent{r.End - s.End, -score},
-				alignEvent{r.Start - s.Start, -score},
-				alignEvent{r.End - s.Start, score},
-			)
-		}
-	}
+	events := buildAlignEvents(ref, inc)
 
 	if ctx.Err() != nil {
 		return 0
@@ -78,4 +56,33 @@ outer:
 	slog.Debug("alignment complete (merge)",
 		"offset_ms", bestOffset, "rating", bestRating, "events", len(events))
 	return bestOffset
+}
+
+// buildAlignEvents generates the merge-sort event list: 4 piecewise-linear
+// rating-derivative breakpoints per reference/incorrect span pair, capped at
+// maxAlignEvents to bound memory on pathological inputs.
+func buildAlignEvents(ref, inc []TimeSpan) []alignEvent {
+	capacity := min(int64(len(ref))*int64(len(inc))*4, maxAlignEvents)
+	events := make([]alignEvent, 0, capacity)
+
+	for _, r := range ref {
+		for _, s := range inc {
+			score := spanScore(r, s)
+			if score == 0 {
+				continue
+			}
+			if int64(len(events))+4 > maxAlignEvents {
+				slog.Warn("alignment: event cap reached, truncating",
+					"events", len(events), "cap", maxAlignEvents)
+				return events
+			}
+			events = append(events,
+				alignEvent{r.Start - s.End, score},
+				alignEvent{r.End - s.End, -score},
+				alignEvent{r.Start - s.Start, -score},
+				alignEvent{r.End - s.Start, score},
+			)
+		}
+	}
+	return events
 }

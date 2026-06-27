@@ -268,11 +268,8 @@ func assCollectStyles(data []byte, maxLine int) (styleNames []string, styleCount
 	inEvents := false
 	for scanner.Scan() {
 		line := scanner.Text()
-		if rest, ok := strings.CutPrefix(line, "Style:"); ok {
-			rest = strings.TrimSpace(rest)
-			if comma := strings.IndexByte(rest, ','); comma > 0 {
-				styleNames = append(styleNames, rest[:comma])
-			}
+		if name, ok := assParseStyleName(line); ok {
+			styleNames = append(styleNames, name)
 		}
 		if strings.HasPrefix(line, "[Events]") {
 			inEvents = true
@@ -281,17 +278,45 @@ func assCollectStyles(data []byte, maxLine int) (styleNames []string, styleCount
 		if strings.HasPrefix(line, "[") && inEvents {
 			break // next section; matches pass 2 behavior
 		}
-		if inEvents {
-			if rest, ok := strings.CutPrefix(line, "Dialogue:"); ok {
-				rest = strings.TrimSpace(rest)
-				parts := strings.SplitN(rest, ",", 10)
-				if len(parts) >= 10 {
-					styleCounts[strings.TrimSpace(parts[3])]++
-				}
-			}
+		if !inEvents {
+			continue
+		}
+		if style, ok := assParseDialogueStyle(line); ok {
+			styleCounts[style]++
 		}
 	}
 	return styleNames, styleCounts, scanner.Err()
+}
+
+// assParseStyleName extracts the style name from a "Style:" definition line.
+// ok is false when the line is not a style definition or has no name field.
+func assParseStyleName(line string) (name string, ok bool) {
+	rest, cut := strings.CutPrefix(line, "Style:")
+	if !cut {
+		return "", false
+	}
+	rest = strings.TrimSpace(rest)
+	comma := strings.IndexByte(rest, ',')
+	if comma <= 0 {
+		return "", false
+	}
+	return rest[:comma], true
+}
+
+// assParseDialogueStyle extracts the style-name field from a "Dialogue:" event
+// line. ok is false when the line is not a well-formed dialogue line; an empty
+// style name with ok=true is preserved so the caller counts it identically.
+func assParseDialogueStyle(line string) (style string, ok bool) {
+	rest, cut := strings.CutPrefix(line, "Dialogue:")
+	if !cut {
+		return "", false
+	}
+	rest = strings.TrimSpace(rest)
+	parts := strings.SplitN(rest, ",", 10)
+	if len(parts) < 10 {
+		return "", false
+	}
+	return strings.TrimSpace(parts[3]), true
 }
 
 // assExtractCues scans ASS data and extracts dialogue and mask cues
@@ -312,47 +337,14 @@ func assExtractCues(data []byte, maxLine int, dialogueStyles map[string]bool) (d
 		if strings.HasPrefix(line, "[") && inEvents {
 			break // next section
 		}
-
 		if !inEvents {
 			continue
 		}
 
-		// Parse Dialogue lines.
-		// Format: Dialogue: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
-		rest, ok := strings.CutPrefix(line, "Dialogue:")
+		cue, styleName, ok := assParseDialogueCue(line)
 		if !ok {
 			continue
 		}
-
-		// Split into at most 10 fields (text field may contain commas).
-		rest = strings.TrimSpace(rest)
-		parts := strings.SplitN(rest, ",", 10)
-		if len(parts) < 10 {
-			continue
-		}
-
-		styleName := strings.TrimSpace(parts[3])
-
-		// Parse timestamps.
-		startTime, err1 := parseASSTime(parts[1])
-		endTime, err2 := parseASSTime(parts[2])
-		if err1 != nil || err2 != nil {
-			continue
-		}
-
-		// Extract text (field 9), strip ASS override tags.
-		text := parts[9]
-		text = stripASSOverrides(text)
-		text = strings.ReplaceAll(text, `\N`, "\n")
-		text = strings.ReplaceAll(text, `\n`, "\n")
-		text = strings.ReplaceAll(text, `\h`, "\u00A0")
-		text = strings.TrimSpace(text)
-
-		if text == "" {
-			continue
-		}
-
-		cue := Cue{Start: startTime, End: endTime, Text: text}
 
 		// ALL cues go to mask — even OP/ED/signs mark time regions
 		// with audio activity, giving broader mask coverage.
@@ -365,6 +357,45 @@ func assExtractCues(data []byte, maxLine int, dialogueStyles map[string]bool) (d
 	}
 
 	return dialogueCues, maskCues, scanner.Err()
+}
+
+// assParseDialogueCue parses a single "Dialogue:" event line into a cue and
+// its style name. ok is false for non-dialogue lines, malformed lines,
+// unparseable timestamps, or empty text after tag stripping.
+//
+// Dialogue format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+func assParseDialogueCue(line string) (cue Cue, styleName string, ok bool) {
+	rest, cut := strings.CutPrefix(line, "Dialogue:")
+	if !cut {
+		return Cue{}, "", false
+	}
+
+	// Split into at most 10 fields (text field may contain commas).
+	rest = strings.TrimSpace(rest)
+	parts := strings.SplitN(rest, ",", 10)
+	if len(parts) < 10 {
+		return Cue{}, "", false
+	}
+
+	// Parse timestamps.
+	startTime, err1 := parseASSTime(parts[1])
+	endTime, err2 := parseASSTime(parts[2])
+	if err1 != nil || err2 != nil {
+		return Cue{}, "", false
+	}
+
+	// Extract text (field 9), strip ASS override tags.
+	text := parts[9]
+	text = stripASSOverrides(text)
+	text = strings.ReplaceAll(text, `\N`, "\n")
+	text = strings.ReplaceAll(text, `\n`, "\n")
+	text = strings.ReplaceAll(text, `\h`, "\u00A0")
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return Cue{}, "", false
+	}
+
+	return Cue{Start: startTime, End: endTime, Text: text}, strings.TrimSpace(parts[3]), true
 }
 
 // parseASSTime parses an ASS timestamp like "0:02:34.56" into time.Duration.

@@ -182,51 +182,17 @@ func linearRegression(points []driftPoint) (slope, intercept, r2 float64) {
 // Evaluates all candidates within tolerance and picks the one that produces
 // the best alignment score, not just the closest ratio numerically.
 func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2, videoFPS float64, reference []Cue) (SyncResult, bool) {
-	fpsTolerance := defaultFramerateConfig.FPSTolerance
-
-	// Collect all candidates within tolerance.
-	var candidates []*framerate.RatioPair
-
-	for i := range framerate.KnownRatios {
-		pair := &framerate.KnownRatios[i]
-
-		if videoFPS > 0 {
-			fromMatch := math.Abs(pair.From-videoFPS) < fpsTolerance
-			toMatch := math.Abs(pair.To-videoFPS) < fpsTolerance
-			if !fromMatch && !toMatch {
-				continue
-			}
-		}
-
-		relErr := math.Abs(observed-pair.Ratio) / pair.Ratio
-		if relErr < defaultFramerateConfig.RatioTolerance {
-			candidates = append(candidates, pair)
-		}
-	}
-
+	candidates := collectRatioCandidates(observed, videoFPS)
 	if len(candidates) == 0 {
 		return SyncResult{}, false
 	}
 
 	// Evaluate alignment quality to pick the best candidate.
 	refSpans := cuesToSpans(reference)
-	var bestPair *framerate.RatioPair
-	var bestCues []Cue
-	bestScore := math.Inf(-1)
-
-	for _, pair := range candidates {
-		if ctx.Err() != nil {
-			return SyncResult{}, false
-		}
-		scaled := scaleCues(incorrect, pair.Ratio)
-		scaledSpans := cuesToSpans(scaled)
-		offset := alignConstantOffset(ctx, refSpans, scaledSpans)
-		score := alignmentScore(refSpans, scaledSpans, offset)
-		if score > bestScore {
-			bestScore = score
-			bestPair = pair
-			bestCues = scaled
-		}
+	bestPair, bestCues := bestRatioCandidate(ctx, candidates, incorrect, refSpans)
+	if bestPair == nil {
+		// Context cancelled (or no candidate scored finite); no match.
+		return SyncResult{}, false
 	}
 
 	corrected := bestCues
@@ -252,4 +218,56 @@ func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2,
 		Confidence: confidence,
 		Method:     MethodFramerate,
 	}, true
+}
+
+// collectRatioCandidates returns the known framerate pairs whose ratio is
+// within tolerance of the observed drift ratio. When videoFPS > 0, only pairs
+// involving that FPS (within FPSTolerance) are considered.
+func collectRatioCandidates(observed, videoFPS float64) []*framerate.RatioPair {
+	fpsTolerance := defaultFramerateConfig.FPSTolerance
+
+	var candidates []*framerate.RatioPair
+	for i := range framerate.KnownRatios {
+		pair := &framerate.KnownRatios[i]
+
+		if videoFPS > 0 {
+			fromMatch := math.Abs(pair.From-videoFPS) < fpsTolerance
+			toMatch := math.Abs(pair.To-videoFPS) < fpsTolerance
+			if !fromMatch && !toMatch {
+				continue
+			}
+		}
+
+		relErr := math.Abs(observed-pair.Ratio) / pair.Ratio
+		if relErr < defaultFramerateConfig.RatioTolerance {
+			candidates = append(candidates, pair)
+		}
+	}
+	return candidates
+}
+
+// bestRatioCandidate scales the incorrect cues by each candidate ratio and
+// returns the pair (with its scaled cues) that produces the best alignment
+// score. Returns (nil, nil) if the context is cancelled before a candidate is
+// evaluated.
+func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, incorrect []Cue, refSpans []TimeSpan) (*framerate.RatioPair, []Cue) {
+	var bestPair *framerate.RatioPair
+	var bestCues []Cue
+	bestScore := math.Inf(-1)
+
+	for _, pair := range candidates {
+		if ctx.Err() != nil {
+			return nil, nil
+		}
+		scaled := scaleCues(incorrect, pair.Ratio)
+		scaledSpans := cuesToSpans(scaled)
+		offset := alignConstantOffset(ctx, refSpans, scaledSpans)
+		score := alignmentScore(refSpans, scaledSpans, offset)
+		if score > bestScore {
+			bestScore = score
+			bestPair = pair
+			bestCues = scaled
+		}
+	}
+	return bestPair, bestCues
 }

@@ -140,40 +140,50 @@ func perCueOffsets(ctx context.Context, refSpans []TimeSpan, incorrect []Cue) []
 		end := min(start+chunkSize, n)
 
 		g.Go(func() error {
-			for i := start; i < end; i++ {
-				if err := gctx.Err(); err != nil {
-					return err
-				}
-				cue := incorrect[i]
-				incSpan := TimeSpan{
-					Start: cue.Start.Milliseconds(),
-					End:   cue.End.Milliseconds(),
-				}
-
-				var bestScore float64
-				var bestOffset int64
-
-				for _, ref := range refSpans {
-					offset := ref.Start - incSpan.Start
-					shifted := TimeSpan{
-						Start: incSpan.Start + offset,
-						End:   incSpan.End + offset,
-					}
-					score := spanScore(ref, shifted)
-					if score > bestScore {
-						bestScore = score
-						bestOffset = offset
-					}
-				}
-
-				offsets[i] = perCueOffset{offsetMs: bestOffset}
-			}
-			return nil
+			return fillCueOffsets(gctx, offsets, incorrect, refSpans, start, end)
 		})
 	}
 
 	_ = g.Wait()
 	return offsets
+}
+
+// fillCueOffsets computes the best offset for incorrect cues in [start,end)
+// and stores them in offsets. Runs as one parallel chunk; returns early if
+// the context is cancelled.
+func fillCueOffsets(ctx context.Context, offsets []perCueOffset, incorrect []Cue, refSpans []TimeSpan, start, end int) error {
+	for i := start; i < end; i++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		cue := incorrect[i]
+		incSpan := TimeSpan{
+			Start: cue.Start.Milliseconds(),
+			End:   cue.End.Milliseconds(),
+		}
+		offsets[i] = perCueOffset{offsetMs: bestCueOffset(incSpan, refSpans)}
+	}
+	return nil
+}
+
+// bestCueOffset returns the constant offset that maximizes the overlap score
+// between incSpan (shifted by that offset) and any reference span.
+func bestCueOffset(incSpan TimeSpan, refSpans []TimeSpan) int64 {
+	var bestScore float64
+	var bestOffset int64
+	for _, ref := range refSpans {
+		offset := ref.Start - incSpan.Start
+		shifted := TimeSpan{
+			Start: incSpan.Start + offset,
+			End:   incSpan.End + offset,
+		}
+		score := spanScore(ref, shifted)
+		if score > bestScore {
+			bestScore = score
+			bestOffset = offset
+		}
+	}
+	return bestOffset
 }
 
 // buildSegments creates segments from split points and computes the best

@@ -1,6 +1,9 @@
 package subsync
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func FuzzNormalizeEncoding(f *testing.F) {
 	// UTF-8 BOM
@@ -21,6 +24,25 @@ func FuzzNormalizeEncoding(f *testing.F) {
 		result := NormalizeEncoding(data)
 		if result == nil {
 			t.Error("NormalizeEncoding returned nil")
+		}
+	})
+}
+
+// FuzzNormalizeEncodingIdempotent checks that encoding normalization reaches a
+// fixed point: once converted to UTF-8 (BOM stripped), a second pass must
+// produce identical bytes.
+func FuzzNormalizeEncodingIdempotent(f *testing.F) {
+	f.Add([]byte("hello"))
+	f.Add([]byte{0xEF, 0xBB, 0xBF, 'h', 'i'})
+	f.Add([]byte{0xFF, 0xFE, 'a', 0})
+	f.Add([]byte{0x93, 0x94})
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		once := NormalizeEncoding(data)
+		twice := NormalizeEncoding(once)
+		if !bytes.Equal(once, twice) {
+			t.Errorf("NormalizeEncoding not idempotent: once=%q twice=%q", once, twice)
 		}
 	})
 }

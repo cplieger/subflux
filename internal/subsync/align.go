@@ -116,24 +116,8 @@ func alignBucketSort(ctx context.Context, ref, inc []TimeSpan, minOffset, maxOff
 
 	deltas := make([]float64, size)
 
-	var iterations int
-	for _, r := range ref {
-		for _, s := range inc {
-			iterations++
-			if iterations%10000 == 0 {
-				if ctx.Err() != nil {
-					return 0
-				}
-			}
-			score := spanScore(r, s)
-			if score == 0 {
-				continue
-			}
-			addDelta(deltas, r.Start-s.End-minOffset, score, size)
-			addDelta(deltas, r.End-s.End-minOffset, -score, size)
-			addDelta(deltas, r.Start-s.Start-minOffset, -score, size)
-			addDelta(deltas, r.End-s.Start-minOffset, score, size)
-		}
+	if !accumulateDeltas(ctx, deltas, ref, inc, minOffset, size) {
+		return 0
 	}
 
 	var derivative, rating, bestRating float64
@@ -151,6 +135,30 @@ func alignBucketSort(ctx context.Context, ref, inc []TimeSpan, minOffset, maxOff
 	slog.Debug("alignment complete (bucket)",
 		"offset_ms", bestOffset, "rating", bestRating, "range_ms", size)
 	return bestOffset
+}
+
+// accumulateDeltas fills the bucket-sort delta array with the piecewise-linear
+// rating-derivative breakpoints for every reference/incorrect span pair. It
+// reports false if the context was cancelled mid-accumulation.
+func accumulateDeltas(ctx context.Context, deltas []float64, ref, inc []TimeSpan, minOffset, size int64) bool {
+	var iterations int
+	for _, r := range ref {
+		for _, s := range inc {
+			iterations++
+			if iterations%10000 == 0 && ctx.Err() != nil {
+				return false
+			}
+			score := spanScore(r, s)
+			if score == 0 {
+				continue
+			}
+			addDelta(deltas, r.Start-s.End-minOffset, score, size)
+			addDelta(deltas, r.End-s.End-minOffset, -score, size)
+			addDelta(deltas, r.Start-s.Start-minOffset, -score, size)
+			addDelta(deltas, r.End-s.Start-minOffset, score, size)
+		}
+	}
+	return true
 }
 
 // addDelta safely adds val to deltas[idx] if idx is within bounds.

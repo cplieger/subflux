@@ -440,7 +440,7 @@ func TestParseSRT_exact_millisecond_values(t *testing.T) {
 
 func TestParseTime_error_branches(t *testing.T) {
 	t.Parallel()
-	// Covers the 4 error return paths in parseTime (srt.go:119-133).
+	// Covers the 4 numeric-parse error paths in parseTime (one per H/M/S/ms field).
 	// These are unreachable via ParseSRT (regex pre-validates numeric format),
 	// but testing them directly ensures the error handling is correct.
 	tests := []struct {
@@ -637,7 +637,7 @@ func genCue(t *rapid.T) Cue {
 	}
 }
 
-// --- Mutant-killing: ParseSRT scanner buffer ---
+// --- ParseSRT scanner buffer ---
 
 func TestParseSRT_large_line(t *testing.T) {
 	t.Parallel()
@@ -660,7 +660,7 @@ func TestParseSRT_large_line(t *testing.T) {
 	}
 }
 
-// --- Mutant-killing: ParseSRT scanner.Err() propagation ---
+// --- ParseSRT scanner.Err() propagation ---
 
 func TestParseSRT_reader_error_propagated(t *testing.T) {
 	t.Parallel()
