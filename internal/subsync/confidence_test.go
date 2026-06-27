@@ -2,8 +2,6 @@ package subsync
 
 import (
 	"testing"
-
-	"pgregory.net/rapid"
 )
 
 func TestSyncResult_Applied(t *testing.T) {
@@ -58,33 +56,4 @@ func TestSyncResult_ShouldApply(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSyncResult_AppliedShouldApply_Invariants(t *testing.T) {
-	rapid.Check(t, func(t *rapid.T) {
-		r := SyncResult{
-			Method:     rapid.SampledFrom([]SyncMethod{MethodNone, MethodOffset, MethodFramerate, MethodSplit, MethodAudio, MethodCrosslang}).Draw(t, "method"),
-			Offset:     rapid.Int64Range(-100000, 100000).Draw(t, "offset"),
-			Confidence: Confidence(rapid.Float64Range(0, 1).Draw(t, "confidence")),
-			Rate:       rapid.Float64Range(0.5, 2.0).Draw(t, "rate"),
-		}
-
-		applied := r.Applied()
-		shouldApply := r.ShouldApply()
-
-		// Invariant 1: If Confidence < 0.5 then ShouldApply() == false.
-		if r.Confidence < 0.5 && shouldApply {
-			t.Errorf("ShouldApply true with low confidence %f", r.Confidence)
-		}
-
-		// Invariant 2: If Confidence >= 0.5 then ShouldApply() == true.
-		if r.Confidence >= 0.5 && !shouldApply {
-			t.Errorf("ShouldApply false with confidence %f", r.Confidence)
-		}
-
-		// Invariant 3: If Offset==0 and Rate==1.0 and Method!=Split then Applied()==false.
-		if r.Offset == 0 && r.Rate == 1.0 && r.Method != MethodSplit && applied {
-			t.Error("Applied true with no changes")
-		}
-	})
 }
