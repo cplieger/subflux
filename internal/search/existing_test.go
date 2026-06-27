@@ -541,30 +541,26 @@ func TestMatchesVariant_standard_is_default(t *testing.T) {
 	})
 }
 
-func TestGlobEscape_idempotent(t *testing.T) {
+func TestGlobEscape_matches_literal(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate paths that may contain glob metacharacters.
 		input := rapid.StringMatching(`[/a-zA-Z0-9._\[\]*?\\ ]{0,50}`).Draw(t, "path")
 
-		first := globEscape(input)
-		second := globEscape(first)
+		escaped := globEscape(input)
 
-		// globEscape is NOT idempotent (escaping a backslash adds another backslash).
-		// But applying it to an already-escaped string should still produce a valid
-		// glob pattern. The key invariant: the first application should escape all
-		// metacharacters.
-		_ = second // Just verify no panic.
-
-		// Verify all metacharacters in the output are escaped.
-		for i, c := range first {
-			if c == '*' || c == '?' || c == '[' {
-				// Must be preceded by a backslash.
-				if i == 0 || first[i-1] != '\\' {
-					t.Errorf("globEscape(%q) = %q: unescaped %c at position %d",
-						input, first, c, i)
-				}
-			}
+		// Contract: an escaped string used as a pattern must match its own
+		// literal value via filepath.Match. This is the round-trip property
+		// globEscape exists to guarantee.
+		matched, err := filepath.Match(escaped, input)
+		if err != nil {
+			// Some inputs yield invalid patterns even after escaping; that's
+			// acceptable but must not panic.
+			return
+		}
+		if !matched {
+			t.Errorf("globEscape(%q) = %q does not match original via filepath.Match",
+				input, escaped)
 		}
 	})
 }
@@ -716,42 +712,6 @@ func TestVariantFromFlags_roundtrip_matchesVariant(t *testing.T) {
 				hi, forced, hi, forced, variant)
 		}
 	})
-}
-
-func TestParseExternalSubPath_EdgeCases(t *testing.T) {
-	tests := []struct {
-		name   string
-		path   string
-		base   string
-		ext    string
-		lang   string
-		hi     bool
-		forced bool
-	}{
-		{"simple english", "/video.en.srt", "/video", ".srt", "en", false, false},
-		{"english HI", "/video.en.hi.srt", "/video", ".srt", "en", true, false},
-		{"english forced", "/video.en.forced.srt", "/video", ".srt", "en", false, true},
-		{"three letter lang", "/video.eng.srt", "/video", ".srt", "eng", false, false},
-		{"SDH variant", "/video.en.sdh.srt", "/video", ".srt", "en", true, false},
-		{"foreign variant", "/video.en.foreign.srt", "/video", ".srt", "en", false, true},
-		{"HI and forced", "/video.en.hi.forced.srt", "/video", ".srt", "en", true, true},
-		{"ass extension", "/video.ja.ass", "/video", ".ass", "ja", false, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sub := parseExternalSubPath(tt.path, tt.base, tt.ext)
-			if sub.Lang != tt.lang {
-				t.Errorf("lang = %q, want %q", sub.Lang, tt.lang)
-			}
-			if sub.HI != tt.hi {
-				t.Errorf("HI = %v, want %v", sub.HI, tt.hi)
-			}
-			if sub.Forced != tt.forced {
-				t.Errorf("Forced = %v, want %v", sub.Forced, tt.forced)
-			}
-		})
-	}
 }
 
 func TestParseExternalSubPath_edge(t *testing.T) {

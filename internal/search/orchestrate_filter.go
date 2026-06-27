@@ -126,36 +126,55 @@ func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType api.Medi
 func filterByVariant(results []api.Subtitle, variant api.Variant) (filtered []api.Subtitle, fallback bool) {
 	switch variant {
 	case api.VariantForced:
-		for i := range results {
-			if results[i].Forced {
-				filtered = append(filtered, results[i])
-			}
-		}
-		return filtered, false
+		return forcedSubs(results), false
 	case api.VariantHI:
-		for i := range results {
-			if results[i].HearingImp && !results[i].Forced {
-				filtered = append(filtered, results[i])
-			}
-		}
-		return filtered, false
+		return hiOnlySubs(results), false
 	default: // api.VariantStandard, "", or unknown variant
-		var regular, hiSubs []api.Subtitle
-		for i := range results {
-			if results[i].Forced {
-				continue
-			}
-			if results[i].HearingImp {
-				hiSubs = append(hiSubs, results[i])
-			} else {
-				regular = append(regular, results[i])
-			}
-		}
-		if len(regular) > 0 {
-			return regular, false
-		}
-		return hiSubs, len(hiSubs) > 0
+		return standardSubs(results)
 	}
+}
+
+// forcedSubs returns only the forced subtitles from results.
+func forcedSubs(results []api.Subtitle) []api.Subtitle {
+	var filtered []api.Subtitle
+	for i := range results {
+		if results[i].Forced {
+			filtered = append(filtered, results[i])
+		}
+	}
+	return filtered
+}
+
+// hiOnlySubs returns only the hearing-impaired, non-forced subtitles.
+func hiOnlySubs(results []api.Subtitle) []api.Subtitle {
+	var filtered []api.Subtitle
+	for i := range results {
+		if results[i].HearingImp && !results[i].Forced {
+			filtered = append(filtered, results[i])
+		}
+	}
+	return filtered
+}
+
+// standardSubs returns regular (non-HI, non-forced) subtitles, falling back to
+// HI subtitles when no regular subtitle is found. The returned bool reports
+// whether the HI fallback was used.
+func standardSubs(results []api.Subtitle) (filtered []api.Subtitle, fallback bool) {
+	var regular, hi []api.Subtitle
+	for i := range results {
+		if results[i].Forced {
+			continue
+		}
+		if results[i].HearingImp {
+			hi = append(hi, results[i])
+		} else {
+			regular = append(regular, results[i])
+		}
+	}
+	if len(regular) > 0 {
+		return regular, false
+	}
+	return hi, len(hi) > 0
 }
 
 // filterByScore returns results at or above minScore.

@@ -242,6 +242,35 @@ func groupTargetsByLang(targets []api.SubtitleTarget) (groups map[string][]api.S
 	return groups, order
 }
 
+// recordScanArtifacts records the subtitle files discovered on disk and the
+// scan state for coverage tracking, returning whether coverage changed. It is
+// a no-op (returns false) for unidentified media with an empty mediaID.
+func (e *Engine) recordScanArtifacts(ctx context.Context, mediaType api.MediaType,
+	mediaID string, req *api.SearchRequest, existing existingSubs,
+) bool {
+	if mediaID == "" {
+		return false
+	}
+	files := existingToSubtitleFiles(existing)
+	changed, err := e.store.RecordSubtitleFiles(ctx, mediaType, mediaID, files)
+	if err != nil {
+		slog.Warn("failed to record subtitle files",
+			"media_id", mediaID, "error", err)
+	}
+	if err := e.store.RecordScanState(ctx, &api.ScanRecord{
+		MediaType: mediaType,
+		MediaID:   mediaID,
+		Title:     req.Title,
+		AudioLang: req.AudioLang,
+		Season:    req.Season,
+		Episode:   req.Episode,
+	}); err != nil {
+		slog.Warn("failed to record scan state",
+			"media_id", mediaID, "error", err)
+	}
+	return changed
+}
+
 // SearchTargets searches for subtitles using resolved SubtitleTargets.
 // Always searches for regular (non-HI, non-forced) subs, with HI as fallback.
 // Respects per-target provider filtering and min scores.
@@ -274,28 +303,8 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 
 	var result api.SearchResult
 
-	// Record discovered subtitle files for coverage tracking.
-	if mediaID != "" {
-		files := existingToSubtitleFiles(existing)
-		changed, err := e.store.RecordSubtitleFiles(ctx,
-			mediaType, mediaID, files)
-		if err != nil {
-			slog.Warn("failed to record subtitle files",
-				"media_id", mediaID, "error", err)
-		}
-		result.CoverageChanged = changed
-		if err := e.store.RecordScanState(ctx, &api.ScanRecord{
-			MediaType: mediaType,
-			MediaID:   mediaID,
-			Title:     req.Title,
-			AudioLang: req.AudioLang,
-			Season:    req.Season,
-			Episode:   req.Episode,
-		}); err != nil {
-			slog.Warn("failed to record scan state",
-				"media_id", mediaID, "error", err)
-		}
-	}
+	// Record discovered subtitle files and scan state for coverage tracking.
+	result.CoverageChanged = e.recordScanArtifacts(ctx, mediaType, mediaID, req, existing)
 
 	searchCfg := e.cfg.Search()
 	upgradeCutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
