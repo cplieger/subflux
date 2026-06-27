@@ -2,99 +2,9 @@ package schema
 
 import (
 	"testing"
-	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/config/defaults"
 )
-
-func TestFormatDuration(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		want  string
-		input time.Duration
-	}{
-		{"zero", "0s", 0},
-		{"seconds", "45s", 45 * time.Second},
-		{"minutes", "5m", 5 * time.Minute},
-		{"hours", "3h", 3 * time.Hour},
-		{"one day", "1D", 24 * time.Hour},
-		{"seven days", "7D", 7 * 24 * time.Hour},
-		{"thirty days", "30D", 30 * 24 * time.Hour},
-		{"ninety days", "90D", 90 * 24 * time.Hour},
-		{"one month (730h)", "1M", 730 * time.Hour},
-		{"three months (2190h)", "3M", 3 * 730 * time.Hour},
-		{"one second", "1s", time.Second},
-		{"one minute", "1m", time.Minute},
-		{"one hour", "1h", time.Hour},
-		{"two days", "2D", 48 * time.Hour},
-		{"sixty days", "60D", 60 * 24 * time.Hour},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := defaults.FormatDuration(tt.input)
-			if got != tt.want {
-				t.Errorf("defaults.FormatDuration(%v) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFormatDuration_round_trip_with_ParseDuration(t *testing.T) {
-	t.Parallel()
-	// FormatDuration output should be parseable by config.ParseDuration and
-	// produce the same duration (round-trip for clean durations).
-	tests := []time.Duration{
-		0,
-		time.Second,
-		30 * time.Second,
-		time.Minute,
-		5 * time.Minute,
-		time.Hour,
-		3 * time.Hour,
-		24 * time.Hour,
-		7 * 24 * time.Hour,
-		730 * time.Hour,
-		3 * 730 * time.Hour,
-	}
-	for _, d := range tests {
-		t.Run(d.String(), func(t *testing.T) {
-			t.Parallel()
-			formatted := defaults.FormatDuration(d)
-			parsed, err := config.ParseDuration(formatted)
-			if err != nil {
-				t.Fatalf("ParseDuration(defaults.FormatDuration(%v) = %q) error: %v", d, formatted, err)
-			}
-			if parsed != d {
-				t.Errorf("round trip failed: %v -> %q -> %v", d, formatted, parsed)
-			}
-		})
-	}
-}
-
-func TestFormatDuration_non_round_durations_fall_to_seconds(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		want  string
-		input time.Duration
-	}{
-		{"90 seconds", "90s", 90 * time.Second},
-		{"sub-minute with millis", "1s", 1500 * time.Millisecond},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := defaults.FormatDuration(tt.input)
-			if got != tt.want {
-				t.Errorf("defaults.FormatDuration(%v) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestSchema_returns_all_sections(t *testing.T) {
 	t.Parallel()

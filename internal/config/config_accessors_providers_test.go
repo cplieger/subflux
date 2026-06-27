@@ -418,3 +418,43 @@ func TestConfig_Validate_property(t *testing.T) {
 		t.Errorf("Validator.Validate() = %v, want nil", err)
 	}
 }
+
+// --- SyncConfig min-confidence defaulting ---
+
+func TestSyncConfig_zero_confidence_uses_default(t *testing.T) {
+	t.Parallel()
+	// A zero SyncMinConfidence is replaced by the default (0.6).
+	czero := &Config{}
+	czero.PostProcessing.SyncMinConfidence = 0
+	if got := czero.SyncConfig().SyncMinConfidence; got != 0.6 {
+		t.Errorf("SyncConfig().SyncMinConfidence(0) = %v, want 0.6 (DefaultSyncMinConfidence)", got)
+	}
+	// A non-zero value is preserved unchanged.
+	cset := &Config{}
+	cset.PostProcessing.SyncMinConfidence = 0.42
+	if got := cset.SyncConfig().SyncMinConfidence; got != 0.42 {
+		t.Errorf("SyncConfig().SyncMinConfidence(0.42) = %v, want 0.42", got)
+	}
+}
+
+// --- ProviderConfigs cache ---
+
+func TestProviderConfigs_uses_cache_when_present(t *testing.T) {
+	t.Parallel()
+	c := &Config{}
+	c.cachedProviderConfigs = map[api.ProviderID]api.ProviderCfg{
+		api.ProviderID("cached"): {Priority: 7, Enabled: true},
+	}
+	// A distinct fallback source makes cache-vs-fallback observable.
+	c.Providers = map[api.ProviderID]yamlProviderCfg{
+		api.ProviderID("fallback"): {Enabled: true, Priority: 9},
+	}
+
+	got := c.ProviderConfigs()
+	if _, ok := got[api.ProviderID("cached")]; !ok {
+		t.Errorf("ProviderConfigs() = %v, want the cached map (key \"cached\" present)", got)
+	}
+	if _, ok := got[api.ProviderID("fallback")]; ok {
+		t.Errorf("ProviderConfigs() = %v, want the cached map, not the fallback built from Providers", got)
+	}
+}
