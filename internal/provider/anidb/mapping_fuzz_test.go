@@ -1,6 +1,7 @@
 package anidb
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -46,8 +47,17 @@ func FuzzDecompressIfGzipped(f *testing.F) {
 		if maxBytes < 0 {
 			return
 		}
-		// Must not panic regardless of input.
-		_, _ = decompressIfGzipped(data, maxBytes)
+		out, err := decompressIfGzipped(data, maxBytes)
+		// Input without the gzip magic header is returned unchanged with no
+		// error; only a real gzip stream is decoded.
+		if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+			if err != nil {
+				t.Fatalf("decompressIfGzipped(non-gzip) err = %v, want nil", err)
+			}
+			if !bytes.Equal(out, data) {
+				t.Fatalf("decompressIfGzipped(non-gzip) altered data: in % x, out % x", data, out)
+			}
+		}
 	})
 }
 

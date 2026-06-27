@@ -244,3 +244,59 @@ func TestSanitizeImdbID_no_prefix_no_leading_zeros(t *testing.T) {
 		}
 	})
 }
+
+func TestLookupLangName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		code      string
+		overrides map[string]string
+		want      string
+	}{
+		{name: "iso2 known code", code: "en", want: "English"},
+		{name: "iso3 known code is canonicalized first", code: "eng", want: "English"},
+		{name: "internal pb code", code: "pb", want: "Brazilian Portuguese"},
+		{name: "unknown code", code: "zz", want: ""},
+		{name: "empty code", code: "", want: ""},
+		{name: "override wins over registry", code: "en", overrides: map[string]string{"en": "ZZZ"}, want: "ZZZ"},
+		{name: "override miss falls through to registry", code: "fr", overrides: map[string]string{"en": "ZZZ"}, want: "French"},
+		{name: "override keyed by canonicalized code", code: "fre", overrides: map[string]string{"fr": "Frenchy"}, want: "Frenchy"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := LookupLangName(tt.code, tt.overrides); got != tt.want {
+				t.Errorf("LookupLangName(%q, %v) = %q, want %q", tt.code, tt.overrides, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLookupLangCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		langName  string
+		overrides map[string]string
+		want      string
+	}{
+		{name: "known name", langName: "English", want: "en"},
+		{name: "internal Brazilian Portuguese name", langName: "Brazilian Portuguese", want: "pb"},
+		{name: "unknown name", langName: "Klingon", want: ""},
+		{name: "empty name", langName: "", want: ""},
+		{name: "override wins over registry", langName: "English", overrides: map[string]string{"English": "zz"}, want: "zz"},
+		{name: "override miss falls through to registry", langName: "French", overrides: map[string]string{"English": "zz"}, want: "fr"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := LookupLangCode(tt.langName, tt.overrides); got != tt.want {
+				t.Errorf("LookupLangCode(%q, %v) = %q, want %q", tt.langName, tt.overrides, got, tt.want)
+			}
+		})
+	}
+}

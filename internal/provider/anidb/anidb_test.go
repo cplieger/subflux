@@ -1,6 +1,7 @@
 package anidb
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -221,16 +222,8 @@ func TestFindEpisodeInMapping(t *testing.T) {
 	}
 }
 
-// anidb-002 — property-based tests for findEpisodeInMapping.
-
-func TestFindEpisodeInMapping_never_panics_on_arbitrary_input(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(rt *rapid.T) {
-		text := rapid.String().Draw(rt, "text")
-		episode := rapid.IntRange(-1000, 1000).Draw(rt, "episode")
-		_ = findEpisodeInMapping(text, episode) // must not panic
-	})
-}
+// Property-based test for findEpisodeInMapping. (No-panic on arbitrary input
+// is covered by FuzzFindEpisodeInMapping.)
 
 func TestFindEpisodeInMapping_roundtrip_on_well_formed(t *testing.T) {
 	t.Parallel()
@@ -276,8 +269,8 @@ func TestFindEpisodeInMapping_roundtrip_on_well_formed(t *testing.T) {
 	})
 }
 
-// anidb-003 — buildEpisodeCacheKey covers the leading-zero / whitespace
-// normalization path that was previously only reachable via live HTTP.
+// buildEpisodeCacheKey covers the leading-zero / whitespace normalization
+// path that is otherwise only reachable via live HTTP.
 
 func TestBuildEpisodeCacheKey(t *testing.T) {
 	t.Parallel()
@@ -331,5 +324,39 @@ func TestBuildEpisodeCacheKey_matches_getEpisodeID_format(t *testing.T) {
 	// Leading-zero normalization is part of the contract.
 	if builtKey := buildEpisodeCacheKey(seriesID, "007"); builtKey != getKey {
 		t.Errorf("leading-zero normalization broken: %q != %q", builtKey, getKey)
+	}
+}
+
+// TestDecompressIfGzipped_passesThroughNonGzip pins the gzip-magic guard:
+// input that does not begin with the gzip magic bytes (0x1f 0x8b) is returned
+// unchanged, while a genuine (here truncated) gzip stream is decoded.
+func TestDecompressIfGzipped_passesThroughNonGzip(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		in      []byte
+		wantErr bool // true: treated as gzip and the truncated stream fails to decode
+	}{
+		{name: "two-byte gzip magic only", in: []byte{0x1f, 0x8b}, wantErr: true},
+		{name: "first byte not magic", in: []byte{0x00, 0x8b}, wantErr: false},
+		{name: "second byte not magic", in: []byte{0x1f, 0x00}, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			out, err := decompressIfGzipped(tt.in, 1024)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("decompressIfGzipped(% x) err = nil, want non-nil", tt.in)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("decompressIfGzipped(% x) err = %v, want nil", tt.in, err)
+			}
+			if !bytes.Equal(out, tt.in) {
+				t.Errorf("decompressIfGzipped(% x) = % x, want unchanged % x", tt.in, out, tt.in)
+			}
+		})
 	}
 }

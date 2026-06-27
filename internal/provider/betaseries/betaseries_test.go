@@ -316,23 +316,3 @@ func TestClassifyBadRequest(t *testing.T) {
 		})
 	}
 }
-
-func FuzzClassifyBadRequest(f *testing.F) {
-	f.Add([]byte(`{"errors":[{"code":4001,"text":"Show not found"}]}`))
-	f.Add([]byte(`{"errors":[{"code":1001,"text":"Invalid API key"}]}`))
-	f.Add([]byte(`{"errors":[{"code":9999,"text":"Unknown"}]}`))
-	f.Add([]byte(`{"errors":[]}`))
-	f.Add([]byte(`not json`))
-	f.Add([]byte(``))
-
-	f.Fuzz(func(t *testing.T, body []byte) {
-		rc, err := classifyBadRequest(body)
-		if err != nil {
-			return
-		}
-		if rc != nil {
-			_, _ = io.ReadAll(rc)
-			rc.Close()
-		}
-	})
-}

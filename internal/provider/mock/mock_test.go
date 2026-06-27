@@ -452,3 +452,26 @@ func TestSchema_returns_all_fields(t *testing.T) {
 		}
 	}
 }
+
+func TestSearch_slow_mode_timer_outlasts_short_context(t *testing.T) {
+	t.Parallel()
+	p := &mockProvider{mode: "slow", resultCount: 1, scoreBase: 50}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	req := &api.SearchRequest{
+		MediaType: api.MediaTypeMovie,
+		Title:     "X",
+		Year:      2020,
+		Languages: []string{"en"},
+	}
+
+	subs, err := p.Search(ctx, req)
+	// Slow mode arms a multi-second timer, so a 200ms context must expire
+	// first: Search returns a context error and no results.
+	if err == nil {
+		t.Error("slow-mode Search err = nil, want a context-deadline error")
+	}
+	if subs != nil {
+		t.Errorf("slow-mode Search subs = %v, want nil", subs)
+	}
+}
