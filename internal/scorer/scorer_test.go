@@ -179,27 +179,6 @@ func TestScore_edition_contributes_for_episodes(t *testing.T) {
 	}
 }
 
-func TestScore_does_not_mutate_input_matches(t *testing.T) {
-	t.Parallel()
-	engine := New(&api.DefaultScores)
-
-	video := &api.VideoInfo{MediaType: "movie"}
-	sub := api.SubtitleInfo{HashVerifiable: true}
-	matches := api.MatchSet{
-		Hash:       true,
-		VideoCodec: true,
-		Source:     true,
-	}
-
-	// MatchSet is a struct (value type), so passing it cannot mutate the caller's copy.
-	engine.Score(video, sub, matches)
-
-	expected := api.MatchSet{Hash: true, VideoCodec: true, Source: true}
-	if matches != expected {
-		t.Error("Score() mutated input matches")
-	}
-}
-
 func TestScore_all_release_attribute_keys(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
