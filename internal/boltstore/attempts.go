@@ -111,38 +111,53 @@ func (d *DB) BackedOffProviders(_ context.Context, mediaType api.MediaType, medi
 		if b == nil {
 			return errors.New("boltstore: search_attempts bucket not found")
 		}
-		c := b.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			// The provider is the only key component after the triple prefix.
-			provider := api.ProviderID(k[len(prefix):])
-			if provider == "" {
-				continue
-			}
-			var rec attemptRec
-			skip, derr := decodeRecord(bucketDecodeMode(bucketSearchAttempts), bucketSearchAttempts, k, v, &rec)
-			if derr != nil {
-				return derr
-			}
-			if skip {
-				// search_attempts is a derived bucket: an undecodable row is
-				// skipped with a warning (logged by decodeRecord). A missing
-				// row means the provider is simply eligible.
-				continue
-			}
-			if maxAttempts > 0 && rec.Failures >= maxAttempts {
-				backed = append(backed, provider)
-				continue
-			}
-			if now.Before(rec.NextRetry) {
-				backed = append(backed, provider)
-			}
-		}
-		return nil
+		var serr error
+		backed, serr = scanBackedOffProviders(b, prefix, maxAttempts, now)
+		return serr
 	})
 	if err != nil {
 		return nil, err
 	}
 	return backed, nil
+}
+
+// scanBackedOffProviders prefix-scans the search_attempts triple under prefix
+// and returns the providers that are currently backed off. The provider is the
+// only key component after the triple prefix; an empty-provider row is skipped
+// (the old store's `provider != ”` filter), and an undecodable derived row is
+// skipped with a warning (logged by decodeRecord) since a missing row just
+// means the provider is eligible.
+func scanBackedOffProviders(b *bolt.Bucket, prefix []byte, maxAttempts int, now time.Time) ([]api.ProviderID, error) {
+	var backed []api.ProviderID
+	c := b.Cursor()
+	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+		provider := api.ProviderID(k[len(prefix):])
+		if provider == "" {
+			continue
+		}
+		var rec attemptRec
+		skip, derr := decodeRecord(bucketDecodeMode(bucketSearchAttempts), bucketSearchAttempts, k, v, &rec)
+		if derr != nil {
+			return nil, derr
+		}
+		if skip {
+			continue
+		}
+		if providerBackedOff(&rec, maxAttempts, now) {
+			backed = append(backed, provider)
+		}
+	}
+	return backed, nil
+}
+
+// providerBackedOff reports whether an attempt row means the provider should be
+// skipped: its failure count reached maxAttempts (only when the threshold is
+// enabled, i.e. maxAttempts > 0) OR its next_retry is still in the future.
+func providerBackedOff(rec *attemptRec, maxAttempts int, now time.Time) bool {
+	if maxAttempts > 0 && rec.Failures >= maxAttempts {
+		return true
+	}
+	return now.Before(rec.NextRetry)
 }
 
 // decodeAttemptEntry dereferences a search_attempts primary key into a fully
@@ -204,25 +219,38 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 		if idx == nil {
 			return errors.New("boltstore: ix_attempts_due bucket not found")
 		}
-		c := idx.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			_, primary, ok := boltkv.SplitTimeIndexKey(k)
-			if !ok {
-				continue // malformed index key; skip defensively
-			}
-			entry, skip, derr := decodeAttemptEntry(b, primary)
-			if derr != nil {
-				return derr
-			}
-			if skip {
-				continue
-			}
-			out = append(out, entry)
-		}
-		return nil
+		var serr error
+		out, serr = collectBackoffByDue(b, idx)
+		return serr
 	})
 	if err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+// collectBackoffByDue walks ix_attempts_due forward (be64(next_retry) is
+// chronological, so a forward cursor is already in next_retry ASC order) and
+// dereferences each entry back to its search_attempts row via decodeAttemptEntry.
+// A malformed index key is skipped defensively; an entry decodeAttemptEntry
+// reports as drift / empty-provider / undecodable is skipped, matching the old
+// `WHERE provider != ” ORDER BY next_retry ASC`.
+func collectBackoffByDue(b, idx *bolt.Bucket) ([]api.BackoffEntry, error) {
+	var out []api.BackoffEntry
+	c := idx.Cursor()
+	for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		_, primary, ok := boltkv.SplitTimeIndexKey(k)
+		if !ok {
+			continue // malformed index key; skip defensively
+		}
+		entry, skip, derr := decodeAttemptEntry(b, primary)
+		if derr != nil {
+			return nil, derr
+		}
+		if skip {
+			continue
+		}
+		out = append(out, entry)
 	}
 	return out, nil
 }

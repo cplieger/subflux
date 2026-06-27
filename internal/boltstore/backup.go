@@ -57,49 +57,56 @@ func (d *DB) BackupInto(ctx context.Context, dest string) error {
 		return fmt.Errorf("boltstore: backup: %w", err)
 	}
 
-	dir := filepath.Dir(dest)
+	tmpName, err := d.writeSnapshotTemp(filepath.Dir(dest))
+	if err != nil {
+		return err
+	}
+
+	// Rename the prepared snapshot onto dest and fsync the parent directory. On
+	// failure the temp never became the live artifact, so remove it
+	// (best-effort; a leaked temp is non-fatal).
+	if err := fsutil.CommitAtomicWrite(tmpName, dest); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("boltstore: backup: commit %q: %w", dest, err)
+	}
+	return nil
+}
+
+// writeSnapshotTemp streams a single consistent hot snapshot of the whole bbolt
+// file into a fresh temp file in dir, fsyncs and closes it, and returns the temp
+// path ready to be renamed onto the destination. The snapshot runs inside a read
+// (View) transaction, so it is a point-in-time-consistent copy (WriteTo copies
+// every live and free page at the transaction's view). On ANY failure after the
+// temp is created it removes the temp (best-effort, errors ignored) so a partial
+// snapshot never lingers, mirroring the old deferred cleanup; the caller owns
+// the temp only on success.
+func (d *DB) writeSnapshotTemp(dir string) (string, error) {
 	tmp, err := os.CreateTemp(dir, ".subflux-backup-*.tmp")
 	if err != nil {
-		return fmt.Errorf("boltstore: backup: create temp in %q: %w", dir, err)
+		return "", fmt.Errorf("boltstore: backup: create temp in %q: %w", dir, err)
 	}
 	tmpName := tmp.Name()
-	// Best-effort cleanup of the temp file on any failure before the rename
-	// commits it; after a successful CommitAtomicWrite the temp no longer
-	// exists, so the deferred remove is a harmless no-op.
-	committed := false
-	defer func() {
-		if !committed {
-			if rmErr := os.Remove(tmpName); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-				// A leaked temp is non-fatal; surface at debug level only.
-				_ = rmErr
-			}
-		}
-	}()
 
 	// Stream the snapshot under a short read transaction. WriteTo copies the
 	// whole file (live + free pages) at the transaction's consistent view.
 	if err := d.db.View(func(tx *bolt.Tx) error {
-		if _, werr := tx.WriteTo(tmp); werr != nil {
-			return werr
-		}
-		return nil
+		_, werr := tx.WriteTo(tmp)
+		return werr
 	}); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("boltstore: backup: write snapshot: %w", err)
+		_ = os.Remove(tmpName)
+		return "", fmt.Errorf("boltstore: backup: write snapshot: %w", err)
 	}
 
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("boltstore: backup: fsync temp: %w", err)
+		_ = os.Remove(tmpName)
+		return "", fmt.Errorf("boltstore: backup: fsync temp: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("boltstore: backup: close temp: %w", err)
+		_ = os.Remove(tmpName)
+		return "", fmt.Errorf("boltstore: backup: close temp: %w", err)
 	}
 
-	// Rename the prepared snapshot onto dest and fsync the parent directory.
-	if err := fsutil.CommitAtomicWrite(tmpName, dest); err != nil {
-		return fmt.Errorf("boltstore: backup: commit %q: %w", dest, err)
-	}
-	committed = true
-	return nil
+	return tmpName, nil
 }
