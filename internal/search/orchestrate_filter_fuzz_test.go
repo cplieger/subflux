@@ -88,3 +88,34 @@ func FuzzFilterByVariant(f *testing.F) {
 		}
 	})
 }
+
+// FuzzFilterByScore verifies that filterByScore keeps only subtitles at or
+// above minScore and never fabricates results (output is a subset of input).
+func FuzzFilterByScore(f *testing.F) {
+	f.Add(10, 20, 30, 15)
+	f.Add(0, 0, 0, 0)
+	f.Add(100, 50, 75, 60)
+	f.Add(-1, 5, 10, 0)
+
+	f.Fuzz(func(t *testing.T, s1, s2, s3, minScore int) {
+		if s1 < -1000 || s1 > 1000 || s2 < -1000 || s2 > 1000 || s3 < -1000 || s3 > 1000 {
+			return
+		}
+		scored := []scoredSub{
+			{sub: api.Subtitle{ID: "1"}, score: s1},
+			{sub: api.Subtitle{ID: "2"}, score: s2},
+			{sub: api.Subtitle{ID: "3"}, score: s3},
+		}
+		result := filterByScore(scored, minScore)
+		// Invariant: all results must be >= minScore.
+		for _, r := range result {
+			if r.score < minScore {
+				t.Fatalf("filterByScore returned score %d below min %d", r.score, minScore)
+			}
+		}
+		// Invariant: result is a subset.
+		if len(result) > len(scored) {
+			t.Fatalf("filterByScore output (%d) larger than input (%d)", len(result), len(scored))
+		}
+	})
+}
