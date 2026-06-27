@@ -1,6 +1,8 @@
 package clisearch
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -63,7 +65,7 @@ func TestSearchItem_label(t *testing.T) {
 	}
 }
 
-func TestSearchItem_label_never_panics(t *testing.T) {
+func TestSearchItem_label_startsWithTitle(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -74,15 +76,13 @@ func TestSearchItem_label_never_panics(t *testing.T) {
 			Season:    rapid.IntRange(0, 100).Draw(t, "season"),
 			Episode:   rapid.IntRange(0, 1000).Draw(t, "episode"),
 		}
-		// Must not panic for any input combination.
+		// Every label() variant formats as "<title> ..." or returns the title
+		// verbatim, so the title is always a prefix of the result. This also
+		// exercises that label() never panics for any field combination.
 		got := item.label()
-		if got == "" && item.Title == "" {
-			// Empty title produces empty label — that's fine.
-			return
-		}
-		// Label should always contain the title.
-		if item.Title != "" && len(got) < len(item.Title) {
-			t.Errorf("label() = %q shorter than title %q", got, item.Title)
+		if !strings.HasPrefix(got, item.Title) {
+			t.Errorf("searchItem{title=%q, mediaType=%q, season=%d, episode=%d}.label() = %q, want prefix %q",
+				item.Title, item.MediaType, item.Season, item.Episode, got, item.Title)
 		}
 	})
 }
@@ -334,6 +334,64 @@ func TestParseSearchParams(t *testing.T) {
 			if pickN != tt.wantPickN {
 				t.Errorf("parseSearchParams(%v) pickN = %d, want %d",
 					tt.params, pickN, tt.wantPickN)
+			}
+		})
+	}
+}
+
+func TestCutPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		s         string
+		prefix    string
+		wantAfter string
+		wantOK    bool
+	}{
+		{name: "prefix present leaves the suffix", s: "--lang", prefix: "--", wantAfter: "lang", wantOK: true},
+		{name: "string equal to prefix yields empty suffix", s: "--", prefix: "--", wantAfter: "", wantOK: true},
+		{name: "prefix absent returns input unchanged", s: "lang", prefix: "--", wantAfter: "lang", wantOK: false},
+		{name: "string shorter than prefix returns input unchanged", s: "-", prefix: "--", wantAfter: "-", wantOK: false},
+		{name: "empty prefix always matches", s: "x", prefix: "", wantAfter: "x", wantOK: true},
+		{name: "both empty match", s: "", prefix: "", wantAfter: "", wantOK: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotAfter, gotOK := cutPrefix(tt.s, tt.prefix)
+			if gotAfter != tt.wantAfter || gotOK != tt.wantOK {
+				t.Errorf("cutPrefix(%q, %q) = (%q, %v), want (%q, %v)",
+					tt.s, tt.prefix, gotAfter, gotOK, tt.wantAfter, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestParseSearchParams_requiresCriteria(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		params  map[string]string
+		name    string
+		wantErr bool
+	}{
+		{name: "no params at all returns errUsage", params: map[string]string{}, wantErr: true},
+		{name: "only lang is not a search criterion", params: map[string]string{"lang": "en"}, wantErr: true},
+		{name: "only pick is not a search criterion", params: map[string]string{"pick": "3"}, wantErr: true},
+		{name: "imdb satisfies criteria", params: map[string]string{"imdb": "tt0903747"}, wantErr: false},
+		{name: "tmdb satisfies criteria", params: map[string]string{"tmdb": "550"}, wantErr: false},
+		{name: "title satisfies criteria", params: map[string]string{"title": "Inception"}, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, _, _, _, _, err := parseSearchParams(tt.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseSearchParams(%v) err = %v, wantErr = %v", tt.params, err, tt.wantErr)
+			}
+			if tt.wantErr && !errors.Is(err, errUsage) {
+				t.Errorf("parseSearchParams(%v) err = %v, want errUsage", tt.params, err)
 			}
 		})
 	}
