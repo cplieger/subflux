@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,7 +14,6 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/provider/dlcache"
 	"pgregory.net/rapid"
@@ -102,6 +103,40 @@ func TestFactory_requires_credentials(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameHDBits)
 			}
 		})
+	}
+}
+
+// TestFactory_torrentCacheUsesOneHourTTL verifies the torrent-ID cache the
+// factory builds keeps entries alive well beyond a single request: a value
+// stored and read back a few milliseconds later must still be present, which
+// fails if the cache were constructed with a zero (or near-zero) TTL.
+func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
+	p, err := Factory(context.Background(), map[string]any{
+		settingUsername: "user",
+		settingPasskey:  "passkey",
+	})
+	if err != nil {
+		t.Fatalf("Factory() error = %v, want nil", err)
+	}
+	prov, ok := p.(*Provider)
+	if !ok {
+		t.Fatalf("Factory() returned %T, want *Provider", p)
+	}
+
+	const key = "torrents:tvdb:1:s1"
+	want := []int{11, 22, 33}
+	prov.torrentCache.Set(key, want)
+
+	// Far below the real 1h TTL, but past the Set instant a zero TTL would
+	// expire entries at.
+	time.Sleep(5 * time.Millisecond)
+
+	got, found := prov.torrentCache.Get(key)
+	if !found {
+		t.Fatalf("torrentCache.Get(%q) found = false, want true", key)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
 	}
 }
 
@@ -418,19 +453,6 @@ func TestFilterSubtitleData_does_not_set_variant_fields(t *testing.T) {
 	}
 }
 
-func TestHdbLangToISO_all_overrides_return_expected(t *testing.T) {
-	t.Parallel()
-	for code, want := range hdbLangOverrides {
-		got := hdbLangToISO(code)
-		if got != want {
-			t.Errorf("hdbLangToISO(%q) = %q, want %q", code, got, want)
-		}
-		if got == "" {
-			t.Errorf("hdbLangToISO(%q) returned empty for override code", code)
-		}
-	}
-}
-
 func TestHdbLangToISO_standard_codes_return_identity(t *testing.T) {
 	t.Parallel()
 	// Standard codes in LangRegistry should return themselves,
@@ -693,47 +715,67 @@ func TestBuildLookup(t *testing.T) {
 	}
 }
 
-// --- redactPasskey ---
+// --- capTorrentIDs ---
 
-func TestRedactPasskey_strips_secret_from_error_message(t *testing.T) {
+func TestCapTorrentIDs(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{passkey: "supersecret32hex"}
+	tests := []struct {
+		name   string
+		ids    []int
+		maxCap int
+		want   []int
+	}{
+		{name: "nil stays nil", ids: nil, maxCap: 5, want: nil},
+		{name: "empty stays empty", ids: []int{}, maxCap: 5, want: []int{}},
+		{name: "under cap unchanged", ids: []int{1, 2, 3}, maxCap: 5, want: []int{1, 2, 3}},
+		{name: "at cap unchanged", ids: []int{1, 2, 3, 4, 5}, maxCap: 5, want: []int{1, 2, 3, 4, 5}},
+		{name: "over cap truncated to first maxCap", ids: []int{1, 2, 3, 4, 5, 6, 7}, maxCap: 5, want: []int{1, 2, 3, 4, 5}},
+	}
 
-	in := fmt.Errorf("Get https://hdbits.org/getdox.php?id=1&passkey=%s: dial tcp: i/o timeout", p.passkey)
-	got := httputil.RedactSecret(in, p.passkey)
-	if got == nil {
-		t.Fatal("redactPasskey returned nil for non-nil input")
-	}
-	if strings.Contains(got.Error(), p.passkey) {
-		t.Errorf("redactPasskey did not strip passkey: %q", got.Error())
-	}
-	if !strings.Contains(got.Error(), "REDACTED") {
-		t.Errorf("redactPasskey did not insert REDACTED marker: %q", got.Error())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := capTorrentIDs(tt.ids, tt.maxCap, "torrents:imdb:tt1")
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("capTorrentIDs(%v, %d) = %v, want %v", tt.ids, tt.maxCap, got, tt.want)
+			}
+		})
 	}
 }
 
-func TestRedactPasskey_pass_through_when_passkey_absent_from_message(t *testing.T) {
+// --- secret redaction (provider wiring) ---
+
+// roundTripFunc adapts a function to http.RoundTripper so a test can drive
+// the provider's HTTP client without a real network.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// TestDownload_redactsPasskeyFromTransportError verifies the public Download
+// path strips the passkey from transport errors: the getdox URL carries the
+// passkey as a query parameter, so a failed request surfaces it inside the
+// wrapping *url.Error unless the provider redacts it.
+func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
 	t.Parallel()
-
-	p := &Provider{passkey: "supersecret32hex"}
-	in := errors.New("some error that does not leak the secret")
-	got := httputil.RedactSecret(in, p.passkey)
-	if got.Error() != in.Error() {
-		t.Errorf("redactPasskey mutated safe error: got %q, want %q", got.Error(), in.Error())
-	}
-}
-
-func TestRedactPasskey_nil_and_empty_passkey(t *testing.T) {
-	t.Parallel()
-
-	p := &Provider{passkey: ""}
-	if got := httputil.RedactSecret(nil, p.passkey); got != nil {
-		t.Errorf("redactPasskey(nil) = %v, want nil", got)
+	const passkey = "supersecret32hex"
+	p := &Provider{
+		passkey: passkey,
+		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("dial tcp: i/o timeout")
+		})},
+		dlCache: dlcache.New(10, 1<<20),
 	}
 
-	in := errors.New("anything")
-	if got := httputil.RedactSecret(in, p.passkey); got.Error() != in.Error() {
-		t.Errorf("redactPasskey with empty passkey mutated error: got %q", got.Error())
+	_, err := p.Download(context.Background(), &api.Subtitle{ID: "123"})
+	if err == nil {
+		t.Fatal("Download() with a failing transport expected an error")
+	}
+	if strings.Contains(err.Error(), passkey) {
+		t.Errorf("Download() leaked passkey in error: %q", err.Error())
+	}
+	// Redaction unwraps the *url.Error but must preserve the underlying cause.
+	if !strings.Contains(err.Error(), "i/o timeout") {
+		t.Errorf("Download() error lost the transport cause: %q", err.Error())
 	}
 }
