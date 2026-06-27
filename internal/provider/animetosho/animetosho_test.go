@@ -1,14 +1,11 @@
 package animetosho
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/provider/archive"
-	"github.com/ulikunitz/xz"
 	"pgregory.net/rapid"
 )
 
@@ -450,167 +447,6 @@ func TestFilterAttachments(t *testing.T) {
 	})
 }
 
-// --- Decompression ---
-
-func TestDecompressData(t *testing.T) {
-	t.Parallel()
-
-	t.Run("plain data returned unchanged", func(t *testing.T) {
-		t.Parallel()
-		data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n")
-		got := archive.Decompress(data)
-		if !bytes.Equal(got, data) {
-			t.Errorf("decompressData(plain) = %q, want %q", got, data)
-		}
-	})
-
-	t.Run("nil data returned as nil", func(t *testing.T) {
-		t.Parallel()
-		got := archive.Decompress(nil)
-		if got != nil {
-			t.Errorf("decompressData(nil) = %v, want nil", got)
-		}
-	})
-
-	t.Run("empty data returned as empty", func(t *testing.T) {
-		t.Parallel()
-		got := archive.Decompress([]byte{})
-		if len(got) != 0 {
-			t.Errorf("decompressData([]) = %v, want empty", got)
-		}
-	})
-
-	t.Run("gzip data decompressed", func(t *testing.T) {
-		t.Parallel()
-		original := []byte("subtitle content here")
-		var buf bytes.Buffer
-		gw := gzip.NewWriter(&buf)
-		if _, err := gw.Write(original); err != nil {
-			t.Fatalf("gzip.Write: %v", err)
-		}
-		if err := gw.Close(); err != nil {
-			t.Fatalf("gzip.Close: %v", err)
-		}
-		got := archive.Decompress(buf.Bytes())
-		if !bytes.Equal(got, original) {
-			t.Errorf("decompressData(gzip) = %q, want %q", got, original)
-		}
-	})
-
-	t.Run("xz invalid header returned as-is", func(t *testing.T) {
-		t.Parallel()
-		// xz magic bytes: FD 37 7A 58 5A 00 + invalid payload
-		xzData := []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x01, 0x02, 0x03}
-		got := archive.Decompress(xzData)
-		if !bytes.Equal(got, xzData) {
-			t.Errorf("decompressData(invalid xz) should return data as-is")
-		}
-	})
-
-	t.Run("valid xz data decompressed", func(t *testing.T) {
-		t.Parallel()
-		original := []byte("subtitle content for xz test")
-		var buf bytes.Buffer
-		w, err := xz.NewWriter(&buf)
-		if err != nil {
-			t.Fatalf("xz.NewWriter: %v", err)
-		}
-		if _, err := w.Write(original); err != nil {
-			t.Fatalf("xz.Write: %v", err)
-		}
-		if err := w.Close(); err != nil {
-			t.Fatalf("xz.Close: %v", err)
-		}
-		got := archive.Decompress(buf.Bytes())
-		if !bytes.Equal(got, original) {
-			t.Errorf("decompressData(valid xz) = %q, want %q", got, original)
-		}
-	})
-
-	t.Run("short data with gzip magic returned as-is", func(t *testing.T) {
-		t.Parallel()
-		// Only 2 bytes matching gzip magic but too short to be valid gzip
-		data := []byte{0x1f, 0x8b}
-		got := archive.Decompress(data)
-		if !bytes.Equal(got, data) {
-			t.Errorf("decompressData(short gzip magic) should return data as-is")
-		}
-	})
-
-	t.Run("invalid gzip data returned as-is", func(t *testing.T) {
-		t.Parallel()
-		// Gzip magic bytes but invalid content
-		data := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF}
-		got := archive.Decompress(data)
-		if !bytes.Equal(got, data) {
-			t.Errorf("decompressData(invalid gzip) should return data as-is")
-		}
-	})
-
-	t.Run("short xz magic not detected", func(t *testing.T) {
-		t.Parallel()
-		// Only 6 bytes with xz-like prefix but len <= 6
-		data := []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}
-		got := archive.Decompress(data)
-		// len(data) == 6, not > 6, so xz branch not taken; returned as-is
-		if !bytes.Equal(got, data) {
-			t.Errorf("decompressData(short xz) should return data as-is")
-		}
-	})
-
-	t.Run("truncated gzip header returned as-is", func(t *testing.T) {
-		t.Parallel()
-		// Gzip magic + method byte but header truncated (< 10 bytes needed).
-		// gzip.NewReader fails on incomplete header → data returned as-is.
-		data := []byte{0x1f, 0x8b, 0x08}
-		got := archive.Decompress(data)
-		if !bytes.Equal(got, data) {
-			t.Errorf("decompressData(truncated gzip header) = %v, want %v", got, data)
-		}
-	})
-
-	t.Run("empty gzip stream decompresses to empty", func(t *testing.T) {
-		t.Parallel()
-		// Valid gzip with zero-length payload.
-		var buf bytes.Buffer
-		gw := gzip.NewWriter(&buf)
-		if err := gw.Close(); err != nil {
-			t.Fatalf("gzip.Close: %v", err)
-		}
-		got := archive.Decompress(buf.Bytes())
-		if len(got) != 0 {
-			t.Errorf("decompressData(empty gzip) = %d bytes, want 0", len(got))
-		}
-	})
-
-	t.Run("xz truncated stream returns raw data", func(t *testing.T) {
-		t.Parallel()
-		// Build a valid xz stream, then truncate it mid-payload to trigger
-		// a read error (not a header error).
-		original := bytes.Repeat([]byte("subtitle data for truncation test\n"), 100)
-		var buf bytes.Buffer
-		w, err := xz.NewWriter(&buf)
-		if err != nil {
-			t.Fatalf("xz.NewWriter: %v", err)
-		}
-		if _, err := w.Write(original); err != nil {
-			t.Fatalf("xz.Write: %v", err)
-		}
-		if err := w.Close(); err != nil {
-			t.Fatalf("xz.Close: %v", err)
-		}
-		full := buf.Bytes()
-		// Keep the header + some stream data, but chop before the footer
-		// so decompression fails mid-read.
-		truncated := full[:len(full)/2]
-		got := archive.Decompress(truncated)
-		// Should return raw data on read error.
-		if !bytes.Equal(got, truncated) {
-			t.Errorf("decompressData(truncated xz) should return raw data, got %d bytes", len(got))
-		}
-	})
-}
-
 // --- File Matching ---
 
 func TestFileMatchesEpisode(t *testing.T) {
@@ -735,65 +571,21 @@ func TestFilterAttachments_season_pack(t *testing.T) {
 	}
 }
 
-func TestDecompressData_gzip_round_trip(t *testing.T) {
+func TestFileMatchesEpisode_case_insensitive(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		original := rapid.SliceOfN(rapid.Byte(), 1, 4096).Draw(t, "data")
-		var buf bytes.Buffer
-		gw := gzip.NewWriter(&buf)
-		if _, err := gw.Write(original); err != nil {
-			t.Fatalf("gzip.Write: %v", err)
-		}
-		if err := gw.Close(); err != nil {
-			t.Fatalf("gzip.Close: %v", err)
-		}
-		got := archive.Decompress(buf.Bytes())
-		if !bytes.Equal(got, original) {
-			t.Fatalf("decompressData(gzip(%d bytes)) = %d bytes, want %d",
-				len(original), len(got), len(original))
-		}
-	})
-}
+		// Restrict to ASCII so ToLower/ToUpper round-trip cleanly. The matcher
+		// lowercases internally and uses a case-insensitive regex, so its
+		// verdict must never depend on the filename's letter case.
+		name := rapid.StringMatching(`[A-Za-z0-9 .-]{0,40}`).Draw(t, "filename")
+		season := rapid.IntRange(0, 30).Draw(t, "season")
+		episode := rapid.IntRange(0, 300).Draw(t, "episode")
 
-func TestDecompressData_xz_round_trip(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		original := rapid.SliceOfN(rapid.Byte(), 1, 4096).Draw(t, "data")
-		var buf bytes.Buffer
-		w, err := xz.NewWriter(&buf)
-		if err != nil {
-			t.Fatalf("xz.NewWriter: %v", err)
-		}
-		if _, err := w.Write(original); err != nil {
-			t.Fatalf("xz.Write: %v", err)
-		}
-		if err := w.Close(); err != nil {
-			t.Fatalf("xz.Close: %v", err)
-		}
-		got := archive.Decompress(buf.Bytes())
-		if !bytes.Equal(got, original) {
-			t.Fatalf("decompressData(xz(%d bytes)) = %d bytes, want %d",
-				len(original), len(got), len(original))
-		}
-	})
-}
-
-func TestDecompressData_non_compressed_passthrough(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		data := rapid.SliceOfN(rapid.Byte(), 0, 4096).Draw(t, "data")
-		// Ensure data doesn't start with gzip or xz magic.
-		if len(data) > 2 && data[0] == 0x1f && data[1] == 0x8b {
-			data[0] = 0x00
-		}
-		if len(data) > 6 && data[0] == 0xFD && data[1] == 0x37 &&
-			data[2] == 0x7A && data[3] == 0x58 &&
-			data[4] == 0x5A && data[5] == 0x00 {
-			data[0] = 0x00
-		}
-		got := archive.Decompress(data)
-		if !bytes.Equal(got, data) {
-			t.Fatalf("decompressData(non-compressed %d bytes) modified the data", len(data))
+		lower := fileMatchesEpisode(strings.ToLower(name), season, episode)
+		upper := fileMatchesEpisode(strings.ToUpper(name), season, episode)
+		if lower != upper {
+			t.Fatalf("fileMatchesEpisode(%q, %d, %d) case mismatch: lower=%v upper=%v",
+				name, season, episode, lower, upper)
 		}
 	})
 }

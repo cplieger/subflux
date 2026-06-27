@@ -175,6 +175,16 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			trackName: "Portuguese BR",
 			wantLang:  "pt",
 		},
+		{
+			// A leading dash is not a subtag boundary (index 0): the tag is
+			// left intact rather than truncated to an empty language.
+			name:      "leading_dash_not_truncated",
+			index:     11,
+			codec:     "srt",
+			lang:      "-en",
+			trackName: "name",
+			wantLang:  "-en",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

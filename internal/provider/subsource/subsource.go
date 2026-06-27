@@ -58,6 +58,19 @@ type Provider struct {
 // Name returns the provider identifier for SubSource.
 func (p *Provider) Name() api.ProviderID { return providerName }
 
+// langEntry pairs a requested ISO language code with its SubSource language name.
+type langEntry struct {
+	iso string
+	ss  string
+}
+
+// langResult holds one language goroutine's outcome: the subtitles found for
+// that language or the error its query returned.
+type langResult struct {
+	err  error
+	subs []api.Subtitle
+}
+
 // Search finds subtitles matching the request via IMDB ID lookup.
 // Tries alternative titles if the primary title is not found.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
@@ -75,29 +88,13 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		return nil, nil
 	}
 
-	// Collect valid languages for concurrent search.
-	type langEntry struct {
-		iso string
-		ss  string
-	}
-	var langs []langEntry
-	for _, lang := range req.Languages {
-		ssLang := iso2ToSubSource(lang)
-		if ssLang != "" {
-			langs = append(langs, langEntry{iso: lang, ss: ssLang})
-		}
-	}
+	langs := collectLangs(req.Languages)
 	if len(langs) == 0 {
 		return nil, nil
 	}
 
 	// Search languages concurrently with bounded concurrency.
-	type langResult struct {
-		err  error
-		subs []api.Subtitle
-	}
 	perLang := make([]langResult, len(langs))
-
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(len(langs))
 	for i, le := range langs {
@@ -114,6 +111,32 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 	}
 	_ = g.Wait()
 
+	results, err := aggregateLangResults(perLang)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("subsource search complete", "results", len(results),
+		"media", req.MediaLabel())
+	return results, nil
+}
+
+// collectLangs maps each requested ISO language to its SubSource language name,
+// dropping languages SubSource does not support.
+func collectLangs(languages []string) []langEntry {
+	var langs []langEntry
+	for _, lang := range languages {
+		ssLang := iso2ToSubSource(lang)
+		if ssLang != "" {
+			langs = append(langs, langEntry{iso: lang, ss: ssLang})
+		}
+	}
+	return langs
+}
+
+// aggregateLangResults flattens the per-language results. If every language
+// query failed, the last error is propagated so the caller can distinguish a
+// provider failure from a genuine no-results.
+func aggregateLangResults(perLang []langResult) ([]api.Subtitle, error) {
 	var results []api.Subtitle
 	var lastErr error
 	var anySuccess bool
@@ -126,14 +149,9 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		results = append(results, lr.subs...)
 	}
 
-	// If no language query succeeded, propagate the error so the caller
-	// can distinguish provider failure from genuine no-results.
 	if !anySuccess && lastErr != nil {
 		return nil, fmt.Errorf("subsource: all language queries failed: %w", lastErr)
 	}
-
-	slog.Info("subsource search complete", "results", len(results),
-		"media", req.MediaLabel())
 	return results, nil
 }
 
@@ -209,19 +227,16 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *api.Sea
 	for _, alt := range req.AlternativeTitles {
 		altReq := *req
 		altReq.Title = alt
-		id, err := p.searchTitle(ctx, &altReq)
-		if err != nil {
+		id, altErr := p.searchTitle(ctx, &altReq)
+		if altErr != nil {
 			if firstErr == nil {
-				firstErr = err
+				firstErr = altErr
 			}
 			// Rate-limit and auth errors won't resolve by trying another
 			// title; surface them immediately so the scan engine can pause
 			// or re-auth instead of burning the remaining alternatives.
-			if _, isRL := errors.AsType[*api.RateLimitError](err); isRL {
-				return 0, fmt.Errorf("subsource search alt title: %w", err)
-			}
-			if _, isAuth := errors.AsType[*api.AuthError](err); isAuth {
-				return 0, fmt.Errorf("subsource search alt title: %w", err)
+			if isFatalSearchError(altErr) {
+				return 0, fmt.Errorf("subsource search alt title: %w", altErr)
 			}
 			continue
 		}
@@ -233,6 +248,20 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *api.Sea
 		return 0, fmt.Errorf("subsource search alt title: %w", firstErr)
 	}
 	return 0, nil
+}
+
+// isFatalSearchError reports whether err should abort the alternative-title
+// loop. Rate-limit and auth errors won't resolve by trying a different title,
+// so the scan engine should see them immediately (to pause or re-auth) rather
+// than after the remaining alternatives are burned.
+func isFatalSearchError(err error) bool {
+	if _, isRL := errors.AsType[*api.RateLimitError](err); isRL {
+		return true
+	}
+	if _, isAuth := errors.AsType[*api.AuthError](err); isAuth {
+		return true
+	}
+	return false
 }
 
 // --- API types ---
