@@ -584,3 +584,36 @@ func TestLangNameToISO_all_map_entries(t *testing.T) {
 		})
 	}
 }
+
+// TestHistoryEventType_UnmarshalJSON_logs_unknown_event_only_when_nonempty
+// pins the empty-string guard around the unknown-event DEBUG log: an unknown
+// non-empty event string is reported once, while an empty event string is
+// dropped silently. Not t.Parallel: captureSlog swaps the default logger.
+func TestHistoryEventType_UnmarshalJSON_logs_unknown_event_only_when_nonempty(t *testing.T) {
+	prev := loggedUnknownEvents
+	loggedUnknownEvents = newLogOnce(256) // fresh dedup set so first() returns true
+	t.Cleanup(func() { loggedUnknownEvents = prev })
+
+	// Unknown non-empty event string: logged once at DEBUG, resolves to 0.
+	buf := captureSlog(t)
+	var h HistoryEventType
+	if err := h.UnmarshalJSON([]byte(`"someUnknownEvent"`)); err != nil {
+		t.Fatalf("UnmarshalJSON(unknown string) error = %v, want nil", err)
+	}
+	if h != 0 {
+		t.Errorf("HistoryEventType(unknown string) = %d, want 0", int(h))
+	}
+	if !strings.Contains(buf.String(), "unknown event type") {
+		t.Errorf("non-empty unknown event: expected DEBUG log, got %q", buf.String())
+	}
+
+	// Empty event string: the guard skips logging entirely.
+	buf2 := captureSlog(t)
+	var h2 HistoryEventType
+	if err := h2.UnmarshalJSON([]byte(`""`)); err != nil {
+		t.Fatalf("UnmarshalJSON(empty string) error = %v, want nil", err)
+	}
+	if buf2.Len() != 0 {
+		t.Errorf("empty event string: expected no log, got %q", buf2.String())
+	}
+}

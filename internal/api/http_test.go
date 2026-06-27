@@ -427,3 +427,46 @@ func TestRequestLogger_rejects_malformed_inbound_id(t *testing.T) {
 		t.Error("RequestLogger should mint a fresh id when inbound is invalid")
 	}
 }
+
+// --- Log-guard tests (serial: they capture the default slog logger) ---
+
+// TestWriteJSONStatus_logs_on_encode_failure pins the encode-error guard: an
+// unencodable value (a channel) makes the JSON encoder fail and the helper
+// logs at DEBUG, while a value that encodes cleanly produces no such log.
+// Not t.Parallel: captureSlog swaps the default logger.
+func TestWriteJSONStatus_logs_on_encode_failure(t *testing.T) {
+	// Encode failure path logs at DEBUG.
+	buf := captureSlog(t)
+	WriteJSONStatus(httptest.NewRecorder(), http.StatusOK, make(chan int))
+	if !strings.Contains(buf.String(), "writeJSON encode failed") {
+		t.Errorf("encode failure: expected DEBUG log, got %q", buf.String())
+	}
+
+	// Successful encode path does not log.
+	buf2 := captureSlog(t)
+	WriteJSONStatus(httptest.NewRecorder(), http.StatusOK, map[string]int{"k": 1})
+	if strings.Contains(buf2.String(), "writeJSON encode failed") {
+		t.Errorf("encode success: expected no log, got %q", buf2.String())
+	}
+}
+
+// TestInternalErrorC_logs_cause_only_when_error_nonnil pins the err != nil
+// guard around the ERROR log: a non-nil cause is logged, while a nil cause
+// produces no log. (That the cause never leaks into the response body is
+// asserted by TestInternalError_returns_500_with_generic_message.)
+// Not t.Parallel: captureSlog swaps the default logger.
+func TestInternalErrorC_logs_cause_only_when_error_nonnil(t *testing.T) {
+	// Non-nil error: the cause is logged at ERROR.
+	buf := captureSlog(t)
+	InternalErrorC(httptest.NewRecorder(), nil, errors.New("boom-cause"), "")
+	if !strings.Contains(buf.String(), "boom-cause") {
+		t.Errorf("non-nil error: expected ERROR log with cause, got %q", buf.String())
+	}
+
+	// Nil error: nothing is logged.
+	buf2 := captureSlog(t)
+	InternalErrorC(httptest.NewRecorder(), nil, nil, "")
+	if buf2.Len() != 0 {
+		t.Errorf("nil error: expected no log, got %q", buf2.String())
+	}
+}
