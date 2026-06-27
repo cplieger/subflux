@@ -2,6 +2,9 @@ package manualops
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -81,13 +84,16 @@ func TestIsValidLangCode(t *testing.T) {
 	}{
 		{"eng", true},
 		{"pt-BR", true},
+		{"zh-Hans", true},
 		{"", false},
-		{"aaaaaaaaaaaaaaaaaaaaaa", false}, // >MaxLangCodeLen
+		{strings.Repeat("a", MaxLangCodeLen), true},    // exactly the limit is valid
+		{strings.Repeat("a", MaxLangCodeLen+1), false}, // one over the limit
 		{"en/gb", false},
 		{"en\\gb", false},
 		{"en..gb", false},
 		{"en\x00gb", false},
-		{"zh-Hans", true},
+		{"en\tUS", false}, // tab (0x09) is a control char
+		{"en US", true},   // space (0x20) is not a control char
 	}
 	for _, tt := range tests {
 		if got := IsValidLangCode(tt.lang); got != tt.want {
@@ -159,6 +165,117 @@ func TestQueryInt(t *testing.T) {
 		if got := QueryInt(q, "key"); got != tt.want {
 			t.Errorf("QueryInt(%q) = %d, want %d", tt.val, got, tt.want)
 		}
+	}
+}
+
+func TestParseSearchQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		query        string
+		wantLang     string
+		wantType     api.MediaType
+		wantFilePath string
+		wantTitle    string
+		wantImdb     string
+		wantSeason   int
+		wantEpisode  int
+		wantYear     int
+		wantRelease  string
+	}{
+		{
+			name:        "explicit movie with all fields",
+			query:       "title=The+Matrix&imdb=tt0133093&lang=fr&type=movie&year=1999&release=Matrix.1999.1080p",
+			wantLang:    "fr",
+			wantType:    api.MediaTypeMovie,
+			wantTitle:   "The Matrix",
+			wantImdb:    "tt0133093",
+			wantYear:    1999,
+			wantRelease: "Matrix.1999.1080p",
+		},
+		{
+			name:      "missing lang defaults to en",
+			query:     "title=X&type=movie",
+			wantLang:  "en",
+			wantType:  api.MediaTypeMovie,
+			wantTitle: "X",
+		},
+		{
+			name:        "no type with season and episode infers episode",
+			query:       "title=Show&season=1&episode=2",
+			wantLang:    "en",
+			wantType:    api.MediaTypeEpisode,
+			wantTitle:   "Show",
+			wantSeason:  1,
+			wantEpisode: 2,
+		},
+		{
+			name:       "no type without episode infers movie",
+			query:      "title=Show&season=1",
+			wantLang:   "en",
+			wantType:   api.MediaTypeMovie,
+			wantTitle:  "Show",
+			wantSeason: 1,
+		},
+		{
+			name:         "file populates release when release absent",
+			query:        "type=movie&file=/media/Movie.2024.mkv",
+			wantLang:     "en",
+			wantType:     api.MediaTypeMovie,
+			wantFilePath: "/media/Movie.2024.mkv",
+			wantRelease:  "/media/Movie.2024.mkv",
+		},
+		{
+			name:         "explicit release is not overwritten by file",
+			query:        "type=movie&file=/media/Movie.mkv&release=Real.Release",
+			wantLang:     "en",
+			wantType:     api.MediaTypeMovie,
+			wantFilePath: "/media/Movie.mkv",
+			wantRelease:  "Real.Release",
+		},
+		{
+			name:        "negative and non-numeric ints clamp to zero",
+			query:       "type=movie&year=-5&season=abc&episode=2",
+			wantLang:    "en",
+			wantType:    api.MediaTypeMovie,
+			wantYear:    0,
+			wantSeason:  0,
+			wantEpisode: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			r := httptest.NewRequest(http.MethodGet, "/api/search?"+tt.query, nil)
+			req, lang, mediaType, filePath := ParseSearchQuery(r)
+			if lang != tt.wantLang {
+				t.Errorf("lang = %q, want %q", lang, tt.wantLang)
+			}
+			if mediaType != tt.wantType {
+				t.Errorf("mediaType = %q, want %q", mediaType, tt.wantType)
+			}
+			if filePath != tt.wantFilePath {
+				t.Errorf("filePath = %q, want %q", filePath, tt.wantFilePath)
+			}
+			if req.Title != tt.wantTitle {
+				t.Errorf("Title = %q, want %q", req.Title, tt.wantTitle)
+			}
+			if req.ImdbID != tt.wantImdb {
+				t.Errorf("ImdbID = %q, want %q", req.ImdbID, tt.wantImdb)
+			}
+			if req.Season != tt.wantSeason {
+				t.Errorf("Season = %d, want %d", req.Season, tt.wantSeason)
+			}
+			if req.Episode != tt.wantEpisode {
+				t.Errorf("Episode = %d, want %d", req.Episode, tt.wantEpisode)
+			}
+			if req.Year != tt.wantYear {
+				t.Errorf("Year = %d, want %d", req.Year, tt.wantYear)
+			}
+			if req.ReleaseName != tt.wantRelease {
+				t.Errorf("ReleaseName = %q, want %q", req.ReleaseName, tt.wantRelease)
+			}
+		})
 	}
 }
 

@@ -11,22 +11,33 @@ import (
 	"github.com/cplieger/subflux/internal/server/scanning"
 )
 
+// precheckImportPath verifies the imported video still exists on disk and that
+// its path passes config validation before any arr API calls are made. When the
+// file has disappeared between poll cycles it cleans up stale DB state via
+// DeleteStateByPaths. Returns false when the import should be skipped.
+func (p *Poller) precheckImportPath(ctx context.Context, ls *LiveState, path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		slog.Debug("poll: video file gone, skipping", "path", path)
+		if _, delErr := p.deps.Store.DeleteStateByPaths(ctx, []string{path}); delErr != nil {
+			slog.Warn("poll: cleanup failed", "path", path, "error", delErr)
+		}
+		return false
+	}
+
+	if err := ls.Cfg.ValidatePath(ctx, path); err != nil {
+		slog.Warn("poll: path validation failed", "path", path, "error", err)
+		return false
+	}
+	return true
+}
+
 // processPollImport is the shared logic for Sonarr/Radarr import events.
 func (p *Poller) processPollImport(
 	ctx context.Context, ls *LiveState, path string,
 	buildFn func() (*ImportResult, error),
 	refreshFn func(ctx context.Context, id int) error,
 ) {
-	if _, err := os.Stat(path); err != nil {
-		slog.Debug("poll: video file gone, skipping", "path", path)
-		if _, delErr := p.deps.Store.DeleteStateByPaths(ctx, []string{path}); delErr != nil {
-			slog.Warn("poll: cleanup failed", "path", path, "error", delErr)
-		}
-		return
-	}
-
-	if err := ls.Cfg.ValidatePath(ctx, path); err != nil {
-		slog.Warn("poll: path validation failed", "path", path, "error", err)
+	if !p.precheckImportPath(ctx, ls, path) {
 		return
 	}
 
