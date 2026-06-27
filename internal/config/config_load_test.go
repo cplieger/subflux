@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -65,6 +66,9 @@ func TestLoadFromBytes_defaults_applied(t *testing.T) {
 	}
 	if cfg.SearchCfg.ScanDelay.D != 5*time.Second {
 		t.Errorf("SearchCfg.ScanDelay = %v, want 5s", cfg.SearchCfg.ScanDelay.D)
+	}
+	if cfg.SearchCfg.MaxSSEClients != 32 {
+		t.Errorf("SearchCfg.MaxSSEClients = %d, want 32", cfg.SearchCfg.MaxSSEClients)
 	}
 	if len(cfg.SearchCfg.ExcludeArrTags) != 1 || cfg.SearchCfg.ExcludeArrTags[0] != "no-subflux" {
 		t.Errorf("SearchCfg.ExcludeArrTags = %v, want [no-subflux]", cfg.SearchCfg.ExcludeArrTags)
@@ -414,5 +418,40 @@ func TestIsAllowedEnvVar(t *testing.T) {
 				t.Errorf("isAllowedEnvVar(%q) = %v, want %v", tt.key, got, tt.want)
 			}
 		})
+	}
+}
+
+// --- Load logging ---
+
+func TestLoad_logs_arr_flags(t *testing.T) {
+	// minimalValidYAML configures sonarr (URL set) but not radarr, so the
+	// "config loaded" line logs sonarr=true and radarr=false.
+	path := writeConfig(t, minimalValidYAML())
+	out := captureLogs(t, func() {
+		cfg, err := Load(context.Background(), path)
+		if err != nil {
+			t.Fatalf("Load(minimalValidYAML) = %v, want nil", err)
+		}
+		_ = cfg.Close()
+	})
+
+	if !strings.Contains(out, "sonarr=true") {
+		t.Errorf("Load log = %q, want it to contain sonarr=true (SonarrConfig().URL != \"\")", out)
+	}
+	if !strings.Contains(out, "radarr=false") {
+		t.Errorf("Load log = %q, want it to contain radarr=false (RadarrConfig().URL == \"\")", out)
+	}
+}
+
+// --- buildCaches ---
+
+func TestBuildCaches_opens_valid_media_root(t *testing.T) {
+	cfg := &Config{MediaRootDirs: []string{t.TempDir()}}
+	cfg.buildCaches(context.Background())
+	defer func() { _ = cfg.Close() }()
+
+	// A live context plus one accessible root yields exactly one cached handle.
+	if len(cfg.cachedRoots) != 1 {
+		t.Fatalf("buildCaches(live ctx, 1 valid root): len(cachedRoots) = %d, want 1", len(cfg.cachedRoots))
 	}
 }

@@ -201,6 +201,15 @@ func yamlTargetToJSON(t *yamlSubtitleTarget) api.SubtitleTargJSON {
 	}
 }
 
+// nonNilTargets returns a non-nil (possibly empty) slice so that a matched
+// rule with no subtitles ([]) stays distinguishable from "no match" (nil).
+func nonNilTargets(targets []api.SubtitleTarget) []api.SubtitleTarget {
+	if targets == nil {
+		return []api.SubtitleTarget{}
+	}
+	return targets
+}
+
 // matchRule returns the subtitle targets for a matching audio language rule,
 // or nil if no rule matches. Does not fall back to defaults.
 func (c *Config) matchRule(audioLang string) []api.SubtitleTarget {
@@ -209,30 +218,19 @@ func (c *Config) matchRule(audioLang string) []api.SubtitleTarget {
 		if !ok {
 			return nil
 		}
-		if targets == nil {
-			return []api.SubtitleTarget{}
-		}
-		return targets
+		return nonNilTargets(targets)
 	}
 	if c.ruleIndex != nil {
 		idx, ok := c.ruleIndex[audioLang]
 		if !ok {
 			return nil
 		}
-		targets := targetsToAPI(c.Languages.Rules[idx].Subtitles)
-		if targets == nil {
-			return []api.SubtitleTarget{}
-		}
-		return targets
+		return nonNilTargets(targetsToAPI(c.Languages.Rules[idx].Subtitles))
 	}
 	// Fallback for configs not loaded via LoadFromBytes (e.g. tests).
 	for _, rule := range c.Languages.Rules {
 		if rule.Audio == audioLang {
-			targets := targetsToAPI(rule.Subtitles)
-			if targets == nil {
-				return []api.SubtitleTarget{}
-			}
-			return targets
+			return nonNilTargets(targetsToAPI(rule.Subtitles))
 		}
 	}
 	return nil

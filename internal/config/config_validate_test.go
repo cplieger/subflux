@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -361,6 +362,103 @@ func TestValidate(t *testing.T) {
 			}
 			if tt.errContains != "" && err != nil && !strings.Contains(err.Error(), tt.errContains) {
 				t.Errorf("validate() error = %q, want substring %q", err, tt.errContains)
+			}
+		})
+	}
+}
+
+// --- media-root accessibility warnings (validate) ---
+// These assert on log output, the only observable effect of the media-root
+// stat loop, so they swap the global logger and must not run in parallel.
+
+func TestValidate_logs_inaccessible_media_root(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing-root")
+	cfg := &Config{MediaRootDirs: []string{missing}}
+
+	out := captureLogs(t, func() {
+		// validate returns other errors (no arr, etc.); we only care that it
+		// reaches the media-root stat loop and logs the inaccessible warning.
+		_ = validate(context.Background(), cfg)
+	})
+
+	if !strings.Contains(out, "media root not accessible") {
+		t.Errorf("validate(nonexistent media root) log = %q, want it to contain %q", out, "media root not accessible")
+	}
+}
+
+func TestValidate_existing_media_root_no_warn(t *testing.T) {
+	cfg := &Config{MediaRootDirs: []string{t.TempDir()}}
+	out := captureLogs(t, func() {
+		_ = validate(context.Background(), cfg)
+	})
+
+	// An existing root stats successfully, so no inaccessible-root warning.
+	if strings.Contains(out, "media root not accessible") {
+		t.Errorf("validate(existing media root) log = %q, want no %q", out, "media root not accessible")
+	}
+}
+
+// --- warnArrURLs ---
+// warnArrURLs has no return value; its warning log is the behavior under test,
+// so these swap the global logger and must not run in parallel.
+
+func TestWarnArrURLs_url_only(t *testing.T) {
+	// URL set, PublicURL empty: warns that public_url is not set.
+	out := captureLogs(t, func() {
+		warnArrURLs("sonarr", yamlArrConfig{URL: "http://sonarr:8989"})
+	})
+
+	if !strings.Contains(out, "public_url not set") {
+		t.Errorf("warnArrURLs(url-only) log = %q, want it to contain %q", out, "public_url not set")
+	}
+}
+
+func TestWarnArrURLs_public_url_only(t *testing.T) {
+	// PublicURL set, URL empty: warns that it falls back to public_url.
+	out := captureLogs(t, func() {
+		warnArrURLs("radarr", yamlArrConfig{PublicURL: "http://radarr:7878"})
+	})
+
+	if !strings.Contains(out, "falling back to public_url") {
+		t.Errorf("warnArrURLs(public-url-only) log = %q, want it to contain %q", out, "falling back to public_url")
+	}
+}
+
+// --- validateBackup / validateSearch boundaries ---
+
+func TestValidateBackup_retention_boundary(t *testing.T) {
+	t.Parallel()
+	// Retention exactly 1 is valid (the guard is "< 1"); frequency at the 1h
+	// minimum keeps the duration check passing.
+	c := &yamlBackupConfig{Enabled: true, Retention: 1, Frequency: Duration{D: time.Hour}}
+	if err := validateBackup(c); err != nil {
+		t.Errorf("validateBackup(retention=1, freq=1h) = %v, want nil", err)
+	}
+}
+
+func TestValidateSearch_download_max_attempts_default(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   int
+		want int
+	}{
+		// A non-positive value is replaced by the default (3).
+		{"zero gets default", 0, 3},
+		// A positive value is preserved.
+		{"positive preserved", 5, 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := yamlSearchConfig{
+				DownloadMaxAttempts: tc.in,
+				ScanDelay:           Duration{D: 5 * time.Second},
+				ScanInterval:        Duration{D: time.Hour},
+			}
+			_ = validateSearch(&s)
+			if s.DownloadMaxAttempts != tc.want {
+				t.Errorf("validateSearch(DownloadMaxAttempts=%d) -> %d, want %d", tc.in, s.DownloadMaxAttempts, tc.want)
 			}
 		})
 	}

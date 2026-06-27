@@ -105,33 +105,38 @@ func (c *Config) RemoveUnderRoot(ctx context.Context, path string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		var rootDir *os.Root
-		var needClose bool
-		if i < len(c.cachedRoots) {
-			rootDir = c.cachedRoots[i]
-		} else {
-			rd, err := os.OpenRoot(root)
-			if err != nil {
-				continue
-			}
-			rootDir = rd
-			needClose = true
+		if done, err := c.removeUnderSingleRoot(i, root, path); done {
+			return err
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			if needClose {
-				rootDir.Close()
-			}
-			continue
-		}
-		err = rootDir.Remove(rel)
-		if needClose {
-			rootDir.Close()
-		}
-		if err == nil || errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("remove %q: %w", path, err)
 	}
 	return fmt.Errorf("path %q: %w", path, ErrPathNotAllowed)
+}
+
+// removeUnderSingleRoot attempts to remove path through the i-th media root,
+// using the pre-opened cached handle when available or opening one for this
+// call. It returns done=true when iteration should stop (the path was under
+// this root and was removed, was already gone, or the removal errored — in
+// which case err is non-nil); done=false means path is not under this root,
+// so the caller should try the next one. Containment is enforced by os.Root
+// plus the ".." relative-path check, exactly as the per-request path checks.
+func (c *Config) removeUnderSingleRoot(i int, root, path string) (bool, error) {
+	var rootDir *os.Root
+	if i < len(c.cachedRoots) {
+		rootDir = c.cachedRoots[i]
+	} else {
+		rd, err := os.OpenRoot(root)
+		if err != nil {
+			return false, nil
+		}
+		defer rd.Close()
+		rootDir = rd
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return false, nil
+	}
+	if err := rootDir.Remove(rel); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return true, fmt.Errorf("remove %q: %w", path, err)
+	}
+	return true, nil
 }

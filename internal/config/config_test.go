@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +13,20 @@ import (
 
 // minScanDelay is the minimum valid ScanDelay for test configs that go through validate().
 var minScanDelay = Duration{D: 5 * time.Second}
+
+// captureLogs runs fn with the default slog logger swapped for a text handler
+// writing to a buffer, and returns the captured output. The previous default
+// logger is restored on return. Tests using it must not call t.Parallel(),
+// since the logger swap is process-wide.
+func captureLogs(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	defer slog.SetDefault(prev)
+	fn()
+	return buf.String()
+}
 
 func minimalValidYAML() string {
 	return `

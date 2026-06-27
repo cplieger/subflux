@@ -349,3 +349,16 @@ search:
 		t.Fatal("LoadFromBytes() expected error for non-string duration node")
 	}
 }
+
+// --- parseMul overflow boundary ---
+
+// TestParseMul_max_boundary_no_overflow checks the overflow boundary: with
+// unit=1ns and n=2^63, ns equals maxDurationFloat exactly (float64(1<<63-1)
+// rounds up to 2^63). The guard is "ns > maxDurationFloat", so the boundary
+// value is accepted rather than rejected as overflow.
+func TestParseMul_max_boundary_no_overflow(t *testing.T) {
+	t.Parallel()
+	if _, err := parseMul("9223372036854775808X", time.Duration(1), "test"); err != nil {
+		t.Errorf("parseMul(ns == maxDurationFloat) = %v, want nil (boundary is not overflow)", err)
+	}
+}
