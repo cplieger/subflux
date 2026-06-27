@@ -3,6 +3,7 @@ package polling
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -89,4 +90,31 @@ func TestPollCache_concurrent(t *testing.T) {
 		})
 	}
 	wg.Wait()
+}
+
+// A failed write-through (setFn error) must be WARN-logged; the cache still
+// advances (verified by TestPollCache_Set_with_failing_setFn_still_caches).
+func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
+	sink := captureLogs(t)
+	pc := NewPollCache(
+		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ api.PollKey, _ time.Time) error { return errors.New("db boom") },
+	)
+	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
+	if !sink.has(slog.LevelWarn, "PollCache: write failed") {
+		t.Errorf("Set with failing setFn: want WARN 'PollCache: write failed'")
+	}
+}
+
+// A successful write-through must not emit the write-failed WARN.
+func TestPollCacheSet_silent_when_setFn_ok(t *testing.T) {
+	sink := captureLogs(t)
+	pc := NewPollCache(
+		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+	)
+	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
+	if sink.has(slog.LevelWarn, "PollCache: write failed") {
+		t.Errorf("Set with ok setFn: unexpected WARN 'PollCache: write failed'")
+	}
 }

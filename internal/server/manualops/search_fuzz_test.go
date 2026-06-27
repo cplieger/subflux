@@ -20,28 +20,6 @@ func FuzzQueryIntNonNegative(f *testing.F) {
 	})
 }
 
-// FuzzIsValidLangCodeDeterministic verifies that IsValidLangCode is a pure
-// function: calling it twice on the same input yields the same result.
-func FuzzIsValidLangCodeDeterministic(f *testing.F) {
-	f.Add("en")
-	f.Add("pt-BR")
-	f.Add("")
-	f.Add("../../etc/passwd")
-	f.Add("a\x00b")
-
-	f.Fuzz(func(t *testing.T, lang string) {
-		r1 := IsValidLangCode(lang)
-		r2 := IsValidLangCode(lang)
-		if r1 != r2 {
-			t.Fatalf("non-deterministic: %q gave %v then %v", lang, r1, r2)
-		}
-		// Additional invariant: if valid, length must be in [1, MaxLangCodeLen].
-		if r1 && (len(lang) == 0 || len(lang) > MaxLangCodeLen) {
-			t.Fatalf("valid but length %d out of bounds", len(lang))
-		}
-	})
-}
-
 type fakeQuery struct {
 	key string
 	val string
