@@ -1,6 +1,7 @@
 package clisearch
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -24,14 +25,36 @@ func FuzzParseArgs(f *testing.F) {
 		args := strings.Fields(input)
 		params, download := parseArgs(args)
 
-		// Invariant 1: never panics (implicit by reaching here).
-
-		// Invariant 2: download is a bool (always valid).
-		_ = download
-
-		// Invariant 3: params is never nil.
+		// params is always allocated, never nil (dereferenced below).
 		if params == nil {
-			t.Error("params is nil")
+			t.Fatalf("parseArgs(%q) returned a nil params map", args)
+		}
+
+		// Every extracted pair is traceable to the input: a non-empty key
+		// whose "--" form is one of the args, paired with a value that is also
+		// one of the args. This pins the parser's contract without
+		// reimplementing it (which would be tautological).
+		for k, v := range params {
+			if k == "" {
+				t.Errorf("parseArgs(%q) produced an empty key", args)
+			}
+			if !slices.Contains(args, "--"+k) {
+				t.Errorf("parseArgs(%q) key %q has no matching %q arg", args, k, "--"+k)
+			}
+			if !slices.Contains(args, v) {
+				t.Errorf("parseArgs(%q) value %q for key %q is not among the args", args, v, k)
+			}
+		}
+
+		// The --download flag is never captured as a key (it is consumed by
+		// the flag branch before the key/value path runs).
+		if _, ok := params[strings.TrimPrefix(flagDownload, "--")]; ok {
+			t.Errorf("parseArgs(%q) captured %q as a key", args, flagDownload)
+		}
+
+		// download being set implies the flag token actually appeared.
+		if download && !slices.Contains(args, flagDownload) {
+			t.Errorf("parseArgs(%q) download = true but %q is not among the args", args, flagDownload)
 		}
 	})
 }

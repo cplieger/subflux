@@ -272,7 +272,6 @@ func TestMatchMovie(t *testing.T) {
 		{name: "no match wrong imdb", imdbID: "tt9999999", tmdbInt: 0, title: "", want: false},
 		{name: "no match wrong tmdb", imdbID: "", tmdbInt: 99999, title: "", want: false},
 		{name: "no match wrong title", imdbID: "", tmdbInt: 0, title: "Interstellar", want: false},
-		{name: "tmdb zero does not match", imdbID: "", tmdbInt: 0, title: "", want: false},
 		{name: "negative tmdb does not match", imdbID: "", tmdbInt: -1, title: "", want: false},
 	}
 	for _, tt := range tests {
@@ -413,5 +412,17 @@ func TestFilterRadarrMovies_propagates_metadata(t *testing.T) {
 	}
 	if got[0].FilePath != "/m/test.mkv" {
 		t.Errorf("filePath = %q, want %q", got[0].FilePath, "/m/test.mkv")
+	}
+}
+
+// TestMatchMovie_zeroTmdbIsNotAMatch pins the boundary that the shared-fixture
+// TestMatchMovie table cannot reach: the TMDB clause is gated on a strictly
+// positive id, so a movie with TmdbID 0 queried with tmdbInt 0 (and no imdb or
+// title) must not match. The table's fixture has TmdbID 27205, so only a
+// zero-id movie exercises this case.
+func TestMatchMovie_zeroTmdbIsNotAMatch(t *testing.T) {
+	t.Parallel()
+	if matchMovie(&api.Movie{}, "", 0, "") {
+		t.Errorf("matchMovie(zero movie, %q, 0, %q) = true, want false", "", "")
 	}
 }
