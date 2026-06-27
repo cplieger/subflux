@@ -4,14 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
-	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 func TestFactory_requires_api_key(t *testing.T) {
@@ -67,69 +64,6 @@ func TestIso2ToSubSource(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("iso2ToSubSource(%q) = %q, want %q",
 					tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIsHearingImpaired_via_provider(t *testing.T) {
-	// Retained to document subsource's commentary-only invocation pattern.
-	// The heavy-lift cases live in provider.TestIsHearingImpaired; this
-	// anchors the subsource call-site contract against the shared helper.
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		commentary string
-		want       bool
-	}{
-		{"empty", "", false},
-		{"sdh", "SDH version", true},
-		{"non-hi", "non hi version", false},
-		{"hi remove", "HI Remove", false},
-		{"closed caption", "Closed Caption", true},
-		{"normal", "good quality", false},
-		{"nonhi prefix", "nonhi version", false},
-		{"non-hi hyphenated", "non-hi subs", false},
-		{"non-sdh", "non-sdh version", false},
-		{"sdh remove", "sdh remove version", false},
-		{"_hi_ delimited", "sub_hi_version", true},
-		{".hi. delimited", "sub.hi.eng", true},
-		{"_cc_ delimited", "sub_cc_eng", true},
-		{".cc. delimited", "sub.cc.eng", true},
-		{"space cc space", "sub cc eng", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := classify.IsHearingImpaired(tt.commentary, ""); got != tt.want {
-				t.Errorf("classify.IsHearingImpaired(%q, \"\") = %v, want %v",
-					tt.commentary, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIsForced(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		commentary string
-		want       bool
-	}{
-		{"empty", "", false},
-		{"forced", "Forced subtitles", true},
-		{"foreign", "Foreign parts only", true},
-		{"normal", "good quality", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := classify.IsForced(tt.commentary); got != tt.want {
-				t.Errorf("classify.IsForced(%q) = %v, want %v", tt.commentary, got, tt.want)
 			}
 		})
 	}
@@ -265,118 +199,6 @@ func TestFlexInt_UnmarshalJSON(t *testing.T) {
 			}
 		})
 	}
-}
-
-// --- checkStatus ---
-
-func TestCheckHTTPStatus(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		wantMsg    string
-		statusCode int
-		wantErr    bool
-	}{
-		{"200 OK", "", 200, false},
-		{"201 Created", "", 201, false},
-		{"301 redirect", "", 301, false},
-		{"400 bad request", "HTTP 400", 400, true},
-		{"401 unauthorized", "invalid API key (401)", 401, true},
-		{"403 forbidden", "access denied (403)", 403, true},
-		{"429 rate limited", "rate limited (429)", 429, true},
-		{"500 server error", "HTTP 500", 500, true},
-		{"399 last non-error", "", 399, false},
-		{"404 not found", "HTTP 404", 404, true},
-		{"503 service unavailable", "HTTP 503", 503, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			resp := &http.Response{
-				StatusCode: tt.statusCode,
-				Body:       io.NopCloser(strings.NewReader("")),
-			}
-			err := httputil.CheckHTTPStatus(resp)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("CheckHTTPStatus() expected error")
-				}
-				if err.Error() != tt.wantMsg {
-					t.Errorf("CheckHTTPStatus(%d) error = %q, want %q",
-						tt.statusCode, err.Error(), tt.wantMsg)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("CheckHTTPStatus(%d) unexpected error: %v", tt.statusCode, err)
-			}
-		})
-	}
-}
-
-func TestCheckHTTPStatus_typed_errors(t *testing.T) {
-	t.Parallel()
-
-	t.Run("401 returns AuthError", func(t *testing.T) {
-		t.Parallel()
-		resp := &http.Response{
-			StatusCode: http.StatusUnauthorized,
-			Body:       io.NopCloser(strings.NewReader("")),
-		}
-		err := httputil.CheckHTTPStatus(resp)
-		var authErr *api.AuthError
-		if !errors.As(err, &authErr) {
-			t.Errorf("CheckHTTPStatus(401) error type = %T, want *api.AuthError", err)
-		}
-	})
-
-	t.Run("403 returns AuthError", func(t *testing.T) {
-		t.Parallel()
-		resp := &http.Response{
-			StatusCode: http.StatusForbidden,
-			Body:       io.NopCloser(strings.NewReader("")),
-		}
-		err := httputil.CheckHTTPStatus(resp)
-		var authErr *api.AuthError
-		if !errors.As(err, &authErr) {
-			t.Errorf("CheckHTTPStatus(403) error type = %T, want *api.AuthError", err)
-		}
-	})
-
-	t.Run("429 returns RateLimitError", func(t *testing.T) {
-		t.Parallel()
-		resp := &http.Response{
-			StatusCode: http.StatusTooManyRequests,
-			Body:       io.NopCloser(strings.NewReader("")),
-		}
-		err := httputil.CheckHTTPStatus(resp)
-		var rlErr *api.RateLimitError
-		if !errors.As(err, &rlErr) {
-			t.Errorf("CheckHTTPStatus(429) error type = %T, want *api.RateLimitError", err)
-		}
-	})
-
-	t.Run("500 is not AuthError or RateLimitError", func(t *testing.T) {
-		t.Parallel()
-		resp := &http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Body:       io.NopCloser(strings.NewReader("")),
-		}
-		err := httputil.CheckHTTPStatus(resp)
-		if err == nil {
-			t.Fatal("CheckHTTPStatus(500) expected error")
-		}
-		var authErr *api.AuthError
-		if errors.As(err, &authErr) {
-			t.Error("CheckHTTPStatus(500) should not return *api.AuthError")
-		}
-		var rlErr *api.RateLimitError
-		if errors.As(err, &rlErr) {
-			t.Error("CheckHTTPStatus(500) should not return *api.RateLimitError")
-		}
-	})
 }
 
 // --- buildSubtitles ---

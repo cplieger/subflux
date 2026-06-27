@@ -352,39 +352,49 @@ func filterAttachments(result entryDetail, languages []string,
 	var subs []api.Subtitle
 	for _, file := range files {
 		for _, att := range file.Attachments {
-			if att.Type != attachTypeSubtitle {
-				continue
+			if sub, ok := attachmentToSubtitle(att, languages); ok {
+				subs = append(subs, sub)
 			}
-			if att.ID <= 0 {
-				continue
-			}
-			lang := classify.Alpha2FromAlpha3(att.Info.Lang)
-			if lang == "" {
-				lang = "en" // AnimeTosho defaults to English.
-			}
-			// Detect Brazilian Portuguese from subtitle name.
-			if lang == "pt" && strings.Contains(
-				strings.ToLower(att.Info.Name), "brazil") {
-				lang = "pb"
-			}
-			if !slices.Contains(languages, lang) {
-				continue
-			}
-
-			hexID := fmt.Sprintf("%08x", att.ID)
-			dlURL := fmt.Sprintf(
-				"%s%s/%d.xz", storageURL, hexID, att.ID)
-
-			subs = append(subs, api.Subtitle{
-				Provider:    providerName,
-				ID:          strconv.Itoa(att.ID),
-				Language:    lang,
-				DownloadURL: dlURL,
-				MatchedBy:   api.MatchByTitle,
-			})
 		}
 	}
 	return subs
+}
+
+// attachmentToSubtitle converts a single AnimeTosho attachment into a Subtitle,
+// applying the type, ID, and language filters. Returns ok=false when the
+// attachment is not a usable subtitle in one of the requested languages.
+// Unknown languages default to English; Brazilian Portuguese is detected from
+// the subtitle name.
+func attachmentToSubtitle(att entryAttachment, languages []string) (api.Subtitle, bool) {
+	if att.Type != attachTypeSubtitle {
+		return api.Subtitle{}, false
+	}
+	if att.ID <= 0 {
+		return api.Subtitle{}, false
+	}
+	lang := classify.Alpha2FromAlpha3(att.Info.Lang)
+	if lang == "" {
+		lang = "en" // AnimeTosho defaults to English.
+	}
+	// Detect Brazilian Portuguese from subtitle name.
+	if lang == "pt" && strings.Contains(
+		strings.ToLower(att.Info.Name), "brazil") {
+		lang = "pb"
+	}
+	if !slices.Contains(languages, lang) {
+		return api.Subtitle{}, false
+	}
+
+	hexID := fmt.Sprintf("%08x", att.ID)
+	dlURL := fmt.Sprintf("%s%s/%d.xz", storageURL, hexID, att.ID)
+
+	return api.Subtitle{
+		Provider:    providerName,
+		ID:          strconv.Itoa(att.ID),
+		Language:    lang,
+		DownloadURL: dlURL,
+		MatchedBy:   api.MatchByTitle,
+	}, true
 }
 
 // matchFiles returns the files from an entry that match the target episode.

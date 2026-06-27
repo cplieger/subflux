@@ -66,6 +66,20 @@ func checkStatus(resp *http.Response) error {
 	return httputil.CheckHTTPStatus(resp)
 }
 
+// langEntry pairs a requested ISO language code with its Gestdown-specific
+// (Addic7ed-style) language name.
+type langEntry struct {
+	iso  string
+	gest string
+}
+
+// langResult holds one language goroutine's outcome: either the subtitles
+// found for that language or the error that ended its show loop.
+type langResult struct {
+	err  error
+	subs []api.Subtitle
+}
+
 // Search finds subtitles for TV episodes via TVDB ID lookup.
 // Gestdown only supports TV shows; movies are skipped.
 func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
@@ -83,56 +97,66 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		return nil, nil
 	}
 
-	// Collect valid languages for concurrent search.
-	type langEntry struct {
-		iso  string
-		gest string
-	}
-	var langs []langEntry
-	for _, lang := range req.Languages {
-		gestLang := iso2ToGestdown(lang)
-		if gestLang != "" {
-			langs = append(langs, langEntry{iso: lang, gest: gestLang})
-		}
-	}
+	langs := collectLangs(req.Languages)
 	if len(langs) == 0 {
 		return nil, nil
 	}
 
-	// Search languages concurrently with bounded concurrency.
-	// Within each language goroutine, the show loop remains sequential
-	// (break-on-first-success semantics preserved).
-	type langResult struct {
-		err  error
-		subs []api.Subtitle
-	}
+	// Search languages concurrently with bounded concurrency. Within each
+	// language goroutine the show loop stays sequential (break-on-first-success).
 	perLang := make([]langResult, len(langs))
-
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(3)
 	for i, le := range langs {
 		g.Go(func() error {
-			for _, show := range shows {
-				if show.ID == "" {
-					continue
-				}
-				subs, searchErr := p.searchSeasonCached(gctx, show.ID, req.Season, req.Episode, le.gest, le.iso)
-				if searchErr != nil {
-					slog.Warn("gestdown search failed",
-						"show", show.ID, "lang", le.iso, "error", searchErr)
-					perLang[i] = langResult{err: searchErr}
-					break
-				}
-				perLang[i] = langResult{subs: subs}
-				if len(subs) > 0 {
-					break
-				}
-			}
+			perLang[i] = p.searchShowsForLang(gctx, shows, req, le.gest, le.iso)
 			return nil
 		})
 	}
 	_ = g.Wait()
 
+	return aggregateResults(perLang, req)
+}
+
+// collectLangs maps each requested ISO language to its Gestdown language name,
+// dropping languages Gestdown does not support.
+func collectLangs(languages []string) []langEntry {
+	var langs []langEntry
+	for _, lang := range languages {
+		gestLang := iso2ToGestdown(lang)
+		if gestLang != "" {
+			langs = append(langs, langEntry{iso: lang, gest: gestLang})
+		}
+	}
+	return langs
+}
+
+// searchShowsForLang searches one language across the candidate shows,
+// stopping at the first show that yields subtitles (or the first error).
+func (p *Provider) searchShowsForLang(ctx context.Context, shows []showResult, req *api.SearchRequest, gestLang, isoLang string) langResult {
+	var lr langResult
+	for _, show := range shows {
+		if show.ID == "" {
+			continue
+		}
+		subs, searchErr := p.searchSeasonCached(ctx, show.ID, req.Season, req.Episode, gestLang, isoLang)
+		if searchErr != nil {
+			slog.Warn("gestdown search failed",
+				"show", show.ID, "lang", isoLang, "error", searchErr)
+			return langResult{err: searchErr}
+		}
+		lr = langResult{subs: subs}
+		if len(subs) > 0 {
+			break
+		}
+	}
+	return lr
+}
+
+// aggregateResults flattens the per-language results. If every attempted
+// language failed, the combined error is returned so the caller can
+// distinguish a provider outage from a genuine no-results.
+func aggregateResults(perLang []langResult, req *api.SearchRequest) ([]api.Subtitle, error) {
 	var results []api.Subtitle
 	attempted, failed := 0, 0
 	for _, lr := range perLang {

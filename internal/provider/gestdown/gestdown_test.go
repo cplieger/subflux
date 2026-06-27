@@ -2,12 +2,25 @@ package gestdown
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/cplieger/ssrf/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"pgregory.net/rapid"
 )
+
+// canceledContext returns an already-cancelled context. The early-return paths
+// never touch the context, so a skipped request still returns (nil, nil); but
+// if an early return regresses and the code falls through to an HTTP call, the
+// cancelled context makes it fail immediately and deterministically instead of
+// performing real network IO.
+func canceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
+}
 
 // --- Factory ---
 
@@ -28,10 +41,12 @@ func TestFactory(t *testing.T) {
 func TestSearch_skips_non_episode(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(context.Background(), nil)
-	req := &api.SearchRequest{MediaType: "movie", TvdbID: 12345, Languages: []string{"en"}}
-	got, err := p.Search(context.Background(), req)
+	// A movie (even with a valid TVDB ID) must be skipped before any network
+	// call; the cancelled context proves no HTTP request is attempted.
+	req := &api.SearchRequest{MediaType: api.MediaTypeMovie, TvdbID: 12345, Languages: []string{"en"}}
+	got, err := p.Search(canceledContext(), req)
 	if err != nil {
-		t.Fatalf("Search() unexpected error: %v", err)
+		t.Fatalf("Search(movie) unexpected error: %v", err)
 	}
 	if got != nil {
 		t.Errorf("Search(movie) = %v, want nil", got)
@@ -41,8 +56,9 @@ func TestSearch_skips_non_episode(t *testing.T) {
 func TestSearch_skips_zero_tvdb_id(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(context.Background(), nil)
-	req := &api.SearchRequest{MediaType: "episode", TvdbID: 0, Languages: []string{"en"}}
-	got, err := p.Search(context.Background(), req)
+	// An episode with no TVDB ID must be skipped before any network call.
+	req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, TvdbID: 0, Languages: []string{"en"}}
+	got, err := p.Search(canceledContext(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
 	}
@@ -57,9 +73,15 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(context.Background(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
-	_, err := p.Download(context.Background(), sub)
+	_, err := p.Download(canceledContext(), sub)
 	if err == nil {
 		t.Fatal("Download(loopback URL) expected error, got nil")
+	}
+	// SSRF validation must run before the request: the error must wrap an
+	// *ssrf.Error, not a transport/context error from a fallthrough.
+	var se *ssrf.Error
+	if !errors.As(err, &se) {
+		t.Errorf("Download(loopback URL) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }
 
@@ -67,9 +89,13 @@ func TestDownload_rejects_internal_ip(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(context.Background(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
-	_, err := p.Download(context.Background(), sub)
+	_, err := p.Download(canceledContext(), sub)
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")
+	}
+	var se *ssrf.Error
+	if !errors.As(err, &se) {
+		t.Errorf("Download(private IP) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }
 
