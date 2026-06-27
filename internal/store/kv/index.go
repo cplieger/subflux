@@ -56,25 +56,11 @@ func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, 
 		return fmt.Errorf("boltkv: primary bucket %q not found", primaryBucket)
 	}
 
-	// Read the prior value (if any) to delete its stale index entries before
-	// the new value overwrites it.
-	existed := false
-	if old := pb.Get(key); old != nil {
-		existed = true
-		var oldVal T
-		if err := Decode(old, &oldVal); err != nil {
-			return fmt.Errorf("boltkv: decode prior %s value for reindex: %w", primaryBucket, err)
-		}
-		for i := range indexes {
-			ix := &indexes[i]
-			ib := tx.Bucket([]byte(ix.Bucket))
-			if ib == nil {
-				return fmt.Errorf("boltkv: index bucket %q not found", ix.Bucket)
-			}
-			if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
-				return fmt.Errorf("boltkv: delete stale index %q: %w", ix.Bucket, err)
-			}
-		}
+	// Read the prior value (if any) and delete its stale index entries before
+	// the new value overwrites it. existed gates the insert-only counter bump.
+	existed, err := reindexPrior(tx, pb, primaryBucket, key, indexes)
+	if err != nil {
+		return err
 	}
 
 	// Write the new primary value.
@@ -87,6 +73,48 @@ func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, 
 	}
 
 	// Add the fresh index entries.
+	if err := addIndexEntries(tx, key, value, indexes); err != nil {
+		return err
+	}
+
+	// Counters track row existence, so they move only on insert/delete.
+	if !existed {
+		if err := addCounters(tx, counters); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reindexPrior reads the existing primary record at key (if any) and deletes
+// the stale secondary-index entries it contributed, so they do not outlive the
+// value about to overwrite them. It reports whether a prior record existed,
+// which the caller uses to bump counters only on a genuine insert.
+func reindexPrior[T any](tx *bolt.Tx, pb *bolt.Bucket, primaryBucket string, key []byte, indexes []IndexSpec[T]) (existed bool, err error) {
+	old := pb.Get(key)
+	if old == nil {
+		return false, nil
+	}
+	var oldVal T
+	if derr := Decode(old, &oldVal); derr != nil {
+		return false, fmt.Errorf("boltkv: decode prior %s value for reindex: %w", primaryBucket, derr)
+	}
+	for i := range indexes {
+		ix := &indexes[i]
+		ib := tx.Bucket([]byte(ix.Bucket))
+		if ib == nil {
+			return false, fmt.Errorf("boltkv: index bucket %q not found", ix.Bucket)
+		}
+		if derr := ib.Delete(ix.Key(key, &oldVal)); derr != nil {
+			return false, fmt.Errorf("boltkv: delete stale index %q: %w", ix.Bucket, derr)
+		}
+	}
+	return true, nil
+}
+
+// addIndexEntries writes the fresh secondary-index entries for value (stored at
+// key) across every declared index, including any projected index value.
+func addIndexEntries[T any](tx *bolt.Tx, key []byte, value *T, indexes []IndexSpec[T]) error {
 	for i := range indexes {
 		ix := &indexes[i]
 		ib := tx.Bucket([]byte(ix.Bucket))
@@ -101,13 +129,14 @@ func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, 
 			return fmt.Errorf("boltkv: put index %q: %w", ix.Bucket, err)
 		}
 	}
+	return nil
+}
 
-	// Counters track row existence, so they move only on insert/delete.
-	if !existed {
-		for i := range counters {
-			if err := adjustCounter(tx, &counters[i], +1); err != nil {
-				return err
-			}
+// addCounters bumps each declared counter by one on a genuine insert.
+func addCounters(tx *bolt.Tx, counters []CounterSpec) error {
+	for i := range counters {
+		if err := adjustCounter(tx, &counters[i], +1); err != nil {
+			return err
 		}
 	}
 	return nil
