@@ -130,7 +130,7 @@ RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/actions --strip-components=1
 # renovate: datasource=npm depName=@cplieger/reactive
-ARG CPLIEGER_REACTIVE_VERSION=1.2.0
+ARG CPLIEGER_REACTIVE_VERSION=1.2.1
 RUN mkdir -p node_modules/@cplieger/reactive && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/reactive --strip-components=1

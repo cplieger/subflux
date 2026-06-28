@@ -29,6 +29,6 @@
   },
   "dependencies": {
     "@cplieger/actions": "2.0.4",
-    "@cplieger/reactive": "1.2.0"
+    "@cplieger/reactive": "1.2.1"
   }
 }
