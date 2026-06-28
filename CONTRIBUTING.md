@@ -91,8 +91,7 @@ bash tests/functional/run.sh --section config # one section
 bash tests/functional/run.sh --dry-run        # list sections
 ```
 
-Override the target with `--url <url>` or `SUBFLUX_URL`. The complementary
-manual checklist lives in `tests/functional/MANUAL-TESTS.md`.
+Override the target with `--url <url>` or `SUBFLUX_URL`.
 
 ## Conventions and gotchas
 
