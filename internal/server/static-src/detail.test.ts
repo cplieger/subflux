@@ -266,4 +266,21 @@ describe("detail: openMovieDetail", () => {
     expect(tbody.children.item(0)).toBe(enBefore);
     expect(covText(enBefore)).toBe(enCovBefore);
   });
+
+  it("switching to a different movie rebuilds the table", () => {
+    openMovieDetail(makeMovie(60, [movieSub("en", 90, "/a.en.srt")]));
+    const tbodyA = movieTbody();
+    const aRow = tbodyA.children.item(0); // en row of movie A
+    expect(aRow instanceof HTMLElement).toBe(true);
+
+    // Different movie id -> REBUILD: keyed <table> forces patch to replace the
+    // table (and its freshly-bound <tbody>), so A's rows are gone and the live
+    // binding is attached to the in-DOM node rather than a detached one.
+    openMovieDetail(makeMovie(61, [movieSub("en", 80, "/b.en.srt")]));
+    const tbodyB = movieTbody();
+
+    expect(tbodyB).not.toBe(tbodyA);
+    expect(document.body.contains(aRow as Node)).toBe(false);
+    expect(covText(tbodyB.children.item(0))).toBe(`srt: ext ${STAR}80`);
+  });
 });

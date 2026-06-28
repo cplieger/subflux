@@ -802,7 +802,7 @@ export function renderSeriesDetail(
   frag.appendChild(
     el(
       "table",
-      { className: "series-detail" },
+      { className: "series-detail", "data-series-id": key },
       el(
         "colgroup",
         null,
@@ -1045,7 +1045,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   frag.appendChild(
     el(
       "table",
-      { className: "movie-detail" },
+      { className: "movie-detail", "data-movie-id": mKey },
       el(
         "thead",
         null,
