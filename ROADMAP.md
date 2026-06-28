@@ -8,9 +8,8 @@ for this repository.
 
 ## Toward 1.0
 
-- **Full manual test pass.** Work through the manual test checklist
-  (`tests/functional/MANUAL-TESTS.md`) end to end across the browser UI,
-  settings flows, sync dialog, coverage badges, and CLI before declaring 1.0.
+- **Full manual test pass.** Work through the browser UI, settings flows,
+  sync dialog, coverage badges, and CLI end to end before declaring 1.0.
 - **First-run / setup flow.** Deep testing and refinement of the initial
   configuration experience (unconfigured mode, the settings wizard, "reset to
   defaults", and the transition to fully-configured/hot-reload). This is the

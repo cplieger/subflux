@@ -53,9 +53,6 @@ const (
 	// Used by both inbound (subflux API key verification) and outbound (Sonarr/Radarr) requests.
 	HeaderXAPIKey = "X-Api-Key" //nolint:gosec // G101 false positive: header name, not a credential
 
-	// QueryParamAPIKey is the canonical query parameter name for API key authentication.
-	QueryParamAPIKey = "api_key"
-
 	// HeaderXRequestID is the canonical X-Request-ID header. The middleware
 	// reuses an inbound value when shape-valid; otherwise mints a fresh
 	// 16-byte hex id and attaches it to the request context.
