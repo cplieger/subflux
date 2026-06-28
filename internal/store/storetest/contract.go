@@ -177,6 +177,16 @@ func writeFile(t *testing.T, path string) {
 	}
 }
 
+// mustSaveDownload saves rec via s.SaveDownload or fails the test, labelling the
+// failure with name so a fatal during a multi-step reconcile setup identifies
+// which save failed. It uses context.Background() (every caller's ctx).
+func mustSaveDownload(t *testing.T, s api.Store, name string, rec *api.DownloadRecord) {
+	t.Helper()
+	if err := s.SaveDownload(context.Background(), rec); err != nil {
+		t.Fatalf("SaveDownload(%s): %v", name, err)
+	}
+}
+
 // testBackoffEligibility asserts the no-row-means-eligible rule and that a
 // recorded attempt becomes backed off (Requirements 2.1, 2.2, 2.4).
 func testBackoffEligibility(t *testing.T, s api.Store) {
@@ -837,24 +847,20 @@ func testReconcileVideoGone(t *testing.T, s api.Store) {
 	okSub := filepath.Join(dir, "ok.eng.srt")
 	writeFile(t, okVideo)
 	writeFile(t, okSub)
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
+	mustSaveDownload(t, s, "ok", &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: "tt-ok", Language: langEng,
 		ProviderName: provOS, ReleaseName: "OK", Score: 100, Path: okSub,
 		Meta: &api.DownloadMeta{VideoPath: okVideo},
-	}); err != nil {
-		t.Fatalf("SaveDownload(ok): %v", err)
-	}
+	})
 
 	// Gone item: neither video nor subtitle exists on disk.
 	goneVideo := filepath.Join(dir, "gone.mkv")
 	goneSub := filepath.Join(dir, "gone.eng.srt")
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
+	mustSaveDownload(t, s, "gone", &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: "tt-gone", Language: langEng,
 		ProviderName: provOS, ReleaseName: "Gone", Score: 100, Path: goneSub,
 		Meta: &api.DownloadMeta{VideoPath: goneVideo},
-	}); err != nil {
-		t.Fatalf("SaveDownload(gone): %v", err)
-	}
+	})
 	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-gone", []api.SubtitleFile{
 		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: goneSub, Codec: codecSubrip},
 	}); err != nil {
@@ -1004,20 +1010,16 @@ func testReconcileAllSubsGone(t *testing.T, s api.Store) {
 	autoSub := filepath.Join(dir, "movie.fr.srt")     // never created
 	manualSub := filepath.Join(dir, "movie.fr.1.srt") // never created
 
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
+	mustSaveDownload(t, s, "auto", &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: "tt-all", Language: langFra,
 		ProviderName: provOS, ReleaseName: "Auto", Score: 100, Path: autoSub,
 		Meta: &api.DownloadMeta{VideoPath: video},
-	}); err != nil {
-		t.Fatalf("SaveDownload(auto): %v", err)
-	}
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
+	})
+	mustSaveDownload(t, s, "manual", &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: "tt-all", Language: langFra,
 		ProviderName: provOS, ReleaseName: "Manual", Score: 200, Path: manualSub,
 		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
-	}); err != nil {
-		t.Fatalf("SaveDownload(manual): %v", err)
-	}
+	})
 	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-all", langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
