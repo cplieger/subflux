@@ -39,14 +39,27 @@ func detectBOMlessUTF16(data []byte) ([]byte, bool) {
 // to UTF-8. Handles UTF-8 (with/without BOM), UTF-16 LE/BE, and common
 // single-byte encodings (Windows-1252, ISO-8859-1).
 //
-// Returns the UTF-8 normalized data. If the input is already valid UTF-8,
-// the original slice is returned (not a copy). Callers must not mutate
-// the returned slice if they need the original data unchanged.
+// Returns the UTF-8 normalized data with any byte-order mark and embedded NUL
+// bytes removed. When the input is already valid, BOM-free, NUL-free UTF-8 the
+// original slice is returned (not a copy); callers must not mutate the returned
+// slice if they need the original data unchanged. The result is a fixed point:
+// NormalizeEncoding(NormalizeEncoding(x)) always equals NormalizeEncoding(x).
 func NormalizeEncoding(data []byte) []byte {
 	if len(data) == 0 {
 		return data
 	}
 	out := decodeToUTF8(data)
+	// Drop embedded NUL bytes BEFORE stripping BOMs. A NUL never appears in
+	// legitimate subtitle text; it only arises when malformed input decodes to
+	// U+0000 code points (e.g. a UTF-16 BOM followed by 0x0000 code units). Left
+	// in place, a NUL breaks idempotency: detectBOMlessUTF16 keys on NUL bytes at
+	// alternating positions, so a second NormalizeEncoding pass would misread the
+	// already-decoded output as BOM-less UTF-16 and re-decode it into different
+	// bytes. Removing every NUL guarantees the second pass falls through to the
+	// utf8.Valid fast path and returns the bytes unchanged. Done first so a NUL
+	// sitting in front of a BOM (e.g. 00 EF BB BF) doesn't hide that BOM from the
+	// loop below.
+	out = stripNUL(out)
 	// Strip ALL leading UTF-8 BOMs from the FINAL result, not just the raw
 	// input: a UTF-16 decode can surface one or more U+FEFF (e.g. redundant
 	// BOMs as the first post-BOM code units) that re-encode to EF BB BF.
@@ -55,6 +68,24 @@ func NormalizeEncoding(data []byte) []byte {
 	// BOM-free UTF-8, so loop until no leading BOM remains.
 	for bytes.HasPrefix(out, bomUTF8) {
 		out = out[len(bomUTF8):]
+	}
+	return out
+}
+
+// stripNUL removes every NUL byte from b. It returns b unchanged (same backing
+// array, no allocation) when b contains no NUL, which is the overwhelmingly
+// common case for real subtitle text. Removing whole 0x00 bytes preserves UTF-8
+// validity: U+0000 is a complete single-byte code point, never part of a
+// multi-byte sequence, so deleting it can't split a rune.
+func stripNUL(b []byte) []byte {
+	if bytes.IndexByte(b, 0) < 0 {
+		return b
+	}
+	out := make([]byte, 0, len(b))
+	for _, c := range b {
+		if c != 0 {
+			out = append(out, c)
+		}
 	}
 	return out
 }
