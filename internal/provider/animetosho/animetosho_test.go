@@ -476,6 +476,7 @@ func TestFileMatchesEpisode(t *testing.T) {
 		{"e-prefix at filename start", "e08 - Show Title.mkv", 1, 8, true},
 		{"padded number match", "Show 08 [720p].mkv", 1, 8, true},
 		{"padded number wrong episode", "Show 03 [720p].mkv", 1, 8, false},
+		{"multiple SxxExx, a later one matches", "Show.S09E09.S01E05.mkv", 1, 5, true},
 	}
 
 	for _, tt := range tests {
