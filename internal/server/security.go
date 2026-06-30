@@ -38,7 +38,7 @@ var importMapRe = regexp.MustCompile(`(?s)<script type="importmap">(.*?)</script
 // cspImportMapFiles are the embedded HTML entrypoints whose inline
 // importmaps the CSP must allow. Both currently ship the identical map;
 // hashing each independently keeps the policy correct if they diverge.
-var cspImportMapFiles = []string{"index.html", "login.html"}
+var cspImportMapFiles = []string{indexHTML, loginHTML}
 
 // importMapHashes returns the unique CSP-quoted sha256 tokens for the
 // inline importmap blocks of the named files, in first-seen order. It
