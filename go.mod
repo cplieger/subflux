@@ -5,10 +5,10 @@ go 1.26.4
 require (
 	github.com/cplieger/auth v1.1.2
 	github.com/cplieger/health v1.1.4
-	github.com/cplieger/httpx/v2 v2.0.1
+	github.com/cplieger/httpx/v2 v2.0.2
 	github.com/cplieger/metrics/v2 v2.2.2
 	github.com/cplieger/ssrf/v2 v2.0.5
-	github.com/cplieger/wiregen v1.2.3
+	github.com/cplieger/wiregen v1.3.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
 	github.com/ulikunitz/xz v0.5.15
