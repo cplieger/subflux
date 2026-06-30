@@ -170,6 +170,13 @@ COPY --from=ts-builder /src/static/*.js internal/server/static/
 # subdirectories, so copy the vendor subtree explicitly — otherwise go:embed
 # omits it and /vendor/* 404s at runtime, breaking the actions framework.
 COPY --from=ts-builder /src/static/vendor/ internal/server/static/vendor/
+# Same non-recursive-glob caveat: the wiregen output (decoders.gen.js /
+# types.gen.js, imported as ./wire/*.gen.js by login.js + app.js) lives in
+# static/wire/, which the *.js glob skips. Without this, go:embed omits it
+# and /wire/decoders.gen.js 404s — served as the JSON 401 envelope, which
+# the browser rejects as a disallowed module MIME type, so the login /
+# first-boot wizard never boots.
+COPY --from=ts-builder /src/static/wire/ internal/server/static/wire/
 
 # Concatenate per-feature CSS splits into the served bundles.
 # Naming convention:
