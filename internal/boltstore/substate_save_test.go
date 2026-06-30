@@ -357,9 +357,9 @@ func TestParseManualOrdinal(t *testing.T) {
 		{"/media/movie.fr.hi.3.srt", 3, true},
 		{"/media/movie.fr.forced.10.srt", 10, true},
 		{"movie.en.1.srt", 1, true},
-		{"/media/movie.fr.9.srt", 9, true},  // ordinal at the upper digit boundary ('9')
-		{"123.srt", 123, true},              // all-digit basename: the scan must stop at index 0, not read s[-1]
-		{"/media/movie.fr.srt", 0, false},   // auto file, no ordinal
+		{"/media/movie.fr.9.srt", 9, true}, // ordinal at the upper digit boundary ('9')
+		{"123.srt", 123, true},             // all-digit basename: the scan must stop at index 0, not read s[-1]
+		{"/media/movie.fr.srt", 0, false},  // auto file, no ordinal
 		{"/media/movie.fr", 0, false},
 	}
 	for _, c := range cases {

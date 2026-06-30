@@ -573,3 +573,52 @@ func TestRecordSubtitleFiles_property_convergence(t *testing.T) {
 		}
 	})
 }
+
+// TestGetSubtitleFiles_videopath_from_highest_auto_state asserts the score /
+// video_path join takes the HIGHEST-scored auto row when a triple has several
+// of them (reconcile can leave more than one auto row; bestAutoStateID selects
+// the max, matching CurrentScore). SaveDownload collapses auto rows into one,
+// so the multi-row state is injected directly via putStateRow.
+func TestGetSubtitleFiles_videopath_from_highest_auto_state(t *testing.T) {
+	db, _ := openTemp(t)
+	// Three auto rows with the peak score in the middle so neither the first
+	// nor the last scanned coincides with the winner.
+	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 70, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v70.mkv"})
+	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 95, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v95.mkv"})
+	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v80.mkv"})
+	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-600",
+		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
+		t.Fatalf("RecordSubtitleFiles: %v", err)
+	}
+
+	rows := listFiles(t, db, covMT, "tmdb-600")
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	if rows[0].Score != 95 || rows[0].VideoPath != "/m/v95.mkv" {
+		t.Errorf("join = score %d / video %q, want 95 / /m/v95.mkv (highest auto row)",
+			rows[0].Score, rows[0].VideoPath)
+	}
+}
+
+// TestGetSubtitleFiles_videopath_tie_keeps_first_auto_state asserts the
+// score-tie tie-break in the coverage join: when two auto rows share the top
+// score, the first in scan order (lowest surrogate id) is the representative,
+// so its video_path is the one joined.
+func TestGetSubtitleFiles_videopath_tie_keeps_first_auto_state(t *testing.T) {
+	db, _ := openTemp(t)
+	putStateRow(t, db, covMT, "tmdb-601", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/first.mkv"})
+	putStateRow(t, db, covMT, "tmdb-601", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/second.mkv"})
+	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-601",
+		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
+		t.Fatalf("RecordSubtitleFiles: %v", err)
+	}
+
+	rows := listFiles(t, db, covMT, "tmdb-601")
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	if rows[0].VideoPath != "/m/first.mkv" {
+		t.Errorf("video_path = %q, want /m/first.mkv (tie keeps first-scanned auto row)", rows[0].VideoPath)
+	}
+}
