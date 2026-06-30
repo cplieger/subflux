@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -107,7 +108,6 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 		{"X-Frame-Options", "DENY"},
 		{"Referrer-Policy", "strict-origin-when-cross-origin"},
 		{"Cache-Control", "no-store"},
-		{"Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:"},
 		{"Permissions-Policy", "camera=(), microphone=(), geolocation=()"},
 		{"Cross-Origin-Opener-Policy", "same-origin"},
 	}
@@ -116,6 +116,23 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 		got := rec.Header().Get(tt.header)
 		if got != tt.want {
 			t.Errorf("securityHeaders() %s = %q, want %q", tt.header, got, tt.want)
+		}
+	}
+
+	// Content-Security-Policy is computed from the embedded importmap at
+	// startup (buildCSPPolicy), so assert its directives rather than a
+	// brittle exact string. The inline importmap must be allowed via a
+	// script-src sha256 hash, or the login/first-boot wizard's
+	// bare-specifier imports (@cplieger/actions) fail to resolve.
+	csp := rec.Header().Get("Content-Security-Policy")
+	for _, want := range []string{
+		"default-src 'self'",
+		"script-src 'self' 'sha256-",
+		"style-src 'self' 'unsafe-inline'",
+		"media-src 'self' blob:",
+	} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("Content-Security-Policy = %q, missing %q", csp, want)
 		}
 	}
 }
