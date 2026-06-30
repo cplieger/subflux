@@ -177,33 +177,42 @@ func TestReconcileState_videoGoneDeletesFanout(t *testing.T) {
 }
 
 // TestReconcileState_siblingPresentDeletesOnlyMissingRow asserts the sibling-
-// present branch: when one row's subtitle is gone but another row for the SAME
-// triple still has its subtitle on disk, only the missing-subtitle row is
-// deleted. The manual lock is PRESERVED, backoff is NOT cleared, and nothing is
-// reset (Requirement 7.2).
+// present branch: when some rows' subtitles are gone but another row for the
+// SAME triple still has its subtitle on disk, EVERY missing-subtitle row is
+// deleted (not just the first) while the present row is preserved. The manual
+// lock is PRESERVED, backoff is NOT cleared, and nothing is reset
+// (Requirement 7.2).
 func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 
 	video := mkfile(t, filepath.Join(dir, "movie.mkv"))
-	autoSub := mkfile(t, filepath.Join(dir, "movie.fr.srt"))     // will be removed
-	manualSub := mkfile(t, filepath.Join(dir, "movie.fr.1.srt")) // stays present (the lock)
+	autoSub := mkfile(t, filepath.Join(dir, "movie.fr.srt"))      // will be removed
+	manualSub := mkfile(t, filepath.Join(dir, "movie.fr.1.srt"))  // stays present (the lock)
+	manualGone := mkfile(t, filepath.Join(dir, "movie.fr.2.srt")) // will be removed
 
-	// Auto row (missing sub) + manual row (present sub, holds the lock).
+	// Auto row (missing sub) + a manual row whose sub is also removed + a manual
+	// row whose sub stays present and holds the lock. Two of the three rows are
+	// missing-subtitle, so the delete loop must run more than once.
 	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt1", "fr",
 		api.ProviderNameOpenSubtitles, "Auto", autoSub, video, 80, false)); err != nil {
 		t.Fatalf("SaveDownload(auto): %v", err)
 	}
 	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt1", "fr",
 		api.ProviderNameSubDL, "Manual", manualSub, video, 50, true)); err != nil {
-		t.Fatalf("SaveDownload(manual): %v", err)
+		t.Fatalf("SaveDownload(manual present): %v", err)
+	}
+	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt1", "fr",
+		api.ProviderNameSubDL, "ManualGone", manualGone, video, 50, true)); err != nil {
+		t.Fatalf("SaveDownload(manual gone): %v", err)
 	}
 	// Seed backoff AFTER the saves (each save clears it) so we can assert it
 	// survives the sibling-present branch.
 	seedAttempt(t, db, api.MediaTypeMovie, "tt1", "fr", api.ProviderNameGestdown)
 
-	rmfile(t, autoSub) // the auto row's subtitle disappears; manual sub remains
+	rmfile(t, autoSub)    // the auto row's subtitle disappears
+	rmfile(t, manualGone) // a second row's subtitle disappears; manualSub remains
 
 	res, err := db.ReconcileState(ctx)
 	if err != nil {
@@ -216,10 +225,11 @@ func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 		t.Errorf("ResetCount = %d, want 0 (sibling present -> no reset)", res.ResetCount)
 	}
 
-	// Only the manual (present) row survives, and it still holds the lock.
+	// Both missing-subtitle rows are deleted; only the manual (present) row
+	// survives, and it still holds the lock.
 	rows := readTripleRows(t, db, api.MediaTypeMovie, "tt1", "fr")
 	if len(rows) != 1 {
-		t.Fatalf("rows = %d, want 1 (only the missing-sub auto row deleted)", len(rows))
+		t.Fatalf("rows = %d, want 1 (every missing-sub row deleted, present sibling kept)", len(rows))
 	}
 	if !rows[0].Manual || rows[0].ReleaseName != "Manual" {
 		t.Errorf("surviving row = {manual:%v release:%q}, want {true Manual}",
