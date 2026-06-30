@@ -2,26 +2,26 @@ package boltstore
 
 import (
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
 // This file is the boltstore-specific WIRING layer over the generic
-// index-maintenance helpers in internal/store/kv (boltkv). It declares each
-// secondary index as a concrete boltkv.IndexSpec[T], declares the O(1)
+// index-maintenance helpers in internal/store/kv (kv). It declares each
+// secondary index as a concrete kv.IndexSpec[T], declares the O(1)
 // maintained meta counters, and exposes the typed put/delete helpers the
 // per-bucket domain methods (tasks 3-7) call.
 //
 // These helpers are the single chokepoint for the secondary-index maintenance
 // invariant (design: "Secondary-index maintenance invariant"): every primary
-// write routes through boltkv.PutIndexed / boltkv.DeleteIndexed with the right
+// write routes through kv.PutIndexed / kv.DeleteIndexed with the right
 // IndexSpecs and CounterSpecs, so each write maintains its indexes AND its
 // counters in the same all-or-nothing transaction. Index maintenance is never
 // hand-rolled at the call sites; they only choose which helper to call.
 //
 // # Why some specs are built per call
 //
-// boltkv derives an index entry's key from (primaryKey, *record). That is
+// kv derives an index entry's key from (primaryKey, *record). That is
 // enough for search_attempts and scan_state, whose primary key already carries
 // every component an index needs, so their IndexSpecs are static.
 //
@@ -32,7 +32,7 @@ import (
 // be supplied by the caller. stateIndexes therefore closes over (mt, mid, lang)
 // and the typed putState / deleteState helpers take them as parameters. A given
 // surrogate id belongs to exactly one triple for its whole life, so the
-// read-old-delete-stale step inside boltkv always rebuilds the same triple key
+// read-old-delete-stale step inside kv always rebuilds the same triple key
 // it originally wrote.
 
 // --- Maintained meta counters ---
@@ -46,7 +46,7 @@ import (
 //   - attempts   = COUNT(*) search_attempts  (Stats)
 //   - subtitle_files = COUNT(*) subtitle_files (TotalSubtitleFiles)
 //
-// boltkv only moves a counter on a genuine insert/delete (not on an update of
+// kv only moves a counter on a genuine insert/delete (not on an update of
 // an existing key), so the counter tracks row existence, matching COUNT(*).
 
 var (
@@ -56,36 +56,36 @@ var (
 )
 
 // downloadCounters maintains the subtitle_state row counter (Stats.downloads).
-func downloadCounters() []boltkv.CounterSpec {
-	return []boltkv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyDownloadCount}}
+func downloadCounters() []kv.CounterSpec {
+	return []kv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyDownloadCount}}
 }
 
 // attemptCounters maintains the search_attempts row counter (Stats.attempts).
-func attemptCounters() []boltkv.CounterSpec {
-	return []boltkv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyAttemptCount}}
+func attemptCounters() []kv.CounterSpec {
+	return []kv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyAttemptCount}}
 }
 
 // fileCounters maintains the subtitle_files row counter (TotalSubtitleFiles).
-func fileCounters() []boltkv.CounterSpec {
-	return []boltkv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyFileCount}}
+func fileCounters() []kv.CounterSpec {
+	return []kv.CounterSpec{{Bucket: bucketMeta, Key: metaKeyFileCount}}
 }
 
 // readDownloadCount returns the maintained subtitle_state row count (O(1)),
 // used by Stats (task 4.4). Returns 0 when the counter is unset.
 func readDownloadCount(tx *bolt.Tx) int64 {
-	return boltkv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyDownloadCount)
+	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyDownloadCount)
 }
 
 // readAttemptCount returns the maintained search_attempts row count (O(1)),
 // used by Stats (task 4.4). Returns 0 when the counter is unset.
 func readAttemptCount(tx *bolt.Tx) int64 {
-	return boltkv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyAttemptCount)
+	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyAttemptCount)
 }
 
 // readFileCount returns the maintained subtitle_files row count (O(1)), used by
 // TotalSubtitleFiles (task 5.1). Returns 0 when the counter is unset.
 func readFileCount(tx *bolt.Tx) int64 {
-	return boltkv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyFileCount)
+	return kv.ReadCounter(tx.Bucket([]byte(bucketMeta)), metaKeyFileCount)
 }
 
 // --- ix_state_triple projected-value codec ---
@@ -113,7 +113,7 @@ func encodeStateProjection(manual bool, score int, provider api.ProviderID) []by
 		m = 1
 	}
 	buf = append(buf, m)
-	buf = append(buf, boltkv.Be64(uint64(int64(score)))...) //nolint:gosec // G115: reinterpret for fixed-width round-trip
+	buf = append(buf, kv.Be64(uint64(int64(score)))...) //nolint:gosec // G115: reinterpret for fixed-width round-trip
 	buf = append(buf, provider...)
 	return buf
 }
@@ -126,7 +126,7 @@ func decodeStateProjection(b []byte) (manual bool, score int, provider api.Provi
 		return false, 0, "", false
 	}
 	manual = b[0] == 1
-	v, _ := boltkv.DecodeBe64(b[1:stateProjectionMinLen])
+	v, _ := kv.DecodeBe64(b[1:stateProjectionMinLen])
 	score = int(int64(v)) //nolint:gosec // G115: inverse of encodeStateProjection
 	provider = api.ProviderID(b[stateProjectionMinLen:])
 	return manual, score, provider, true
@@ -145,10 +145,10 @@ func decodeStateProjection(b []byte) (manual bool, score int, provider api.Provi
 // The triple is closed over because it is not stored in stateRec (see the
 // file-level note). ix_state_imported / ix_state_video keys derive entirely
 // from the record, so on a reset that changes media_imported (or a row whose
-// video_path changes) boltkv's read-old-delete-stale step removes the old entry
+// video_path changes) kv's read-old-delete-stale step removes the old entry
 // and adds the new one in the same tx.
-func stateIndexes(mt api.MediaType, mid, lang string) []boltkv.IndexSpec[stateRec] {
-	return []boltkv.IndexSpec[stateRec]{
+func stateIndexes(mt api.MediaType, mid, lang string) []kv.IndexSpec[stateRec] {
+	return []kv.IndexSpec[stateRec]{
 		{
 			Bucket: bucketIxStateTriple,
 			Key: func(_ []byte, v *stateRec) []byte {
@@ -176,9 +176,9 @@ func stateIndexes(mt api.MediaType, mid, lang string) []boltkv.IndexSpec[stateRe
 // attemptIndexes declares the search_attempts secondary index ix_attempts_due
 // (be64(next_retry) 0x00 primary), existence-only. The primary key already
 // carries (mt, mid, lang, provider), so the spec is static: it derives the due
-// key from the record's NextRetry and the primary key boltkv passes in.
-func attemptIndexes() []boltkv.IndexSpec[attemptRec] {
-	return []boltkv.IndexSpec[attemptRec]{{
+// key from the record's NextRetry and the primary key kv passes in.
+func attemptIndexes() []kv.IndexSpec[attemptRec] {
+	return []kv.IndexSpec[attemptRec]{{
 		Bucket: bucketIxAttemptsDue,
 		Key: func(pk []byte, v *attemptRec) []byte {
 			return attemptsDueKey(v.NextRetry, pk)
@@ -189,8 +189,8 @@ func attemptIndexes() []boltkv.IndexSpec[attemptRec] {
 // scanIndexes declares the scan_state secondary index ix_scan_at
 // (be64(scanned_at) 0x00 primary), existence-only. The primary key carries
 // (mt, mid), so the spec is static.
-func scanIndexes() []boltkv.IndexSpec[scanRec] {
-	return []boltkv.IndexSpec[scanRec]{{
+func scanIndexes() []kv.IndexSpec[scanRec] {
+	return []kv.IndexSpec[scanRec]{{
 		Bucket: bucketIxScanAt,
 		Key: func(pk []byte, v *scanRec) []byte {
 			return scanAtKey(v.ScannedAt, pk)
@@ -204,9 +204,9 @@ func scanIndexes() []boltkv.IndexSpec[scanRec] {
 // and maintains the three triple indexes and the downloads counter, all in tx.
 // The caller supplies (mt, mid, lang) because they are not stored in the record
 // but are needed to build the ix_state_triple key. rec.ID must already be
-// allocated (via boltkv.NextID on the subtitle_state bucket).
+// allocated (via kv.NextID on the subtitle_state bucket).
 func putState(tx *bolt.Tx, mt api.MediaType, mid, lang string, rec *stateRec) error {
-	return boltkv.PutIndexed(tx, bucketSubtitleState, stateKey(rec.ID), rec,
+	return kv.PutIndexed(tx, bucketSubtitleState, stateKey(rec.ID), rec,
 		stateIndexes(mt, mid, lang), downloadCounters())
 }
 
@@ -215,35 +215,35 @@ func putState(tx *bolt.Tx, mt api.MediaType, mid, lang string, rec *stateRec) er
 // (mt, mid, lang) identify the triple for the ix_state_triple key. It is
 // idempotent: deleting an absent id is a no-op and returns existed=false.
 func deleteState(tx *bolt.Tx, mt api.MediaType, mid, lang string, id int64) (existed bool, err error) {
-	return boltkv.DeleteIndexed(tx, bucketSubtitleState, stateKey(id),
+	return kv.DeleteIndexed(tx, bucketSubtitleState, stateKey(id),
 		stateIndexes(mt, mid, lang), downloadCounters())
 }
 
 // putAttempt inserts or updates a search_attempts row and maintains the
 // ix_attempts_due index and the attempts counter, all in tx.
 func putAttempt(tx *bolt.Tx, mt api.MediaType, mid, lang string, p api.ProviderID, rec *attemptRec) error {
-	return boltkv.PutIndexed(tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p), rec,
+	return kv.PutIndexed(tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p), rec,
 		attemptIndexes(), attemptCounters())
 }
 
 // deleteAttempt removes a search_attempts row, its ix_attempts_due entry, and
 // decrements the attempts counter, all in tx. Idempotent on an absent key.
 func deleteAttempt(tx *bolt.Tx, mt api.MediaType, mid, lang string, p api.ProviderID) (existed bool, err error) {
-	return boltkv.DeleteIndexed[attemptRec](tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p),
+	return kv.DeleteIndexed[attemptRec](tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p),
 		attemptIndexes(), attemptCounters())
 }
 
 // putScanState upserts a scan_state row (one per (mt, mid)) and maintains the
 // ix_scan_at index, all in tx. scan_state has no maintained counter.
 func putScanState(tx *bolt.Tx, mt api.MediaType, mid string, rec *scanRec) error {
-	return boltkv.PutIndexed(tx, bucketScanState, scanStateKey(mt, mid), rec,
+	return kv.PutIndexed(tx, bucketScanState, scanStateKey(mt, mid), rec,
 		scanIndexes(), nil)
 }
 
 // deleteScanState removes a scan_state row and its ix_scan_at entry, all in tx.
 // Idempotent on an absent key. Used by reconcile/orphan cleanup (task 6).
 func deleteScanState(tx *bolt.Tx, mt api.MediaType, mid string) (existed bool, err error) {
-	return boltkv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
+	return kv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
 		scanIndexes(), nil)
 }
 
@@ -254,12 +254,12 @@ func deleteScanState(tx *bolt.Tx, mt api.MediaType, mid string) (existed bool, e
 // counter, so writes still route through this chokepoint rather than a bare
 // bucket Put.
 func putSubtitleFile(tx *bolt.Tx, key []byte, rec *fileRec) error {
-	return boltkv.PutIndexed[fileRec](tx, bucketSubtitleFiles, key, rec, nil, fileCounters())
+	return kv.PutIndexed[fileRec](tx, bucketSubtitleFiles, key, rec, nil, fileCounters())
 }
 
 // deleteSubtitleFile removes the subtitle_files row at the supplied composite
 // key and decrements the total-files counter, all in tx. Idempotent on an
 // absent key.
 func deleteSubtitleFile(tx *bolt.Tx, key []byte) (existed bool, err error) {
-	return boltkv.DeleteIndexed[fileRec](tx, bucketSubtitleFiles, key, nil, fileCounters())
+	return kv.DeleteIndexed[fileRec](tx, bucketSubtitleFiles, key, nil, fileCounters())
 }

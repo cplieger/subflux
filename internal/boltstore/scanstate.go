@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -72,7 +72,7 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 		}
 		c := b.Cursor()
 		for key, v := c.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, v = c.Next() {
-			parts := boltkv.Split(key)
+			parts := kv.Split(key)
 			if len(parts) < 2 {
 				continue // malformed key; a correctly built key always parses
 			}
@@ -111,7 +111,7 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 // primary key (mt 0x00 mid); like the SQL query it keys the result set by
 // media id alone, independent of media type.
 func (d *DB) RecentlyScanned(_ context.Context, cutoff time.Time) (map[string]bool, error) {
-	seek := boltkv.Be64(uint64(cutoff.UnixNano()))
+	seek := kv.Be64(uint64(cutoff.UnixNano()))
 
 	out := make(map[string]bool)
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -121,11 +121,11 @@ func (d *DB) RecentlyScanned(_ context.Context, cutoff time.Time) (map[string]bo
 		}
 		c := idx.Cursor()
 		for k, _ := c.Seek(seek); k != nil; k, _ = c.Next() {
-			_, primary, ok := boltkv.SplitTimeIndexKey(k)
+			_, primary, ok := kv.SplitTimeIndexKey(k)
 			if !ok {
 				continue // malformed index key
 			}
-			parts := boltkv.Split(primary)
+			parts := kv.Split(primary)
 			if len(parts) < 2 {
 				continue
 			}
@@ -156,7 +156,7 @@ func (d *DB) LastScanTime(_ context.Context) (string, error) {
 		if k == nil {
 			return nil // no scans recorded -> empty string
 		}
-		unixNano, _, ok := boltkv.SplitTimeIndexKey(k)
+		unixNano, _, ok := kv.SplitTimeIndexKey(k)
 		if !ok {
 			return fmt.Errorf("boltstore: malformed ix_scan_at key %x", k)
 		}

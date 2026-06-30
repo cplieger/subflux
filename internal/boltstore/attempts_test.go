@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -36,7 +36,7 @@ func readAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api
 			return nil
 		}
 		found = true
-		return boltkv.Decode(raw, &rec)
+		return kv.Decode(raw, &rec)
 	})
 	if err != nil {
 		t.Fatalf("readAttempt: %v", err)
@@ -177,7 +177,7 @@ func TestRecordNoResult_nextRetryFormula(t *testing.T) {
 				return nil
 			}
 			found = true
-			return boltkv.Decode(raw, &rec)
+			return kv.Decode(raw, &rec)
 		}); err != nil {
 			rt.Fatalf("read row: %v", err)
 		}

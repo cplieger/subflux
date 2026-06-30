@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -163,7 +163,7 @@ func loadFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string) (map[sub
 			continue // malformed key; a correctly built key always parses
 		}
 		var fr fileRec
-		if derr := boltkv.Decode(v, &fr); derr != nil {
+		if derr := kv.Decode(v, &fr); derr != nil {
 			slog.Warn("boltstore: undecodable subtitle_files value, treating as replaceable",
 				"key", hex.EncodeToString(key), "error", derr)
 			// Leave fr zero: a codec mismatch forces a rewrite if still wanted,
@@ -179,7 +179,7 @@ func loadFileRows(tx *bolt.Tx, mediaType api.MediaType, mediaID string) (map[sub
 // false for a key with fewer than the six components. The media_id is recovered
 // by callers from their query, so it is not returned here.
 func parseSubFileKey(key []byte) (subFileKey, bool) {
-	parts := boltkv.Split(key)
+	parts := kv.Split(key)
 	if len(parts) < 6 {
 		return subFileKey{}, false
 	}
@@ -202,7 +202,7 @@ func (d *DB) UpsertSubtitleFile(_ context.Context, mediaType api.MediaType, medi
 		var offset int64
 		if old := b.Get(key); old != nil {
 			var ofr fileRec
-			if boltkv.Decode(old, &ofr) == nil {
+			if kv.Decode(old, &ofr) == nil {
 				offset = ofr.OffsetMs // preserve cumulative offset on update
 			}
 		}
@@ -286,7 +286,7 @@ type autoStateJoin struct {
 // video_path). It returns skip=true for a malformed key or an undecodable
 // (tolerated, derived-bucket) value.
 func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType api.MediaType, key, v []byte, autoCache map[string]autoStateJoin) (api.SubtitleEntry, bool, error) {
-	parts := boltkv.Split(key)
+	parts := kv.Split(key)
 	if len(parts) < 6 {
 		return api.SubtitleEntry{}, true, nil // malformed key
 	}
@@ -324,7 +324,7 @@ func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType api.MediaType, key, v [
 // cachedAutoStateInfo returns the auto-row join (score, video_path) for the
 // (media_id, language) triple, memoizing the autoStateInfo lookup in cache.
 func (d *DB) cachedAutoStateInfo(tx *bolt.Tx, mediaType api.MediaType, mediaID, language string, cache map[string]autoStateJoin) autoStateJoin {
-	cacheKey := mediaID + string(boltkv.Sep) + language
+	cacheKey := mediaID + string(kv.Sep) + language
 	info, ok := cache[cacheKey]
 	if !ok {
 		score, vp := autoStateInfo(tx, mediaType, mediaID, language)
@@ -415,7 +415,7 @@ func stateVideoPath(tx *bolt.Tx, id int64) string {
 		return ""
 	}
 	var sr stateRec
-	if boltkv.Decode(raw, &sr) != nil {
+	if kv.Decode(raw, &sr) != nil {
 		return ""
 	}
 	return sr.VideoPath
@@ -451,7 +451,7 @@ func (d *DB) SetSyncOffset(_ context.Context, path string, offsetMs int64) error
 		if b == nil {
 			return errors.New("boltstore: sync_offsets bucket not found")
 		}
-		return b.Put(syncOffsetKey(path), boltkv.Be64(uint64(offsetMs))) //nolint:gosec // G115: bit-preserving round-trip, no ordering on this bucket
+		return b.Put(syncOffsetKey(path), kv.Be64(uint64(offsetMs))) //nolint:gosec // G115: bit-preserving round-trip, no ordering on this bucket
 	})
 }
 
@@ -471,7 +471,7 @@ func (d *DB) GetSyncOffset(_ context.Context, path string) (int64, error) {
 		if v == nil {
 			return nil // no stored offset -> 0, no error
 		}
-		u, ok := boltkv.DecodeBe64(v)
+		u, ok := kv.DecodeBe64(v)
 		if !ok {
 			return fmt.Errorf("boltstore: malformed sync_offset value for path %q", path)
 		}

@@ -1,4 +1,4 @@
-package boltkv
+package kv
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 func NextID(b *bolt.Bucket) (id uint64, key []byte, err error) {
 	id, err = b.NextSequence()
 	if err != nil {
-		return 0, nil, fmt.Errorf("boltkv: next sequence: %w", err)
+		return 0, nil, fmt.Errorf("kv: next sequence: %w", err)
 	}
 	return id, Be64(id), nil
 }

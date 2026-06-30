@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -232,7 +232,7 @@ func putStateRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, sr st
 	var id int64
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
-		seq, _, err := boltkv.NextID(sb)
+		seq, _, err := kv.NextID(sb)
 		if err != nil {
 			return err
 		}
@@ -430,7 +430,7 @@ func TestGetState_defaultThousandRowCap(t *testing.T) {
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		for i := range total {
-			seq, _, err := boltkv.NextID(sb)
+			seq, _, err := kv.NextID(sb)
 			if err != nil {
 				return err
 			}

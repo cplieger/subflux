@@ -7,7 +7,7 @@ import (
 
 	"github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -29,7 +29,7 @@ func newUserStore(t *testing.T) *Store {
 // 8.3/8.4 create paths so the DeleteUser cascade can be exercised.
 func seedChild(t *testing.T, db *bolt.DB, indexBucket, primaryBucket string, userID int64, primaryKey []byte) {
 	t.Helper()
-	idxKey := append(append(boltkv.Be64(uint64(userID)), boltkv.Sep), primaryKey...)
+	idxKey := append(append(kv.Be64(uint64(userID)), kv.Sep), primaryKey...)
 	if err := db.Update(func(tx *bolt.Tx) error {
 		if err := tx.Bucket([]byte(primaryBucket)).Put(primaryKey, []byte(`{}`)); err != nil {
 			return err
@@ -43,7 +43,7 @@ func seedChild(t *testing.T, db *bolt.DB, indexBucket, primaryBucket string, use
 // childExists reports whether the child primary and its index entry are present.
 func childExists(t *testing.T, db *bolt.DB, indexBucket, primaryBucket string, userID int64, primaryKey []byte) (primary, index bool) {
 	t.Helper()
-	idxKey := append(append(boltkv.Be64(uint64(userID)), boltkv.Sep), primaryKey...)
+	idxKey := append(append(kv.Be64(uint64(userID)), kv.Sep), primaryKey...)
 	_ = db.View(func(tx *bolt.Tx) error {
 		primary = tx.Bucket([]byte(primaryBucket)).Get(primaryKey) != nil
 		index = tx.Bucket([]byte(indexBucket)).Get(idxKey) != nil

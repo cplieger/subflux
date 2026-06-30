@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"pgregory.net/rapid"
 )
 
@@ -44,19 +44,19 @@ func TestProp_keyEncodeParse(t *testing.T) {
 		id := rapid.Int64Range(1, 1<<55).Draw(rt, "id")
 
 		// attemptKey: mt 0x00 mid 0x00 lang 0x00 provider, Split round-trips.
-		if got := boltkv.Split(attemptKey(mt, mid, lang, provider)); !slices.Equal(
+		if got := kv.Split(attemptKey(mt, mid, lang, provider)); !slices.Equal(
 			got, []string{string(mt), mid, lang, string(provider)}) {
 			rt.Errorf("Split(attemptKey) = %q, want %q", got, []string{string(mt), mid, lang, string(provider)})
 		}
 
 		// subtitleFileKey: six components, Split round-trips.
-		if got := boltkv.Split(subtitleFileKey(mt, mid, lang, variant, source, path)); !slices.Equal(
+		if got := kv.Split(subtitleFileKey(mt, mid, lang, variant, source, path)); !slices.Equal(
 			got, []string{string(mt), mid, lang, string(variant), string(source), path}) {
 			rt.Errorf("Split(subtitleFileKey) = %q, want 6-component round-trip", got)
 		}
 
 		// scanStateKey: mt 0x00 mid.
-		if got := boltkv.Split(scanStateKey(mt, mid)); !slices.Equal(got, []string{string(mt), mid}) {
+		if got := kv.Split(scanStateKey(mt, mid)); !slices.Equal(got, []string{string(mt), mid}) {
 			rt.Errorf("Split(scanStateKey) = %q, want %q", got, []string{string(mt), mid})
 		}
 
@@ -94,7 +94,7 @@ func TestProp_be64Ordering(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		a := rapid.Uint64().Draw(rt, "a")
 		b := rapid.Uint64().Draw(rt, "b")
-		byteCmp := bytes.Compare(boltkv.Be64(a), boltkv.Be64(b))
+		byteCmp := bytes.Compare(kv.Be64(a), kv.Be64(b))
 		if sign(byteCmp) != cmpUint64(a, b) {
 			rt.Errorf("Be64 order mismatch for (%d, %d): byteSign=%d numSign=%d", a, b, sign(byteCmp), cmpUint64(a, b))
 		}
@@ -110,8 +110,8 @@ func TestProp_be64Ordering(t *testing.T) {
 		ta := time.Unix(0, rapid.Int64Range(0, 1<<55).Draw(rt, "ta"))
 		tb := time.Unix(0, rapid.Int64Range(0, 1<<55).Draw(rt, "tb"))
 		primary := stateKey(ia)
-		ka := boltkv.TimeIndexKey(ta, primary)
-		kb := boltkv.TimeIndexKey(tb, primary)
+		ka := kv.TimeIndexKey(ta, primary)
+		kb := kv.TimeIndexKey(tb, primary)
 		// With the same primary, key order must match timestamp order.
 		if sign(bytes.Compare(ka, kb)) != cmpInt64(ta.UnixNano(), tb.UnixNano()) {
 			rt.Errorf("TimeIndexKey order mismatch for (%d, %d)", ta.UnixNano(), tb.UnixNano())
@@ -221,7 +221,7 @@ func assertRecStable[T any](rt *rapid.T, v *T) {
 		rt.Fatalf("encodeRecord: %v", err)
 	}
 	var got T
-	skip, derr := decodeRecord(boltkv.FailClosed, "prop", []byte("k"), enc, &got)
+	skip, derr := decodeRecord(kv.FailClosed, "prop", []byte("k"), enc, &got)
 	if skip {
 		rt.Fatalf("FailClosed decode must never skip")
 	}
@@ -247,7 +247,7 @@ func TestProp_malformedDecode(t *testing.T) {
 		valid := json.Valid(data)
 
 		var v stateRec
-		skip, err := decodeRecord(boltkv.FailClosed, bucketSubtitleState, []byte("k"), data, &v)
+		skip, err := decodeRecord(kv.FailClosed, bucketSubtitleState, []byte("k"), data, &v)
 		if skip {
 			rt.Fatalf("FailClosed must never skip")
 		}
@@ -256,7 +256,7 @@ func TestProp_malformedDecode(t *testing.T) {
 		}
 
 		var vs stateRec
-		skip, serr := decodeRecord(boltkv.TolerantSkip, bucketSubtitleState, []byte("k"), data, &vs)
+		skip, serr := decodeRecord(kv.TolerantSkip, bucketSubtitleState, []byte("k"), data, &vs)
 		if serr != nil {
 			rt.Fatalf("TolerantSkip returned error: %v", serr)
 		}

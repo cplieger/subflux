@@ -1,4 +1,4 @@
-package boltkv
+package kv
 
 import (
 	"testing"

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
 
@@ -120,7 +120,7 @@ func (r *pkRec) toPasskey() *auth.PasskeyCredential {
 // user-scoped scan and what users.go's cascade uses; a credential_id appended
 // after it is unambiguous because the separator sits at the fixed offset 8.
 func passkeyUserPrefix(userID int64) []byte {
-	return append(boltkv.Be64(uint64(userID)), boltkv.Sep) //nolint:gosec // G115: positive surrogate id
+	return append(kv.Be64(uint64(userID)), kv.Sep) //nolint:gosec // G115: positive surrogate id
 }
 
 // passkeyUserIndexKey builds the full ix_passkey_user key:
@@ -179,7 +179,7 @@ func insertPasskey(tx *bbolt.Tx, pb *bbolt.Bucket, cred *auth.PasskeyCredential)
 	cred.ID = id
 
 	rec := toPasskeyRec(cred)
-	enc, err := boltkv.Encode(&rec)
+	enc, err := kv.Encode(&rec)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func (s *Store) UpdatePasskeyAfterLogin(_ context.Context, credID []byte, signCo
 		rec.UserVerified = flags.UserVerified
 		rec.CloneWarning = flags.CloneWarning
 
-		enc, err := boltkv.Encode(&rec)
+		enc, err := kv.Encode(&rec)
 		if err != nil {
 			return err
 		}
@@ -326,7 +326,7 @@ func (s *Store) RenamePasskey(_ context.Context, id, userID int64, name string) 
 			return err
 		}
 		rec.Name = name
-		enc, err := boltkv.Encode(rec)
+		enc, err := kv.Encode(rec)
 		if err != nil {
 			return err
 		}

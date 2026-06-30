@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 )
 
 // Bucket names. bbolt is a single file of top-level buckets, each an ordered
@@ -72,9 +72,9 @@ var (
 //
 // All four components are NUL-free text, so the key prefix-scans cleanly by
 // triplePrefix (all providers for a triple) and round-trips through
-// [boltkv.Split].
+// [kv.Split].
 func attemptKey(mt api.MediaType, mid, lang string, p api.ProviderID) []byte {
-	return boltkv.Join(string(mt), mid, lang, string(p))
+	return kv.Join(string(mt), mid, lang, string(p))
 }
 
 // --- subtitle_state (primary) ---
@@ -84,14 +84,14 @@ func attemptKey(mt api.MediaType, mid, lang string, p api.ProviderID) []byte {
 // "id DESC" tiebreak is recoverable. id is a positive surrogate from
 // bbolt.NextSequence; the uint64 reinterpretation preserves ordering.
 func stateKey(id int64) []byte {
-	return boltkv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id, ordering preserved
+	return kv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id, ordering preserved
 }
 
 // parseStateKey decodes a subtitle_state primary key back into its surrogate id
 // so an index walk can dereference the primary record. ok is false for a
 // non-8-byte key.
 func parseStateKey(key []byte) (id int64, ok bool) {
-	v, ok := boltkv.DecodeBe64(key)
+	v, ok := kv.DecodeBe64(key)
 	if !ok {
 		return 0, false
 	}
@@ -107,7 +107,7 @@ func parseStateKey(key []byte) (id int64, ok bool) {
 // The trailing separator is what guarantees component-boundary safety: a prefix
 // scan for lang "fr" cannot match a key whose language merely starts with "fr".
 func triplePrefix(mt api.MediaType, mid, lang string) []byte {
-	return append(boltkv.Join(string(mt), mid, lang), boltkv.Sep)
+	return append(kv.Join(string(mt), mid, lang), kv.Sep)
 }
 
 // mediaPrefix builds the (media_type, media_id) scan prefix:
@@ -117,7 +117,7 @@ func triplePrefix(mt api.MediaType, mid, lang string) []byte {
 // Used for all-rows-for-a-media-item scans. The trailing separator keeps mid
 // "tt1" from matching a key for mid "tt12".
 func mediaPrefix(mt api.MediaType, mid string) []byte {
-	return append(boltkv.Join(string(mt), mid), boltkv.Sep)
+	return append(kv.Join(string(mt), mid), kv.Sep)
 }
 
 // typePrefix builds the media-type scan prefix:
@@ -129,7 +129,7 @@ func mediaPrefix(mt api.MediaType, mid string) []byte {
 // prefix bytes after this separator, which is why the boundary after the type
 // must already be sealed by the trailing 0x00.
 func typePrefix(mt api.MediaType) []byte {
-	return append([]byte(mt), boltkv.Sep)
+	return append([]byte(mt), kv.Sep)
 }
 
 // --- subtitle_files (primary) ---
@@ -140,9 +140,9 @@ func typePrefix(mt api.MediaType) []byte {
 //
 // lang and variant live in the key so per-media coverage counts come from a
 // key-only prefix walk. Filesystem paths are NUL-free, so the key round-trips
-// through [boltkv.Split].
+// through [kv.Split].
 func subtitleFileKey(mt api.MediaType, mid, lang string, variant api.Variant, source api.SubtitleSource, path string) []byte {
-	return boltkv.Join(string(mt), mid, lang, string(variant), string(source), path)
+	return kv.Join(string(mt), mid, lang, string(variant), string(source), path)
 }
 
 // --- scan_state (primary) ---
@@ -150,7 +150,7 @@ func subtitleFileKey(mt api.MediaType, mid, lang string, variant api.Variant, so
 // scanStateKey builds the scan_state primary key: mt 0x00 mid. One row per
 // (media_type, media_id).
 func scanStateKey(mt api.MediaType, mid string) []byte {
-	return boltkv.Join(string(mt), mid)
+	return kv.Join(string(mt), mid)
 }
 
 // --- sync_offsets (primary) ---
@@ -175,7 +175,7 @@ func pollStateKey(k api.PollKey) []byte {
 // where primary is the [attemptKey] it dereferences. A forward cursor walks in
 // ascending next_retry order and a Seek to be64(cutoff) lands exactly.
 func attemptsDueKey(nextRetry time.Time, primary []byte) []byte {
-	return boltkv.TimeIndexKey(nextRetry, primary)
+	return kv.TimeIndexKey(nextRetry, primary)
 }
 
 // --- ix_state_triple (subtitle_state secondary) ---
@@ -195,7 +195,7 @@ func stateTripleKeyID(key []byte) (id int64, ok bool) {
 	if len(key) < 8 {
 		return 0, false
 	}
-	v, ok := boltkv.DecodeBe64(key[len(key)-8:])
+	v, ok := kv.DecodeBe64(key[len(key)-8:])
 	if !ok {
 		return 0, false
 	}
@@ -208,7 +208,7 @@ func stateTripleKeyID(key []byte) (id int64, ok bool) {
 // be64(id). Forward walk is oldest-first; reverse walk drives the
 // "media_imported DESC, id DESC" state ordering and keyset pagination.
 func stateImportedKey(mediaImported time.Time, id int64) []byte {
-	return boltkv.TimeIndexKey(mediaImported, stateKey(id))
+	return kv.TimeIndexKey(mediaImported, stateKey(id))
 }
 
 // --- ix_state_video (subtitle_state secondary) ---
@@ -223,7 +223,7 @@ func stateImportedKey(mediaImported time.Time, id int64) []byte {
 func stateVideoKey(videoPath string, id int64) []byte {
 	buf := make([]byte, 0, len(videoPath)+1+8)
 	buf = append(buf, videoPath...)
-	buf = append(buf, boltkv.Sep)
+	buf = append(buf, kv.Sep)
 	buf = append(buf, stateKey(id)...)
 	return buf
 }
@@ -234,7 +234,7 @@ func stateVideoKey(videoPath string, id int64) []byte {
 func videoPrefix(videoPath string) []byte {
 	buf := make([]byte, 0, len(videoPath)+1)
 	buf = append(buf, videoPath...)
-	buf = append(buf, boltkv.Sep)
+	buf = append(buf, kv.Sep)
 	return buf
 }
 
@@ -243,10 +243,10 @@ func videoPrefix(videoPath string) []byte {
 // video path is everything before that separator. ok is false for a malformed
 // key.
 func splitStateVideoKey(key []byte) (videoPath string, id int64, ok bool) {
-	if len(key) < 9 || key[len(key)-9] != boltkv.Sep {
+	if len(key) < 9 || key[len(key)-9] != kv.Sep {
 		return "", 0, false
 	}
-	v, ok := boltkv.DecodeBe64(key[len(key)-8:])
+	v, ok := kv.DecodeBe64(key[len(key)-8:])
 	if !ok {
 		return "", 0, false
 	}
@@ -259,5 +259,5 @@ func splitStateVideoKey(key []byte) (videoPath string, id int64, ok bool) {
 // where primary is the [scanStateKey]. RecentlyScanned seeks to be64(cutoff)
 // and walks forward; LastScanTime reads the last entry.
 func scanAtKey(scannedAt time.Time, primary []byte) []byte {
-	return boltkv.TimeIndexKey(scannedAt, primary)
+	return kv.TimeIndexKey(scannedAt, primary)
 }

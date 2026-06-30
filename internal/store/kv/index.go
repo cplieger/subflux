@@ -1,4 +1,4 @@
-package boltkv
+package kv
 
 import (
 	"encoding/binary"
@@ -53,7 +53,7 @@ type CounterSpec struct {
 func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, indexes []IndexSpec[T], counters []CounterSpec) error {
 	pb := tx.Bucket([]byte(primaryBucket))
 	if pb == nil {
-		return fmt.Errorf("boltkv: primary bucket %q not found", primaryBucket)
+		return fmt.Errorf("kv: primary bucket %q not found", primaryBucket)
 	}
 
 	// Read the prior value (if any) and delete its stale index entries before
@@ -69,7 +69,7 @@ func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, 
 		return err
 	}
 	if err := pb.Put(key, enc); err != nil {
-		return fmt.Errorf("boltkv: put primary %q: %w", primaryBucket, err)
+		return fmt.Errorf("kv: put primary %q: %w", primaryBucket, err)
 	}
 
 	// Add the fresh index entries.
@@ -97,16 +97,16 @@ func reindexPrior[T any](tx *bolt.Tx, pb *bolt.Bucket, primaryBucket string, key
 	}
 	var oldVal T
 	if derr := Decode(old, &oldVal); derr != nil {
-		return false, fmt.Errorf("boltkv: decode prior %s value for reindex: %w", primaryBucket, derr)
+		return false, fmt.Errorf("kv: decode prior %s value for reindex: %w", primaryBucket, derr)
 	}
 	for i := range indexes {
 		ix := &indexes[i]
 		ib := tx.Bucket([]byte(ix.Bucket))
 		if ib == nil {
-			return false, fmt.Errorf("boltkv: index bucket %q not found", ix.Bucket)
+			return false, fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
 		}
 		if derr := ib.Delete(ix.Key(key, &oldVal)); derr != nil {
-			return false, fmt.Errorf("boltkv: delete stale index %q: %w", ix.Bucket, derr)
+			return false, fmt.Errorf("kv: delete stale index %q: %w", ix.Bucket, derr)
 		}
 	}
 	return true, nil
@@ -119,14 +119,14 @@ func addIndexEntries[T any](tx *bolt.Tx, key []byte, value *T, indexes []IndexSp
 		ix := &indexes[i]
 		ib := tx.Bucket([]byte(ix.Bucket))
 		if ib == nil {
-			return fmt.Errorf("boltkv: index bucket %q not found", ix.Bucket)
+			return fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
 		}
 		var iv []byte
 		if ix.Value != nil {
 			iv = ix.Value(key, value)
 		}
 		if err := ib.Put(ix.Key(key, value), iv); err != nil {
-			return fmt.Errorf("boltkv: put index %q: %w", ix.Bucket, err)
+			return fmt.Errorf("kv: put index %q: %w", ix.Bucket, err)
 		}
 	}
 	return nil
@@ -150,7 +150,7 @@ func addCounters(tx *bolt.Tx, counters []CounterSpec) error {
 func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes []IndexSpec[T], counters []CounterSpec) (existed bool, err error) {
 	pb := tx.Bucket([]byte(primaryBucket))
 	if pb == nil {
-		return false, fmt.Errorf("boltkv: primary bucket %q not found", primaryBucket)
+		return false, fmt.Errorf("kv: primary bucket %q not found", primaryBucket)
 	}
 	old := pb.Get(key)
 	if old == nil {
@@ -158,20 +158,20 @@ func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes
 	}
 	var oldVal T
 	if err := Decode(old, &oldVal); err != nil {
-		return false, fmt.Errorf("boltkv: decode prior %s value for delete: %w", primaryBucket, err)
+		return false, fmt.Errorf("kv: decode prior %s value for delete: %w", primaryBucket, err)
 	}
 	for i := range indexes {
 		ix := &indexes[i]
 		ib := tx.Bucket([]byte(ix.Bucket))
 		if ib == nil {
-			return false, fmt.Errorf("boltkv: index bucket %q not found", ix.Bucket)
+			return false, fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
 		}
 		if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
-			return false, fmt.Errorf("boltkv: delete index %q: %w", ix.Bucket, err)
+			return false, fmt.Errorf("kv: delete index %q: %w", ix.Bucket, err)
 		}
 	}
 	if err := pb.Delete(key); err != nil {
-		return false, fmt.Errorf("boltkv: delete primary %q: %w", primaryBucket, err)
+		return false, fmt.Errorf("kv: delete primary %q: %w", primaryBucket, err)
 	}
 	for i := range counters {
 		if err := adjustCounter(tx, &counters[i], -1); err != nil {
@@ -197,7 +197,7 @@ func GetUint64(b *bolt.Bucket, key []byte) (uint64, bool) {
 // keys (core_schema_version, auth_schema_version).
 func PutUint64(b *bolt.Bucket, key []byte, v uint64) error {
 	if err := b.Put(key, Be64(v)); err != nil {
-		return fmt.Errorf("boltkv: put scalar: %w", err)
+		return fmt.Errorf("kv: put scalar: %w", err)
 	}
 	return nil
 }
@@ -213,7 +213,7 @@ func ReadCounter(b *bolt.Bucket, key []byte) int64 {
 func adjustCounter(tx *bolt.Tx, c *CounterSpec, sign int64) error {
 	b := tx.Bucket([]byte(c.Bucket))
 	if b == nil {
-		return fmt.Errorf("boltkv: counter bucket %q not found", c.Bucket)
+		return fmt.Errorf("kv: counter bucket %q not found", c.Bucket)
 	}
 	delta := c.Delta
 	if delta == 0 {

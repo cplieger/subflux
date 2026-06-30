@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -36,7 +36,7 @@ func roundTrip[T any](t *testing.T, v *T) {
 		t.Fatalf("encodeRecord: %v", err)
 	}
 	var got T
-	skip, derr := decodeRecord(boltkv.FailClosed, "test", []byte("k"), enc, &got)
+	skip, derr := decodeRecord(kv.FailClosed, "test", []byte("k"), enc, &got)
 	if skip {
 		t.Fatal("FailClosed decode must never skip")
 	}
@@ -59,13 +59,13 @@ func TestDecodeRecord_policy(t *testing.T) {
 	malformed := []byte("{not json")
 
 	var v1 stateRec
-	skip, err := decodeRecord(boltkv.TolerantSkip, bucketSubtitleState, []byte("k"), malformed, &v1)
+	skip, err := decodeRecord(kv.TolerantSkip, bucketSubtitleState, []byte("k"), malformed, &v1)
 	if !skip || err != nil {
 		t.Errorf("TolerantSkip on malformed = (skip=%v, err=%v), want (true, nil)", skip, err)
 	}
 
 	var v2 stateRec
-	skip, err = decodeRecord(boltkv.FailClosed, bucketAuthUsers, []byte("k"), malformed, &v2)
+	skip, err = decodeRecord(kv.FailClosed, bucketAuthUsers, []byte("k"), malformed, &v2)
 	if skip || err == nil {
 		t.Errorf("FailClosed on malformed = (skip=%v, err=%v), want (false, non-nil)", skip, err)
 	}
@@ -76,13 +76,13 @@ func TestDecodeRecord_policy(t *testing.T) {
 func TestBucketDecodeMode(t *testing.T) {
 	tolerant := []string{bucketSearchAttempts, bucketSubtitleState, bucketSubtitleFiles, bucketScanState}
 	for _, b := range tolerant {
-		if got := bucketDecodeMode(b); got != boltkv.TolerantSkip {
+		if got := bucketDecodeMode(b); got != kv.TolerantSkip {
 			t.Errorf("bucketDecodeMode(%q) = %v, want TolerantSkip", b, got)
 		}
 	}
 	failClosed := []string{bucketAuthUsers, bucketAuthPasskeys, bucketAuthAPIKeys, bucketMeta, "unknown_bucket"}
 	for _, b := range failClosed {
-		if got := bucketDecodeMode(b); got != boltkv.FailClosed {
+		if got := bucketDecodeMode(b); got != kv.FailClosed {
 			t.Errorf("bucketDecodeMode(%q) = %v, want FailClosed", b, got)
 		}
 	}

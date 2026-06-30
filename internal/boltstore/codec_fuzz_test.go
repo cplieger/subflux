@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 )
 
 // sampleRecords returns one fully-populated value of each core-domain record
@@ -37,7 +37,7 @@ func sampleRecords() []any {
 //     byte-stable).
 func FuzzDecode(f *testing.F) {
 	for _, rec := range sampleRecords() {
-		if enc, err := boltkv.Encode(rec); err == nil {
+		if enc, err := kv.Encode(rec); err == nil {
 			f.Add(enc)
 		}
 	}
@@ -65,7 +65,7 @@ func fuzzOne[T any](t *testing.T, bucket string, data []byte) {
 
 	// FailClosed: never skips; invalid JSON must error; no panic.
 	var v T
-	skip, err := decodeRecord(boltkv.FailClosed, bucket, []byte("k"), data, &v)
+	skip, err := decodeRecord(kv.FailClosed, bucket, []byte("k"), data, &v)
 	if skip {
 		t.Fatalf("[%s] FailClosed must never skip", bucket)
 	}
@@ -75,7 +75,7 @@ func fuzzOne[T any](t *testing.T, bucket string, data []byte) {
 
 	// TolerantSkip: never errors; invalid JSON is skipped; no panic.
 	var vs T
-	skip, serr := decodeRecord(boltkv.TolerantSkip, bucket, []byte("k"), data, &vs)
+	skip, serr := decodeRecord(kv.TolerantSkip, bucket, []byte("k"), data, &vs)
 	if serr != nil {
 		t.Fatalf("[%s] TolerantSkip returned error: %v", bucket, serr)
 	}
@@ -94,7 +94,7 @@ func fuzzOne[T any](t *testing.T, bucket string, data []byte) {
 		t.Fatalf("[%s] re-encode failed: %v", bucket, eerr)
 	}
 	var v2 T
-	if _, err := decodeRecord(boltkv.FailClosed, bucket, []byte("k"), enc, &v2); err != nil {
+	if _, err := decodeRecord(kv.FailClosed, bucket, []byte("k"), enc, &v2); err != nil {
 		t.Fatalf("[%s] re-decode of re-encoded value failed: %v", bucket, err)
 	}
 	enc2, eerr := encodeRecord(&v2)

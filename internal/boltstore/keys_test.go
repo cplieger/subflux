@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 )
 
 // TestAttemptKey_layoutAndRoundTrip asserts the search_attempts key is exactly
@@ -18,7 +18,7 @@ func TestAttemptKey_layoutAndRoundTrip(t *testing.T) {
 	if !bytes.Equal(key, want) {
 		t.Fatalf("attemptKey = %q, want %q", key, want)
 	}
-	got := boltkv.Split(key)
+	got := kv.Split(key)
 	wantParts := []string{"episode", "tvdb-99-s01e02", "fr", "opensubtitles"}
 	if !slices.Equal(got, wantParts) {
 		t.Errorf("Split(attemptKey) = %q, want %q", got, wantParts)
@@ -129,7 +129,7 @@ func TestStateVideoKey_roundTripAndBoundary(t *testing.T) {
 func TestSubtitleFileKey_roundTrip(t *testing.T) {
 	key := subtitleFileKey(api.MediaTypeEpisode, "tvdb-1-s01e01", "es", api.Variant("hi"),
 		api.SourceExternal, "/media/tv/Show/Show.S01E01.es.hi.srt")
-	got := boltkv.Split(key)
+	got := kv.Split(key)
 	want := []string{
 		"episode", "tvdb-1-s01e01", "es", "hi", "external",
 		"/media/tv/Show/Show.S01E01.es.hi.srt",
@@ -147,7 +147,7 @@ func TestSubtitleFileKey_roundTrip(t *testing.T) {
 func TestScanStateKey_roundTrip(t *testing.T) {
 	key := scanStateKey(api.MediaTypeMovie, "tmdb-603")
 	want := []string{"movie", "tmdb-603"}
-	if got := boltkv.Split(key); !slices.Equal(got, want) {
+	if got := kv.Split(key); !slices.Equal(got, want) {
 		t.Errorf("Split(scanStateKey) = %q, want %q", got, want)
 	}
 }
@@ -189,7 +189,7 @@ func TestTimeIndexKeys_chronologicalOrder(t *testing.T) {
 		t.Error("scanAtKey: earlier scanned_at must sort before later")
 	}
 	// A seek to the later cutoff excludes the earlier entry, includes the later.
-	cutoff := boltkv.Be64(uint64(later.UnixNano()))
+	cutoff := kv.Be64(uint64(later.UnixNano()))
 	if bytes.Compare(k1[:8], cutoff) >= 0 {
 		t.Error("earlier scanAtKey timestamp should be < later cutoff")
 	}
