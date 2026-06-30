@@ -1,6 +1,6 @@
 # subflux
 
-[![Image Size](https://ghcr-badge.egpl.dev/cplieger/subflux/size)](https://github.com/cplieger/subflux/pkgs/container/subflux)
+[![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/size.json)](https://github.com/cplieger/subflux/pkgs/container/subflux)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cplieger/subflux)](https://goreportcard.com/report/github.com/cplieger/subflux)
