@@ -42,6 +42,14 @@ var staticFS embed.FS
 
 var staticSub = mustSub(staticFS, "static")
 
+// indexHTML and loginHTML are the embedded HTML entrypoints served by
+// handleUI and hashed into the CSP. Named constants because the literals
+// recur across handleUI and the CSP builder (goconst).
+const (
+	indexHTML = "index.html"
+	loginHTML = "login.html"
+)
+
 // mustSub extracts a subdirectory from an embedded FS, panicking on failure.
 func mustSub(fsys embed.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)

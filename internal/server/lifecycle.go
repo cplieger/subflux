@@ -181,11 +181,11 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(pathpkg.Clean(r.URL.Path), "/")
 	if p == "" {
-		p = "index.html"
+		p = indexHTML
 	}
 
 	// Static assets are public: serve them directly if present.
-	if p != "index.html" && p != "login.html" {
+	if p != indexHTML && p != loginHTML {
 		if info, err := fs.Stat(staticSub, p); err == nil && !info.IsDir() {
 			http.ServeFileFS(w, r, staticSub, p)
 			return
@@ -194,7 +194,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 
 	if _, _, err := s.authenticator.Authenticate(r); err != nil {
 		if authlib.IsBrowserRequest(r) {
-			http.ServeFileFS(w, r, staticSub, "login.html")
+			http.ServeFileFS(w, r, staticSub, loginHTML)
 			return
 		}
 		api.UnauthorizedC(w, r, api.CodeUnauthorized, authlib.ErrUnauthenticated.Error())
@@ -206,5 +206,5 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, staticSub, p)
 		return
 	}
-	http.ServeFileFS(w, r, staticSub, "index.html")
+	http.ServeFileFS(w, r, staticSub, indexHTML)
 }
