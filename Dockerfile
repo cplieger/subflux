@@ -165,6 +165,11 @@ COPY *.go ./
 COPY config.example.yaml ./
 COPY internal/ internal/
 COPY --from=ts-builder /src/static/*.js internal/server/static/
+# The lib TS compiles to static/vendor/<scope>-<lib>/ (importmap targets in
+# index.html / login.html). The *.js glob above is non-recursive and skips
+# subdirectories, so copy the vendor subtree explicitly — otherwise go:embed
+# omits it and /vendor/* 404s at runtime, breaking the actions framework.
+COPY --from=ts-builder /src/static/vendor/ internal/server/static/vendor/
 
 # Concatenate per-feature CSS splits into the served bundles.
 # Naming convention:
