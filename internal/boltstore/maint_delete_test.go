@@ -297,6 +297,64 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	}
 }
 
+// TestDeleteStateByPaths_cleansMultipleMediaAndFiles asserts the orphan-cleanup
+// fan-out is exhaustive in two dimensions at once: every subtitle_files row of
+// an orphaned media item is removed (not just the first), and every orphaned
+// media item in the batch is cleaned (not just the first). Media A is orphaned
+// with TWO coverage files; media B is a second orphaned item in the same
+// DeleteStateByPaths call. After the delete, no files and no scan_state may
+// remain for either.
+func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := context.Background()
+	const videoA = "/media/a.mkv"
+	const videoB = "/media/b.mkv"
+
+	// Media A: one state row backed by videoA, but TWO coverage files (fr+en).
+	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttA", "fr",
+		api.ProviderNameOpenSubtitles, "A", "/p/a.fr.srt", videoA, 100, false)); err != nil {
+		t.Fatalf("SaveDownload(A): %v", err)
+	}
+	seedFile(t, db, api.MediaTypeMovie, "ttA", "fr", "/p/a.fr.srt")
+	seedFile(t, db, api.MediaTypeMovie, "ttA", "en", "/p/a.en.srt")
+	seedScan(t, db, api.MediaTypeMovie, "ttA")
+
+	// Media B: a second orphaned item in the same batch, one coverage file.
+	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttB", "fr",
+		api.ProviderNameOpenSubtitles, "B", "/p/b.fr.srt", videoB, 100, false)); err != nil {
+		t.Fatalf("SaveDownload(B): %v", err)
+	}
+	seedFile(t, db, api.MediaTypeMovie, "ttB", "fr", "/p/b.fr.srt")
+	seedScan(t, db, api.MediaTypeMovie, "ttB")
+
+	if total, _ := db.TotalSubtitleFiles(ctx); total != 3 {
+		t.Fatalf("seeded TotalSubtitleFiles = %d, want 3", total)
+	}
+
+	// Delete both video files in a single call so both media items are orphaned
+	// within one cleanup pass.
+	if _, err := db.DeleteStateByPaths(ctx, []string{videoA, videoB}); err != nil {
+		t.Fatalf("DeleteStateByPaths: %v", err)
+	}
+
+	// All three coverage files gone (A's second file proves the per-media loop
+	// did not stop after the first).
+	if total, _ := db.TotalSubtitleFiles(ctx); total != 0 {
+		t.Errorf("TotalSubtitleFiles = %d, want 0 (every file of every orphan removed)", total)
+	}
+	// Both media items' scan_state gone (B proves the cleanup loop did not stop
+	// after the first media item).
+	for _, mid := range []string{"ttA", "ttB"} {
+		states, err := db.GetScanStates(ctx, api.MediaTypeMovie, mid)
+		if err != nil {
+			t.Fatalf("GetScanStates(%s): %v", mid, err)
+		}
+		if len(states) != 0 {
+			t.Errorf("GetScanStates(%s) = %d, want 0 (orphan scan_state cleaned)", mid, len(states))
+		}
+	}
+}
+
 // mustStats reads Stats and fails the test on error.
 func mustStats(t *testing.T, db *DB) (downloads, attempts int, _ error) {
 	t.Helper()

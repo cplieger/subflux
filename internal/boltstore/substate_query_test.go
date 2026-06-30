@@ -756,3 +756,101 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+// --- asciiLower (LIKE case-folding helper) ---
+
+// TestAsciiLower pins the ASCII-only case folding at its letter boundaries: the
+// upper bound 'Z' and lower bound 'A' must fold, characters just outside the
+// A-Z range ('[' = 'Z'+1, '@' = 'A'-1, and the digit '9') must be left alone,
+// and an already-lowercase or non-letter string must be returned unchanged.
+// The 'Z' cases in particular guard both the detect loop and the transform
+// loop, where an off-by-one on the upper bound would silently stop folding the
+// last letter of the alphabet (the title-search and media-id-prefix filters
+// route through this helper, so such a slip would make those filters miss
+// 'Z'/'z' matches).
+func TestAsciiLower(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"Z", "z"},                     // upper boundary of A-Z: must fold
+		{"A", "a"},                     // lower boundary of A-Z: must fold
+		{"aZ", "az"},                   // 'Z' as the sole trigger after a lowercase char
+		{"Hello WORLD", "hello world"}, // mixed
+		{"[", "["},                     // 'Z'+1: outside the range, unchanged
+		{"@", "@"},                     // 'A'-1: outside the range, unchanged
+		{"9", "9"},                     // digit, unchanged
+		{"abc", "abc"},                 // already lowercase: returned as-is
+		{"", ""},                       // empty
+	}
+	for _, c := range cases {
+		if got := asciiLower(c.in); got != c.want {
+			t.Errorf("asciiLower(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// --- CurrentScore with multiple auto rows ---
+//
+// SaveDownload collapses a triple's auto rows into one (update-in-place), so the
+// public-API tests above only ever exercise CurrentScore with a single auto
+// row. The store is nonetheless written to handle several auto rows per triple
+// (reconcile resets every auto row; collectTripleRows returns them all), and
+// CurrentScore must pick the highest score, breaking a tie in favour of the
+// first row in triple-scan order (ascending surrogate id). The two tests below
+// inject the multi-auto-row state directly via putStateRow so that selection
+// rule is actually verified.
+
+// TestCurrentScore_multipleAutoRowsHighestWins asserts that with several auto
+// rows for one triple, CurrentScore returns the highest score (not the first or
+// last scanned).
+func TestCurrentScore_multipleAutoRowsHighestWins(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Three auto rows in ascending id order with the peak score in the middle,
+	// so neither "first wins" nor "last wins" coincides with the right answer.
+	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 70, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: now})
+	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 95, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: now})
+	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: now})
+
+	score, _, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	if err != nil {
+		t.Fatalf("CurrentScore: %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if score != 95 {
+		t.Errorf("score = %d, want 95 (highest of 70/95/80)", score)
+	}
+}
+
+// TestCurrentScore_tieKeepsFirstScanned asserts the documented tie-break: when
+// two auto rows share the top score, the first row in triple-scan order (lowest
+// surrogate id) wins, so its media_imported is the one returned. The two rows
+// carry distinct media_imported values so the winner is observable.
+func TestCurrentScore_tieKeepsFirstScanned(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := context.Background()
+
+	earlier := time.Now().Add(-time.Hour).Round(0)
+	later := time.Now().Round(0)
+
+	// First-inserted row (lower id) carries the earlier import time; the
+	// second, equal-scoring row carries the later time. The tie-break must keep
+	// the first, so the returned media_imported is `earlier`.
+	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: earlier})
+	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: later})
+
+	score, imported, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	if err != nil {
+		t.Fatalf("CurrentScore: %v", err)
+	}
+	if !found || score != 80 {
+		t.Fatalf("(score, found) = (%d, %v), want (80, true)", score, found)
+	}
+	if !imported.Equal(earlier) {
+		t.Errorf("media_imported = %v, want %v (tie keeps the first-scanned row)", imported, earlier)
+	}
+}
