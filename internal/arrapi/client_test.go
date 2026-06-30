@@ -286,3 +286,27 @@ func TestNewClient_clampsOptions(t *testing.T) {
 		})
 	}
 }
+
+// --- Ping body-drain logging ---
+
+// TestPing_silent_drain_on_success asserts the body-drain step in Ping stays
+// silent when draining a successful response. The drain-failure log is guarded
+// by `err != nil`; negating that guard would emit a spurious "failed to drain
+// ping response" on every successful ping, which this test detects.
+func TestPing_silent_drain_on_success(t *testing.T) {
+	// Non-parallel: captureLogs swaps the global slog default.
+	h := captureLogs(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"version":"4.0.0"}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.Ping(context.Background()); err != nil {
+		t.Fatalf("Ping() unexpected error: %v", err)
+	}
+	if _, ok := h.find("failed to drain ping response"); ok {
+		t.Error("Ping() logged a drain failure on a successful drain")
+	}
+}

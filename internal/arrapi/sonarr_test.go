@@ -519,3 +519,61 @@ func TestResolveExcludeTagIDs_unknown_tag_returns_empty(t *testing.T) {
 		t.Errorf("ResolveExcludeTagIDs(unknown) got %d IDs, want 0", len(got))
 	}
 }
+
+// --- success-summary debug logs ---
+
+// TestGetSeries_logs_count_on_success asserts the documented "fetched series
+// from Sonarr" debug summary is emitted (with the correct count) on a
+// successful fetch. The log is guarded by `if err == nil`; negating that
+// guard suppresses the summary on success, which this test detects.
+func TestGetSeries_logs_count_on_success(t *testing.T) {
+	// Non-parallel: captureLogs swaps the global slog default.
+	h := captureLogs(t)
+
+	series := []api.Series{{ID: 1, Title: "A"}, {ID: 2, Title: "B"}, {ID: 3, Title: "C"}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+		json.NewEncoder(w).Encode(series)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if _, err := c.GetSeries(context.Background()); err != nil {
+		t.Fatalf("GetSeries() unexpected error: %v", err)
+	}
+	rec, ok := h.find("fetched series from Sonarr")
+	if !ok {
+		t.Fatal("GetSeries() did not emit 'fetched series from Sonarr' on success")
+	}
+	if got := logAttrInt(t, rec, "count"); got != 3 {
+		t.Errorf("fetched series count = %d, want 3", got)
+	}
+}
+
+// TestGetTags_logs_count_on_success asserts the "fetched tags from arr" debug
+// summary is emitted (with the correct count) on a successful fetch. The log
+// is guarded by `if err == nil`; negating that guard suppresses the summary on
+// success, which this test detects.
+func TestGetTags_logs_count_on_success(t *testing.T) {
+	// Non-parallel: captureLogs swaps the global slog default.
+	h := captureLogs(t)
+
+	tags := []api.Tag{{ID: 1, Label: "x"}, {ID: 2, Label: "y"}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+		json.NewEncoder(w).Encode(tags)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if _, err := c.getTags(context.Background()); err != nil {
+		t.Fatalf("getTags() unexpected error: %v", err)
+	}
+	rec, ok := h.find("fetched tags from arr")
+	if !ok {
+		t.Fatal("getTags() did not emit 'fetched tags from arr' on success")
+	}
+	if got := logAttrInt(t, rec, "count"); got != 2 {
+		t.Errorf("fetched tags count = %d, want 2", got)
+	}
+}
