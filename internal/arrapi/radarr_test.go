@@ -226,3 +226,39 @@ func TestGetWantedMovies_empty_list_succeeds(t *testing.T) {
 		t.Error("GetWantedMovies(empty) callback was invoked, want no calls")
 	}
 }
+
+// TestGetWantedMovies_logs_missing_movieFile asserts the diagnostic emitted
+// for a movie that reports HasFile but carries no MovieFile payload. The log
+// is guarded by `m.HasFile && m.MovieFile == nil`; negating the nil check
+// would log for the wrong movies (e.g. a tag-excluded movie that does have a
+// file) and stay silent for this one. Asserting the logged title pins the
+// exact movie, so the mutant is caught whether it logs nothing or the wrong
+// title.
+func TestGetWantedMovies_logs_missing_movieFile(t *testing.T) {
+	// Non-parallel: captureLogs swaps the global slog default.
+	h := captureLogs(t)
+
+	movies := []api.Movie{
+		{ID: 1, Title: "Ghost File", HasFile: true, MovieFile: nil},
+		{ID: 2, Title: "Excluded With File", HasFile: true, MovieFile: &api.MovieFile{Path: "/m/e.mkv"}, Tags: []int{7}},
+		{ID: 3, Title: "Wanted", HasFile: true, MovieFile: &api.MovieFile{Path: "/m/w.mkv"}},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+		json.NewEncoder(w).Encode(movies)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	err := c.GetWantedMovies(context.Background(), map[int]struct{}{7: {}}, func(_ api.Movie) error { return nil })
+	if err != nil {
+		t.Fatalf("GetWantedMovies() unexpected error: %v", err)
+	}
+	rec, ok := h.find("movie has file but no movieFile data")
+	if !ok {
+		t.Fatal("GetWantedMovies() did not log the missing-movieFile diagnostic")
+	}
+	if got := rec.attrs["movie"]; got != "Ghost File" {
+		t.Errorf("missing-movieFile log movie = %v, want %q", got, "Ghost File")
+	}
+}

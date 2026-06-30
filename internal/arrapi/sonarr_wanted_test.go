@@ -341,3 +341,57 @@ func TestWantedEpisode(t *testing.T) {
 		})
 	}
 }
+
+// TestGetWantedEpisodes_processed_count_excludes_empty_series asserts that a
+// non-excluded series with zero wanted episodes is NOT recorded as
+// "processed". The collection guard `len(wanted) > 0` decides whether a series
+// is recorded; a boundary mutant (`>= 0`) records empty series too, inflating
+// the processed count without changing the callback count, which the log
+// assertion detects.
+func TestGetWantedEpisodes_processed_count_excludes_empty_series(t *testing.T) {
+	// Non-parallel: captureLogs swaps the global slog default.
+	h := captureLogs(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc(apiPrefix+"/series", func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode([]api.Series{
+			{ID: 1, Title: "Has wanted"},
+			{ID: 2, Title: "No wanted"},
+		})
+	})
+	mux.HandleFunc(apiPrefix+"/episode", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("seriesId") == "1" {
+			json.NewEncoder(w).Encode([]api.Episode{
+				{ID: 10, HasFile: true, EpisodeFile: &api.EpisodeFile{Path: "/tv/s01e01.mkv"}},
+			})
+			return
+		}
+		// Series 2: episodes exist but none qualify -> zero wanted episodes.
+		json.NewEncoder(w).Encode([]api.Episode{
+			{ID: 20, HasFile: false},
+			{ID: 21, HasFile: true, EpisodeFile: nil},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	var count int
+	err := c.GetWantedEpisodes(context.Background(), nil, func(_ api.Series, _ api.Episode) error {
+		count++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("GetWantedEpisodes() unexpected error: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("callback count = %d, want 1 (only series 1's wanted episode)", count)
+	}
+	rec, ok := h.find("finished iterating series")
+	if !ok {
+		t.Fatal("GetWantedEpisodes() did not emit 'finished iterating series'")
+	}
+	if got := logAttrInt(t, rec, "processed"); got != 1 {
+		t.Errorf("processed = %d, want 1 (empty series must not be recorded)", got)
+	}
+}
