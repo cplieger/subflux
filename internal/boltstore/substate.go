@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -117,7 +117,7 @@ func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, m
 	if sb == nil {
 		return errors.New("boltstore: subtitle_state bucket not found")
 	}
-	id, _, err := boltkv.NextID(sb)
+	id, _, err := kv.NextID(sb)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func collectTripleRows(tx *bolt.Tx, mt api.MediaType, mid, lang string) ([]state
 			continue // index/primary drift: no primary for this access path
 		}
 		var sr stateRec
-		if err := boltkv.Decode(raw, &sr); err != nil {
+		if err := kv.Decode(raw, &sr); err != nil {
 			return nil, fmt.Errorf("boltstore: decode subtitle_state id=%d: %w", id, err)
 		}
 		out = append(out, sr)
@@ -509,14 +509,14 @@ func splitStateTripleKey(key []byte) (mt api.MediaType, mid, lang string, id int
 	if len(key) < 8 {
 		return "", "", "", 0, false
 	}
-	v, vok := boltkv.DecodeBe64(key[len(key)-8:])
+	v, vok := kv.DecodeBe64(key[len(key)-8:])
 	if !vok {
 		return "", "", "", 0, false
 	}
 	// The bytes before the id are triplePrefix(mt,mid,lang) = mt 0x00 mid 0x00
 	// lang 0x00, so Split yields [mt, mid, lang, ""] (trailing empty from the
 	// separator).
-	parts := boltkv.Split(key[:len(key)-8])
+	parts := kv.Split(key[:len(key)-8])
 	if len(parts) < 4 {
 		return "", "", "", 0, false
 	}
@@ -620,7 +620,7 @@ func stateEntryFrom(tr stateTripleInfo, sr *stateRec) api.StateEntry {
 // fail-closed decode error. Extracted from GetState so the reverse-walk loop
 // stays a thin offset/limit pager over the matched rows.
 func (d *DB) matchStateRow(sb *bolt.Bucket, triples map[int64]stateTripleInfo, q *api.StateQuery, indexKey []byte) (entry api.StateEntry, matched bool, derr error) {
-	_, primary, ok := boltkv.SplitTimeIndexKey(indexKey)
+	_, primary, ok := kv.SplitTimeIndexKey(indexKey)
 	if !ok {
 		return api.StateEntry{}, false, nil
 	}

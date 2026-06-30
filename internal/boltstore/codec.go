@@ -5,15 +5,15 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
 // This file owns the bbolt record value structs for the core domain, the
-// thin typed (de)serialisation wrappers over the boltkv codec, the
+// thin typed (de)serialisation wrappers over the kv codec, the
 // schema-version constants/keys/helpers, and the per-bucket decode policy.
 //
-// Bucket VALUES are JSON (via boltkv.Encode/Decode): stdlib-only, debuggable,
+// Bucket VALUES are JSON (via kv.Encode/Decode): stdlib-only, debuggable,
 // and additively forward-compatible without a migration script. Bucket KEYS
 // stay binary and live in keys.go. The mt/mid/lang components of most records
 // live in the KEY (and in the secondary indexes), so the value structs below
@@ -81,22 +81,22 @@ type scanRec struct {
 // --- Typed codec wrappers ---
 
 // encodeRecord serialises a core-domain record value as JSON via the shared
-// boltkv codec. It is a thin typed wrapper so call sites read as
+// kv codec. It is a thin typed wrapper so call sites read as
 // encodeRecord(&rec) rather than threading the codec mechanism; PutIndexed
 // already encodes for index-maintained writes, so this is for the rare direct
 // put.
 func encodeRecord[T any](v *T) ([]byte, error) {
-	return boltkv.Encode(v)
+	return kv.Encode(v)
 }
 
 // decodeRecord decodes a core-domain record value into v, applying the
 // supplied decode-failure policy. It is a thin typed wrapper over
-// boltkv.DecodeOrHandle: on a cursor walk the caller continues to the next
+// kv.DecodeOrHandle: on a cursor walk the caller continues to the next
 // record when skip is true (TolerantSkip), or aborts the read when err is
 // non-nil (FailClosed). Callers pick the mode with bucketDecodeMode, overriding
-// to boltkv.FailClosed for lock- or uniqueness-bearing reads (see below).
-func decodeRecord[T any](mode boltkv.DecodeMode, bucket string, key, data []byte, v *T) (skip bool, err error) {
-	return boltkv.DecodeOrHandle(mode, bucket, key, data, v)
+// to kv.FailClosed for lock- or uniqueness-bearing reads (see below).
+func decodeRecord[T any](mode kv.DecodeMode, bucket string, key, data []byte, v *T) (skip bool, err error) {
+	return kv.DecodeOrHandle(mode, bucket, key, data, v)
 }
 
 // --- Schema versioning ---
@@ -138,7 +138,7 @@ func readSchemaVersion(tx *bolt.Tx, key []byte) (version uint64, present bool) {
 	if mb == nil {
 		return 0, false
 	}
-	return boltkv.GetUint64(mb, key)
+	return kv.GetUint64(mb, key)
 }
 
 // writeSchemaVersion writes version as an 8-byte big-endian scalar at key in
@@ -150,7 +150,7 @@ func writeSchemaVersion(tx *bolt.Tx, key []byte, version uint64) error {
 	if mb == nil {
 		return fmt.Errorf("boltstore: write schema version: meta bucket %q not found", bucketMeta)
 	}
-	return boltkv.PutUint64(mb, key, version)
+	return kv.PutUint64(mb, key, version)
 }
 
 // checkSchemaVersion applies the detect-and-refuse policy: an absent version
@@ -205,18 +205,18 @@ func verifySchemaVersions(tx *bolt.Tx) error {
 // vanish.
 //
 // OVERRIDE: a lock-bearing read (IsManuallyLocked and the manual-row reads it
-// guards) or a uniqueness-bearing read MUST pass boltkv.FailClosed explicitly
+// guards) or a uniqueness-bearing read MUST pass kv.FailClosed explicitly
 // even though subtitle_state defaults to TolerantSkip, and MUST treat the
 // affected triple as locked on a decode error. bucketDecodeMode gives the
 // per-bucket DEFAULT for ordinary scans; the convention for those special
 // reads is to override.
-func bucketDecodeMode(bucket string) boltkv.DecodeMode {
+func bucketDecodeMode(bucket string) kv.DecodeMode {
 	switch bucket {
 	case bucketSearchAttempts, bucketSubtitleState, bucketSubtitleFiles, bucketScanState:
-		return boltkv.TolerantSkip
+		return kv.TolerantSkip
 	default:
 		// auth_users, auth_passkeys, auth_api_keys, meta, and any unknown
 		// bucket fail closed.
-		return boltkv.FailClosed
+		return kv.FailClosed
 	}
 }

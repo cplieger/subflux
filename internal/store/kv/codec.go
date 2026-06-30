@@ -1,4 +1,4 @@
-package boltkv
+package kv
 
 import (
 	"encoding/hex"
@@ -13,7 +13,7 @@ import (
 func Encode(v any) ([]byte, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("boltkv: encode: %w", err)
+		return nil, fmt.Errorf("kv: encode: %w", err)
 	}
 	return data, nil
 }
@@ -25,7 +25,7 @@ func Encode(v any) ([]byte, error) {
 // centralises that decision.
 func Decode(data []byte, v any) error {
 	if err := json.Unmarshal(data, v); err != nil {
-		return fmt.Errorf("boltkv: decode: %w", err)
+		return fmt.Errorf("kv: decode: %w", err)
 	}
 	return nil
 }
@@ -67,11 +67,11 @@ func (m DecodeMode) String() string {
 func DecodeOrHandle(mode DecodeMode, bucket string, key, data []byte, v any) (skip bool, err error) {
 	if derr := Decode(data, v); derr != nil {
 		if mode == TolerantSkip {
-			slog.Warn("boltkv: skipping undecodable record",
+			slog.Warn("kv: skipping undecodable record",
 				"bucket", bucket, "key", hex.EncodeToString(key), "error", derr)
 			return true, nil
 		}
-		return false, fmt.Errorf("boltkv: decode %s record: %w", bucket, derr)
+		return false, fmt.Errorf("kv: decode %s record: %w", bucket, derr)
 	}
 	return false, nil
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
 
@@ -89,7 +89,7 @@ func (r *keyRec) toKey() *auth.Key {
 // user-scoped scan and what users.go's cascade uses; a key_hash appended after
 // it is unambiguous because the separator sits at the fixed offset 8.
 func apiKeyUserPrefix(userID int64) []byte {
-	return append(boltkv.Be64(uint64(userID)), boltkv.Sep) //nolint:gosec // G115: positive surrogate id
+	return append(kv.Be64(uint64(userID)), kv.Sep) //nolint:gosec // G115: positive surrogate id
 }
 
 // apiKeyUserIndexKey builds the full ix_apikey_user key:
@@ -149,7 +149,7 @@ func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte)
 	key.ID = id
 
 	rec := toKeyRec(key)
-	enc, err := boltkv.Encode(&rec)
+	enc, err := kv.Encode(&rec)
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -78,7 +78,7 @@ func setFileOffset(t *testing.T, db *DB, mt api.MediaType, mid, lang string, var
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		var fr fileRec
 		if old := tx.Bucket([]byte(bucketSubtitleFiles)).Get(key); old != nil {
-			_ = boltkv.Decode(old, &fr)
+			_ = kv.Decode(old, &fr)
 		}
 		fr.OffsetMs = offset
 		return putSubtitleFile(tx, key, &fr)

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -165,7 +165,7 @@ func statePath(sb *bolt.Bucket, id int64) string {
 		return ""
 	}
 	var sr stateRec
-	if boltkv.Decode(raw, &sr) != nil {
+	if kv.Decode(raw, &sr) != nil {
 		return ""
 	}
 	return sr.Path
@@ -395,7 +395,7 @@ func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string,
 	var toDelete []attemptComponents
 	c := b.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		parts := boltkv.Split(k)
+		parts := kv.Split(k)
 		if len(parts) != 4 {
 			// Malformed key (not mt 0x00 mid 0x00 lang 0x00 provider); skip
 			// rather than misroute a delete. A correctly built key always
@@ -798,7 +798,7 @@ func reconcileResetTriple(tx *bolt.Tx, sb *bolt.Bucket, tr stateTripleInfo, miss
 			continue // row vanished between snapshot and now; nothing to reset
 		}
 		var sr stateRec
-		if derr := boltkv.Decode(raw, &sr); derr != nil {
+		if derr := kv.Decode(raw, &sr); derr != nil {
 			return fmt.Errorf("boltstore: decode subtitle_state id=%d: %w", e.id, derr)
 		}
 		sr.Path = ""

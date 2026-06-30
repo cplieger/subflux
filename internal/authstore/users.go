@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
 
@@ -103,7 +103,7 @@ func (r *userRec) toUser() *auth.User {
 // value stored in the ix_user_name / ix_user_oidc index buckets, so a lookup
 // dereferences straight back into auth_users.
 func userKey(id int64) []byte {
-	return boltkv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id from a monotonic sequence
+	return kv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id from a monotonic sequence
 }
 
 // userNameIndexKey builds the ix_user_name key: asciiFold(username). The fold
@@ -116,7 +116,7 @@ func userNameIndexKey(username string) []byte {
 // userOIDCIndexKey builds the ix_user_oidc key: issuer 0x00 sub. Only written
 // when oidc_sub is non-empty (mirrors the SQLite partial unique index).
 func userOIDCIndexKey(issuer, sub string) []byte {
-	return boltkv.Join(issuer, sub)
+	return kv.Join(issuer, sub)
 }
 
 // asciiFold lower-cases the ASCII letters A-Z and leaves every other byte
@@ -230,7 +230,7 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 	user.ID = id
 
 	rec := toUserRec(user)
-	enc, err := boltkv.Encode(&rec)
+	enc, err := kv.Encode(&rec)
 	if err != nil {
 		return err
 	}
@@ -414,7 +414,7 @@ func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 		user.CreatedAt = oldRec.CreatedAt
 		user.UpdatedAt = time.Now().UTC()
 		rec := toUserRec(user)
-		enc, err := boltkv.Encode(&rec)
+		enc, err := kv.Encode(&rec)
 		if err != nil {
 			return err
 		}
@@ -583,7 +583,7 @@ func cascadeDeleteByUser(tx *bbolt.Tx, indexBucket, primaryBucket string, userID
 	if !ok {
 		return nil
 	}
-	prefix := append(boltkv.Be64(uint64(userID)), boltkv.Sep) //nolint:gosec // G115: positive surrogate id
+	prefix := append(kv.Be64(uint64(userID)), kv.Sep) //nolint:gosec // G115: positive surrogate id
 
 	type victim struct{ indexKey, primaryKey []byte }
 	var victims []victim

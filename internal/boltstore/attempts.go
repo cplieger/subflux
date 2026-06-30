@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -68,7 +68,7 @@ func (d *DB) RecordNoResult(_ context.Context, mediaType api.MediaType, mediaID,
 			// putAttempt chokepoint would re-decode and fail anyway); we surface
 			// a clean error rather than silently resetting the count.
 			var old attemptRec
-			if derr := boltkv.Decode(raw, &old); derr != nil {
+			if derr := kv.Decode(raw, &old); derr != nil {
 				return fmt.Errorf("boltstore: decode prior search_attempts row: %w", derr)
 			}
 			failures = old.Failures + 1
@@ -168,7 +168,7 @@ func providerBackedOff(rec *attemptRec, maxAttempts int, now time.Time) bool {
 // undecodable derived record (decodeRecord logs a warning). A genuine decode
 // error other than tolerant-skip is returned.
 func decodeAttemptEntry(b *bolt.Bucket, primary []byte) (api.BackoffEntry, bool, error) {
-	parts := boltkv.Split(primary)
+	parts := kv.Split(primary)
 	if len(parts) != 4 {
 		// Malformed key (not mt 0x00 mid 0x00 lang 0x00 provider); skip rather
 		// than surface a half-parsed entry.
@@ -239,7 +239,7 @@ func collectBackoffByDue(b, idx *bolt.Bucket) ([]api.BackoffEntry, error) {
 	var out []api.BackoffEntry
 	c := idx.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		_, primary, ok := boltkv.SplitTimeIndexKey(k)
+		_, primary, ok := kv.SplitTimeIndexKey(k)
 		if !ok {
 			continue // malformed index key; skip defensively
 		}
@@ -271,7 +271,7 @@ func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, medi
 	// Build `mediaType 0x00 mediaIDPrefix`. Join with a single component yields
 	// the bare media type with no trailing separator, then the separator and
 	// the (possibly empty) media-id prefix follow.
-	prefix := append(boltkv.Join(string(mediaType)), boltkv.Sep)
+	prefix := append(kv.Join(string(mediaType)), kv.Sep)
 	prefix = append(prefix, mediaIDPrefix...)
 
 	var out []api.BackoffEntry

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	boltkv "github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
 
@@ -82,7 +82,7 @@ func New(db *bbolt.DB) *Store {
 //  1. checks the relevant uniqueness index with uniqueCheck,
 //  2. allocates a surrogate id with nextAuthID when the record is
 //     surrogate-keyed, and
-//  3. writes the record and maintains its index buckets via boltkv.PutIndexed.
+//  3. writes the record and maintains its index buckets via kv.PutIndexed.
 //
 // Because a bbolt Update commit fsyncs, a mutation that returns nil is
 // crash-durable on commit and a failed Update rolls back atomically leaving no
@@ -140,7 +140,7 @@ func (s *Store) view(fn func(tx *bbolt.Tx) error) error {
 // authBucket returns the named bucket from tx. ok is false when the bucket is
 // absent, which the read paths treat as an empty first boot (Requirement 9.6)
 // rather than an error — an absent bucket simply has no rows. Writes go through
-// boltkv.PutIndexed, which returns a descriptive "bucket not found" error if
+// kv.PutIndexed, which returns a descriptive "bucket not found" error if
 // the owner (boltstore) somehow did not bootstrap; in production that never
 // happens because boltstore.Open always bootstraps before authstore.New runs.
 func authBucket(tx *bbolt.Tx, name string) (b *bbolt.Bucket, ok bool) {
@@ -173,7 +173,7 @@ func uniqueCheck(tx *bbolt.Tx, indexBucket string, indexKey []byte) error {
 // for the error message.
 func decodeAuthRecord[T any](bucket string, key, data []byte, v *T) error {
 	// FailClosed never returns skip=true, so the boolean is discarded.
-	_, err := boltkv.DecodeOrHandle(boltkv.FailClosed, bucket, key, data, v)
+	_, err := kv.DecodeOrHandle(kv.FailClosed, bucket, key, data, v)
 	return err
 }
 
@@ -183,7 +183,7 @@ func decodeAuthRecord[T any](bucket string, key, data []byte, v *T) error {
 // a row by id) even though passkeys and API keys are PRIMARY-keyed by
 // credential id / key hash. Must be called inside an update transaction.
 func nextAuthID(b *bbolt.Bucket) (id int64, err error) {
-	seq, _, err := boltkv.NextID(b)
+	seq, _, err := kv.NextID(b)
 	if err != nil {
 		return 0, err
 	}
