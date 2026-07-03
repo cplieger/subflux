@@ -3,7 +3,6 @@
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/size.json)](https://github.com/cplieger/subflux/pkgs/container/subflux)
 ![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)
 ![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cplieger/subflux)](https://goreportcard.com/report/github.com/cplieger/subflux)
 [![Test coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/coverage.json)](https://github.com/cplieger/subflux/actions/workflows/coverage.yml)
 [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/subflux/badges/mutation.json)](https://github.com/cplieger/subflux/issues?q=label%3Agremlins-tracker)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13221/badge)](https://www.bestpractices.dev/projects/13221)
@@ -16,7 +15,7 @@ A fast, low-memory subtitle search and download engine for Sonarr/Radarr librari
 
 Subflux finds, scores, downloads, and time-syncs subtitles for your Plex/Sonarr/Radarr library. It watches the \*arr import history in real time and runs scheduled full-library scans, querying multiple providers concurrently, ranking results by release quality, and syncing subtitle timing to the video before saving.
 
-It was born from diagnosing Bazarr's 15–20 GB memory consumption on a 52k-episode library (CPython arena fragmentation during long Sonarr sync loops). Subflux processes items in a batch-fetch-then-iterate model with bounded goroutine pools and no Python runtime — a single static binary in a distroless image.
+Where Bazarr can consume 15-20 GB of memory during long Sonarr sync loops, subflux stays lean: it processes items in a batch-fetch-then-iterate model with bounded goroutine pools and no Python runtime, shipping as a single static binary in a distroless image.
 
 ## Features
 
@@ -40,14 +39,12 @@ services:
     ports:
       - "8374:8374"
     volumes:
-      - ./config:/config        # config.yaml + SQLite state
+      - ./config:/config        # config.yaml + bbolt state
       - /media:/media           # must NOT be read-only — subflux writes .srt files
     restart: unless-stopped
 ```
 
 Open `http://localhost:8374`; the settings dialog auto-opens on first run (unconfigured mode) until a valid config is saved. Point it at your Sonarr/Radarr instances and configure providers + language rules.
-
-> The media volume must not be mounted `:ro` — subflux writes subtitle files alongside the media.
 
 ## Configuration
 
@@ -56,6 +53,12 @@ All settings are editable in the web UI (schema-driven form) and persist to `con
 ## Security
 
 Distroless `gcr.io/distroless/static:nonroot` (UID 65534, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.
+
+## Disclaimer
+
+This project is built with care and follows security best practices, but it is intended for personal / self-hosted use. No guarantees of fitness for production environments. Use at your own risk.
+
+This project was built with AI-assisted tooling using [Claude Opus](https://www.anthropic.com/claude) and [Kiro](https://kiro.dev). The human maintainer defines architecture, supervises implementation, and makes all final decisions.
 
 ## License
 
