@@ -131,13 +131,13 @@ uname -r
 
 Must be >= 5.10.94 or >= 5.15.17 (within the respective branch).
 
-### Known deployment hosts
+### Common deployment platforms
 
-| Host                         | Kernel | Status                              |
-| ---------------------------- | ------ | ----------------------------------- |
-| Borgcube (TrueNAS Community) | 6.x    | Safe (ZFS, not ext4)                |
-| Defiant (DietPi)             | 6.x    | Safe (above fix version)            |
-| Voyager (Synology)           | 4.4.x  | Not affected (does not run subflux) |
+| Platform                | Kernel | Status                   |
+| ----------------------- | ------ | ------------------------ |
+| TrueNAS Community (ZFS) | 6.x    | Safe (ZFS, not ext4)     |
+| DietPi / Raspberry Pi   | 6.x    | Safe (above fix version) |
+| Synology DSM            | 4.4.x  | Not affected             |
 
 ### ZFS hosts
 

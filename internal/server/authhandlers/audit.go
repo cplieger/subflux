@@ -25,7 +25,7 @@ import (
 // appended verbatim. Use slog.String / slog.Int / slog.Bool to keep
 // the structured shape; raw kv pairs work too but lose type info.
 //
-// Why slog and not a DB table: a homelab user already has Loki for
+// Why slog and not a DB table: a self-hosted deployment already has Loki for
 // container logs. A new SQLite audit_events table adds schema, a
 // retention policy, and a UI for ~3x the LOC and no incremental value
 // over `loki | grep event_kind=auth | grep user=alice`. See

@@ -89,8 +89,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// --- public: no auth ---
 
 	// Health and metrics (probes, Prometheus). Health is at
-	// /api/health for cross-app consistency with the homelab's
-	// custom Go apps; metrics stays at /metrics per Prometheus
+	// /api/health for cross-app consistency with the cplieger Go
+	// apps; metrics stays at /metrics per Prometheus
 	// convention. Both live in the public scope (no auth required).
 	public.Add("/api/health", s.handleHealth)
 	public.Add("/metrics", s.metrics.Handler())
