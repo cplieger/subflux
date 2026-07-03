@@ -3,7 +3,7 @@
 Subflux is **pre-1.0** (currently `v0.x`). It is functional and in active use,
 but the road to a stable `1.0` is about hardening and validation, not new
 scope. This document supersedes the
-[default fleet roadmap](https://github.com/cplieger/.github/blob/main/ROADMAP.md)
+[default shared roadmap](https://github.com/cplieger/.github/blob/main/ROADMAP.md)
 for this repository.
 
 ## Toward 1.0

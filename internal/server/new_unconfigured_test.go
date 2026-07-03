@@ -19,8 +19,8 @@ import (
 //
 // History: introduced when the cleanup-remaining-lint pass moved the
 // late "ensure live state is non-nil" guard to after polling.NewPoller
-// rather than before it. Surfaced in production logs on the homelab
-// host with "starting in unconfigured mode" + segfault. CI did not
+// rather than before it. Surfaced in production logs on a self-hosted
+// deployment with "starting in unconfigured mode" + segfault. CI did not
 // catch this because no existing test exercises server.New directly:
 // every test in this package constructs *Server{} field-literal style.
 func TestNew_UnconfiguredMode_NoPanic(t *testing.T) {

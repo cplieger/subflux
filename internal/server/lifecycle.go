@@ -121,7 +121,7 @@ func securityHeaders(next http.Handler) http.Handler {
 const keyStatus = "status"
 
 // handleHealth returns the liveness+readiness status. Emits the
-// canonical JSON envelope shared across the homelab's custom Go apps
+// canonical JSON envelope shared across the cplieger Go apps
 // (vibekit, vibecli, subflux, registry-stats, plex-exporter): 200 with
 // {"status":"ok"} when ready, 503 with {"status":"unready",...} during
 // startup or graceful shutdown. Same wire shape, different mechanisms

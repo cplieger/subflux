@@ -33,7 +33,7 @@ cleanup_tmp() { rm -f "$SF_BODY" "$SF_STATUS"; }
 
 command -v jq >/dev/null 2>&1 || { printf '\033[0;31mERROR: jq is required but not found\033[0m\n'; exit 1; }
 
-SUBFLUX_URL="${SUBFLUX_URL:-http://192.168.1.77:8374}"
+SUBFLUX_URL="${SUBFLUX_URL:-http://192.0.2.77:8374}"
 SECTION="${SECTION:-all}"
 DRY_RUN=false
 PASS=0; FAIL=0; SKIP=0; ERRORS=""

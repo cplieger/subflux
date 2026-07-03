@@ -1,6 +1,6 @@
 # Security assurance case — subflux
 
-This extends the fleet-wide
+This extends the shared
 [default assurance case](https://github.com/cplieger/.github/blob/main/assurance-case.md)
 with the threat model specific to `subflux`. Read that first. subflux is
 **pre-1.0**; this case reflects the current posture, and the
