@@ -18,6 +18,7 @@ import { on, emit, BusEvent } from "./bus.js";
 import type { DetailConfig } from "./bus.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
 import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import { skeletonTiming } from "./skeleton-timing.js";
 
 // --- Coverage view ---
 
@@ -88,26 +89,60 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   return merged;
 }
 
+/** Build the 8-row coverage-table loading skeleton fragment. */
+function coverageSkeleton(): DocumentFragment {
+  const skel = document.createDocumentFragment();
+  for (let i = 0; i < 8; i++) {
+    skel.appendChild(
+      el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+    );
+  }
+  return skel;
+}
+
 export async function loadCoverage(silent?: boolean): Promise<void> {
   if (store.get("isUnconfigured")) {
     return;
   }
   const out = $.coverageContent;
-  if (!silent && coverage.size === 0) {
-    const skel = document.createDocumentFragment();
-    for (let i = 0; i < 8; i++) {
-      skel.appendChild(
-        el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-      );
-    }
-    patch(out, skel);
-  }
+  const showSkeleton = !silent && coverage.size === 0;
+  // Start the fetch first so the anti-flicker timing can honor THIS load's
+  // AbortSignal: fetchAndMergeCoverage aborts any prior in-flight load and
+  // installs a fresh controller synchronously, so `coverageAbort` is now ours.
+  const pending = fetchAndMergeCoverage();
+  const ctrl = coverageAbort;
+  // Anti-flicker: hold the skeleton back 150ms (a fast load skips it entirely)
+  // and, once shown, keep it up at least 300ms so it never appears then
+  // instantly vanishes. The skeleton is suppressed when this load is aborted
+  // (superseded), so a stale skeleton never lands over a newer load's content.
+  // ensureMounted() still runs on commit even when aborted: it mounts the live
+  // reactive collection (idempotent, never a stale paint), which the aborting
+  // path — an SSE-driven fetchAndMergeCoverage — does not do itself.
+  const timing =
+    showSkeleton && ctrl
+      ? skeletonTiming(
+          () => {
+            patch(out, coverageSkeleton());
+          },
+          { signal: ctrl.signal },
+        )
+      : null;
   try {
-    await fetchAndMergeCoverage();
-    ensureMounted();
+    await pending;
+    if (timing) {
+      timing.commit(() => {
+        ensureMounted();
+      });
+    } else {
+      ensureMounted();
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (!silent) {
+    if (timing) {
+      timing.commit(() => {
+        patch(out, errDiv(msg));
+      });
+    } else if (!silent) {
       patch(out, errDiv(msg));
     }
   }
