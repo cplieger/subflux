@@ -19,6 +19,11 @@ import (
 // serveAndWait builds the global middleware chain, binds the HTTP listener, and
 // serves until ctx is cancelled, then performs graceful shutdown via webhttp.Run.
 func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeMux, onReady func()) {
+	// Seed the client-IP resolver from the live config before serving so the
+	// access log, audit log, rate limiter, and session records resolve the real
+	// client from the start. Hot reload re-applies it (see applyTrustedProxies).
+	s.applyTrustedProxies()
+
 	srv := newHTTPServer(s.buildHandler(mux))
 
 	// Bind the listener up front so a port-in-use error surfaces synchronously
@@ -86,26 +91,26 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // clients that send no Origin/Sec-Fetch-Site (arr webhooks, the subflux CLI) are
 // permitted by default; their auth is the API key.
 //
-// webhttp.Logging comes next so it observes the final status and threads a
+// The access logger comes next so it observes the final status and threads a
 // request id into the context (the typed-code error helpers read it back via
-// webhttp.WriteError). /api/events is skipped: its open-to-close SSE lifetime
-// would emit one misleading high-latency access line and RecordHTTP sample, and
-// the skip leaves the SSE writer un-recorded by Logging — webhttp.Recoverer then
-// wraps it in the StatusRecorder whose Unwrap keeps http.ResponseController
-// (per-connection write-deadline clearing) reaching the real writer.
-// Recoverer sits INSIDE Logging so a recovered panic logs as its 500 (not the
-// recorder's default 200) and increments the panic metric. SecurityHeaders and
-// the app-owned Cache-Control: no-store setter run innermost, so every response
-// — including 4xx/5xx envelopes — carries them.
+// webhttp.WriteError). subflux owns this middleware (accessLog) rather than
+// using webhttp.Logging: it builds on webhttp's exported request-id +
+// StatusRecorder primitives but adds a client_ip field — resolved through the
+// trusted-proxy set — that webhttp.Logging's fixed field shape cannot carry.
+// /api/events is skipped: its open-to-close SSE lifetime would emit one
+// misleading high-latency access line and RecordHTTP sample, and the skip
+// leaves the SSE writer un-recorded — webhttp.Recoverer then wraps it in the
+// StatusRecorder whose Unwrap keeps http.ResponseController (per-connection
+// write-deadline clearing) reaching the real writer. Recoverer sits INSIDE the
+// access logger so a recovered panic logs as its 500 (not the recorder's
+// default 200) and increments the panic metric. SecurityHeaders and the
+// app-owned Cache-Control: no-store setter run innermost, so every response —
+// including 4xx/5xx envelopes — carries them.
 func (s *Server) buildHandler(mux http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	return webhttp.Chain(mux,
 		cop.Handler,
-		webhttp.Logging(
-			webhttp.WithLogger(slog.Default()),
-			webhttp.WithRecordMetric(s.metrics.RecordHTTP),
-			webhttp.WithSkipPaths("/api/events"),
-		),
+		s.accessLogMW("/api/events"),
 		webhttp.Recoverer(
 			webhttp.WithRecoverLogger(slog.Default()),
 			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),

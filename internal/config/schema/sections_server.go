@@ -178,6 +178,22 @@ func mediaRootsSection() api.SchemaSection {
 	}
 }
 
+func trustedProxiesSection() api.SchemaSection {
+	return api.SchemaSection{
+		Key: "trusted_proxies", Title: "Trusted Proxies", Type: fieldList,
+		Help: "CIDR ranges of reverse proxies in front of subflux. When set, the real client IP is " +
+			"resolved from a trusted X-Forwarded-For for the audit log, login rate limiter, session " +
+			"records, and access log. Leave empty when subflux is directly exposed.",
+		Fields: []api.SchemaField{
+			{
+				Key: "cidr", Label: "Proxy CIDR", Type: fieldText,
+				Placeholder: "10.0.0.0/8",
+				Help:        "Proxy IP range in CIDR notation; a single proxy is a /32 (e.g. 192.168.1.5/32)",
+			},
+		},
+	}
+}
+
 func languagesSection() api.SchemaSection {
 	return api.SchemaSection{
 		Key: keyLanguages, Title: "Languages", Type: fieldLanguages,

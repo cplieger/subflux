@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -59,17 +60,24 @@ type Config struct {
 	// cachedLangCodes is the pre-computed result of LanguageCodes().
 	cachedLangCodes []string
 	MediaRootDirs   []string `yaml:"media_roots"`
+	// TrustedProxies lists reverse-proxy CIDR ranges (or single IPs as /32)
+	// whose X-Forwarded-For may be trusted for client-IP resolution. Empty
+	// (the default) trusts nothing: the socket peer is used and XFF ignored.
+	TrustedProxies []string `yaml:"trusted_proxies"`
 	// cachedDefaultTargets is the pre-computed default targets.
 	cachedDefaultTargets []api.SubtitleTarget
 	// cachedRoots holds pre-opened *os.Root handles for media_roots,
 	// eliminating per-request OpenRoot syscalls.
-	cachedRoots     []*os.Root
-	Auth            yamlAuthConfig        `yaml:"auth"`
-	Backup          yamlBackupConfig      `yaml:"backup"`
-	SearchCfg       yamlSearchConfig      `yaml:"search"`
-	AdaptiveCfg     yamlAdaptiveConfig    `yaml:"adaptive"`
-	PostProcessing  yamlPostProcessConfig `yaml:"post_processing"`
-	PollIntervalCfg Duration              `yaml:"poll_interval"`
+	cachedRoots []*os.Root
+	// cachedTrustedProxies is the parsed form of TrustedProxies, built at
+	// load/hot-reload and consumed by the client-IP resolver.
+	cachedTrustedProxies []*net.IPNet
+	Auth                 yamlAuthConfig        `yaml:"auth"`
+	Backup               yamlBackupConfig      `yaml:"backup"`
+	SearchCfg            yamlSearchConfig      `yaml:"search"`
+	AdaptiveCfg          yamlAdaptiveConfig    `yaml:"adaptive"`
+	PostProcessing       yamlPostProcessConfig `yaml:"post_processing"`
+	PollIntervalCfg      Duration              `yaml:"poll_interval"`
 }
 
 // LanguageRules maps detected audio languages to desired subtitle downloads.

@@ -9,6 +9,7 @@ import (
 
 	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"
 )
 
@@ -89,7 +90,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 		slog.Warn("admin bootstrap: invalidate sessions", "error", err)
 	}
 
-	slog.Info("admin bootstrap: password reset", "username", username, "ip", clientIPFromReq(r))
+	slog.Info("admin bootstrap: password reset", "username", username, "ip", authhandlers.ClientIP(r))
 	api.WriteJSON(w, map[string]string{keyStatus: "ok", "username": username})
 }
 
@@ -133,7 +134,7 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	}
 
 	slog.Info("admin bootstrap: API key generated",
-		"username", username, "label", label, "ip", clientIPFromReq(r))
+		"username", username, "label", label, "ip", authhandlers.ClientIP(r))
 	api.WriteJSON(w, map[string]string{keyStatus: "ok", "key": plaintext})
 }
 
@@ -143,21 +144,16 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 // is needed, matching the first-boot recovery use case.
 func (s *Server) requireLocalhost(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// webhttp.ClientIP with no trusted proxy ranges returns the unspoofable
-		// socket-peer host (X-Forwarded-For is ignored) — the same value the
-		// former hand-rolled net.SplitHostPort produced.
-		ip := net.ParseIP(webhttp.ClientIP(r))
+		// authhandlers.ClientIP resolves through the shared trusted-proxy set.
+		// Unconfigured it returns the unspoofable socket peer (loopback for a
+		// same-host docker exec). Behind a trusted proxy it resolves the real
+		// client from X-Forwarded-For, which is then non-loopback and correctly
+		// rejected — a request arriving via the proxy is not a local call.
+		ip := net.ParseIP(authhandlers.ClientIP(r))
 		if ip == nil || !ip.IsLoopback() {
 			api.ForbiddenC(w, r, api.CodeForbidden, "admin bootstrap is localhost-only")
 			return
 		}
 		next(w, r)
 	}
-}
-
-// clientIPFromReq extracts the client IP via the shared spoof-aware resolver.
-// With no trusted proxy ranges it returns the unspoofable socket-peer host,
-// matching the previous port-strip behavior.
-func clientIPFromReq(r *http.Request) string {
-	return webhttp.ClientIP(r)
 }

@@ -50,6 +50,18 @@ Open `http://localhost:8374`; the settings dialog auto-opens on first run (uncon
 
 All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI also supports manual search and remote commands against a running instance (`subflux search`, `subflux scan`, `subflux status`, `subflux locks`, …) via the `SUBFLUX_URL` env var.
 
+### Running behind a reverse proxy
+
+When subflux runs behind a reverse proxy (nginx, Caddy, Traefik, HAProxy, …), the network peer subflux sees is the proxy, not the browser. Set `trusted_proxies` to the proxy's IP or CIDR so the real client IP — resolved from a trusted `X-Forwarded-For` header — is used for the audit log, the login rate limiter, the session `IPAddress`, and the request access log, instead of the proxy's address:
+
+```yaml
+trusted_proxies:
+  - 10.0.0.0/8
+  - 192.168.0.0/16
+```
+
+Entries are CIDR ranges; write a single proxy as a `/32` (IPv4) or `/128` (IPv6). Only when the direct peer is one of these ranges is `X-Forwarded-For` consulted (walked right-to-left, spoof-safe); invalid CIDRs are rejected at config load. Leave `trusted_proxies` empty (the default) when subflux is directly exposed — the socket peer is used and `X-Forwarded-For` is ignored.
+
 ## Security
 
 Distroless `gcr.io/distroless/static:nonroot` (UID 65534, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.
