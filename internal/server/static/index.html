@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Subflux</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="/theme-init.js"></script>
+<script data-theme-init>(function(){try{var c=localStorage.getItem("subflux-theme");if(c!=="light"&&c!=="dark"&&c!=="system"){c="system";}var r=c==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):c;document.documentElement.setAttribute("data-theme",r);}catch(e){document.documentElement.setAttribute("data-theme",window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}})();</script>
 <link rel="stylesheet" href="/ui-primitives.css" fetchpriority="high">
 <link rel="stylesheet" href="/style.css" fetchpriority="high">
 </head>

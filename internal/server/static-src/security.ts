@@ -3,6 +3,7 @@
 import * as bus from "./bus.js";
 import * as notify from "./notify.js";
 import { el, icon, dialog, closeDialog, dialogHead, onBackdropClose, confirm } from "./dom.js";
+import { createDialog } from "@cplieger/ui-primitives/dialog";
 import { reconcile, patch } from "@cplieger/reactive";
 import {
   apiGet,
@@ -69,8 +70,22 @@ export function initSecurity(): void {
 
 async function openSecurity(): Promise<void> {
   const dlg = secDlg();
+  // createDialog bundles the three things this site used to hand-wire:
+  // showModal() (open), drag-safe backdrop dismiss, and Escape handling — all
+  // routed through the shared fade-out close (dialog.is-leaving), so the header
+  // close button, a backdrop click, and Escape now all animate identically.
+  // The controller is disposed on the dialog's `close` event so its listeners
+  // don't accumulate across reopens of the reused #securityDialog element.
+  const ctrl = createDialog(dlg);
+  dlg.addEventListener(
+    "close",
+    () => {
+      ctrl.dispose();
+    },
+    { once: true },
+  );
   const closeFn = (): void => {
-    closeDialog(dlg);
+    ctrl.close();
   };
   const header = dialogHead("Security", closeFn);
 
@@ -78,9 +93,7 @@ async function openSecurity(): Promise<void> {
   body.appendChild(el("p", { className: "muted" }, "Loading\u2026"));
 
   dlg.replaceChildren(header, body);
-  dlg.showModal();
-  onBackdropClose(dlg, closeFn);
-  dlg.addEventListener("cancel", closeFn, { once: true });
+  ctrl.open();
 
   await renderSections(body);
 }
