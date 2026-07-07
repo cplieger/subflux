@@ -134,11 +134,19 @@ ARG CPLIEGER_REACTIVE_VERSION=1.2.2
 RUN mkdir -p node_modules/@cplieger/reactive && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/reactive --strip-components=1
+# renovate: datasource=npm depName=@cplieger/ui-primitives
+ARG CPLIEGER_UI_PRIMITIVES_VERSION=2.1.0
+RUN mkdir -p node_modules/@cplieger/ui-primitives && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/ui-primitives/-/ui-primitives-${CPLIEGER_UI_PRIMITIVES_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/ui-primitives --strip-components=1
 
 # Compile app TypeScript and the @cplieger lib TS source in a single layer.
 # App TS emits to ../static via tsconfig.json's outDir; lib TS emits to
 # ../static/vendor/<scope>-<lib>/ for the importmap-based browser resolution
-# (see internal/server/static/index.html).
+# (see internal/server/static/index.html). ui-primitives has a subdir export
+# (toast/), so its src/toast/*.ts is compiled alongside src/*.ts; rootDir=src
+# preserves the toast/ layout the importmap points at. Its base stylesheet is
+# copied to ../static/ui-primitives.css (served via <link>, not the CSS bundle).
 RUN /tmp/package/lib/tsgo --project tsconfig.json && \
     /tmp/package/lib/tsgo \
         --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
@@ -151,7 +159,15 @@ RUN /tmp/package/lib/tsgo --project tsconfig.json && \
         --outDir ../static/vendor/cplieger-reactive \
         --rootDir node_modules/@cplieger/reactive/src \
         --skipLibCheck --strict \
-        node_modules/@cplieger/reactive/src/*.ts
+        node_modules/@cplieger/reactive/src/*.ts && \
+    /tmp/package/lib/tsgo \
+        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
+        --outDir ../static/vendor/cplieger-ui-primitives \
+        --rootDir node_modules/@cplieger/ui-primitives/src \
+        --skipLibCheck --strict \
+        node_modules/@cplieger/ui-primitives/src/*.ts \
+        node_modules/@cplieger/ui-primitives/src/toast/*.ts && \
+    cp node_modules/@cplieger/ui-primitives/css/ui-primitives.css ../static/ui-primitives.css
 
 # --- Go build ---
 FROM golang:1.26-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS builder
@@ -177,6 +193,13 @@ COPY --from=ts-builder /src/static/vendor/ internal/server/static/vendor/
 # the browser rejects as a disallowed module MIME type, so the login /
 # first-boot wizard never boots.
 COPY --from=ts-builder /src/static/wire/ internal/server/static/wire/
+# @cplieger/ui-primitives ships one base stylesheet (structure + motion). It is
+# served standalone at /ui-primitives.css via a <link> (loaded before style.css
+# so the skin split in style.css layers on top) rather than concatenated into
+# the CSS bundle, which is assembled from static-src/css below. The non-recursive
+# *.js glob above skips it, so copy it explicitly or go:embed omits it and
+# /ui-primitives.css 404s (unstyled toasts/tooltips/confirm at runtime).
+COPY --from=ts-builder /src/static/ui-primitives.css internal/server/static/ui-primitives.css
 
 # Concatenate per-feature CSS splits into the served bundles.
 # Naming convention:

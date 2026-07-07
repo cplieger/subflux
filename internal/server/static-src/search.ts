@@ -216,8 +216,10 @@ export function openSearchPopup(
   if (searchDlg.open) {
     searchDlg.close();
   }
-  searchDlg.style.removeProperty("opacity");
-  searchDlg.style.removeProperty("translate");
+  // closeDialog (@cplieger/ui-primitives) fades out via an `is-leaving` class,
+  // not inline styles; clear it so a reopen within the fade window renders
+  // visible and the pending close callback no-ops (it is guarded on the class).
+  searchDlg.classList.remove("is-leaving");
   searchDlg.showModal();
   searchDlg.focus();
 

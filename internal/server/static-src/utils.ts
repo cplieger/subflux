@@ -3,6 +3,7 @@
 import { el, option, pad } from "./dom.js";
 import { LANGUAGES, langNameMap } from "./languages.js";
 import { DEFAULT_VARIANT } from "./constants.js";
+import { viewTransition as uipViewTransition } from "@cplieger/ui-primitives/view-transition";
 
 // Debounce: returns a wrapper that delays fn execution until ms
 // milliseconds after the last invocation. Each call resets the timer.
@@ -51,31 +52,12 @@ export function prettyLabel(s: string): string {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-let pending: Promise<void> | null = null;
-
 export function viewTransition(fn: () => void): void {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
-  if (!document.startViewTransition) {
-    fn();
-    return;
-  }
-  const run = (): void => {
-    const t = document.startViewTransition(fn);
-    pending = t.finished.then(() => {
-      pending = null;
-    });
-    t.ready.catch(() => {
-      /* ignore */
-    });
-    t.finished.catch(() => {
-      pending = null;
-    });
-  };
-  if (pending) {
-    void pending.then(run);
-  } else {
-    run();
-  }
+  // Delegate to the queued, feature-detected @cplieger/ui-primitives wrapper
+  // (overlapping calls serialize; resolves — never rejects — on skip). The
+  // void-returning signature is kept so the fire-and-forget call sites don't
+  // trip no-floating-promises; the returned promise is intentionally ignored.
+  void uipViewTransition(fn);
 }
 
 // Build a table row that acts as a clickable link: responds to click,

@@ -1,137 +1,36 @@
-// Notification system: stacked toasts with auto-dismiss, progress bar,
-// max visible limit, and proper queuing.
+// Notification system: stacked, auto-dismissing toasts.
 //
-// Error toasts can optionally include a Retry button (passed by the
-// actions framework when an action def sets `retryable`). Clicking the
-// button invokes the supplied callback and dismisses the toast.
+// Backed by @cplieger/ui-primitives' toast primitive. The subflux-facing API
+// (success / error / info) is preserved verbatim so call sites and the actions
+// framework wiring (actions-boot.ts) don't churn; internally each delegates to
+// a library toaster. Durations match the previous hand-rolled behaviour:
+// success 4s, info 3s, error sticky-until-clicked. Error toasts can carry a
+// Retry button (passed by the actions framework when an action def sets
+// `retryable`). Screen-reader announcement is handled by the primitive's shared
+// live region (the `announce` primitive), replacing the old aria-live stack.
 
-import { el } from "./dom.js";
+import { createToaster } from "@cplieger/ui-primitives/toast";
 
-const MAX_VISIBLE = 3;
+// Auto-dismiss windows (ms). Errors are sticky (0) — handled by the library's
+// per-level default, so `error()` passes no duration.
+const SUCCESS_DURATION_MS = 4000;
+const INFO_DURATION_MS = 3000;
 
-let container: HTMLElement | null = null;
-const queue: HTMLElement[] = [];
-
-function ensureContainer(): HTMLElement {
-  if (container) {
-    return container;
-  }
-  container = el("div", {
-    className: "toast-stack",
-    "aria-live": "polite",
-    role: "status",
-  });
-  document.body.appendChild(container);
-  return container;
-}
-
-function show(
-  message: string,
-  level: string,
-  duration: number,
-  retry?: { onClick: () => void },
-): void {
-  const c = ensureContainer();
-  const toast = el(
-    "div",
-    {
-      className: "toast",
-      "data-level": level,
-    },
-    message,
-  );
-
-  if (retry !== undefined) {
-    // Render a Retry button inside the toast. Click invokes the callback
-    // and dismisses the toast. Stop propagation so the toast's own click
-    // handler doesn't double-dismiss.
-    const btn = el(
-      "button",
-      {
-        type: "button",
-        className: "toast-retry",
-        "aria-label": "Retry",
-      },
-      "Retry",
-    );
-    btn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      retry.onClick();
-      dismiss(toast);
-    });
-    toast.appendChild(btn);
-  }
-
-  if (duration > 0) {
-    const bar = el("span", { className: "toast-progress" });
-    bar.style.animationDuration = `${duration}ms`;
-    toast.appendChild(bar);
-  }
-  toast.dataset["duration"] = String(duration);
-
-  toast.addEventListener(
-    "click",
-    () => {
-      dismiss(toast);
-    },
-    { once: true },
-  );
-
-  if (c.children.length >= MAX_VISIBLE) {
-    queue.push(toast);
-    return;
-  }
-
-  c.appendChild(toast);
-
-  if (duration > 0) {
-    setTimeout(() => {
-      dismiss(toast);
-    }, duration);
-  }
-}
-
-function dismiss(toast: HTMLElement): void {
-  toast.classList.add("toast-exit");
-  let removed = false;
-  const remove = () => {
-    if (removed) {
-      return;
-    }
-    removed = true;
-    toast.remove();
-    if (queue.length > 0 && container && container.children.length < MAX_VISIBLE) {
-      const next = queue.shift();
-      if (next) {
-        container.appendChild(next);
-        const ms = Number(next.dataset["duration"] ?? 0);
-        if (ms > 0) {
-          setTimeout(() => {
-            dismiss(next);
-          }, ms);
-        }
-      }
-    }
-  };
-  toast.addEventListener("animationend", remove, { once: true });
-  setTimeout(() => {
-    if (toast.parentNode) {
-      remove();
-    }
-  }, 400);
-}
+// One app-lifetime toaster. maxVisible: 3 matches the previous stack cap; the
+// overflow queue + Escape-to-dismiss-newest are the library's defaults.
+const toaster = createToaster({ maxVisible: 3 });
 
 export function success(message: string): void {
-  show(message, "ok", 4000);
+  toaster.show(message, { level: "success", duration: SUCCESS_DURATION_MS });
 }
 
-/** Error toast. Optional retry callback renders a Retry button inside the
- *  toast — used by the actions framework when an action def sets
- *  `retryable`. */
+/** Error toast. Sticky until dismissed. Optional retry callback renders a Retry
+ *  button inside the toast — used by the actions framework when an action def
+ *  sets `retryable`. */
 export function error(message: string, retry?: { onClick: () => void }): void {
-  show(message, "err", 0, retry);
+  toaster.error(message, retry);
 }
 
 export function info(message: string): void {
-  show(message, "info", 3000);
+  toaster.show(message, { level: "info", duration: INFO_DURATION_MS });
 }
