@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/cplieger/webhttp"
 )
 
 // TrustedProxyNets returns the parsed trusted reverse-proxy CIDR set used for
@@ -15,30 +17,18 @@ func (c *Config) TrustedProxyNets() []*net.IPNet {
 	return c.cachedTrustedProxies
 }
 
-// parseTrustedProxies parses each trusted_proxies entry with net.ParseCIDR.
-// Every entry must be CIDR notation; a single proxy is written as a /32
-// (IPv4) or /128 (IPv6), e.g. "192.168.1.5/32". Blank entries are skipped.
-// An invalid entry yields a field-tagged validation error naming the offender.
+// parseTrustedProxies parses the trusted_proxies entries via
+// webhttp.ParseCIDRs, the same helper webhttp.ClientIP consumes. Each entry is
+// CIDR notation (e.g. "10.0.0.0/8") or a bare IP treated as a single host
+// ("192.168.1.5" -> /32, "::1" -> /128); surrounding whitespace is trimmed and
+// blank entries are skipped. Strict: any entry that is neither a valid CIDR nor
+// a bare IP yields a field-tagged validation error naming the offenders.
 func parseTrustedProxies(cidrs []string) ([]*net.IPNet, error) {
-	if len(cidrs) == 0 {
-		return nil, nil
-	}
-	nets := make([]*net.IPNet, 0, len(cidrs))
-	for _, entry := range cidrs {
-		s := strings.TrimSpace(entry)
-		if s == "" {
-			continue
-		}
-		_, network, err := net.ParseCIDR(s)
-		if err != nil {
-			return nil, configFieldErr("trusted_proxies",
-				fmt.Sprintf("invalid trusted_proxies entry %q: must be CIDR notation "+
-					"such as 10.0.0.0/8 or 192.168.1.5/32", s))
-		}
-		nets = append(nets, network)
-	}
-	if len(nets) == 0 {
-		return nil, nil
+	nets, invalid := webhttp.ParseCIDRs(cidrs)
+	if len(invalid) > 0 {
+		return nil, configFieldErr("trusted_proxies",
+			fmt.Sprintf("invalid trusted_proxies entries [%s]: each must be CIDR notation "+
+				"such as 10.0.0.0/8 or a bare IP such as 192.168.1.5", strings.Join(invalid, ", ")))
 	}
 	return nets, nil
 }
