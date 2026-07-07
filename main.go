@@ -11,10 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	// Embed the IANA tz database so TZ (default Europe/Paris) is honored regardless
-	// of the base image's zoneinfo; without it, on a base that ships no
-	// /usr/share/zoneinfo, time.Local silently falls back to UTC.
-	_ "time/tzdata"
 
 	"github.com/cplieger/auth/ratelimit"
 	authwebauthn "github.com/cplieger/auth/webauthn"
@@ -470,7 +466,7 @@ func setupLogging(level, format string) {
 		lvl = slog.LevelInfo
 	}
 
-	opts := &slog.HandlerOptions{Level: lvl}
+	opts := &slog.HandlerOptions{Level: lvl, ReplaceAttr: utcTimeAttr}
 	var handler slog.Handler
 	if format == "json" {
 		handler = slog.NewJSONHandler(os.Stderr, opts)
@@ -478,6 +474,18 @@ func setupLogging(level, format string) {
 		handler = slog.NewTextHandler(os.Stderr, opts)
 	}
 	slog.SetDefault(slog.New(handler))
+}
+
+// utcTimeAttr is a slog ReplaceAttr that renders the record's built-in time
+// key in UTC, so log-line timestamps are zone-stable regardless of the
+// container's TZ (the fleet logs-in-UTC standard). It rewrites only the
+// top-level time attribute; a user attribute that happens to share the "time"
+// key inside a group is left untouched.
+func utcTimeAttr(groups []string, a slog.Attr) slog.Attr {
+	if len(groups) == 0 && a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+		a.Value = slog.TimeValue(a.Value.Time().UTC())
+	}
+	return a
 }
 
 // --- CLI Auth Commands ---

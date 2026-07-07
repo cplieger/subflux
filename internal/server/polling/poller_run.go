@@ -182,7 +182,7 @@ func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 	since := p.deps.PollCache.Get(ctx, api.PollKeySonarr)
 	entries, err := ls.Sonarr.GetHistorySince(ctx, since, api.HistoryImported)
 	if err != nil {
-		slog.Warn("sonarr poll failed", "since", since.Format(time.RFC3339), "error", err)
+		slog.Warn("sonarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
 	}
 	if len(entries) == 0 {
@@ -230,7 +230,7 @@ func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 	since := p.deps.PollCache.Get(ctx, api.PollKeyRadarr)
 	entries, err := ls.Radarr.GetHistorySince(ctx, since, api.HistoryImported)
 	if err != nil {
-		slog.Warn("radarr poll failed", "since", since.Format(time.RFC3339), "error", err)
+		slog.Warn("radarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
 	}
 	if len(entries) == 0 {
