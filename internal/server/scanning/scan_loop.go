@@ -244,7 +244,7 @@ func loadRecentScans(ctx context.Context, db ScanStore, scanInterval time.Durati
 	if len(recent) > 0 {
 		slog.Info("scan resume: skipping recently scanned items",
 			"recent", len(recent),
-			"cutoff", cutoff.Format(time.RFC3339))
+			"cutoff", cutoff.UTC().Format(time.RFC3339))
 	}
 	return recent
 }

@@ -288,7 +288,7 @@ by the mock provider for functional testing.
 00:00:10,000 --> 00:00:15,000
 Language: %s
 Timestamp: %s
-`, lang, release, lang, time.Now().Format(time.RFC3339))
+`, lang, release, lang, time.Now().UTC().Format(time.RFC3339))
 }
 
 // Schema returns the UI schema fields for the mock provider settings page.

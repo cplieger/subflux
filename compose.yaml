@@ -6,9 +6,6 @@ services:
     restart: unless-stopped
     user: "1000:1000"  # match your host user
 
-    environment:
-      TZ: "Europe/Paris"
-
     ports:
       - "8374:8374"
 

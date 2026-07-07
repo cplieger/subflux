@@ -61,7 +61,7 @@ func (s *Server) runOneBackup(ctx context.Context) {
 		slog.Warn("backup: create directory failed", "dir", dir, "error", err)
 		return
 	}
-	dest := filepath.Join(dir, "subflux-"+time.Now().Format("20060102-150405")+".bolt")
+	dest := filepath.Join(dir, "subflux-"+time.Now().UTC().Format("20060102-150405")+".bolt")
 	start := time.Now()
 	if err := bs.BackupInto(ctx, dest); err != nil {
 		slog.Error("backup failed", "dest", dest, "error", err)
