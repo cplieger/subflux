@@ -13,7 +13,6 @@ import type {
 } from "./wire/types.gen.js";
 import { fmtTime } from "./utils.js";
 import { EMBEDDED_PROVIDER } from "./constants.js";
-import { hideTip } from "./tooltip.js";
 import type { ActivityEntry } from "./api-types.js";
 import { reconcile } from "@cplieger/reactive";
 
@@ -223,7 +222,6 @@ export const pollStatusAction = defineAction<undefined, undefined>({
     if (!popupVisible) {
       return;
     }
-    hideTip();
     renderPopup(stats, providers, activities, alerts, ongoing, isActive);
   },
   error: false,

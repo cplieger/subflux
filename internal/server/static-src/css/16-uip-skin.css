@@ -1,0 +1,182 @@
+/* ================================================================
+   16. @cplieger/ui-primitives skin
+   ================================================================
+   The base stylesheet (@cplieger/ui-primitives/css, served separately as
+   /ui-primitives.css) ships STRUCTURE + MOTION only, keyed off --uip-*
+   custom properties and .uip-* classes. This split supplies subflux's SKIN:
+   it (1) overrides the --uip-* props with subflux's tokens/durations/z-indices
+   and (2) writes visual rules against the .uip-* classes so the rendered result
+   is identical to the previous hand-rolled toast / tooltip / confirm and the
+   native <dialog> close animation.
+
+   Loaded after every other split (last in MANIFEST) so source-order wins the
+   ties against the base stylesheet and the base-element dialog rules. */
+
+/* --- Custom-property overrides (map the library onto subflux's tokens) --- */
+:root {
+  /* z-index ladder: keep subflux's relationships (toast above tooltip; the
+     native-Popover status/user menus stay in the top layer, above both). */
+  --uip-z-toast: 1000;
+  --uip-z-tooltip: 500;
+
+  /* Toast enter/leave reuse subflux's legacy toast easing + 0.3s duration. */
+  --uip-toast-enter-duration: 0.3s;
+  --uip-toast-enter-easing: var(--ease);
+  --uip-toast-leave-duration: 0.3s;
+  --uip-toast-leave-easing: var(--ease);
+  --uip-toast-progress-color: oklch(100% 0 0deg / 40%);
+
+  /* Tooltip fade + confirm/dialog fade map onto the named duration tokens. */
+  --uip-tooltip-fade-duration: var(--dur-micro);
+  --uip-dialog-leave-duration: var(--dur-standard);
+}
+
+/* --- Toast (was .toast / .toast-stack in 03-components) --- */
+.uip-toast-stack {
+  /* subflux anchors the stack bottom-right (the base is top-right) and stacks
+     column-reverse. Safe-area insets match the previous rule exactly. */
+  inset-block: auto max(var(--sp-6), env(safe-area-inset-bottom, var(--sp-6)));
+  inset-inline-end: max(var(--sp-6), env(safe-area-inset-right, var(--sp-6)));
+  flex-direction: column-reverse;
+  gap: var(--sp-2);
+}
+
+.uip-toast {
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow);
+
+  /* Default (info): surface card. */
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+
+  /* Enter start: rise from below + slight scale (was translate 0 1rem, scale .95).
+     Uses `transform` (the property the base transitions) rather than the
+     translate/scale longhands so the base's transition drives it. */
+  transform: translateY(1rem) scale(0.95);
+}
+
+.uip-toast.is-shown {
+  transform: translateY(0) scale(1);
+}
+
+.uip-toast.is-leaving {
+  /* Exit: slide right + slight scale (was translate 1rem 0, scale .95). */
+  transform: translateX(1rem) scale(0.95);
+}
+
+/* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM level modifier (uip-toast--<level>) */
+.uip-toast--success {
+  background: var(--ok);
+  color: oklch(100% 0 0deg);
+  border: none;
+}
+
+/* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM level modifier (uip-toast--<level>) */
+.uip-toast--error {
+  background: var(--err);
+  color: oklch(100% 0 0deg);
+  border: none;
+}
+
+/* --- Tooltip (was .tooltip in 03-components) --- */
+.uip-tooltip {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3) 0.6rem;
+  font-size: var(--text-xs);
+  max-width: 17.5rem;
+  box-shadow: var(--shadow);
+  translate: 0;
+  transition:
+    opacity var(--dur-micro),
+    translate var(--dur-micro);
+}
+
+/* Fade + slide in on insertion (the base shows instantly; subflux faded in). */
+@starting-style {
+  .uip-tooltip {
+    opacity: 0;
+    translate: 0 2px;
+  }
+}
+
+.uip-tooltip.is-leaving {
+  opacity: 0;
+  translate: 0 2px;
+}
+
+/* --- Confirm (was the hand-rolled .dlg-confirm flow) --- */
+/* .uip-confirm is a native <dialog>, so it inherits subflux's base dialog
+   chrome (surface/border/radius/shadow, backdrop, @starting-style enter). Only
+   the transition + inner parts need skinning here. */
+.uip-confirm {
+  max-width: 28rem;
+  width: auto;
+  transition:
+    opacity var(--dur-standard),
+    translate var(--dur-standard);
+}
+
+@supports (transition-behavior: allow-discrete) {
+  .uip-confirm {
+    transition:
+      opacity var(--dur-standard),
+      translate var(--dur-standard),
+      overlay var(--dur-standard) allow-discrete,
+      display var(--dur-standard) allow-discrete;
+  }
+}
+
+.uip-confirm-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  padding: var(--sp-5) var(--sp-6);
+  border-block-end: 1px solid var(--border);
+}
+
+.uip-confirm-msg {
+  margin: 0;
+  padding: var(--sp-5) var(--sp-6);
+}
+
+.uip-confirm-actions {
+  /* DOM order is [Cancel, OK]; row-reverse + flex-end renders [OK(primary),
+     Cancel] left-packed, matching subflux's [Confirm, Cancel] footer. */
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6);
+  border-block-start: 1px solid var(--border);
+}
+
+.uip-confirm-cancel {
+  background: var(--ghost);
+  color: var(--text-2);
+}
+
+.uip-confirm-cancel:hover {
+  background: var(--ghost-hover);
+  color: var(--text);
+}
+
+.uip-confirm-ok.is-destructive {
+  background: var(--err);
+}
+
+/* --- Dialog primitive close animation --- */
+/* subflux's native <dialog>s keep their existing @starting-style enter and the
+   :where(dialog) transition; the library's closeDialog adds `is-leaving` for
+   the fade-out. Reproduce the previous inline-style exit (opacity + downward
+   translate). `dialog.is-leaving` (0,1,1) ties :where(dialog)[open] and wins by
+   source order (this split is concatenated last). */
+dialog.is-leaving {
+  opacity: 0;
+  translate: 0 0.5rem;
+}

@@ -12,7 +12,6 @@ vi.mock("@cplieger/actions", () => ({
   RETRY_STANDARD: {},
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
-vi.mock("./tooltip.js", () => ({ hideTip: vi.fn() }));
 vi.mock("./wire/decoders.gen.js", () => ({
   decodeStats: vi.fn((v: unknown) => v),
   decodeProvidersResponse: vi.fn((v: unknown) => v),

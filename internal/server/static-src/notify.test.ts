@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// We need to re-import the module fresh for each test since it has module-level state.
-// Use dynamic import with vi.resetModules().
+// notify.ts wraps a @cplieger/ui-primitives toaster created at module load, so
+// re-import fresh per test (vi.resetModules) to get an isolated toaster + stack.
+// These tests cover the subflux WRAPPER contract (level → toast class, durations,
+// stack cap); the primitive's own lifecycle is covered in its package.
 beforeEach(() => {
   document.body.innerHTML = "";
   vi.useFakeTimers();
@@ -10,15 +12,16 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.runOnlyPendingTimers();
   vi.useRealTimers();
 });
 
-function getStack(): HTMLElement | null {
-  return document.querySelector(".toast-stack");
+function stack(): HTMLElement | null {
+  return document.querySelector(".uip-toast-stack");
 }
 
 function toasts(): NodeListOf<Element> {
-  return document.querySelectorAll(".toast");
+  return document.querySelectorAll(".uip-toast");
 }
 
 async function loadNotify() {
@@ -26,33 +29,29 @@ async function loadNotify() {
 }
 
 describe("notify", () => {
-  it("success creates toast with data-level ok", async () => {
+  it("success creates a success toast in the stack", async () => {
     expect.assertions(2);
     const { success } = await loadNotify();
     success("done");
-    const stack = getStack();
-    expect(stack).not.toBeNull();
-    const toast = stack!.querySelector(".toast");
-    expect(toast?.getAttribute("data-level")).toBe("ok");
+    expect(stack()).not.toBeNull();
+    expect(document.querySelector(".uip-toast--success")?.textContent).toContain("done");
   });
 
-  it("error creates toast with data-level err", async () => {
+  it("error creates an error toast", async () => {
     expect.assertions(1);
     const { error } = await loadNotify();
     error("fail");
-    const toast = document.querySelector(".toast");
-    expect(toast?.getAttribute("data-level")).toBe("err");
+    expect(document.querySelector(".uip-toast--error")).not.toBeNull();
   });
 
-  it("info creates toast with data-level info", async () => {
+  it("info creates an info toast", async () => {
     expect.assertions(1);
     const { info } = await loadNotify();
     info("note");
-    const toast = document.querySelector(".toast");
-    expect(toast?.getAttribute("data-level")).toBe("info");
+    expect(document.querySelector(".uip-toast--info")).not.toBeNull();
   });
 
-  it("4th toast is queued when 3 visible", async () => {
+  it("caps the visible stack at 3, queueing the rest", async () => {
     expect.assertions(1);
     const { success } = await loadNotify();
     success("1");
@@ -62,31 +61,15 @@ describe("notify", () => {
     expect(toasts().length).toBe(3);
   });
 
-  it("queued toast promoted on dismiss", async () => {
-    expect.assertions(2);
-    const { success } = await loadNotify();
-    success("1");
-    success("2");
-    success("3");
-    success("4");
-    expect(toasts().length).toBe(3);
-    // Simulate dismiss via click + animationend.
-    const first = toasts()[0] as HTMLElement;
-    first.click();
-    first.dispatchEvent(new Event("animationend"));
-    expect(toasts().length).toBe(3); // queued promoted
-  });
-
-  it("auto-dismiss fires after duration for success", async () => {
+  it("auto-dismisses a success toast after its 4s duration", async () => {
     expect.assertions(2);
     const { success } = await loadNotify();
     success("auto");
     expect(toasts().length).toBe(1);
+    // Enter rAF + the 4s auto-dismiss timer fire; then the leave completes on
+    // transitionend (with a 400ms fallback for good measure).
     vi.advanceTimersByTime(4000);
-    const toast = document.querySelector(".toast") as HTMLElement;
-    if (toast) {
-      toast.dispatchEvent(new Event("animationend"));
-    }
+    document.querySelector(".uip-toast")?.dispatchEvent(new Event("transitionend"));
     vi.advanceTimersByTime(400);
     expect(toasts().length).toBe(0);
   });

@@ -11,6 +11,7 @@ import {
   confirm,
   closeDialog,
 } from "./dom.js";
+import { _resetForTest as resetConfirm } from "@cplieger/ui-primitives/confirm";
 
 describe("dom: el()", () => {
   it.todo("creates element with tag name");
@@ -28,68 +29,78 @@ describe("dom: el()", () => {
   it.todo("skips null/undefined children");
 });
 
+// confirm() now delegates to the @cplieger/ui-primitives confirm primitive,
+// which owns a reused <dialog class="uip-confirm"> appended to the body. These
+// tests cover the subflux WRAPPER's contract: (title, message, label) maps onto
+// the primitive and the returned promise resolves true/false. resetConfirm()
+// clears the primitive's cached dialog between tests.
 describe("dom: confirm()", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    document.body.innerHTML = '<dialog id="confirmDialog"></dialog>';
+    document.body.innerHTML = "";
+    resetConfirm();
   });
 
   afterEach(() => {
-    // confirm() resolves synchronously on the click; closeDialog() leaves a
-    // 250ms fallback timer behind. Flush it so it does not leak into the
-    // next test.
+    resetConfirm();
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
-  function dlg(): HTMLDialogElement {
-    return document.getElementById("confirmDialog") as HTMLDialogElement;
+  function dlg(): HTMLDialogElement | null {
+    return document.querySelector<HTMLDialogElement>(".uip-confirm");
   }
 
-  function footButtons(): HTMLButtonElement[] {
-    return [...dlg().querySelectorAll<HTMLButtonElement>(".dlg-foot button")];
+  function okBtn(): HTMLButtonElement | null {
+    return document.querySelector<HTMLButtonElement>(".uip-confirm-ok");
   }
 
-  it("opens as a modal showing the title and message", () => {
+  function cancelBtn(): HTMLButtonElement | null {
+    return document.querySelector<HTMLButtonElement>(".uip-confirm-cancel");
+  }
+
+  it("opens a modal showing the title and message", () => {
     void confirm("Delete file", "This cannot be undone");
-    expect(dlg().open).toBe(true);
-    expect(dlg().querySelector("h2")?.textContent).toBe("Delete file");
-    expect(dlg().querySelector(".dlg-body p")?.textContent).toBe("This cannot be undone");
+    expect(dlg()?.open).toBe(true);
+    expect(document.querySelector(".uip-confirm-title")?.textContent).toBe("Delete file");
+    expect(document.querySelector(".uip-confirm-msg")?.textContent).toBe("This cannot be undone");
   });
 
   it("uses a custom confirm-button label when provided", () => {
     void confirm("Title", "Body", "Yes, delete");
-    expect(footButtons()[0]?.textContent).toBe("Yes, delete");
+    expect(okBtn()?.textContent).toBe("Yes, delete");
   });
 
   it("resolves true when the confirm button is clicked", async () => {
     const p = confirm("Title", "Body");
-    footButtons()[0]?.click();
+    okBtn()?.click();
     await expect(p).resolves.toBe(true);
   });
 
   it("resolves false when the cancel button is clicked", async () => {
     const p = confirm("Title", "Body");
-    footButtons()
-      .find((b) => b.textContent === "Cancel")
-      ?.click();
+    cancelBtn()?.click();
     await expect(p).resolves.toBe(false);
   });
 
-  it("resolves false on a backdrop click (mousedown then click on the dialog itself)", async () => {
+  it("resolves false on a backdrop press (mousedown then mouseup on the dialog)", async () => {
     const p = confirm("Title", "Body");
-    dlg().dispatchEvent(new MouseEvent("mousedown"));
-    dlg().dispatchEvent(new MouseEvent("click"));
+    const d = dlg();
+    d?.dispatchEvent(new MouseEvent("mousedown"));
+    d?.dispatchEvent(new MouseEvent("mouseup"));
     await expect(p).resolves.toBe(false);
   });
 
-  it("resolves false when the dialog emits a native close (Escape)", async () => {
+  it("resolves false when the dialog emits a native cancel (Escape)", async () => {
     const p = confirm("Title", "Body");
-    dlg().dispatchEvent(new Event("close"));
+    dlg()?.dispatchEvent(new Event("cancel"));
     await expect(p).resolves.toBe(false);
   });
 });
 
+// closeDialog() now delegates to the ui-primitives dialog primitive: it adds a
+// namespaced `is-leaving` class, waits for the CSS transition (400ms fallback),
+// then close()s. The subflux skin maps `dialog.is-leaving` to the visual exit.
 describe("dom: closeDialog()", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -97,6 +108,7 @@ describe("dom: closeDialog()", () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
@@ -109,18 +121,16 @@ describe("dom: closeDialog()", () => {
     expect(closeDialog(dlg())).toBeUndefined();
   });
 
-  it("starts the fade-out and closes via the 250ms fallback when no transitionend fires", () => {
+  it("adds is-leaving and closes via the fallback timer when no transitionend fires", () => {
     const d = dlg();
     d.showModal();
     closeDialog(d);
-    // Fade-out started, but the dialog stays open until the transition ends
-    // (or the fallback timer fires).
-    expect(d.style.opacity).toBe("0");
+    // Fade-out started; the dialog stays open until the transition ends (or the
+    // fallback timer fires).
+    expect(d.classList.contains("is-leaving")).toBe(true);
     expect(d.open).toBe(true);
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(400);
     expect(d.open).toBe(false);
-    // Inline transition styles are cleared once the dialog actually closes.
-    expect(d.style.opacity).toBe("");
   });
 
   it("closes on transitionend and does not close a second time on the fallback timer", () => {
@@ -130,7 +140,7 @@ describe("dom: closeDialog()", () => {
     closeDialog(d);
     d.dispatchEvent(new Event("transitionend"));
     expect(d.open).toBe(false);
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(400);
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 });

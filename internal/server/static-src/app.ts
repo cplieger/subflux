@@ -20,6 +20,7 @@ import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js"
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
 import { el, dialog, onBackdropClose, $ } from "./dom.js";
+import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { patch } from "@cplieger/reactive";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
@@ -98,6 +99,10 @@ events.connect();
 
 // --- Init ---
 theme.init();
+// Delegated tooltip controller (@cplieger/ui-primitives). Reads the existing
+// `data-tip` attributes in place (no attribute migration). delayCold/delayWarm
+// are both 300ms to reproduce subflux's prior flat 300ms show delay.
+initTooltips({ attribute: "data-tip", delayCold: 300, delayWarm: 300 });
 void initLanguages();
 initUserMenu();
 initSecurity();

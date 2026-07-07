@@ -5,6 +5,8 @@
 // reconcile/patch). Re-export it so existing `import { el } from "./dom.js"`
 // call sites are unchanged.
 import { el } from "@cplieger/reactive";
+import { closeDialog as uipCloseDialog, wireBackdropDismiss } from "@cplieger/ui-primitives/dialog";
+import { confirm as uipConfirm } from "@cplieger/ui-primitives/confirm";
 
 export { el };
 export type { AttrValue } from "@cplieger/reactive";
@@ -36,64 +38,38 @@ export function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+// Fade-out-then-close a native <dialog>, delegating the lifecycle to
+// @cplieger/ui-primitives' dialog primitive: it adds the namespaced
+// `is-leaving` class, waits for the CSS transition (or a fallback), then
+// close()s. The subflux skin maps `dialog.is-leaving` to the exact
+// opacity + `translate: 0 0.5rem` exit the old inline-style version produced,
+// so the animation is unchanged. Returns a truthy force-close fn when the
+// dialog was open (preserved for the one caller — config.ts — that checks it),
+// or undefined when already closed.
 export function closeDialog(dlg: HTMLDialogElement): (() => void) | undefined {
   if (!dlg.open) {
-    return;
+    return undefined;
   }
-  dlg.style.opacity = "0";
-  dlg.style.translate = "0 0.5rem";
-  let finished = false;
-  const finish = () => {
-    if (finished) {
-      return;
-    }
-    finished = true;
-    dlg.style.removeProperty("opacity");
-    dlg.style.removeProperty("translate");
-    dlg.close();
+  uipCloseDialog(dlg);
+  return () => {
+    uipCloseDialog(dlg);
   };
-  dlg.addEventListener(
-    "transitionend",
-    () => {
-      finish();
-    },
-    { once: true },
-  );
-  setTimeout(() => {
-    if (dlg.open) {
-      finish();
-    }
-  }, 250);
-  return finish;
 }
 
+// Drag-safe backdrop dismissal via the library's wireBackdropDismiss (a press
+// must both start and end on the dialog element itself, so a drag-select ending
+// on the backdrop doesn't count). Listeners are detached both after the first
+// dismissal and on the dialog's `close` event, matching the previous
+// AbortController-based cleanup so nothing leaks across reopens.
 export function onBackdropClose(dlg: HTMLDialogElement, closeFn: () => void): void {
-  const ac = new AbortController();
-  let downOnBackdrop = false;
-  dlg.addEventListener(
-    "mousedown",
-    (e: MouseEvent) => {
-      downOnBackdrop = e.target === dlg;
-    },
-    { signal: ac.signal },
-  );
-  dlg.addEventListener(
-    "click",
-    (e: MouseEvent) => {
-      if (e.target === dlg && downOnBackdrop) {
-        ac.abort();
-        closeFn();
-      }
-    },
-    { signal: ac.signal },
-  );
-  dlg.addEventListener(
-    "close",
-    () => {
-      ac.abort();
-    },
-    { once: true },
-  );
+  let cleanup: () => void = () => undefined;
+  cleanup = wireBackdropDismiss(dlg, () => {
+    cleanup();
+    closeFn();
+  });
+  dlg.addEventListener("close", () => {
+    cleanup();
+  });
 }
 
 export function dialogHead(title: string | HTMLElement, closeFn: () => void): HTMLElement {
@@ -202,55 +178,15 @@ export function select(id: string): HTMLSelectElement {
   return document.getElementById(id) as HTMLSelectElement;
 }
 
+// Promise-based confirmation, delegating to @cplieger/ui-primitives' confirm
+// primitive (its own reused, lazily-created <dialog class="uip-confirm">).
+// subflux always supplies a title; `confirmLabel` maps to the OK button.
+// Cancel / Escape / backdrop-click all resolve false. The skin styles the
+// `.uip-confirm` dialog (which inherits subflux's base dialog chrome) + its
+// parts to match the previous look. Signature kept as (title, message, label)
+// so the files.ts / security.ts call sites are unchanged.
 export function confirm(title: string, message: string, confirmLabel?: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const dlg = dialog("confirmDialog");
-    let resolved = false;
-    const settle = (value: boolean) => {
-      if (resolved) {
-        return;
-      }
-      resolved = true;
-      closeDialog(dlg);
-      resolve(value);
-    };
-    const closeFn = () => {
-      settle(false);
-    };
-    const header = dialogHead(title, closeFn);
-
-    const body = el("div", { className: "dlg-body" }, el("p", null, message));
-
-    const footer = el(
-      "div",
-      { className: "dlg-foot" },
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: () => {
-            settle(true);
-          },
-        },
-        confirmLabel ?? "Confirm",
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          onclick: closeFn,
-        },
-        "Cancel",
-      ),
-    );
-
-    dlg.replaceChildren(header, body, footer);
-    dlg.showModal();
-    onBackdropClose(dlg, closeFn);
-    // Handle native Escape: browser fires cancel→close without calling closeFn.
-    dlg.addEventListener("close", closeFn, { once: true });
-  });
+  return uipConfirm(message, confirmLabel !== undefined ? { title, confirmLabel } : { title });
 }
 
 // Insert an element into the card header, before the arr link if present.

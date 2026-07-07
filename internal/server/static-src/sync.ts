@@ -308,8 +308,10 @@ export function openSyncDialog(
   if (dlg.open) {
     dlg.close();
   }
-  dlg.style.removeProperty("opacity");
-  dlg.style.removeProperty("translate");
+  // closeDialog (@cplieger/ui-primitives) fades out via an `is-leaving` class,
+  // not inline styles; clear it so a reopen within the fade window renders
+  // visible and the pending close callback no-ops (it is guarded on the class).
+  dlg.classList.remove("is-leaving");
   dlg.showModal();
   (document.activeElement as HTMLElement | null)?.blur();
 
