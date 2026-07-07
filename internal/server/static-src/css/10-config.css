@@ -193,10 +193,17 @@
   width: 8rem;
 }
 
-.lang-advanced {
-  width: 100%;
+/* Advanced fields region (collapsible via createDisclosure). The region element
+   (.lang-advanced) is owned by the primitive: .uip-disclosure-region (base
+   stylesheet) supplies overflow:hidden + the height 0<->auto tween, so it needs
+   no width/overflow/display of its own. All visual padding lives on the inner
+   wrapper so it is clipped when the height collapses to zero — no flex row-gap +
+   margin residual (the reason this was previously left as a display toggle). The
+   block-start padding reproduces the old spacing exactly: the flex row-gap
+   (--sp-3) plus the region's former margin-block (--sp-2). */
+.lang-advanced-inner {
+  padding-block: calc(var(--sp-3) + var(--sp-2)) var(--sp-2);
   padding-inline-start: var(--sp-4);
-  margin-block: var(--sp-2);
   font-size: var(--text-sm);
 }
 
