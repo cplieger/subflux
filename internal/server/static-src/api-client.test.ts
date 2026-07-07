@@ -2,84 +2,61 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { apiGet, apiGetRaw, apiPostRaw, apiDelete } from "./api-client.js";
 
-function mockFetch(response: Partial<Response>) {
-  const r = {
-    ok: response.ok ?? true,
-    status: response.status ?? 200,
-    statusText: response.statusText ?? "OK",
-    headers: new Headers(
-      (response.headers as HeadersInit) ?? { "Content-Type": "application/json" },
-    ),
-    json: response.json ?? (() => Promise.resolve(null)),
-    text: response.text ?? (() => Promise.resolve("")),
-  } as Response;
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(r));
+// The client's request core is @cplieger/fetch, which reads a response body
+// via res.text() + JSON.parse (not res.json()) and builds request headers as a
+// Headers instance. Stub the global fetch with real Response objects so the
+// mock matches exactly what the core consumes.
+function stubFetch(body: BodyInit | null, init?: ResponseInit): void {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, init)));
 }
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 beforeEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("apiGetRaw", () => {
-  const cases = [
-    {
-      name: "200 with JSON body",
-      mock: {
-        ok: true,
-        status: 200,
-        headers: { "Content-Type": "application/json" } as unknown as Headers,
-        json: () => Promise.resolve({ name: "test" }),
-      },
-      expect: { ok: true, status: 200, data: { name: "test" } },
-    },
-    {
-      name: "204 No Content",
-      mock: {
-        ok: true,
-        status: 204,
-        headers: { "Content-Type": "application/json" } as unknown as Headers,
-        json: () => Promise.reject(new Error("no body")),
-      },
-      expect: { ok: true, status: 204, data: null },
-    },
-    {
-      name: "400 with JSON error",
-      mock: {
-        ok: false,
-        status: 400,
-        statusText: "Bad Request",
-        headers: { "Content-Type": "application/json" } as unknown as Headers,
-        json: () => Promise.resolve({ error: "invalid input" }),
-      },
-      expect: { ok: false, status: 400, error: "invalid input" },
-    },
-    {
-      name: "500 with non-JSON body",
-      mock: {
-        ok: false,
-        status: 500,
-        statusText: "Internal Server Error",
-        headers: { "Content-Type": "text/plain" } as unknown as Headers,
-        text: () => Promise.resolve("something broke"),
-      },
-      expect: { ok: false, status: 500, error: "something broke" },
-    },
-  ] as const;
+  it("200 with JSON body", async () => {
+    expect.assertions(3);
+    stubFetch(JSON.stringify({ name: "test" }), { status: 200, headers: JSON_HEADERS });
+    const r = await apiGetRaw<{ name: string }>("/api/test");
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(200);
+    expect(r.data).toEqual({ name: "test" });
+  });
 
-  for (const tc of cases) {
-    it(tc.name, async () => {
-      expect.assertions(3);
-      mockFetch(tc.mock as unknown as Partial<Response>);
-      const r = await apiGetRaw<{ name: string }>("/api/test");
-      expect(r.ok).toBe(tc.expect.ok);
-      expect(r.status).toBe(tc.expect.status);
-      if ("data" in tc.expect) {
-        expect(r.data).toEqual(tc.expect.data);
-      } else {
-        expect(r.error).toBe(tc.expect.error);
-      }
-    });
-  }
+  it("204 No Content", async () => {
+    expect.assertions(3);
+    stubFetch(null, { status: 204 });
+    const r = await apiGetRaw<{ name: string }>("/api/test");
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(204);
+    // Empty-body 2xx collapses to null (subflux's contract), even on the raw
+    // helper — @cplieger/fetch yields undefined, the client maps it to null.
+    expect(r.data).toEqual(null);
+  });
+
+  it("400 with JSON error", async () => {
+    expect.assertions(3);
+    stubFetch(JSON.stringify({ error: "invalid input" }), { status: 400, headers: JSON_HEADERS });
+    const r = await apiGetRaw<{ name: string }>("/api/test");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.error).toBe("invalid input");
+  });
+
+  it("500 with non-JSON body falls back to the HTTP status", async () => {
+    expect.assertions(3);
+    stubFetch("something broke", { status: 500, headers: { "Content-Type": "text/plain" } });
+    const r = await apiGetRaw<{ name: string }>("/api/test");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(500);
+    // @cplieger/fetch does not surface a non-JSON error body; it reports
+    // `HTTP <status>`. subflux endpoints always return `{"error": ...}` JSON,
+    // so this path only occurs for an infrastructure/proxy response.
+    expect(r.error).toBe("HTTP 500");
+  });
 
   it("network failure", async () => {
     expect.assertions(3);
@@ -94,30 +71,22 @@ describe("apiGetRaw", () => {
 describe("apiPostRaw", () => {
   it("sends Content-Type header when body provided", async () => {
     expect.assertions(2);
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "Content-Type": "application/json" }),
-      json: () => Promise.resolve({ id: 1 }),
-    } as unknown as Response);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ id: 1 }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await apiPostRaw("/api/create", { name: "x" });
     expect(r.ok).toBe(true);
+    // @cplieger/fetch builds request headers as a Headers instance.
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
   });
 });
 
 describe("apiGet", () => {
   it("returns null on non-2xx", async () => {
     expect.assertions(1);
-    mockFetch({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ error: "not found" }),
-    });
+    stubFetch(JSON.stringify({ error: "not found" }), { status: 404, headers: JSON_HEADERS });
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {
       /* noop */
     });
@@ -144,25 +113,14 @@ describe("apiGet", () => {
 describe("apiDelete", () => {
   it("returns true on success", async () => {
     expect.assertions(1);
-    mockFetch({
-      ok: true,
-      status: 200,
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve(null),
-    });
+    stubFetch(JSON.stringify({}), { status: 200, headers: JSON_HEADERS });
     const r = await apiDelete("/api/item/1");
     expect(r).toBe(true);
   });
 
   it("returns false on failure", async () => {
     expect.assertions(1);
-    mockFetch({
-      ok: false,
-      status: 403,
-      statusText: "Forbidden",
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ error: "forbidden" }),
-    });
+    stubFetch(JSON.stringify({ error: "forbidden" }), { status: 403, headers: JSON_HEADERS });
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {
       /* noop */
     });
@@ -175,18 +133,14 @@ describe("apiDelete", () => {
 describe("typed error envelope", () => {
   it("exposes code and requestId on 4xx with full envelope", async () => {
     expect.assertions(4);
-    mockFetch({
-      ok: false,
-      status: 422,
-      statusText: "Unprocessable Entity",
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () =>
-        Promise.resolve({
-          error: "invalid input",
-          code: "config_invalid",
-          request_id: "req-abc-123",
-        }),
-    });
+    stubFetch(
+      JSON.stringify({
+        error: "invalid input",
+        code: "config_invalid",
+        request_id: "req-abc-123",
+      }),
+      { status: 422, headers: JSON_HEADERS },
+    );
     const r = await apiGetRaw("/api/cfg");
     expect(r.ok).toBe(false);
     expect(r.error).toBe("invalid input");
@@ -196,12 +150,9 @@ describe("typed error envelope", () => {
 
   it("leaves code and requestId undefined on legacy error without those fields", async () => {
     expect.assertions(4);
-    mockFetch({
-      ok: false,
+    stubFetch(JSON.stringify({ error: "something went wrong" }), {
       status: 400,
-      statusText: "Bad Request",
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ error: "something went wrong" }),
+      headers: JSON_HEADERS,
     });
     const r = await apiGetRaw("/api/old");
     expect(r.ok).toBe(false);
@@ -212,18 +163,12 @@ describe("typed error envelope", () => {
 });
 
 describe("apiGetTyped", () => {
-  // The decoder runs only on 2xx with a non-null body. On decoder
-  // failure, the helper logs once at console.error and returns null
-  // (the same null-on-failure contract as the untyped apiGet, so
-  // existing call-site error handling does not need to change).
+  // The decoder runs only on a 2xx body. On decoder failure, the helper logs
+  // once at console.error and returns null (the same null-on-failure contract
+  // as untyped apiGet, so existing call-site error handling is unchanged).
   it("runs the decoder on 2xx and returns the typed value", async () => {
     expect.assertions(1);
-    mockFetch({
-      ok: true,
-      status: 200,
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ a: 1 }),
-    });
+    stubFetch(JSON.stringify({ a: 1 }), { status: 200, headers: JSON_HEADERS });
     const decoded = await import("./api-client.js").then((m) =>
       m.apiGetTyped<{ doubled: number }>("/api/x", (v) => {
         const o = v as { a: number };
@@ -235,12 +180,7 @@ describe("apiGetTyped", () => {
 
   it("returns null and logs when the decoder throws", async () => {
     expect.assertions(2);
-    mockFetch({
-      ok: true,
-      status: 200,
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ wrong: "shape" }),
-    });
+    stubFetch(JSON.stringify({ wrong: "shape" }), { status: 200, headers: JSON_HEADERS });
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {
       /* noop */
     });
@@ -260,12 +200,7 @@ describe("apiGetTyped", () => {
 
   it("apiGetTypedRaw exposes the decode error in the envelope", async () => {
     expect.assertions(2);
-    mockFetch({
-      ok: true,
-      status: 200,
-      headers: { "Content-Type": "application/json" } as unknown as Headers,
-      json: () => Promise.resolve({ wrong: "shape" }),
-    });
+    stubFetch(JSON.stringify({ wrong: "shape" }), { status: 200, headers: JSON_HEADERS });
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {
       /* noop */
     });

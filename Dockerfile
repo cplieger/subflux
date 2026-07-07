@@ -139,6 +139,11 @@ ARG CPLIEGER_UI_PRIMITIVES_VERSION=2.1.0
 RUN mkdir -p node_modules/@cplieger/ui-primitives && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/ui-primitives/-/ui-primitives-${CPLIEGER_UI_PRIMITIVES_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/ui-primitives --strip-components=1
+# renovate: datasource=npm depName=@cplieger/fetch
+ARG CPLIEGER_FETCH_VERSION=1.1.0
+RUN mkdir -p node_modules/@cplieger/fetch && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/fetch/-/fetch-${CPLIEGER_FETCH_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/fetch --strip-components=1
 
 # Compile app TypeScript and the @cplieger lib TS source in a single layer.
 # App TS emits to ../static via tsconfig.json's outDir; lib TS emits to
@@ -167,7 +172,13 @@ RUN /tmp/package/lib/tsgo --project tsconfig.json && \
         --skipLibCheck --strict \
         node_modules/@cplieger/ui-primitives/src/*.ts \
         node_modules/@cplieger/ui-primitives/src/toast/*.ts && \
-    cp node_modules/@cplieger/ui-primitives/css/ui-primitives.css ../static/ui-primitives.css
+    cp node_modules/@cplieger/ui-primitives/css/ui-primitives.css ../static/ui-primitives.css && \
+    /tmp/package/lib/tsgo \
+        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
+        --outDir ../static/vendor/cplieger-fetch \
+        --rootDir node_modules/@cplieger/fetch/src \
+        --skipLibCheck --strict \
+        node_modules/@cplieger/fetch/src/*.ts
 
 # --- Go build ---
 FROM golang:1.26-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS builder

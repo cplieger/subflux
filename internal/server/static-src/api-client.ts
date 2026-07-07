@@ -1,35 +1,49 @@
 // ---------------------------------------------------------------------------
-// Thin API client: one shared shape for every REST-style fetch call.
+// Thin API client: subflux's REST-style surface layered over @cplieger/fetch.
 //
-// Every handler on the server returns JSON: success payload on 2xx, or
-// `{"error": "msg"}` on any 4xx/5xx. This client parses the JSON and
-// returns a typed result without forcing each caller to repeat
-// Content-Type headers, JSON.stringify, and r.text() fallback handling.
+// The request/response core — JSON body encoding, the non-throwing ApiResult
+// envelope, timeout composition, credentials, and decoder validation — is now
+// @cplieger/fetch. This module keeps the pieces fetch deliberately leaves to
+// each consumer:
 //
-// Two shapes:
+//   - subflux's ApiResult shape: a loose interface (`ok` is a plain boolean
+//     with optional data/error), NOT fetch's discriminated ApiOk|ApiErr union,
+//     so existing call sites that read r.data / r.error without narrowing keep
+//     compiling. It also carries `headers` on the error envelope — fetch omits
+//     response headers by design (they're on its "unsupported by design"
+//     list), but subflux's login rate-limit UI reads `Retry-After` off a 429
+//     (see login.ts), so we capture the response headers via an injected
+//     fetchFn and attach them here.
+//   - the null-collapsing (`apiGet` → T|null) + boolean (`apiDelete`) sugar and
+//     the console diagnostics (silent on caller abort; one warn per failed
+//     call; one error at a decode boundary).
+//   - the exact helper signatures every module already imports.
 //
-//   apiX<T>(path, body?) → Promise<T | null>
-//     Returns parsed JSON on 2xx, null on non-2xx or network failure.
-//     Use for fire-and-forget calls where you only need the happy path.
+// Two shapes, as before:
 //
-//   apiXRaw<T>(path, body?) → Promise<ApiResult<T>>
-//     Returns {ok, status, data?, error?}. Use for flows that need the
-//     status code (login 401 vs 429) or the server's error message.
+//   apiX<T>(path, body?)     → Promise<T | null>       (2xx body or null)
+//   apiXRaw<T>(path, body?)  → Promise<ApiResult<T>>   (full envelope: status,
+//                                                        error, code, headers)
 //
-// Pattern mirrors apps/vibekit/web/static-src/api-client.ts.
+// Raw platform fetch() stays reserved for the documented non-JSON / streaming /
+// custom-header flows (config YAML PUT, WebAuthn finish, OIDC HEAD, video
+// stream) — those never routed through this client and still don't.
 // ---------------------------------------------------------------------------
 
-const JSON_HEADERS: Record<string, string> = { "Content-Type": "application/json" };
-
-/** Default timeout for all API requests (30 seconds). Acts as a safety net
- *  for callers that don't pass an explicit AbortSignal. */
-const DEFAULT_TIMEOUT_MS = 30_000;
-
+import { createFetch } from "@cplieger/fetch";
+import type { HttpMethod, RequestOptions } from "@cplieger/fetch";
 import { decodeArray } from "./validators.js";
 
-// ApiResult is the raw result from a request. One of `data` or `error`
-// will be set on a 2xx/non-2xx respectively. Network failures produce
-// `{ok: false, status: 0, error: "..."}`.
+/** Decoder<T> is owned by validators.ts (single source of truth); re-exported
+ *  here so callers can import it from api-client as well as validators. */
+export type { Decoder } from "./validators.js";
+import type { Decoder } from "./validators.js";
+
+// ApiResult keeps subflux's historical envelope shape rather than adopting
+// fetch's discriminated union: `ok` is a plain boolean with optional
+// data/error (so `r.data` / `r.error` reads at existing call sites need no
+// narrowing), plus the lifted `code` / `requestId` fields and `headers`
+// (populated on the error path only — see the module header).
 export interface ApiResult<T> {
   ok: boolean;
   status: number;
@@ -40,35 +54,15 @@ export interface ApiResult<T> {
   headers?: Headers;
 }
 
-interface ErrorEnvelope {
-  error?: string;
-  code?: string;
-  request_id?: string;
-}
-
-/** Decoder<T> is owned by validators.ts (single source of truth); re-exported
- *  here so callers can import it from api-client as well as validators. */
-export type { Decoder } from "./validators.js";
-import type { Decoder } from "./validators.js";
-
-async function parseJSONSafe(r: Response): Promise<unknown> {
-  if (r.status === 204) {
-    return null;
-  }
-  const ct = r.headers.get("Content-Type") ?? "";
-  if (!ct.includes("application/json")) {
-    // Fallback for endpoints that return plain text (e.g. /api/config YAML).
-    // Only reached on error paths since every handler routes through api.*.
-    const text = await r.text();
-    return text ? { error: text } : null;
-  }
-  try {
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
-
+// The shared non-throwing core. Delegates the request lifecycle to
+// @cplieger/fetch and maps its envelope onto subflux's ApiResult.
+//
+// A fresh fetch instance is built per call so the header-capturing fetchFn
+// writes into a per-call closure variable — there is no shared slot for
+// concurrent requests to clobber. createFetch is cheap (a few closures); the
+// per-request cost is negligible for a UI. credentials mirror actions-boot's
+// configureApi("same-origin"), which also matches the browser default the
+// former hand-rolled core relied on.
 async function requestRaw<T>(
   method: string,
   path: string,
@@ -77,54 +71,56 @@ async function requestRaw<T>(
   decoder?: Decoder<T>,
   extraHeaders?: Record<string, string>,
 ): Promise<ApiResult<T>> {
-  try {
-    const init: RequestInit = { method };
-    const headers: Record<string, string> = {};
-    if (body !== undefined) {
-      Object.assign(headers, JSON_HEADERS);
-      init.body = JSON.stringify(body);
-    }
-    if (extraHeaders !== undefined) {
-      Object.assign(headers, extraHeaders);
-    }
-    if (Object.keys(headers).length > 0) {
-      init.headers = headers;
-    }
-    const timeoutSignal = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
-    init.signal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-    const r = await fetch(path, init);
-    const parsed = await parseJSONSafe(r);
-    if (!r.ok) {
-      const envelope = (parsed as ErrorEnvelope | null) ?? {};
-      const result: ApiResult<T> = {
-        ok: false,
-        status: r.status,
-        error: envelope.error ?? r.statusText,
-        headers: r.headers,
-      };
-      if (envelope.code) {
-        result.code = envelope.code;
-      }
-      if (envelope.request_id) {
-        result.requestId = envelope.request_id;
-      }
-      return result;
-    }
-    if (decoder && parsed !== null) {
-      try {
-        return { ok: true, status: r.status, data: decoder(parsed) };
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error("api decode failed:", method, path, msg);
-        return { ok: false, status: r.status, error: `response shape mismatch: ${msg}` };
-      }
-    }
-    // 204 No Content responses give parsed == null; callers that expect
-    // a specific response shape should use apiX variants, not the raw ones.
-    return { ok: true, status: r.status, data: parsed as T };
-  } catch (e) {
-    return { ok: false, status: 0, error: e instanceof Error ? e.message : String(e) };
+  let responseHeaders: Headers | undefined;
+  const client = createFetch({
+    credentials: "same-origin",
+    fetchFn: (input, init) =>
+      fetch(input, init).then((res) => {
+        responseHeaders = res.headers;
+        return res;
+      }),
+  });
+
+  const opts: RequestOptions<T> = {};
+  if (body !== undefined) {
+    opts.body = body;
   }
+  if (signal !== undefined) {
+    opts.signal = signal;
+  }
+  if (decoder !== undefined) {
+    opts.decoder = decoder;
+  }
+  if (extraHeaders !== undefined) {
+    opts.headers = extraHeaders;
+  }
+
+  const r = await client.requestRaw<T>(method as HttpMethod, path, opts);
+
+  if (r.ok) {
+    // Preserve subflux's empty-body contract: a 204 / empty 2xx collapses to
+    // `data: null` (fetch yields `undefined`); a real JSON null/0/false/""
+    // body is genuine data and passes through unchanged.
+    return { ok: true, status: r.status, data: (r.data ?? null) as T };
+  }
+
+  // fetch classifies a JSON-parse / decoder failure as code "decode". Keep
+  // subflux's single console.error diagnostic at that boundary; the null
+  // collapse + warn (below, in request) still applies for the plain helpers.
+  if (r.code === "decode") {
+    console.error("api decode failed:", method, path, r.error);
+  }
+  const result: ApiResult<T> = { ok: false, status: r.status, error: r.error };
+  if (r.code !== undefined) {
+    result.code = r.code;
+  }
+  if (r.requestId !== undefined) {
+    result.requestId = r.requestId;
+  }
+  if (responseHeaders !== undefined) {
+    result.headers = responseHeaders;
+  }
+  return result;
 }
 
 async function request<T>(
@@ -242,11 +238,10 @@ export function apiDeleteRaw<T>(path: string, body?: unknown): Promise<ApiResult
   return requestRaw<T>("DELETE", path, body);
 }
 
-/** Uniform raw-request helper with optional extra headers. Used by the
- *  actions framework's apiAction adapter to thread per-dispatch headers
- *  (notably Idempotency-Key) through fetch. The per-method shorthands
- *  above stay clean for direct callers; this helper is preferred for
- *  layered code that already knows the method as a string. */
+/** Uniform raw-request helper with optional extra headers. Used by layered
+ *  code that already knows the method as a string and needs to thread
+ *  per-request headers (e.g. an Idempotency-Key) through the client. The
+ *  per-method shorthands above stay clean for direct callers. */
 export function apiRequestRaw<T>(
   method: string,
   path: string,
