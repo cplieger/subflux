@@ -36,7 +36,11 @@ func TestParseTrustedProxies(t *testing.T) {
 			wantLen: 2, contains: "192.168.42.1", notContains: "172.16.0.1",
 		},
 		{name: "ipv6 range", in: []string{"2001:db8::/32"}, wantLen: 1, contains: "2001:db8::1"},
-		{name: "invalid: bare IP without mask", in: []string{"10.0.0.5"}, wantErr: true},
+		{
+			name: "bare IPv4 is a /32 host", in: []string{"10.0.0.5"},
+			wantLen: 1, contains: "10.0.0.5", notContains: "10.0.0.6",
+		},
+		{name: "bare IPv6 is a /128 host", in: []string{"::1"}, wantLen: 1, contains: "::1"},
 		{name: "invalid: garbage", in: []string{"not-a-cidr"}, wantErr: true},
 		{name: "invalid: one bad among good", in: []string{"10.0.0.0/8", "bad"}, wantErr: true},
 	}
