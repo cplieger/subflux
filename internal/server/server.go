@@ -67,6 +67,7 @@ type Metrics interface {
 	RecordScan(items, found int, dur time.Duration)
 	RecordImport(source api.PollKey)
 	RecordHTTP(method, path string, status int, d time.Duration)
+	RecordPanic()
 	TotalSearches() int64
 	Handler() http.HandlerFunc
 

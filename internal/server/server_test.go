@@ -9,18 +9,28 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/webhttp"
 )
 
 var errMock = errors.New("mock error")
 
+// securityChain wraps h with the same response-security middleware serveAndWait
+// installs (webhttp.SecurityHeaders with subflux's CSP / Permissions-Policy /
+// COOP, then Cache-Control: no-store), so the header tests exercise the real
+// composition rather than a stand-in.
+func securityChain(h http.Handler) http.Handler {
+	return webhttp.Chain(h, securityHeadersMW(), cacheControlMW)
+}
+
 func TestHandleHealth_returns_ok(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
-	s.ready.Store(true)
+	s.ready.Set(true)
 
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/api/health", http.NoBody)
@@ -93,7 +103,7 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	handler := securityHeaders(inner)
+	handler := securityChain(inner)
 
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/", http.NoBody)
@@ -115,7 +125,7 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 	for _, tt := range tests {
 		got := rec.Header().Get(tt.header)
 		if got != tt.want {
-			t.Errorf("securityHeaders() %s = %q, want %q", tt.header, got, tt.want)
+			t.Errorf("securityChain() %s = %q, want %q", tt.header, got, tt.want)
 		}
 	}
 
@@ -144,7 +154,7 @@ func TestSecurityHeaders_passes_through_to_next_handler(t *testing.T) {
 		w.Header().Set("X-Custom", "test")
 		w.WriteHeader(http.StatusTeapot)
 	})
-	handler := securityHeaders(inner)
+	handler := securityChain(inner)
 
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/", http.NoBody)
@@ -152,7 +162,7 @@ func TestSecurityHeaders_passes_through_to_next_handler(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusTeapot {
-		t.Errorf("securityHeaders() status = %d, want %d", rec.Code, http.StatusTeapot)
+		t.Errorf("securityChain() status = %d, want %d", rec.Code, http.StatusTeapot)
 	}
 	if got := rec.Header().Get("X-Custom"); got != "test" {
 		t.Errorf("inner handler header X-Custom = %q, want %q", got, "test")
@@ -298,5 +308,60 @@ func TestAsyncAction_post_returns_accepted(t *testing.T) {
 	}
 	if resp["status"] != "custom started" {
 		t.Errorf("asyncAction(POST) status = %q, want %q", resp["status"], "custom started")
+	}
+}
+
+// TestBuildHandler_preserves_streaming_writer smoke-tests that the global
+// middleware chain (webhttp.Logging skip + Recoverer's StatusRecorder +
+// SecurityHeaders + Cache-Control) still hands a streaming handler a writer that
+// implements http.Flusher and whose http.ResponseController can clear the
+// per-connection write deadline (reaching the real writer via
+// StatusRecorder.Unwrap). This guards the SSE (/api/events, skipped by Logging)
+// and preview-video (/api/preview/video, logged) routes against the webhttp swap.
+func TestBuildHandler_preserves_streaming_writer(t *testing.T) {
+	t.Parallel()
+
+	type probe struct {
+		deadlineErr error
+		flusher     bool
+	}
+
+	for _, path := range []string{"/api/events", "/api/preview/video"} {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			s := &Server{metrics: metrics.New()}
+			ch := make(chan probe, 1)
+
+			mux := http.NewServeMux()
+			mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+				_, fl := w.(http.Flusher)
+				de := http.NewResponseController(w).SetWriteDeadline(time.Time{})
+				ch <- probe{flusher: fl, deadlineErr: de}
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(": ok\n\n"))
+				http.NewResponseController(w).Flush()
+			})
+
+			ts := httptest.NewServer(s.buildHandler(mux))
+			defer ts.Close()
+
+			resp, err := ts.Client().Get(ts.URL + path)
+			if err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("status = %d, want 200", resp.StatusCode)
+			}
+			p := <-ch
+			if !p.flusher {
+				t.Errorf("%s: streaming handler writer does not implement http.Flusher", path)
+			}
+			if p.deadlineErr != nil {
+				t.Errorf("%s: SetWriteDeadline via ResponseController failed: %v", path, p.deadlineErr)
+			}
+		})
 	}
 }

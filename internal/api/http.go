@@ -11,7 +11,14 @@
 // `error` continue to work unchanged. `code` and `request_id` are
 // additive: callers that pass a code via the (w, r, code, msg)
 // variants populate the field. `request_id` is auto-populated from
-// r.Context() when the request was wrapped by the request-ID middleware.
+// r.Context() when the request was wrapped by webhttp.Logging.
+//
+// The JSON/error funnel is layered on the webhttp library
+// (github.com/cplieger/webhttp): jsonHeaders/WriteJSON/WriteJSONStatus/Ok and
+// the writeError envelope delegate to webhttp's mechanism, so the wire shape is
+// defined once in the library and stays byte-identical across every consumer.
+// subflux keeps its ~70-code taxonomy and the BadRequestC-style named helpers
+// on top; they just delegate now.
 //
 // Hand-crafted JSON strings (`http.Error(w, ..., status)` for JSON,
 // `fmt.Fprint(w, \`{"ok":true}\`)`, `w.Write([]byte(...))` for JSON) are
@@ -26,6 +33,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/cplieger/webhttp"
 )
 
 // Canonical JSON response keys and sentinel error messages shared
@@ -52,30 +61,22 @@ const (
 	// HeaderXAPIKey is the canonical HTTP header name for API key authentication.
 	// Used by both inbound (subflux API key verification) and outbound (Sonarr/Radarr) requests.
 	HeaderXAPIKey = "X-Api-Key" //nolint:gosec // G101 false positive: header name, not a credential
-
-	// HeaderXRequestID is the canonical X-Request-ID header. The middleware
-	// reuses an inbound value when shape-valid; otherwise mints a fresh
-	// 16-byte hex id and attaches it to the request context.
-	HeaderXRequestID = "X-Request-ID"
 )
 
 // errorResponse is the canonical JSON error envelope for all HTTP error helpers.
-// Wire format: {"error": msg, "code": ..., "request_id": ...}.
-//
-// `error` is always populated. `code` and `request_id` are emitted only
-// when set (omitempty); legacy callers that don't pass a code or that
-// run without the request-ID middleware emit only `error`, preserving
-// existing wire compatibility.
-type errorResponse struct {
-	Error     string `json:"error"`
-	Code      string `json:"code,omitempty"`
-	RequestID string `json:"request_id,omitempty"`
-}
+// It aliases webhttp.ErrorResponse so the wire format ({"error": msg, "code":
+// ..., "request_id": ...}) is defined once, in the library, and stays
+// byte-identical across every consumer. `error` is always populated; `code` and
+// `request_id` are emitted only when set (omitempty), preserving the legacy
+// error-only shape for callers that pass no code and run without the request-id
+// middleware.
+type errorResponse = webhttp.ErrorResponse
 
-// jsonHeaders sets the standard JSON response headers.
+// jsonHeaders sets the standard JSON response headers (application/json +
+// nosniff) via webhttp.JSONHeaders, so the header set matches every other
+// webhttp consumer.
 func jsonHeaders(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", contentTypeJSON)
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	webhttp.JSONHeaders(w)
 }
 
 // WriteJSON encodes v as JSON with status 200.
@@ -83,7 +84,10 @@ func WriteJSON(w http.ResponseWriter, v any) {
 	WriteJSONStatus(w, http.StatusOK, v)
 }
 
-// WriteJSONStatus encodes v as JSON with the given status code.
+// WriteJSONStatus encodes v as JSON with the given status code. The encode
+// failure is logged at Debug (deliberately quiet: the status line is already on
+// the wire and an app JSON payload that fails to encode is exceptional) rather
+// than delegating to webhttp.WriteJSONStatus, which logs at Warn.
 func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
 	jsonHeaders(w)
 	w.WriteHeader(code)
@@ -106,36 +110,23 @@ func JSONError(w http.ResponseWriter, err error, code int) {
 
 // JSONErrorWithCode is JSONError + an error-code envelope. Use when the
 // error string is safe to surface verbatim AND a stable machine-
-// readable code is meaningful for the client.
+// readable code is meaningful for the client. Delegates to webhttp.WriteError
+// so the envelope and its request-id population match writeError.
 func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code, msg string) {
-	WriteJSONStatus(w, status, errorResponse{
-		Error:     msg,
-		Code:      code,
-		RequestID: requestIDFrom(r),
-	})
+	webhttp.WriteError(w, r, status, code, msg)
 }
 
-// Ok writes a 200 {"ok": true} response — the standard
-// "action succeeded" reply for endpoints that don't return data.
+// Ok writes a 200 {"ok": true} response — the standard "action succeeded" reply
+// for endpoints that don't return data. Delegates to webhttp.Ok so the body
+// matches the {"ok":true} every webhttp consumer emits.
 func Ok(w http.ResponseWriter) {
-	WriteJSON(w, map[string]bool{"ok": true})
+	webhttp.Ok(w)
 }
 
-// requestIDFrom extracts the request id from r's context, if r is non-nil.
-// Tolerates a nil request so legacy (w, msg) helpers work without a request.
-func requestIDFrom(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-	return RequestIDFromContext(r.Context())
-}
-
-// writeError is the single place that builds an errorResponse and emits it.
-// All public helpers funnel through this function.
+// writeError is the single place all named error helpers funnel through. It
+// delegates to webhttp.WriteError, which builds the {error,code,request_id}
+// envelope and pulls the request id from r's context (nil-safe on r). The wire
+// shape is identical to the previous hand-built errorResponse.
 func writeError(w http.ResponseWriter, r *http.Request, status int, code, msg string) {
-	WriteJSONStatus(w, status, errorResponse{
-		Error:     msg,
-		Code:      code,
-		RequestID: requestIDFrom(r),
-	})
+	webhttp.WriteError(w, r, status, code, msg)
 }

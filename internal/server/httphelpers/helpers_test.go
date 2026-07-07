@@ -51,9 +51,10 @@ func TestDecodeJSONBody_invalid_returns_400(t *testing.T) {
 	}
 }
 
-// A JSON value larger than the byte cap is truncated by the LimitReader into
-// invalid JSON, so the decode is rejected. This pins the size-cap boundary:
-// remove the cap and the oversized value decodes successfully.
+// A JSON value larger than the byte cap trips the http.MaxBytesReader installed
+// by webhttp.LimitBody, so the decode fails and yields a 400 rather than being
+// silently truncated. This pins the size-cap boundary: remove the cap and the
+// oversized value decodes successfully.
 func TestDecodeJSONBody_oversized_returns_400(t *testing.T) {
 	t.Parallel()
 	big := `"` + strings.Repeat("x", 100) + `"`
@@ -97,6 +98,15 @@ func TestRequireMethod(t *testing.T) {
 			}
 			if rec.Code != tc.wantCode {
 				t.Errorf("status = %d, want %d", rec.Code, tc.wantCode)
+			}
+			// On a mismatch webhttp.RequireMethod sets the RFC-9110 Allow header
+			// to the permitted method; on a match it leaves it unset.
+			allow := rec.Header().Get("Allow")
+			if tc.pass && allow != "" {
+				t.Errorf("Allow header = %q, want empty on method match", allow)
+			}
+			if !tc.pass && allow != tc.want {
+				t.Errorf("Allow header = %q, want %q on mismatch", allow, tc.want)
 			}
 		})
 	}

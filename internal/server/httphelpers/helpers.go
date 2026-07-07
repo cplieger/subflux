@@ -2,28 +2,32 @@
 // across server sub-packages. This breaks the import cycle between server/
 // and its sub-packages (queryhandlers, confighandlers, etc.) that previously
 // required copy-pasting these helpers.
+//
+// The method gate and body decoder delegate to the webhttp prelude primitives
+// (RequireMethod, LimitBody, MaxJSONBody) so subflux inherits the RFC-9110 Allow
+// header on 405s and the MaxBytesReader overflow-to-400 behavior, while keeping
+// subflux's own error-code taxonomy for the response envelope.
 package httphelpers
 
 import (
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/webhttp"
 )
 
-// MaxDefaultBodySize is the default JSON body size cap for most handlers (1 MiB).
-const MaxDefaultBodySize = 1 << 20
+// MaxDefaultBodySize is the default JSON body size cap for most handlers (1 MiB),
+// aliased to webhttp.MaxJSONBody so the limit has a single definition.
+const MaxDefaultBodySize = webhttp.MaxJSONBody
 
-// RequireMethod checks that the request method matches the expected
-// value. Writes 405 and returns false if not.
+// RequireMethod checks that the request method matches the expected value. On a
+// mismatch it delegates to webhttp.RequireMethod, which sets the RFC-9110 Allow
+// header to the permitted method and writes subflux's {error,code,request_id}
+// 405 envelope (code "method_not_allowed"), then returns false.
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
-	if r.Method != method {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
-		return false
-	}
-	return true
+	return webhttp.RequireMethod(w, r, method)
 }
 
 // RequireGET is sugar for RequireMethod(w, r, http.MethodGet).
@@ -36,14 +40,17 @@ func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodPost)
 }
 
-// DecodeJSONBody decodes a JSON request body into dst with a size cap.
-// Writes 400 and returns false on decode failure.
+// DecodeJSONBody decodes a JSON request body into dst under a size cap enforced
+// by an http.MaxBytesReader (webhttp.LimitBody): a body exceeding maxBytes fails
+// the decode and yields a 400 rather than being silently truncated. A maxBytes
+// of 0 or less uses MaxDefaultBodySize. Writes subflux's 400 envelope (code
+// "bad_request") and returns false on any decode failure.
 func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
 	if maxBytes <= 0 {
 		maxBytes = MaxDefaultBodySize
 	}
-	dec := json.NewDecoder(io.LimitReader(r.Body, maxBytes))
-	if err := dec.Decode(dst); err != nil {
+	webhttp.LimitBody(w, r, maxBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		slog.Debug("decode request body failed", "path", r.URL.Path, "error", err)
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid json")
 		return false

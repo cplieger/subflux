@@ -27,6 +27,7 @@ type Metrics struct {
 	adaptSkips   *extmetrics.Counter
 	httpRequests *extmetrics.LabeledCounter
 	httpDuration *extmetrics.Histogram
+	httpPanics   *extmetrics.Counter
 	registry     *extmetrics.Registry
 
 	// Store observability (Requirement 17).
@@ -62,6 +63,7 @@ func New() *Metrics {
 		adaptSkips:   extmetrics.NewCounter("adaptive_skips_total", "Total items skipped by adaptive search"),
 		httpRequests: extmetrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
 		httpDuration: extmetrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
+		httpPanics:   extmetrics.NewCounter("http_panics_total", "Total HTTP handler panics recovered by the Recoverer middleware"),
 
 		// Store observability.
 		storeFileBytes:     extmetrics.NewGauge("store_file_bytes", "Current bbolt database file size in bytes"),
@@ -90,6 +92,7 @@ func New() *Metrics {
 	m.registry.RegisterCounter(m.adaptSkips)
 	m.registry.RegisterLabeledCounter(m.httpRequests)
 	m.registry.RegisterHistogram(m.httpDuration)
+	m.registry.RegisterCounter(m.httpPanics)
 	m.registry.RegisterGauge(m.storeFileBytes)
 	m.registry.RegisterGauge(m.storeFreelistBytes)
 	m.registry.RegisterGauge(m.reconcileDuration)
@@ -139,6 +142,13 @@ func (m *Metrics) RecordScan(items, found int, dur time.Duration) {
 // RecordHTTP records one HTTP request (method, path, status, duration).
 func (m *Metrics) RecordHTTP(method, path string, status int, d time.Duration) {
 	extmetrics.RecordHTTP(m.httpRequests, m.httpDuration, d, method, path, strconv.Itoa(status))
+}
+
+// RecordPanic records one HTTP handler panic recovered by the webhttp.Recoverer
+// middleware. Wired as Recoverer's WithPanicHook so a recovered 500 also
+// increments a monitorable counter.
+func (m *Metrics) RecordPanic() {
+	m.httpPanics.Inc()
 }
 
 // AdaptiveSkip records an item skipped by adaptive search.

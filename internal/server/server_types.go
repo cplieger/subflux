@@ -25,6 +25,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/wiring"
+	"github.com/cplieger/webhttp"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
 )
@@ -123,7 +124,7 @@ type Server struct {
 	fileHOnce     sync.Once
 	coverageHOnce sync.Once
 	reloadMu      sync.Mutex
-	ready         atomic.Bool
+	ready         webhttp.Ready
 	configured    atomic.Bool
 	scanning      atomic.Bool
 }

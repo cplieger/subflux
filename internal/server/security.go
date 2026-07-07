@@ -88,5 +88,6 @@ func mustBuildCSPPolicy(staticFS fs.FS) string {
 }
 
 // cspPolicy is the Content-Security-Policy header value, computed once
-// from the embedded HTML. securityHeaders sets it on every response.
+// from the embedded HTML. securityHeadersMW passes it via webhttp.WithCSP so it
+// is set on every response.
 var cspPolicy = mustBuildCSPPolicy(staticSub)

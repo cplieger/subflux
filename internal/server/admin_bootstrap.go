@@ -24,6 +24,10 @@ func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Label    string `json:"label"`
 	}
+	// Bound the request body (a handful of short fields) with webhttp.LimitBody
+	// rather than reading it unbounded; an oversized body then fails the decode
+	// and yields the same 400 envelope below.
+	webhttp.LimitBody(w, r, webhttp.MaxJSONBody)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
 		return
@@ -139,11 +143,10 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 // is needed, matching the first-boot recovery use case.
 func (s *Server) requireLocalhost(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			host = r.RemoteAddr
-		}
-		ip := net.ParseIP(host)
+		// webhttp.ClientIP with no trusted proxy ranges returns the unspoofable
+		// socket-peer host (X-Forwarded-For is ignored) — the same value the
+		// former hand-rolled net.SplitHostPort produced.
+		ip := net.ParseIP(webhttp.ClientIP(r))
 		if ip == nil || !ip.IsLoopback() {
 			api.ForbiddenC(w, r, api.CodeForbidden, "admin bootstrap is localhost-only")
 			return
