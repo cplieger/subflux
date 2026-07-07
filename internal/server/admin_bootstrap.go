@@ -9,6 +9,7 @@ import (
 
 	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/webhttp"
 )
 
 // handleAdminBootstrap serves CLI auth commands (reset-password, generate-api-key)
@@ -151,12 +152,9 @@ func (s *Server) requireLocalhost(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// clientIPFromReq extracts the client IP, stripping the port. This is a
-// local copy to avoid importing the authhandlers package.
+// clientIPFromReq extracts the client IP via the shared spoof-aware resolver.
+// With no trusted proxy ranges it returns the unspoofable socket-peer host,
+// matching the previous port-strip behavior.
 func clientIPFromReq(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+	return webhttp.ClientIP(r)
 }
