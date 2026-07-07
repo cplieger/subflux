@@ -1,13 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "app.ts",
-    "login.ts",
-    "theme-init.ts",
-    "**/*.test.ts",
-    "**/*.fuzz.test.ts",
-    "**/*.property.test.ts"
-  ],
+  "entry": ["app.ts", "login.ts", "**/*.test.ts", "**/*.fuzz.test.ts", "**/*.property.test.ts"],
   "ignore": ["wire/*.gen.ts"],
   "project": ["**/*.ts", "!**/*.d.ts", "!node_modules/**"],
   "ignoreDependencies": [

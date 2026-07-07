@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
@@ -25,12 +24,13 @@ func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Label    string `json:"label"`
 	}
-	// Bound the request body (a handful of short fields) with webhttp.LimitBody
-	// rather than reading it unbounded; an oversized body then fails the decode
-	// and yields the same 400 envelope below.
-	webhttp.LimitBody(w, r, webhttp.MaxJSONBody)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
+	// Cap + decode via webhttp.DecodeBody: it bounds the body at MaxJSONBody
+	// (1 MiB) with an http.MaxBytesReader and, on any decode failure (including
+	// trailing data past the single JSON object), writes the 400 envelope
+	// {error,code:"bad_request",request_id} — byte-identical to the previous
+	// api.BadRequestC(api.CodeBadRequest) since both route through
+	// webhttp.WriteError.
+	if !webhttp.DecodeBody(w, r, &req, "invalid request body") {
 		return
 	}
 

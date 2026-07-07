@@ -31,7 +31,7 @@
 // ---------------------------------------------------------------------------
 
 import { createFetch } from "@cplieger/fetch";
-import type { HttpMethod, RequestOptions } from "@cplieger/fetch";
+import type { ApiResult as FetchApiResult, HttpMethod, RequestOptions } from "@cplieger/fetch";
 import { decodeArray } from "./validators.js";
 
 /** Decoder<T> is owned by validators.ts (single source of truth); re-exported
@@ -95,7 +95,36 @@ async function requestRaw<T>(
     opts.headers = extraHeaders;
   }
 
-  const r = await client.requestRaw<T>(method as HttpMethod, path, opts);
+  // Drive @cplieger/fetch's per-verb raw helpers (apiGetRaw / apiPostRaw / …)
+  // rather than the generic requestRaw, so the library's verb helpers are what
+  // subflux actually consumes. Each is a thin wrapper over requestRaw with the
+  // method baked in (GET/DELETE thread the body through opts, POST/PUT/PATCH via
+  // the body param), so the envelope mapping, header capture, decode/warn
+  // diagnostics, and empty-body contract below are all unchanged. The raw
+  // (not null-collapsing) family is the right fit: subflux layers its own
+  // null-collapse + loose envelope + response-header capture on top, which the
+  // T|null helpers would hide.
+  let r: FetchApiResult<T>;
+  switch (method) {
+    case "GET":
+      r = await client.apiGetRaw<T>(path, opts);
+      break;
+    case "POST":
+      r = await client.apiPostRaw<T>(path, body, opts);
+      break;
+    case "PUT":
+      r = await client.apiPutRaw<T>(path, body, opts);
+      break;
+    case "PATCH":
+      r = await client.apiPatchRaw<T>(path, body, opts);
+      break;
+    case "DELETE":
+      r = await client.apiDeleteRaw<T>(path, opts);
+      break;
+    default:
+      r = await client.requestRaw<T>(method as HttpMethod, path, opts);
+      break;
+  }
 
   if (r.ok) {
     // Preserve subflux's empty-body contract: a 204 / empty 2xx collapses to

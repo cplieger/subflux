@@ -13,6 +13,7 @@ import (
 
 	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"
 )
 
@@ -93,14 +94,15 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 //
 // The access logger comes next so it observes the final status and threads a
 // request id into the context (the typed-code error helpers read it back via
-// webhttp.WriteError). subflux owns this middleware (accessLog) rather than
-// using webhttp.Logging: it builds on webhttp's exported request-id +
-// StatusRecorder primitives but adds a client_ip field — resolved through the
-// trusted-proxy set — that webhttp.Logging's fixed field shape cannot carry.
-// /api/events is skipped: its open-to-close SSE lifetime would emit one
-// misleading high-latency access line and RecordHTTP sample, and the skip
-// leaves the SSE writer un-recorded — webhttp.Recoverer then wraps it in the
-// StatusRecorder whose Unwrap keeps http.ResponseController (per-connection
+// webhttp.WriteError). It is webhttp.Logging configured to reproduce subflux's
+// access line exactly: WithClientIPFunc(authhandlers.ClientIP) adds the
+// client_ip field resolved through the hot-reloadable trusted-proxy set (a
+// field the fixed-shape line does not carry on its own), and
+// WithRecordMetric(s.metrics.RecordHTTP) fires the per-request metric hook.
+// /api/events is skipped via WithSkipPaths: its open-to-close SSE lifetime would
+// emit one misleading high-latency access line and RecordHTTP sample, and the
+// skip leaves the SSE writer un-recorded — webhttp.Recoverer then wraps it in
+// the StatusRecorder whose Unwrap keeps http.ResponseController (per-connection
 // write-deadline clearing) reaching the real writer. Recoverer sits INSIDE the
 // access logger so a recovered panic logs as its 500 (not the recorder's
 // default 200) and increments the panic metric. SecurityHeaders and the
@@ -110,7 +112,12 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	return webhttp.Chain(mux,
 		cop.Handler,
-		s.accessLogMW("/api/events"),
+		webhttp.Logging(
+			webhttp.WithLogger(slog.Default()),
+			webhttp.WithSkipPaths("/api/events"),
+			webhttp.WithClientIPFunc(authhandlers.ClientIP),
+			webhttp.WithRecordMetric(s.metrics.RecordHTTP),
+		),
 		webhttp.Recoverer(
 			webhttp.WithRecoverLogger(slog.Default()),
 			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),

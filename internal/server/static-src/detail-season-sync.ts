@@ -1,6 +1,7 @@
 // detail-season-sync.ts — Season audio sync dialog extracted from detail.ts.
 
-import { el, dialog, closeDialog, onBackdropClose, dialogHead, pad } from "./dom.js";
+import { el, dialog, closeDialog, dialogHead, pad } from "./dom.js";
+import { createDialog } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
 import { audioSyncAction } from "./sync-actions.js";
 import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
@@ -20,9 +21,26 @@ export function confirmSeasonSync(
   const label = `${seriesTitle} S${pad(seasonNum)}`;
   const syncAbort = new AbortController();
 
+  // createDialog bundles open + drag-safe backdrop dismiss + Escape → fade-out
+  // close. The in-flight sync abort is wired through onClose so it fires on
+  // every dismissal path: the old hand-wiring aborted on backdrop click and the
+  // Cancel button but let Escape close the dialog WITHOUT stopping the running
+  // workers. dispose() on the `close` event keeps the controller's listeners
+  // from accumulating across reopens of the reused #seasonSyncConfirm element.
+  const ctrl = createDialog(dlg, {
+    onClose: () => {
+      syncAbort.abort();
+    },
+  });
+  dlg.addEventListener(
+    "close",
+    () => {
+      ctrl.dispose();
+    },
+    { once: true },
+  );
   const closeFn = (): void => {
-    syncAbort.abort();
-    closeDialog(dlg);
+    ctrl.close();
   };
   const header = dialogHead(`Sync ${label}`, closeFn);
 
@@ -77,8 +95,7 @@ export function confirmSeasonSync(
   );
 
   patch(dlg, header, body, footer);
-  dlg.showModal();
-  onBackdropClose(dlg, closeFn);
+  ctrl.open();
 }
 
 async function runSeasonAudioSync(
