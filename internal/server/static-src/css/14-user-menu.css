@@ -2,11 +2,22 @@
    User menu popover
    ================================================================ */
 
-[id="userMenuPopup"] {
-  display: flex;
+/* User menu container (was [id="userMenuPopup"]). The user menu is a
+   createPopover popover; createPopover toggles [hidden], so guard `display`
+   with :not([hidden]) — the base `.uip-popover[hidden] { display: none }` and
+   this rule are equal specificity and this split loads later, so without the
+   guard `display: flex` would win and show the menu while closed. The shared
+   chrome (width, surface, border, radius, shadow, sizing) comes from
+   .uip-popover in 16-uip-skin.css; only the vertical-list layout + tighter
+   padding differ here. */
+.uip-popover.pop-menu {
   flex-direction: column;
   gap: 0;
   padding: var(--sp-3) 0;
+}
+
+.uip-popover.pop-menu:not([hidden]) {
+  display: flex;
 }
 
 .um-user {

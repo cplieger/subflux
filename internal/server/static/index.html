@@ -19,8 +19,7 @@
 <header>
 <h1><a href="/">Subflux</a></h1>
 <nav aria-label="Quick actions">
-<button type="button" class="nav-btn ghost" id="statusBtn"
-  popovertarget="statusPopup" aria-label="Status">
+<button type="button" class="nav-btn ghost" id="statusBtn" aria-label="Status">
   <span class="nav-icon" id="statusIcon"><span class="icon icon-dot"></span></span>
   <span class="nav-label">Status</span>
 </button>
@@ -35,16 +34,15 @@
 <button type="button" class="nav-btn ghost" id="themeBtn" data-action="theme" aria-label="Toggle theme" hidden>
   <span class="nav-icon"><span class="icon icon-moon"></span></span>
 </button>
-<button type="button" class="nav-btn ghost" id="userBtn" aria-label="User menu"
-  popovertarget="userMenuPopup">
+<button type="button" class="nav-btn ghost" id="userBtn" aria-label="User menu">
   <span class="nav-icon"><span class="icon icon-user"></span></span>
 </button>
 </nav>
 </header>
 
-<div id="statusPopup" popover role="group" aria-label="Status"></div>
+<div id="statusPopup" hidden role="group" aria-label="Status"></div>
 
-<div id="userMenuPopup" popover role="menu" aria-label="User menu"></div>
+<div id="userMenuPopup" class="pop-menu" hidden role="menu" aria-label="User menu"></div>
 
 <dialog class="dlg-security" id="securityDialog" aria-label="Security settings"></dialog>
 
@@ -152,6 +150,7 @@
     "@cplieger/reactive": "/vendor/cplieger-reactive/index.js",
     "@cplieger/ui-primitives/toast": "/vendor/cplieger-ui-primitives/toast/index.js",
     "@cplieger/ui-primitives/tooltip": "/vendor/cplieger-ui-primitives/tooltip.js",
+    "@cplieger/ui-primitives/popover": "/vendor/cplieger-ui-primitives/popover.js",
     "@cplieger/ui-primitives/dialog": "/vendor/cplieger-ui-primitives/dialog.js",
     "@cplieger/ui-primitives/confirm": "/vendor/cplieger-ui-primitives/confirm.js",
     "@cplieger/ui-primitives/theme": "/vendor/cplieger-ui-primitives/theme.js",

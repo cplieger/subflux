@@ -180,3 +180,56 @@ dialog.is-leaving {
   opacity: 0;
   translate: 0 0.5rem;
 }
+
+/* --- Popover (status popup + user menu; was [popover] in 08-popover) --- */
+/* The status popup and user menu are createPopover popovers now. createPopover
+   positions the panel with inline styles (position:fixed + left/top, or
+   left+right when stretched), so this supplies only the visual chrome + the
+   enter/leave motion the native popover used to get from 08-popover.css. The
+   z-index (--uip-z-popover, 1100) already sits above subflux's toast (1000) and
+   tooltip (500), reproducing the native popover's above-everything stacking. */
+.uip-popover {
+  width: min(23.75rem, calc(100vw - 1.5rem));
+  max-height: 60dvh;
+  min-height: 6rem;
+  padding: var(--sp-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Enter: fade + slide down into place (was the @starting-style opacity/translate
+   on :popover-open). Overrides the base .uip-popover.is-open opacity-only fade. */
+.uip-popover.is-open {
+  animation: subflux-popover-enter var(--dur-standard) var(--ease-standard);
+}
+
+@keyframes subflux-popover-enter {
+  from {
+    opacity: 0;
+    translate: 0 -0.5rem;
+  }
+}
+
+/* Leave: fade + slide up (was the native popover close transition). Overrides
+   the base .uip-popover.is-leaving opacity-only fade. */
+.uip-popover.is-leaving {
+  opacity: 0;
+  translate: 0 -0.5rem;
+  transition:
+    opacity var(--dur-standard) var(--ease-standard),
+    translate var(--dur-standard) var(--ease-standard);
+}
+
+/* Full-bleed mobile variant (was `@media (width < 600px)` in 08-popover). The
+   library pins left+right inline (margin 0) to span the viewport, so drop the
+   content width so those pins win, and square the top + drop the top border so
+   it reads as a dropdown sliding from under the header bar. */
+.uip-popover.is-stretched {
+  width: auto;
+  border-radius: 0 0 var(--radius) var(--radius);
+  border-block-start: none;
+}

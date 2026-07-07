@@ -14,7 +14,8 @@ import type {
 import { fmtTime } from "./utils.js";
 import { EMBEDDED_PROVIDER } from "./constants.js";
 import type { ActivityEntry } from "./api-types.js";
-import { reconcile } from "@cplieger/reactive";
+import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
+import { patch, reconcile } from "@cplieger/reactive";
 
 interface Alert {
   id: number;
@@ -36,9 +37,38 @@ type ProvidersResponse = ProvidersResponseType;
 const toastedActivities = new Set<string>();
 const dismissedActivities = new Set<string>();
 
+// The status popup is a @cplieger/ui-primitives popover anchored to the status
+// button (replacing the native Popover API). Held here so isPopupOpen() and the
+// background poll can query/refresh it.
+let statusPopover: MenuPopover | null = null;
+
+// requires @cplieger/ui-primitives >= 2.1.0 (popover stretch mode); verified
+// locally via a node_modules overlay until released.
+export function initStatusPopover(): void {
+  statusPopover = createMenuPopover($.statusBtn, $.statusPopup, {
+    // Panel role is "group" (not a menu), so leave haspopup at its default
+    // ("true") — there is no dedicated "group" aria-haspopup token.
+    onOpen: () => {
+      // First open: paint the skeleton, then poll. This was the native `toggle`
+      // listener in app.ts before the popover migration.
+      if (!$.statusPopup.children.length) {
+        const skel = document.createDocumentFragment();
+        for (let i = 0; i < 2; i++) {
+          skel.appendChild(
+            el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+          );
+        }
+        patch($.statusPopup, skel);
+      }
+      void pollStatus();
+    },
+  });
+  $.statusBtn.addEventListener("click", () => statusPopover?.toggle());
+}
+
 // Check if the status popup is currently visible.
 function isPopupOpen(): boolean {
-  return $.statusPopup.matches(":popover-open");
+  return statusPopover?.isOpen ?? false;
 }
 
 // Build the stats summary fragment (media count, downloads, missing, providers).

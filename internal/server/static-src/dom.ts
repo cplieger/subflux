@@ -153,8 +153,9 @@ export const $ = {
     return req("statusPopup");
   },
 
-  // Status button in the header. Updated by status.ts, anchor for the
-  // popup opened by the browser-native popover API.
+  // Status button in the header. Updated by status.ts; the anchor for the
+  // status popup (a @cplieger/ui-primitives popover — see status.ts
+  // initStatusPopover).
   get statusBtn(): HTMLElement {
     return req("statusBtn");
   },
