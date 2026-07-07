@@ -15,6 +15,7 @@ import (
 
 	authlib "github.com/cplieger/auth"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/webhttp"
 )
 
 // serveAndWait binds the HTTP listener, starts the server, and blocks
@@ -35,7 +36,11 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// auto-populate the `request_id` field of the JSON envelope.
 	// securityHeaders runs innermost so headers are set on every
 	// response, including 4xx error envelopes that consume the id.
-	handler := http.NewCrossOriginProtection().Handler(api.RequestLogger(securityHeaders(mux), s.metrics.RecordHTTP))
+	// webhttp.Recoverer sits inside RequestLogger (so a recovered panic is
+	// logged as its 500, with the request id) and outside securityHeaders (so
+	// the 500 envelope still carries the security headers set on the way in).
+	handler := http.NewCrossOriginProtection().Handler(
+		api.RequestLogger(webhttp.Recoverer()(securityHeaders(mux)), s.metrics.RecordHTTP))
 	srv := newHTTPServer(handler)
 
 	var lc net.ListenConfig
@@ -89,15 +94,17 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 }
 
 // newHTTPServer creates an http.Server with standard timeouts and limits.
+// webhttp.NewServer supplies ReadHeaderTimeout (10s), IdleTimeout (120s), and
+// MaxHeaderBytes (1 MiB) as defaults; the explicit read/write bounds are
+// re-supplied because subflux's endpoints are bounded request/response handlers
+// (the 60s WriteTimeout covers the long preview/scan responses).
 func newHTTPServer(handler http.Handler) *http.Server {
-	return &http.Server{
-		Handler:           handler,
-		ReadTimeout:       10 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1 MB
-	}
+	return webhttp.NewServer(handler,
+		webhttp.WithReadTimeout(10*time.Second),
+		webhttp.WithReadHeaderTimeout(10*time.Second),
+		webhttp.WithWriteTimeout(60*time.Second),
+		webhttp.WithIdleTimeout(120*time.Second),
+	)
 }
 
 // securityHeaders adds standard security headers to all responses.

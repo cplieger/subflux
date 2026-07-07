@@ -7,13 +7,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"hash/fnv"
-	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	authwebauthn "github.com/cplieger/auth/webauthn"
+	"github.com/cplieger/webhttp"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -177,11 +177,10 @@ func (cs *CeremonyStore) Cleanup() {
 	})
 }
 
-// ClientIP extracts the client IP address from the request, stripping the port.
+// ClientIP extracts the client IP address from the request. It delegates to
+// webhttp.ClientIP with no trusted proxy ranges, so it returns the unspoofable
+// socket-peer host (X-Forwarded-For is ignored) — the same behavior as the
+// previous port-strip, now on the shared spoof-aware resolver.
 func ClientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+	return webhttp.ClientIP(r)
 }

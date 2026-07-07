@@ -10,6 +10,8 @@ github.com/cplieger/metrics/v2 v2.2.2 h1:h5uS59t0abqIIFNe2KBkYI9QGfSuFxYwLwogZTq
 github.com/cplieger/metrics/v2 v2.2.2/go.mod h1:92d0LHn9dLuEuw/FcsO1ZHHrMtMcj2kAfuZiHt5ghZQ=
 github.com/cplieger/ssrf/v2 v2.0.5 h1:rbKc6pw02BO3vyFzY7HBaWVy5aZkutYkJB1a8lbnDIg=
 github.com/cplieger/ssrf/v2 v2.0.5/go.mod h1:duZRnvl1FAdozPbF48iZbMkwYZU5XtT/1rUfdcG7EZs=
+github.com/cplieger/webhttp v1.2.0 h1:eYOvBubDVcWTOiPPfJlLErxweCi99h6aqd7xfyZzN+Y=
+github.com/cplieger/webhttp v1.2.0/go.mod h1:LQLE9eJNI6RztoQoXsRGUpa+RlaWXE3HnL7q3rdWPsE=
 github.com/cplieger/wiregen v1.3.0 h1:NVCvsq8GVsOPJbypo1C3eE/lYjmlNCXYco+wBqN9Tro=
 github.com/cplieger/wiregen v1.3.0/go.mod h1:+QB/vxQHDNwsoLEatwxbMdOdWiE78ri15wbwHnD3USg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

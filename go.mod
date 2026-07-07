@@ -8,6 +8,7 @@ require (
 	github.com/cplieger/httpx/v2 v2.1.1
 	github.com/cplieger/metrics/v2 v2.2.2
 	github.com/cplieger/ssrf/v2 v2.0.5
+	github.com/cplieger/webhttp v1.2.0
 	github.com/cplieger/wiregen v1.3.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5

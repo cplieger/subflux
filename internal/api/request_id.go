@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	extmetrics "github.com/cplieger/metrics/v2"
+	"github.com/cplieger/webhttp"
 )
 
 type ctxKey struct{}
@@ -75,8 +75,8 @@ func validRequestID(s string) bool {
 // header so a reverse proxy / client can correlate without parsing
 // logs.
 //
-// Wraps the writer in extmetrics.StatusRecorder so downstream handlers
-// can still type-assert to http.Flusher / http.Hijacker (via
+// Wraps the writer in webhttp.StatusRecorder so downstream handlers can
+// still type-assert to http.Flusher / http.Hijacker (via
 // http.ResponseController's Unwrap chain) — the previous local
 // statusRecorder lacked Unwrap and broke SSE streaming under the
 // middleware.
@@ -90,7 +90,7 @@ func RequestLogger(next http.Handler, record func(method, path string, status in
 		ctx := WithRequestID(r.Context(), id)
 
 		start := time.Now()
-		rec := extmetrics.NewStatusRecorder(w)
+		rec := webhttp.NewStatusRecorder(w)
 		next.ServeHTTP(rec, r.WithContext(ctx))
 
 		dur := time.Since(start)
