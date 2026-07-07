@@ -2,7 +2,6 @@ package authhandlers
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -299,11 +298,10 @@ func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
+	req, ok := decodeAuthBody[struct {
 		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
+	}](w, r)
+	if !ok {
 		return
 	}
 

@@ -1,7 +1,6 @@
 package authhandlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -51,11 +50,10 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	user := api.UserFromContext(r.Context())
 
-	var req struct {
+	req, ok := decodeAuthBody[struct {
 		Label string `json:"label"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
+	}](w, r)
+	if !ok {
 		return
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 	"github.com/cplieger/auth/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/webhttp"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -69,12 +69,15 @@ const (
 
 // --- Helpers ---
 
-// decodeAuthBody decodes the JSON request body into T with a size cap.
-// Returns the decoded value and true on success, or writes a 400 response
-// and returns zero value and false on failure.
+// decodeAuthBody decodes the JSON request body into T under a size cap.
+// webhttp.LimitBody installs an http.MaxBytesReader so a body exceeding
+// maxAuthBodySize fails the decode (yielding the 400 below) rather than being
+// silently truncated. Returns the decoded value and true on success, or writes
+// a 400 response and returns the zero value and false on failure.
 func decodeAuthBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	var v T
-	if err := json.NewDecoder(io.LimitReader(r.Body, maxAuthBodySize)).Decode(&v); err != nil {
+	webhttp.LimitBody(w, r, maxAuthBodySize)
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
 		return v, false
 	}

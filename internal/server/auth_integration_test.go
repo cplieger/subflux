@@ -162,6 +162,7 @@ type noopMetrics struct{}
 
 func (noopMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) {}
 func (noopMetrics) RecordHTTP(_, _ string, _ int, _ time.Duration)          {}
+func (noopMetrics) RecordPanic()                                            {}
 func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
 func (noopMetrics) AdaptiveSkip()                                           {}
 func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
@@ -183,11 +184,11 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 	t.Parallel()
 	s, db := testAuthServer(t)
 	s.metrics = noopMetrics{}
-	s.ready.Store(true)
+	s.ready.Set(true)
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
-	ts := httptest.NewServer(securityHeaders(mux))
+	ts := httptest.NewServer(securityChain(mux))
 	defer ts.Close()
 
 	client := ts.Client()

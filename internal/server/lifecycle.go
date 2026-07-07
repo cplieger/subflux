@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -18,31 +16,13 @@ import (
 	"github.com/cplieger/webhttp"
 )
 
-// serveAndWait binds the HTTP listener, starts the server, and blocks
-// until ctx is cancelled, then performs graceful shutdown.
+// serveAndWait builds the global middleware chain, binds the HTTP listener, and
+// serves until ctx is cancelled, then performs graceful shutdown via webhttp.Run.
 func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeMux, onReady func()) {
-	// Outer-to-inner: http.NewCrossOriginProtection (Go 1.25+) is the
-	// outermost layer so cross-origin state-changing requests are rejected
-	// before any other middleware runs. It checks Sec-Fetch-Site (sent by
-	// all modern browsers) and falls back to Origin vs Host comparison.
-	// GET/HEAD/OPTIONS are always allowed (covers /api/events SSE,
-	// /metrics scrape, healthcheck). Non-browser clients (arr webhook
-	// callers, the subflux CLI's remote commands) send no Origin /
-	// Sec-Fetch-Site, which the middleware permits by default; their
-	// auth is enforced by API key.
-	//
-	// Inside that, api.RequestLogger threads a request id into
-	// r.Context() so the typed-code error helpers (BadRequestC etc.)
-	// auto-populate the `request_id` field of the JSON envelope.
-	// securityHeaders runs innermost so headers are set on every
-	// response, including 4xx error envelopes that consume the id.
-	// webhttp.Recoverer sits inside RequestLogger (so a recovered panic is
-	// logged as its 500, with the request id) and outside securityHeaders (so
-	// the 500 envelope still carries the security headers set on the way in).
-	handler := http.NewCrossOriginProtection().Handler(
-		api.RequestLogger(webhttp.Recoverer()(securityHeaders(mux)), s.metrics.RecordHTTP))
-	srv := newHTTPServer(handler)
+	srv := newHTTPServer(s.buildHandler(mux))
 
+	// Bind the listener up front so a port-in-use error surfaces synchronously
+	// before webhttp.Run starts serving.
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
@@ -51,35 +31,38 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		return
 	}
 
-	go func() {
-		slog.Info("HTTP server listening", "addr", addr)
-		if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("HTTP server error", "error", err)
-		}
-	}()
-
 	go s.runAuthCleanup(ctx)
 
 	if onReady != nil {
-		s.ready.Store(true)
+		s.ready.Set(true)
 		onReady()
 	}
+	slog.Info("HTTP server listening", "addr", addr)
 
-	<-ctx.Done()
-	s.ready.Store(false)
-	slog.Info("shutting down HTTP server",
-		"sse_clients", s.events.ClientCount())
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		slog.Warn("HTTP server shutdown error", "error", err)
-	}
-	if s.sessBatcher != nil {
-		s.sessBatcher.Stop()
+	// Flip readiness off the instant shutdown is signalled — before webhttp.Run
+	// drains in-flight requests — so /api/health reports unready during the drain
+	// window, preserving the pre-webhttp teardown ordering for load balancers.
+	context.AfterFunc(ctx, func() {
+		s.ready.Set(false)
+		slog.Info("shutting down HTTP server", "sse_clients", s.events.ClientCount())
+	})
+
+	// onShutdown runs after Run drains in-flight requests (within the same grace
+	// budget), matching the old ordering where the session batcher stopped after
+	// srv.Shutdown returned.
+	onShutdown := func(context.Context) {
+		if s.sessBatcher != nil {
+			s.sessBatcher.Stop()
+		}
 	}
 
-	// Wait for background goroutines (scans, downloads, scheduler, poller)
-	// to finish with a bounded timeout to avoid hanging on stuck goroutines.
+	if err := webhttp.Run(ctx, srv, ln, onShutdown); err != nil {
+		slog.Error("HTTP server error", "error", err)
+	}
+
+	// subflux's own background goroutines (scans, downloads, scheduler, poller)
+	// drain on a separate bounded budget OUTSIDE Run, so a stuck goroutine can't
+	// hang shutdown past 10s.
 	bgDone := make(chan struct{})
 	go func() {
 		s.bgWg.Wait()
@@ -93,63 +76,107 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	}
 }
 
-// newHTTPServer creates an http.Server with standard timeouts and limits.
-// webhttp.NewServer supplies ReadHeaderTimeout (10s), IdleTimeout (120s), and
-// MaxHeaderBytes (1 MiB) as defaults; the explicit read/write bounds are
-// re-supplied because subflux's endpoints are bounded request/response handlers
-// (the 60s WriteTimeout covers the long preview/scan responses).
-func newHTTPServer(handler http.Handler) *http.Server {
-	return webhttp.NewServer(handler,
-		webhttp.WithReadTimeout(10*time.Second),
-		webhttp.WithReadHeaderTimeout(10*time.Second),
-		webhttp.WithWriteTimeout(60*time.Second),
-		webhttp.WithIdleTimeout(120*time.Second),
+// buildHandler assembles the global middleware chain around mux via webhttp.Chain
+// (first entry outermost). Extracted from serveAndWait so the chain has one
+// definition that the streaming smoke tests can exercise end-to-end.
+//
+// http.NewCrossOriginProtection (Go 1.25+) stays OUTERMOST and is app-owned, not
+// a webhttp feature: cross-origin state-changing requests are rejected before
+// anything else runs (Sec-Fetch-Site, else Origin vs Host). GET/HEAD/OPTIONS and
+// clients that send no Origin/Sec-Fetch-Site (arr webhooks, the subflux CLI) are
+// permitted by default; their auth is the API key.
+//
+// webhttp.Logging comes next so it observes the final status and threads a
+// request id into the context (the typed-code error helpers read it back via
+// webhttp.WriteError). /api/events is skipped: its open-to-close SSE lifetime
+// would emit one misleading high-latency access line and RecordHTTP sample, and
+// the skip leaves the SSE writer un-recorded by Logging — webhttp.Recoverer then
+// wraps it in the StatusRecorder whose Unwrap keeps http.ResponseController
+// (per-connection write-deadline clearing) reaching the real writer.
+// Recoverer sits INSIDE Logging so a recovered panic logs as its 500 (not the
+// recorder's default 200) and increments the panic metric. SecurityHeaders and
+// the app-owned Cache-Control: no-store setter run innermost, so every response
+// — including 4xx/5xx envelopes — carries them.
+func (s *Server) buildHandler(mux http.Handler) http.Handler {
+	cop := http.NewCrossOriginProtection()
+	return webhttp.Chain(mux,
+		cop.Handler,
+		webhttp.Logging(
+			webhttp.WithLogger(slog.Default()),
+			webhttp.WithRecordMetric(s.metrics.RecordHTTP),
+			webhttp.WithSkipPaths("/api/events"),
+		),
+		webhttp.Recoverer(
+			webhttp.WithRecoverLogger(slog.Default()),
+			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),
+		),
+		securityHeadersMW(),
+		cacheControlMW,
 	)
 }
 
-// securityHeaders adds standard security headers to all responses.
-func securityHeaders(next http.Handler) http.Handler {
+// newHTTPServer creates the app's http.Server. webhttp.NewServer supplies the
+// streaming-safe defaults (ReadHeaderTimeout 10s, IdleTimeout 120s,
+// MaxHeaderBytes 1 MiB); subflux re-supplies explicit read/write bounds because
+// its endpoints are bounded request/response handlers. The 60s WriteTimeout is
+// deliberate: subflux is a streaming app that uses the INVERSE of webhttp's
+// "omit WriteTimeout" guidance — a global WriteTimeout plus per-connection write
+// deadline clearing (http.ResponseController) on the SSE / preview-video / scan
+// routes, which reach the real writer through webhttp.StatusRecorder.Unwrap.
+func newHTTPServer(handler http.Handler) *http.Server {
+	return webhttp.NewServer(handler,
+		webhttp.WithReadTimeout(10*time.Second),
+		webhttp.WithWriteTimeout(60*time.Second),
+		webhttp.WithReadHeaderTimeout(10*time.Second),
+	)
+}
+
+// securityHeadersMW is subflux's response-security middleware. webhttp.SecurityHeaders
+// supplies the baseline (X-Content-Type-Options: nosniff, X-Frame-Options: DENY,
+// Referrer-Policy: strict-origin-when-cross-origin — all matching subflux's prior
+// values); subflux layers on its computed CSP, the Permissions-Policy feature
+// gate, and Cross-Origin-Opener-Policy: same-origin. Cache-Control is NOT a
+// webhttp feature and is applied separately by cacheControlMW.
+func securityHeadersMW() webhttp.Middleware {
+	return webhttp.SecurityHeaders(
+		webhttp.WithCSP(cspPolicy),
+		webhttp.WithPermissionsPolicy("camera=(), microphone=(), geolocation=()"),
+		webhttp.WithCOOP("same-origin"),
+	)
+}
+
+// cacheControlMW sets Cache-Control: no-store on every response. subflux serves
+// per-user, per-request data (coverage tables, config, auth/session state) that
+// must never be cached by a browser or intermediary. webhttp ships no
+// cache-control feature, so this stays a one-line app-owned middleware, applied
+// innermost in the global chain.
+func cacheControlMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Security-Policy", cspPolicy)
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
 }
 
 // --- Top-level handlers ---
 
-// keyStatus is the JSON response key shared by the health envelope and the
-// admin-bootstrap responses ({"status":"ok"} / {"status":"unready",...}).
+// keyStatus is the JSON "status" response key used by the admin-bootstrap
+// responses ({"status":"ok"}). The health envelope now comes from
+// webhttp.ReadinessHandler, which owns its own struct and key ordering.
 const keyStatus = "status"
 
-// handleHealth returns the liveness+readiness status. Emits the
-// canonical JSON envelope shared across the cplieger Go apps
-// (vibekit, vibecli, subflux, registry-stats, plex-exporter): 200 with
-// {"status":"ok"} when ready, 503 with {"status":"unready",...} during
-// startup or graceful shutdown. Same wire shape, different mechanisms
-// per app — here `s.ready` flips after the listener binds and serves,
-// and back to false on shutdown.
+// handleHealth reports HTTP serving state via webhttp.ReadinessHandler: 200 with
+// {"status":"ok"} when s.ready is set, 503 with {"status":"unready","reason":...}
+// during startup or graceful shutdown. s.ready (a webhttp.Ready) flips true once
+// the listener binds and serves, and back to false the instant shutdown is
+// signalled.
 //
-// The file-based health check (/tmp/.healthy) is the Docker probe;
-// this endpoint is for HTTP-level liveness/readiness checks (also used
-// by the functional test suite to wait for boot).
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	if !s.ready.Load() {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			keyStatus: "unready",
-			"reason":  "starting up or shutting down",
-		})
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{keyStatus: "ok"})
+// This is the serving-state gate for a load balancer (and the functional test
+// suite's boot-wait probe). It is deliberately distinct from the health
+// library's file-marker liveness probe (subflux health -> health.RunProbe) that
+// answers "is the process alive?" for the Docker HEALTHCHECK; the two are never
+// the same endpoint.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	webhttp.ReadinessHandler(&s.ready)(w, r)
 }
 
 // asyncActionResponse is the typed 202 Accepted response for async actions.
