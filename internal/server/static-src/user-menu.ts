@@ -9,10 +9,16 @@ import { decodeMeResponse } from "./wire/decoders.gen.js";
 import { openConfig } from "./config.js";
 import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
+import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
 
 // --- Inline interfaces for API response shapes ---
 
 let userInfo: MeResponse | null = null;
+
+// The user menu is a @cplieger/ui-primitives popover anchored to the user
+// button (replacing the native Popover API). Held here so the menu items and
+// the open-rebuild hook can drive it.
+let menuPopover: MenuPopover | null = null;
 
 export function initUserMenu(): void {
   void fetchMe();
@@ -28,9 +34,12 @@ async function fetchMe(): Promise<void> {
   }
 }
 
+// requires @cplieger/ui-primitives >= 2.1.0 (popover stretch mode); verified
+// locally via a node_modules overlay until released.
 function wireUserButton(): void {
   const btn = document.getElementById("userBtn");
-  if (!btn) {
+  const popup = document.getElementById("userMenuPopup");
+  if (!btn || !popup) {
     return;
   }
 
@@ -39,15 +48,15 @@ function wireUserButton(): void {
   document.getElementById("configBtn")?.remove();
   document.getElementById("themeBtn")?.remove();
 
-  // Rebuild menu content each time the popover opens so the theme
-  // label/icon reflect the live data-theme. Auto-mode (matchMedia) can
-  // flip data-theme while the menu is closed, leaving a stale label.
-  const popup = document.getElementById("userMenuPopup");
-  popup?.addEventListener("toggle", (e: Event) => {
-    if ((e as ToggleEvent).newState === "open") {
-      buildMenuContent();
-    }
+  // Rebuild menu content each time the popover opens (onOpen) so the theme
+  // label/icon reflect the live data-theme. Auto-mode (matchMedia) can flip
+  // data-theme while the menu is closed, leaving a stale label. haspopup:
+  // "menu" matches the panel's role="menu".
+  menuPopover = createMenuPopover(btn, popup, {
+    haspopup: "menu",
+    onOpen: buildMenuContent,
   });
+  btn.addEventListener("click", () => menuPopover?.toggle());
 }
 
 function buildMenuContent(): void {
@@ -72,7 +81,7 @@ function buildMenuContent(): void {
   // Security link.
   items.push(
     menuItem("Security", "settings", () => {
-      popup.hidePopover();
+      menuPopover?.hide();
       bus.emit(bus.BusEvent.OpenSecurity);
     }),
   );
@@ -81,7 +90,7 @@ function buildMenuContent(): void {
   if (userInfo?.role === "admin") {
     items.push(
       menuItem("Settings", "settings", () => {
-        popup.hidePopover();
+        menuPopover?.hide();
         openConfig();
       }),
     );

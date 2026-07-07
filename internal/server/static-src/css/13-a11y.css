@@ -40,7 +40,7 @@
 @media (forced-colors: active) {
   .badge,
   .card,
-  [popover],
+  .uip-popover,
   .toast {
     border: 1px solid CanvasText;
   }

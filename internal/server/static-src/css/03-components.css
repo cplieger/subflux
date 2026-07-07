@@ -236,7 +236,7 @@ td[data-col="actions"] button {
   }
 }
 
-[popover] .skeleton-row {
+.uip-popover .skeleton-row {
   border-block-end: none;
 }
 

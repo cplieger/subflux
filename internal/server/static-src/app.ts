@@ -9,7 +9,7 @@ import { on, BusEvent } from "./bus.js";
 initActions();
 import * as events from "./events.js";
 import * as theme from "./theme.js";
-import { pollStatus, pollStatusAction, updateLiveTimers } from "./status.js";
+import { initStatusPopover, pollStatusAction, updateLiveTimers } from "./status.js";
 import { loadCoverage, filterCoverage } from "./coverage.js";
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import { closeSearchPopup } from "./search.js";
@@ -19,9 +19,8 @@ import { reloadHistory } from "./history.js";
 import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js";
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
-import { el, dialog, onBackdropClose, $ } from "./dom.js";
+import { dialog, onBackdropClose, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
-import { patch } from "@cplieger/reactive";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
@@ -105,6 +104,7 @@ theme.init();
 initTooltips({ attribute: "data-tip", delayCold: 300, delayWarm: 300 });
 void initLanguages();
 initUserMenu();
+initStatusPopover();
 initSecurity();
 
 // Action-framework global: live-log every action error to the browser
@@ -303,47 +303,11 @@ if (configForm) {
   });
 }
 
-// Refresh popup content when it opens.
-$.statusPopup.addEventListener("toggle", (e: Event) => {
-  const te = e as ToggleEvent;
-  if (te.newState === "open") {
-    // Show skeleton if popup is empty (first open).
-    if (!$.statusPopup.children.length) {
-      const skel = document.createDocumentFragment();
-      for (let i = 0; i < 2; i++) {
-        skel.appendChild(
-          el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-        );
-      }
-      patch($.statusPopup, skel);
-    }
-    void pollStatus();
-  }
-});
-
-// Close popups on outside click
-document.addEventListener("click", (e: MouseEvent) => {
-  const t = e.target as HTMLElement;
-  if (!t.closest("[popover]") && !t.closest("[popovertarget]")) {
-    document.querySelectorAll("[popover]").forEach((p: Element) => {
-      if (p.matches(":popover-open")) {
-        (p as HTMLElement).hidePopover();
-      }
-    });
-  }
-});
-
-// Close popups on Escape key
-document.addEventListener("keydown", (e: KeyboardEvent) => {
-  if (e.key !== "Escape") {
-    return;
-  }
-  document.querySelectorAll("[popover]").forEach((p: Element) => {
-    if (p.matches(":popover-open")) {
-      (p as HTMLElement).hidePopover();
-    }
-  });
-});
+// The status popup + user menu are now @cplieger/ui-primitives popovers
+// (see status.ts initStatusPopover + user-menu.ts). createPopover owns their
+// open-content refresh (onOpen), outside-click, and Escape dismissal, so the
+// old native-[popover] toggle listener + document-level outside-click/Escape
+// sweeps are gone.
 
 // Keyboard shortcut: / to focus library search (unless in an input/dialog).
 document.addEventListener("keydown", (e: KeyboardEvent) => {

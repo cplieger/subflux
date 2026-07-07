@@ -1,89 +1,14 @@
 /* ================================================================
-   7. Popover (status popup)
-   ================================================================ */
-
-.nav-btn[aria-label="Status"] {
-  anchor-name: --status-anchor;
-}
-
-[popover] {
-  width: min(23.75rem, calc(100vw - 1.5rem));
-  max-height: 60dvh;
-  min-height: 6rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--sp-5);
-  box-shadow: var(--shadow);
-  margin: 0;
-  inset: auto;
-  position: fixed;
-  position-anchor: --status-anchor;
-  top: anchor(end);
-  right: anchor(right);
-  margin-block-start: var(--sp-3);
-  opacity: 0;
-  translate: 0 -0.5rem;
-  transition:
-    opacity var(--dur-standard),
-    translate var(--dur-standard),
-    overlay var(--dur-standard) allow-discrete,
-    display var(--dur-standard) allow-discrete;
-}
-
-[popover]:popover-open {
-  opacity: 1;
-  translate: 0;
-}
-
-@starting-style {
-  [popover]:popover-open {
-    opacity: 0;
-    translate: 0 -0.5rem;
-  }
-}
-
-/* Narrow viewport: full-width dropdown below header */
-@media (width < 600px) {
-  header:has(h1) {
-    anchor-name: --header-anchor;
-  }
-
-  [popover] {
-    width: 100%;
-    max-height: 60dvh;
-    border-radius: 0 0 var(--radius) var(--radius);
-    border-block-start: none;
-    position: fixed;
-    position-anchor: --header-anchor;
-    inset: auto;
-    top: anchor(end);
-    left: 0;
-    right: 0;
-    margin: 0;
-    opacity: 0;
-    translate: 0 -0.5rem;
-    transition:
-      opacity var(--dur-standard),
-      translate var(--dur-standard),
-      overlay var(--dur-standard) allow-discrete,
-      display var(--dur-standard) allow-discrete;
-  }
-
-  [popover]:popover-open {
-    opacity: 1;
-    translate: 0;
-  }
-
-  @starting-style {
-    [popover]:popover-open {
-      opacity: 0;
-      translate: 0 -0.5rem;
-    }
-  }
-}
+   7. Popover content (status popup)
+   ================================================================
+   The popover CONTAINER (chrome, sizing, enter/leave motion, and the
+   full-bleed mobile variant) now lives on the .uip-popover / .uip-popover
+   .is-stretched classes in 16-uip-skin.css — the status popup + user menu are
+   @cplieger/ui-primitives popovers (createPopover), positioned with inline
+   styles by the placement engine, so the old native-[popover] rules + CSS
+   anchor positioning + the `@media (width < 600px)` full-width switch are gone
+   (the switch moved into JS in popover-menu.ts). Only the popup's CONTENT
+   styling remains here. */
 
 .pop-item {
   padding: var(--sp-4) var(--sp-3);

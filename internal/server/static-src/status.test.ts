@@ -23,7 +23,7 @@ describe("status: renderPopup", () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <button id="statusBtn"></button>
-      <div id="statusPopup" popover></div>
+      <div id="statusPopup" hidden></div>
     `;
     store.set("config", null);
     store.set("configChecked", true);
