@@ -298,6 +298,11 @@ func (c *Config) buildCaches(ctx context.Context) {
 	}
 	c.cachedDefaultTargets = targetsToAPI(c.Languages.Default)
 
+	// Parse the trusted-proxy CIDR set. validate() already rejected any
+	// malformed entry before buildCaches runs, so the error is unreachable
+	// here; discard it defensively and fall back to an empty (trust-nothing) set.
+	c.cachedTrustedProxies, _ = parseTrustedProxies(c.TrustedProxies)
+
 	// Check context before the expensive media-root syscall loop.
 	if ctx.Err() != nil {
 		return

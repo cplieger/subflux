@@ -37,6 +37,7 @@ func Schema(providerSchemas []api.ProviderSchema) []api.SchemaSection {
 		sonarrSection(),
 		radarrSection(),
 		mediaRootsSection(),
+		trustedProxiesSection(),
 		pollIntervalSection(),
 		languagesSection(),
 		{

@@ -11,7 +11,7 @@ func TestSchema_returns_all_sections(t *testing.T) {
 	sections := Schema(nil)
 
 	wantKeys := []string{
-		"sonarr", "radarr", "media_roots", "poll_interval",
+		"sonarr", "radarr", "media_roots", "trusted_proxies", "poll_interval",
 		"languages", "providers", "search", "adaptive",
 		"post_processing", "auth", "scoring", "backup", "logging",
 	}

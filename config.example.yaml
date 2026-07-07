@@ -20,6 +20,19 @@ radarr:
 media_roots:
   - /media
 
+# Reverse-proxy trust for client-IP resolution.
+# When subflux runs behind a reverse proxy (nginx, Caddy, Traefik, HAProxy, ...)
+# the socket peer is the proxy, not the client. Set trusted_proxies to the
+# proxy's IP/CIDR so the real client IP (resolved from a trusted
+# X-Forwarded-For) is used for the audit log, the login rate limiter, the
+# session IPAddress, and the access log — instead of the proxy's address.
+# Entries are CIDR ranges; write a single proxy as a /32 (IPv4) or /128 (IPv6).
+# Leave empty (the default) when subflux is directly exposed: the socket peer
+# is used and X-Forwarded-For is ignored (spoof-safe).
+trusted_proxies: []
+#  - 10.0.0.0/8
+#  - 192.168.0.0/16
+
 # How often to check Sonarr/Radarr for new imports (minimum 10s).
 poll_interval: 30s
 
