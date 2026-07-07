@@ -29,6 +29,12 @@
   /* Tooltip fade + confirm/dialog fade map onto the named duration tokens. */
   --uip-tooltip-fade-duration: var(--dur-micro);
   --uip-dialog-leave-duration: var(--dur-standard);
+
+  /* Disclosure height tween (the language "advanced fields" collapsible) maps
+     onto subflux's standard motion. The base default is a bare `ease`; subflux's
+     easing vocabulary forbids bare easings, so pin the named standard pair. */
+  --uip-disclosure-duration: var(--dur-standard);
+  --uip-disclosure-easing: var(--ease-standard);
 }
 
 /* --- Toast (was .toast / .toast-stack in 03-components) --- */

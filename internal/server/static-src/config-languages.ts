@@ -4,6 +4,7 @@ import * as store from "./store.js";
 import { el, option, icon } from "./dom.js";
 import { langSelect } from "./utils.js";
 import { SUBTITLE_VARIANTS, DEFAULT_VARIANT } from "./constants.js";
+import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 
 // --- Inline interfaces for language config shapes ---
 
@@ -116,14 +117,25 @@ export function buildLanguagesSection(): HTMLElement {
 }
 
 function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
+  // Block wrapper: the flex controls row and the collapsible advanced region are
+  // siblings inside it (not the region nested in the flex row), so the region
+  // collapses to zero height with no flex row-gap residual. This wrapper is the
+  // serialize anchor — a direct child of .lang-subs / the defaults container.
+  const wrapper = el("div", { className: "lang-sub" });
+
   const row = el("div", { className: "lang-row" });
   row.appendChild(langSelect(null, sub.code));
   if (!isDefault) {
     row.appendChild(variantSelect(null, sub.variant ?? DEFAULT_VARIANT));
   }
 
-  // Advanced fields (collapsible).
+  // Advanced fields (collapsible). `adv` is the disclosure region: createDisclosure
+  // owns its height (0 <-> auto) and its aria-hidden/inert state. The visual
+  // padding lives on the inner wrapper so it collapses with the height — no
+  // residual sliver when closed.
   const adv = el("div", { className: "lang-advanced" });
+  const advInner = el("div", { className: "lang-advanced-inner" });
+  adv.appendChild(advInner);
   if (!isDefault) {
     const ms = el("input", {
       type: "number",
@@ -132,7 +144,9 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
       autocomplete: "off",
       value: sub.min_score != null ? String(sub.min_score) : "",
     });
-    adv.appendChild(cfgFieldEl("Min score", ms, "Override global minimum score for this target"));
+    advInner.appendChild(
+      cfgFieldEl("Min score", ms, "Override global minimum score for this target"),
+    );
   }
   const prov = el("input", {
     type: "text",
@@ -141,7 +155,7 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
     autocomplete: "off",
     value: (sub.providers ?? []).join(", "),
   });
-  adv.appendChild(cfgFieldEl("Providers", prov, "Only use these providers (empty = all)"));
+  advInner.appendChild(cfgFieldEl("Providers", prov, "Only use these providers (empty = all)"));
   const excl = el("input", {
     type: "text",
     className: "lang-exclude",
@@ -149,27 +163,24 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
     autocomplete: "off",
     value: (sub.exclude ?? []).join(", "),
   });
-  adv.appendChild(cfgFieldEl("Exclude", excl, "Skip these providers"));
+  advInner.appendChild(cfgFieldEl("Exclude", excl, "Skip these providers"));
 
-  // Only show advanced if any field has a value.
+  // Expand initially only if any advanced field already has a value. The `open`
+  // option replaces the old adv.style.display bootstrap (same initial state).
   const hasAdvanced =
     sub.min_score != null ||
     (sub.providers != null && sub.providers.length > 0) ||
     (sub.exclude != null && sub.exclude.length > 0);
-  if (!hasAdvanced) {
-    adv.style.display = "none";
-  }
 
+  // The gear is the disclosure trigger (a native <button>, so createDisclosure
+  // handles Enter/Space via the native click). No onclick here — the disclosure
+  // controller owns the toggle.
   const toggleBtn = el(
     "button",
     {
       type: "button",
       className: "close-btn ghost",
       "aria-label": "Advanced settings",
-      onclick: () => {
-        const hidden = adv.style.display === "none";
-        adv.style.display = hidden ? "" : "none";
-      },
     },
     icon("settings"),
   );
@@ -183,14 +194,21 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
         className: "close-btn ghost",
         "aria-label": "Remove subtitle",
         onclick: () => {
-          row.remove();
+          wrapper.remove();
         },
       },
       icon("close"),
     ),
   );
-  row.appendChild(adv);
-  return row;
+
+  wrapper.appendChild(row);
+  wrapper.appendChild(adv);
+
+  // WAI-ARIA disclosure: aria-expanded on the gear, aria-controls/aria-hidden/
+  // inert on the region, and an animated height 0 <-> auto.
+  createDisclosure(toggleBtn, adv, { open: hasAdvanced });
+
+  return wrapper;
 }
 
 function buildRuleBlock(rule: LanguageRule): HTMLElement {
@@ -250,7 +268,7 @@ export function serializeLanguagesFromForm(): string {
       }
       lines.push(`    - audio: ${audioSel.value}`);
       lines.push("      subtitles:");
-      const subs = block.querySelectorAll(".lang-subs > .lang-row");
+      const subs = block.querySelectorAll(".lang-subs > .lang-sub");
       if (subs.length === 0) {
         lines[lines.length - 1] = "      subtitles: []";
       } else {
