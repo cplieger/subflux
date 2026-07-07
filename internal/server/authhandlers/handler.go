@@ -2,7 +2,6 @@ package authhandlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -69,15 +68,15 @@ const (
 
 // --- Helpers ---
 
-// decodeAuthBody decodes the JSON request body into T under a size cap.
-// webhttp.LimitBody installs an http.MaxBytesReader so a body exceeding
-// maxAuthBodySize fails the decode (yielding the 400 below) rather than being
-// silently truncated. Returns the decoded value and true on success, or writes
-// a 400 response and returns the zero value and false on failure.
+// decodeAuthBody decodes the JSON request body into T under a size cap, via
+// webhttp.DecodeJSONInto (http.MaxBytesReader cap + single-value decode +
+// trailing-data rejection): a body exceeding maxAuthBodySize (a tight 4 KB for
+// auth endpoints), malformed JSON, or trailing data fails the decode (yielding
+// the 400 below). Returns the decoded value and true on success, or writes a
+// 400 response and returns the zero value and false on failure.
 func decodeAuthBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	var v T
-	webhttp.LimitBody(w, r, maxAuthBodySize)
-	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+	if err := webhttp.DecodeJSONInto(w, r, &v, maxAuthBodySize); err != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
 		return v, false
 	}

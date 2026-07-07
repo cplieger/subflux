@@ -10,7 +10,6 @@
 package httphelpers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -40,17 +39,17 @@ func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
 	return RequireMethod(w, r, http.MethodPost)
 }
 
-// DecodeJSONBody decodes a JSON request body into dst under a size cap enforced
-// by an http.MaxBytesReader (webhttp.LimitBody): a body exceeding maxBytes fails
-// the decode and yields a 400 rather than being silently truncated. A maxBytes
-// of 0 or less uses MaxDefaultBodySize. Writes subflux's 400 envelope (code
-// "bad_request") and returns false on any decode failure.
+// DecodeJSONBody decodes a JSON request body into dst under a size cap, via
+// webhttp.DecodeJSONInto (http.MaxBytesReader cap + single-value decode +
+// trailing-data rejection): a body exceeding maxBytes, malformed JSON, or data
+// after the first value fails the decode rather than being silently accepted. A
+// maxBytes of 0 or less uses MaxDefaultBodySize. Writes subflux's 400 envelope
+// (code "bad_request") and returns false on any decode failure.
 func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) bool {
 	if maxBytes <= 0 {
 		maxBytes = MaxDefaultBodySize
 	}
-	webhttp.LimitBody(w, r, maxBytes)
-	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+	if err := webhttp.DecodeJSONInto(w, r, dst, maxBytes); err != nil {
 		slog.Debug("decode request body failed", "path", r.URL.Path, "error", err)
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid json")
 		return false
