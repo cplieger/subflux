@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth"
-	authoidc "github.com/cplieger/auth/oidc"
+	authlib "github.com/cplieger/auth/v2"
+	authoidc "github.com/cplieger/auth/v2/oidc"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -198,7 +198,10 @@ func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims
 	}
 
 	// No sub match and no username collision → JIT-provision a new user.
-	newUser, _ := authoidc.ResolveUser(claims, nil)
+	newUser, _, err := authoidc.ResolveUser(claims, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("resolve oidc user: %w", err)
+	}
 	now := time.Now()
 	newUser.CreatedAt = now
 	newUser.UpdatedAt = now

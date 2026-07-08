@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	authwebauthn "github.com/cplieger/auth/webauthn"
+	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 

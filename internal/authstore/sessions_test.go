@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth"
+	"github.com/cplieger/auth/v2"
 )
 
 // newSessionStore returns a Store wired over a bootstrapped, shared bbolt

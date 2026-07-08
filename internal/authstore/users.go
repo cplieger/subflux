@@ -9,7 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/cplieger/auth"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )

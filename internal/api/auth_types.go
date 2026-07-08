@@ -1,11 +1,11 @@
 package api
 
-import "github.com/cplieger/auth"
+import "github.com/cplieger/auth/v2"
 
 // --- Authentication types ---
 //
 // Subflux's auth domain types are type aliases of the standalone
-// github.com/cplieger/auth library types. The library is the single source
+// github.com/cplieger/auth/v2 library types. The library is the single source
 // of truth; aliasing lets subflux pass its own api.* values straight into the
 // library's authenticator, verifiers, WebAuthn, and OIDC helpers with no
 // conversion, while keeping the rest of the codebase referring to api.* names.

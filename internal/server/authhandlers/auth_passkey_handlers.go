@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth"
-	authwebauthn "github.com/cplieger/auth/webauthn"
+	authlib "github.com/cplieger/auth/v2"
+	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 )
 

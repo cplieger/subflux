@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/cplieger/auth/ratelimit"
-	authwebauthn "github.com/cplieger/auth/webauthn"
+	"github.com/cplieger/auth/v2/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/health"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrapi"
