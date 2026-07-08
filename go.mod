@@ -4,12 +4,12 @@ go 1.26.5
 
 require (
 	github.com/cplieger/auth v1.1.2
-	github.com/cplieger/health v1.1.4
-	github.com/cplieger/httpx/v2 v2.1.1
-	github.com/cplieger/metrics/v2 v2.2.2
-	github.com/cplieger/ssrf/v2 v2.0.5
-	github.com/cplieger/webhttp v1.2.0
-	github.com/cplieger/wiregen v1.3.1
+	github.com/cplieger/health v1.1.5
+	github.com/cplieger/httpx/v2 v2.1.2
+	github.com/cplieger/metrics/v2 v2.2.3
+	github.com/cplieger/ssrf/v2 v2.0.6
+	github.com/cplieger/webhttp v1.2.1
+	github.com/cplieger/wiregen v1.3.3
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
 	github.com/ulikunitz/xz v0.5.15
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/coreos/go-oidc/v3 v3.19.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
@@ -32,7 +32,7 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
