@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	authlib "github.com/cplieger/auth"
+	authlib "github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 

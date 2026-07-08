@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cplieger/auth"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"

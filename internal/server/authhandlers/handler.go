@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	authlib "github.com/cplieger/auth"
-	authoidc "github.com/cplieger/auth/oidc"
-	"github.com/cplieger/auth/ratelimit"
+	authlib "github.com/cplieger/auth/v2"
+	authoidc "github.com/cplieger/auth/v2/oidc"
+	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/webhttp"

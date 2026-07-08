@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth"
-	authlibstore "github.com/cplieger/auth/store"
+	"github.com/cplieger/auth/v2"
+	authlibstore "github.com/cplieger/auth/v2/store"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/authstore/authstoretest"
 	"github.com/cplieger/subflux/internal/boltstore"

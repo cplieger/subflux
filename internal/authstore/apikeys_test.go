@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth"
+	"github.com/cplieger/auth/v2"
 	bolt "go.etcd.io/bbolt"
 )
 

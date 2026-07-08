@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	authlib "github.com/cplieger/auth"
-	"github.com/cplieger/auth/ratelimit"
+	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"

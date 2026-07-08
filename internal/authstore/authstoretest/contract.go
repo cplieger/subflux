@@ -58,8 +58,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth"
-	authlibstore "github.com/cplieger/auth/store"
+	"github.com/cplieger/auth/v2"
+	authlibstore "github.com/cplieger/auth/v2/store"
 )
 
 // Harness builds AuthStore instances over durable storage that survives a

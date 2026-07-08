@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	authlib "github.com/cplieger/auth"
+	authlib "github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"

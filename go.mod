@@ -3,7 +3,7 @@ module github.com/cplieger/subflux
 go 1.26.5
 
 require (
-	github.com/cplieger/auth v1.1.2
+	github.com/cplieger/auth/v2 v2.0.6
 	github.com/cplieger/health v1.1.5
 	github.com/cplieger/httpx/v2 v2.1.2
 	github.com/cplieger/metrics/v2 v2.2.3
