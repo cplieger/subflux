@@ -1,6 +1,6 @@
 module github.com/cplieger/subflux
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/cplieger/auth v1.1.2
