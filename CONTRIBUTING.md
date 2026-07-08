@@ -112,6 +112,9 @@ Override the target with `--url <url>` or `SUBFLUX_URL`.
   subtitle files alongside media; a read-only mount silently drops downloads.
 - **Go `regexp` has no negative lookahead** (`(?!...)`). Use two regexes with
   combined boolean logic instead.
+- **Logs are UTC.** A `utcTimeAttr` slog `ReplaceAttr` forces every
+  record's timestamp to UTC, so the container needs no `TZ` and the binary
+  embeds no `time/tzdata`.
 
 ## Commits and PRs
 
