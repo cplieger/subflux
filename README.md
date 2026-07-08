@@ -27,7 +27,7 @@ Where Bazarr can consume 15-20 GB of memory during long Sonarr sync loops, subfl
 - **Manual override** — numbered manual downloads lock an item from automation; locks clear automatically when files are deleted or the video is replaced.
 - **Web UI** — a zero-dependency, zero-build vanilla-ESM SPA: library coverage table, manual search, sync dialog with video preview, history, schema-driven settings, and live SSE updates.
 - **Multi-user auth** — local password + WebAuthn/passkeys + OIDC + TOTP, API keys, and rate limiting.
-- **Prometheus metrics** at `/metrics`, structured `slog` logging, and a distroless file-marker healthcheck.
+- **Prometheus metrics** at `/metrics`, structured `slog` logging (UTC timestamps), and a distroless file-marker healthcheck.
 
 ## Run it
 
