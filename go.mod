@@ -4,8 +4,8 @@ go 1.26.5
 
 require (
 	github.com/cplieger/auth/v2 v2.0.6
-	github.com/cplieger/health v1.1.5
-	github.com/cplieger/httpx/v2 v2.1.2
+	github.com/cplieger/health v1.1.6
+	github.com/cplieger/httpx/v2 v2.2.0
 	github.com/cplieger/metrics/v2 v2.2.3
 	github.com/cplieger/ssrf/v2 v2.0.6
 	github.com/cplieger/webhttp v1.2.1
