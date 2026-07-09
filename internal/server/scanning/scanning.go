@@ -10,6 +10,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/showskip"
@@ -65,25 +66,34 @@ type AlertRecorder interface {
 	RecordInfo(msg string)
 }
 
-// ScanClient is the narrow interface consumed by the scan subsystem.
-// It documents the exact arr API surface needed for full-library scans.
-type ScanClient interface {
-	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(api.Series, api.Episode) error) error
-	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(api.Movie) error) error
+// ScanSonarrClient is the Sonarr surface the full-scan engine needs:
+// wanted-episode iteration, exclude-tag resolution, and a post-download rescan.
+type ScanSonarrClient interface {
+	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
-	RefreshSeries(ctx context.Context, seriesID int) error
-	RefreshMovie(ctx context.Context, movieID int) error
+	RescanSeries(ctx context.Context, seriesID int) error
 }
 
-// Compile-time assertion: api.ArrClient satisfies ScanClient.
-var _ ScanClient = api.ArrClient(nil)
+// ScanRadarrClient is the Radarr surface the full-scan engine needs.
+type ScanRadarrClient interface {
+	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
+	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
+	RescanMovie(ctx context.Context, movieID int) error
+}
+
+// Compile-time assertions: the arrapi-backed role clients satisfy the scan
+// surfaces.
+var (
+	_ ScanSonarrClient = api.SonarrClient(nil)
+	_ ScanRadarrClient = api.RadarrClient(nil)
+)
 
 // LiveState holds the runtime state needed for a scan pass.
 type LiveState struct {
 	Cfg         api.ConfigProvider
 	Engine      api.SearchEngine
-	Sonarr      ScanClient
-	Radarr      ScanClient
+	Sonarr      ScanSonarrClient
+	Radarr      ScanRadarrClient
 	ShowCounter api.ShowSubtitleCounter
 	Providers   []api.Provider
 }

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 )
@@ -129,7 +129,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
 		return
 	}
-	if okPass, perr := authlib.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
+	if okPass, perr := auth.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
 		h.RateLimiter.Record(ip, user.Username)
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid password")
 		return
@@ -268,7 +268,7 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	hasPassword := user.PasswordHash != ""
 	oidcLinked := user.OIDCSub != ""
 
-	if !authlib.CanDisableAuthMethod(api.MethodPasskey, hasPassword, passkeyCount-1, cfg.OIDCEnabled(), oidcLinked) {
+	if !auth.CanDisableAuthMethod(auth.MethodPasskey, hasPassword, passkeyCount-1, cfg.OIDCEnabled(), oidcLinked) {
 		api.ConflictC(w, r, api.CodeConflict, "cannot remove last authentication method")
 		return
 	}

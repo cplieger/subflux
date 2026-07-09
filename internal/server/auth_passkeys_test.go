@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
@@ -40,7 +41,7 @@ func TestListPasskeys_WithData(t *testing.T) {
 	user := createTestUser(t, db, "listpk-data", "correct-horse-battery-staple")
 
 	for i := range 2 {
-		pk := &api.PasskeyCredential{
+		pk := &auth.PasskeyCredential{
 			UserID:       user.ID,
 			CredentialID: []byte("cred-" + strconv.Itoa(i)),
 			PublicKey:    []byte("pub-" + strconv.Itoa(i)),
@@ -77,7 +78,7 @@ func TestRenamePasskey_Success(t *testing.T) {
 	s, db := testAuthServer(t)
 	user := createTestUser(t, db, "rename-pk", "correct-horse-battery-staple")
 
-	passkey := &api.PasskeyCredential{
+	passkey := &auth.PasskeyCredential{
 		UserID:       user.ID,
 		CredentialID: []byte("test-cred-id"),
 		PublicKey:    []byte("test-pub-key"),
@@ -197,7 +198,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 	s, db := testAuthServer(t)
 	user := createTestUser(t, db, "delpk-ok", "correct-horse-battery-staple")
 
-	passkey := &api.PasskeyCredential{
+	passkey := &auth.PasskeyCredential{
 		UserID:       user.ID,
 		CredentialID: []byte("del-cred-id"),
 		PublicKey:    []byte("del-pub-key"),
@@ -241,7 +242,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 
 	// Create a user with no password (OIDC-only style) and one passkey.
 	now := time.Now()
-	user := &api.User{
+	user := &auth.User{
 		Username:  "delpk-lastmethod",
 		Role:      "admin",
 		Enabled:   true,
@@ -252,7 +253,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	passkey := &api.PasskeyCredential{
+	passkey := &auth.PasskeyCredential{
 		UserID:       user.ID,
 		CredentialID: []byte("last-cred-id"),
 		PublicKey:    []byte("last-pub-key"),
@@ -292,7 +293,7 @@ func TestAuthMe_WithPasskeys(t *testing.T) {
 	s, db := testAuthServer(t)
 	user := createTestUser(t, db, "me-passkeys", "correct-horse-battery-staple")
 
-	pk := &api.PasskeyCredential{
+	pk := &auth.PasskeyCredential{
 		UserID:       user.ID,
 		CredentialID: []byte("me-cred-id"),
 		PublicKey:    []byte("me-pub-key"),

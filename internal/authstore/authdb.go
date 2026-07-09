@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -36,11 +36,11 @@ type oidcRec struct {
 // implemented in tasks 8.1-8.7. Bucket bootstrap is owned by the core store
 // (task 2.3), which creates the auth buckets alongside the core buckets.
 type Store struct {
-	db       *bbolt.DB               // shared with the core store (one file, one lock)
-	sessions map[string]*api.Session // ephemeral, never persisted
-	oidc     map[string]*oidcRec     // ephemeral, never persisted
-	stop     chan struct{}           // sweeper shutdown signal (closed by Close)
-	done     chan struct{}           // closed by the sweeper goroutine on exit; nil until Open
+	db       *bbolt.DB                // shared with the core store (one file, one lock)
+	sessions map[string]*auth.Session // ephemeral, never persisted
+	oidc     map[string]*oidcRec      // ephemeral, never persisted
+	stop     chan struct{}            // sweeper shutdown signal (closed by Close)
+	done     chan struct{}            // closed by the sweeper goroutine on exit; nil until Open
 
 	// Sweeper timings, set in New to the package defaults (sweeper.go). They
 	// live on the Store rather than as Open arguments because Open takes none
@@ -63,7 +63,7 @@ type Store struct {
 func New(db *bbolt.DB) *Store {
 	return &Store{
 		db:            db,
-		sessions:      make(map[string]*api.Session),
+		sessions:      make(map[string]*auth.Session),
 		oidc:          make(map[string]*oidcRec),
 		stop:          make(chan struct{}),
 		sweepInterval: defaultSweepInterval,

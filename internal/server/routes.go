@@ -39,7 +39,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v2"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.
@@ -82,9 +82,9 @@ func (g *routeGroup) Add(pattern string, handler http.HandlerFunc) {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	public := newRouteGroup(mux)
 	user := newRouteGroup(mux, s.requireAuth)
-	admin := newRouteGroup(mux, s.requireAuth, s.requireRole(api.RoleAdmin))
+	admin := newRouteGroup(mux, s.requireAuth, s.requireRole(auth.RoleAdmin))
 	userConfigured := newRouteGroup(mux, s.requireAuth, s.requireConfigured)
-	adminConfigured := newRouteGroup(mux, s.requireAuth, s.requireRole(api.RoleAdmin), s.requireConfigured)
+	adminConfigured := newRouteGroup(mux, s.requireAuth, s.requireRole(auth.RoleAdmin), s.requireConfigured)
 
 	// --- public: no auth ---
 

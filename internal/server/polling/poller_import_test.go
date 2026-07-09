@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -241,8 +242,8 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			video := tempVideo(t)
 			metrics := &mockMetrics{}
 			sonarr := &mockHistoryPoller{
-				series:   map[int]*api.Series{10: {ID: 10, Title: "Show", Year: 2020, Tags: tt.tags}},
-				episodes: map[int]*api.Episode{20: {ID: 20, SeasonNumber: 1, EpisodeNumber: 2}},
+				series:   map[int]arrapi.Series{10: {ID: 10, Title: "Show", Year: 2020, Tags: tt.tags}},
+				episodes: map[int]arrapi.Episode{20: {ID: 20, SeasonNumber: 1, EpisodeNumber: 2}},
 			}
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
@@ -251,7 +252,7 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			ls := &LiveState{Cfg: cfg, Engine: engine, Sonarr: sonarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
-			entry := api.HistoryEntry{SeriesID: 10, EpisodeID: 20, Data: map[string]string{"importedPath": video}}
+			entry := arrapi.HistoryRecord{SeriesID: 10, EpisodeID: 20, Data: map[string]string{"importedPath": video}}
 			p.processSonarrImport(context.Background(), ls, &entry, tt.excludeIDs)
 
 			if !slices.Equal(metrics.imports, tt.want) {
@@ -279,7 +280,7 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			video := tempVideo(t)
 			metrics := &mockMetrics{}
 			radarr := &mockHistoryPoller{
-				movies: map[int]*api.Movie{30: {ID: 30, Title: "Film", Year: 2021, Tags: tt.tags}},
+				movies: map[int]arrapi.Movie{30: {ID: 30, Title: "Film", Year: 2021, Tags: tt.tags}},
 			}
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
@@ -288,7 +289,7 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			ls := &LiveState{Cfg: cfg, Engine: engine, Radarr: radarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
-			entry := api.HistoryEntry{MovieID: 30, Data: map[string]string{"importedPath": video}}
+			entry := arrapi.HistoryRecord{MovieID: 30, Data: map[string]string{"importedPath": video}}
 			p.processRadarrImport(context.Background(), ls, &entry, tt.excludeIDs)
 
 			if !slices.Equal(metrics.imports, tt.want) {

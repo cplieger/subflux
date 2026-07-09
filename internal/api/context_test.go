@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cplieger/auth/v2"
 	"pgregory.net/rapid"
 )
 
 func TestNewUserContext_round_trip(t *testing.T) {
 	t.Parallel()
 
-	user := &User{ID: 42, Username: "testuser", Role: "admin"}
+	user := &auth.User{ID: 42, Username: "testuser", Role: "admin"}
 	ctx := NewUserContext(context.Background(), user)
 
 	got := UserFromContext(ctx)
@@ -68,7 +69,7 @@ func TestUserFromContext_round_trip_preserves_identity(t *testing.T) {
 		username := rapid.StringMatching(`[a-z]{3,20}`).Draw(t, "username")
 		role := rapid.SampledFrom([]string{"admin", "user", "viewer"}).Draw(t, "role")
 
-		user := &User{ID: id, Username: username, Role: Role(role)}
+		user := &auth.User{ID: id, Username: username, Role: auth.Role(role)}
 		ctx := NewUserContext(context.Background(), user)
 		got := UserFromContext(ctx)
 
@@ -82,7 +83,7 @@ func TestUserFromContext_round_trip_preserves_identity(t *testing.T) {
 		if got.Username != username {
 			t.Errorf("Username = %q, want %q", got.Username, username)
 		}
-		if got.Role != Role(role) {
+		if got.Role != auth.Role(role) {
 			t.Errorf("Role = %q, want %q", got.Role, role)
 		}
 	})
@@ -110,7 +111,7 @@ func TestSessionHashFromContext_distinct_from_user_key(t *testing.T) {
 	t.Parallel()
 
 	// A user-valued context must not leak into the session-hash key.
-	ctx := NewUserContext(context.Background(), &User{ID: 1, Username: "u"})
+	ctx := NewUserContext(context.Background(), &auth.User{ID: 1, Username: "u"})
 	if got := SessionHashFromContext(ctx); got != "" {
 		t.Errorf("SessionHashFromContext on user-only ctx = %q, want \"\"", got)
 	}

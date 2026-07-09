@@ -44,9 +44,6 @@ const MaxListResponseBytes = 2 << 20
 // MaxErrorBodyBytes is the maximum size for reading error response bodies (1 MB).
 const MaxErrorBodyBytes = 1 << 20
 
-// MaxBulkListBytes is the maximum size for bulk list responses (200 MB).
-const MaxBulkListBytes = 200 << 20
-
 // HTTPStatusError represents a non-2xx HTTP response that is not already
 // covered by a more specific typed error. Delegates to httpx.HTTPStatusError.
 type HTTPStatusError = httpx.HTTPStatusError

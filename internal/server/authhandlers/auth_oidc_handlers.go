@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	authoidc "github.com/cplieger/auth/v2/oidc"
 	"github.com/cplieger/subflux/internal/api"
 )
@@ -46,7 +46,7 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectURI := authlib.ValidateRedirectURI(r.URL.Query().Get("redirect"))
+	redirectURI := auth.ValidateRedirectURI(r.URL.Query().Get("redirect"))
 
 	ctx := r.Context()
 	if err := h.OidcDB.CreateOIDCState(ctx, state, nonce, verifier, redirectURI); err != nil {
@@ -136,15 +136,15 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.createAndSetSession(w, r, user, api.MethodOIDC, oidcExpiry); err != nil {
+	if err := h.createAndSetSession(w, r, user, auth.MethodOIDC, oidcExpiry); err != nil {
 		slog.Error("oidc: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	redirectURI = authlib.ValidateRedirectURI(redirectURI)
+	redirectURI = auth.ValidateRedirectURI(redirectURI)
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
-		slog.String("method", string(api.MethodOIDC)))
+		slog.String("method", string(auth.MethodOIDC)))
 	http.Redirect(w, r, redirectURI, http.StatusFound) //nolint:gosec // G710: redirectURI validated above
 }
 
@@ -161,7 +161,7 @@ var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordles
 //
 // Email and username are never used to auto-link; that is an account-takeover
 // vector. A username collision triggers an explicit, password-proven link.
-func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *api.User, linkToken string, err error) {
+func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *auth.User, linkToken string, err error) {
 	bySub, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by sub: %w", err)
@@ -248,7 +248,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	okPass, err := authlib.VerifyPassword(req.Password, user.PasswordHash)
+	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !okPass {
 		h.RateLimiter.Record(ip, user.Username)
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
@@ -285,7 +285,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	}
 	h.clearPasskeys(ctx, user.ID)
 
-	if err := h.createSessionAndRespond(w, r, user, api.MethodOIDC); err != nil {
+	if err := h.createSessionAndRespond(w, r, user, auth.MethodOIDC); err != nil {
 		slog.Error("oidc link: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
@@ -298,8 +298,8 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 // isLastLocalAdmin reports whether u is an admin and the only admin with a
 // local password — i.e. migrating it to SSO-only would remove the break-glass
 // account. Non-admins always return false.
-func (h *Handler) isLastLocalAdmin(ctx context.Context, u *api.User) (bool, error) {
-	if u.Role != api.RoleAdmin {
+func (h *Handler) isLastLocalAdmin(ctx context.Context, u *auth.User) (bool, error) {
+	if u.Role != auth.RoleAdmin {
 		return false, nil
 	}
 	users, err := h.Store.ListUsers(ctx)
@@ -308,7 +308,7 @@ func (h *Handler) isLastLocalAdmin(ctx context.Context, u *api.User) (bool, erro
 	}
 	localAdmins := 0
 	for i := range users {
-		if users[i].Role == api.RoleAdmin && users[i].PasswordHash != "" {
+		if users[i].Role == auth.RoleAdmin && users[i].PasswordHash != "" {
 			localAdmins++
 		}
 	}

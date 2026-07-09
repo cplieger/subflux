@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -33,7 +33,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := authlib.VerifyPassword(req.CurrentPassword, user.PasswordHash)
+	ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
 	if err != nil || !ok {
 		h.RateLimiter.Record(ip, user.Username)
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid current password")

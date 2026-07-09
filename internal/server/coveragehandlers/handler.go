@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
@@ -29,15 +30,30 @@ type CoverageStore interface {
 // Compile-time assertion: api.Store satisfies CoverageStore.
 var _ CoverageStore = api.Store(nil)
 
-// ArrClient is the narrow interface for arr API calls needed by coverage handlers.
-type ArrClient interface {
-	GetSeries(ctx context.Context) ([]api.Series, error)
-	GetMovies(ctx context.Context) ([]api.Movie, error)
-	ResolveExcludeTagIDs(ctx context.Context, tags []string, includeAll bool) map[int]struct{}
+// CoverageSonarrClient is the Sonarr surface coverage handlers use.
+type CoverageSonarrClient interface {
+	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
-// Compile-time assertion: api.ArrClient satisfies ArrClient.
-var _ ArrClient = api.ArrClient(nil)
+// CoverageRadarrClient is the Radarr surface coverage handlers use.
+type CoverageRadarrClient interface {
+	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
+}
+
+// tagResolver is the minimal surface fetchCoverageData needs; both role clients
+// satisfy it.
+type tagResolver interface {
+	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
+}
+
+// Compile-time assertions: the arrapi-backed role clients satisfy the coverage
+// surfaces.
+var (
+	_ CoverageSonarrClient = api.SonarrClient(nil)
+	_ CoverageRadarrClient = api.RadarrClient(nil)
+)
 
 // Deps holds the dependencies for coverage handlers.
 type Deps struct {
@@ -48,8 +64,8 @@ type Deps struct {
 // LiveState holds the runtime state needed by coverage handlers.
 type LiveState struct {
 	Cfg    api.ConfigProvider
-	Sonarr ArrClient // nil when sonarr not configured
-	Radarr ArrClient // nil when radarr not configured
+	Sonarr CoverageSonarrClient // nil when sonarr not configured
+	Radarr CoverageRadarrClient // nil when radarr not configured
 }
 
 // Handler provides HTTP handlers for the /api/coverage/* endpoints.
@@ -138,7 +154,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := ser.OriginalLangCode()
+		audioLang := api.OriginalLangCode(ser.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
@@ -166,7 +182,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 // groupEpisodeSubsBySeries buckets indexed episode subtitle maps by their
 // owning series, returning a slice parallel to allSeries. Episode media IDs
 // whose series prefix doesn't match any series are dropped.
-func groupEpisodeSubsBySeries(allSeries []api.Series, episodeSubs map[string]map[coverage.Key]*coverage.Status) [][]map[coverage.Key]*coverage.Status {
+func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]map[coverage.Key]*coverage.Status) [][]map[coverage.Key]*coverage.Status {
 	prefixToIdx := make(map[string]int, len(allSeries))
 	for i := range allSeries {
 		p := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
@@ -223,7 +239,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := m.OriginalLangCode()
+		audioLang := api.OriginalLangCode(m.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
@@ -318,9 +334,8 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 // fetchCoverageSeriesData fetches series, exclude tags, and subtitle files concurrently.
 //
 //nolint:dupl // type-specific wrappers around shared fetchCoverageData
-func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) ([]api.Series, map[int]struct{}, []api.SubtitleEntry, error) {
-	var allSeries []api.Series
-	excludeIDs, allFiles, err := h.fetchCoverageData(ctx, ls.Sonarr, api.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
+func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (allSeries []arrapi.Series, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
+	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Sonarr, api.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
 		allSeries, ferr = ls.Sonarr.GetSeries(gctx)
 		if ferr != nil {
@@ -337,9 +352,8 @@ func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) ([
 // fetchCoverageMoviesData fetches movies, exclude tags, and subtitle files concurrently.
 //
 //nolint:dupl // type-specific wrappers around shared fetchCoverageData
-func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) ([]api.Movie, map[int]struct{}, []api.SubtitleEntry, error) {
-	var allMovies []api.Movie
-	excludeIDs, allFiles, err := h.fetchCoverageData(ctx, ls.Radarr, api.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
+func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (allMovies []arrapi.Movie, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
+	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Radarr, api.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
 		allMovies, ferr = ls.Radarr.GetMovies(gctx)
 		if ferr != nil {
@@ -354,7 +368,7 @@ func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) ([
 }
 
 // fetchCoverageData is the shared concurrent fetch pattern for coverage handlers.
-func (h *Handler) fetchCoverageData(ctx context.Context, client ArrClient, mediaType api.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []api.SubtitleEntry, error) {
+func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, mediaType api.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []api.SubtitleEntry, error) {
 	var (
 		excludeIDs map[int]struct{}
 		allFiles   []api.SubtitleEntry

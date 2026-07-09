@@ -4,14 +4,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
 // ScanItem holds either an episode or a movie for alphabetical scanning.
 type ScanItem struct {
-	Series *api.Series  // non-nil for episodes
-	Ep     *api.Episode // non-nil for episodes
-	Movie  *api.Movie   // non-nil for movies
+	Series *arrapi.Series  // non-nil for episodes
+	Ep     *arrapi.Episode // non-nil for episodes
+	Movie  *arrapi.Movie   // non-nil for movies
 }
 
 // SortByTitle merges episodes and movies into a single slice sorted

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
@@ -13,34 +14,34 @@ import (
 // movieTitleArrClient returns a movie with a known title.
 type movieTitleArrClient struct{ dummyArrClient }
 
-func (movieTitleArrClient) GetMovieByID(_ context.Context, _ int) (*api.Movie, error) {
-	return &api.Movie{Title: "Inception", TmdbID: 27205}, nil
+func (movieTitleArrClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+	return arrapi.Movie{Title: "Inception", TmdbID: 27205}, nil
 }
 
 // seriesTitleArrClient returns a series with a known title.
 type seriesTitleArrClient struct{ dummyArrClient }
 
-func (seriesTitleArrClient) GetSeriesByID(_ context.Context, _ int) (*api.Series, error) {
-	return &api.Series{Title: "Breaking Bad", TvdbID: 81189}, nil
+func (seriesTitleArrClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+	return arrapi.Series{Title: "Breaking Bad", TvdbID: 81189}, nil
 }
 
 // arrErrorClient returns errors from GetMovieByID and GetSeriesByID.
 type arrErrorClient struct{ dummyArrClient }
 
-func (arrErrorClient) GetMovieByID(_ context.Context, _ int) (*api.Movie, error) {
-	return nil, errMock
+func (arrErrorClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+	return arrapi.Movie{}, errMock
 }
 
-func (arrErrorClient) GetSeriesByID(_ context.Context, _ int) (*api.Series, error) {
-	return nil, errMock
+func (arrErrorClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+	return arrapi.Series{}, errMock
 }
 
 func TestLookupMediaTitle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr    api.ArrClient
-		sonarr    api.ArrClient
+		radarr    api.RadarrClient
+		sonarr    api.SonarrClient
 		name      string
 		mediaType api.MediaType
 		want      string
@@ -79,7 +80,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr api.ArrClient
+		radarr api.RadarrClient
 		name   string
 		want   string
 		arrID  int
@@ -114,7 +115,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		sonarr  api.ArrClient
+		sonarr  api.SonarrClient
 		name    string
 		want    string
 		series  int
@@ -149,8 +150,8 @@ func TestResolveMediaIDs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr       api.ArrClient
-		sonarr       api.ArrClient
+		radarr       api.RadarrClient
+		sonarr       api.SonarrClient
 		name         string
 		mediaType    api.MediaType
 		wantCoverage string

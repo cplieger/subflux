@@ -5,10 +5,9 @@
 //
 // The auth library publishes store.Composite, composed of
 // UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore.
-// Subflux's domain types (api.User, api.Session, api.Key,
-// api.PasskeyCredential) are type aliases of the library's types
-// (see internal/api/auth_types.go), so AuthDB satisfies this interface
-// directly with zero adapter glue.
+// Subflux uses the library's domain types (auth.User, auth.Session, auth.Key,
+// auth.PasskeyCredential) directly, so AuthDB satisfies this interface with
+// zero adapter glue.
 //
 // This tiny package also keeps the historical role of breaking a test-time
 // import cycle:

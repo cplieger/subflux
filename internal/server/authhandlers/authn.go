@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 )
@@ -15,9 +15,9 @@ import (
 // SessionStore is the narrow store interface the Authenticator needs to
 // resolve a request to a user via session cookie or API key.
 type SessionStore interface {
-	GetSessionByHash(ctx context.Context, tokenHash string) (*api.Session, error)
-	GetUserByID(ctx context.Context, id int64) (*api.User, error)
-	GetAPIKeyByHash(ctx context.Context, hash string) (*api.Key, error)
+	GetSessionByHash(ctx context.Context, tokenHash string) (*auth.Session, error)
+	GetUserByID(ctx context.Context, id int64) (*auth.User, error)
+	GetAPIKeyByHash(ctx context.Context, hash string) (*auth.Key, error)
 }
 
 // Compile-time assertion: the composite authstore satisfies SessionStore.
@@ -34,16 +34,16 @@ type Authenticator struct {
 }
 
 // syntheticAdminUser is injected when Bypass returns true (auth.disable_auth).
-var syntheticAdminUser = &api.User{
+var syntheticAdminUser = &auth.User{
 	ID:       0,
 	Username: "admin",
-	Role:     api.RoleAdmin,
+	Role:     auth.RoleAdmin,
 	Enabled:  true,
 }
 
 // Authenticate checks session cookie first, then API key. Returns the user and
-// session hash, or [authlib.ErrUnauthenticated].
-func (a *Authenticator) Authenticate(r *http.Request) (user *api.User, sessHash string, err error) {
+// session hash, or [auth.ErrUnauthenticated].
+func (a *Authenticator) Authenticate(r *http.Request) (user *auth.User, sessHash string, err error) {
 	if a.Bypass != nil && a.Bypass() {
 		return syntheticAdminUser, "", nil
 	}
@@ -57,19 +57,19 @@ func (a *Authenticator) Authenticate(r *http.Request) (user *api.User, sessHash 
 			return user, hash, nil
 		}
 	}
-	return nil, "", authlib.ErrUnauthenticated
+	return nil, "", auth.ErrUnauthenticated
 }
 
 // RequireAuth checks authentication and returns the user. If not authenticated
 // it writes the appropriate response (401 JSON for API clients, 302 to /login
 // for browsers) and returns ok=false.
-func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (user *api.User, sessHash string, ok bool) {
+func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (user *auth.User, sessHash string, ok bool) {
 	user, sessHash, err := a.Authenticate(r)
 	if err != nil {
-		if authlib.IsBrowserRequest(r) {
+		if auth.IsBrowserRequest(r) {
 			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
 		} else {
-			api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, authlib.ErrUnauthenticated.Error())
+			api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
 		}
 		return nil, "", false
 	}
@@ -78,10 +78,10 @@ func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (use
 
 // verifiers returns the ordered credential verifiers: subflux session cookie,
 // then the library's API-key verifier.
-func (a *Authenticator) verifiers() []authlib.CredentialVerifier {
-	return []authlib.CredentialVerifier{
+func (a *Authenticator) verifiers() []auth.CredentialVerifier {
+	return []auth.CredentialVerifier{
 		&sessionVerifier{store: a.Store, idleTimeout: a.IdleTimeout, absTimeout: a.AbsTimeout},
-		authlib.NewAPIKeyVerifier(a.Store),
+		auth.NewAPIKeyVerifier(a.Store),
 	}
 }
 
@@ -96,12 +96,12 @@ type sessionVerifier struct {
 }
 
 // Verify checks the session cookie and returns the user if valid.
-func (v *sessionVerifier) Verify(ctx context.Context, r *http.Request) (user *api.User, sessHash string, err error) {
+func (v *sessionVerifier) Verify(ctx context.Context, r *http.Request) (user *auth.User, sessHash string, err error) {
 	token := ReadSessionCookie(r)
 	if token == "" {
 		return nil, "", nil
 	}
-	hash := authlib.SessionHash(token)
+	hash := auth.SessionHash(token)
 	sess, err := v.store.GetSessionByHash(ctx, hash)
 	if err != nil {
 		slog.Debug("auth: session lookup failed", "error", err)
@@ -110,7 +110,7 @@ func (v *sessionVerifier) Verify(ctx context.Context, r *http.Request) (user *ap
 	if sess == nil {
 		return nil, "", nil
 	}
-	if authlib.ValidateSession(sess, v.idleTimeout, v.absTimeout, time.Now()) != nil {
+	if auth.ValidateSession(sess, v.idleTimeout, v.absTimeout, time.Now()) != nil {
 		return nil, "", nil
 	}
 	user, err = v.store.GetUserByID(ctx, sess.UserID)

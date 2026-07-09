@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"
@@ -62,16 +62,16 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	if errLen := authlib.ValidatePasswordLength(password, true); errLen != nil {
+	if errLen := auth.ValidatePasswordLength(password, true); errLen != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, errLen.Error())
 		return
 	}
-	if errCtx := authlib.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
+	if errCtx := auth.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, errCtx.Error())
 		return
 	}
 
-	hash, err := authlib.HashPassword(password)
+	hash, err := auth.HashPassword(password)
 	if err != nil {
 		slog.Error("admin bootstrap: hash password", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -112,14 +112,14 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
+	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		slog.Error("admin bootstrap: generate api key", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	apiKey := &api.Key{
+	apiKey := &auth.Key{
 		UserID:    user.ID,
 		KeyHash:   hash,
 		KeyPrefix: prefix,

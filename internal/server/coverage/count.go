@@ -4,13 +4,14 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
 )
 
 // CountMissing returns the total number of missing subtitle targets across
 // all series and movies.
-func CountMissing(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []api.Series, allMovies []api.Movie) int {
+func CountMissing(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
 	ignoredCodecs := search.IgnoredCodecsFromConfig(cfg)
 	return CountMissingSeries(ctx, cfg, db, allSeries, ignoredCodecs) +
 		CountMissingMovies(ctx, cfg, db, allMovies, ignoredCodecs)
@@ -24,7 +25,7 @@ type langKey struct{ lang, variant string }
 type prefixCounts map[langKey]int
 
 // CountMissingSeries returns the number of missing subtitle targets for series.
-func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []api.Series, ignoredCodecs map[string]bool) int {
+func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
 	if len(allSeries) == 0 {
 		return 0
 	}
@@ -48,7 +49,7 @@ func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.Cove
 		if epCount == 0 {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(ser.OriginalLangCode(), nil)
+		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(ser.OriginalLanguage), nil)
 		missing += missingForSeries(epCount, targets, prefixIdx[prefixes[i]])
 	}
 	return missing
@@ -56,7 +57,7 @@ func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.Cove
 
 // seriesPrefixes returns the per-series media-ID prefixes (parallel to
 // allSeries) together with the set of non-empty prefixes for membership tests.
-func seriesPrefixes(allSeries []api.Series) (prefixes []string, prefixSet map[string]struct{}) {
+func seriesPrefixes(allSeries []arrapi.Series) (prefixes []string, prefixSet map[string]struct{}) {
 	prefixes = make([]string, 0, len(allSeries))
 	prefixSet = make(map[string]struct{}, len(allSeries))
 	for i := range allSeries {
@@ -119,7 +120,7 @@ func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts
 }
 
 // CountMissingMovies returns the number of missing subtitle targets for movies.
-func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allMovies []api.Movie, ignoredCodecs map[string]bool) int {
+func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
 	if len(allMovies) == 0 {
 		return 0
 	}
@@ -135,7 +136,7 @@ func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.Cove
 		if !m.HasFile {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(m.OriginalLangCode(), nil)
+		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(m.OriginalLanguage), nil)
 		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue

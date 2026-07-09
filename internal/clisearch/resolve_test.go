@@ -3,7 +3,7 @@ package clisearch
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 )
 
 func TestParseTmdbID(t *testing.T) {
@@ -37,25 +37,25 @@ func TestParseTmdbID(t *testing.T) {
 func TestEpisodesForSeries(t *testing.T) {
 	t.Parallel()
 
-	series := &api.Series{
+	series := &arrapi.Series{
 		Title:  "Breaking Bad",
 		Year:   2008,
 		ImdbID: "tt0903747",
 		TvdbID: 81189,
 	}
 
-	episodes := []api.Episode{
+	episodes := []arrapi.Episode{
 		{
 			SeasonNumber:  1,
 			EpisodeNumber: 1,
 			HasFile:       true,
-			EpisodeFile:   &api.EpisodeFile{Path: "/tv/bb/s01e01.mkv", SceneName: "BB.S01E01"},
+			EpisodeFile:   &arrapi.EpisodeFile{Path: "/tv/bb/s01e01.mkv", SceneName: "BB.S01E01"},
 		},
 		{
 			SeasonNumber:  1,
 			EpisodeNumber: 2,
 			HasFile:       true,
-			EpisodeFile:   &api.EpisodeFile{Path: "/tv/bb/s01e02.mkv", SceneName: "BB.S01E02"},
+			EpisodeFile:   &arrapi.EpisodeFile{Path: "/tv/bb/s01e02.mkv", SceneName: "BB.S01E02"},
 		},
 		{
 			SeasonNumber:  1,
@@ -67,13 +67,13 @@ func TestEpisodesForSeries(t *testing.T) {
 			SeasonNumber:  2,
 			EpisodeNumber: 1,
 			HasFile:       true,
-			EpisodeFile:   &api.EpisodeFile{Path: "/tv/bb/s02e01.mkv", SceneName: "BB.S02E01"},
+			EpisodeFile:   &arrapi.EpisodeFile{Path: "/tv/bb/s02e01.mkv", SceneName: "BB.S02E01"},
 		},
 		{
 			SeasonNumber:  2,
 			EpisodeNumber: 2,
 			HasFile:       true,
-			EpisodeFile:   &api.EpisodeFile{Path: "/tv/bb/s02e02.mkv", SceneName: ""},
+			EpisodeFile:   &arrapi.EpisodeFile{Path: "/tv/bb/s02e02.mkv", SceneName: ""},
 		},
 	}
 
@@ -161,11 +161,11 @@ func TestEpisodesForSeries(t *testing.T) {
 func TestEpisodesForSeries_skips_episodes_without_files(t *testing.T) {
 	t.Parallel()
 
-	series := &api.Series{Title: "Test", ImdbID: "tt0000001"}
-	episodes := []api.Episode{
+	series := &arrapi.Series{Title: "Test", ImdbID: "tt0000001"}
+	episodes := []arrapi.Episode{
 		{SeasonNumber: 1, EpisodeNumber: 1, HasFile: false, EpisodeFile: nil},
 		{SeasonNumber: 1, EpisodeNumber: 2, HasFile: true, EpisodeFile: nil},
-		{SeasonNumber: 1, EpisodeNumber: 3, HasFile: false, EpisodeFile: &api.EpisodeFile{Path: "/x"}},
+		{SeasonNumber: 1, EpisodeNumber: 3, HasFile: false, EpisodeFile: &arrapi.EpisodeFile{Path: "/x"}},
 	}
 
 	got := episodesForSeries(series, episodes, 0, 0)
@@ -177,7 +177,7 @@ func TestEpisodesForSeries_skips_episodes_without_files(t *testing.T) {
 func TestEpisodesForSeries_empty_episodes(t *testing.T) {
 	t.Parallel()
 
-	series := &api.Series{Title: "Test", ImdbID: "tt0000001"}
+	series := &arrapi.Series{Title: "Test", ImdbID: "tt0000001"}
 	got := episodesForSeries(series, nil, 0, 0)
 	if len(got) != 0 {
 		t.Errorf("expected 0 items for nil episodes, got %d", len(got))
@@ -191,48 +191,48 @@ func TestMatchSeries(t *testing.T) {
 		name   string
 		imdbID string
 		title  string
-		series api.Series
+		series arrapi.Series
 		want   bool
 	}{
 		{
 			name:   "match by imdb ID",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			imdbID: "tt0903747",
 			want:   true,
 		},
 		{
 			name:   "match by title case insensitive",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			title:  "breaking bad",
 			want:   true,
 		},
 		{
 			name:   "no match when both empty",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			want:   false,
 		},
 		{
 			name:   "no match wrong imdb",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			imdbID: "tt9999999",
 			want:   false,
 		},
 		{
 			name:   "no match wrong title",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			title:  "Better Call Saul",
 			want:   false,
 		},
 		{
 			name:   "imdb match takes priority even with wrong title",
-			series: api.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
+			series: arrapi.Series{ImdbID: "tt0903747", Title: "Breaking Bad"},
 			imdbID: "tt0903747",
 			title:  "Wrong Title",
 			want:   true,
 		},
 		{
 			name:   "empty imdb on series does not match empty search imdb",
-			series: api.Series{ImdbID: "", Title: "Show"},
+			series: arrapi.Series{ImdbID: "", Title: "Show"},
 			want:   false,
 		},
 	}
@@ -252,7 +252,7 @@ func TestMatchSeries(t *testing.T) {
 func TestMatchMovie(t *testing.T) {
 	t.Parallel()
 
-	movie := &api.Movie{
+	movie := &arrapi.Movie{
 		Title:  "Inception",
 		ImdbID: "tt1375666",
 		TmdbID: 27205,
@@ -290,16 +290,16 @@ func TestMatchMovie(t *testing.T) {
 func TestFilterRadarrMovies(t *testing.T) {
 	t.Parallel()
 
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{
 			Title: "Inception", ImdbID: "tt1375666", TmdbID: 27205,
 			Year: 2010, HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/inception.mkv", SceneName: "Inception.2010.1080p"},
+			MovieFile: &arrapi.MovieFile{Path: "/movies/inception.mkv", SceneName: "Inception.2010.1080p"},
 		},
 		{
 			Title: "Interstellar", ImdbID: "tt0816692", TmdbID: 157336,
 			Year: 2014, HasFile: true,
-			MovieFile: &api.MovieFile{Path: "/movies/interstellar.mkv", SceneName: "Interstellar.2014"},
+			MovieFile: &arrapi.MovieFile{Path: "/movies/interstellar.mkv", SceneName: "Interstellar.2014"},
 		},
 		{
 			Title: "No File Movie", ImdbID: "tt0000001", TmdbID: 1,
@@ -391,10 +391,10 @@ func TestFilterRadarrMovies_empty_list(t *testing.T) {
 func TestFilterRadarrMovies_propagates_metadata(t *testing.T) {
 	t.Parallel()
 
-	movies := []api.Movie{{
+	movies := []arrapi.Movie{{
 		Title: "Test", ImdbID: "tt0000001", TmdbID: 42,
 		Year: 2024, HasFile: true,
-		MovieFile: &api.MovieFile{Path: "/m/test.mkv", SceneName: "Test.2024"},
+		MovieFile: &arrapi.MovieFile{Path: "/m/test.mkv", SceneName: "Test.2024"},
 	}}
 
 	got := filterRadarrMovies(movies, "tt0000001", 0, "")
@@ -422,7 +422,7 @@ func TestFilterRadarrMovies_propagates_metadata(t *testing.T) {
 // zero-id movie exercises this case.
 func TestMatchMovie_zeroTmdbIsNotAMatch(t *testing.T) {
 	t.Parallel()
-	if matchMovie(&api.Movie{}, "", 0, "") {
+	if matchMovie(&arrapi.Movie{}, "", 0, "") {
 		t.Errorf("matchMovie(zero movie, %q, 0, %q) = true, want false", "", "")
 	}
 }

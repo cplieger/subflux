@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -50,7 +50,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		_, _ = authlib.VerifyPassword(req.Password, authlib.DummyHash())
+		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
@@ -59,7 +59,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.Enabled {
-		_, _ = authlib.VerifyPassword(req.Password, authlib.DummyHash())
+		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
@@ -67,7 +67,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	passOK, err := authlib.VerifyPassword(req.Password, user.PasswordHash)
+	passOK, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !passOK {
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
@@ -79,13 +79,13 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	// Password verified: clear failure counters (anti soft-lockout, OWASP
 	// ASVS 2.2.1) and create session directly.
 	h.RateLimiter.Reset(ip, req.Username)
-	if err := h.createSessionAndRespond(w, r, user, api.MethodPassword); err != nil {
+	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
-		slog.String("method", string(api.MethodPassword)))
+		slog.String("method", string(auth.MethodPassword)))
 }
 
 // --- POST /api/auth/logout ---
@@ -99,12 +99,12 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	user := ""
 	token := ReadSessionCookie(r)
 	if token != "" {
-		if sess, err := h.Store.GetSessionByHash(r.Context(), authlib.SessionHash(token)); err == nil && sess != nil {
+		if sess, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && sess != nil {
 			if u, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && u != nil {
 				user = u.Username
 			}
 		}
-		if err := h.Store.DeleteSession(r.Context(), authlib.SessionHash(token)); err != nil {
+		if err := h.Store.DeleteSession(r.Context(), auth.SessionHash(token)); err != nil {
 			slog.Warn("logout: delete session", "error", err)
 		}
 	}
@@ -186,10 +186,10 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	user := &api.User{
+	user := &auth.User{
 		Username:     req.Username,
 		PasswordHash: hash,
-		Role:         api.RoleAdmin,
+		Role:         auth.RoleAdmin,
 		Enabled:      true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -203,7 +203,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("setup: admin account created", "username", user.Username)
 
-	if err := h.createSessionAndRespond(w, r, user, api.MethodPassword); err != nil {
+	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("setup: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 	}

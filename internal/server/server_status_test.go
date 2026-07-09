@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -327,12 +328,12 @@ func TestHandleGetActivity_empty_returns_empty_array(t *testing.T) {
 func TestSortByTitle_mixed(t *testing.T) {
 	t.Parallel()
 	episodes := []scanning.ScanItem{
-		{Series: &api.Series{Title: "Zorro"}},
-		{Series: &api.Series{Title: "Archer"}},
+		{Series: &arrapi.Series{Title: "Zorro"}},
+		{Series: &arrapi.Series{Title: "Archer"}},
 	}
 	movies := []scanning.ScanItem{
-		{Movie: &api.Movie{Title: "Batman"}},
-		{Movie: &api.Movie{Title: "Alien"}},
+		{Movie: &arrapi.Movie{Title: "Batman"}},
+		{Movie: &arrapi.Movie{Title: "Alien"}},
 	}
 	got := scanning.SortByTitle(episodes, movies)
 	want := []string{"Alien", "Archer", "Batman", "Zorro"}
@@ -350,10 +351,10 @@ func TestSortByTitle_mixed(t *testing.T) {
 func TestSortByTitle_case_insensitive(t *testing.T) {
 	t.Parallel()
 	episodes := []scanning.ScanItem{
-		{Series: &api.Series{Title: "the Office"}},
+		{Series: &arrapi.Series{Title: "the Office"}},
 	}
 	movies := []scanning.ScanItem{
-		{Movie: &api.Movie{Title: "The Matrix"}},
+		{Movie: &arrapi.Movie{Title: "The Matrix"}},
 	}
 	got := scanning.SortByTitle(episodes, movies)
 	if len(got) != 2 {
@@ -376,8 +377,8 @@ func TestSortByTitle_both_empty(t *testing.T) {
 func TestSortByTitle_one_empty(t *testing.T) {
 	t.Parallel()
 	movies := []scanning.ScanItem{
-		{Movie: &api.Movie{Title: "Zulu"}},
-		{Movie: &api.Movie{Title: "Alpha"}},
+		{Movie: &arrapi.Movie{Title: "Zulu"}},
+		{Movie: &arrapi.Movie{Title: "Alpha"}},
 	}
 	got := scanning.SortByTitle(nil, movies)
 	if len(got) != 2 {
@@ -392,9 +393,9 @@ func TestSortByTitle_one_empty(t *testing.T) {
 func TestSortByTitle_secondary_sort_by_season_episode(t *testing.T) {
 	t.Parallel()
 	episodes := []scanning.ScanItem{
-		{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 2, EpisodeNumber: 1}},
-		{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 3}},
-		{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 1}},
+		{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 2, EpisodeNumber: 1}},
+		{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 3}},
+		{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 1}},
 	}
 	got := scanning.SortByTitle(episodes, nil)
 	if len(got) != 3 {
@@ -421,9 +422,9 @@ func TestExtractAltTitles_property_no_primary_no_dupes(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		primary := rapid.String().Draw(t, "primary")
 		n := rapid.IntRange(0, 10).Draw(t, "n")
-		alts := make([]api.AlternateTitle, n)
+		alts := make([]arrapi.AlternateTitle, n)
 		for i := range n {
-			alts[i] = api.AlternateTitle{
+			alts[i] = arrapi.AlternateTitle{
 				Title: rapid.String().Draw(t, fmt.Sprintf("alt_%d", i)),
 			}
 		}
@@ -458,10 +459,10 @@ func TestSortByTitle_property_output_is_sorted(t *testing.T) {
 		episodes := make([]scanning.ScanItem, nEp)
 		for i := range nEp {
 			episodes[i] = scanning.ScanItem{
-				Series: &api.Series{
+				Series: &arrapi.Series{
 					Title: rapid.StringMatching(`[A-Za-z ]{1,20}`).Draw(t, fmt.Sprintf("ep_title_%d", i)),
 				},
-				Ep: &api.Episode{
+				Ep: &arrapi.Episode{
 					SeasonNumber:  rapid.IntRange(0, 10).Draw(t, fmt.Sprintf("ep_s_%d", i)),
 					EpisodeNumber: rapid.IntRange(1, 50).Draw(t, fmt.Sprintf("ep_e_%d", i)),
 				},
@@ -470,7 +471,7 @@ func TestSortByTitle_property_output_is_sorted(t *testing.T) {
 		movies := make([]scanning.ScanItem, nMov)
 		for i := range nMov {
 			movies[i] = scanning.ScanItem{
-				Movie: &api.Movie{
+				Movie: &arrapi.Movie{
 					Title: rapid.StringMatching(`[A-Za-z ]{1,20}`).Draw(t, fmt.Sprintf("mov_title_%d", i)),
 				},
 			}

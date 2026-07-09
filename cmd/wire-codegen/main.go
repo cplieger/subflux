@@ -56,10 +56,14 @@ func main() {
 	}
 
 	// Enum values are auto-discovered from each type's const block in source.
-	// MediaType keeps explicit values: "series" is a valid value with no const.
+	// Two need explicit values because they aren't discoverable that way:
+	// MediaType ("series" is valid but has no const), and Role (its
+	// "admin"/"user" constants live in the external github.com/cplieger/auth/v2
+	// package, which wiregen does not scan for enum members).
 	r.Enums = map[string]wiregen.EnumDef{
 		"MediaType": {Values: []string{"movie", "episode", "series"}},
-		"Variant":   {}, "Role": {}, "ScoreTier": {},
+		"Role":      {Values: []string{"admin", "user"}},
+		"Variant":   {}, "ScoreTier": {},
 		"NotifyLevel": {}, "ActivitySource": {},
 	}
 

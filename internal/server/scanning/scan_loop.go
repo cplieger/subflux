@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"golang.org/x/sync/errgroup"
@@ -143,7 +144,7 @@ func processItems(ctx context.Context, deps *Deps, ls *LiveState,
 }
 
 func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
-	series *api.Series, ep *api.Episode,
+	series *arrapi.Series, ep *arrapi.Episode,
 	tracker *seasonTracker, langs []string,
 	skippedSeries map[string]struct{}, stats *api.ScanStats, actID string,
 ) {
@@ -169,7 +170,7 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 
 	outcome, foundLangs := ScanEpisode(ctx, deps, ls, series, ep)
 
-	seasonEpCount := series.SeasonEpisodeFileCount(ep.SeasonNumber)
+	seasonEpCount := api.SeasonEpisodeFileCount(series, ep.SeasonNumber)
 	recordEpisodeOutcomes(tracker, series.ImdbID, ep.SeasonNumber,
 		langs, foundLangs, outcome, seasonEpCount)
 
@@ -216,7 +217,7 @@ func recordEpisodeOutcomes(tracker *seasonTracker, imdbID string, season int,
 }
 
 func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
-	m *api.Movie, stats *api.ScanStats, actID string,
+	m *arrapi.Movie, stats *api.ScanStats, actID string,
 ) {
 	outcome := ScanMovie(ctx, deps, ls, m)
 	switch outcome {

@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cplieger/arrapi"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/provider/embedded"
@@ -106,7 +108,7 @@ func (m *qhMockConfig) LanguageRulesForUI() api.LanguageRulesJSON { return api.L
 func (m *qhMockConfig) AuthEnabled() bool                         { return false }
 func (m *qhMockConfig) BasicAuthEnabled() bool                    { return true }
 func (m *qhMockConfig) OIDCEnabled() bool                         { return false }
-func (m *qhMockConfig) OIDCConfig() api.OIDCConfig                { return api.OIDCConfig{} }
+func (m *qhMockConfig) OIDCConfig() auth.OIDCConfig               { return auth.OIDCConfig{} }
 func (m *qhMockConfig) SessionIdleTimeout() time.Duration         { return 24 * time.Hour }
 func (m *qhMockConfig) SessionAbsoluteTimeout() time.Duration     { return 7 * 24 * time.Hour }
 func (m *qhMockConfig) CheckBreachedPasswords() bool              { return false }
@@ -127,43 +129,50 @@ func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, err
 	return nil, nil
 }
 
-// dummyArrClient is a non-nil api.ArrClient for tests that need sonarr/radarr != nil
-// to reach deeper handler branches. All methods return errors or empty results.
+// dummyArrClient is a non-nil fake satisfying BOTH api.SonarrClient and
+// api.RadarrClient, for tests that need sonarr/radarr != nil to reach deeper
+// handler branches. All methods return empty results; role-specific fakes
+// embed it and override the methods they exercise.
 type dummyArrClient struct{}
 
-func (dummyArrClient) Ping(context.Context) error                      { return nil }
-func (dummyArrClient) GetSeries(context.Context) ([]api.Series, error) { return nil, nil }
-func (dummyArrClient) GetEpisodes(context.Context, int) ([]api.Episode, error) {
+var (
+	_ api.SonarrClient = dummyArrClient{}
+	_ api.RadarrClient = dummyArrClient{}
+)
+
+func (dummyArrClient) Ping(context.Context) error                         { return nil }
+func (dummyArrClient) GetSeries(context.Context) ([]arrapi.Series, error) { return nil, nil }
+func (dummyArrClient) GetEpisodes(context.Context, int) ([]arrapi.Episode, error) {
 	return nil, nil
 }
-func (dummyArrClient) GetMovies(context.Context) ([]api.Movie, error) { return nil, nil }
-func (dummyArrClient) GetHistorySince(context.Context, time.Time, api.HistoryEventType) ([]api.HistoryEntry, error) {
+func (dummyArrClient) GetMovies(context.Context) ([]arrapi.Movie, error) { return nil, nil }
+func (dummyArrClient) GetHistorySince(context.Context, time.Time, ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
 	return nil, nil
 }
 
-func (dummyArrClient) GetWantedEpisodes(context.Context, map[int]struct{}, func(api.Series, api.Episode) error) error {
+func (dummyArrClient) GetWantedEpisodes(context.Context, map[int]struct{}, func(arrapi.Series, arrapi.Episode) error) error {
 	return nil
 }
 
-func (dummyArrClient) GetWantedMovies(context.Context, map[int]struct{}, func(api.Movie) error) error {
+func (dummyArrClient) GetWantedMovies(context.Context, map[int]struct{}, func(arrapi.Movie) error) error {
 	return nil
 }
 
 func (dummyArrClient) ResolveExcludeTagIDs(context.Context, []string, bool) map[int]struct{} {
 	return nil
 }
-func (dummyArrClient) RefreshSeries(context.Context, int) error { return nil }
-func (dummyArrClient) RefreshMovie(context.Context, int) error  { return nil }
-func (dummyArrClient) GetSeriesByID(context.Context, int) (*api.Series, error) {
-	return nil, nil
+func (dummyArrClient) RescanSeries(context.Context, int) error { return nil }
+func (dummyArrClient) RescanMovie(context.Context, int) error  { return nil }
+func (dummyArrClient) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+	return arrapi.Series{}, nil
 }
 
-func (dummyArrClient) GetEpisodeByID(context.Context, int) (*api.Episode, error) {
-	return nil, nil
+func (dummyArrClient) GetEpisodeByID(context.Context, int) (arrapi.Episode, error) {
+	return arrapi.Episode{}, nil
 }
 
-func (dummyArrClient) GetMovieByID(context.Context, int) (*api.Movie, error) {
-	return nil, nil
+func (dummyArrClient) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+	return arrapi.Movie{}, nil
 }
 
 // newTestServer creates a minimal Server for handler testing.

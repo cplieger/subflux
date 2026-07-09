@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -11,7 +12,7 @@ import (
 // primary; a single distinct alt is returned unchanged.
 func TestExtractAltTitles_returns_distinct_alt(t *testing.T) {
 	t.Parallel()
-	got := ExtractAltTitles([]api.AlternateTitle{{Title: "Alt"}}, "Main")
+	got := ExtractAltTitles([]arrapi.AlternateTitle{{Title: "Alt"}}, "Main")
 	if len(got) != 1 || got[0] != "Alt" {
 		t.Errorf("ExtractAltTitles([Alt], Main) = %v, want [Alt]", got)
 	}
@@ -26,32 +27,32 @@ func TestEpisodeSearchRequest(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name   string
-		series *api.Series
-		ep     *api.Episode
+		series *arrapi.Series
+		ep     *arrapi.Episode
 		langs  []string
 		want   api.SearchRequest
 	}{
 		{
 			name: "scene name and original language",
-			series: &api.Series{
+			series: &arrapi.Series{
 				Title:            "Breaking Bad",
 				Year:             2008,
 				ImdbID:           "tt0903747",
 				TvdbID:           81189,
-				OriginalLanguage: &api.LanguageInfo{Name: "English"},
-				AlternateTitles:  []api.AlternateTitle{{Title: "BrBa"}, {Title: "Breaking Bad"}},
+				OriginalLanguage: &arrapi.Language{Name: "English"},
+				AlternateTitles:  []arrapi.AlternateTitle{{Title: "BrBa"}, {Title: "Breaking Bad"}},
 			},
-			ep: &api.Episode{
+			ep: &arrapi.Episode{
 				Title:                 "Pilot",
 				SeasonNumber:          1,
 				EpisodeNumber:         1,
 				SceneSeasonNumber:     1,
 				SceneEpisodeNumber:    1,
 				AbsoluteEpisodeNumber: 1,
-				EpisodeFile: &api.EpisodeFile{
+				EpisodeFile: &arrapi.EpisodeFile{
 					SceneName: "Breaking.Bad.S01E01.720p",
 					Path:      "/tv/bb/s01e01.mkv",
-					MediaInfo: &api.MediaInfo{AudioLanguages: "English/Japanese"},
+					MediaInfo: &arrapi.MediaInfo{AudioLanguages: "English/Japanese"},
 				},
 			},
 			langs: []string{"en", "fr"},
@@ -75,19 +76,19 @@ func TestEpisodeSearchRequest(t *testing.T) {
 		},
 		{
 			name: "no original language falls back to first audio track; path used when scene empty",
-			series: &api.Series{
+			series: &arrapi.Series{
 				Title:  "Anime",
 				Year:   2010,
 				ImdbID: "tt1",
 				TvdbID: 5,
 			},
-			ep: &api.Episode{
+			ep: &arrapi.Episode{
 				Title:         "Ep1",
 				SeasonNumber:  1,
 				EpisodeNumber: 2,
-				EpisodeFile: &api.EpisodeFile{
+				EpisodeFile: &arrapi.EpisodeFile{
 					Path:      "/anime/ep.mkv",
-					MediaInfo: &api.MediaInfo{AudioLanguages: "Japanese/English"},
+					MediaInfo: &arrapi.MediaInfo{AudioLanguages: "Japanese/English"},
 				},
 			},
 			langs: []string{"en"},
@@ -107,13 +108,13 @@ func TestEpisodeSearchRequest(t *testing.T) {
 		},
 		{
 			name: "nil episode file yields empty release name and audio lang",
-			series: &api.Series{
+			series: &arrapi.Series{
 				Title:  "NoFile",
 				Year:   2020,
 				ImdbID: "tt2",
 				TvdbID: 7,
 			},
-			ep: &api.Episode{
+			ep: &arrapi.Episode{
 				Title:         "EpX",
 				SeasonNumber:  3,
 				EpisodeNumber: 4,
@@ -151,23 +152,23 @@ func TestMovieSearchRequest(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name  string
-		movie *api.Movie
+		movie *arrapi.Movie
 		langs []string
 		want  api.SearchRequest
 	}{
 		{
 			name: "scene name and original language",
-			movie: &api.Movie{
+			movie: &arrapi.Movie{
 				Title:            "Inception",
 				Year:             2010,
 				ImdbID:           "tt1375666",
 				TmdbID:           27205,
-				OriginalLanguage: &api.LanguageInfo{Name: "English"},
-				AlternateTitles:  []api.AlternateTitle{{Title: "Origin"}},
-				MovieFile: &api.MovieFile{
+				OriginalLanguage: &arrapi.Language{Name: "English"},
+				AlternateTitles:  []arrapi.AlternateTitle{{Title: "Origin"}},
+				MovieFile: &arrapi.MovieFile{
 					SceneName: "Inception.2010.1080p",
 					Path:      "/movies/inception.mkv",
-					MediaInfo: &api.MediaInfo{AudioLanguages: "English"},
+					MediaInfo: &arrapi.MediaInfo{AudioLanguages: "English"},
 				},
 			},
 			langs: []string{"en"},
@@ -185,14 +186,14 @@ func TestMovieSearchRequest(t *testing.T) {
 		},
 		{
 			name: "no original language falls back to first audio track; path used when scene empty",
-			movie: &api.Movie{
+			movie: &arrapi.Movie{
 				Title:  "Amelie",
 				Year:   2001,
 				ImdbID: "tt3",
 				TmdbID: 194,
-				MovieFile: &api.MovieFile{
+				MovieFile: &arrapi.MovieFile{
 					Path:      "/movies/amelie.mkv",
-					MediaInfo: &api.MediaInfo{AudioLanguages: "French,German"},
+					MediaInfo: &arrapi.MediaInfo{AudioLanguages: "French,German"},
 				},
 			},
 			langs: []string{"fr"},
@@ -209,7 +210,7 @@ func TestMovieSearchRequest(t *testing.T) {
 		},
 		{
 			name: "nil movie file yields empty release name and audio lang",
-			movie: &api.Movie{
+			movie: &arrapi.Movie{
 				Title:  "NoFile",
 				Year:   2022,
 				ImdbID: "tt4",

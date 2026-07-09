@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
@@ -53,8 +54,8 @@ func TestHandleCoverageMovies_no_radarr_returns_empty(t *testing.T) {
 // coverageMoviesArrClient returns canned movie data for coverage tests.
 type coverageMoviesArrClient struct{ dummyArrClient }
 
-func (c coverageMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
-	return []api.Movie{
+func (c coverageMoviesArrClient) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+	return []arrapi.Movie{
 		{
 			ID:               1,
 			Title:            "Test Movie",
@@ -64,8 +65,8 @@ func (c coverageMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, erro
 			InCinemas:        "2024-06-01",
 			DigitalRelease:   "2024-09-01",
 			HasFile:          true,
-			OriginalLanguage: &api.LanguageInfo{Name: "English"},
-			MovieFile:        &api.MovieFile{Path: "/movies/test.mkv", SceneName: "Test.Movie.2024"},
+			OriginalLanguage: &arrapi.Language{Name: "English"},
+			MovieFile:        &arrapi.MovieFile{Path: "/movies/test.mkv", SceneName: "Test.Movie.2024"},
 			Tags:             []int{2},
 		},
 		{
@@ -157,7 +158,7 @@ func TestHandleCoverageMovies_returns_movies_with_coverage(t *testing.T) {
 // coverageMoviesErrorArrClient returns an error from GetMovies.
 type coverageMoviesErrorArrClient struct{ dummyArrClient }
 
-func (c coverageMoviesErrorArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
+func (c coverageMoviesErrorArrClient) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
 	return nil, errMock
 }
 
@@ -218,8 +219,8 @@ func TestHandleCoverageMovies_db_error_returns_500(t *testing.T) {
 // coverageMoviesNilFileArrClient returns a movie with HasFile=true but nil MovieFile.
 type coverageMoviesNilFileArrClient struct{ dummyArrClient }
 
-func (c coverageMoviesNilFileArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
-	return []api.Movie{
+func (c coverageMoviesNilFileArrClient) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+	return []arrapi.Movie{
 		{
 			ID:      1,
 			Title:   "Nil File Movie",

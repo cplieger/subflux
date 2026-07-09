@@ -60,8 +60,8 @@ type Deps struct {
 type LiveState struct {
 	Cfg       api.ConfigProvider
 	Engine    api.SearchEngine
-	Sonarr    api.ArrClient
-	Radarr    api.ArrClient
+	Sonarr    api.SonarrClient
+	Radarr    api.RadarrClient
 	Providers []api.Provider
 }
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"pgregory.net/rapid"
@@ -193,28 +193,28 @@ func TestExtractAltTitles(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		alts    []api.AlternateTitle
+		alts    []arrapi.AlternateTitle
 		primary string
 		want    []string
 	}{
 		{"nil alts", nil, "Breaking Bad", nil},
-		{"empty alts", []api.AlternateTitle{}, "Breaking Bad", nil},
-		{"excludes primary", []api.AlternateTitle{
+		{"empty alts", []arrapi.AlternateTitle{}, "Breaking Bad", nil},
+		{"excludes primary", []arrapi.AlternateTitle{
 			{Title: "Breaking Bad"},
 		}, "Breaking Bad", nil},
-		{"excludes primary case insensitive", []api.AlternateTitle{
+		{"excludes primary case insensitive", []arrapi.AlternateTitle{
 			{Title: "breaking bad"},
 		}, "Breaking Bad", nil},
-		{"returns unique alts", []api.AlternateTitle{
+		{"returns unique alts", []arrapi.AlternateTitle{
 			{Title: "Metástasis"},
 			{Title: "Во все тяжкие"},
 		}, "Breaking Bad", []string{"Metástasis", "Во все тяжкие"}},
-		{"deduplicates case insensitive", []api.AlternateTitle{
+		{"deduplicates case insensitive", []arrapi.AlternateTitle{
 			{Title: "Alt Title"},
 			{Title: "alt title"},
 			{Title: "ALT TITLE"},
 		}, "Primary", []string{"Alt Title"}},
-		{"skips empty titles", []api.AlternateTitle{
+		{"skips empty titles", []arrapi.AlternateTitle{
 			{Title: ""},
 			{Title: "Valid Alt"},
 			{Title: ""},
@@ -272,8 +272,8 @@ func TestScanItemSeasonEp(t *testing.T) {
 		wantSeason int
 		wantEp     int
 	}{
-		{name: "episode", item: scanning.ScanItem{Ep: &api.Episode{SeasonNumber: 3, EpisodeNumber: 7}}, wantSeason: 3, wantEp: 7},
-		{name: "movie returns zero", item: scanning.ScanItem{Movie: &api.Movie{Title: "Test"}}, wantSeason: 0, wantEp: 0},
+		{name: "episode", item: scanning.ScanItem{Ep: &arrapi.Episode{SeasonNumber: 3, EpisodeNumber: 7}}, wantSeason: 3, wantEp: 7},
+		{name: "movie returns zero", item: scanning.ScanItem{Movie: &arrapi.Movie{Title: "Test"}}, wantSeason: 0, wantEp: 0},
 		{name: "nil ep and movie", item: scanning.ScanItem{}, wantSeason: 0, wantEp: 0},
 	}
 
@@ -299,12 +299,12 @@ func TestScanItemTitle(t *testing.T) {
 		item scanning.ScanItem
 		want string
 	}{
-		{"series", scanning.ScanItem{Series: &api.Series{Title: "Breaking Bad"}}, "Breaking Bad"},
-		{"movie", scanning.ScanItem{Movie: &api.Movie{Title: "Inception"}}, "Inception"},
+		{"series", scanning.ScanItem{Series: &arrapi.Series{Title: "Breaking Bad"}}, "Breaking Bad"},
+		{"movie", scanning.ScanItem{Movie: &arrapi.Movie{Title: "Inception"}}, "Inception"},
 		{"both nil", scanning.ScanItem{}, ""},
 		{"series takes priority over movie", scanning.ScanItem{
-			Series: &api.Series{Title: "Series"},
-			Movie:  &api.Movie{Title: "Movie"},
+			Series: &arrapi.Series{Title: "Series"},
+			Movie:  &arrapi.Movie{Title: "Movie"},
 		}, "Series"},
 	}
 

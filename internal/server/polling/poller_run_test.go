@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -50,34 +51,34 @@ func (m *mockStore) DeleteStateByPaths(_ context.Context, paths []string) (api.C
 
 type mockHistoryPoller struct {
 	historyErr error
-	series     map[int]*api.Series
-	episodes   map[int]*api.Episode
-	movies     map[int]*api.Movie
+	series     map[int]arrapi.Series
+	episodes   map[int]arrapi.Episode
+	movies     map[int]arrapi.Movie
 	excludeIDs map[int]struct{}
-	history    []api.HistoryEntry
+	history    []arrapi.HistoryRecord
 }
 
-func (m *mockHistoryPoller) GetHistorySince(_ context.Context, _ time.Time, _ api.HistoryEventType) ([]api.HistoryEntry, error) {
+func (m *mockHistoryPoller) GetHistorySince(_ context.Context, _ time.Time, _ ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
 	return m.history, m.historyErr
 }
 
-func (m *mockHistoryPoller) GetSeriesByID(_ context.Context, id int) (*api.Series, error) {
+func (m *mockHistoryPoller) GetSeriesByID(_ context.Context, id int) (arrapi.Series, error) {
 	return m.series[id], nil
 }
 
-func (m *mockHistoryPoller) GetEpisodeByID(_ context.Context, id int) (*api.Episode, error) {
+func (m *mockHistoryPoller) GetEpisodeByID(_ context.Context, id int) (arrapi.Episode, error) {
 	return m.episodes[id], nil
 }
 
-func (m *mockHistoryPoller) GetMovieByID(_ context.Context, id int) (*api.Movie, error) {
+func (m *mockHistoryPoller) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
 	return m.movies[id], nil
 }
 
 func (m *mockHistoryPoller) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return m.excludeIDs
 }
-func (m *mockHistoryPoller) RefreshSeries(_ context.Context, _ int) error { return nil }
-func (m *mockHistoryPoller) RefreshMovie(_ context.Context, _ int) error  { return nil }
+func (m *mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { return nil }
+func (m *mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
 
 type mockCfg struct {
 	targets  []api.SubtitleTarget
@@ -158,8 +159,8 @@ func (f *countingExcludeResolver) ResolveExcludeTagIDs(_ context.Context, _ []st
 }
 
 // histEntry builds a history entry with the given imported path and the current time.
-func histEntry(path string) api.HistoryEntry {
-	return api.HistoryEntry{Date: time.Now().UTC(), Data: map[string]string{"importedPath": path}}
+func histEntry(path string) arrapi.HistoryRecord {
+	return arrapi.HistoryRecord{Date: time.Now().UTC(), Data: map[string]string{"importedPath": path}}
 }
 
 // --- PollOnce smoke tests ---
@@ -234,7 +235,7 @@ func TestPollOnce_returns_zero_when_no_events(t *testing.T) {
 func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	now := time.Now().UTC()
 	sonarr := &mockHistoryPoller{
-		history: []api.HistoryEntry{
+		history: []arrapi.HistoryRecord{
 			{
 				Date: now,
 				Data: map[string]string{"importedPath": "/missing/path/a.mkv"},
@@ -361,11 +362,11 @@ func TestPollOnce_warns_when_exceeds_interval(t *testing.T) {
 
 // PollOnce returns the sum of imported-history entries seen across Sonarr and Radarr.
 func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
-	sonarr := &mockHistoryPoller{history: []api.HistoryEntry{
+	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{
 		histEntry("/nonexistent/s1.mkv"),
 		histEntry("/nonexistent/s2.mkv"),
 	}}
-	radarr := &mockHistoryPoller{history: []api.HistoryEntry{
+	radarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{
 		histEntry("/nonexistent/r1.mkv"),
 	}}
 	// noopStore is stateless so the concurrent Sonarr+Radarr goroutines don't race.
@@ -401,7 +402,7 @@ func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
 func TestPollSonarr_processes_nonEmpty_path(t *testing.T) {
 	store := &mockStore{}
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
-	sonarr := &mockHistoryPoller{history: []api.HistoryEntry{histEntry("/nonexistent/one.mkv")}}
+	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/one.mkv")}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
 	p.pollSonarr(context.Background(), ls)
@@ -418,7 +419,7 @@ func TestPollSonarr_processes_nonEmpty_path(t *testing.T) {
 func TestPollSonarr_continues_after_each_entry(t *testing.T) {
 	store := &mockStore{}
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
-	sonarr := &mockHistoryPoller{history: []api.HistoryEntry{
+	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{
 		histEntry("/nonexistent/a.mkv"),
 		histEntry("/nonexistent/b.mkv"),
 	}}
@@ -433,7 +434,7 @@ func TestPollSonarr_continues_after_each_entry(t *testing.T) {
 // pollRadarr processes a successful history fetch and returns the entry count.
 func TestPollRadarr_processes_on_success(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
-	radarr := &mockHistoryPoller{history: []api.HistoryEntry{histEntry("/nonexistent/movie.mkv")}}
+	radarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/movie.mkv")}}
 	ls := &LiveState{Cfg: cfg, Radarr: radarr}
 	p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
 	if got := p.pollRadarr(context.Background(), ls); got != 1 {

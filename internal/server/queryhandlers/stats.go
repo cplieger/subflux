@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"golang.org/x/sync/errgroup"
@@ -65,7 +66,7 @@ func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
 
 // fetchMediaCountsParallel fetches series and movies concurrently from
 // the configured sonarr/radarr clients.
-func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []api.Series, movies []api.Movie, partial bool) {
+func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arrapi.Series, movies []arrapi.Movie, partial bool) {
 	g, gctx := errgroup.WithContext(ctx)
 
 	if ls.Sonarr != nil {

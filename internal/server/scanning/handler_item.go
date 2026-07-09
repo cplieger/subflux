@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 )
@@ -13,19 +14,19 @@ import (
 // scanSeries scans all episodes in a series.
 func (h *Handler) scanSeries(ctx context.Context, seriesID int) int {
 	return h.scanEpisodes(ctx, seriesID, "Series",
-		func(_ *api.Episode) bool { return true })
+		func(_ *arrapi.Episode) bool { return true })
 }
 
 // scanSeason scans all episodes in a specific season.
 func (h *Handler) scanSeason(ctx context.Context, seriesID, seasonNum int) int {
 	return h.scanEpisodes(ctx, seriesID,
 		fmt.Sprintf("Season S%02d", seasonNum),
-		func(ep *api.Episode) bool { return ep.SeasonNumber == seasonNum })
+		func(ep *arrapi.Episode) bool { return ep.SeasonNumber == seasonNum })
 }
 
 // scanEpisodes fetches episodes for a series and scans those matching the filter.
 func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
-	filterEp func(*api.Episode) bool,
+	filterEp func(*arrapi.Episode) bool,
 ) int {
 	st := h.deps.StateFunc()
 	if st.Sonarr == nil {
@@ -66,42 +67,38 @@ func (h *Handler) scanEpisodes(ctx context.Context, seriesID int, label string,
 // failed, the series was not found, the episode fetch failed, or no matching
 // episode has a file.
 func (h *Handler) collectSeriesEpisodes(ctx context.Context, st *HandlerState,
-	seriesID int, label string, filterEp func(*api.Episode) bool,
-) (*api.Series, []*api.Episode, bool) {
-	series, err := st.Sonarr.GetSeriesByID(ctx, seriesID)
+	seriesID int, label string, filterEp func(*arrapi.Episode) bool,
+) (series *arrapi.Series, withFiles []*arrapi.Episode, ok bool) {
+	ser, err := st.Sonarr.GetSeriesByID(ctx, seriesID)
 	if err != nil {
 		slog.Error("scan: failed to fetch series",
 			"id", seriesID, "error", err)
 		h.deps.Alerts.Record("scan", label+" scan failed: "+err.Error())
 		return nil, nil, false
 	}
-	if series == nil {
-		slog.Warn("scan: series not found", "id", seriesID)
-		return nil, nil, false
-	}
 
 	episodes, err := st.Sonarr.GetEpisodes(ctx, seriesID)
 	if err != nil {
 		slog.Error("scan: failed to fetch episodes",
-			"series", series.Title, "error", err)
+			"series", ser.Title, "error", err)
 		h.deps.Alerts.Record("scan", label+" scan failed: "+err.Error())
 		return nil, nil, false
 	}
 
-	withFiles := filterEpisodesWithFiles(episodes, filterEp)
+	withFiles = filterEpisodesWithFiles(episodes, filterEp)
 	if len(withFiles) == 0 {
-		slog.Debug("scan: no episodes with files", "series", series.Title)
+		slog.Debug("scan: no episodes with files", "series", ser.Title)
 		return nil, nil, false
 	}
-	return series, withFiles, true
+	return &ser, withFiles, true
 }
 
 // filterEpisodesWithFiles returns pointers to the episodes that match filterEp
 // and have a downloaded file.
-func filterEpisodesWithFiles(episodes []api.Episode,
-	filterEp func(*api.Episode) bool,
-) []*api.Episode {
-	var withFiles []*api.Episode
+func filterEpisodesWithFiles(episodes []arrapi.Episode,
+	filterEp func(*arrapi.Episode) bool,
+) []*arrapi.Episode {
+	var withFiles []*arrapi.Episode
 	for i := range episodes {
 		if filterEp(&episodes[i]) && episodes[i].HasFile && episodes[i].EpisodeFile != nil {
 			withFiles = append(withFiles, &episodes[i])
@@ -130,8 +127,8 @@ func (h *Handler) acquireScanSlot(actID string) bool {
 // honouring context cancellation and the inter-item scan delay. It returns
 // the number of episodes for which a subtitle was found and the number
 // searched.
-func (h *Handler) runEpisodeScans(ctx context.Context, series *api.Series,
-	withFiles []*api.Episode, actID string, scanDelay time.Duration,
+func (h *Handler) runEpisodeScans(ctx context.Context, series *arrapi.Series,
+	withFiles []*arrapi.Episode, actID string, scanDelay time.Duration,
 ) (found, searched int) {
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
@@ -173,10 +170,6 @@ func (h *Handler) scanSingleEpisode(ctx context.Context,
 		h.deps.Alerts.Record("scan", "Episode scan failed: "+err.Error())
 		return
 	}
-	if series == nil {
-		slog.Warn("scan episode: series not found", "id", seriesID)
-		return
-	}
 
 	episodes, err := st.Sonarr.GetEpisodes(ctx, seriesID)
 	if err != nil {
@@ -186,7 +179,7 @@ func (h *Handler) scanSingleEpisode(ctx context.Context,
 		return
 	}
 
-	var ep *api.Episode
+	var ep *arrapi.Episode
 	for i := range episodes {
 		if episodes[i].SeasonNumber == seasonNum &&
 			episodes[i].EpisodeNumber == episodeNum &&
@@ -210,7 +203,7 @@ func (h *Handler) scanSingleEpisode(ctx context.Context,
 
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
-	outcome, _ := ScanEpisode(ctx, deps, sls, series, ep, true)
+	outcome, _ := ScanEpisode(ctx, deps, sls, &series, ep, true)
 	slog.Info("episode scan complete",
 		"media", label, "outcome", outcome)
 }
@@ -229,7 +222,7 @@ func (h *Handler) scanSingleMovie(ctx context.Context, movieID int) {
 		h.deps.Alerts.Record("scan", "Movie scan failed: "+err.Error())
 		return
 	}
-	if movie == nil || movie.MovieFile == nil {
+	if movie.MovieFile == nil {
 		slog.Warn("scan movie: movie not found or no file",
 			"id", movieID)
 		return
@@ -242,7 +235,7 @@ func (h *Handler) scanSingleMovie(ctx context.Context, movieID int) {
 
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
-	outcome := ScanMovie(ctx, deps, sls, movie, true)
+	outcome := ScanMovie(ctx, deps, sls, &movie, true)
 	slog.Info("movie scan complete",
 		"media", label, "outcome", outcome)
 }
@@ -260,7 +253,7 @@ func (h *Handler) scanMovieSync(ctx context.Context, movieID int) (found, total 
 			"id", movieID, "error", err)
 		return 0, 0
 	}
-	if movie == nil || movie.MovieFile == nil {
+	if movie.MovieFile == nil {
 		slog.Warn("scan movie: movie not found or no file", "id", movieID)
 		return 0, 0
 	}
@@ -276,14 +269,14 @@ func (h *Handler) scanMovieSync(ctx context.Context, movieID int) (found, total 
 	}
 	defer h.deps.ScanGuard.Unlock()
 
-	origLang := movie.OriginalLangCode()
-	audioLangs := movie.MovieFile.AudioLanguages()
+	origLang := api.OriginalLangCode(movie.OriginalLanguage)
+	audioLangs := api.AudioLanguages(movie.MovieFile.MediaInfo)
 	targets := st.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 	total = len(targets)
 
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
-	outcome := ScanMovie(ctx, deps, sls, movie, true)
+	outcome := ScanMovie(ctx, deps, sls, &movie, true)
 	if outcome == ScanFound {
 		found = 1
 	}

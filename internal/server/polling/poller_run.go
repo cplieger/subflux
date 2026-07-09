@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httputil"
@@ -43,8 +44,8 @@ type Deps struct {
 type LiveState struct {
 	Cfg    PollerCfg
 	Engine api.SearchEngine
-	Sonarr HistoryPoller
-	Radarr HistoryPoller
+	Sonarr PollSonarrClient
+	Radarr PollRadarrClient
 }
 
 // StateFunc returns the current live state. Called each poll cycle to pick
@@ -163,7 +164,7 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 
 // getExcludeTagIDs returns cached tag IDs if still valid, otherwise resolves
 // them from the arr client and caches with singleflight deduplication.
-func (p *Poller) getExcludeTagIDs(ctx context.Context, client HistoryPoller, cacheKey string,
+func (p *Poller) getExcludeTagIDs(ctx context.Context, client tagResolver, cacheKey string,
 	tags []string, _ time.Duration,
 ) map[int]struct{} {
 	ids, err := p.tagCache.GetOrFetchCtx(ctx, cacheKey, func(ctx context.Context) (map[int]struct{}, error) {
@@ -180,7 +181,7 @@ func (p *Poller) getExcludeTagIDs(ctx context.Context, client HistoryPoller, cac
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 	since := p.deps.PollCache.Get(ctx, api.PollKeySonarr)
-	entries, err := ls.Sonarr.GetHistorySince(ctx, since, api.HistoryImported)
+	entries, err := ls.Sonarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("sonarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
@@ -228,7 +229,7 @@ func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 	since := p.deps.PollCache.Get(ctx, api.PollKeyRadarr)
-	entries, err := ls.Radarr.GetHistorySince(ctx, since, api.HistoryImported)
+	entries, err := ls.Radarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("radarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0

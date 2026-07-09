@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
@@ -364,7 +365,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	// 1. Verify all auth buckets exist by exercising each one.
 	// If any bucket is missing, the operations below will fail.
 	now := time.Now()
-	user := &api.User{
+	user := &auth.User{
 		Username:     "migration-test",
 		PasswordHash: "$argon2id$v=19$m=19456,t=2,p=1$dGVzdHNhbHQ$dGVzdGhhc2g",
 		Role:         "admin",
@@ -379,7 +380,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		t.Fatalf("auth_users count: %v", err)
 	}
 
-	sess := &api.Session{
+	sess := &auth.Session{
 		TokenHash: "migration-sess-hash", UserID: user.ID,
 		AuthMethod: "password", IPAddress: "127.0.0.1",
 		CreatedAt: now, LastActivity: now,
@@ -388,7 +389,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		t.Fatalf("auth_sessions: %v", err)
 	}
 
-	apiKey := &api.Key{
+	apiKey := &auth.Key{
 		UserID: user.ID, KeyHash: "migration-key-hash",
 		KeyPrefix: "sfx_test", KeySuffix: "abcd",
 		Label: "migration-key", CreatedAt: now,

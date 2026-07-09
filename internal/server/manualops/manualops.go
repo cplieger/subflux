@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -56,27 +57,25 @@ type ActivityTracker interface {
 	Fail(id string)
 }
 
-// Refresher is the narrow interface for triggering arr metadata refreshes
-// after manual downloads. Only RefreshSeries and RefreshMovie are needed.
-type Refresher interface {
-	RefreshSeries(ctx context.Context, seriesID int) error
-	RefreshMovie(ctx context.Context, movieID int) error
+// ManualSonarrClient is the Sonarr surface manual downloads use: series lookup
+// (for media-ID and title resolution) and a post-download rescan.
+type ManualSonarrClient interface {
+	GetSeriesByID(ctx context.Context, seriesID int) (arrapi.Series, error)
+	RescanSeries(ctx context.Context, seriesID int) error
 }
 
-// Compile-time assertion: api.ArrClient satisfies Refresher.
-var _ Refresher = api.ArrClient(nil)
-
-// ManualArrClient is the narrow interface for arr operations needed by
-// manual download handlers: media lookup + refresh after download.
-type ManualArrClient interface {
-	GetSeriesByID(ctx context.Context, seriesID int) (*api.Series, error)
-	GetMovieByID(ctx context.Context, movieID int) (*api.Movie, error)
-	RefreshSeries(ctx context.Context, seriesID int) error
-	RefreshMovie(ctx context.Context, movieID int) error
+// ManualRadarrClient is the Radarr surface manual downloads use.
+type ManualRadarrClient interface {
+	GetMovieByID(ctx context.Context, movieID int) (arrapi.Movie, error)
+	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// Compile-time assertion: api.ArrClient satisfies ManualArrClient.
-var _ ManualArrClient = api.ArrClient(nil)
+// Compile-time assertions: the arrapi-backed role clients satisfy the manual
+// surfaces.
+var (
+	_ ManualSonarrClient = api.SonarrClient(nil)
+	_ ManualRadarrClient = api.RadarrClient(nil)
+)
 
 // EventPublisher publishes events to SSE clients.
 type EventPublisher interface {
@@ -88,8 +87,8 @@ type EventPublisher interface {
 type LiveState struct {
 	Cfg       api.ConfigProvider
 	Engine    api.SearchEngine
-	Sonarr    ManualArrClient
-	Radarr    ManualArrClient
+	Sonarr    ManualSonarrClient
+	Radarr    ManualRadarrClient
 	Providers []api.Provider
 }
 

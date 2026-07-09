@@ -10,19 +10,28 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/singleflight"
 )
 
-// MediaFetcher is the narrow interface consumed by media browser handlers.
-type MediaFetcher interface {
-	GetSeries(ctx context.Context) ([]api.Series, error)
-	GetMovies(ctx context.Context) ([]api.Movie, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]api.Episode, error)
+// MediaSonarrClient is the Sonarr surface the media browser uses.
+type MediaSonarrClient interface {
+	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
-// Compile-time assertion: api.ArrClient satisfies MediaFetcher.
-var _ MediaFetcher = api.ArrClient(nil)
+// MediaRadarrClient is the Radarr surface the media browser uses.
+type MediaRadarrClient interface {
+	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+}
+
+// Compile-time assertions: the arrapi-backed role clients satisfy the media
+// browser surfaces.
+var (
+	_ MediaSonarrClient = api.SonarrClient(nil)
+	_ MediaRadarrClient = api.RadarrClient(nil)
+)
 
 // Deps holds the dependencies for media handlers.
 type Deps struct {
@@ -36,8 +45,8 @@ type Deps struct {
 // LiveState holds the runtime state needed by media handlers.
 type LiveState struct {
 	Cfg    api.ConfigProvider
-	Sonarr MediaFetcher // nil when sonarr not configured
-	Radarr MediaFetcher // nil when radarr not configured
+	Sonarr MediaSonarrClient // nil when sonarr not configured
+	Radarr MediaRadarrClient // nil when radarr not configured
 }
 
 // Handler provides HTTP handlers for the /api/media/* endpoints.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/go-webauthn/webauthn/protocol"
@@ -96,7 +97,7 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if errSC := h.Store.UpdatePasskeyAfterLogin(ctx, cred.ID, cred.Authenticator.SignCount, api.PasskeyFlags{
+	if errSC := h.Store.UpdatePasskeyAfterLogin(ctx, cred.ID, cred.Authenticator.SignCount, auth.PasskeyFlags{
 		UserPresent:    cred.Flags.UserPresent,
 		UserVerified:   cred.Flags.UserVerified,
 		BackupEligible: cred.Flags.BackupEligible,
@@ -118,13 +119,13 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := h.createSessionAndRespond(w, r, user, api.MethodPasskey); err != nil {
+	if err := h.createSessionAndRespond(w, r, user, auth.MethodPasskey); err != nil {
 		slog.Error("webauthn: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
-		slog.String("method", string(api.MethodPasskey)))
+		slog.String("method", string(auth.MethodPasskey)))
 }
 
 // webAuthnUserFinder returns the credential-lookup callback FinishLogin uses to

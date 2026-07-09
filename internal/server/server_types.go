@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cplieger/auth/v2"
 	authoidc "github.com/cplieger/auth/v2/oidc"
 	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
@@ -37,8 +38,8 @@ type liveState struct {
 	cfg       api.ConfigProvider
 	engine    api.SearchEngine
 	scorer    api.Scorer
-	sonarr    api.ArrClient
-	radarr    api.ArrClient
+	sonarr    api.SonarrClient
+	radarr    api.RadarrClient
 	providers []api.Provider
 }
 
@@ -61,7 +62,7 @@ type authDeps struct {
 	rateLimiter   ratelimit.Checker
 	webauthn      *webauthn.WebAuthn
 	oidcProvider  *authoidc.Provider
-	oidcCfg       *api.OIDCConfig
+	oidcCfg       *auth.OIDCConfig
 	ceremonies    *authhandlers.CeremonyStore
 	sessDebounce  *sessionActivityDebouncer
 	sessBatcher   *sessionActivityBatcher
@@ -101,7 +102,8 @@ type Server struct {
 	manualH      *manualops.Handler
 	previewH     *previewhandlers.Handler
 	loadConfig   api.ConfigLoader
-	newArrClient func(baseURL, apiKey string) (api.ArrClient, error)
+	newSonarr    func(baseURL, apiKey string) (api.SonarrClient, error)
+	newRadarr    func(baseURL, apiKey string) (api.RadarrClient, error)
 	wire         wiring.Func
 	activity     *activity.Log
 	live         atomic.Pointer[liveState]
@@ -133,7 +135,7 @@ type Server struct {
 type Option func(*Server)
 
 // WithConfig sets the initial configuration and arr clients.
-func WithConfig(cfg api.ConfigProvider, sonarr, radarr api.ArrClient) Option {
+func WithConfig(cfg api.ConfigProvider, sonarr api.SonarrClient, radarr api.RadarrClient) Option {
 	return func(s *Server) {
 		ls := &liveState{cfg: cfg, sonarr: sonarr, radarr: radarr}
 		s.live.Store(ls)
@@ -159,9 +161,16 @@ func WithMetrics(m Metrics) Option { return func(s *Server) { s.metrics = m } }
 // WithPort sets the HTTP listen port (unconfigured mode).
 func WithPort(port int) Option { return func(s *Server) { s.serverPort = port } }
 
-// WithArrClientFactory sets the factory for creating arr API clients.
-func WithArrClientFactory(f func(baseURL, apiKey string) (api.ArrClient, error)) Option {
-	return func(s *Server) { s.newArrClient = f }
+// WithArrClientFactories sets the factories for creating Sonarr and Radarr API
+// clients, used by hot reload and config-save connectivity checks.
+func WithArrClientFactories(
+	newSonarr func(baseURL, apiKey string) (api.SonarrClient, error),
+	newRadarr func(baseURL, apiKey string) (api.RadarrClient, error),
+) Option {
+	return func(s *Server) {
+		s.newSonarr = newSonarr
+		s.newRadarr = newRadarr
+	}
 }
 
 // WithDefaultConfig sets the embedded default config bytes.

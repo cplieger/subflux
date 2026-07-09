@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/auth/v2/ratelimit"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -96,14 +95,14 @@ func (c *authTestConfig) SessionAbsoluteTimeout() time.Duration {
 func (c *authTestConfig) WebAuthnRPID() string { return "" }
 
 // createTestUser creates a user in the DB with the given username and password.
-func createTestUser(t *testing.T, db *authstore.Store, username, password string) *api.User {
+func createTestUser(t *testing.T, db *authstore.Store, username, password string) *auth.User {
 	t.Helper()
-	hash, err := authlib.HashPassword(password)
+	hash, err := auth.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	user := &api.User{
+	user := &auth.User{
 		Username:     username,
 		PasswordHash: hash,
 		Role:         "admin",
@@ -121,15 +120,15 @@ func createTestUser(t *testing.T, db *authstore.Store, username, password string
 // plaintext token.
 func createTestSession(t *testing.T, db *authstore.Store, userID int64) string {
 	t.Helper()
-	token, hash, err := authlib.GenerateSessionToken()
+	token, hash, err := auth.GenerateSessionToken()
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	sess := &api.Session{
+	sess := &auth.Session{
 		TokenHash:    hash,
 		UserID:       userID,
-		AuthMethod:   api.MethodPassword,
+		AuthMethod:   auth.MethodPassword,
 		IPAddress:    "127.0.0.1",
 		CreatedAt:    now,
 		LastActivity: now,

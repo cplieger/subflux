@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
@@ -53,8 +54,8 @@ func TestHandleCoverageSeries_no_sonarr_returns_empty(t *testing.T) {
 // coverageSeriesArrClient returns canned series data for coverage tests.
 type coverageSeriesArrClient struct{ dummyArrClient }
 
-func (c coverageSeriesArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
-	return []api.Series{
+func (c coverageSeriesArrClient) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+	return []arrapi.Series{
 		{
 			ID:               1,
 			Title:            "Test Show",
@@ -62,15 +63,15 @@ func (c coverageSeriesArrClient) GetSeries(_ context.Context) ([]api.Series, err
 			TvdbID:           81189,
 			ImdbID:           "tt1234567",
 			FirstAired:       "2024-01-01",
-			OriginalLanguage: &api.LanguageInfo{Name: "English"},
-			Statistics:       &api.SeriesStatistics{EpisodeFileCount: 3},
+			OriginalLanguage: &arrapi.Language{Name: "English"},
+			Statistics:       &arrapi.SeriesStatistics{EpisodeFileCount: 3},
 			Tags:             []int{1},
 		},
 		{
 			ID:         2,
 			Title:      "No Episodes",
 			TvdbID:     99999,
-			Statistics: &api.SeriesStatistics{EpisodeFileCount: 0},
+			Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 0},
 		},
 	}, nil
 }
@@ -162,7 +163,7 @@ func TestHandleCoverageSeries_returns_series_with_coverage(t *testing.T) {
 // coverageSeriesErrorArrClient returns an error from GetSeries.
 type coverageSeriesErrorArrClient struct{ dummyArrClient }
 
-func (c coverageSeriesErrorArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
+func (c coverageSeriesErrorArrClient) GetSeries(_ context.Context) ([]arrapi.Series, error) {
 	return nil, errMock
 }
 
@@ -261,13 +262,13 @@ func TestHandleCoverageSeries_no_targets_sets_rule_no_targets(t *testing.T) {
 // coverageSeriesNoLangArrClient returns a series with no OriginalLanguage.
 type coverageSeriesNoLangArrClient struct{ dummyArrClient }
 
-func (c coverageSeriesNoLangArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
-	return []api.Series{
+func (c coverageSeriesNoLangArrClient) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+	return []arrapi.Series{
 		{
 			ID:         1,
 			Title:      "No Lang Show",
 			TvdbID:     55555,
-			Statistics: &api.SeriesStatistics{EpisodeFileCount: 2},
+			Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 2},
 		},
 	}, nil
 }

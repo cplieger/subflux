@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
@@ -26,24 +27,31 @@ func (g *ScanGuard) Lock() { g.mu.Lock() }
 // Unlock releases the scan serialization lock.
 func (g *ScanGuard) Unlock() { g.mu.Unlock() }
 
-// HandlerClient is the narrow interface consumed by scan HTTP handlers.
-// It documents the exact 3 methods manual scan handlers call on sonarr/radarr.
-type HandlerClient interface {
-	GetSeriesByID(ctx context.Context, id int) (*api.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]api.Episode, error)
-	GetMovieByID(ctx context.Context, id int) (*api.Movie, error)
+// ScanHandlerSonarr is the Sonarr surface the manual scan HTTP handlers call.
+type ScanHandlerSonarr interface {
+	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
-// Compile-time assertion: api.ArrClient satisfies HandlerClient.
-var _ HandlerClient = api.ArrClient(nil)
+// ScanHandlerRadarr is the Radarr surface the manual scan HTTP handlers call.
+type ScanHandlerRadarr interface {
+	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+}
+
+// Compile-time assertions: the arrapi-backed role clients satisfy the handler
+// surfaces.
+var (
+	_ ScanHandlerSonarr = api.SonarrClient(nil)
+	_ ScanHandlerRadarr = api.RadarrClient(nil)
+)
 
 // HandlerState holds the runtime state needed by scan HTTP handlers.
 // Provided by the server on each request via the StateFunc callback.
 type HandlerState struct {
 	Cfg    api.ConfigProvider
 	Engine api.SearchEngine
-	Sonarr HandlerClient // nil when sonarr not configured
-	Radarr HandlerClient // nil when radarr not configured
+	Sonarr ScanHandlerSonarr // nil when sonarr not configured
+	Radarr ScanHandlerRadarr // nil when radarr not configured
 }
 
 // HandlerDeps holds the dependencies for the scan HTTP handler family.

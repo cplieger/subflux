@@ -6,6 +6,7 @@ package queryhandlers
 import (
 	"context"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -21,14 +22,22 @@ type QueryStore interface {
 // Compile-time assertion: api.Store satisfies QueryStore.
 var _ QueryStore = api.Store(nil)
 
-// StatsArrClient is the narrow interface consumed by the stats handler.
-type StatsArrClient interface {
-	GetSeries(ctx context.Context) ([]api.Series, error)
-	GetMovies(ctx context.Context) ([]api.Movie, error)
+// StatsSonarrClient is the Sonarr surface the stats handler uses.
+type StatsSonarrClient interface {
+	GetSeries(ctx context.Context) ([]arrapi.Series, error)
 }
 
-// Compile-time assertion: api.ArrClient satisfies StatsArrClient.
-var _ StatsArrClient = api.ArrClient(nil)
+// StatsRadarrClient is the Radarr surface the stats handler uses.
+type StatsRadarrClient interface {
+	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+}
+
+// Compile-time assertions: the arrapi-backed role clients satisfy the stats
+// surfaces.
+var (
+	_ StatsSonarrClient = api.SonarrClient(nil)
+	_ StatsRadarrClient = api.RadarrClient(nil)
+)
 
 // MetricsReader is the narrow interface for reading search metrics.
 type MetricsReader interface {
@@ -39,8 +48,8 @@ type MetricsReader interface {
 type LiveState struct {
 	Cfg       api.ConfigProvider
 	Engine    api.SearchEngine
-	Sonarr    StatsArrClient
-	Radarr    StatsArrClient
+	Sonarr    StatsSonarrClient
+	Radarr    StatsRadarrClient
 	Providers []api.Provider
 }
 
@@ -51,7 +60,7 @@ type Deps struct {
 	Metrics      MetricsReader
 	State        func() *LiveState
 	Configured   func() bool
-	CountMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []api.Series, movies []api.Movie) int
+	CountMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
 }
 
 // Handler holds all dependencies for the query handler family.
@@ -61,7 +70,7 @@ type Handler struct {
 	metrics      MetricsReader
 	state        func() *LiveState
 	configured   func() bool
-	countMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []api.Series, movies []api.Movie) int
+	countMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
 	statsCache   statsCache
 }
 

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -19,8 +19,8 @@ import (
 // the auth layer. Decouples middleware from the concrete *auth.Authenticator
 // type, enabling test doubles without constructing a full authenticator.
 type sessionAuthenticator interface {
-	RequireAuth(w http.ResponseWriter, r *http.Request) (*api.User, string, bool)
-	Authenticate(r *http.Request) (*api.User, string, error)
+	RequireAuth(w http.ResponseWriter, r *http.Request) (*auth.User, string, bool)
+	Authenticate(r *http.Request) (*auth.User, string, error)
 }
 
 // sessionActivityDebouncer tracks per-session last-update times to avoid
@@ -111,11 +111,11 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 // requireRole returns a middleware that authorizes requests based on the
 // user's role. Must be chained after requireAuth so UserFromContext is
 // populated. Admin is a superset of user (see auth.HasRole).
-func (s *Server) requireRole(role api.Role) middleware {
+func (s *Server) requireRole(role auth.Role) middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			user := api.UserFromContext(r.Context())
-			if !authlib.HasRole(user, role) {
+			if !auth.HasRole(user, role) {
 				api.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
 				return
 			}
