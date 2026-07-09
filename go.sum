@@ -12,8 +12,8 @@ github.com/cplieger/ssrf/v2 v2.0.6 h1:kzokAs1Ar7GaSNFGELt2Gfq3Ub0NZmvCGovTmYWWTG
 github.com/cplieger/ssrf/v2 v2.0.6/go.mod h1:Ujn/7wQbHHQZp/UzDF/WOS41UE1VR998dQyuBWM44TU=
 github.com/cplieger/webhttp v1.2.1 h1:00i9InjHiFN60YiBsljghwh4x1HdrfmuciyrpcCL1Fw=
 github.com/cplieger/webhttp v1.2.1/go.mod h1:Nb8A8w/9MzFxB90Vbt6vQ/odRPd+hPedWekRkvIFnjg=
-github.com/cplieger/wiregen v1.3.3 h1:ytT6YjxyopaLZnIxnBjbScD6cynrx9ljLBAu/A1j3/g=
-github.com/cplieger/wiregen v1.3.3/go.mod h1:inZWQ7o2M1YANc9wlcqvK8sfb6wAGZ9v6NleSeVApNg=
+github.com/cplieger/wiregen v1.3.4 h1:s9rW09OaLaHOhG8V1JQ3KgNhEkvjCb6Qoviv3qUK8j8=
+github.com/cplieger/wiregen v1.3.4/go.mod h1:2ALAYEJeGcDlpFcYHQ7+fTWotumXSCmeOCgh7ebP0vE=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
