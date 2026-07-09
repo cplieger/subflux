@@ -8,29 +8,19 @@ import (
 	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
-// ScanHandlerClient is the narrow interface consumed by scan handlers.
-// It documents the exact 3 methods scan_handlers.go calls on sonarr/radarr,
-// enabling focused test fakes without implementing the full 14-method ArrClient.
-type ScanHandlerClient = scanning.HandlerClient
-
 // initScanHandler creates the scanning.Handler and stores it on the Server.
-// Called during server construction after all deps are available.
+// Called during server construction after all deps are available. The server's
+// api.SonarrClient/api.RadarrClient satisfy the scan handler's narrower
+// per-role surfaces; a nil (unconfigured) client stays a nil interface.
 func (s *Server) initScanHandler() *scanning.Handler {
 	return scanning.NewHandler(scanning.HandlerDeps{
 		StateFunc: func() *scanning.HandlerState {
 			ls := s.state()
-			var sonarr, radarr scanning.HandlerClient
-			if ls.sonarr != nil {
-				sonarr = ls.sonarr
-			}
-			if ls.radarr != nil {
-				radarr = ls.radarr
-			}
 			return &scanning.HandlerState{
 				Cfg:    ls.cfg,
 				Engine: ls.engine,
-				Sonarr: sonarr,
-				Radarr: radarr,
+				Sonarr: ls.sonarr,
+				Radarr: ls.radarr,
 			}
 		},
 		CtxFunc:  func() context.Context { return s.ctx },

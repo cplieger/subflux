@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/arrapi"
+	"github.com/cplieger/subflux/internal/arrsvc"
 )
 
 // resolveItems queries Sonarr and Radarr to find media items matching the
@@ -25,7 +26,7 @@ func resolveItems(ctx context.Context, cfg api.ConfigProvider,
 	var items []searchItem
 	if sc := cfg.SonarrConfig(); sc.URL != "" {
 		queried = true
-		sonarr, err := arrapi.NewClient(sc.URL, sc.APIKey)
+		sonarr, err := arrsvc.NewSonarr(sc.URL, sc.APIKey)
 		if err != nil {
 			slog.Warn("invalid sonarr config", "error", err)
 		} else {
@@ -35,7 +36,7 @@ func resolveItems(ctx context.Context, cfg api.ConfigProvider,
 	if len(items) == 0 && seasonFilter == 0 && episodeFilter == 0 {
 		if rc := cfg.RadarrConfig(); rc.URL != "" {
 			queried = true
-			radarr, err := arrapi.NewClient(rc.URL, rc.APIKey)
+			radarr, err := arrsvc.NewRadarr(rc.URL, rc.APIKey)
 			if err != nil {
 				slog.Warn("invalid radarr config", "error", err)
 			} else {
@@ -52,7 +53,7 @@ func resolveItems(ctx context.Context, cfg api.ConfigProvider,
 	return items
 }
 
-func resolveFromSonarr(ctx context.Context, client *arrapi.Client,
+func resolveFromSonarr(ctx context.Context, client *arrsvc.Sonarr,
 	imdbID, title string,
 	seasonFilter, episodeFilter int,
 ) []searchItem {
@@ -77,12 +78,12 @@ func resolveFromSonarr(ctx context.Context, client *arrapi.Client,
 	return items
 }
 
-func matchSeries(s *api.Series, imdbID, title string) bool {
+func matchSeries(s *arrapi.Series, imdbID, title string) bool {
 	return (imdbID != "" && s.ImdbID == imdbID) ||
 		(title != "" && strings.EqualFold(s.Title, title))
 }
 
-func episodesForSeries(series *api.Series, episodes []api.Episode,
+func episodesForSeries(series *arrapi.Series, episodes []arrapi.Episode,
 	seasonFilter, episodeFilter int,
 ) []searchItem {
 	var items []searchItem
@@ -107,7 +108,7 @@ func episodesForSeries(series *api.Series, episodes []api.Episode,
 	return items
 }
 
-func resolveFromRadarr(ctx context.Context, client *arrapi.Client,
+func resolveFromRadarr(ctx context.Context, client *arrsvc.Radarr,
 	imdbID, tmdbID, title string,
 ) []searchItem {
 	tmdbInt := parseTmdbID(tmdbID)
@@ -127,13 +128,13 @@ func parseTmdbID(tmdbID string) int {
 	return n
 }
 
-func matchMovie(m *api.Movie, imdbID string, tmdbInt int, title string) bool {
+func matchMovie(m *arrapi.Movie, imdbID string, tmdbInt int, title string) bool {
 	return (imdbID != "" && m.ImdbID == imdbID) ||
 		(tmdbInt > 0 && m.TmdbID == tmdbInt) ||
 		(title != "" && strings.EqualFold(m.Title, title))
 }
 
-func filterRadarrMovies(movies []api.Movie, imdbID string, tmdbInt int, title string) []searchItem {
+func filterRadarrMovies(movies []arrapi.Movie, imdbID string, tmdbInt int, title string) []searchItem {
 	for i := range movies {
 		m := &movies[i]
 		if !matchMovie(m, imdbID, tmdbInt, title) || !m.HasFile || m.MovieFile == nil {

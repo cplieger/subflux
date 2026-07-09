@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"
@@ -239,11 +239,11 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, _, err := s.authenticator.Authenticate(r); err != nil {
-		if authlib.IsBrowserRequest(r) {
+		if auth.IsBrowserRequest(r) {
 			http.ServeFileFS(w, r, staticSub, loginHTML)
 			return
 		}
-		api.UnauthorizedC(w, r, api.CodeUnauthorized, authlib.ErrUnauthenticated.Error())
+		api.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
 		return
 	}
 

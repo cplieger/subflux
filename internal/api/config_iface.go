@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"time"
+
+	"github.com/cplieger/auth/v2"
 )
 
 // ConfigProvider sub-interfaces. Consumers should accept the narrowest
@@ -68,7 +70,7 @@ type AuthConfigProvider interface {
 	AuthEnabled() bool
 	BasicAuthEnabled() bool
 	OIDCEnabled() bool
-	OIDCConfig() OIDCConfig
+	OIDCConfig() auth.OIDCConfig
 	SessionIdleTimeout() time.Duration
 	SessionAbsoluteTimeout() time.Duration
 	CheckBreachedPasswords() bool

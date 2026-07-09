@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -42,11 +42,11 @@ func TestListAPIKeys_WithData(t *testing.T) {
 	user := createTestUser(t, db, "listkeys-data", "correct-horse-battery-staple")
 
 	for i := range 2 {
-		_, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
+		_, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 		if err != nil {
 			t.Fatal(err)
 		}
-		key := &api.Key{
+		key := &auth.Key{
 			UserID:    user.ID,
 			KeyHash:   hash,
 			KeyPrefix: prefix,
@@ -126,12 +126,12 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 	user := createTestUser(t, db, "nancy", "correct-horse-battery-staple")
 
 	// Generate an API key (same logic as CLI).
-	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
+	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	apiKey := &api.Key{
+	apiKey := &auth.Key{
 		UserID:    user.ID,
 		KeyHash:   hash,
 		KeyPrefix: prefix,
@@ -192,12 +192,12 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	user := createTestUser(t, db, "karl", "correct-horse-battery-staple")
 
 	// Generate a key first.
-	plaintext, hash, prefix, suffix, err := authlib.GenerateAPIKey("sfx_")
+	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = plaintext
-	apiKey := &api.Key{
+	apiKey := &auth.Key{
 		UserID:    user.ID,
 		KeyHash:   hash,
 		KeyPrefix: prefix,

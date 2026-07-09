@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -23,7 +24,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 		CreatedAt time.Time `json:"created_at"`
 		Username  string    `json:"username"`
 		Email     string    `json:"email"`
-		Role      api.Role  `json:"role"`
+		Role      auth.Role `json:"role"`
 		ID        int64     `json:"id"`
 		Enabled   bool      `json:"enabled"`
 	}
@@ -50,10 +51,10 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	admin := api.UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
-		Username string   `json:"username"`
-		Password string   `json:"password"`
-		Role     api.Role `json:"role"`
-		Email    string   `json:"email"`
+		Username string    `json:"username"`
+		Password string    `json:"password"`
+		Role     auth.Role `json:"role"`
+		Email    string    `json:"email"`
 	}](w, r)
 	if !ok {
 		return
@@ -68,9 +69,9 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Role == "" {
-		req.Role = api.RoleUser
+		req.Role = auth.RoleUser
 	}
-	if req.Role != api.RoleAdmin && req.Role != api.RoleUser {
+	if req.Role != auth.RoleAdmin && req.Role != auth.RoleUser {
 		api.BadRequestC(w, r, api.CodeBadRequest, "role must be admin or user")
 		return
 	}
@@ -92,7 +93,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	newUser := &api.User{
+	newUser := &auth.User{
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: hash,
@@ -166,11 +167,11 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 // one *local* (password-bearing, break-glass) admin so an SSO outage can't lock
 // everyone out. A non-admin target, or an admin target that leaves the guards
 // satisfied, returns "".
-func lastAdminDeletionBlock(users []api.User, userID int64) string {
-	var target *api.User
+func lastAdminDeletionBlock(users []auth.User, userID int64) string {
+	var target *auth.User
 	adminCount, localAdmins := 0, 0
 	for i := range users {
-		if users[i].Role == api.RoleAdmin {
+		if users[i].Role == auth.RoleAdmin {
 			adminCount++
 			if users[i].PasswordHash != "" {
 				localAdmins++
@@ -180,7 +181,7 @@ func lastAdminDeletionBlock(users []api.User, userID int64) string {
 			target = &users[i]
 		}
 	}
-	if target == nil || target.Role != api.RoleAdmin {
+	if target == nil || target.Role != auth.RoleAdmin {
 		return ""
 	}
 	if adminCount <= 1 {

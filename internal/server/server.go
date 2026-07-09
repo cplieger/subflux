@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	authoidc "github.com/cplieger/auth/v2/oidc"
 	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
@@ -185,13 +186,13 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *we
 }
 
 // SetOIDCLazy stores the OIDC config for lazy provider initialization.
-func (s *Server) SetOIDCLazy(cfg api.OIDCConfig) {
+func (s *Server) SetOIDCLazy(cfg auth.OIDCConfig) {
 	s.oidcCfg = &cfg
 }
 
-// toAuthOIDCConfig adapts subflux's api.OIDCConfig to the auth/oidc package's
-// Config type (structurally identical, distinct named types).
-func toAuthOIDCConfig(c api.OIDCConfig) authoidc.Config {
+// toAuthOIDCConfig adapts the auth library's OIDCConfig to the auth/oidc
+// package's Config type (structurally identical, distinct named types).
+func toAuthOIDCConfig(c auth.OIDCConfig) authoidc.Config {
 	return authoidc.Config{
 		IssuerURL:    c.IssuerURL,
 		ClientID:     c.ClientID,

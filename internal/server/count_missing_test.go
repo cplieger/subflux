@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -63,8 +64,8 @@ func TestCountMissingSeries_series_with_zero_episodes(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 0}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 0}},
 	}
 
 	got := countMissingSeries(context.Background(), cfg, db, series, nil)
@@ -79,7 +80,7 @@ func TestCountMissingSeries_series_with_nil_statistics(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
-	series := []api.Series{
+	series := []arrapi.Series{
 		{TvdbID: 81189, Statistics: nil},
 	}
 
@@ -101,8 +102,8 @@ func TestCountMissingSeries_all_episodes_covered(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e03", Language: "fr", Variant: "standard"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 3}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 3}},
 	}
 
 	got := countMissingSeries(context.Background(), cfg, db, series, nil)
@@ -121,8 +122,8 @@ func TestCountMissingSeries_some_episodes_missing(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 3}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 3}},
 	}
 
 	// 3 episodes, 1 covered → 2 missing.
@@ -146,8 +147,8 @@ func TestCountMissingSeries_multiple_targets(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 2}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 2}},
 	}
 
 	// 2 targets × 2 episodes = 4 expected. fr: 2 covered, en: 0 covered → 2 missing.
@@ -163,8 +164,8 @@ func TestCountMissingSeries_no_targets(t *testing.T) {
 		targets: nil,
 	}
 	db := &countMissingStore{}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 5}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5}},
 	}
 
 	got := countMissingSeries(context.Background(), cfg, db, series, nil)
@@ -183,9 +184,9 @@ func TestCountMissingSeries_different_series_isolated(t *testing.T) {
 			{MediaID: "tvdb-100-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 100, Statistics: &api.SeriesStatistics{EpisodeFileCount: 1}},
-		{TvdbID: 200, Statistics: &api.SeriesStatistics{EpisodeFileCount: 2}},
+	series := []arrapi.Series{
+		{TvdbID: 100, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 1}},
+		{TvdbID: 200, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 2}},
 	}
 
 	// Series 100: 1 ep, 1 covered → 0 missing.
@@ -207,8 +208,8 @@ func TestCountMissingSeries_variant_matching(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e01", Language: "en", Variant: "standard"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 1}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 1}},
 	}
 
 	// Target is en/hi, but only en/standard exists → 1 missing.
@@ -237,7 +238,7 @@ func TestCountMissingMovies_movie_without_file(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: false},
 	}
 
@@ -257,7 +258,7 @@ func TestCountMissingMovies_movie_fully_covered(t *testing.T) {
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -273,7 +274,7 @@ func TestCountMissingMovies_movie_missing_subtitle(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -296,7 +297,7 @@ func TestCountMissingMovies_multiple_targets(t *testing.T) {
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -317,7 +318,7 @@ func TestCountMissingMovies_variant_matching(t *testing.T) {
 			{MediaID: "tmdb-1271", Language: "en", Variant: "standard"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -334,7 +335,7 @@ func TestCountMissingMovies_no_targets(t *testing.T) {
 		targets: nil,
 	}
 	db := &countMissingStore{}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -354,7 +355,7 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 			{MediaID: "tmdb-100", Language: "fr", Variant: "standard"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 100, HasFile: true},
 		{TmdbID: 200, HasFile: true},
 	}
@@ -381,8 +382,8 @@ func TestCountMissingSeries_db_error_returns_zero(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingErrorStore{}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 5}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5}},
 	}
 
 	got := countMissingSeries(context.Background(), cfg, db, series, nil)
@@ -397,7 +398,7 @@ func TestCountMissingMovies_db_error_returns_zero(t *testing.T) {
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingErrorStore{}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -420,8 +421,8 @@ func TestCountMissingSeries_ignored_codec_counts_as_missing(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 1}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 1}},
 	}
 
 	// PGS is ignored → episode counts as missing.
@@ -441,8 +442,8 @@ func TestCountMissingSeries_usable_sub_not_missing(t *testing.T) {
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
 	}
-	series := []api.Series{
-		{TvdbID: 81189, Statistics: &api.SeriesStatistics{EpisodeFileCount: 1}},
+	series := []arrapi.Series{
+		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 1}},
 	}
 
 	got := countMissingSeries(context.Background(), cfg, db, series, map[string]bool{"pgs": true})
@@ -461,7 +462,7 @@ func TestCountMissingMovies_ignored_codec_counts_as_missing(t *testing.T) {
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "embedded", Codec: "vobsub"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -483,7 +484,7 @@ func TestCountMissingMovies_usable_overrides_ignored(t *testing.T) {
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
@@ -501,7 +502,7 @@ func TestCountMissingMovies_empty_media_id_skipped(t *testing.T) {
 	}
 	db := &countMissingStore{}
 	// Movie with TmdbID=0 and no ImdbID produces empty mediaID.
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 0, HasFile: true},
 	}
 	got := countMissingMovies(context.Background(), cfg, db, movies, nil)
@@ -523,10 +524,10 @@ func TestCountMissing_sums_series_and_movies(t *testing.T) {
 		},
 		movieFiles: []api.SubtitleEntry{},
 	}
-	series := []api.Series{
-		{TvdbID: 100, Statistics: &api.SeriesStatistics{EpisodeFileCount: 2}},
+	series := []arrapi.Series{
+		{TvdbID: 100, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 2}},
 	}
-	movies := []api.Movie{
+	movies := []arrapi.Movie{
 		{TmdbID: 200, HasFile: true},
 	}
 

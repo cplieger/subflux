@@ -35,7 +35,8 @@ type Deps struct {
 	Alerts        AlertLog
 	LoadConfig    api.ConfigLoader
 	SchemaFunc    api.SchemaFunc
-	NewArrClient  func(baseURL, apiKey string) (api.ArrClient, error)
+	NewSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
+	NewRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
 	HotReload     func(ctx context.Context, cfg api.ConfigProvider) error
 	State         func() StateView
 	ConfigPath    func() string
@@ -54,7 +55,8 @@ type Handler struct {
 	alerts        AlertLog
 	loadConfig    api.ConfigLoader
 	schemaFunc    api.SchemaFunc
-	newArrClient  func(baseURL, apiKey string) (api.ArrClient, error)
+	newSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
+	newRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
 	hotReload     func(ctx context.Context, cfg api.ConfigProvider) error
 	state         func() StateView
 	configured    func() bool
@@ -70,7 +72,8 @@ func New(d *Deps) *Handler {
 		defaultConfig: d.DefaultConfig,
 		registry:      d.Registry,
 		alerts:        d.Alerts,
-		newArrClient:  d.NewArrClient,
+		newSonarr:     d.NewSonarr,
+		newRadarr:     d.NewRadarr,
 		hotReload:     d.HotReload,
 		state:         d.State,
 		configured:    d.Configured,
@@ -248,15 +251,27 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 			return nil
 		}
 	}
-	client, err := h.newArrClient(newArr.URL, newArr.APIKey)
+	pinger, err := h.newArrPinger(name, newArr.URL, newArr.APIKey)
 	if err != nil {
 		return err
 	}
-	if err := client.Ping(ctx); err != nil {
+	if err := pinger.Ping(ctx); err != nil {
 		slog.Warn(name+" connectivity check failed", "error", err)
 		return err
 	}
 	return nil
+}
+
+// newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a
+// connectivity check. Both role clients expose Ping.
+func (h *Handler) newArrPinger(name, baseURL, apiKey string) (interface {
+	Ping(context.Context) error
+}, error,
+) {
+	if name == "sonarr" {
+		return h.newSonarr(baseURL, apiKey)
+	}
+	return h.newRadarr(baseURL, apiKey)
 }
 
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.

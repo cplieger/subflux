@@ -66,17 +66,17 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 		}
 	}
 
-	var sonarrClient api.ArrClient
+	var sonarrClient api.SonarrClient
 	if sonarrCfg := newCfg.SonarrConfig(); sonarrCfg.URL != "" {
-		c, err := s.newArrClient(sonarrCfg.URL, sonarrCfg.APIKey)
+		c, err := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey)
 		if err != nil {
 			return fmt.Errorf("invalid sonarr config: %w", err)
 		}
 		sonarrClient = c
 	}
-	var radarrClient api.ArrClient
+	var radarrClient api.RadarrClient
 	if radarrCfg := newCfg.RadarrConfig(); radarrCfg.URL != "" {
-		c, err := s.newArrClient(radarrCfg.URL, radarrCfg.APIKey)
+		c, err := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey)
 		if err != nil {
 			return fmt.Errorf("invalid radarr config: %w", err)
 		}

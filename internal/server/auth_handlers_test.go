@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	authlib "github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
@@ -40,7 +40,7 @@ func TestChangePassword_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := authlib.VerifyPassword("new-password-is-here-now", updated.PasswordHash)
+	ok, err := auth.VerifyPassword("new-password-is-here-now", updated.PasswordHash)
 	if err != nil || !ok {
 		t.Error("new password verification failed")
 	}
@@ -92,7 +92,7 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 
 	// Hash a new password and update the user (same logic as CLI).
 	newPassword := "new-password-for-reset"
-	hash, err := authlib.HashPassword(newPassword)
+	hash, err := auth.HashPassword(newPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,13 +111,13 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := authlib.VerifyPassword(newPassword, updated.PasswordHash)
+	ok, err := auth.VerifyPassword(newPassword, updated.PasswordHash)
 	if err != nil || !ok {
 		t.Error("new password verification failed after reset")
 	}
 
 	// Verify old password no longer works.
-	ok, err = authlib.VerifyPassword("old-password-for-reset", updated.PasswordHash)
+	ok, err = auth.VerifyPassword("old-password-for-reset", updated.PasswordHash)
 	if err != nil {
 		t.Fatal(err)
 	}

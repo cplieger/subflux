@@ -1,6 +1,10 @@
 package api
 
-import "context"
+import (
+	"context"
+
+	"github.com/cplieger/auth/v2"
+)
 
 // Context keys. Each uses a distinct private type so keys from different
 // categories cannot collide, and external packages cannot fabricate them.
@@ -15,14 +19,14 @@ var (
 )
 
 // NewUserContext returns a new context with the given user stored in it.
-func NewUserContext(ctx context.Context, u *User) context.Context {
+func NewUserContext(ctx context.Context, u *auth.User) context.Context {
 	return context.WithValue(ctx, userContextKey, u)
 }
 
 // UserFromContext extracts the authenticated user from the request context.
 // Returns nil if no user is present.
-func UserFromContext(ctx context.Context) *User {
-	u, ok := ctx.Value(userContextKey).(*User)
+func UserFromContext(ctx context.Context) *auth.User {
+	u, ok := ctx.Value(userContextKey).(*auth.User)
 	if !ok {
 		return nil
 	}

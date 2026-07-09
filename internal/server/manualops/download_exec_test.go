@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -12,24 +13,29 @@ import (
 // lookups. Get* return the configured value (or error); Refresh* are unused by
 // the functions under test and are no-ops.
 type fakeArr struct {
-	movie  *api.Movie
-	series *api.Series
+	movie  arrapi.Movie
+	series arrapi.Series
 	getErr error
 }
 
-var _ ManualArrClient = (*fakeArr)(nil)
+var (
+	_ ManualSonarrClient = (*fakeArr)(nil)
+	_ ManualRadarrClient = (*fakeArr)(nil)
+)
 
-func (f *fakeArr) GetMovieByID(context.Context, int) (*api.Movie, error)   { return f.movie, f.getErr }
-func (f *fakeArr) GetSeriesByID(context.Context, int) (*api.Series, error) { return f.series, f.getErr }
-func (f *fakeArr) RefreshMovie(context.Context, int) error                 { return nil }
-func (f *fakeArr) RefreshSeries(context.Context, int) error                { return nil }
+func (f *fakeArr) GetMovieByID(context.Context, int) (arrapi.Movie, error) { return f.movie, f.getErr }
+func (f *fakeArr) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+	return f.series, f.getErr
+}
+func (f *fakeArr) RescanMovie(context.Context, int) error  { return nil }
+func (f *fakeArr) RescanSeries(context.Context, int) error { return nil }
 
 func TestResolveMediaIDs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
-		radarr      ManualArrClient
-		sonarr      ManualArrClient
+		radarr      ManualRadarrClient
+		sonarr      ManualSonarrClient
 		mediaType   api.MediaType
 		arrID       int
 		season      int
@@ -39,7 +45,7 @@ func TestResolveMediaIDs(t *testing.T) {
 	}{
 		{
 			name:        "movie resolved via radarr uses tmdb id for both",
-			radarr:      &fakeArr{movie: &api.Movie{TmdbID: 123}},
+			radarr:      &fakeArr{movie: arrapi.Movie{TmdbID: 123}},
 			mediaType:   api.MediaTypeMovie,
 			arrID:       5,
 			wantCover:   "tmdb-123",
@@ -62,7 +68,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		},
 		{
 			name:        "episode resolved via sonarr uses tvdb id for both",
-			sonarr:      &fakeArr{series: &api.Series{TvdbID: 999}},
+			sonarr:      &fakeArr{series: arrapi.Series{TvdbID: 999}},
 			mediaType:   api.MediaTypeEpisode,
 			arrID:       7,
 			season:      1,
@@ -106,29 +112,29 @@ func TestLookupMediaTitle(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
-		radarr    ManualArrClient
-		sonarr    ManualArrClient
+		radarr    ManualRadarrClient
+		sonarr    ManualSonarrClient
 		mediaType api.MediaType
 		arrID     int
 		want      string
 	}{
 		{
 			name:      "movie title from radarr",
-			radarr:    &fakeArr{movie: &api.Movie{Title: "The Matrix"}},
+			radarr:    &fakeArr{movie: arrapi.Movie{Title: "The Matrix"}},
 			mediaType: api.MediaTypeMovie,
 			arrID:     5,
 			want:      "The Matrix",
 		},
 		{
 			name:      "episode title from sonarr",
-			sonarr:    &fakeArr{series: &api.Series{Title: "Breaking Bad"}},
+			sonarr:    &fakeArr{series: arrapi.Series{Title: "Breaking Bad"}},
 			mediaType: api.MediaTypeEpisode,
 			arrID:     7,
 			want:      "Breaking Bad",
 		},
 		{
 			name:      "zero arr id never consults the client",
-			radarr:    &fakeArr{movie: &api.Movie{Title: "Should Not Be Read"}},
+			radarr:    &fakeArr{movie: arrapi.Movie{Title: "Should Not Be Read"}},
 			mediaType: api.MediaTypeMovie,
 			arrID:     0,
 			want:      "",

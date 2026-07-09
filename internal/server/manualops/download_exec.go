@@ -148,7 +148,7 @@ func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 		return ""
 	}
 	m, err := ls.Radarr.GetMovieByID(ctx, arrID)
-	if err != nil || m == nil {
+	if err != nil {
 		slog.Warn("failed to look up movie for media ID", "arr_id", arrID, "error", err)
 		return ""
 	}
@@ -161,7 +161,7 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 		return ""
 	}
 	ser, err := ls.Sonarr.GetSeriesByID(ctx, seriesID)
-	if err != nil || ser == nil {
+	if err != nil {
 		slog.Warn("failed to look up series for media ID", "series_id", seriesID, "error", err)
 		return ""
 	}
@@ -174,11 +174,11 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaTyp
 		return ""
 	}
 	if mediaType == api.MediaTypeMovie && ls.Radarr != nil {
-		if m, err := ls.Radarr.GetMovieByID(ctx, arrID); err == nil && m != nil {
+		if m, err := ls.Radarr.GetMovieByID(ctx, arrID); err == nil {
 			return m.Title
 		}
 	} else if mediaType == api.MediaTypeEpisode && ls.Sonarr != nil {
-		if ser, err := ls.Sonarr.GetSeriesByID(ctx, arrID); err == nil && ser != nil {
+		if ser, err := ls.Sonarr.GetSeriesByID(ctx, arrID); err == nil {
 			return ser.Title
 		}
 	}
@@ -202,12 +202,12 @@ func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
 	}
 
 	if mediaType == api.MediaTypeMovie && req.ArrID > 0 && ls.Radarr != nil {
-		if err := ls.Radarr.RefreshMovie(ctx, req.ArrID); err != nil {
+		if err := ls.Radarr.RescanMovie(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh movie in radarr",
 				"movie_id", req.ArrID, "error", err)
 		}
 	} else if mediaType == api.MediaTypeEpisode && req.ArrID > 0 && ls.Sonarr != nil {
-		if err := ls.Sonarr.RefreshSeries(ctx, req.ArrID); err != nil {
+		if err := ls.Sonarr.RescanSeries(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh series in sonarr",
 				"series_id", req.ArrID, "error", err)
 		}

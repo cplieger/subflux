@@ -6,21 +6,22 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 )
 
 // ScanEpisode searches for subtitles for a single episode.
 // Returns the scan outcome and the language codes that had at least one
 // subtitle downloaded.
-func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *api.Series, ep *api.Episode, forceUpgrade ...bool) (outcome ScanOutcome, foundLangs []string) {
+func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (outcome ScanOutcome, foundLangs []string) {
 	label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 	slog.Debug("scan: processing episode",
 		"media", label, "imdb", series.ImdbID,
 		"scene", ep.EpisodeFile.SceneName,
 		"path", ep.EpisodeFile.Path)
 
-	origLang := series.OriginalLangCode()
-	audioLangs := ep.EpisodeFile.AudioLanguages()
+	origLang := api.OriginalLangCode(series.OriginalLanguage)
+	audioLangs := api.AudioLanguages(ep.EpisodeFile.MediaInfo)
 	targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
 	req := EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
@@ -34,7 +35,7 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *api.Ser
 		mediaID := api.BuildMediaID(&req)
 		deps.Events.PublishCoverageUpdate(api.MediaTypeEpisode, mediaID)
 		if len(result.Paths) > 0 && ls.Sonarr != nil {
-			if err := ls.Sonarr.RefreshSeries(ctx, series.ID); err != nil {
+			if err := ls.Sonarr.RescanSeries(ctx, series.ID); err != nil {
 				slog.Warn("failed to refresh series", "series_id", series.ID, "error", err)
 			}
 		}
@@ -49,15 +50,15 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *api.Ser
 }
 
 // ScanMovie searches for subtitles for a single movie.
-func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *api.Movie, forceUpgrade ...bool) ScanOutcome {
+func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) ScanOutcome {
 	label := fmt.Sprintf("%s (%d)", m.Title, m.Year)
 	slog.Debug("scan: processing movie",
 		"media", label, "imdb", m.ImdbID, "tmdb", m.TmdbID,
 		"scene", m.MovieFile.SceneName,
 		"path", m.MovieFile.Path)
 
-	origLang := m.OriginalLangCode()
-	audioLangs := m.MovieFile.AudioLanguages()
+	origLang := api.OriginalLangCode(m.OriginalLanguage)
+	audioLangs := api.AudioLanguages(m.MovieFile.MediaInfo)
 	targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
 	req := MovieSearchRequest(m, ls.Cfg.LanguageCodes())
@@ -71,7 +72,7 @@ func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *api.Movie, for
 		mediaID := api.BuildMediaID(&req)
 		deps.Events.PublishCoverageUpdate(api.MediaTypeMovie, mediaID)
 		if len(result.Paths) > 0 && ls.Radarr != nil {
-			if err := ls.Radarr.RefreshMovie(ctx, m.ID); err != nil {
+			if err := ls.Radarr.RescanMovie(ctx, m.ID); err != nil {
 				slog.Warn("failed to refresh movie", "movie_id", m.ID, "error", err)
 			}
 		}
@@ -94,7 +95,7 @@ func SceneOrPath(sceneName, filePath string) string {
 }
 
 // ExtractAltTitles returns unique alternative titles, excluding the primary.
-func ExtractAltTitles(alts []api.AlternateTitle, primary string) []string {
+func ExtractAltTitles(alts []arrapi.AlternateTitle, primary string) []string {
 	if len(alts) == 0 {
 		return nil
 	}
@@ -117,7 +118,7 @@ func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 	items := make([]ScanItem, 0, 60000)
 	slog.Debug("fetching series from sonarr")
 	err := ls.Sonarr.GetWantedEpisodes(ctx, excludeTags,
-		func(series api.Series, ep api.Episode) error {
+		func(series arrapi.Series, ep arrapi.Episode) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -142,7 +143,7 @@ func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 	items := make([]ScanItem, 0, 5000)
 	slog.Debug("fetching movies from radarr")
 	err := ls.Radarr.GetWantedMovies(ctx, excludeTags,
-		func(m api.Movie) error {
+		func(m arrapi.Movie) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -162,11 +163,11 @@ func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 // EpisodeSearchRequest builds a SearchRequest from arr Series+Episode data.
 // This is the single source of truth for the episode→SearchRequest mapping,
 // used by both scanning and polling.
-func EpisodeSearchRequest(series *api.Series, ep *api.Episode, langs []string) api.SearchRequest {
-	origLang := series.OriginalLangCode()
+func EpisodeSearchRequest(series *arrapi.Series, ep *arrapi.Episode, langs []string) api.SearchRequest {
+	origLang := api.OriginalLangCode(series.OriginalLanguage)
 	var audioLangs []string
 	if ep.EpisodeFile != nil {
-		audioLangs = ep.EpisodeFile.AudioLanguages()
+		audioLangs = api.AudioLanguages(ep.EpisodeFile.MediaInfo)
 	}
 	resolvedAudio := origLang
 	if resolvedAudio == "" && len(audioLangs) > 0 {
@@ -198,11 +199,11 @@ func EpisodeSearchRequest(series *api.Series, ep *api.Episode, langs []string) a
 // MovieSearchRequest builds a SearchRequest from arr Movie data.
 // This is the single source of truth for the movie→SearchRequest mapping,
 // used by both scanning and polling.
-func MovieSearchRequest(m *api.Movie, langs []string) api.SearchRequest {
-	origLang := m.OriginalLangCode()
+func MovieSearchRequest(m *arrapi.Movie, langs []string) api.SearchRequest {
+	origLang := api.OriginalLangCode(m.OriginalLanguage)
 	var audioLangs []string
 	if m.MovieFile != nil {
-		audioLangs = m.MovieFile.AudioLanguages()
+		audioLangs = api.AudioLanguages(m.MovieFile.MediaInfo)
 	}
 	resolvedAudio := origLang
 	if resolvedAudio == "" && len(audioLangs) > 0 {

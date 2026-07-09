@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
@@ -44,7 +45,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	user := createTestUser(t, db, "alex", "correct-horse-battery-staple")
 	// Regular (non-admin) account: link-on-login migrates it to SSO-only.
 	// (The last-local-admin guard only blocks admins.)
-	user.Role = api.RoleUser
+	user.Role = auth.RoleUser
 	if err := db.UpdateUser(context.Background(), user); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +104,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	s, db := testAuthServer(t)
 
 	// OIDC-only account: no password, no passkey → unlink refused.
-	oidcOnly := &api.User{Username: "oidconly", Role: api.RoleUser, Enabled: true, OIDCSub: "sub-x", OIDCIssuer: "iss"}
+	oidcOnly := &auth.User{Username: "oidconly", Role: auth.RoleUser, Enabled: true, OIDCSub: "sub-x", OIDCIssuer: "iss"}
 	if err := db.CreateUser(context.Background(), oidcOnly); err != nil {
 		t.Fatal(err)
 	}

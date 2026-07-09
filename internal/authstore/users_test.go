@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/auth/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
@@ -337,8 +336,8 @@ func TestDeleteUser_cascadesAndIsolates(t *testing.T) {
 
 	// Seed ephemeral sessions for both users.
 	s.mu.Lock()
-	s.sessions["victim-sess"] = &api.Session{UserID: victim.ID, TokenHash: "victim-sess"}
-	s.sessions["keep-sess"] = &api.Session{UserID: keep.ID, TokenHash: "keep-sess"}
+	s.sessions["victim-sess"] = &auth.Session{UserID: victim.ID, TokenHash: "victim-sess"}
+	s.sessions["keep-sess"] = &auth.Session{UserID: keep.ID, TokenHash: "keep-sess"}
 	s.mu.Unlock()
 
 	if err := s.DeleteUser(ctx, victim.ID); err != nil {

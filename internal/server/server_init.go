@@ -43,7 +43,8 @@ func (s *Server) initHandlers() {
 		DefaultConfig: s.defaultConfig,
 		Registry:      s.registry,
 		Alerts:        s.alerts,
-		NewArrClient:  s.newArrClient,
+		NewSonarr:     s.newSonarr,
+		NewRadarr:     s.newRadarr,
 		HotReload:     s.hotReload,
 		State: func() confighandlers.StateView {
 			ls := s.state()

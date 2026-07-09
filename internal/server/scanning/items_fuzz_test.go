@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 )
 
 // FuzzSortByTitleIdempotent verifies the idempotence invariant:
@@ -17,8 +17,8 @@ func FuzzSortByTitleIdempotent(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, titleA string, seasonA, epA int, titleB string, seasonB, epB int) {
 		episodes := []ScanItem{
-			{Series: &api.Series{Title: titleA}, Ep: &api.Episode{SeasonNumber: seasonA, EpisodeNumber: epA}},
-			{Series: &api.Series{Title: titleB}, Ep: &api.Episode{SeasonNumber: seasonB, EpisodeNumber: epB}},
+			{Series: &arrapi.Series{Title: titleA}, Ep: &arrapi.Episode{SeasonNumber: seasonA, EpisodeNumber: epA}},
+			{Series: &arrapi.Series{Title: titleB}, Ep: &arrapi.Episode{SeasonNumber: seasonB, EpisodeNumber: epB}},
 		}
 
 		sorted1 := SortByTitle(episodes, nil)
@@ -46,11 +46,11 @@ func FuzzSortByTitleStable(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, t1 string, s1, e1 int, t2 string, s2, e2 int, t3 string, s3, e3 int) {
 		episodes := []ScanItem{
-			{Series: &api.Series{Title: t1}, Ep: &api.Episode{SeasonNumber: s1, EpisodeNumber: e1}},
-			{Series: &api.Series{Title: t2}, Ep: &api.Episode{SeasonNumber: s2, EpisodeNumber: e2}},
+			{Series: &arrapi.Series{Title: t1}, Ep: &arrapi.Episode{SeasonNumber: s1, EpisodeNumber: e1}},
+			{Series: &arrapi.Series{Title: t2}, Ep: &arrapi.Episode{SeasonNumber: s2, EpisodeNumber: e2}},
 		}
 		movies := []ScanItem{
-			{Movie: &api.Movie{Title: t3}},
+			{Movie: &arrapi.Movie{Title: t3}},
 		}
 
 		sorted := SortByTitle(episodes, movies)

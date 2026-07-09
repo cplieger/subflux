@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
@@ -26,8 +26,8 @@ func (c *Config) BasicAuthEnabled() bool {
 func (c *Config) OIDCEnabled() bool { return c.Auth.OIDCEnabled }
 
 // OIDCConfig returns the OIDC provider settings.
-func (c *Config) OIDCConfig() api.OIDCConfig {
-	return api.OIDCConfig{
+func (c *Config) OIDCConfig() auth.OIDCConfig {
+	return auth.OIDCConfig{
 		IssuerURL:    c.Auth.OIDC.IssuerURL,
 		ClientID:     c.Auth.OIDC.ClientID,
 		ClientSecret: c.Auth.OIDC.ClientSecret,

@@ -3,6 +3,7 @@ package server
 import (
 	"testing"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/scanning"
 )
@@ -11,7 +12,7 @@ import (
 
 func TestSkipResumed_nil_recent_returns_false(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 100}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 100}}
 	stats := &api.ScanStats{}
 
 	got := scanning.SkipResumed(item, nil, stats)
@@ -26,7 +27,7 @@ func TestSkipResumed_nil_recent_returns_false(t *testing.T) {
 
 func TestSkipResumed_movie_not_in_recent(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 100}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 100}}
 	recent := map[string]bool{"tmdb-200": true}
 	stats := &api.ScanStats{}
 
@@ -42,7 +43,7 @@ func TestSkipResumed_movie_not_in_recent(t *testing.T) {
 
 func TestSkipResumed_movie_in_recent(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 100}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 100}}
 	recent := map[string]bool{"tmdb-100": true}
 	stats := &api.ScanStats{}
 
@@ -65,8 +66,8 @@ func TestSkipResumed_movie_in_recent(t *testing.T) {
 func TestSkipResumed_episode_not_in_recent(t *testing.T) {
 	t.Parallel()
 	item := scanning.ScanItem{
-		Series: &api.Series{TvdbID: 81189},
-		Ep:     &api.Episode{SeasonNumber: 1, EpisodeNumber: 3},
+		Series: &arrapi.Series{TvdbID: 81189},
+		Ep:     &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 3},
 	}
 	recent := map[string]bool{"tvdb-81189-s01e01": true}
 	stats := &api.ScanStats{}
@@ -84,8 +85,8 @@ func TestSkipResumed_episode_not_in_recent(t *testing.T) {
 func TestSkipResumed_episode_in_recent(t *testing.T) {
 	t.Parallel()
 	item := scanning.ScanItem{
-		Series: &api.Series{TvdbID: 81189},
-		Ep:     &api.Episode{SeasonNumber: 2, EpisodeNumber: 5},
+		Series: &arrapi.Series{TvdbID: 81189},
+		Ep:     &arrapi.Episode{SeasonNumber: 2, EpisodeNumber: 5},
 	}
 	recent := map[string]bool{"tvdb-81189-s02e05": true}
 	stats := &api.ScanStats{}
@@ -110,8 +111,8 @@ func TestSkipResumed_episode_media_id_format(t *testing.T) {
 	t.Parallel()
 	// Verify the exact media ID format: tvdb-{id}-s{SS}e{EE}
 	item := scanning.ScanItem{
-		Series: &api.Series{TvdbID: 12345},
-		Ep:     &api.Episode{SeasonNumber: 10, EpisodeNumber: 99},
+		Series: &arrapi.Series{TvdbID: 12345},
+		Ep:     &arrapi.Episode{SeasonNumber: 10, EpisodeNumber: 99},
 	}
 	recent := map[string]bool{"tvdb-12345-s10e99": true}
 	stats := &api.ScanStats{}
@@ -125,7 +126,7 @@ func TestSkipResumed_episode_media_id_format(t *testing.T) {
 
 func TestSkipResumed_empty_recent_map(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 100}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 100}}
 	recent := map[string]bool{}
 	stats := &api.ScanStats{}
 
@@ -139,7 +140,7 @@ func TestSkipResumed_empty_recent_map(t *testing.T) {
 func TestSkipResumed_stats_accumulate(t *testing.T) {
 	t.Parallel()
 	stats := &api.ScanStats{MoviesSearched: 5, MoviesSkipped: 2}
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 100}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 100}}
 	recent := map[string]bool{"tmdb-100": true}
 
 	scanning.SkipResumed(item, recent, stats)
@@ -154,7 +155,7 @@ func TestSkipResumed_stats_accumulate(t *testing.T) {
 
 func TestSkipResumed_movie_empty_media_id_returns_false(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 0}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 0}}
 	recent := map[string]bool{"tmdb-0": true, "": true}
 	stats := &api.ScanStats{}
 
@@ -170,7 +171,7 @@ func TestSkipResumed_movie_empty_media_id_returns_false(t *testing.T) {
 
 func TestSkipResumed_movie_imdb_fallback(t *testing.T) {
 	t.Parallel()
-	item := scanning.ScanItem{Movie: &api.Movie{TmdbID: 0, ImdbID: "tt1234567"}}
+	item := scanning.ScanItem{Movie: &arrapi.Movie{TmdbID: 0, ImdbID: "tt1234567"}}
 	recent := map[string]bool{"tt1234567": true}
 	stats := &api.ScanStats{}
 
@@ -187,8 +188,8 @@ func TestSkipResumed_movie_imdb_fallback(t *testing.T) {
 func TestSkipResumed_episode_imdb_fallback(t *testing.T) {
 	t.Parallel()
 	item := scanning.ScanItem{
-		Series: &api.Series{TvdbID: 0, ImdbID: "tt9999999"},
-		Ep:     &api.Episode{SeasonNumber: 1, EpisodeNumber: 5},
+		Series: &arrapi.Series{TvdbID: 0, ImdbID: "tt9999999"},
+		Ep:     &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 5},
 	}
 	recent := map[string]bool{"tt9999999-s01e05": true}
 	stats := &api.ScanStats{}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 )
 
 // FuzzExtractAltTitlesNoDuplicates verifies that ExtractAltTitles never
@@ -16,7 +16,7 @@ func FuzzExtractAltTitlesNoDuplicates(f *testing.F) {
 	f.Add("X", "", "", "")
 
 	f.Fuzz(func(t *testing.T, primary, a1, a2, a3 string) {
-		alts := []api.AlternateTitle{
+		alts := []arrapi.AlternateTitle{
 			{Title: a1},
 			{Title: a2},
 			{Title: a3},

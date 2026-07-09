@@ -1,6 +1,10 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	"github.com/cplieger/auth/v2"
+)
 
 // SetupStatus is the JSON response for GET /api/auth/setup.
 type SetupStatus struct {
@@ -10,13 +14,13 @@ type SetupStatus struct {
 
 // MeResponse is the JSON response for GET /api/auth/me.
 type MeResponse struct {
-	Username    string `json:"username"`
-	Role        Role   `json:"role"`
-	ID          int64  `json:"id"`
-	HasPasskeys bool   `json:"has_passkeys"`
-	OIDCLinked  bool   `json:"oidc_linked"`
-	HasPassword bool   `json:"has_password"`
-	CanLinkOIDC bool   `json:"can_link_oidc"`
+	Username    string    `json:"username"`
+	Role        auth.Role `json:"role"`
+	ID          int64     `json:"id"`
+	HasPasskeys bool      `json:"has_passkeys"`
+	OIDCLinked  bool      `json:"oidc_linked"`
+	HasPassword bool      `json:"has_password"`
+	CanLinkOIDC bool      `json:"can_link_oidc"`
 }
 
 // LoginSuccess is the JSON response after successful login.
@@ -60,8 +64,8 @@ type KeyGenerated struct {
 
 // AdminUserCreatedResponse is the JSON response after admin creates a user.
 type AdminUserCreatedResponse struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Role     Role   `json:"role"`
-	ID       int64  `json:"id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	Role     auth.Role `json:"role"`
+	ID       int64     `json:"id"`
 }

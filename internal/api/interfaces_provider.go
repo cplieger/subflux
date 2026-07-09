@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"time"
+
+	"github.com/cplieger/arrapi"
 )
 
 // This file contains implementation/provider contracts: interfaces that
@@ -83,54 +85,42 @@ type Scorer interface {
 	ScoreToTier(score int, mediaType MediaType) ScoreTier
 }
 
-// --- Arr Client ---
+// --- Arr clients ---
+//
+// arrapi splits Sonarr and Radarr into two concrete clients, so subflux models
+// them as two role interfaces rather than one combined client. A single
+// subflux instance holds one SonarrClient and one RadarrClient; calling a movie
+// method on a series client is a compile error, not a runtime 404.
+// *arrsvc.Sonarr and *arrsvc.Radarr satisfy these structurally. By-ID getters
+// return values (an absent ID surfaces as an IsNotFound error, not a nil
+// pointer), matching arrapi. GetHistorySince is variadic (no event types = all).
 
-// ArrPinger verifies arr instance connectivity.
-type ArrPinger interface {
+// SonarrClient is the Sonarr-side surface subflux consumes: library reads,
+// per-item lookups, import-history polling, wanted-episode iteration,
+// exclude-tag resolution, and a post-download rescan.
+type SonarrClient interface {
 	Ping(ctx context.Context) error
-}
-
-// ArrBatchFetcher fetches bulk series/episode/movie lists.
-type ArrBatchFetcher interface {
-	GetSeries(ctx context.Context) ([]Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]Episode, error)
-	GetMovies(ctx context.Context) ([]Movie, error)
-}
-
-// ArrItemFetcher fetches individual items by ID.
-type ArrItemFetcher interface {
-	GetSeriesByID(ctx context.Context, id int) (*Series, error)
-	GetEpisodeByID(ctx context.Context, id int) (*Episode, error)
-	GetMovieByID(ctx context.Context, id int) (*Movie, error)
-}
-
-// ArrHistoryFetcher fetches history entries.
-type ArrHistoryFetcher interface {
-	GetHistorySince(ctx context.Context, since time.Time, eventType HistoryEventType) ([]HistoryEntry, error)
-}
-
-// ArrWantedIterator iterates wanted items with exclusion support.
-type ArrWantedIterator interface {
-	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(Series, Episode) error) error
-	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(Movie) error) error
+	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	GetEpisodeByID(ctx context.Context, id int) (arrapi.Episode, error)
+	GetHistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
+	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
+	RescanSeries(ctx context.Context, seriesID int) error
 }
 
-// ArrRefresher triggers arr refreshes.
-type ArrRefresher interface {
-	RefreshSeries(ctx context.Context, seriesID int) error
-	RefreshMovie(ctx context.Context, movieID int) error
-}
-
-// ArrClient abstracts Sonarr/Radarr API operations used by the server.
-// Composed of canonical sub-interfaces for narrow consumer usage.
-type ArrClient interface {
-	ArrPinger
-	ArrBatchFetcher
-	ArrItemFetcher
-	ArrHistoryFetcher
-	ArrWantedIterator
-	ArrRefresher
+// RadarrClient is the Radarr-side surface subflux consumes: library reads,
+// per-item lookups, import-history polling, wanted-movie iteration, exclude-tag
+// resolution, and a post-download rescan.
+type RadarrClient interface {
+	Ping(ctx context.Context) error
+	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	GetHistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
+	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
+	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
+	RescanMovie(ctx context.Context, movieID int) error
 }
 
 // --- Config loading ---

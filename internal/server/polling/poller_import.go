@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
@@ -83,7 +84,7 @@ func (p *Poller) processPollImport(
 }
 
 // processSonarrImport handles a single Sonarr import event from the history API.
-func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *api.HistoryEntry, excludeIDs map[int]struct{}) {
+func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) {
 	path := entry.ImportedPath()
 
 	p.processPollImport(ctx, ls, path,
@@ -106,14 +107,14 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 
 			label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 
-			origLang := series.OriginalLangCode()
+			origLang := api.OriginalLangCode(series.OriginalLanguage)
 			var audioLangs []string
 			if ep.EpisodeFile != nil {
-				audioLangs = ep.EpisodeFile.AudioLanguages()
+				audioLangs = api.AudioLanguages(ep.EpisodeFile.MediaInfo)
 			}
 			targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
-			req := scanning.EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
+			req := scanning.EpisodeSearchRequest(&series, &ep, ls.Cfg.LanguageCodes())
 
 			return &ImportResult{
 				Req:       &req,
@@ -124,13 +125,13 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 			}, nil
 		},
 		func(ctx context.Context, id int) error {
-			return ls.Sonarr.RefreshSeries(ctx, id)
+			return ls.Sonarr.RescanSeries(ctx, id)
 		},
 	)
 }
 
 // processRadarrImport handles a single Radarr import event from the history API.
-func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *api.HistoryEntry, excludeIDs map[int]struct{}) {
+func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) {
 	path := entry.ImportedPath()
 
 	p.processPollImport(ctx, ls, path,
@@ -147,14 +148,14 @@ func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *
 
 			label := fmt.Sprintf("%s (%d)", movie.Title, movie.Year)
 
-			origLang := movie.OriginalLangCode()
+			origLang := api.OriginalLangCode(movie.OriginalLanguage)
 			var audioLangs []string
 			if movie.MovieFile != nil {
-				audioLangs = movie.MovieFile.AudioLanguages()
+				audioLangs = api.AudioLanguages(movie.MovieFile.MediaInfo)
 			}
 			targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
-			req := scanning.MovieSearchRequest(movie, ls.Cfg.LanguageCodes())
+			req := scanning.MovieSearchRequest(&movie, ls.Cfg.LanguageCodes())
 
 			return &ImportResult{
 				Req:       &req,
@@ -165,7 +166,7 @@ func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *
 			}, nil
 		},
 		func(ctx context.Context, id int) error {
-			return ls.Radarr.RefreshMovie(ctx, id)
+			return ls.Radarr.RescanMovie(ctx, id)
 		},
 	)
 }

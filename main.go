@@ -16,7 +16,7 @@ import (
 	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/health"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/arrapi"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/cliparse"
@@ -40,7 +40,6 @@ var (
 	_ authstore.AuthStore = (*authstore.Store)(nil)
 	_ api.ConfigProvider  = (*config.Config)(nil)
 	_ api.Scorer          = (*scorer.Engine)(nil)
-	_ api.ArrClient       = (*arrapi.Client)(nil)
 )
 
 //go:embed config.example.yaml
@@ -268,7 +267,7 @@ func runServer() int {
 		mx := metrics.New()
 		srv := server.New(db, reg,
 			server.WithDefaultConfig(defaultConfig),
-			server.WithArrClientFactory(newArrClientFactory()),
+			server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
 			server.WithWire(newWireFunc(reg)),
 			server.WithSchema(schema.Schema),
 			server.WithConfigLoader(newConfigLoader()),
@@ -321,9 +320,10 @@ func runConfiguredServer(cfg *config.Config) int {
 	defer m.Cleanup()
 
 	// Create arr clients from config.
-	var sonarr, radarr api.ArrClient
+	var sonarr api.SonarrClient
+	var radarr api.RadarrClient
 	if sc := cfg.SonarrConfig(); sc.URL != "" {
-		c, err := arrapi.NewClient(sc.URL, sc.APIKey)
+		c, err := arrsvc.NewSonarr(sc.URL, sc.APIKey)
 		if err != nil {
 			slog.Error("invalid sonarr config", "error", err)
 			return 1
@@ -332,7 +332,7 @@ func runConfiguredServer(cfg *config.Config) int {
 		defer c.Close()
 	}
 	if rc := cfg.RadarrConfig(); rc.URL != "" {
-		c, err := arrapi.NewClient(rc.URL, rc.APIKey)
+		c, err := arrsvc.NewRadarr(rc.URL, rc.APIKey)
 		if err != nil {
 			slog.Error("invalid radarr config", "error", err)
 			return 1
@@ -346,7 +346,7 @@ func runConfiguredServer(cfg *config.Config) int {
 	srv := server.New(db, reg,
 		server.WithDefaultConfig(defaultConfig),
 		server.WithConfig(cfg, sonarr, radarr),
-		server.WithArrClientFactory(newArrClientFactory()),
+		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
 		server.WithWire(newWireFunc(reg)),
 		server.WithSchema(schema.Schema),
 		server.WithConfigLoader(newConfigLoader()),
@@ -412,11 +412,26 @@ func serveAndWait(ctx context.Context, cancel context.CancelFunc, m *health.Mark
 
 // --- Environment ---
 
-// newArrClientFactory returns a function that creates arr API clients.
-// Used by the server for hot reload (creating new clients from updated config).
-func newArrClientFactory() func(baseURL, apiKey string) (api.ArrClient, error) {
-	return func(baseURL, apiKey string) (api.ArrClient, error) {
-		return arrapi.NewClient(baseURL, apiKey)
+// newSonarrFactory returns a function that creates Sonarr API clients, used by
+// the server for hot reload and config-save connectivity checks.
+func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
+	return func(baseURL, apiKey string) (api.SonarrClient, error) {
+		c, err := arrsvc.NewSonarr(baseURL, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+}
+
+// newRadarrFactory returns a function that creates Radarr API clients.
+func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
+	return func(baseURL, apiKey string) (api.RadarrClient, error) {
+		c, err := arrsvc.NewRadarr(baseURL, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
 	}
 }
 

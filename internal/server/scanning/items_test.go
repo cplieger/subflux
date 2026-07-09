@@ -3,7 +3,7 @@ package scanning
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 )
 
 // SortByTitle returns every input item; one episode and one movie together
@@ -11,8 +11,8 @@ import (
 // would silently drop the whole queue.)
 func TestSortByTitle_returns_all_items(t *testing.T) {
 	t.Parallel()
-	ep := ScanItem{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 1}}
-	mv := ScanItem{Movie: &api.Movie{Title: "Movie"}}
+	ep := ScanItem{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 1}}
+	mv := ScanItem{Movie: &arrapi.Movie{Title: "Movie"}}
 
 	got := SortByTitle([]ScanItem{ep}, []ScanItem{mv})
 
@@ -24,8 +24,8 @@ func TestSortByTitle_returns_all_items(t *testing.T) {
 // Same-title episodes are ordered by season number ahead of episode number.
 func TestSortByTitle_orders_by_season(t *testing.T) {
 	t.Parallel()
-	s1 := ScanItem{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 9}}
-	s2 := ScanItem{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 2, EpisodeNumber: 1}}
+	s1 := ScanItem{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 9}}
+	s2 := ScanItem{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 2, EpisodeNumber: 1}}
 
 	got := SortByTitle([]ScanItem{s2, s1}, nil)
 
@@ -40,8 +40,8 @@ func TestSortByTitle_orders_by_season(t *testing.T) {
 // Same-title, same-season episodes are ordered by ascending episode number.
 func TestSortByTitle_orders_by_episode(t *testing.T) {
 	t.Parallel()
-	e3 := ScanItem{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 3}}
-	e1 := ScanItem{Series: &api.Series{Title: "Show"}, Ep: &api.Episode{SeasonNumber: 1, EpisodeNumber: 1}}
+	e3 := ScanItem{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 3}}
+	e1 := ScanItem{Series: &arrapi.Series{Title: "Show"}, Ep: &arrapi.Episode{SeasonNumber: 1, EpisodeNumber: 1}}
 
 	got := SortByTitle([]ScanItem{e3, e1}, nil)
 
@@ -63,8 +63,8 @@ func TestScanItemTitle(t *testing.T) {
 		item ScanItem
 		want string
 	}{
-		{"series", ScanItem{Series: &api.Series{Title: "TheSeries"}}, "TheSeries"},
-		{"movie", ScanItem{Movie: &api.Movie{Title: "TheMovie"}}, "TheMovie"},
+		{"series", ScanItem{Series: &arrapi.Series{Title: "TheSeries"}}, "TheSeries"},
+		{"movie", ScanItem{Movie: &arrapi.Movie{Title: "TheMovie"}}, "TheMovie"},
 		{"neither", ScanItem{}, ""},
 	}
 	for _, tc := range cases {

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi"
 )
 
 func TestHandleMediaSeries_no_sonarr_returns_empty(t *testing.T) {
@@ -59,15 +59,15 @@ func TestHandleMediaEpisodes_no_sonarr(t *testing.T) {
 
 type mediaSeriesArrClient struct{ dummyArrClient }
 
-func (mediaSeriesArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
-	return []api.Series{
+func (mediaSeriesArrClient) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+	return []arrapi.Series{
 		{
 			ID:     1,
 			Title:  "Breaking Bad",
 			Year:   2008,
 			TvdbID: 81189,
 			ImdbID: "tt0903747",
-			Statistics: &api.SeriesStatistics{
+			Statistics: &arrapi.SeriesStatistics{
 				EpisodeFileCount: 62,
 				SeasonCount:      5,
 			},
@@ -84,14 +84,14 @@ func (mediaSeriesArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
 
 type mediaSeriesErrorArrClient struct{ dummyArrClient }
 
-func (mediaSeriesErrorArrClient) GetSeries(_ context.Context) ([]api.Series, error) {
+func (mediaSeriesErrorArrClient) GetSeries(_ context.Context) ([]arrapi.Series, error) {
 	return nil, errMock
 }
 
 type mediaMoviesArrClient struct{ dummyArrClient }
 
-func (mediaMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
-	return []api.Movie{
+func (mediaMoviesArrClient) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+	return []arrapi.Movie{
 		{
 			ID:      10,
 			Title:   "Inception",
@@ -99,7 +99,7 @@ func (mediaMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
 			TmdbID:  27205,
 			ImdbID:  "tt1375666",
 			HasFile: true,
-			MovieFile: &api.MovieFile{
+			MovieFile: &arrapi.MovieFile{
 				Path:      "/movies/Inception (2010)/Inception.mkv",
 				SceneName: "Inception.2010.1080p.BluRay",
 			},
@@ -116,21 +116,21 @@ func (mediaMoviesArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
 
 type mediaMoviesErrorArrClient struct{ dummyArrClient }
 
-func (mediaMoviesErrorArrClient) GetMovies(_ context.Context) ([]api.Movie, error) {
+func (mediaMoviesErrorArrClient) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
 	return nil, errMock
 }
 
 type mediaEpisodesArrClient struct{ dummyArrClient }
 
-func (mediaEpisodesArrClient) GetEpisodes(_ context.Context, _ int) ([]api.Episode, error) {
-	return []api.Episode{
+func (mediaEpisodesArrClient) GetEpisodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
+	return []arrapi.Episode{
 		{
 			ID:            101,
 			Title:         "Pilot",
 			SeasonNumber:  1,
 			EpisodeNumber: 1,
 			HasFile:       true,
-			EpisodeFile: &api.EpisodeFile{
+			EpisodeFile: &arrapi.EpisodeFile{
 				Path:      "/tv/Show/S01E01.mkv",
 				SceneName: "Show.S01E01.720p",
 			},
@@ -151,7 +151,7 @@ func (mediaEpisodesArrClient) GetEpisodes(_ context.Context, _ int) ([]api.Episo
 			SeasonNumber:  1,
 			EpisodeNumber: 2,
 			HasFile:       true,
-			EpisodeFile: &api.EpisodeFile{
+			EpisodeFile: &arrapi.EpisodeFile{
 				Path:      "/tv/Show/S01E02.mkv",
 				SceneName: "Show.S01E02.720p",
 			},
@@ -161,7 +161,7 @@ func (mediaEpisodesArrClient) GetEpisodes(_ context.Context, _ int) ([]api.Episo
 
 type mediaEpisodesErrorArrClient struct{ dummyArrClient }
 
-func (mediaEpisodesErrorArrClient) GetEpisodes(_ context.Context, _ int) ([]api.Episode, error) {
+func (mediaEpisodesErrorArrClient) GetEpisodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
 	return nil, errMock
 }
 
