@@ -13,7 +13,7 @@ IMG="${1:?usage: image-smoke.sh <image-ref>}"
 NAME="smoke-subflux-$$"
 TIMEOUT=90 # must cover the image's healthcheck start-period + a few intervals
 
-# shellcheck disable=SC2329  # invoked indirectly via trap
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via trap
 cleanup() {
   code=$?
   # Dump container logs only on failure (a passing run stays quiet).
