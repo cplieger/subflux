@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
@@ -87,7 +87,7 @@ const maxBodySize = httphelpers.MaxDefaultBodySize
 // HandleGetConfig returns the current config file with secrets redacted.
 func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	configPath := h.configPath()
-	data, err := fsutil.ReadBounded(r.Context(), configPath, maxBodySize)
+	data, err := atomicfile.ReadBounded(r.Context(), configPath, maxBodySize)
 	if err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", configPath)
 		return
@@ -276,5 +276,6 @@ func (h *Handler) newArrPinger(name, baseURL, apiKey string) (interface {
 
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.
 func atomicWriteConfig(ctx context.Context, path string, data []byte) error {
-	return fsutil.AtomicWriteFileMode(ctx, path, data, 0o600)
+	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600))
+	return err
 }

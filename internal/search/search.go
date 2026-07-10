@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/timeout"
 	"golang.org/x/sync/errgroup"
@@ -26,7 +26,7 @@ type SearchMetrics interface {
 }
 
 // FileWriter abstracts atomic file writes, decoupling the search engine from
-// the concrete fsutil implementation. The default wraps fsutil.AtomicWriteFile;
+// the concrete atomicfile implementation. The default wraps atomicfile.WriteFile;
 // tests can inject a stub that records writes without touching disk.
 type FileWriter interface {
 	WriteFile(ctx context.Context, path string, data []byte) error
@@ -106,11 +106,12 @@ func (noopHealth) RecordFailure(api.ProviderID, error)           {}
 func (noopHealth) Status() map[api.ProviderID]api.ProviderStatus { return nil }
 func (noopHealth) Reset()                                        {}
 
-// fsutilWriter is the default FileWriter that delegates to fsutil.AtomicWriteFile.
-type fsutilWriter struct{}
+// atomicWriter is the default FileWriter that delegates to atomicfile.WriteFile.
+type atomicWriter struct{}
 
-func (fsutilWriter) WriteFile(ctx context.Context, path string, data []byte) error {
-	return fsutil.AtomicWriteFile(ctx, path, data)
+func (atomicWriter) WriteFile(ctx context.Context, path string, data []byte) error {
+	_, err := atomicfile.WriteFile(ctx, path, data)
+	return err
 }
 
 // New creates a search engine. The providers slice is required; all other
@@ -149,7 +150,7 @@ func New(providers []api.Provider, opts ...Option) *Engine {
 		e.timeout = noopHealth{}
 	}
 	if e.fileWriter == nil {
-		e.fileWriter = fsutilWriter{}
+		e.fileWriter = atomicWriter{}
 	}
 	return e
 }

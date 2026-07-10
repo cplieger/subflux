@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/atomicfile/v2"
 )
 
 // --- Secret management ---
@@ -77,7 +77,7 @@ func RedactSecrets(data []byte) []byte {
 
 // MergeSecrets fills empty secret values in newData from the existing config file.
 func MergeSecrets(newData []byte, configPath string) []byte {
-	existing, err := fsutil.ReadBounded(context.Background(), configPath, 1<<20)
+	existing, err := atomicfile.ReadBounded(context.Background(), configPath, 1<<20)
 	if err != nil {
 		return newData
 	}

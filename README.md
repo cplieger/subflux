@@ -62,6 +62,43 @@ trusted_proxies:
 
 Entries are CIDR ranges; write a single proxy as a `/32` (IPv4) or `/128` (IPv6). Only when the direct peer is one of these ranges is `X-Forwarded-For` consulted (walked right-to-left, spoof-safe); invalid CIDRs are rejected at config load. Leave `trusted_proxies` empty (the default) when subflux is directly exposed — the socket peer is used and `X-Forwarded-For` is ignored.
 
+## Alerting
+
+subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate these
+with Prometheus or the Mimir ruler; delivery is through your Alertmanager.
+
+```yaml
+groups:
+  - name: subflux
+    rules:
+      - alert: SubfluxHTTP5xx
+        expr: sum(increase(subflux_http_requests_total{status=~"5.."}[10m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux is returning HTTP 5xx"
+          description: >
+            subflux returned more than 5 server errors in 10m. Check upstream
+            connectivity, provider config, and the subflux logs.
+      - alert: SubfluxBackupStale
+        expr: >
+          subflux_backup_last_success_timestamp > 0
+          and (time() - subflux_backup_last_success_timestamp) > 172800
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux backup is stale"
+          description: >
+            No successful subflux backup recorded in over 48h. Check the backup
+            task and the /config volume.
+```
+
+Thresholds are starting points; add your scrape `job` label to the selectors if
+you run more than one instance, and route by whatever labels your Alertmanager
+uses.
+
 ## Security
 
 Distroless `gcr.io/distroless/static:nonroot` (UID 65534, no shell). Provider URLs are validated against SSRF before every fetch; secrets are redacted from config API responses; archive extraction is zip-bomb-guarded; all external input is size-capped and validated. Images are published with cosign signatures and SBOM attestations.

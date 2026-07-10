@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
@@ -86,7 +86,7 @@ func (s *Server) initHandlers() {
 			return pls
 		},
 		ValidatePath: s.validateFSPath,
-		ReadBounded:  fsutil.ReadBounded,
+		ReadBounded:  atomicfile.ReadBounded,
 		ServerCtx:    func() context.Context { return s.ctx },
 	})
 
