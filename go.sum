@@ -1,7 +1,7 @@
 github.com/coreos/go-oidc/v3 v3.20.0 h1:EtE0WIBHk03N+DqGkY4+UONzzZHk7amKt6IyNd7OsZE=
 github.com/coreos/go-oidc/v3 v3.20.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/arrapi v1.4.0 h1:Gl90q1JPqeH/CFQ7edC6h1MZlCmQrk4pazuNjqVSpYg=
-github.com/cplieger/arrapi v1.4.0/go.mod h1:UyrzgAcAkE7N7kkS7tOpfkzXruo/VfUTxSkN/NDCuLU=
+github.com/cplieger/arrapi v1.5.1 h1:GwGD7StxbwGsUwhSpfPY92Nk83jNre/mG7o5BrWFPgc=
+github.com/cplieger/arrapi v1.5.1/go.mod h1:1MnSv5eOmw3mtSVQE/krKNrlboPwksq8BquZTxEPwPY=
 github.com/cplieger/auth/v2 v2.0.6 h1:dQTI8olJsGKKXl8Z0BadzJdGLyayJw+cGk+0mshSQ7A=
 github.com/cplieger/auth/v2 v2.0.6/go.mod h1:0AE1741V65LpzNlQdqaj9DkQ5Bpz2rtug3d6z0fAnoY=
 github.com/cplieger/health v1.1.6 h1:l5vgCWdmZrvj4iUair1VjecDtFdthEr1nz01usveDjU=
