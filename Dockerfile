@@ -105,7 +105,7 @@ SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 RUN apk add --no-cache ca-certificates curl
 
 # renovate: datasource=npm depName=@typescript/native-preview
-ARG TSGO_VERSION=7.0.0-dev.20260615.1
+ARG TSGO_VERSION=7.0.0-dev.20260706.1
 # Arch-aware fetch: native per-arch runners build arm64 on real arm64
 # hardware, so the tsgo binary must match the build arch. This is an Alpine
 # builder, so use `uname -m` (aarch64/x86_64); tsgo's npm platform package
