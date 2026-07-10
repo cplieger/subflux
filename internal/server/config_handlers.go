@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -29,7 +29,8 @@ func configFilePath() string {
 
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.
 func atomicWriteConfig(ctx context.Context, path string, data []byte, _ string) error {
-	return fsutil.AtomicWriteFileMode(ctx, path, data, 0o600)
+	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600))
+	return err
 }
 
 // handleGetConfig delegates to the confighandlers subpackage.

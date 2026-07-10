@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/auth/v2/ratelimit"
 	authwebauthn "github.com/cplieger/auth/v2/webauthn"
 	"github.com/cplieger/health"
+	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
@@ -476,31 +477,12 @@ func envOr(key, fallback string) string {
 // setupLogging configures the global slog default with the given level and format.
 // Unrecognized levels default to info; format "json" selects JSON output.
 func setupLogging(level, format string) {
-	var lvl slog.Level
-	if err := lvl.UnmarshalText([]byte(level)); err != nil {
-		lvl = slog.LevelInfo
-	}
-
-	opts := &slog.HandlerOptions{Level: lvl, ReplaceAttr: utcTimeAttr}
-	var handler slog.Handler
+	lvl, _ := slogx.ParseLevel(level, slog.LevelInfo)
+	f := slogx.Text
 	if format == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, opts)
+		f = slogx.JSON
 	}
-	slog.SetDefault(slog.New(handler))
-}
-
-// utcTimeAttr is a slog ReplaceAttr that renders the record's built-in time
-// key in UTC, so log-line timestamps are zone-stable regardless of the
-// container's TZ (the fleet logs-in-UTC standard). It rewrites only the
-// top-level time attribute; a user attribute that happens to share the "time"
-// key inside a group is left untouched.
-func utcTimeAttr(groups []string, a slog.Attr) slog.Attr {
-	if len(groups) == 0 && a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
-		a.Value = slog.TimeValue(a.Value.Time().UTC())
-	}
-	return a
+	slogx.Setup(slogx.Options{Format: f, Level: lvl})
 }
 
 // --- CLI Auth Commands ---

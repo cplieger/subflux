@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 )
 
 // writeSubtitleFile atomically writes subtitle data to the given path.
 func writeSubtitleFile(ctx context.Context, path string, data []byte) error {
-	return fsutil.AtomicWriteFile(ctx, path, data)
+	_, err := atomicfile.WriteFile(ctx, path, data)
+	return err
 }
 
 // recordDownload persists the download record using the injected recorder.

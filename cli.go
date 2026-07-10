@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/clisearch"
 	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -156,7 +156,8 @@ func doEnablePasswordLogin() error {
 	if err != nil {
 		return err
 	}
-	if err := fsutil.AtomicWriteFileMode(context.Background(), configPath, out, 0o600); err != nil {
+	if _, err := atomicfile.WriteFile(context.Background(), configPath, out,
+		atomicfile.WithMode(0o600)); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	fmt.Fprintln(os.Stderr, "Password login re-enabled (auth.basic_enabled: true). Restart subflux to apply.")

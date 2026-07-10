@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/atomicfile/v2"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -34,11 +32,11 @@ import (
 //
 // # Atomic write
 //
-// The snapshot streams to a temp file in dest's directory, is fsynced and
-// closed, then renamed onto dest with a parent-directory fsync (via
-// fsutil.CommitAtomicWrite). A crash mid-backup therefore leaves either a
-// complete snapshot at dest or nothing at dest — never a partial
-// "subflux-<ts>.bolt" that pruning would later treat as a valid backup.
+// The snapshot streams into an atomicfile.PendingFile in dest's directory, is
+// fsynced and closed, then renamed onto dest with a parent-directory fsync (via
+// atomicfile). A crash mid-backup therefore leaves either a complete snapshot at
+// dest or nothing at dest — never a partial "subflux-<ts>.bolt" that pruning
+// would later treat as a valid backup.
 //
 // # Restore procedure (summary; full runbook is spec task 12.4)
 //
@@ -57,56 +55,32 @@ func (d *DB) BackupInto(ctx context.Context, dest string) error {
 		return fmt.Errorf("boltstore: backup: %w", err)
 	}
 
-	tmpName, err := d.writeSnapshotTemp(filepath.Dir(dest))
+	// The snapshot file holds the auth buckets (users, passkeys, API keys), so
+	// keep it owner-only (0o600) to match the live store. Symlink targets are
+	// refused (atomicfile's default): a backup dest is always a fresh
+	// timestamped path, never a symlink.
+	pf, err := atomicfile.NewPendingFile(ctx, dest, atomicfile.WithMode(0o600))
 	if err != nil {
-		return err
+		return fmt.Errorf("boltstore: backup: %w", err)
 	}
-
-	// Rename the prepared snapshot onto dest and fsync the parent directory. On
-	// failure the temp never became the live artifact, so remove it
-	// (best-effort; a leaked temp is non-fatal).
-	if err := fsutil.CommitAtomicWrite(tmpName, dest); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("boltstore: backup: commit %q: %w", dest, err)
-	}
-	return nil
-}
-
-// writeSnapshotTemp streams a single consistent hot snapshot of the whole bbolt
-// file into a fresh temp file in dir, fsyncs and closes it, and returns the temp
-// path ready to be renamed onto the destination. The snapshot runs inside a read
-// (View) transaction, so it is a point-in-time-consistent copy (WriteTo copies
-// every live and free page at the transaction's view). On ANY failure after the
-// temp is created it removes the temp (best-effort, errors ignored) so a partial
-// snapshot never lingers, mirroring the old deferred cleanup; the caller owns
-// the temp only on success.
-func (d *DB) writeSnapshotTemp(dir string) (string, error) {
-	tmp, err := os.CreateTemp(dir, ".subflux-backup-*.tmp")
-	if err != nil {
-		return "", fmt.Errorf("boltstore: backup: create temp in %q: %w", dir, err)
-	}
-	tmpName := tmp.Name()
+	// On any failure before Commit, remove the temp (best-effort). Cleanup is a
+	// no-op after a successful Commit.
+	defer func() { _ = pf.Cleanup() }()
 
 	// Stream the snapshot under a short read transaction. WriteTo copies the
 	// whole file (live + free pages) at the transaction's consistent view.
 	if err := d.db.View(func(tx *bolt.Tx) error {
-		_, werr := tx.WriteTo(tmp)
+		_, werr := tx.WriteTo(pf)
 		return werr
 	}); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return "", fmt.Errorf("boltstore: backup: write snapshot: %w", err)
+		return fmt.Errorf("boltstore: backup: write snapshot: %w", err)
 	}
 
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return "", fmt.Errorf("boltstore: backup: fsync temp: %w", err)
+	// Commit runs the durability barrier (fsync + close), atomically renames the
+	// temp onto dest, and fsyncs the parent directory — so a partial
+	// "subflux-<ts>.bolt" never lingers for pruning to treat as a valid backup.
+	if _, err := pf.Commit(ctx); err != nil {
+		return fmt.Errorf("boltstore: backup: commit %q: %w", dest, err)
 	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return "", fmt.Errorf("boltstore: backup: close temp: %w", err)
-	}
-
-	return tmpName, nil
+	return nil
 }

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
@@ -104,7 +104,7 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := fsutil.ReadBounded(ctx, req.SubtitlePath, MaxSyncSubSize)
+	data, err := atomicfile.ReadBounded(ctx, req.SubtitlePath, MaxSyncSubSize)
 	if err != nil {
 		slog.Warn("sync audio: read subtitle failed",
 			"path", req.SubtitlePath, "error", err)
@@ -212,7 +212,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := fsutil.AtomicWriteFile(ctx, req.SubtitlePath, srtData); err != nil {
+	if _, err := atomicfile.WriteFile(ctx, req.SubtitlePath, srtData); err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", req.SubtitlePath)
 		return
 	}
@@ -318,7 +318,7 @@ func MsToVTT(ms int64) string {
 
 // readAndParseSRT reads a subtitle file, normalizes encoding, and parses SRT.
 func (h *Handler) readAndParseSRT(path string) ([]byte, []api.SubtitleCue, error) {
-	data, err := fsutil.ReadBounded(context.Background(), path, MaxSyncSubSize)
+	data, err := atomicfile.ReadBounded(context.Background(), path, MaxSyncSubSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read subtitle: %w", err)
 	}
@@ -338,9 +338,13 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []api.S
 		return 0, fmt.Errorf("write SRT: %w", err)
 	}
 
-	tmpPath, cleanup, err := fsutil.PrepareAtomicWrite(ctx, path, srtData)
+	pf, err := atomicfile.NewPendingFile(ctx, path)
 	if err != nil {
 		return 0, fmt.Errorf("save (prepare): %w", err)
+	}
+	defer func() { _ = pf.Cleanup() }()
+	if _, err := pf.Write(srtData); err != nil {
+		return 0, fmt.Errorf("save (write): %w", err)
 	}
 
 	prevOffset, offsetErr := h.store.GetSyncOffset(ctx, path)
@@ -350,7 +354,6 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []api.S
 	cumulativeOffset := prevOffset + audioOffset
 
 	if err := h.store.SetSyncOffset(ctx, path, cumulativeOffset); err != nil {
-		cleanup()
 		slog.Error("audio sync: DB offset update failed, temp file removed",
 			"path", filepath.Base(path),
 			"cumulative_offset_ms", cumulativeOffset,
@@ -358,7 +361,7 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []api.S
 		return 0, fmt.Errorf("offset tracking failed: %w", err)
 	}
 
-	if err := fsutil.CommitAtomicWrite(tmpPath, path); err != nil {
+	if _, err := pf.Commit(ctx); err != nil {
 		return 0, fmt.Errorf("save (commit): %w", err)
 	}
 

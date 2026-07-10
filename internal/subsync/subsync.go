@@ -34,7 +34,6 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 )
 
 // Options configures a sync operation.
@@ -175,6 +174,10 @@ func syncAndBuild(ctx context.Context, videoPath string, opts *Options, refCues,
 	}, nil
 }
 
+// ErrFileTooLarge is returned when a subtitle file exceeds the maximum safe
+// size. Wrap it with fmt.Errorf("%w: ...") so callers can use errors.Is.
+var ErrFileTooLarge = errors.New("subsync: file too large")
+
 // readAndNormalize reads a subtitle file, validates its size, and normalizes
 // the encoding to UTF-8. Uses a two-layer size check: os.Stat for early
 // rejection (avoids reading large files at all), then io.LimitReader as
@@ -203,7 +206,7 @@ func readAndNormalize(ctx context.Context, path string) ([]byte, error) {
 		return nil, errors.New("path is a directory, not a file")
 	}
 	if info.Size() > api.MaxSafeFileBytes {
-		return nil, fmt.Errorf("%w: %d bytes (max %d)", fsutil.ErrFileTooLarge, info.Size(), api.MaxSafeFileBytes)
+		return nil, fmt.Errorf("%w: %d bytes (max %d)", ErrFileTooLarge, info.Size(), api.MaxSafeFileBytes)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(f, api.MaxSafeFileBytes+1))
@@ -211,7 +214,7 @@ func readAndNormalize(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(data)) > api.MaxSafeFileBytes {
-		return nil, fmt.Errorf("%w: read %d bytes (max %d)", fsutil.ErrFileTooLarge, len(data), api.MaxSafeFileBytes)
+		return nil, fmt.Errorf("%w: read %d bytes (max %d)", ErrFileTooLarge, len(data), api.MaxSafeFileBytes)
 	}
 	return NormalizeEncoding(data), nil
 }

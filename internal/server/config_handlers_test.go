@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/fsutil"
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -324,12 +324,12 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte("hello world"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := fsutil.ReadBounded(context.Background(), path, 1024)
+		got, err := atomicfile.ReadBounded(context.Background(), path, 1024)
 		if err != nil {
-			t.Fatalf("fsutil.ReadBounded(%q, 1024) error: %v", path, err)
+			t.Fatalf("atomicfile.ReadBounded(%q, 1024) error: %v", path, err)
 		}
 		if string(got) != "hello world" {
-			t.Errorf("fsutil.ReadBounded(%q, 1024) = %q, want %q", path, got, "hello world")
+			t.Errorf("atomicfile.ReadBounded(%q, 1024) = %q, want %q", path, got, "hello world")
 		}
 	})
 
@@ -340,12 +340,12 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte(strings.Repeat("x", 100)), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		_, err := fsutil.ReadBounded(context.Background(), path, 50)
+		_, err := atomicfile.ReadBounded(context.Background(), path, 50)
 		if err == nil {
-			t.Fatal("fsutil.ReadBounded() expected error for oversized file, got nil")
+			t.Fatal("atomicfile.ReadBounded() expected error for oversized file, got nil")
 		}
 		if !strings.Contains(err.Error(), "file too large") {
-			t.Errorf("fsutil.ReadBounded() error = %q, want to contain %q", err.Error(), "file too large")
+			t.Errorf("atomicfile.ReadBounded() error = %q, want to contain %q", err.Error(), "file too large")
 		}
 	})
 
@@ -357,20 +357,20 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := fsutil.ReadBounded(context.Background(), path, 50)
+		got, err := atomicfile.ReadBounded(context.Background(), path, 50)
 		if err != nil {
-			t.Fatalf("fsutil.ReadBounded(%q, 50) error: %v", path, err)
+			t.Fatalf("atomicfile.ReadBounded(%q, 50) error: %v", path, err)
 		}
 		if string(got) != content {
-			t.Errorf("fsutil.ReadBounded(%q, 50) = %q, want %q", path, got, content)
+			t.Errorf("atomicfile.ReadBounded(%q, 50) = %q, want %q", path, got, content)
 		}
 	})
 
 	t.Run("nonexistent file returns error", func(t *testing.T) {
 		t.Parallel()
-		_, err := fsutil.ReadBounded(context.Background(), "/nonexistent/path/file.txt", 1024)
+		_, err := atomicfile.ReadBounded(context.Background(), "/nonexistent/path/file.txt", 1024)
 		if err == nil {
-			t.Fatal("fsutil.ReadBounded(nonexistent) expected error, got nil")
+			t.Fatal("atomicfile.ReadBounded(nonexistent) expected error, got nil")
 		}
 	})
 
@@ -381,12 +381,12 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := fsutil.ReadBounded(context.Background(), path, 1024)
+		got, err := atomicfile.ReadBounded(context.Background(), path, 1024)
 		if err != nil {
-			t.Fatalf("fsutil.ReadBounded(%q, 1024) error: %v", path, err)
+			t.Fatalf("atomicfile.ReadBounded(%q, 1024) error: %v", path, err)
 		}
 		if len(got) != 0 {
-			t.Errorf("fsutil.ReadBounded(empty) = %q, want empty", got)
+			t.Errorf("atomicfile.ReadBounded(empty) = %q, want empty", got)
 		}
 	})
 }
