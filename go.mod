@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/cplieger/arrapi v1.5.1
-	github.com/cplieger/auth/v2 v2.0.6
+	github.com/cplieger/auth/v2 v2.0.7
 	github.com/cplieger/health v1.1.6
 	github.com/cplieger/httpx/v2 v2.4.0
 	github.com/cplieger/metrics/v2 v2.2.3
