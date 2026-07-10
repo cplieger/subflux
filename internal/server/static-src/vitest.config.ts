@@ -51,7 +51,7 @@ export default defineConfig({
     printConsoleTrace: true,
     expandSnapshotDiff: true,
 
-    // TypeScript type-checking is handled by tsgo --noEmit (via validate-local.sh
+    // TypeScript type-checking is handled by tsc --noEmit (via validate-local.sh
     // and CI). Vitest's built-in typecheck is experimental and redundant here.
 
     coverage: {

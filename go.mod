@@ -4,10 +4,12 @@ go 1.26.5
 
 require (
 	github.com/cplieger/arrapi v1.5.1
+	github.com/cplieger/atomicfile/v2 v2.1.2
 	github.com/cplieger/auth/v2 v2.0.7
 	github.com/cplieger/health v1.1.6
 	github.com/cplieger/httpx/v2 v2.4.0
 	github.com/cplieger/metrics/v2 v2.2.3
+	github.com/cplieger/slogx v1.1.0
 	github.com/cplieger/ssrf/v2 v2.0.6
 	github.com/cplieger/webhttp v1.3.0
 	github.com/cplieger/wiregen v1.3.4
