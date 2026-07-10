@@ -72,7 +72,7 @@ go generate ./...         # runs ./cmd/wire-codegen
 
 ### Frontend assets
 
-The TypeScript under `internal/server/static-src/` is compiled with tsgo and
+The TypeScript under `internal/server/static-src/` is compiled with tsc and
 the CSS is concatenated from per-feature splits via `MANIFEST` files — both
 happen inside the Docker build, and the compiled output
 (`internal/server/static/*.js`, `style.css`, …) is gitignored and embedded at
@@ -112,7 +112,7 @@ Override the target with `--url <url>` or `SUBFLUX_URL`.
   subtitle files alongside media; a read-only mount silently drops downloads.
 - **Go `regexp` has no negative lookahead** (`(?!...)`). Use two regexes with
   combined boolean logic instead.
-- **Logs are UTC.** A `utcTimeAttr` slog `ReplaceAttr` forces every
+- **Logs are UTC.** The `slogx` library (its `UTCTime` `ReplaceAttr`) forces every
   record's timestamp to UTC, so the container needs no `TZ` and the binary
   embeds no `time/tzdata`.
 

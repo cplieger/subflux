@@ -13,7 +13,7 @@
     "stylelint",
     "stylelint-config-standard"
   ],
-  "ignoreBinaries": ["tsgo"],
+  "ignoreBinaries": ["tsc"],
   "ignoreMembers": [],
   "treatConfigHintsAsErrors": true,
   "includeEntryExports": true,

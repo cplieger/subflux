@@ -25,7 +25,7 @@
 // forbidden. Use these helpers instead.
 //
 // Pattern mirrors apps/vibekit/web/internal/api/http.go and
-// apps/vibecli/internal/api/middleware.go.
+// apps/web-terminal-kiro/internal/api/middleware.go.
 
 package api
 

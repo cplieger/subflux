@@ -25,9 +25,6 @@ for this repository.
   [gremlins](https://gremlins.dev/) mutation-testing runs (subflux has an
   extensive property-based and fuzz suite; these runs are the main source of
   hardening work).
-- Adopt the stable `tsgo`
-  ([@typescript/native-preview](https://www.npmjs.com/package/@typescript/native-preview))
-  release for the web frontend once it reaches general availability.
 - Dependency and base-image currency via Renovate; security findings
   (CodeQL / Trivy / Scorecard) addressed as they arise.
 - Bug and security response per

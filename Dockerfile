@@ -14,7 +14,7 @@ ARG FFMPEG_VERSION=8.1
 ARG X264_COMMIT
 # Alpine package versions are implicitly pinned via the base-image digest
 # above; pinning each apk package separately drifts faster than it helps
-# (mirrors the DL3008 convention used in apps/vibekit and apps/vibecli).
+# (mirrors the DL3008 convention used in apps/vibekit and apps/web-terminal-kiro).
 # hadolint ignore=DL3018
 RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
     && apk add --no-cache curl git \
@@ -90,47 +90,46 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
     && cp ffprobe_g ffprobe
 
 # --- TypeScript build (compile static-src/*.ts → static/*.js) ---
-# Uses the same tsgo (Microsoft's typescript-go native preview) tarball
-# pattern as apps/vibekit and apps/vibecli; renovate tracks the npm package
-# @typescript/native-preview's `latest` dist-tag (Microsoft's curated stabler
-# channel) rather than the daily `latest` channel — the platform-specific
-# linux-x64 tarball is published in lockstep at the same version string.
-# Plain alpine here (not golang-alpine) because nothing in this stage needs
-# Go — tsgo is a self-contained native binary. See .github/renovate.json
-# for the followTag rule.
+# Uses the same tsc (TypeScript 7 native compiler) tarball pattern as
+# apps/vibekit. Now that TS7 shipped stable, renovate tracks the `typescript`
+# npm package and we fetch its per-platform native binary
+# (@typescript/typescript-linux-<arch>, published in lockstep with the
+# metapackage at the same version). Plain alpine here (not golang-alpine)
+# because nothing in this stage needs Go — tsc is a self-contained native
+# binary.
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates curl
 
-# renovate: datasource=npm depName=@typescript/native-preview
-ARG TSGO_VERSION=7.0.0-dev.20260707.2
+# renovate: datasource=npm depName=typescript
+ARG TS_VERSION=7.0.2
 # Arch-aware fetch: native per-arch runners build arm64 on real arm64
-# hardware, so the tsgo binary must match the build arch. This is an Alpine
-# builder, so use `uname -m` (aarch64/x86_64); tsgo's npm platform package
+# hardware, so the tsc binary must match the build arch. This is an Alpine
+# builder, so use `uname -m` (aarch64/x86_64); the npm platform package
 # uses arm64/x64. A hardcoded x64 breaks the arm64 build — the x64 binary
 # can't execute on aarch64.
-RUN TSGO_ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo "x64") && \
+RUN TS_ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo "x64") && \
     curl -fsSL \
-      "https://registry.npmjs.org/@typescript/native-preview-linux-${TSGO_ARCH}/-/native-preview-linux-${TSGO_ARCH}-${TSGO_VERSION}.tgz" \
+      "https://registry.npmjs.org/@typescript/typescript-linux-${TS_ARCH}/-/typescript-linux-${TS_ARCH}-${TS_VERSION}.tgz" \
     | tar -xz -C /tmp
 
 WORKDIR /src/static-src
 COPY internal/server/static-src/ ./
 
 # Fetch @cplieger/actions and @cplieger/reactive TS source from npm registry
-# so tsgo can resolve the `import ... from "@cplieger/<lib>"` statements at
+# so tsc can resolve the `import ... from "@cplieger/<lib>"` statements at
 # build time. Each lib publishes TS source only — same pattern as vibekit /
-# vibecli. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsgo's
+# web-terminal-kiro. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsc's
 # bundler resolution finds the package + its types.
 # renovate: datasource=npm depName=@cplieger/actions
-ARG CPLIEGER_ACTIONS_VERSION=2.0.10
+ARG CPLIEGER_ACTIONS_VERSION=2.0.11
 RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/actions --strip-components=1
 # renovate: datasource=npm depName=@cplieger/reactive
-ARG CPLIEGER_REACTIVE_VERSION=1.2.3
+ARG CPLIEGER_REACTIVE_VERSION=1.2.4
 RUN mkdir -p node_modules/@cplieger/reactive && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/reactive --strip-components=1
@@ -152,20 +151,20 @@ RUN mkdir -p node_modules/@cplieger/fetch && \
 # (toast/), so its src/toast/*.ts is compiled alongside src/*.ts; rootDir=src
 # preserves the toast/ layout the importmap points at. Its base stylesheet is
 # copied to ../static/ui-primitives.css (served via <link>, not the CSS bundle).
-RUN /tmp/package/lib/tsgo --project tsconfig.json && \
-    /tmp/package/lib/tsgo \
+RUN /tmp/package/lib/tsc --project tsconfig.json && \
+    /tmp/package/lib/tsc \
         --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-actions \
         --rootDir node_modules/@cplieger/actions/src \
         --skipLibCheck --strict \
         node_modules/@cplieger/actions/src/*.ts && \
-    /tmp/package/lib/tsgo \
+    /tmp/package/lib/tsc \
         --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-reactive \
         --rootDir node_modules/@cplieger/reactive/src \
         --skipLibCheck --strict \
         node_modules/@cplieger/reactive/src/*.ts && \
-    /tmp/package/lib/tsgo \
+    /tmp/package/lib/tsc \
         --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-ui-primitives \
         --rootDir node_modules/@cplieger/ui-primitives/src \
@@ -173,7 +172,7 @@ RUN /tmp/package/lib/tsgo --project tsconfig.json && \
         node_modules/@cplieger/ui-primitives/src/*.ts \
         node_modules/@cplieger/ui-primitives/src/toast/*.ts && \
     cp node_modules/@cplieger/ui-primitives/css/ui-primitives.css ../static/ui-primitives.css && \
-    /tmp/package/lib/tsgo \
+    /tmp/package/lib/tsc \
         --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
         --outDir ../static/vendor/cplieger-fetch \
         --rootDir node_modules/@cplieger/fetch/src \
@@ -214,7 +213,7 @@ COPY --from=ts-builder /src/static/ui-primitives.css internal/server/static/ui-p
 
 # Concatenate per-feature CSS splits into the served bundles.
 # Naming convention:
-#   MANIFEST          -> style.css  (the main bundle, like vibekit/vibecli)
+#   MANIFEST          -> style.css  (the main bundle, like vibekit/web-terminal-kiro)
 #   <name>.MANIFEST   -> <name>.css (e.g. login.MANIFEST -> login.css)
 RUN set -eu; \
     css_src=internal/server/static-src/css; \

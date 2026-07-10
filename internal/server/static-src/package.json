@@ -1,8 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "typecheck": "tsgo -project tsconfig.json",
-    "typecheck:tests": "tsgo -project tsconfig.test.json",
+    "typecheck": "tsc -project tsconfig.json",
+    "typecheck:tests": "tsc -project tsconfig.test.json",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --run --coverage",
@@ -14,6 +14,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "25.9.4",
+    "@typescript/native": "npm:typescript@7.0.2",
     "@vitest/coverage-v8": "4.1.10",
     "eslint": "10.6.0",
     "fast-check": "4.8.0",
@@ -23,14 +24,14 @@
     "prettier": "3.9.4",
     "stylelint": "17.14.0",
     "stylelint-config-standard": "40.0.0",
-    "typescript": "6.0.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.63.0",
     "vitest": "4.1.10"
   },
   "dependencies": {
-    "@cplieger/actions": "2.0.10",
+    "@cplieger/actions": "2.0.11",
     "@cplieger/fetch": "1.1.1",
-    "@cplieger/reactive": "1.2.3",
+    "@cplieger/reactive": "1.2.4",
     "@cplieger/ui-primitives": "2.1.1"
   }
 }

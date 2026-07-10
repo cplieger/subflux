@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/fsutil"
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
@@ -62,7 +62,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	subPath := api.ManualSubtitlePath(req.FilePath, req.Language, n, req.HearingImp, req.Forced)
 
 	// Atomic write: temp file + rename prevents corruption on crash.
-	if err := fsutil.AtomicWriteFile(ctx, subPath, data); err != nil {
+	if _, err := atomicfile.WriteFile(ctx, subPath, data); err != nil {
 		slog.Error("manual download: write failed", "path", subPath, "error", err)
 		NotifyError(deps, "manual", "Write failed for manual subtitle download",
 			"Write failed for subtitle download")
