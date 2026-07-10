@@ -31,6 +31,6 @@
     "@cplieger/actions": "2.0.10",
     "@cplieger/fetch": "1.1.1",
     "@cplieger/reactive": "1.2.2",
-    "@cplieger/ui-primitives": "2.1.0"
+    "@cplieger/ui-primitives": "2.1.1"
   }
 }
