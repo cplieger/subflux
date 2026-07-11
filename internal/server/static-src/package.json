@@ -17,7 +17,7 @@
     "@typescript/native": "npm:typescript@7.0.2",
     "@vitest/coverage-v8": "4.1.10",
     "eslint": "10.6.0",
-    "fast-check": "4.8.0",
+    "fast-check": "4.9.0",
     "happy-dom": "20.10.6",
     "html-validate": "11.5.5",
     "knip": "6.25.0",
