@@ -57,7 +57,7 @@ func (p *Poller) processPollImport(
 	// Re-verify file exists after arr API calls (race window: 200-800ms).
 	if _, err := os.Stat(path); err != nil {
 		slog.Debug("poll: video file removed during metadata fetch", "path", path)
-		return
+		return retryable
 	}
 
 	slog.Info("poll: import detected",
@@ -70,7 +70,7 @@ func (p *Poller) processPollImport(
 			"media", result.Label, "error", searchErr)
 		p.deps.Alerts.RecordWarn(string(result.Source),
 			fmt.Sprintf("Search failed for %s: %v", result.Label, searchErr))
-		return
+		return retryable
 	}
 	if len(searchResult.Paths) > 0 || searchResult.CoverageChanged {
 		mediaID := api.BuildMediaID(result.Req)
@@ -99,7 +99,8 @@ func (p *Poller) processPollImport(
 func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
 	path := entry.ImportedPath()
 
-	return p.processPollImport(ctx, ls, path,
+	return p.processPollImport(
+		ctx, ls, path,
 		func() (*ImportResult, error) {
 			series, err := ls.Sonarr.GetSeriesByID(ctx, entry.SeriesID)
 			if err != nil {
@@ -146,7 +147,8 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
 	path := entry.ImportedPath()
 
-	return p.processPollImport(ctx, ls, path,
+	return p.processPollImport(
+		ctx, ls, path,
 		func() (*ImportResult, error) {
 			movie, err := ls.Radarr.GetMovieByID(ctx, entry.MovieID)
 			if err != nil {

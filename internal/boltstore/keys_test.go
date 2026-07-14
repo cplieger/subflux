@@ -96,11 +96,11 @@ func TestStateQuadKey_prefixAndID(t *testing.T) {
 	if !ok || gotID != id {
 		t.Errorf("stateQuadKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
 	}
-	mt, mid, lang, variant, sid, ok := splitStateQuadKey(key)
-	if !ok || mt != api.MediaTypeMovie || mid != "tmdb-27205" || lang != "en" ||
-		variant != api.VariantForced || sid != id {
-		t.Errorf("splitStateQuadKey = (%s, %s, %s, %s, %d, %v), want (movie, tmdb-27205, en, forced, %d, true)",
-			mt, mid, lang, variant, sid, ok, id)
+	quad, sid, ok := splitStateQuadKey(key)
+	if !ok || quad.mt != api.MediaTypeMovie || quad.mid != "tmdb-27205" || quad.lang != "en" ||
+		quad.variant != api.VariantForced || sid != id {
+		t.Errorf("splitStateQuadKey = (%+v, %d, %v), want (movie/tmdb-27205/en/forced, %d, true)",
+			quad, sid, ok, id)
 	}
 
 	// Two ids under the same quad sort by id (insertion order).

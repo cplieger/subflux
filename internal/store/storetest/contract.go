@@ -486,11 +486,22 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 // testVariantIndependence asserts the variant key dimension: state rows,
 // scores, locks, and manual ordinals of one (media, language) are tracked
 // independently per variant, an empty variant means any/all variants on the
-// lock reads, and ClearManualLock("") clears every variant's lock.
+// lock reads, and ClearManualLock("") clears every variant's lock. The three
+// phases (row/score independence, lock scoping, lock listing + clear-all)
+// share seeded state, so they run in order on one store.
 func testVariantIndependence(t *testing.T, s api.Store) {
 	t.Helper()
-	ctx := context.Background()
 	mid := "tt-var-1"
+	assertVariantRowIndependence(t, s, mid)
+	assertVariantLockScoping(t, s, mid)
+	assertVariantLockListAndClear(t, s, mid)
+}
+
+// assertVariantRowIndependence seeds one auto row per variant and asserts the
+// rows and their scores stay independent per quad.
+func assertVariantRowIndependence(t *testing.T, s api.Store, mid string) {
+	t.Helper()
+	ctx := context.Background()
 
 	// One auto row per variant: same language, different variants.
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{
@@ -524,7 +535,16 @@ func testVariantIndependence(t *testing.T, s api.Store) {
 		t.Fatalf("GetState variants = %v, want standard and forced exposed", variants)
 	}
 
-	// CurrentScore answers per quad.
+	assertVariantScores(t, s, mid)
+}
+
+// assertVariantScores asserts CurrentScore answers per quad after the
+// standard(85)/forced(60) seeding, and reports not-found for the unseeded
+// hi variant.
+func assertVariantScores(t *testing.T, s api.Store, mid string) {
+	t.Helper()
+	ctx := context.Background()
+
 	if score, _, found, serr := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); serr != nil || !found || score != 85 {
 		t.Fatalf("CurrentScore(standard) = (%d, %v, %v), want (85, true, nil)", score, found, serr)
 	}
@@ -534,6 +554,13 @@ func testVariantIndependence(t *testing.T, s api.Store) {
 	if _, _, found, serr := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langFra, api.VariantHI); serr != nil || found {
 		t.Fatalf("CurrentScore(hi) found = %v (err %v), want false (no hi row)", found, serr)
 	}
+}
+
+// assertVariantLockScoping saves a manual forced download and asserts the lock
+// and the manual ordinal stay scoped to the forced quad.
+func assertVariantLockScoping(t *testing.T, s api.Store, mid string) {
+	t.Helper()
+	ctx := context.Background()
 
 	// A manual forced download locks ONLY the forced quad.
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{
@@ -561,8 +588,14 @@ func testVariantIndependence(t *testing.T, s api.Store) {
 	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); n != 1 {
 		t.Fatalf("NextManualNumber(standard) = %d, want 1 (forced ordinal must not leak)", n)
 	}
+}
 
-	// The lock list carries the variant.
+// assertVariantLockListAndClear asserts the lock list carries the variant and
+// that ClearManualLock("") clears every variant's lock for the language.
+func assertVariantLockListAndClear(t *testing.T, s api.Store, mid string) {
+	t.Helper()
+	ctx := context.Background()
+
 	locks, err := s.GetManualLocks(ctx)
 	if err != nil {
 		t.Fatalf("GetManualLocks: %v", err)

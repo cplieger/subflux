@@ -158,10 +158,7 @@ header:has(h1) {
 
   /* The stronger light-theme tint would sink amber-on-amber below AA, so the
      text deepens with it (hover = more contrast, per the design system). */
-  color: light-dark(
-    color-mix(in oklch, var(--warn) 70%, oklch(0% 0 0deg)),
-    oklch(0% 0 0deg)
-  );
+  color: light-dark(color-mix(in oklch, var(--warn) 70%, oklch(0% 0 0deg)), oklch(0% 0 0deg));
 }
 
 .nav-btn[data-status="error"] {

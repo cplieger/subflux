@@ -9,10 +9,20 @@ import (
 	"time"
 )
 
-// startStream connects an SSE client to a HandleEvents server and returns
-// the response + line scanner. The client cap lives on the bus itself
-// (construct with New(cap)).
-func startStream(t *testing.T, bus *EventBus) (*http.Response, *bufio.Scanner) {
+// stream is one connected SSE client: the response status/headers, a line
+// scanner over the body, and an explicit closer (the body is also closed via
+// t.Cleanup, so calling close is optional and double-close is safe).
+type stream struct {
+	status int
+	header http.Header
+	sc     *bufio.Scanner
+	close  func()
+}
+
+// startStream connects an SSE client to a HandleEvents server. The client cap
+// lives on the bus itself (construct with New(cap)). The response body never
+// escapes: it is owned here and closed via t.Cleanup and/or st.close.
+func startStream(t *testing.T, bus *EventBus) stream {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		HandleEvents(bus, w, r)
@@ -23,7 +33,12 @@ func startStream(t *testing.T, bus *EventBus) (*http.Response, *bufio.Scanner) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { resp.Body.Close() })
-	return resp, bufio.NewScanner(resp.Body)
+	return stream{
+		status: resp.StatusCode,
+		header: resp.Header,
+		sc:     bufio.NewScanner(resp.Body),
+		close:  func() { resp.Body.Close() },
+	}
 }
 
 // readUntil scans lines until pred matches, bounded to avoid hanging on a
@@ -79,15 +94,15 @@ func TestClientCountZeroInitially(t *testing.T) {
 // data), exactly what static-src/events.ts addEventListener handlers parse.
 func TestWireFormat(t *testing.T) {
 	bus := New(0)
-	_, sc := startStream(t, bus)
-	readUntil(t, sc, func(l string) bool { return l == ": connected" })
+	st := startStream(t, bus)
+	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
 	waitClients(t, bus, 1)
 
 	bus.Publish(Event{Type: CoverageUpdate, Data: CoverageEvent{
 		MediaType: "episode", MediaID: "tt1-s01e01", Language: "fr", Source: "auto",
 	}})
 
-	lines := readUntil(t, sc, func(l string) bool { return strings.HasPrefix(l, "data: ") })
+	lines := readUntil(t, st.sc, func(l string) bool { return strings.HasPrefix(l, "data: ") })
 	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, "event: coverage") {
 		t.Errorf("missing named event field: %v", lines)
@@ -99,35 +114,35 @@ func TestWireFormat(t *testing.T) {
 
 func TestHandleEventsClientCap(t *testing.T) {
 	bus := New(1)
-	_, sc := startStream(t, bus)
-	readUntil(t, sc, func(l string) bool { return l == ": connected" })
+	st := startStream(t, bus)
+	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
 	waitClients(t, bus, 1)
 
-	resp2, _ := startStream(t, bus)
-	if resp2.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("second client status = %d, want 503", resp2.StatusCode)
+	st2 := startStream(t, bus)
+	if st2.status != http.StatusServiceUnavailable {
+		t.Errorf("second client status = %d, want 503", st2.status)
 	}
 
 	// Hot reload raises the cap on the live hub: the next client is admitted.
 	bus.SetMaxClients(2)
-	_, sc3 := startStream(t, bus)
-	readUntil(t, sc3, func(l string) bool { return l == ": connected" })
+	st3 := startStream(t, bus)
+	readUntil(t, st3.sc, func(l string) bool { return l == ": connected" })
 	waitClients(t, bus, 2)
 }
 
 func TestShutdownDrainsAndRefuses(t *testing.T) {
 	bus := New(0)
-	resp, sc := startStream(t, bus)
-	readUntil(t, sc, func(l string) bool { return l == ": connected" })
+	st := startStream(t, bus)
+	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
 	waitClients(t, bus, 1)
 
 	bus.Shutdown()
 	waitClients(t, bus, 0)
-	resp.Body.Close()
+	st.close()
 
-	resp2, _ := startStream(t, bus)
-	if resp2.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("post-shutdown client status = %d, want 503", resp2.StatusCode)
+	st2 := startStream(t, bus)
+	if st2.status != http.StatusServiceUnavailable {
+		t.Errorf("post-shutdown client status = %d, want 503", st2.status)
 	}
 
 	var nilBus *EventBus
@@ -137,12 +152,12 @@ func TestShutdownDrainsAndRefuses(t *testing.T) {
 
 func TestHandleEventsHeaders(t *testing.T) {
 	bus := New(0)
-	resp, sc := startStream(t, bus)
-	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+	st := startStream(t, bus)
+	if ct := st.header.Get("Content-Type"); ct != "text/event-stream" {
 		t.Errorf("Content-Type = %q", ct)
 	}
-	if cc := resp.Header.Get("Cache-Control"); !strings.Contains(cc, "no-transform") {
+	if cc := st.header.Get("Cache-Control"); !strings.Contains(cc, "no-transform") {
 		t.Errorf("Cache-Control = %q, want no-transform (Caddy/nginx gzip defense)", cc)
 	}
-	readUntil(t, sc, func(l string) bool { return l == ": connected" })
+	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
 }
