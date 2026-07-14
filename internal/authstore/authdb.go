@@ -32,9 +32,8 @@ type oidcRec struct {
 // which owns it. The auth store never closes the handle — its Close only stops
 // the background sweeper.
 //
-// Scaffold status: the durable and ephemeral accessors are stubs; they are
-// implemented in tasks 8.1-8.7. Bucket bootstrap is owned by the core store
-// (task 2.3), which creates the auth buckets alongside the core buckets.
+// Bucket bootstrap is owned by the core store, which creates the auth buckets
+// alongside the core buckets in one Update on Open.
 type Store struct {
 	db       *bbolt.DB                // shared with the core store (one file, one lock)
 	sessions map[string]*auth.Session // ephemeral, never persisted

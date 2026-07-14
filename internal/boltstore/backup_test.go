@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // This file covers the task-7.1 backup behaviour: BackupInto produces a single
@@ -66,7 +68,7 @@ func TestBackupInto_roundTripsThroughOpen(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = snap.Close(context.Background()) })
 
-	score, _, found, err := snap.CurrentScore(ctx, testMT, testMID, testLang)
+	score, _, found, err := snap.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore on snapshot: %v", err)
 	}
@@ -104,7 +106,7 @@ func TestBackupInto_overwritesExistingDest(t *testing.T) {
 		t.Fatalf("open snapshot after overwrite: %v", err)
 	}
 	t.Cleanup(func() { _ = snap.Close(context.Background()) })
-	if _, _, found, err := snap.CurrentScore(ctx, testMT, testMID, testLang); err != nil || !found {
+	if _, _, found, err := snap.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil || !found {
 		t.Fatalf("snapshot after overwrite: found=%v err=%v, want found=true", found, err)
 	}
 }

@@ -13,7 +13,7 @@ var driftBP = api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hou
 
 // seedAttempt records one search_attempts row for the (mt, mid, lang, provider)
 // quad through the production RecordNoResult path (which maintains the
-// ix_attempts_due index and the attempts counter).
+// attempts counter).
 func seedAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api.ProviderID) {
 	t.Helper()
 	if err := db.RecordNoResult(context.Background(), mt, mid, lang, p, driftBP); err != nil {
@@ -21,18 +21,17 @@ func seedAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api
 	}
 }
 
-// assertBackoffConsistent asserts the attempts counter, the ix_attempts_due
-// index, and a raw walk of the search_attempts primary all agree on the row
-// count. CleanupDrift must keep the index and counter consistent with the
-// primary after deletions (Requirement 8.1).
+// assertBackoffConsistent asserts the attempts counter and a raw walk of the
+// search_attempts primary agree on the row count. CleanupDrift must keep the
+// counter consistent with the primary after deletions (Requirement 8.1).
 func assertBackoffConsistent(t *testing.T, db *DB, wantRows int) {
 	t.Helper()
 	_, attempts, _ := mustStats(t, db)
 	if attempts != wantRows {
 		t.Errorf("Stats().attempts = %d, want %d", attempts, wantRows)
 	}
-	if n := dueIndexLen(t, db); n != wantRows {
-		t.Errorf("ix_attempts_due entries = %d, want %d", n, wantRows)
+	if n := attemptRowCount(t, db); n != wantRows {
+		t.Errorf("search_attempts rows = %d, want %d", n, wantRows)
 	}
 }
 
@@ -50,9 +49,9 @@ func TestCleanupDrift_emptyIsNoop(t *testing.T) {
 	assertBackoffConsistent(t, db, 2)
 }
 
-// TestCleanupDrift_adaptiveDisabledClearsAll clears every backoff row (and its
-// due-index entry) when adaptive search is disabled (Requirement 7.8), and the
-// per-language/provider fields are ignored once the blanket clear runs.
+// TestCleanupDrift_adaptiveDisabledClearsAll clears every backoff row when
+// adaptive search is disabled (Requirement 7.8), and the per-language/provider
+// fields are ignored once the blanket clear runs.
 func TestCleanupDrift_adaptiveDisabledClearsAll(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := context.Background()

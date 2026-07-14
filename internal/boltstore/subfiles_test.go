@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -68,22 +67,15 @@ func countFileRowsRaw(t *testing.T, db *DB) int {
 	return n
 }
 
-// setFileOffset white-box writes a subtitle_files row's offset_ms via the same
-// chokepoint production uses, so the offset-preservation tests have a non-zero
-// offset to preserve (RecordSubtitleFiles/UpsertSubtitleFile insert at 0; the
-// offset is set elsewhere, e.g. the sync path).
-func setFileOffset(t *testing.T, db *DB, mt api.MediaType, mid, lang string, variant api.Variant, source api.SubtitleSource, path string, offset int64) {
+// setFileOffset stores a sync offset for a path through the production write
+// path (SetSyncOffset -> sync_offsets bucket). The offset lives solely in
+// sync_offsets — a subtitle_files rewrite cannot touch it — so the
+// "preserved" assertions below pin the GetSubtitleFiles join surviving codec
+// updates.
+func setFileOffset(t *testing.T, db *DB, path string, offset int64) {
 	t.Helper()
-	key := subtitleFileKey(mt, mid, lang, variant, source, path)
-	if err := db.db.Update(func(tx *bolt.Tx) error {
-		var fr fileRec
-		if old := tx.Bucket([]byte(bucketSubtitleFiles)).Get(key); old != nil {
-			_ = kv.Decode(old, &fr)
-		}
-		fr.OffsetMs = offset
-		return putSubtitleFile(tx, key, &fr)
-	}); err != nil {
-		t.Fatalf("setFileOffset: %v", err)
+	if err := db.SetSyncOffset(context.Background(), path, offset); err != nil {
+		t.Fatalf("SetSyncOffset(%q): %v", path, err)
 	}
 }
 
@@ -145,8 +137,9 @@ func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testin
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	// Give the row a non-zero offset that a codec update must preserve.
-	setFileOffset(t, db, covMT, "tmdb-1", "en", vStd, srcExt, "/m/x.en.srt", 1500)
+	// Give the path a non-zero stored sync offset; the codec update must not
+	// affect the joined value.
+	setFileOffset(t, db, "/m/x.en.srt", 1500)
 
 	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "ass", "/m/x.en.srt")})
@@ -251,7 +244,7 @@ func TestUpsertSubtitleFile_insert_then_update_preserves_offset(t *testing.T) {
 	if totalFiles(t, db) != 1 {
 		t.Fatalf("count after insert = %d, want 1", totalFiles(t, db))
 	}
-	setFileOffset(t, db, covMT, "tmdb-1", "en", vStd, srcExt, "/m/x.en.srt", 750)
+	setFileOffset(t, db, "/m/x.en.srt", 750)
 
 	// Update the codec via upsert: offset preserved, no new row.
 	f.Codec = "ass"

@@ -10,7 +10,7 @@ import (
 )
 
 // This file covers the task-3.2 backoff listing behaviour: GetBackoffItems
-// (ascending next_retry via the due index, Requirement 2.3) and
+// (ascending next_retry via in-memory sort, Requirement 2.3) and
 // GetBackoffByPrefix (provider rows only, ordered media id then ascending
 // next_retry, Requirement 15.4), plus prefix isolation/inclusion semantics.
 

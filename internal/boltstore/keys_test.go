@@ -71,28 +71,63 @@ func TestTriplePrefix_boundarySafety(t *testing.T) {
 	}
 }
 
-// TestStateTripleKey_prefixAndID asserts the triple index key carries
-// triplePrefix (so it prefix-scans by triple and by media) and that the
-// trailing surrogate id parses back.
-func TestStateTripleKey_prefixAndID(t *testing.T) {
+// TestStateQuadKey_prefixAndID asserts the quad index key carries quadPrefix,
+// triplePrefix (all-variant scans), and mediaPrefix (so it prefix-scans by
+// quad, by language, and by media), that its components split back, and that
+// the trailing surrogate id parses back.
+func TestStateQuadKey_prefixAndID(t *testing.T) {
 	const id int64 = 4242
-	key := stateTripleKey(api.MediaTypeMovie, "tmdb-27205", "en", id)
+	key := stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, id)
 
+	if !bytes.HasPrefix(key, quadPrefix(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced)) {
+		t.Error("stateQuadKey must carry its quadPrefix")
+	}
 	if !bytes.HasPrefix(key, triplePrefix(api.MediaTypeMovie, "tmdb-27205", "en")) {
-		t.Error("stateTripleKey must carry its triplePrefix")
+		t.Error("stateQuadKey must carry its triplePrefix (all-variant scans)")
 	}
 	if !bytes.HasPrefix(key, mediaPrefix(api.MediaTypeMovie, "tmdb-27205")) {
-		t.Error("stateTripleKey must carry its mediaPrefix")
+		t.Error("stateQuadKey must carry its mediaPrefix")
 	}
-	gotID, ok := stateTripleKeyID(key)
+	// A different variant of the same triple must not match the quadPrefix.
+	if bytes.HasPrefix(key, quadPrefix(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantStandard)) {
+		t.Error("a forced key must not match the standard quadPrefix")
+	}
+	gotID, ok := stateQuadKeyID(key)
 	if !ok || gotID != id {
-		t.Errorf("stateTripleKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
+		t.Errorf("stateQuadKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
+	}
+	mt, mid, lang, variant, sid, ok := splitStateQuadKey(key)
+	if !ok || mt != api.MediaTypeMovie || mid != "tmdb-27205" || lang != "en" ||
+		variant != api.VariantForced || sid != id {
+		t.Errorf("splitStateQuadKey = (%s, %s, %s, %s, %d, %v), want (movie, tmdb-27205, en, forced, %d, true)",
+			mt, mid, lang, variant, sid, ok, id)
 	}
 
-	// Two ids under the same triple sort by id (insertion order).
-	if bytes.Compare(stateTripleKey(api.MediaTypeMovie, "tmdb-27205", "en", 1),
-		stateTripleKey(api.MediaTypeMovie, "tmdb-27205", "en", 2)) >= 0 {
-		t.Error("stateTripleKey id=1 should sort before id=2 under the same triple")
+	// Two ids under the same quad sort by id (insertion order).
+	if bytes.Compare(stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, 1),
+		stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, 2)) >= 0 {
+		t.Error("stateQuadKey id=1 should sort before id=2 under the same quad")
+	}
+}
+
+// TestStatePrefix_emptyVariantSpansAllVariants asserts the statePrefix helper
+// implements the empty-variant convention: "" yields the language-wide triple
+// prefix that matches every variant's quad keys, while a concrete variant
+// yields the exact quad prefix.
+func TestStatePrefix_emptyVariantSpansAllVariants(t *testing.T) {
+	forcedKey := stateQuadKey(api.MediaTypeMovie, "tt1", "fr", api.VariantForced, 7)
+	stdKey := stateQuadKey(api.MediaTypeMovie, "tt1", "fr", api.VariantStandard, 8)
+
+	all := statePrefix(api.MediaTypeMovie, "tt1", "fr", "")
+	if !bytes.HasPrefix(forcedKey, all) || !bytes.HasPrefix(stdKey, all) {
+		t.Error("statePrefix(\"\") must match every variant of the language")
+	}
+	exact := statePrefix(api.MediaTypeMovie, "tt1", "fr", api.VariantForced)
+	if !bytes.HasPrefix(forcedKey, exact) {
+		t.Error("statePrefix(forced) must match the forced key")
+	}
+	if bytes.HasPrefix(stdKey, exact) {
+		t.Error("statePrefix(forced) must not match the standard key")
 	}
 }
 
@@ -163,16 +198,10 @@ func TestBareKeys(t *testing.T) {
 }
 
 // TestTimeIndexKeys_chronologicalOrder asserts the time-ordered index helpers
-// (attempts-due, state-imported, scan-at) sort chronologically and seek to a
-// cutoff exactly.
+// (state-imported, scan-at) sort chronologically and seek to a cutoff exactly.
 func TestTimeIndexKeys_chronologicalOrder(t *testing.T) {
 	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	earlier, later := base, base.Add(time.Hour)
-
-	attemptPrimary := attemptKey(api.MediaTypeEpisode, "tt1", "fr", api.ProviderNameGestdown)
-	if bytes.Compare(attemptsDueKey(earlier, attemptPrimary), attemptsDueKey(later, attemptPrimary)) >= 0 {
-		t.Error("attemptsDueKey: earlier next_retry must sort before later")
-	}
 
 	if bytes.Compare(stateImportedKey(earlier, 1), stateImportedKey(later, 1)) >= 0 {
 		t.Error("stateImportedKey: earlier media_imported must sort before later")

@@ -15,10 +15,11 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the adaptive-backoff domain (search_attempts bucket plus the
-// ix_attempts_due index). RecordNoResult / BackedOffProviders are implemented
-// here (task 3.1); GetBackoffItems / GetBackoffByPrefix remain stubs until
-// task 3.2.
+// This file holds the adaptive-backoff domain (the search_attempts bucket):
+// RecordNoResult, BackedOffProviders, GetBackoffItems, and GetBackoffByPrefix.
+// The bucket has no secondary index: it is bounded by the number of
+// currently-backed-off (triple, provider) pairs, so the ordered listings sort
+// in memory instead of maintaining a due-order index on every write.
 
 // computeNextRetry computes a backoff window's next_retry from the prior
 // failure count and the backoff parameters, mirroring the SQLite formula the
@@ -43,8 +44,8 @@ func computeNextRetry(now time.Time, oldFailures int, bp api.BackoffParams) time
 // recomputes its backoff window, all in one write transaction. It reads the
 // prior attempt (if any) to obtain the failure count, increments it, computes
 // the new next_retry from the BackoffParams, and writes the row through the
-// putAttempt chokepoint, which maintains the ix_attempts_due index and the
-// attempts counter in the same transaction.
+// putAttempt chokepoint, which maintains the attempts counter in the same
+// transaction.
 //
 // A brand-new row starts at failures=1 with next_retry = now + InitialDelay,
 // matching the old SQLite INSERT branch (which used the full InitialDelay
@@ -160,15 +161,14 @@ func providerBackedOff(rec *attemptRec, maxAttempts int, now time.Time) bool {
 	return now.Before(rec.NextRetry)
 }
 
-// decodeAttemptEntry dereferences a search_attempts primary key into a fully
+// decodeAttemptEntry turns one search_attempts row (key + value) into a fully
 // populated api.BackoffEntry. It parses (mt, mid, lang, provider) out of the
-// composite primary key, reads and decodes the row, and reports skip=true when
-// the row is absent (index/primary drift), the provider component is empty
-// (matching the old store's `provider != ”` filter), or the row is an
-// undecodable derived record (decodeRecord logs a warning). A genuine decode
-// error other than tolerant-skip is returned.
-func decodeAttemptEntry(b *bolt.Bucket, primary []byte) (api.BackoffEntry, bool, error) {
-	parts := kv.Split(primary)
+// composite primary key and decodes the value, reporting skip=true when the
+// provider component is empty (matching the old store's `provider != ”`
+// filter) or the row is an undecodable derived record (decodeRecord logs a
+// warning). A genuine decode error other than tolerant-skip is returned.
+func decodeAttemptEntry(key, raw []byte) (api.BackoffEntry, bool, error) {
+	parts := kv.Split(key)
 	if len(parts) != 4 {
 		// Malformed key (not mt 0x00 mid 0x00 lang 0x00 provider); skip rather
 		// than surface a half-parsed entry.
@@ -178,13 +178,8 @@ func decodeAttemptEntry(b *bolt.Bucket, primary []byte) (api.BackoffEntry, bool,
 	if provider == "" {
 		return api.BackoffEntry{}, true, nil // provider != '' filter
 	}
-	raw := b.Get(primary)
-	if raw == nil {
-		// No primary for this access path: treat as drift and skip.
-		return api.BackoffEntry{}, true, nil
-	}
 	var rec attemptRec
-	skip, derr := decodeRecord(bucketDecodeMode(bucketSearchAttempts), bucketSearchAttempts, primary, raw, &rec)
+	skip, derr := decodeRecord(bucketDecodeMode(bucketSearchAttempts), bucketSearchAttempts, key, raw, &rec)
 	if derr != nil {
 		return api.BackoffEntry{}, false, derr
 	}
@@ -203,11 +198,12 @@ func decodeAttemptEntry(b *bolt.Bucket, primary []byte) (api.BackoffEntry, bool,
 }
 
 // GetBackoffItems returns every backed-off provider row ordered by ascending
-// next_retry. It walks the ix_attempts_due index forward (be64(next_retry) is
-// chronological, so a forward cursor is already in next_retry order) and
-// dereferences each entry back to its search_attempts row, so no in-memory sort
-// is needed. Rows with an empty provider component are excluded, matching the
-// old store's `WHERE provider != ” ORDER BY next_retry ASC`.
+// next_retry, then by primary key for a deterministic tie order. It scans the
+// primary bucket and sorts in memory: the bucket holds only currently
+// backed-off (triple, provider) pairs, so the sort input is small and bounded,
+// and this listing is a rare introspection call (CLI `subflux backoff`, the
+// backoff API). Rows with an empty provider component are excluded, matching
+// the old store's `WHERE provider != ” ORDER BY next_retry ASC`.
 func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 	var out []api.BackoffEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -215,43 +211,23 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 		if b == nil {
 			return errors.New("boltstore: search_attempts bucket not found")
 		}
-		idx := tx.Bucket([]byte(bucketIxAttemptsDue))
-		if idx == nil {
-			return errors.New("boltstore: ix_attempts_due bucket not found")
-		}
-		var serr error
-		out, serr = collectBackoffByDue(b, idx)
-		return serr
+		return b.ForEach(func(k, v []byte) error {
+			entry, skip, derr := decodeAttemptEntry(k, v)
+			if derr != nil {
+				return derr
+			}
+			if !skip {
+				out = append(out, entry)
+			}
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-// collectBackoffByDue walks ix_attempts_due forward (be64(next_retry) is
-// chronological, so a forward cursor is already in next_retry ASC order) and
-// dereferences each entry back to its search_attempts row via decodeAttemptEntry.
-// A malformed index key is skipped defensively; an entry decodeAttemptEntry
-// reports as drift / empty-provider / undecodable is skipped, matching the old
-// `WHERE provider != ” ORDER BY next_retry ASC`.
-func collectBackoffByDue(b, idx *bolt.Bucket) ([]api.BackoffEntry, error) {
-	var out []api.BackoffEntry
-	c := idx.Cursor()
-	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		_, primary, ok := kv.SplitTimeIndexKey(k)
-		if !ok {
-			continue // malformed index key; skip defensively
-		}
-		entry, skip, derr := decodeAttemptEntry(b, primary)
-		if derr != nil {
-			return nil, derr
-		}
-		if skip {
-			continue
-		}
-		out = append(out, entry)
-	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].NextRetry.Before(out[j].NextRetry)
+	})
 	return out, nil
 }
 
@@ -281,8 +257,8 @@ func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, medi
 			return errors.New("boltstore: search_attempts bucket not found")
 		}
 		c := b.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			entry, skip, derr := decodeAttemptEntry(b, k)
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			entry, skip, derr := decodeAttemptEntry(k, v)
 			if derr != nil {
 				return derr
 			}

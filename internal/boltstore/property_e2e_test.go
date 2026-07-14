@@ -20,7 +20,7 @@ import (
 // RecordSubtitleFiles, RecordScanState, ClearManualLock, DeleteStateByPaths,
 // ReconcileState) through a rich op alphabet, keys drawn from a SMALL pool to
 // force collisions, in-place upserts, and deletes. After every op sequence it
-// asserts the secondary indexes, the ix_state_triple projection, and the O(1)
+// asserts the secondary indexes, the ix_state_quad projection, and the O(1)
 // meta counters all agree with a full primary re-scan. This is a strictly
 // stronger invariant than the helper-level test because the multi-bucket domain
 // methods (SaveDownload clearing backoff, DeleteStateByPaths fan-out, the
@@ -28,21 +28,14 @@ import (
 //
 // # Oracle design
 //
-// The primary buckets are the source of truth. For the indexes whose key
-// derives entirely from a primary value (ix_state_imported, ix_state_video,
-// ix_attempts_due, ix_scan_at) the expectation is rebuilt by re-scanning the
-// primary and compared exactly (compareIndex). The maintained counters are
-// compared to a primary row count (verifyCounters). ix_state_triple is special:
-// its key encodes the (media_type, media_id, language) triple, which stateRec
-// deliberately does NOT store (the triple lives only in the index key, see
-// codec.go), so it cannot be rebuilt from a primary value alone. It is instead
-// held to the two properties that fully pin it to the primary: a bijection by
-// surrogate id (every primary row has exactly one triple entry and vice versa,
-// no stale/duplicate/orphan), and a projected value that decodes to the
-// primary's (manual, score, provider). The helper-level test in index_test.go
-// already pins the exact triple-KEY bytes via its deterministic id->triple
-// binding (tripleFor); here the bijection + projection cross-check guards the
-// same buckets across the real domain methods.
+// The primary buckets are the source of truth. Every state index key derives
+// entirely from the self-contained primary value (stateRec carries its own
+// quad; see codec.go), so each index expectation — ix_state_quad including its
+// (manual, score, provider) projection, ix_state_imported, ix_state_video,
+// and ix_scan_at — is rebuilt by re-scanning the primary and compared exactly
+// (compareIndex). The maintained counters are compared to a primary row count
+// (verifyCounters). search_attempts has no secondary index (GetBackoffItems
+// sorts in memory), so only its counter is checked.
 
 // pubTriple is a (media_type, media_id, language) triple drawn by the
 // public-method op driver.
@@ -116,7 +109,7 @@ func allPubSubPaths() []string {
 
 // TestPublicStore_indexEqualsRescan drives the public api.Store domain methods
 // with a rich op alphabet and a small key pool, then asserts every index, the
-// ix_state_triple projection, and the maintained counters equal a full primary
+// ix_state_quad projection, and the maintained counters equal a full primary
 // re-scan (Requirements 14.3, 18.5).
 func TestPublicStore_indexEqualsRescan(t *testing.T) {
 	ctx := context.Background()
@@ -140,7 +133,6 @@ func TestPublicStore_indexEqualsRescan(t *testing.T) {
 
 		if err := db.db.View(func(tx *bolt.Tx) error {
 			verifyStateIndexesEndToEnd(rt, tx)
-			verifyAttemptIndex(rt, tx)
 			verifyScanIndex(rt, tx)
 			verifyCounters(rt, tx)
 			return nil
@@ -228,7 +220,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 
 	case "clearLock":
 		tr := rapid.SampledFrom(pubTriples).Draw(rt, "clearTriple")
-		if err := db.ClearManualLock(ctx, tr.mt, tr.mid, tr.lang); err != nil {
+		if err := db.ClearManualLock(ctx, tr.mt, tr.mid, tr.lang, api.VariantStandard); err != nil {
 			rt.Fatalf("ClearManualLock: %v", err)
 		}
 
@@ -267,15 +259,14 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 	}
 }
 
-// verifyStateIndexesEndToEnd rebuilds ix_state_imported and ix_state_video from
-// a full subtitle_state primary re-scan and compares them exactly, then checks
-// ix_state_triple is a bijection (by surrogate id) with the primary whose
-// projected value decodes to the primary's (manual, score, provider). See the
-// file-level "Oracle design" note for why ix_state_triple is checked this way
-// rather than by exact key bytes.
+// verifyStateIndexesEndToEnd rebuilds all three state indexes — ix_state_quad
+// (exact key bytes AND the (manual, score, provider) projection, both derived
+// from the self-contained primary record), ix_state_imported, and
+// ix_state_video — from a full subtitle_state primary re-scan and compares
+// them exactly.
 func verifyStateIndexesEndToEnd(rt *rapid.T, tx *bolt.Tx) {
 	rt.Helper()
-	prim := map[int64]stateRec{}
+	wantQuad := map[string]string{}
 	wantImported := map[string]string{}
 	wantVideo := map[string]string{}
 
@@ -290,46 +281,13 @@ func verifyStateIndexesEndToEnd(rt *rapid.T, tx *bolt.Tx) {
 			rt.Errorf("subtitle_state: decode id %d: %v", id, err)
 			return nil
 		}
-		prim[id] = rec
+		wantQuad[string(stateQuadKey(rec.MediaType, rec.MediaID, rec.Language, rec.Variant, id))] = string(encodeStateProjection(rec.Manual, rec.Score, rec.Provider))
 		wantImported[string(stateImportedKey(rec.MediaImported, id))] = ""
 		wantVideo[string(stateVideoKey(rec.VideoPath, id))] = ""
 		return nil
 	})
 
+	compareIndex(rt, "ix_state_quad", wantQuad, bucketMap(tx, bucketIxStateQuad))
 	compareIndex(rt, "ix_state_imported", wantImported, bucketMap(tx, bucketIxStateImported))
 	compareIndex(rt, "ix_state_video", wantVideo, bucketMap(tx, bucketIxStateVideo))
-
-	// ix_state_triple bijection + projection cross-check.
-	seen := map[int64]bool{}
-	_ = tx.Bucket([]byte(bucketIxStateTriple)).ForEach(func(k, v []byte) error {
-		id, ok := stateTripleKeyID(k)
-		if !ok {
-			rt.Errorf("ix_state_triple: malformed key %x", k)
-			return nil
-		}
-		rec, ok := prim[id]
-		if !ok {
-			rt.Errorf("ix_state_triple: orphan entry for id %d (no primary row)", id)
-			return nil
-		}
-		if seen[id] {
-			rt.Errorf("ix_state_triple: duplicate entry for id %d", id)
-		}
-		seen[id] = true
-		manual, score, provider, ok := decodeStateProjection(v)
-		if !ok {
-			rt.Errorf("ix_state_triple: undecodable projection for id %d: %x", id, v)
-			return nil
-		}
-		if manual != rec.Manual || score != rec.Score || provider != rec.Provider {
-			rt.Errorf("ix_state_triple projection for id %d = (manual=%v, score=%d, provider=%q), want (%v, %d, %q)",
-				id, manual, score, provider, rec.Manual, rec.Score, rec.Provider)
-		}
-		return nil
-	})
-	for id := range prim {
-		if !seen[id] {
-			rt.Errorf("subtitle_state id %d has no ix_state_triple entry", id)
-		}
-	}
 }

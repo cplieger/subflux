@@ -1,31 +1,23 @@
 // Package boltstore is the bbolt-backed core store for subflux's search,
-// subtitle, scan, sync-offset, and poll domains. It implements the composite
-// api.Store interface.
+// subtitle, scan, sync-offset, and poll domains. It fully implements the
+// composite api.Store interface.
 //
-// # Why internal/boltstore and not internal/store
+// # Naming
 //
-// During the parallel build phase of the bbolt store-engine rewrite the legacy
-// SQLite store still lives at internal/store (package store, type *store.DB)
-// and serves main.go until SQLite is removed. The differential-parity test
-// imports BOTH the old SQLite store and this new bbolt store simultaneously, so
-// the new core store cannot reuse the internal/store import path without a
-// package/type collision. It therefore lives here at internal/boltstore until
-// the composition root is swapped and the SQLite packages are deleted (see the
-// bbolt-store-rewrite spec, tasks 10 and 11).
+// The package lives at internal/boltstore rather than internal/store for a
+// historical reason: during the SQLite-to-bbolt rewrite both engines existed
+// side by side (the differential-parity oracle imported both), so the new
+// engine could not take the internal/store path. The SQLite engine is gone;
+// internal/store now holds only the engine-agnostic leaves this package
+// builds on (store/kv: codec, key encoders, index helpers; store/storetest:
+// the api.Store contract suite). boltstore is the permanent home of the
+// engine.
 //
 // # Ownership
 //
 // The core store OWNS the shared *bbolt.DB handle: Open opens it and Close
 // closes it. The auth store (internal/authstore) shares the same handle via
 // authstore.New and never closes it.
-//
-// # Scaffold status
-//
-// The domain methods in this package are stubs returning errNotImplemented (or
-// panicking where the contract leaves no error channel). They are replaced
-// file-by-file in later tasks: keys/codec/index foundation (task 2), then the
-// per-bucket domains (tasks 3-7). Every api.Store method is present so the
-// compile-time interface assertion below holds throughout the parallel build.
 package boltstore
 
 import (
@@ -50,15 +42,20 @@ var _ api.Store = (*DB)(nil)
 // (treated as present/skip), matching the old reconcile classifier.
 type statFunc func(path string) (os.FileInfo, error)
 
-// errNotImplemented was returned by the domain-method stubs that later tasks
-// replaced with real bbolt-backed implementations. All core api.Store methods
-// are now implemented, so it has been removed.
-
 // openTimeout bounds how long Open waits for the bbolt file lock before failing
 // fast. bbolt takes an exclusive OS lock on the file, so a second opener (for
 // example a stale or duplicate process) must surface quickly at startup rather
 // than block indefinitely.
 const openTimeout = 5 * time.Second
+
+// initialMmapSize is the initial mmap span (not allocated disk) requested at
+// Open. bbolt grows the file by remapping, and on non-Linux platforms (no
+// mremap) a grow while a hot-backup WriteTo read transaction is open must wait
+// for it to finish. Pre-mapping 256 MiB — far above the expected tens-of-MB
+// working set — makes grow-remaps a non-event for the deployment's lifetime.
+// Virtual address space is free; resident memory is still driven by actual
+// page access.
+const initialMmapSize = 256 << 20
 
 // DB is the bbolt-backed core store. It owns the *bbolt.DB handle that the auth
 // store shares.
@@ -90,11 +87,11 @@ type DB struct {
 //
 // The schema versions are written UNCONDITIONALLY to the current value, not
 // only-when-absent. verifySchemaVersions has already refused any stored version
-// newer than this build, so the only values that reach the write are absent
-// (fresh file), equal (re-open), or lower (forward-compatible, since value
-// changes are additive by design). Setting them to the current value in every
-// case is correct and avoids a read-modify-write branch: after a successful
-// Open the file is, by definition, a current-build file.
+// that mismatches this build (no migration exists in either direction), so the
+// only values that reach the write are absent (fresh file) or equal (re-open).
+// Setting them to the current value in every case is correct and avoids a
+// read-modify-write branch: after a successful Open the file is, by
+// definition, a current-build file.
 //
 // If the bootstrap Update fails, Open closes the handle before returning so a
 // failed Open never leaks the file lock.
@@ -102,7 +99,19 @@ func Open(path string) (*DB, error) {
 	if path == "" {
 		return nil, errors.New("boltstore: open: path must not be empty")
 	}
-	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: openTimeout})
+	db, err := bbolt.Open(path, 0o600, &bbolt.Options{
+		Timeout: openTimeout,
+		// Freelist as hashmap instead of sorted array: O(1) allocation and no
+		// O(n) sorted-insert on free. etcd runs this in production and bbolt's
+		// maintainers list defaulting it as a TODO; the array type's only edge
+		// (slightly better contiguous-page reuse) doesn't matter at this scale.
+		FreelistType: bbolt.FreelistMapType,
+		// Don't write the freelist on every commit; rebuild it on Open instead.
+		// etcd's default. Commits get cheaper; the crash-recovery cost is a
+		// full-file scan at open, which is instant on a tens-of-MB file.
+		NoFreelistSync:  true,
+		InitialMmapSize: initialMmapSize,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("boltstore: open %q: %w", path, err)
 	}

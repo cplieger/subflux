@@ -39,7 +39,7 @@ func manualRec(provider api.ProviderID, release, path string, score int) *api.Do
 func TestCurrentScore_notFoundWhenNoRow(t *testing.T) {
 	db, _ := openTemp(t)
 
-	score, imported, found, err := db.CurrentScore(context.Background(), testMT, testMID, testLang)
+	score, imported, found, err := db.CurrentScore(context.Background(), testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestCurrentScore_highestAutoScoreAndImported(t *testing.T) {
 		t.Fatalf("upgrade SaveDownload: %v", err)
 	}
 
-	score, imported, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	score, imported, found, err := db.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestCurrentScore_ignoresManualRows(t *testing.T) {
 		t.Fatalf("manual SaveDownload: %v", err)
 	}
 
-	score, _, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	score, _, found, err := db.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestCurrentScore_ignoresManualRows(t *testing.T) {
 	if err := db.SaveDownload(ctx, manualRec(testProv, "Only.Manual", "/media/test.es.1.srt", 88)); err != nil {
 		t.Fatalf("manual-only SaveDownload: %v", err)
 	}
-	_, _, found2, err := db.CurrentScore(ctx, testMT, testMID, "es")
+	_, _, found2, err := db.CurrentScore(ctx, testMT, testMID, "es", api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore (manual-only): %v", err)
 	}
@@ -221,8 +221,10 @@ func TestDownloadedRefs_excludesEmptyReleaseName(t *testing.T) {
 }
 
 // putStateRow inserts a fully-specified subtitle_state row through the putState
-// chokepoint (which allocates the be64 key, maintains ix_state_triple /
-// ix_state_imported / ix_state_video, and bumps the downloads counter). The
+// chokepoint (which allocates the be64 key, maintains ix_state_quad /
+// ix_state_imported / ix_state_video, and bumps the downloads counter). Rows
+// land under the standard variant (the query tests exercise the language
+// dimension; variant-specific behaviour is covered by the contract suite). The
 // caller controls every field EXCEPT the surrogate id, which is allocated via
 // NextSequence so the row's key and the id-DESC tiebreak stay recoverable. It
 // returns the allocated id. This is the test seam that lets the ordering and
@@ -238,7 +240,8 @@ func putStateRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, sr st
 		}
 		sr.ID = int64(seq)
 		id = sr.ID
-		return putState(tx, mt, mid, lang, &sr)
+		sr.MediaType, sr.MediaID, sr.Language, sr.Variant = mt, mid, lang, api.VariantStandard
+		return putState(tx, &sr)
 	}); err != nil {
 		t.Fatalf("putStateRow(%s/%s/%s): %v", mt, mid, lang, err)
 	}
@@ -246,12 +249,13 @@ func putStateRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, sr st
 }
 
 // deleteStateRow removes a row through the deleteState chokepoint (which
-// removes every index entry and decrements the downloads counter), used to
-// exercise the Stats counter on the delete path.
-func deleteStateRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, id int64) {
+// removes every index entry — derived from the self-contained record — and
+// decrements the downloads counter), used to exercise the Stats counter on
+// the delete path. Pairs with putStateRow's standard-variant rows.
+func deleteStateRow(t *testing.T, db *DB, id int64) {
 	t.Helper()
 	if err := db.db.Update(func(tx *bolt.Tx) error {
-		_, err := deleteState(tx, mt, mid, lang, id)
+		_, err := deleteState(tx, id)
 		return err
 	}); err != nil {
 		t.Fatalf("deleteStateRow: %v", err)
@@ -436,10 +440,14 @@ func TestGetState_defaultThousandRowCap(t *testing.T) {
 			}
 			sr := stateRec{
 				ID:            int64(seq),
+				MediaType:     api.MediaTypeMovie,
+				MediaID:       "m-" + itoa(i),
+				Language:      "en",
+				Variant:       api.VariantStandard,
 				Title:         "Bulk",
 				MediaImported: base.Add(time.Duration(i) * time.Second),
 			}
-			if err := putState(tx, api.MediaTypeMovie, "m-"+itoa(i), "en", &sr); err != nil {
+			if err := putState(tx, &sr); err != nil {
 				return err
 			}
 		}
@@ -601,7 +609,7 @@ func TestStats_countersTrackInsertsAndDeletes(t *testing.T) {
 	if len(rows) == 0 {
 		t.Fatal("expected state rows on the T1 triple")
 	}
-	deleteStateRow(t, db, testMT, testMID, testLang, rows[0].ID)
+	deleteStateRow(t, db, rows[0].ID)
 
 	// A save on the other-id triple clears ITS backoff -> attempts = 0.
 	if err := db.SaveDownload(ctx, &api.DownloadRecord{
@@ -652,9 +660,9 @@ func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 	}
 
 	want := []api.ManualLockEntry{
-		{MediaType: api.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Count: 1},
-		{MediaType: api.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Count: 2},
-		{MediaType: api.MediaTypeMovie, MediaID: "tt-a", Language: "en", Count: 1},
+		{MediaType: api.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Variant: api.VariantStandard, Count: 1},
+		{MediaType: api.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Variant: api.VariantStandard, Count: 2},
+		{MediaType: api.MediaTypeMovie, MediaID: "tt-a", Language: "en", Variant: api.VariantStandard, Count: 1},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("locks = %+v, want %+v", got, want)
@@ -814,7 +822,7 @@ func TestCurrentScore_multipleAutoRowsHighestWins(t *testing.T) {
 	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 95, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: now})
 	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: now})
 
-	score, _, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	score, _, found, err := db.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -843,7 +851,7 @@ func TestCurrentScore_tieKeepsFirstScanned(t *testing.T) {
 	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: earlier})
 	putStateRow(t, db, testMT, testMID, testLang, stateRec{Score: 80, Provider: testProv, Path: "/media/test.fr.srt", VideoPath: "/media/test.mkv", MediaImported: later})
 
-	score, imported, found, err := db.CurrentScore(ctx, testMT, testMID, testLang)
+	score, imported, found, err := db.CurrentScore(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}

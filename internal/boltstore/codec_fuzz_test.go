@@ -17,13 +17,15 @@ func sampleRecords() []any {
 	return []any{
 		&attemptRec{LastTried: base, NextRetry: base.Add(time.Hour), Failures: 3},
 		&stateRec{
-			ID: 4242, Provider: api.ProviderNameOpenSubtitles,
+			ID: 4242, MediaType: api.MediaTypeEpisode, MediaID: "tt0903747-s01e01",
+			Language: "fr", Variant: api.VariantStandard,
+			Provider:    api.ProviderNameOpenSubtitles,
 			ReleaseName: "Show.S01E01.1080p.WEB-DL", Path: "/media/tv/Show/Show.S01E01.fr.srt",
 			Title: "Show", ImdbID: "tt0903747", ReleaseTag: "WEB-DL",
 			Score: 92, Season: 1, Episode: 1, Manual: true,
 			VideoPath: "/media/tv/Show/Show.S01E01.mkv", MediaImported: base,
 		},
-		&fileRec{Codec: "subrip", OffsetMs: -250, UpdatedAt: base},
+		&fileRec{Codec: "subrip", UpdatedAt: base},
 		&scanRec{Title: "Inception", AudioLang: "en", Season: 0, Episode: 0, ScannedAt: base},
 	}
 }

@@ -15,15 +15,20 @@ import (
 // with the ordinal taken verbatim from rec.Path (Requirement 4.5), and the
 // auto-vs-manual row distinction.
 
-// readTripleRows reads every subtitle_state row under a triple back through the
-// shared collectTripleRows helper in a View transaction.
+// readTripleRows reads every subtitle_state row under a language (all
+// variants) back through the shared collectStateRows helper in a View
+// transaction, projecting just the records (these cases pin record fields;
+// the variant key dimension is covered by the contract suite and keys tests).
 func readTripleRows(t *testing.T, db *DB, mt api.MediaType, mid, lang string) []stateRec {
 	t.Helper()
 	var rows []stateRec
 	if err := db.db.View(func(tx *bolt.Tx) error {
-		var err error
-		rows, err = collectTripleRows(tx, mt, mid, lang)
-		return err
+		collected, err := collectStateRows(tx, mt, mid, lang, "")
+		if err != nil {
+			return err
+		}
+		rows = collected
+		return nil
 	}); err != nil {
 		t.Fatalf("readTripleRows: %v", err)
 	}
@@ -161,9 +166,9 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 		t.Errorf("unrelated triple backoff = %v, want preserved", other)
 	}
 
-	// The due index and attempts counter reflect only the surviving row.
-	if n := dueIndexLen(t, db); n != 1 {
-		t.Errorf("ix_attempts_due entries = %d, want 1 (only the unrelated triple)", n)
+	// The primary bucket and attempts counter reflect only the surviving row.
+	if n := attemptRowCount(t, db); n != 1 {
+		t.Errorf("search_attempts rows = %d, want 1 (only the unrelated triple)", n)
 	}
 	var attempts int64
 	_ = db.db.View(func(tx *bolt.Tx) error { attempts = readAttemptCount(tx); return nil })
@@ -267,7 +272,7 @@ func TestSaveDownload_manualDoesNotTouchAutoRow(t *testing.T) {
 }
 
 // TestSaveDownload_indexAndCounterMaintained asserts the surrogate id, the
-// ix_state_triple projection, and the downloads counter are all maintained by
+// ix_state_quad projection, and the downloads counter are all maintained by
 // the putState chokepoint after a save (Requirement 8.1, 18.x projection).
 func TestSaveDownload_indexAndCounterMaintained(t *testing.T) {
 	db, _ := openTemp(t)
@@ -287,14 +292,14 @@ func TestSaveDownload_indexAndCounterMaintained(t *testing.T) {
 		if got := readDownloadCount(tx); got != 1 {
 			t.Errorf("downloads counter = %d, want 1", got)
 		}
-		// ix_state_triple has exactly one entry whose projection matches the row.
-		idx := tx.Bucket([]byte(bucketIxStateTriple))
+		// ix_state_quad has exactly one entry whose projection matches the row.
+		idx := tx.Bucket([]byte(bucketIxStateQuad))
 		prefix := triplePrefix(testMT, testMID, testLang)
 		n := 0
 		c := idx.Cursor()
 		for k, v := c.Seek(prefix); k != nil && hasPrefix(k, prefix); k, v = c.Next() {
 			n++
-			id, ok := stateTripleKeyID(k)
+			id, ok := stateQuadKeyID(k)
 			if !ok || id != wantID {
 				t.Errorf("triple index key id = (%d, ok=%v), want %d", id, ok, wantID)
 			}
@@ -308,7 +313,7 @@ func TestSaveDownload_indexAndCounterMaintained(t *testing.T) {
 			}
 		}
 		if n != 1 {
-			t.Errorf("ix_state_triple entries = %d, want 1", n)
+			t.Errorf("ix_state_quad entries = %d, want 1", n)
 		}
 		// ix_state_imported and ix_state_video each have one entry.
 		if got := indexLen(tx, bucketIxStateImported); got != 1 {

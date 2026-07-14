@@ -25,13 +25,14 @@ func TestBoltStoreContract(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open(%q): %v", path, err)
 		}
+		db.db.StrictMode = true // consistency check every commit (test-only)
 		t.Cleanup(func() { _ = db.Close(context.Background()) })
 		return db
 	})
 }
 
 // destructiveClearStore is a deliberately broken api.Store: it embeds a real,
-// fully-functional *DB but overrides ClearManualLock to DELETE the triple's
+// fully-functional *DB but overrides ClearManualLock to DELETE the quad's
 // manual rows instead of flipping them to auto. That violates the promoted
 // non-destructive-ClearManualLock invariant (the rows must be preserved and
 // stay visible to GetState/DownloadedRefs, Requirement 4.3). It exists only to
@@ -40,21 +41,21 @@ type destructiveClearStore struct {
 	*DB
 }
 
-// ClearManualLock destructively deletes the manual rows for the triple. A
+// ClearManualLock destructively deletes the manual rows for the quad. A
 // conforming implementation flips manual=false and preserves the rows; this
 // removes them, so AssertClearManualLockNonDestructive must report a failure.
-func (s destructiveClearStore) ClearManualLock(_ context.Context, mt api.MediaType, mid, lang string) error {
+func (s destructiveClearStore) ClearManualLock(_ context.Context, mt api.MediaType, mid, lang string, variant api.Variant) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectTripleRows(tx, mt, mid, lang)
+		rows, err := collectStateRows(tx, mt, mid, lang, variant)
 		if err != nil {
 			return err
 		}
 		for i := range rows {
-			r := rows[i]
+			r := &rows[i]
 			if !r.Manual {
 				continue
 			}
-			if _, derr := deleteState(tx, mt, mid, lang, r.ID); derr != nil {
+			if _, derr := deleteState(tx, r.ID); derr != nil {
 				return derr
 			}
 		}
