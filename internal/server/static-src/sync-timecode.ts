@@ -142,6 +142,12 @@ export function buildTimecodeInput(
     hEl.textContent = d.h;
     tEl.textContent = d.t;
     oEl.textContent = d.o;
+    // Keep the spinbutton contract honest: every segment announces the
+    // current total offset (the value the arrows actually change).
+    for (const seg of [secEl, hEl, tEl, oEl]) {
+      seg.setAttribute("aria-valuenow", String(ms));
+      seg.setAttribute("aria-valuetext", `${(ms / 1000).toFixed(3)} seconds`);
+    }
   }
 
   function adjust(delta: number): void {
@@ -170,6 +176,12 @@ export function buildTimecodeInput(
     seg.addEventListener("click", () => {
       setActive(seg, delta);
     });
+    // Real DOM focus selects the segment, so Tab reaches every magnitude and
+    // the existing ArrowUp/Down handler operates on it — selection was
+    // previously click-only, stranding keyboard users on the default 1ms.
+    seg.addEventListener("focus", () => {
+      setActive(seg, delta);
+    });
     seg.addEventListener(
       "wheel",
       (e: WheelEvent) => {
@@ -183,16 +195,25 @@ export function buildTimecodeInput(
   const segAttrs = (label: string): Record<string, string> => ({
     className: "tc-seg",
     role: "spinbutton",
+    tabindex: "0",
     "aria-label": label,
   });
 
+  const toggleSign = (): void => {
+    ms = -ms;
+    refresh();
+    onChange(ms);
+  };
   const signEl = el("span", {
     ...segAttrs("Sign"),
     className: "tc-seg tc-sign",
-    onclick: () => {
-      ms = -ms;
-      refresh();
-      onChange(ms);
+    role: "button",
+    onclick: toggleSign,
+    onkeydown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleSign();
+      }
     },
   });
 

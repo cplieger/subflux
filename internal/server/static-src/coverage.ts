@@ -271,7 +271,11 @@ function buildBadges(targets: CoverageTarget[]): DocumentFragment {
     } else if (ignoredPct > 0) {
       status = "warn";
     }
-    const displayHave = t.have + (t.have_ignored || 0);
+    // Cap the displayed count at the total: an item covered by BOTH a real
+    // sub and an ignored-codec one would otherwise render "53/52". The
+    // ignored-codec detail moves to the tooltip whenever it exists, not only
+    // below full coverage.
+    const displayHave = Math.min(t.have + (t.have_ignored || 0), t.total);
     frag.appendChild(
       el(
         "span",
@@ -279,7 +283,7 @@ function buildBadges(targets: CoverageTarget[]): DocumentFragment {
           className: "badge badge-split",
           "data-status": status,
           "data-tip":
-            ignoredPct > 0 && pct < 1 ? `${t.have_ignored} with ignored codec only` : undefined,
+            (t.have_ignored || 0) > 0 ? `${t.have_ignored} with ignored codec only` : undefined,
         },
         el("span", { className: "badge-lang" }, label),
         el("span", { className: "badge-detail" }, `${displayHave}/${t.total}`),
@@ -384,16 +388,19 @@ function ensureMounted(): void {
   const tbl = el("table", { className: "library" }, thead, tbody);
   const emptyEl = emptyState("No media found. Data will appear after the first scheduled scan.");
   const noMatchEl = emptyState("No matching items.");
+  // Same pagination affordance as the history table (.more-btn is the one
+  // sanctioned full-width pagination style; the old "cov-show-more" class had
+  // no CSS rule at all).
   const showMore = el(
     "button",
     {
       type: "button",
-      className: "ghost cov-show-more",
+      className: "more-btn",
       onclick: () => {
         pageLimit.value += COV_PAGE_SIZE;
       },
     },
-    "Show more",
+    "Show more\u2026",
   );
   patch(out, el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
 

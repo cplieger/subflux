@@ -18,8 +18,10 @@
   }
 
   .auth-card .wiz-lang-remove {
-    width: 2.5rem;
-    height: 2.5rem;
+    /* 44px touch-target floor (2.75rem), matching every other coarse-pointer
+       control; 2.5rem (40px) sat below it. */
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
   .wiz-toggle input + span {

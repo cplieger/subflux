@@ -1,11 +1,19 @@
 // detail.ts — series and movie detail drilldown views
 
 import * as store from "./store.js";
-import { $, el, icon, emptyDiv, errDiv, pad, insertNavButton } from "./dom.js";
+import { $, el, icon, errDiv, pad, insertNavButton } from "./dom.js";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { decodeSubtitleEntry } from "./wire/decoders.gen.js";
 import { registerCleanup } from "@cplieger/actions";
-import { fmtEpisode, tvdbMediaId, langName, fmtLangVariant } from "./utils.js";
+import {
+  fmtEpisode,
+  tvdbMediaId,
+  langName,
+  fmtLangVariant,
+  emptyState,
+  setDocTitle,
+} from "./utils.js";
+import { openConfig } from "./config.js";
 import { DEFAULT_VARIANT, EMBEDDED_PROVIDER } from "./constants.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
@@ -178,6 +186,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
   if (!skipPush) {
     history.pushState(null, "", `/series/${s.tvdb_id}`);
   }
+  setDocTitle(s.title);
   const targets = s.targets;
   const subsInfo =
     targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
@@ -736,7 +745,11 @@ export function renderSeriesDetail(
     // Tear down any live series binding so a later same-series render rebuilds.
     disposeSeriesBinding();
     const frag = document.createDocumentFragment();
-    frag.appendChild(emptyDiv("No episodes found."));
+    frag.appendChild(
+      emptyState(
+        "No episodes with video files were found for this series. Episodes appear here once Sonarr has imported them.",
+      ),
+    );
     patch(out, frag);
     return;
   }
@@ -918,6 +931,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   if (!skipPush) {
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
   }
+  setDocTitle(m.title);
   const targets = m.targets;
   const subsInfo =
     targets.length > 0 ? targets.map((t) => fmtLangVariant(t.language, t.variant)).join(", ") : "";
@@ -1007,9 +1021,19 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
 
   if (targets.length === 0) {
     // No language targets: nothing to bind. Drop any live movie binding and
-    // show the muted "not scanned" badge.
+    // explain the state with a way out (a bare "not scanned" badge as the
+    // whole page body was a dead end).
     disposeMovieBinding();
-    patch(out, el("span", { className: "badge", "data-status": "muted" }, "not scanned"));
+    patch(
+      out,
+      emptyState(
+        "No language rule matches this movie, so there is nothing to search for. Add or adjust a language rule in Settings.",
+        "Open Settings",
+        () => {
+          openConfig();
+        },
+      ),
+    );
     return;
   }
 

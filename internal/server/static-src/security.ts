@@ -240,10 +240,14 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
 
 function passkeyRow(pk: PasskeyItem): HTMLElement {
   const date = new Date(pk.created_at).toLocaleDateString();
+  // A real button (was a click-only <span>): rename must be reachable by
+  // keyboard and announced as an action, not as plain text.
   const nameEl = el(
-    "span",
+    "button",
     {
-      className: "sec-pk-name",
+      type: "button",
+      className: "sec-pk-name sec-pk-rename",
+      "aria-label": `Rename passkey ${pk.name || "Passkey"}`,
       onclick: () => renamePasskey(pk, nameEl),
     },
     pk.name || "Passkey",
@@ -529,6 +533,13 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
     container.appendChild(keyDisplay);
     container.appendChild(el("div", { className: "sec-actions" }, doneBtn));
   }
+
+  // The key is shown exactly once and is inserted ABOVE the current focus:
+  // announce it and move focus onto it so it cannot be missed.
+  keyDisplay.setAttribute("role", "status");
+  keyDisplay.setAttribute("aria-live", "polite");
+  keyDisplay.tabIndex = -1;
+  keyDisplay.focus();
 }
 
 // --- Single Sign-On (OIDC) ---
@@ -698,6 +709,11 @@ function showInputDialog(message: string, attrs?: Record<string, string>): Promi
 }
 
 function showFeedback(feedbackEl: HTMLElement, msg: string, isError: boolean): void {
+  // Announce the outcome: inline feedback in this dialog is otherwise
+  // invisible to screen readers (set the role before the text so the
+  // insertion is what gets announced).
+  feedbackEl.setAttribute("role", isError ? "alert" : "status");
+  feedbackEl.setAttribute("aria-live", isError ? "assertive" : "polite");
   feedbackEl.textContent = msg;
   feedbackEl.hidden = false;
   feedbackEl.className = isError ? "sec-feedback sec-feedback-err" : "sec-feedback sec-feedback-ok";

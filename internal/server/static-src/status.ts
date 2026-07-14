@@ -4,7 +4,7 @@ import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { el, text, icon, $ } from "./dom.js";
-import { apiGet, apiGetArray, apiGetTyped } from "./api-client.js";
+import { apiGetArray, apiGetRaw, apiGetTyped } from "./api-client.js";
 import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { decodeStats, decodeProvidersResponse, decodeActivityEntry } from "./wire/decoders.gen.js";
 import type {
@@ -165,6 +165,27 @@ function updateStatusButton(
   return isActive;
 }
 
+/** Flip the status button to the offline state (server unreachable) and, when
+ *  the popup is open, replace its content with a single explanatory row.
+ *  The next successful poll overwrites both. */
+function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
+  btn.dataset["status"] = "offline";
+  const statusEl = document.getElementById("statusIcon");
+  if (statusEl) {
+    statusEl.replaceChildren(icon("warning"));
+  }
+  const statusLabel = btn.querySelector(".nav-label");
+  if (statusLabel) {
+    statusLabel.textContent = "Offline";
+  }
+  if (popupVisible) {
+    patch(
+      $.statusPopup,
+      el("div", { className: "pop-item muted" }, "Server unreachable \u2014 retrying\u2026"),
+    );
+  }
+}
+
 /** Process activity side effects: seed toasted set, detect scan completion, show toasts. */
 function processActivitySideEffects(
   btn: HTMLElement,
@@ -216,8 +237,19 @@ export const pollStatusAction = defineAction<undefined, undefined>({
     const unconfigured = store.get("isUnconfigured");
     const popupVisible = isPopupOpen();
 
-    // Always fetch alerts and activity.
-    const alerts = (await apiGet<Alert[]>("/api/alerts", signal)) ?? [];
+    // Always fetch alerts and activity. Alerts go through the RAW helper so a
+    // network-level failure (status 0, not an abort) is distinguishable from
+    // "no alerts": an unreachable server must show the offline state, not
+    // coalesce to a green "Healthy" — the status button would otherwise be at
+    // its most reassuring exactly when the app is down.
+    const alertsRes = await apiGetRaw<Alert[]>("/api/alerts", signal);
+    if (!alertsRes.ok && alertsRes.status === 0) {
+      if (!signal.aborted) {
+        setOfflineStatus($.statusBtn, popupVisible);
+      }
+      return;
+    }
+    const alerts = (alertsRes.ok ? alertsRes.data : null) ?? [];
     const activities = (await apiGetArray("/api/activity", decodeActivityEntry, signal)) ?? [];
 
     let providers: ProvidersResponse = { enabled: false };
@@ -344,7 +376,15 @@ function buildAlertItem(a: Alert): HTMLElement {
       type: "button",
       className: "pop-dismiss",
       "aria-label": "Dismiss alert",
-      onclick: () => dismissAlert(a.id),
+      onclick: (e: MouseEvent) => {
+        // Optimistic exit animation, matching activity dismissal; a server
+        // failure surfaces as the alert reappearing on the next poll.
+        const item = (e.currentTarget as HTMLElement).closest(".pop-item");
+        if (item) {
+          animateDismiss(item);
+        }
+        void dismissAlert(a.id);
+      },
     },
     icon("close"),
   );
@@ -497,16 +537,30 @@ function renderPopup(
   });
 }
 
+/** Play the authored exit animation (fade + slide + collapse) on a popup row,
+ *  removing the element when the transition ends (300ms fallback covers
+ *  reduced-motion and transition-less environments). Removal outside
+ *  reconcile is safe: the dismissed row is filtered from the next render. */
+function animateDismiss(item: Element): void {
+  item.classList.add("pop-dismissing");
+  const remove = (): void => {
+    item.remove();
+  };
+  item.addEventListener("transitionend", remove, { once: true });
+  setTimeout(remove, 300);
+}
+
 function dismissActivity(id: string): void {
   dismissedActivities.add(id);
-  // Swap close button to spinner for immediate feedback.
+  // Play the exit animation for immediate feedback; the row is filtered from
+  // subsequent renders by the dismissedActivities set.
   const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
   if (item) {
     const btn = item.querySelector<HTMLButtonElement>(".close-btn");
     if (btn) {
       btn.disabled = true;
-      btn.replaceChildren(el("span", { className: "spinner" }));
     }
+    animateDismiss(item);
   }
   // Fire and forget; next poll will filter it out. Silent error: the
   // dismissedActivities set above already hides the row optimistically;

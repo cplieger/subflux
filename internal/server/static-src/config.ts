@@ -10,6 +10,7 @@ import { apiGet, apiGetArray } from "./api-client.js";
 import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
   apiAction,
+  bindLoadingState,
   defineAction,
   ActionError,
   classifyFetchError,
@@ -94,6 +95,17 @@ export async function loadConfig(): Promise<void> {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     notify.error(`Failed to load config: ${msg}`);
+  }
+}
+
+// Save can legitimately take seconds (the server pings changed arrs before
+// applying): disable + aria-busy the button for the in-flight window so the
+// wait is visible and double-clicks have nothing to land on. Static button,
+// so bind once at module init.
+{
+  const saveBtn = document.getElementById("saveConfigBtn");
+  if (saveBtn instanceof HTMLButtonElement) {
+    bindLoadingState("config.save", saveBtn);
   }
 }
 

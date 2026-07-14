@@ -42,8 +42,8 @@ header:has(h1) {
 
 .nav-btn {
   transition:
-    color var(--dur-micro),
-    background var(--dur-micro);
+    color var(--dur-micro) var(--ease-micro),
+    background var(--dur-micro) var(--ease-micro);
 
   &:active {
     translate: 0;
@@ -119,19 +119,26 @@ header:has(h1) {
   }
 }
 
-/* Status severity (data-status on .nav-btn) */
+/* Status severity (data-status on .nav-btn).
+   Solid chips pair white text with the dark light-theme fills and black text
+   with the bright dark-theme fills (AA pairing, see _shared-tokens.css).
+   Hovers darken on light (white text gains contrast) and brighten on dark
+   (black text gains contrast) — the house dark-hover direction. */
 .nav-btn[data-status="idle"] {
   background: var(--ok);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
 }
 
 .nav-btn[data-status="idle"]:hover {
-  background: color-mix(in oklch, var(--ok) 80%, oklch(0% 0 0deg));
+  background: light-dark(
+    color-mix(in oklch, var(--ok) 80%, oklch(0% 0 0deg)),
+    color-mix(in oklch, var(--ok) 80%, oklch(100% 0 0deg))
+  );
 }
 
 .nav-btn[data-status="scanning"] {
   background: var(--accent);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
 }
 
 .nav-btn[data-status="scanning"]:hover {
@@ -146,25 +153,50 @@ header:has(h1) {
 .nav-btn[data-status="warn"]:hover {
   background: light-dark(
     color-mix(in oklch, var(--warn) 20%, transparent),
-    color-mix(in oklch, var(--warn) 80%, oklch(0% 0 0deg))
+    color-mix(in oklch, var(--warn) 80%, oklch(100% 0 0deg))
+  );
+
+  /* The stronger light-theme tint would sink amber-on-amber below AA, so the
+     text deepens with it (hover = more contrast, per the design system). */
+  color: light-dark(
+    color-mix(in oklch, var(--warn) 70%, oklch(0% 0 0deg)),
+    oklch(0% 0 0deg)
   );
 }
 
 .nav-btn[data-status="error"] {
   background: var(--err);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
 }
 
 .nav-btn[data-status="error"]:hover {
-  background: color-mix(in oklch, var(--err) 80%, oklch(0% 0 0deg));
+  background: light-dark(
+    color-mix(in oklch, var(--err) 80%, oklch(0% 0 0deg)),
+    color-mix(in oklch, var(--err) 80%, oklch(100% 0 0deg))
+  );
+}
+
+.nav-btn[data-status="offline"] {
+  background: var(--muted);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
+}
+
+.nav-btn[data-status="offline"]:hover {
+  background: light-dark(
+    color-mix(in oklch, var(--muted) 80%, oklch(0% 0 0deg)),
+    color-mix(in oklch, var(--muted) 80%, oklch(100% 0 0deg))
+  );
 }
 
 .nav-btn[data-status="scanning"] .nav-icon {
   display: inline-block;
   width: var(--icon);
   height: var(--icon);
-  border: 2px solid oklch(100% 0 0deg / 30%);
-  border-block-start-color: oklch(100% 0 0deg);
+
+  /* currentColor keeps the spinner matched to the chip's theme-flipped text
+     (white on light, black on dark) without a second light-dark() pair. */
+  border: 2px solid color-mix(in oklch, currentcolor 30%, transparent);
+  border-block-start-color: currentcolor;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   font-size: 0;

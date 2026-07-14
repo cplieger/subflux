@@ -20,7 +20,7 @@
   <div class="auth-card">
     <h1>Subflux</h1>
 
-    <div id="loginError" class="auth-error" hidden></div>
+    <div id="loginError" class="auth-error" role="alert" hidden></div>
 
     <!-- Password login form -->
     <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on">
@@ -52,35 +52,13 @@
   </div>
 </main>
 
-<!-- TOTP verification (shown after password step) -->
-<main id="totpPage" class="auth-page" hidden aria-label="Two-factor verification">
-  <div class="auth-card">
-    <h2>Two-Factor Authentication</h2>
-    <p>Enter the code from your authenticator app</p>
-
-    <div id="totpError" class="auth-error" hidden></div>
-
-    <form id="totpForm" method="post" action="/api/auth/totp" autocomplete="on">
-      <label for="totpCode">Code</label>
-      <input type="text" id="totpCode" name="code"
-        autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*"
-        maxlength="8" required autofocus
-        placeholder="000000">
-
-      <button type="submit">Verify</button>
-    </form>
-
-    <p class="auth-hint">You can also use a recovery code</p>
-  </div>
-</main>
-
 <!-- Setup: Step 1 - Account creation -->
 <main id="setupPage" class="auth-page" hidden aria-label="Initial setup">
   <div class="auth-card">
     <h2>Welcome to Subflux</h2>
     <p>Create your admin account to get started</p>
 
-    <div id="setupError" class="auth-error" hidden></div>
+    <div id="setupError" class="auth-error" role="alert" hidden></div>
 
     <form id="setupForm" method="post" action="/api/auth/setup" autocomplete="on">
       <label for="setupUsername">Username</label>
@@ -106,7 +84,7 @@
 <main id="configWizardPage" class="auth-page auth-page-wide" hidden aria-label="Configuration wizard">
   <h2 class="wizard-title">Configure Subflux</h2>
   <div class="auth-card auth-card-wide">
-    <div id="wizardError" class="auth-error" hidden></div>
+    <div id="wizardError" class="auth-error" role="alert" hidden></div>
     <div id="wizardSection" class="wizard-section"></div>
 
     <div class="wizard-nav">

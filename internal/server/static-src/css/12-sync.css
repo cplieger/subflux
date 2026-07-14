@@ -84,8 +84,8 @@
   background: light-dark(oklch(92% 0.005 32deg), var(--bg));
   cursor: pointer;
   transition:
-    background var(--dur-micro),
-    outline-color var(--dur-micro);
+    background var(--dur-micro) var(--ease-micro),
+    outline-color var(--dur-micro) var(--ease-micro);
   touch-action: none;
   outline: 2px solid transparent;
   outline-offset: -2px;
@@ -142,7 +142,7 @@
   cursor: pointer;
   line-height: 1;
   border-radius: 0;
-  transition: background var(--dur-micro);
+  transition: background var(--dur-micro) var(--ease-micro);
 
   &:first-child {
     border-block-end: none;
@@ -159,7 +159,7 @@
 
   &:active {
     background: var(--accent);
-    color: oklch(100% 0 0deg);
+    color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   }
 }
 
@@ -180,8 +180,8 @@
   touch-action: manipulation;
   user-select: none;
   transition:
-    background var(--dur-micro),
-    border-color var(--dur-micro);
+    background var(--dur-micro) var(--ease-micro),
+    border-color var(--dur-micro) var(--ease-micro);
 
   &:hover {
     background: var(--accent-dim);
@@ -190,7 +190,7 @@
 
   &:active {
     background: var(--accent);
-    color: oklch(100% 0 0deg);
+    color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   }
 }
 
@@ -233,7 +233,7 @@
   border: none;
   border-radius: 0;
   cursor: pointer;
-  transition: background var(--dur-standard);
+  transition: background var(--dur-standard) var(--ease-standard);
 
   &:hover {
     background: oklch(100% 0 0deg / 8%);

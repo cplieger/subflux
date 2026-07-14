@@ -298,6 +298,38 @@ function abortValidation(): void {
   }
 }
 
+/** Run an awaited wizard operation with visible busy feedback: the nav
+ *  buttons are disabled, the active one carries aria-busy and a progress
+ *  label ("Checking…"/"Saving…") for the duration, and everything is
+ *  restored in a finally. Without this, async path validation and the final
+ *  save gave no indication anything was happening, and a second click
+ *  silently aborted/restarted the work. */
+async function withWizardBusy<T>(
+  btn: HTMLElement,
+  label: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const oldLabel = btn.textContent;
+  const navButtons = [$("wizardBack"), $("wizardNext"), $("wizardFinish")].filter(
+    (b): b is HTMLButtonElement => b instanceof HTMLButtonElement,
+  );
+  for (const b of navButtons) {
+    b.disabled = true;
+  }
+  btn.setAttribute("aria-busy", "true");
+  btn.textContent = label;
+  try {
+    return await fn();
+  } finally {
+    btn.textContent = oldLabel;
+    btn.removeAttribute("aria-busy");
+    for (const b of navButtons) {
+      b.disabled = false;
+    }
+    updateWizardNav();
+  }
+}
+
 function wireWizardNav(): void {
   if (navWired) {
     return;
@@ -334,9 +366,15 @@ function wireWizardNav(): void {
       return;
     }
     if (step.validateAsync) {
+      const validateAsync = step.validateAsync;
+      const nextBtn = $("wizardNext");
       validationAbort = new AbortController();
-      const asyncErr = await step.validateAsync(validationAbort.signal);
-      if (validationAbort.signal.aborted) {
+      const signal = validationAbort.signal;
+      const validate = (): Promise<string> => validateAsync(signal);
+      const asyncErr = nextBtn
+        ? await withWizardBusy(nextBtn, "Checking\u2026", validate)
+        : await validate();
+      if (signal.aborted) {
         return;
       }
       validationAbort = null;
@@ -358,6 +396,15 @@ function wireWizardNav(): void {
 // --- Finish wizard ---
 
 async function finishWizard(): Promise<void> {
+  const finishBtn = $("wizardFinish");
+  if (finishBtn) {
+    await withWizardBusy(finishBtn, "Saving\u2026", finishWizardInner);
+  } else {
+    await finishWizardInner();
+  }
+}
+
+async function finishWizardInner(): Promise<void> {
   abortValidation();
   const step = wizardSteps[wizardIndex];
   if (step) {

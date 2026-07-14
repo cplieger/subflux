@@ -4,7 +4,13 @@ import * as notify from "./notify.js";
 import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./dom.js";
 import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
-import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
+import {
+  apiAction,
+  bindLoadingState,
+  retryNetwork,
+  RETRY_STANDARD,
+  registerCleanup,
+} from "@cplieger/actions";
 import { langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";
@@ -59,6 +65,7 @@ let syncState: SyncState = {
 // offset crosses zero, replacing the scattered manual hidden-toggles.
 let offset = signal(0);
 let stopOffsetEffect: (() => void) | null = null;
+let stopSaveBinding: (() => void) | null = null;
 
 // Drain any in-flight ffmpeg stream + revoke blob URL on page unload.
 // Browsers handle this naturally on real navigation; the registration
@@ -155,6 +162,10 @@ export function openSyncDialog(
   if (stopOffsetEffect) {
     stopOffsetEffect();
     stopOffsetEffect = null;
+  }
+  if (stopSaveBinding) {
+    stopSaveBinding();
+    stopSaveBinding = null;
   }
   offset = signal(initialOffset);
   syncState = {
@@ -276,16 +287,18 @@ export function openSyncDialog(
 
   // Footer with Save + Reset (matches config dialog footer).
   const footer = el("div", { className: "dlg-foot" });
-  footer.appendChild(
-    el(
-      "button",
-      {
-        type: "button",
-        onclick: () => applyManualOffset(),
-      },
-      "Save Offset",
-    ),
-  );
+  const saveBtn = el(
+    "button",
+    {
+      type: "button",
+      onclick: () => applyManualOffset(),
+    },
+    "Save Offset",
+  ) as HTMLButtonElement;
+  footer.appendChild(saveBtn);
+  // Disable + aria-busy while the save is in flight (the action-feedback
+  // contract: no silent seconds-long waits, no swallowed double-clicks).
+  stopSaveBinding = bindLoadingState("sync.save_offset", saveBtn);
   const resetBtn = el(
     "button",
     {
@@ -313,11 +326,23 @@ export function openSyncDialog(
   // visible and the pending close callback no-ops (it is guarded on the class).
   dlg.classList.remove("is-leaving");
   dlg.showModal();
-  (document.activeElement as HTMLElement | null)?.blur();
+  // Keep keyboard focus INSIDE the modal (the dialog itself has
+  // tabindex="-1"); the previous blur() dropped focus to <body>, leaving
+  // keyboard/SR users with no position. The dialog-level arrow handler below
+  // works regardless of which element holds focus, so no blur is needed to
+  // make arrows feel "global".
+  dlg.focus();
 
-  // Arrow keys adjust the active timecode segment from anywhere in the dialog.
-  // Use onkeydown property to avoid accumulating listeners across reopens.
+  // Arrow keys adjust the active timecode segment from anywhere in the
+  // dialog — EXCEPT inside form controls: the subtitle <select> (and any
+  // input) needs its own arrow keys, and a segment is always pre-selected so
+  // the handler would otherwise swallow them. Use onkeydown property to
+  // avoid accumulating listeners across reopens.
   dlg.onkeydown = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest("select, input, textarea")) {
+      return;
+    }
     (timecode as TimecodeInput).handleKey(e);
   };
 
@@ -379,6 +404,10 @@ function closeSyncDialog(): void {
   if (stopOffsetEffect) {
     stopOffsetEffect();
     stopOffsetEffect = null;
+  }
+  if (stopSaveBinding) {
+    stopSaveBinding();
+    stopSaveBinding = null;
   }
   if (syncState.status === "preview" && syncState.ffmpegAbort) {
     syncState.ffmpegAbort.abort();
@@ -646,7 +675,7 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
     {
       type: "button",
       className: "sync-offset-btn",
-      "aria-label": "Play/Pause",
+      "aria-label": "Pause",
       onclick: () => {
         if (video.paused) {
           video.play().catch(() => {
@@ -661,11 +690,15 @@ function buildSeekControls(video: HTMLVideoElement): HTMLElement {
   );
   seekRow.appendChild(playPauseBtn);
 
+  // Keep the accessible name in sync with the state the button will
+  // trigger, not a static "Play/Pause" that never reflects either.
   video.addEventListener("play", () => {
     playPauseBtn.replaceChildren(icon("pause"));
+    playPauseBtn.setAttribute("aria-label", "Pause");
   });
   video.addEventListener("pause", () => {
     playPauseBtn.replaceChildren(icon("play"));
+    playPauseBtn.setAttribute("aria-label", "Play");
   });
 
   for (const delta of [10, 30]) {
@@ -797,11 +830,17 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
   const trackUrl = `/api/preview/subtitle?path=${encodeURIComponent(
     syncState.subtitlePath,
   )}&start=${syncState.previewStart || 0}&shift=${offset.peek() || 0}`;
+  // Declare the track's REAL language to the platform (caption menus, SR
+  // announcements): a hardcoded srclang="en" mislabeled every non-English
+  // subtitle.
+  const entry = syncState.entries.find((s) => s.path === syncState.subtitlePath);
+  const entryLang = entry?.language ?? "";
+  const lang = entryLang === "" ? "en" : entryLang;
   const track = el("track", {
     kind: "subtitles",
     src: trackUrl,
-    srclang: "en",
-    label: "Subtitles",
+    srclang: lang,
+    label: entryLang === "" ? "Subtitles" : langName(entryLang),
     default: true,
   }) as HTMLTrackElement;
   video.appendChild(track);

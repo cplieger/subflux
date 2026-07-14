@@ -368,7 +368,14 @@ function renderPopupResults(
   }
 
   const frag: DocumentFragment = document.createDocumentFragment();
-  frag.appendChild(el("div", { className: "muted result-count" }, `${results.length} result(s)`));
+  // The list renders at most 30 rows; say so instead of a bare total that
+  // contradicts the visible list ("80 results" over 30 rows read as a bug).
+  const shown = Math.min(results.length, 30);
+  const countText =
+    results.length > shown
+      ? `Showing ${shown} of ${results.length} results (best matches first)`
+      : `${results.length} ${results.length === 1 ? "result" : "results"}`;
+  frag.appendChild(el("div", { className: "muted result-count" }, countText));
 
   // Header row.
   frag.appendChild(
