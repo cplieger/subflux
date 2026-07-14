@@ -86,7 +86,10 @@ export async function triggerScan(
         renderPending: () => el("span", { className: "spinner" }),
         renderSuccess: () => el("span", { className: "icon icon-check" }),
         renderError: () => el("span", { className: "icon icon-close" }),
-        announce: false,
+        // Keep the library's built-in screen-reader announcement: the ✓/✗
+        // glyph is the ONLY other outcome signal (scan activities are
+        // excluded from completion toasts), so suppressing it made the
+        // result invisible to assistive tech.
       },
     );
   } else {

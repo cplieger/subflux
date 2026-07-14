@@ -243,6 +243,7 @@ export interface StateEntry {
   title: string;
   media_id: string;
   language: string;
+  variant: Variant;
   provider: string;
   path: string;
   release_name: string;

@@ -11,12 +11,15 @@ import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
 import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import { skeletonTiming } from "./skeleton-timing.js";
+import * as store from "./store.js";
 
 interface HistoryEntry {
   id: number; // unique subtitle_state row id (stable collection key)
   media_id: string;
   media_type: string;
   language: string;
+  variant: string; // standard | hi | forced (state rows are keyed per variant)
   provider: string;
   release_name: string;
   title: string;
@@ -111,10 +114,16 @@ function buildHistoryRow(entry: HistoryEntry): HTMLElement {
     label += ` \u00B7 ${fmtEpisode(entry.season, entry.episode)}`;
   }
   const href = historyMediaHref(entry);
+  // Non-standard variants (forced/hi) qualify the language cell; standard
+  // stays bare so the common case reads clean.
+  const lang =
+    entry.variant && entry.variant !== "standard"
+      ? `${entry.language} ${entry.variant}`
+      : entry.language;
   const cells = [
     el("td", { "data-col": "meta" }, time),
     el("td", { "data-col": "title" }, label),
-    el("td", { "data-col": "meta" }, entry.language),
+    el("td", { "data-col": "meta" }, lang),
     el("td", { "data-col": "meta" }, entry.provider),
     el("td", { "data-col": "meta" }, entry.manual ? "manual" : "auto"),
     el("td", { "data-col": "meta" }, entry.release_name || ""),
@@ -129,10 +138,16 @@ function buildHistoryRow(entry: HistoryEntry): HTMLElement {
     : el("tr", null, ...cells);
 }
 
-/** Populate language and provider dropdowns from accumulated data. */
+/** Populate language and provider dropdowns. Options come from the STABLE
+ *  sources — configured languages and the provider map — merged with the
+ *  values seen in loaded rows (covers history from since-removed providers or
+ *  languages). Deriving from loaded pages alone made options depend on how
+ *  many "Show more" pages happened to be loaded: filtering is server-side, so
+ *  a provider present only in older history was unselectable. */
 function updateHistoryFilters(data: HistoryEntry[]): void {
-  const langs = new Set<string>();
-  const provs = new Set<string>();
+  const cfg = store.get("config");
+  const langs = new Set<string>(cfg?.languages ?? []);
+  const provs = new Set<string>(Object.keys(cfg?.providers ?? {}));
   for (const entry of data) {
     if (entry.language) {
       langs.add(entry.language);
@@ -248,6 +263,26 @@ function showError(e: unknown): void {
 
 async function reload(): Promise<void> {
   const g = ++gen;
+  // Design-system skeleton (same anti-flicker timing as the library table)
+  // for the first mount only: previously the panel stayed BLANK for the whole
+  // fetch. Filter-change reloads keep the current rows until data lands
+  // (patching a skeleton over a live reactive table would drop bindings).
+  const out = document.getElementById("historyContent");
+  const firstMount = out !== null && out.querySelector("table.history") === null;
+  const timing = firstMount
+    ? skeletonTiming(() => {
+        if (g !== gen) {
+          return;
+        }
+        const skel = document.createDocumentFragment();
+        for (let i = 0; i < 6; i++) {
+          skel.appendChild(
+            el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+          );
+        }
+        patch(out, skel);
+      })
+    : null;
   try {
     const page = await fetchPage(0, PAGE_SIZE);
     if (g !== gen) {
@@ -256,8 +291,18 @@ async function reload(): Promise<void> {
     history.setAll(page.items);
     hasMore.value = page.hasMore;
     updateHistoryFilters(history.items());
-    ensureMounted();
-    renderTick.value += 1;
+    const mount = (): void => {
+      if (g !== gen) {
+        return;
+      }
+      ensureMounted();
+      renderTick.value += 1;
+    };
+    if (timing) {
+      timing.commit(mount);
+    } else {
+      mount();
+    }
   } catch (e: unknown) {
     if (g === gen) {
       showError(e);

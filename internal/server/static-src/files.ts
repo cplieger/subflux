@@ -133,10 +133,15 @@ async function loadFiles(): Promise<void> {
   // Mark as files view so data:invalidate reloads files, not library.
   store.set("detailCtx", { files: true });
 
-  patch(
-    out,
-    el("div", { className: "empty" }, el("span", { className: "spinner" }), " Loading files\u2026"),
-  );
+  // Design-system skeleton (matching the library/history tables) instead of
+  // the one-off centered spinner — one loading pattern per concern.
+  const skel = document.createDocumentFragment();
+  for (let i = 0; i < 4; i++) {
+    skel.appendChild(
+      el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+    );
+  }
+  patch(out, skel);
 
   await refreshFileData();
 }

@@ -93,7 +93,7 @@
   height: 1.25rem;
   background: var(--border);
   border-radius: 0.625rem;
-  transition: background var(--dur-standard);
+  transition: background var(--dur-standard) var(--ease-standard);
   flex-shrink: 0;
 }
 
@@ -106,7 +106,7 @@
   inset-block-end: 0.125rem;
   background: oklch(100% 0 0deg);
   border-radius: 50%;
-  transition: translate var(--dur-standard);
+  transition: translate var(--dur-standard) var(--ease-standard);
 }
 
 .wiz-toggle input:checked + span {
@@ -214,7 +214,7 @@
   box-shadow: 0 0.25rem 1rem var(--shadow-color);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--dur-micro);
+  transition: opacity var(--dur-micro) var(--ease-micro);
   white-space: normal;
   text-align: start;
   z-index: 10;
@@ -263,7 +263,7 @@
   border-radius: var(--radius);
   margin-block-end: var(--sp-4);
   overflow: hidden;
-  transition: border-color var(--dur-micro);
+  transition: border-color var(--dur-micro) var(--ease-micro);
 }
 
 .wiz-prov-card.open {
@@ -374,6 +374,27 @@
   color: var(--text);
 }
 
+/* Narrow phones / touch: the fixed-width flex row (10rem + arrow + 10rem +
+   6rem + remove) overflows the card. Re-grid it: selects share the row width,
+   the decorative arrow goes, and the remove button keeps its square. */
+@media (width < 640px), (pointer: coarse) {
+  .wiz-lang-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+  }
+
+  .wiz-lang-row .wiz-lang-arrow {
+    display: none;
+  }
+
+  .wiz-lang-select,
+  .wiz-lang-variant {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 /* Media root input: fill available space */
 .wiz-media-input {
   flex: 1;
@@ -460,7 +481,7 @@
   height: 0.5rem;
   border-radius: 50%;
   background: var(--border);
-  transition: background var(--dur-standard);
+  transition: background var(--dur-standard) var(--ease-standard);
 }
 
 .wizard-dot.active {

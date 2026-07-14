@@ -139,6 +139,9 @@ async function requestRaw<T>(
   if (r.code === "decode") {
     console.error("api decode failed:", method, path, r.error);
   }
+  // Raw and null-collapsing helpers alike route through here, so the
+  // session-expiry redirect covers every surface.
+  handleSessionExpiry(r.status);
   const result: ApiResult<T> = { ok: false, status: r.status, error: r.error };
   if (r.code !== undefined) {
     result.code = r.code;
@@ -150,6 +153,26 @@ async function requestRaw<T>(
     result.headers = responseHeaders;
   }
   return result;
+}
+
+// Session expiry chokepoint: every API call routes through requestRaw, so a
+// 401 anywhere in the MAIN app (dialogs included) means the session is gone
+// and no surface has a local recovery path — redirect to the login page with
+// a return target instead of leaving a blank dialog or a silently-failed
+// action. The login shell (/login) is excluded: its own POSTs legitimately
+// answer 401 on bad credentials and must not loop.
+let redirectingToLogin = false;
+
+function handleSessionExpiry(status: number): void {
+  if (status !== 401 || redirectingToLogin) {
+    return;
+  }
+  const { pathname, search } = window.location;
+  if (pathname.startsWith("/login")) {
+    return;
+  }
+  redirectingToLogin = true;
+  window.location.href = `/login?next=${encodeURIComponent(pathname + search)}`;
 }
 
 async function request<T>(

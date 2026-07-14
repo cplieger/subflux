@@ -25,6 +25,9 @@ vi.mock("./bus.js", () => ({
 vi.mock("./search.js", () => ({ openSearchPopup: () => undefined }));
 vi.mock("./sync.js", () => ({ openSyncDialog: () => undefined }));
 vi.mock("./files.js", () => ({ openFileManager: () => undefined }));
+// detail.ts imports openConfig (for the no-targets empty state); mock the
+// whole module so its transitive graph (status.ts actions) stays out.
+vi.mock("./config.js", () => ({ openConfig: () => undefined }));
 vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: () => undefined,
   triggerSeasonScan: () => undefined,

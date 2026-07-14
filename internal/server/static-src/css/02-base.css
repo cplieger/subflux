@@ -11,7 +11,6 @@
 }
 
 html {
-  -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overscroll-behavior: contain;
 }
@@ -71,11 +70,16 @@ body {
   height: 1.75rem;
   color: var(--text);
   font: inherit;
-  transition: border-color var(--dur-micro);
+  transition: border-color var(--dur-micro) var(--ease-micro);
 
   &:focus {
     outline: none;
     border-color: var(--accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   &:user-invalid {
@@ -112,7 +116,10 @@ input[type="date"]:invalid {
 /* --- Buttons --- */
 :where(button) {
   background: var(--accent);
-  color: oklch(100% 0 0deg);
+  /* Solid status/accent fills carry white text on light (dark fills) and
+     black text on dark (bright fills) — the AA pairing pinned in
+     _shared-tokens.css. */
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--sp-2) var(--sp-5);
@@ -126,8 +133,8 @@ input[type="date"]:invalid {
   align-items: center;
   gap: var(--sp-2);
   transition:
-    background var(--dur-micro),
-    translate 0.08s;
+    background var(--dur-micro) var(--ease-micro),
+    translate 0.08s var(--ease-micro);
 
   &[hidden] {
     display: none;
@@ -367,7 +374,7 @@ button[data-status="err"] {
 
 .clickable {
   cursor: pointer;
-  transition: background var(--dur-micro);
+  transition: background var(--dur-micro) var(--ease-micro);
 
   &:focus-visible {
     outline: 2px solid var(--accent);
@@ -392,8 +399,8 @@ button[data-status="err"] {
   opacity: 0;
   translate: 0 0.5rem;
   transition:
-    opacity var(--dur-standard),
-    translate var(--dur-standard);
+    opacity var(--dur-standard) var(--ease-standard),
+    translate var(--dur-standard) var(--ease-standard);
 
   &[open] {
     opacity: 1;
@@ -402,7 +409,7 @@ button[data-status="err"] {
 
   &::backdrop {
     background: oklch(0% 0 0deg / 0%);
-    transition: background var(--dur-standard);
+    transition: background var(--dur-standard) var(--ease-standard);
   }
 
   &[open]::backdrop {
@@ -413,17 +420,17 @@ button[data-status="err"] {
 @supports (transition-behavior: allow-discrete) {
   :where(dialog) {
     transition:
-      opacity var(--dur-standard),
-      translate var(--dur-standard),
-      overlay var(--dur-standard) allow-discrete,
-      display var(--dur-standard) allow-discrete;
+      opacity var(--dur-standard) var(--ease-standard),
+      translate var(--dur-standard) var(--ease-standard),
+      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+      display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
 
   :where(dialog)::backdrop {
     transition:
-      background var(--dur-standard),
-      overlay var(--dur-standard) allow-discrete,
-      display var(--dur-standard) allow-discrete;
+      background var(--dur-standard) var(--ease-standard),
+      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+      display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
 }
 
@@ -498,7 +505,14 @@ button[data-status="err"] {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The universal selector does not match view-transition pseudo-elements */
+  ::view-transition-old(main),
+  ::view-transition-new(main) {
+    animation: none !important;
   }
   /* stylelint-enable declaration-no-important, time-min-milliseconds */
 }

@@ -8,6 +8,7 @@ const MEDIA_TYPES = ["movie", "episode", "series"] as const;
 const NOTIFY_LEVELS = ["error", "success", "info"] as const;
 const ROLES = ["admin", "user"] as const;
 const SCORE_TIERS = ["excellent", "good", "acceptable", "minimal", "none"] as const;
+const VARIANTS = ["standard", "hi", "forced"] as const;
 
 export const decodeActivityEntry: Decoder<ActivityEntry> = (v) => {
   const o = asObject(v, "$.activity_entry");
@@ -335,6 +336,7 @@ export const decodeStateEntry: Decoder<StateEntry> = (v) => {
     title: reqStr(o, "title", "$.state_entry"),
     media_id: reqStr(o, "media_id", "$.state_entry"),
     language: reqStr(o, "language", "$.state_entry"),
+    variant: reqOneOf(o, "variant", VARIANTS, "$.state_entry"),
     provider: reqStr(o, "provider", "$.state_entry"),
     path: reqStr(o, "path", "$.state_entry"),
     release_name: reqStr(o, "release_name", "$.state_entry"),

@@ -97,39 +97,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  &:hover {
+  /* The name is a real <button> now (keyboard-reachable rename); undo the
+     base button chrome so the row keeps its compact text look. */
+  &.sec-pk-rename {
+    display: block;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: inherit;
+    text-align: start;
+  }
+
+  &.sec-pk-rename:hover {
+    background: transparent;
     text-decoration: underline;
   }
-}
 
-.sec-totp-uri {
-  margin-block: var(--sp-4);
-
-  & code {
-    display: block;
-    word-break: break-all;
-    font-family: ui-monospace, monospace;
-    font-size: var(--text-xs);
-    background: var(--raised);
-    padding: var(--sp-4);
-    border-radius: var(--radius-sm);
-    margin-block-start: var(--sp-3);
-  }
-}
-
-.sec-recovery-codes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-  gap: var(--sp-3);
-  margin-block: var(--sp-4);
-
-  & code {
-    font-family: ui-monospace, monospace;
-    font-size: var(--text-sm);
-    background: var(--raised);
-    padding: var(--sp-3);
-    border-radius: var(--radius-sm);
-    text-align: center;
+  &:hover {
+    text-decoration: underline;
   }
 }
 

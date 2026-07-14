@@ -78,9 +78,10 @@ function buildMenuContent(): void {
     );
   }
 
-  // Security link.
+  // Security link. Dedicated shield glyph: sharing the Settings gear made
+  // the two adjacent items visually identical.
   items.push(
-    menuItem("Security", "settings", () => {
+    menuItem("Security", "shield", () => {
       menuPopover?.hide();
       bus.emit(bus.BusEvent.OpenSecurity);
     }),
@@ -120,14 +121,52 @@ function buildMenuContent(): void {
     ),
   );
 
-  // Logout.
+  // Logout. Dedicated sign-out glyph: the close/X icon means
+  // error/dismiss everywhere else in the app.
   items.push(
-    menuItem("Logout", "close", () => {
+    menuItem("Logout", "logout", () => {
       void doLogout();
     }),
   );
 
   popup.replaceChildren(...items);
+
+  // The panel announces itself as role="menu", so it must honor the menu
+  // interaction contract: arrow keys move a roving focus over the items
+  // (Home/End jump), and the first item receives focus on open. createPopover
+  // only handles Escape; without this the announced role lied to AT users.
+  popup.onkeydown = menuKeydown;
+  const first = popup.querySelector<HTMLElement>(".um-item");
+  first?.focus();
+}
+
+// Roving focus over the .um-item entries of the user menu.
+function menuKeydown(e: KeyboardEvent): void {
+  const popup = e.currentTarget as HTMLElement;
+  const items = Array.from(popup.querySelectorAll<HTMLElement>(".um-item"));
+  if (items.length === 0) {
+    return;
+  }
+  const current = items.indexOf(document.activeElement as HTMLElement);
+  let next: number;
+  switch (e.key) {
+    case "ArrowDown":
+      next = current < 0 ? 0 : (current + 1) % items.length;
+      break;
+    case "ArrowUp":
+      next = current <= 0 ? items.length - 1 : current - 1;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = items.length - 1;
+      break;
+    default:
+      return;
+  }
+  e.preventDefault();
+  items[next]?.focus();
 }
 
 function menuItem(
@@ -156,14 +195,30 @@ function menuItem(
   );
 }
 
+// The theme item is labeled with what clicking it switches TO (the next stop
+// in the library's light -> dark -> system cycle), keyed off the STORED
+// choice so "system" is representable (the resolved data-theme attribute can
+// never distinguish system-dark from pinned dark).
 function resolveThemeLabel(): string {
-  const active = document.documentElement.getAttribute("data-theme");
-  return active === "dark" ? "Light mode" : "Dark mode";
+  switch (theme.choice()) {
+    case "light":
+      return "Dark mode";
+    case "dark":
+      return "System theme";
+    default:
+      return "Light mode";
+  }
 }
 
 function themeIcon(): string {
-  const active = document.documentElement.getAttribute("data-theme");
-  return active === "dark" ? "sun" : "moon";
+  switch (theme.choice()) {
+    case "light":
+      return "moon";
+    case "dark":
+      return "monitor";
+    default:
+      return "sun";
+  }
 }
 
 /** Logout. Best-effort: the redirect below runs regardless of the server

@@ -1,17 +1,16 @@
-// Theme management: dark/light with system-preference fallback.
+// Theme management: light / dark / system three-state cycle.
 //
-// Backed by @cplieger/ui-primitives' theme primitive. The subflux-facing API
-// (init / cycle) and the binary dark <-> light toggle are preserved exactly;
-// the library controller now owns persistence + live OS-preference following.
+// Backed by @cplieger/ui-primitives' theme primitive, using its native
+// light -> dark -> system -> light cycle. "system" resolves live via
+// matchMedia and follows the OS while selected, so a user who cycles back to
+// it regains OS-following without clearing storage by hand (the old binary
+// toggle pinned dark/light forever and made "system" unreachable).
 //
-// Storage key + values are unchanged ("subflux-theme": "dark" | "light", or
-// absent = follow the system preference), so the paint-time anti-FOUC script in
-// theme-init.ts stays byte-compatible. The library treats an absent/unknown
-// stored value as "system" (resolved live via matchMedia), matching the
-// previous null -> system behaviour; the binary toggle below only ever pins
-// "dark"/"light" (never "system"), so it can never cycle into a third state.
+// Storage key + values are unchanged ("subflux-theme": "light" | "dark" |
+// "system", or absent = system), so the paint-time anti-FOUC script in
+// theme-init.ts stays byte-compatible.
 
-import { createTheme, type ThemeController } from "@cplieger/ui-primitives/theme";
+import { createTheme, type ThemeChoice, type ThemeController } from "@cplieger/ui-primitives/theme";
 
 const THEME_KEY = "subflux-theme";
 
@@ -29,9 +28,11 @@ export function init(): void {
 }
 
 export function cycle(): void {
-  const t = ensureController();
-  // Binary toggle: flip the currently-resolved theme and pin it. Matches the
-  // previous dark <-> light behaviour (never enters the library's "system"
-  // leg of its default light -> dark -> system cycle).
-  t.set(t.resolved() === "dark" ? "light" : "dark");
+  ensureController().cycle();
+}
+
+// choice returns the STORED preference ("light" | "dark" | "system") — the
+// user menu labels the cycle button with what clicking it switches TO.
+export function choice(): ThemeChoice {
+  return ensureController().get();
 }

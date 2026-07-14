@@ -28,6 +28,9 @@ function decodeSSE<T>(e: MessageEvent, decoder: Decoder<T>): T | null {
 let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
+// True once any SSE connection has opened this page load; a later open is
+// therefore a RECONNECT after a gap (error backoff or hidden-tab pause).
+let everConnected = false;
 
 export function connect(): void {
   if (eventSource) {
@@ -44,6 +47,17 @@ export function connect(): void {
 
   eventSource.addEventListener("open", () => {
     reconnectAttempt = 0;
+    if (everConnected) {
+      // Reconnected after a gap. Both reconnect paths (error backoff and the
+      // visibilitychange pause) construct a FRESH EventSource, which never
+      // sends Last-Event-ID, so any events published during the gap are
+      // gone. Refetch the pull state instead of trusting the stream: the
+      // current page reloads via DataInvalidate and the status button
+      // re-polls, so coverage badges and activity can't silently go stale.
+      emit(BusEvent.DataInvalidate);
+      void pollStatus();
+    }
+    everConnected = true;
   });
 
   eventSource.addEventListener("coverage", (e: MessageEvent) => {

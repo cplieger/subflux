@@ -111,6 +111,18 @@
   mask-image: url("icons/chevron-bold.svg");
 }
 
+.icon-shield {
+  mask-image: url("icons/shield.svg");
+}
+
+.icon-logout {
+  mask-image: url("icons/logout.svg");
+}
+
+.icon-monitor {
+  mask-image: url("icons/monitor.svg");
+}
+
 /* --- Badge (data-status drives color) --- */
 .badge {
   padding: var(--sp-2) var(--sp-5);
@@ -126,8 +138,8 @@
   text-align: center;
   flex-shrink: 0;
   transition:
-    background 0.4s,
-    color 0.4s;
+    background var(--dur-micro) var(--ease-micro),
+    color var(--dur-micro) var(--ease-micro);
 
   /* Default: muted */
   background: var(--raised);
@@ -162,8 +174,12 @@ td[data-col="actions"] button {
 }
 
 .badge[data-status="manual"] {
+  /* Solid amber chip. The light theme's --warn is dark enough (54% L, for
+     AA text contrast on tints) that black-on-amber fails there, so the chip
+     text flips per theme: white on the dark light-theme amber, black on the
+     bright dark-theme amber. Mirrors the .nav-btn[data-status="warn"] split. */
   background: var(--warn);
-  color: oklch(0% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   min-width: auto;
 }
 
@@ -264,7 +280,7 @@ td[data-col="actions"] button {
     height: 1.25rem;
     background: var(--border);
     border-radius: 0.625rem;
-    transition: background var(--dur-standard);
+    transition: background var(--dur-standard) var(--ease-standard);
     flex-shrink: 0;
 
     &::before {
@@ -276,7 +292,7 @@ td[data-col="actions"] button {
       inset-block-end: 0.125rem;
       background: oklch(100% 0 0deg);
       border-radius: 50%;
-      transition: translate var(--dur-standard);
+      transition: translate var(--dur-standard) var(--ease-standard);
     }
   }
 
@@ -286,6 +302,11 @@ td[data-col="actions"] button {
     &::before {
       translate: 1rem;
     }
+  }
+
+  & input:focus-visible + span {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 

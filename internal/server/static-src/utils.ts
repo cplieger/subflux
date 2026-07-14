@@ -61,7 +61,11 @@ export function viewTransition(fn: () => void): void {
 }
 
 // Build a table row that acts as a clickable link: responds to click,
-// Enter, and Space for keyboard accessibility.
+// Enter, and Space for keyboard accessibility. Deliberately NO role
+// override: role="link" on a <tr> would flatten the row/cell semantics
+// assistive tech relies on for table navigation (the accessible name would
+// become the concatenated text of every cell). The row stays focusable and
+// operable while keeping its native table role.
 export function clickableRow(
   handler: () => void,
   ...children: (string | Node | null | undefined)[]
@@ -71,7 +75,6 @@ export function clickableRow(
     {
       className: "clickable",
       tabindex: "0",
-      role: "link",
       onclick: handler,
       onkeydown: (e: KeyboardEvent) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -82,6 +85,13 @@ export function clickableRow(
     },
     ...children,
   );
+}
+
+// Set the document title to "Subflux · <context>" (or plain "Subflux"), so
+// browser tabs, history entries, and screen-reader page announcements
+// distinguish the routes.
+export function setDocTitle(context?: string): void {
+  document.title = context ? `Subflux \u00B7 ${context}` : "Subflux";
 }
 
 // Build a standardized empty-state placeholder with an optional action button.

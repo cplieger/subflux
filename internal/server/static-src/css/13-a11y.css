@@ -2,6 +2,22 @@
    12. Accessibility & view transitions
    ================================================================ */
 
+/* Skip link: visually hidden until keyboard-focused */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--sp-5);
+  z-index: 2000;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--raised);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus-visible {
+  top: var(--sp-5);
+}
+
 /* View transition: crossfade main content on route changes */
 
 /* (view-transition-name is on main in Layer 3) */

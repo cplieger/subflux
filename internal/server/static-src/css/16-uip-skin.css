@@ -15,7 +15,8 @@
 /* --- Custom-property overrides (map the library onto subflux's tokens) --- */
 :root {
   /* z-index ladder: keep subflux's relationships (toast above tooltip; the
-     native-Popover status/user menus stay in the top layer, above both). */
+     createPopover status/user menus sit on the same ladder above both, at
+     --uip-z-popover 1100). */
   --uip-z-toast: 1000;
   --uip-z-tooltip: 500;
 
@@ -76,14 +77,14 @@
 /* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM level modifier (uip-toast--<level>) */
 .uip-toast--success {
   background: var(--ok);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   border: none;
 }
 
 /* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM level modifier (uip-toast--<level>) */
 .uip-toast--error {
   background: var(--err);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   border: none;
 }
 
@@ -99,8 +100,8 @@
   box-shadow: var(--shadow);
   translate: 0;
   transition:
-    opacity var(--dur-micro),
-    translate var(--dur-micro);
+    opacity var(--dur-micro) var(--ease-micro),
+    translate var(--dur-micro) var(--ease-micro);
 }
 
 /* Fade + slide in on insertion (the base shows instantly; subflux faded in). */
@@ -124,17 +125,17 @@
   max-width: 28rem;
   width: auto;
   transition:
-    opacity var(--dur-standard),
-    translate var(--dur-standard);
+    opacity var(--dur-standard) var(--ease-standard),
+    translate var(--dur-standard) var(--ease-standard);
 }
 
 @supports (transition-behavior: allow-discrete) {
   .uip-confirm {
     transition:
-      opacity var(--dur-standard),
-      translate var(--dur-standard),
-      overlay var(--dur-standard) allow-discrete,
-      display var(--dur-standard) allow-discrete;
+      opacity var(--dur-standard) var(--ease-standard),
+      translate var(--dur-standard) var(--ease-standard),
+      overlay var(--dur-standard) var(--ease-standard) allow-discrete,
+      display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
 }
 

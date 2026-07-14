@@ -100,7 +100,12 @@
   align-self: center;
 }
 
-.pop-item.pop-done {
+/* Exit animation for dismissable rows: .pop-dismissing is added by
+   status.ts's animateDismiss on both done activities AND alert rows, so the
+   transition lives on the dismissing state itself (an alert row is a plain
+   .pop-item and would otherwise snap). */
+.pop-item.pop-done,
+.pop-item.pop-dismissing {
   transition:
     opacity var(--dur-exit) var(--ease-exit),
     translate var(--dur-exit) var(--ease-exit),

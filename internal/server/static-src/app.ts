@@ -19,7 +19,7 @@ import { reloadHistory } from "./history.js";
 import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js";
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
-import { dialog, onBackdropClose, $ } from "./dom.js";
+import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { apiGet, apiGetArray } from "./api-client.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
@@ -52,6 +52,13 @@ const searchDlg = dialog("searchResultPopup");
 const configDlg = dialog("configDialog");
 
 function refreshCurrentPage(): void {
+  // History is its own surface: a completed download invalidates it just like
+  // the library, but the coverage-centric branches below would never reload
+  // it, leaving /history stale until a filter change or navigation.
+  if (store.get("currentPage") === "history") {
+    reloadHistory();
+    return;
+  }
   const ctx = store.get("detailCtx");
   if (ctx && "files" in ctx && ctx.files) {
     // Files page handles its own refresh after delete; skip SSE-triggered refreshes.
@@ -162,12 +169,14 @@ window.addEventListener("popstate", () => {
   if (consumeSyncClosing()) {
     return;
   }
+  // Use the animated close path (closeDialog contract) so Back-button
+  // dismissal matches every other close: a bare dlg.close() snaps shut.
   if (searchDlg.open) {
-    searchDlg.close();
+    closeDialog(searchDlg);
   }
   // Don't close config dialog when unconfigured; user must save first.
   if (configDlg.open && !isUnconfigured()) {
-    configDlg.close();
+    closeDialog(configDlg);
   }
   viewTransition(() => {
     void applyRoute();

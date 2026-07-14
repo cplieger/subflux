@@ -15,7 +15,7 @@ import {
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
-import { viewTransition } from "./utils.js";
+import { viewTransition, setDocTitle } from "./utils.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
 import type { CoverageItem, SeasonGroup } from "./api-types.js";
 
@@ -248,6 +248,7 @@ export async function applyRoute(): Promise<void> {
   // Simple path matches (no regex needed).
   if (path === "/settings") {
     showPage("library");
+    setDocTitle("Settings");
     openConfig(true);
     return;
   }
@@ -282,6 +283,8 @@ function showPage(page: string, skipRender?: boolean): void {
   $.coveragePanel.hidden = page !== "library";
   $.historyPanel.hidden = page !== "history";
   $.historyBtn.classList.toggle("active", page === "history");
+  // Detail routes overwrite this with the item title once resolved.
+  setDocTitle(page === "history" ? "History" : undefined);
   if (page === "history") {
     setHistoryHeader();
   }

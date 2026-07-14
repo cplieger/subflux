@@ -9,7 +9,7 @@
   grid-template-columns: 3rem 7rem 3rem 1fr auto;
   gap: var(--sp-3);
   align-items: center;
-  transition: background var(--dur-micro);
+  transition: background var(--dur-micro) var(--ease-micro);
 
   &:last-child {
     border: none;

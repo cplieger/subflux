@@ -53,6 +53,6 @@
 
   &:hover {
     background: var(--err);
-    color: oklch(100% 0 0deg);
+    color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   }
 }

@@ -22,7 +22,7 @@
   height: 1.75rem;
   color: var(--text);
   font: inherit;
-  transition: border-color var(--dur-micro);
+  transition: border-color var(--dur-micro) var(--ease-micro);
   width: 100%;
 }
 
@@ -46,7 +46,7 @@
 
 .auth-card button {
   background: var(--accent);
-  color: oklch(100% 0 0deg);
+  color: light-dark(oklch(100% 0 0deg), oklch(0% 0 0deg));
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--sp-2) var(--sp-5);
@@ -62,8 +62,8 @@
   justify-content: center;
   gap: var(--sp-2);
   transition:
-    background var(--dur-micro),
-    translate 0.08s;
+    background var(--dur-micro) var(--ease-micro),
+    translate 0.08s var(--ease-micro);
   width: 100%;
 }
 
