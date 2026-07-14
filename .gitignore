@@ -29,3 +29,7 @@ internal/cache/testdata/rapid/
 # (e.g. ../webhttp with ParseCIDRs). Local-only; go.mod keeps the released pin.
 go.work
 go.work.sum
+
+# Stryker mutation-testing artifacts (weekly-stryker.yaml / local npx stryker run)
+reports/
+.stryker-tmp/
