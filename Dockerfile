@@ -134,7 +134,7 @@ RUN mkdir -p node_modules/@cplieger/reactive && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/reactive --strip-components=1
 # renovate: datasource=npm depName=@cplieger/ui-primitives
-ARG CPLIEGER_UI_PRIMITIVES_VERSION=2.1.1
+ARG CPLIEGER_UI_PRIMITIVES_VERSION=2.1.2
 RUN mkdir -p node_modules/@cplieger/ui-primitives && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/ui-primitives/-/ui-primitives-${CPLIEGER_UI_PRIMITIVES_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/ui-primitives --strip-components=1
