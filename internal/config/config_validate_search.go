@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
@@ -40,9 +41,14 @@ func validateAdaptive(a *yamlAdaptiveConfig) error {
 		return nil
 	}
 	var ve ValidationErrors
-	if a.BackoffMultiplier < 1 {
+	// NaN compares false against every bound (NaN < 1 is false), so it would
+	// slip through a plain range check and later defeat the max-delay clamp in
+	// the backoff computation (NaN > max is also false). Require a finite
+	// value explicitly. YAML accepts .nan/.inf literals, so this is reachable
+	// from a config file.
+	if math.IsNaN(a.BackoffMultiplier) || math.IsInf(a.BackoffMultiplier, 0) || a.BackoffMultiplier < 1 {
 		ve.Add(configFieldErr("adaptive.backoff_multiplier",
-			fmt.Sprintf("adaptive.backoff_multiplier must be >= 1, got %g", a.BackoffMultiplier)))
+			fmt.Sprintf("adaptive.backoff_multiplier must be a finite number >= 1, got %g", a.BackoffMultiplier)))
 	}
 	if a.InitialDelay.D <= 0 {
 		ve.Add(&FieldDependencyError{

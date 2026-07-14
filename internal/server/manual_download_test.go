@@ -160,7 +160,7 @@ func TestHandleClearLock_db_error(t *testing.T) {
 		db:       db,
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.manualH = manualops.NewHandler(manualops.HandlerDeps{
 		DBFunc:       func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) },
@@ -189,7 +189,7 @@ func TestHandleClearLock_db_error(t *testing.T) {
 // clearLockErrorStore is a minimal mock that returns an error from ClearManualLock.
 type clearLockErrorStore struct{ qhMockStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string) error {
+func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
 	return errMock
 }
 

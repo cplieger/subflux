@@ -42,7 +42,12 @@ func (e *Engine) SyncAndPostProcess(ctx context.Context, data []byte,
 func (e *Engine) syncSubtitle(ctx context.Context, data []byte, videoPath, lang string, cfg api.SyncConfig) (synced []byte, offsetMs int64) {
 	if cfg.SyncSubtitles {
 		synced, offsetMs = e.syncer.Sync(ctx, data, videoPath, lang)
-		if offsetMs != 0 {
+		// A sync is applied when it produced a constant offset OR changed the
+		// bytes: framerate correction and split-aware alignment adjust cues
+		// per-segment and deliberately report Offset 0, so gating on the
+		// offset alone would discard exactly those corrections. Audio
+		// fallback runs only when reference sync changed nothing.
+		if offsetMs != 0 || !bytes.Equal(synced, data) {
 			return synced, offsetMs
 		}
 	}
@@ -160,6 +165,7 @@ func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 		MediaType:    mediaType,
 		MediaID:      mediaID,
 		Language:     lang,
+		Variant:      saveVariant,
 		ProviderName: best.sub.Provider,
 		ReleaseName:  best.sub.ReleaseName,
 		Path:         subPath,

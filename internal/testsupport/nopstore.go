@@ -53,7 +53,7 @@ func (*NopStore) DownloadedRefs(context.Context, api.MediaType, string, string) 
 }
 
 // CurrentScore returns the current subtitle score for a media item and language.
-func (*NopStore) CurrentScore(context.Context, api.MediaType, string, string) (score int, at time.Time, found bool, _ error) {
+func (*NopStore) CurrentScore(context.Context, api.MediaType, string, string, api.Variant) (score int, at time.Time, found bool, _ error) {
 	return 0, time.Time{}, false, nil
 }
 
@@ -70,25 +70,29 @@ func (*NopStore) HistoryMediaIDs(context.Context, api.MediaType, string) ([]stri
 // --- Manual locks ---
 
 // IsManuallyLocked reports whether the item+language has a manual download lock.
-func (*NopStore) IsManuallyLocked(context.Context, api.MediaType, string, string) (bool, error) {
+func (*NopStore) IsManuallyLocked(context.Context, api.MediaType, string, string, api.Variant) (bool, error) {
 	return false, nil
 }
 
 // ClearManualLock removes the manual download lock for the given item and language.
-func (*NopStore) ClearManualLock(context.Context, api.MediaType, string, string) error { return nil }
+func (*NopStore) ClearManualLock(context.Context, api.MediaType, string, string, api.Variant) error {
+	return nil
+}
 
 // ManualDownloadCount returns the number of manual subtitle downloads for the item+language.
-func (*NopStore) ManualDownloadCount(context.Context, api.MediaType, string, string) (int, error) {
+func (*NopStore) ManualDownloadCount(context.Context, api.MediaType, string, string, api.Variant) (int, error) {
 	return 0, nil
 }
 
 // ManualSubtitlePaths returns paths of manually downloaded subtitle files for the item+language.
-func (*NopStore) ManualSubtitlePaths(context.Context, api.MediaType, string, string) ([]string, error) {
+func (*NopStore) ManualSubtitlePaths(context.Context, api.MediaType, string, string, api.Variant) ([]string, error) {
 	return nil, nil
 }
 
 // NextManualNumber returns the next sequential number for a manual subtitle file.
-func (*NopStore) NextManualNumber(context.Context, api.MediaType, string, string) int { return 1 }
+func (*NopStore) NextManualNumber(context.Context, api.MediaType, string, string, api.Variant) int {
+	return 1
+}
 
 // GetManualLocks returns all active manual download locks.
 func (*NopStore) GetManualLocks(context.Context) ([]api.ManualLockEntry, error) { return nil, nil }

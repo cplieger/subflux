@@ -1,107 +1,78 @@
-// Package events provides an in-memory pub/sub event bus for server-sent events.
+// Package events is subflux's typed server-sent-events layer: the sealed
+// Event/EventData types the app publishes, marshaled onto the shared
+// webhttp/sse broadcast hub. The transport (fan-out, replay ring with
+// Last-Event-ID resume, keepalives, proxy-defensive headers, slow-client
+// eviction) is the library's; this package owns only the subflux event
+// vocabulary and its wire encoding.
 package events
 
 import (
-	"sync"
-	"sync/atomic"
+	"encoding/json"
+	"log/slog"
+
+	"github.com/cplieger/webhttp/sse"
 )
 
-// RingBufferSize is the capacity of the shared ring buffer.
-// Must be a power of 2 for efficient modulo via bitmask.
-const RingBufferSize = 256
-
-// EventBus is an in-memory pub/sub for server-sent events using a shared
-// ring buffer. Publishers write to the ring; subscribers track their own
-// read position and skip events they've fallen behind on.
+// EventBus publishes subflux's typed events to connected SSE clients.
+// A nil *EventBus is safe to publish to (no-op), so optional wiring needs
+// no guards.
 type EventBus struct {
-	notify   chan struct{}
-	ring     [RingBufferSize]Event
-	ringMu   sync.RWMutex
-	writeAt  atomic.Uint64
-	notifyMu sync.Mutex
-	clients  atomic.Int32
+	hub *sse.Hub
 }
 
-// New creates a new event bus.
-func New() *EventBus {
-	eb := &EventBus{
-		notify: make(chan struct{}),
+// New creates the event bus with the given concurrent-client cap (<= 0 means
+// DefaultMaxSSEClients). The underlying hub keeps a replay ring, so a browser
+// that reconnects after a transient drop resumes via the standard
+// Last-Event-ID header instead of silently missing events. The cap is
+// enforced by the hub atomically at admission; SetMaxClients re-applies a
+// hot-reloaded value without rebuilding the hub.
+func New(maxClients int) *EventBus {
+	if maxClients <= 0 {
+		maxClients = DefaultMaxSSEClients
 	}
-	return eb
+	return &EventBus{hub: sse.NewHub(sse.WithMaxClients(maxClients))}
 }
 
-// Subscription tracks a single subscriber's read position.
-type Subscription struct {
-	eb     *EventBus
-	readAt uint64
-	Done   atomic.Bool
-}
-
-// Subscribe registers a new client and returns a subscription + unsubscribe func.
-func (eb *EventBus) Subscribe() (sub *Subscription, unsub func()) {
-	eb.clients.Add(1)
-	s := &Subscription{
-		eb:     eb,
-		readAt: eb.writeAt.Load(),
+// SetMaxClients applies a new client cap (<= 0 means DefaultMaxSSEClients) to
+// the running hub — used by config hot reload. Existing connections above a
+// lowered cap are not evicted. No-op when the bus is nil.
+func (eb *EventBus) SetMaxClients(n int) {
+	if eb == nil {
+		return
 	}
-	var once sync.Once
-	return s, func() {
-		once.Do(func() {
-			s.Done.Store(true)
-			eb.clients.Add(-1)
-		})
+	if n <= 0 {
+		n = DefaultMaxSSEClients
 	}
+	eb.hub.SetMaxClients(n)
 }
 
-// WaitCh returns a channel that is closed when new events are published.
-// The returned channel is safe to use in a select statement and does not
-// spawn any goroutines (unlike the previous Wait() method).
-func (eb *EventBus) WaitCh() <-chan struct{} {
-	eb.notifyMu.Lock()
-	ch := eb.notify
-	eb.notifyMu.Unlock()
-	return ch
+// Shutdown drains the hub: every connected stream is cancelled and later
+// connection attempts are refused with 503, so graceful shutdown is not held
+// open by long-lived SSE requests. No-op when the bus is nil.
+func (eb *EventBus) Shutdown() {
+	if eb == nil {
+		return
+	}
+	eb.hub.Shutdown()
 }
 
-// Next returns the next event for this subscriber, or false if caught up.
-func (s *Subscription) Next() (Event, bool) {
-	w := s.eb.writeAt.Load()
-	if s.readAt >= w {
-		return Event{}, false
-	}
-	// If we've fallen behind more than the buffer, skip to latest.
-	if w-s.readAt > RingBufferSize {
-		s.readAt = w - RingBufferSize
-	}
-	s.eb.ringMu.RLock()
-	e := s.eb.ring[s.readAt%RingBufferSize]
-	s.eb.ringMu.RUnlock()
-	s.readAt++
-	return e, true
-}
-
-// Publish sends an event to the ring buffer and wakes all subscribers.
-// No-op when the bus is nil.
+// Publish broadcasts an event to every connected client. The wire payload
+// is the JSON-encoded Event (type + data), sent as a NAMED SSE event
+// (`event: <type>`) so the browser dispatches it to the matching
+// addEventListener handler. No-op when the bus is nil.
 func (eb *EventBus) Publish(e Event) {
 	if eb == nil {
 		return
 	}
-	pos := eb.writeAt.Load()
-	eb.ringMu.Lock()
-	eb.ring[pos%RingBufferSize] = e
-	eb.ringMu.Unlock()
-	eb.writeAt.Add(1)
-
-	// Wake all waiters by closing the current notify channel and swapping
-	// in a fresh one. This is lock-free on the read path (WaitCh).
-	eb.notifyMu.Lock()
-	old := eb.notify
-	eb.notify = make(chan struct{})
-	eb.notifyMu.Unlock()
-	close(old)
+	data, err := json.Marshal(e)
+	if err != nil {
+		slog.Warn("SSE: failed to marshal event", "type", e.Type, "error", err)
+		return
+	}
+	eb.hub.Publish(sse.Event{Name: string(e.Type), Data: data})
 }
 
 // ClientCount returns the number of connected SSE clients.
 func (eb *EventBus) ClientCount() int {
-	return int(eb.clients.Load())
+	return eb.hub.ClientCount()
 }

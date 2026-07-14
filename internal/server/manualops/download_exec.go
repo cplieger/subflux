@@ -58,7 +58,9 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	mediaType := req.MediaType
 	coverageMediaID, historyMediaID := ResolveMediaIDs(ctx, ls, mediaType, req.ArrID, req.Season, req.Episode)
 
-	n := db.NextManualNumber(ctx, mediaType, historyMediaID, req.Language)
+	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
+	// independent sequences, matching the variant-aware manual file naming.
+	n := db.NextManualNumber(ctx, mediaType, historyMediaID, req.Language, variant)
 	subPath := api.ManualSubtitlePath(req.FilePath, req.Language, n, req.HearingImp, req.Forced)
 
 	// Atomic write: temp file + rename prevents corruption on crash.
@@ -98,6 +100,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		MediaType:    mediaType,
 		MediaID:      historyMediaID,
 		Language:     req.Language,
+		Variant:      variant,
 		ProviderName: req.Provider,
 		ReleaseName:  req.ReleaseName,
 		Path:         subPath,

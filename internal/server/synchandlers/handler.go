@@ -104,6 +104,17 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ASS/SSA apply is refused: the writeback path serializes cues as SRT
+	// dialogue only, which would silently destroy styling, signs, and karaoke
+	// and leave SRT content under an .ass name. Dry-run is still allowed so
+	// the computed offset can be inspected. Lift this gate only when a
+	// format-preserving ASS writer exists.
+	if !req.DryRun && isASSSubtitlePath(req.SubtitlePath) {
+		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat,
+			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
+		return
+	}
+
 	data, err := atomicfile.ReadBounded(ctx, req.SubtitlePath, MaxSyncSubSize)
 	if err != nil {
 		slog.Warn("sync audio: read subtitle failed",
@@ -203,7 +214,11 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 
 	if delta != 0 {
 		offset := time.Duration(delta) * time.Millisecond
-		cues = h.subtitleProc.ShiftCues(cues, offset)
+		// ShiftAndFilterCues (not the bare ShiftCues clamp) so a large
+		// negative offset DROPS cues pushed entirely before time zero instead
+		// of writing them as 00:00:00,000 --> 00:00:00,000 flashes — matching
+		// what the preview path already shows the user.
+		cues = ShiftAndFilterCues(cues, offset)
 	}
 
 	srtData, err := h.subtitleProc.WriteSRT(cues)
@@ -236,6 +251,17 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- Helpers ---
+
+// isASSSubtitlePath reports whether the path names an ASS/SSA subtitle, the
+// formats the SRT-only writeback must never overwrite (see HandleSyncAudio).
+func isASSSubtitlePath(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".ass", ".ssa":
+		return true
+	default:
+		return false
+	}
+}
 
 // ShiftAndFilterCues applies a timing shift to all cues and removes cues
 // that end before time zero. Cue start times are clamped to zero.
@@ -353,16 +379,21 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []api.S
 	}
 	cumulativeOffset := prevOffset + audioOffset
 
+	// Commit the file BEFORE recording the offset (same order as the manual
+	// offset handler): if the commit fails the DB still holds the old offset,
+	// so the next delta is computed against what is actually on disk. The
+	// reverse order could persist an offset for a write that never landed and
+	// silently mis-shift the next sync.
+	if _, err := pf.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("save (commit): %w", err)
+	}
+
 	if err := h.store.SetSyncOffset(ctx, path, cumulativeOffset); err != nil {
-		slog.Error("audio sync: DB offset update failed, temp file removed",
+		slog.Error("audio sync: file saved but DB offset update failed",
 			"path", filepath.Base(path),
 			"cumulative_offset_ms", cumulativeOffset,
 			"error", err)
-		return 0, fmt.Errorf("offset tracking failed: %w", err)
-	}
-
-	if _, err := pf.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("save (commit): %w", err)
+		return 0, fmt.Errorf("offset applied but tracking failed (re-open the sync dialog to verify): %w", err)
 	}
 
 	slog.Info("audio sync applied",

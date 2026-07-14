@@ -96,6 +96,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		MediaType api.MediaType `json:"media_type"`
 		MediaID   string        `json:"media_id"`
 		Language  string        `json:"language"`
+		Variant   api.Variant   `json:"variant,omitempty"`
 	}
 	if !h.deps.DecodeJSON(w, r, &req, 0) {
 		return
@@ -116,6 +117,13 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Variant is optional: empty clears the locks of every variant of the
+	// language; a specific variant clears only that quad's lock.
+	if !isValidLockVariant(req.Variant) {
+		api.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
+		return
+	}
+
 	deps := &SearchDeps{
 		DB:       h.deps.DBFunc(),
 		Activity: h.deps.Activity,
@@ -123,14 +131,16 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		Events:   h.deps.Events,
 	}
 
-	if err := RunClearLock(ctx, deps, string(req.MediaType), req.MediaID, req.Language); err != nil {
+	if err := RunClearLock(ctx, deps, string(req.MediaType), req.MediaID, req.Language, req.Variant); err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
-			"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language)
+			"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
+			"variant", req.Variant)
 		return
 	}
 
 	slog.Info("manual lock cleared",
-		"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language)
+		"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
+		"variant", req.Variant)
 
 	h.deps.Events.PublishCoverageUpdate(req.MediaType, req.MediaID, req.Language, "", "")
 

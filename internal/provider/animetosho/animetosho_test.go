@@ -180,7 +180,7 @@ func TestFilterAttachments(t *testing.T) {
 
 	t.Run("empty files returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := filterAttachments(entryDetail{}, []string{"en"}, 1, 1)
+		got := filterAttachments(entryDetail{}, []string{"en"}, 1, 1, 0)
 		if got != nil {
 			t.Errorf("filterAttachments(empty) = %v, want nil", got)
 		}
@@ -193,7 +193,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   12345,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -222,7 +222,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0 (non-subtitle)", len(got))
 		}
@@ -235,7 +235,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   0,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0 (zero ID)", len(got))
 		}
@@ -248,7 +248,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   -5,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0 (negative ID)", len(got))
 		}
@@ -261,7 +261,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: ""},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -277,7 +277,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: ""},
 		})
-		got := filterAttachments(detail, []string{"fr"}, 1, 1)
+		got := filterAttachments(detail, []string{"fr"}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0", len(got))
 		}
@@ -290,7 +290,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "jpn"},
 		})
-		got := filterAttachments(detail, []string{"ja"}, 1, 1)
+		got := filterAttachments(detail, []string{"ja"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -306,7 +306,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "fre"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0", len(got))
 		}
@@ -326,7 +326,7 @@ func TestFilterAttachments(t *testing.T) {
 				}},
 			},
 		}
-		got := filterAttachments(detail, []string{"en", "ja"}, 1, 1)
+		got := filterAttachments(detail, []string{"en", "ja"}, 1, 1, 0)
 		if len(got) != 2 {
 			t.Fatalf("filterAttachments() = %d results, want 2", len(got))
 		}
@@ -345,7 +345,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, nil, 1, 1)
+		got := filterAttachments(detail, nil, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0", len(got))
 		}
@@ -358,7 +358,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "en"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -374,7 +374,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   255,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -391,7 +391,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   16777215, // 0x00ffffff
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{"en"}, 1, 1)
+		got := filterAttachments(detail, []string{"en"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -408,7 +408,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "eng"},
 		})
-		got := filterAttachments(detail, []string{}, 1, 1)
+		got := filterAttachments(detail, []string{}, 1, 1, 0)
 		if len(got) != 0 {
 			t.Errorf("filterAttachments() = %d results, want 0", len(got))
 		}
@@ -421,7 +421,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "por", Name: "Brazilian Portuguese"},
 		})
-		got := filterAttachments(detail, []string{"pb"}, 1, 1)
+		got := filterAttachments(detail, []string{"pb"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -437,7 +437,7 @@ func TestFilterAttachments(t *testing.T) {
 			ID:   1,
 			Info: attachmentInfo{Lang: "por", Name: "European Portuguese"},
 		})
-		got := filterAttachments(detail, []string{"pt"}, 1, 1)
+		got := filterAttachments(detail, []string{"pt"}, 1, 1, 0)
 		if len(got) != 1 {
 			t.Fatalf("filterAttachments() = %d results, want 1", len(got))
 		}
@@ -482,10 +482,43 @@ func TestFileMatchesEpisode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := fileMatchesEpisode(tt.filename, tt.season, tt.episode)
+			got := fileMatchesEpisode(tt.filename, tt.season, tt.episode, 0)
 			if got != tt.want {
 				t.Errorf("fileMatchesEpisode(%q, %d, %d) = %v, want %v",
 					tt.filename, tt.season, tt.episode, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFileMatchesEpisodeAbsoluteNumber(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		filename   string
+		season     int
+		episode    int
+		absEpisode int
+		want       bool
+	}{
+		{"batch named by absolute number", "[Group] Show - 26 [1080p].mkv", 2, 1, 26, true},
+		{"absolute with e prefix", "Show e26.mkv", 2, 1, 26, true},
+		{"absolute dash pad", "Show - 26.mkv", 2, 1, 26, true},
+		{"aired number still matches first", "Show - 01.mkv", 2, 1, 26, true},
+		{"neither number present", "Show - 99.mkv", 2, 1, 26, false},
+		{"absolute ignored when equal to aired", "Show - 05.mkv", 1, 5, 5, true},
+		{"absolute zero never probes", "Show - 00.mkv", 2, 1, 0, false},
+		{"SxxExx present disables fallback", "Show S01E01 - 26.mkv", 2, 1, 26, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := fileMatchesEpisode(tt.filename, tt.season, tt.episode, tt.absEpisode)
+			if got != tt.want {
+				t.Errorf("fileMatchesEpisode(%q, %d, %d, abs=%d) = %v, want %v",
+					tt.filename, tt.season, tt.episode, tt.absEpisode, got, tt.want)
 			}
 		})
 	}
@@ -497,7 +530,7 @@ func TestMatchFiles(t *testing.T) {
 	t.Run("single file returned as-is", func(t *testing.T) {
 		t.Parallel()
 		files := []entryFile{{Filename: "whatever.mkv"}}
-		got := matchFiles(files, 1, 1)
+		got := matchFiles(files, 1, 1, 0)
 		if len(got) != 1 {
 			t.Errorf("matchFiles(single) = %d, want 1", len(got))
 		}
@@ -516,7 +549,7 @@ func TestMatchFiles(t *testing.T) {
 				{Type: "subtitle", ID: 3, Info: attachmentInfo{Lang: "eng"}},
 			}},
 		}
-		got := matchFiles(files, 1, 2)
+		got := matchFiles(files, 1, 2, 0)
 		if len(got) != 1 {
 			t.Fatalf("matchFiles(pack, S01E02) = %d, want 1", len(got))
 		}
@@ -531,7 +564,7 @@ func TestMatchFiles(t *testing.T) {
 			{Filename: "Show S01E01.mkv"},
 			{Filename: "Show S01E02.mkv"},
 		}
-		got := matchFiles(files, 1, 5)
+		got := matchFiles(files, 1, 5, 0)
 		if got != nil {
 			t.Errorf("matchFiles(no match) = %v, want nil", got)
 		}
@@ -539,7 +572,7 @@ func TestMatchFiles(t *testing.T) {
 
 	t.Run("empty files returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := matchFiles(nil, 1, 1)
+		got := matchFiles(nil, 1, 1, 0)
 		if got != nil {
 			t.Errorf("matchFiles(nil) = %v, want nil", got)
 		}
@@ -563,7 +596,7 @@ func TestFilterAttachments_season_pack(t *testing.T) {
 		},
 	}
 
-	got := filterAttachments(detail, []string{"en"}, 1, 2)
+	got := filterAttachments(detail, []string{"en"}, 1, 2, 0)
 	if len(got) != 1 {
 		t.Fatalf("filterAttachments(season pack, E02) = %d, want 1", len(got))
 	}
@@ -582,8 +615,8 @@ func TestFileMatchesEpisode_case_insensitive(t *testing.T) {
 		season := rapid.IntRange(0, 30).Draw(t, "season")
 		episode := rapid.IntRange(0, 300).Draw(t, "episode")
 
-		lower := fileMatchesEpisode(strings.ToLower(name), season, episode)
-		upper := fileMatchesEpisode(strings.ToUpper(name), season, episode)
+		lower := fileMatchesEpisode(strings.ToLower(name), season, episode, 0)
+		upper := fileMatchesEpisode(strings.ToUpper(name), season, episode, 0)
 		if lower != upper {
 			t.Fatalf("fileMatchesEpisode(%q, %d, %d) case mismatch: lower=%v upper=%v",
 				name, season, episode, lower, upper)
@@ -603,6 +636,6 @@ func FuzzFileMatchesEpisode(f *testing.F) {
 	f.Add("random garbage !@#$%", 3, 99)
 	f.Fuzz(func(t *testing.T, filename string, season, episode int) {
 		// Must not panic on any input.
-		_ = fileMatchesEpisode(filename, season, episode)
+		_ = fileMatchesEpisode(filename, season, episode, 0)
 	})
 }

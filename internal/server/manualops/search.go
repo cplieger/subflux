@@ -120,10 +120,12 @@ func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef) []S
 	return results
 }
 
-// ManualSearchResponse is the typed response from RunSearch.
+// ManualSearchResponse is the typed response from RunSearch. It deliberately
+// carries no lock state: manual locks are invisible infrastructure ("a manual
+// pick is never overwritten"), not a user-facing concept, so the popup has
+// nothing to display about them.
 type ManualSearchResponse struct {
-	Results        []SearchResult `json:"results"`
-	ManuallyLocked bool           `json:"manually_locked"`
+	Results []SearchResult `json:"results"`
 }
 
 // RunSearch executes the manual search against all providers and returns
@@ -132,11 +134,6 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *api.SearchRequest, lang string, mediaType api.MediaType, filePath string,
 ) ManualSearchResponse {
 	mediaID := api.BuildMediaID(req)
-	isLocked, lockErr := deps.DB.IsManuallyLocked(ctx, mediaType, mediaID, lang)
-	if lockErr != nil {
-		slog.Warn("manual search: lock check failed", "error", lockErr)
-	}
-
 	TryComputeHash(ctx, ls, req, filePath)
 
 	// Search all providers in parallel (skip embedded — those are already on disk).
@@ -200,7 +197,6 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	}
 
 	return ManualSearchResponse{
-		ManuallyLocked: isLocked,
-		Results:        BuildSearchResults(scored, refs),
+		Results: BuildSearchResults(scored, refs),
 	}
 }

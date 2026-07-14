@@ -9,7 +9,6 @@
 //   - languages: comma-separated language codes to return results for (default: all requested)
 //   - error_message: custom error message for error modes
 //   - flaky_rate: failure probability 0.0-1.0 for flaky mode (default 0.5)
-//   - score_base: base score for returned subtitles (default 50)
 //   - include_hash: return hash-matched results (default false)
 //   - hearing_impaired: return HI-flagged results (default false)
 //   - forced: return forced-flagged results (default false)
@@ -43,7 +42,6 @@ const (
 	keyMode            = "mode"
 	keyDelayMs         = "delay_ms"
 	keyResultCount     = "result_count"
-	keyScoreBase       = "score_base"
 	keyLanguages       = "languages"
 	keyHearingImpaired = "hearing_impaired"
 	keyForced          = "forced"
@@ -73,7 +71,6 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 		hi:          provider.SettingBool(settings, provider.KeyHearingImpaired, false),
 		forced:      provider.SettingBool(settings, provider.KeyForced, false),
 		resultCount: provider.SettingInt(settings, provider.KeyResultCount, 3),
-		scoreBase:   provider.SettingInt(settings, provider.KeyScoreBase, 50),
 		flakyRate:   provider.SettingFloat(settings, provider.KeyFlakyRate, 0.5),
 	}
 	if p.mode == "" {
@@ -109,7 +106,6 @@ type mockProvider struct {
 	languages   []string // if set, only return results for these languages
 	delay       time.Duration
 	resultCount int
-	scoreBase   int
 	flakyRate   float64
 	includeHash bool
 	hi          bool
@@ -217,7 +213,6 @@ func (p *mockProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
 				Year:        req.Year,
 				Season:      req.Season,
 				Episode:     req.Episode,
-				Score:       p.scoreBase - i*5,
 				HearingImp:  p.hi,
 				Forced:      p.forced,
 			}
@@ -246,7 +241,6 @@ func (p *mockProvider) generateSeasonPackResults(req *api.SearchRequest) []api.S
 			Title:       req.Title,
 			Year:        req.Year,
 			Season:      req.Season,
-			Score:       p.scoreBase,
 		}
 		results = append(results, sub)
 	}
@@ -306,10 +300,6 @@ func Schema() []api.ProviderSchemaField {
 		{
 			Key: keyResultCount, Label: "Result Count", Type: fieldText,
 			Default: "3", Help: "Number of results in static mode",
-		},
-		{
-			Key: keyScoreBase, Label: "Base Score", Type: fieldText,
-			Default: "50", Help: "Starting score (decrements by 5 per result)",
 		},
 		{
 			Key: keyLanguages, Label: "Languages", Type: fieldText,

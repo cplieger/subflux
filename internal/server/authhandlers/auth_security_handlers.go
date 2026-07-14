@@ -42,10 +42,17 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	h.RateLimiter.Reset(ip, user.Username)
 
 	ctx := r.Context()
-	cfg := h.Config()
 	// Password can authenticate on its own whenever basic auth is enabled,
-	// so it must meet the strong (sole-factor) floor in that case.
-	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, req.NewPassword, user.Username, cfg.BasicAuthEnabled(), cfg.CheckBreachedPasswords(), h.HTTPClient)
+	// so it must meet the strong (sole-factor) floor in that case. This
+	// endpoint is reachable in unconfigured mode, where Config() is nil:
+	// default to the strong floor (basic auth enabled) and no breach check,
+	// matching the setup handler's defaults.
+	soleFactor, checkBreach := true, false
+	if cfg := h.Config(); cfg != nil {
+		soleFactor = cfg.BasicAuthEnabled()
+		checkBreach = cfg.CheckBreachedPasswords()
+	}
+	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, req.NewPassword, user.Username, soleFactor, checkBreach, h.HTTPClient)
 	if userMsg != "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return

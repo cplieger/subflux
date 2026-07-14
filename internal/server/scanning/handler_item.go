@@ -140,7 +140,7 @@ func (h *Handler) runEpisodeScans(ctx context.Context, series *arrapi.Series,
 			fmt.Sprintf("%s S%02dE%02d (%d/%d)",
 				series.Title, ep.SeasonNumber, ep.EpisodeNumber,
 				i+1, len(withFiles)))
-		outcome, _ := ScanEpisode(ctx, deps, sls, series, ep, true)
+		outcome, _, _ := ScanEpisode(ctx, deps, sls, series, ep, true)
 		searched++
 		if outcome == ScanFound {
 			found++
@@ -201,9 +201,19 @@ func (h *Handler) scanSingleEpisode(ctx context.Context,
 	actID := h.startScanActivity(action, label)
 	defer h.endScanActivity(actID, action, label, true)
 
+	// Join the same serialization as the series/season/movie manual scans: a
+	// single-item scan running concurrently with a full or manual scan means
+	// duplicate provider queries and competing subtitle-state writes for the
+	// same item.
+	if !h.acquireScanSlot(actID) {
+		slog.Debug("scan cancelled while queued", "media", label)
+		return
+	}
+	defer h.deps.ScanGuard.Unlock()
+
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()
-	outcome, _ := ScanEpisode(ctx, deps, sls, &series, ep, true)
+	outcome, _, _ := ScanEpisode(ctx, deps, sls, &series, ep, true)
 	slog.Info("episode scan complete",
 		"media", label, "outcome", outcome)
 }
@@ -232,6 +242,13 @@ func (h *Handler) scanSingleMovie(ctx context.Context, movieID int) {
 	const action = "Movie Search"
 	actID := h.startScanActivity(action, label)
 	defer h.endScanActivity(actID, action, label, true)
+
+	// Serialize with the other manual scans (see scanSingleEpisode).
+	if !h.acquireScanSlot(actID) {
+		slog.Debug("scan cancelled while queued", "media", label)
+		return
+	}
+	defer h.deps.ScanGuard.Unlock()
 
 	deps := h.deps.ScanDeps()
 	sls := h.deps.ScanLiveStateFunc()

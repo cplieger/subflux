@@ -36,7 +36,6 @@ const (
 	KeyHearingImpaired SettingKey = "hearing_impaired"
 	KeyForced          SettingKey = "forced"
 	KeyResultCount     SettingKey = "result_count"
-	KeyScoreBase       SettingKey = "score_base"
 	KeyFlakyRate       SettingKey = "flaky_rate"
 	KeyDelayMs         SettingKey = "delay_ms"
 )

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cplieger/envx"
 	"github.com/cplieger/subflux/internal/cliparse"
 )
 
@@ -24,7 +25,7 @@ var cliClient = &http.Client{Timeout: 30 * time.Second}
 // empty string if SUBFLUX_URL is malformed (caller decides how to fail;
 // keeps the no-os.Exit-from-helpers contract).
 func serverURL() (string, bool) {
-	u := envOr("SUBFLUX_URL", "http://127.0.0.1:8374")
+	u := envx.String("SUBFLUX_URL", "http://127.0.0.1:8374")
 	u = strings.TrimRight(strings.TrimSpace(u), "/")
 	parsed, err := url.Parse(u)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -57,6 +58,13 @@ func cliRequest(method, path string, body io.Reader) (data []byte, status int, o
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	// The remote endpoints sit behind session/API-key auth on a configured
+	// server. SUBFLUX_API_KEY (generate one with `subflux generate-api-key`)
+	// authenticates the CLI via the X-API-Key header the server's verifier
+	// reads; without it, commands against an auth-enabled instance answer 401.
+	if key := envx.String("SUBFLUX_API_KEY", ""); key != "" {
+		req.Header.Set("X-API-Key", key)
 	}
 	resp, err := cliClient.Do(req)
 	if err != nil {
@@ -149,8 +157,9 @@ func runCLIAction(path, successMsg string) int {
 	return 0
 }
 
-// runCLIUnlock clears a manual lock via the server API.
-// Usage: subflux unlock --type episode --id tt0903747-s01e01 --lang fr
+// runCLIUnlock clears a manual lock via the server API. Locks are held per
+// variant; omitting --variant clears every variant's lock for the language.
+// Usage: subflux unlock --type episode --id tt0903747-s01e01 --lang fr [--variant forced]
 func runCLIUnlock() int {
 	params, _ := cliparse.ParseArgs(os.Args[2:])
 	mediaType := params["type"]
@@ -159,14 +168,18 @@ func runCLIUnlock() int {
 	if mediaType == "" || mediaID == "" || lang == "" {
 		fmt.Fprintln(os.Stderr, "Usage:")
 		fmt.Fprintln(os.Stderr,
-			"  subflux unlock --type episode --id tt0903747-s01e01 --lang fr")
+			"  subflux unlock --type episode --id tt0903747-s01e01 --lang fr [--variant forced]")
 		// 2: usage error per POSIX convention.
 		return 2
 	}
 
-	body, err := json.Marshal(map[string]string{
+	payload := map[string]string{
 		"media_type": mediaType, "media_id": mediaID, "language": lang,
-	})
+	}
+	if v := params["variant"]; v != "" {
+		payload["variant"] = v
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1

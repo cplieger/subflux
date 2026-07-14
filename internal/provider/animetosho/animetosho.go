@@ -186,7 +186,7 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 		}
 		g.Go(func() error {
 			subs, err := p.getSubtitlesForEntry(
-				gctx, entry.ID, req.Languages, req.Season, req.Episode)
+				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode)
 			if err != nil {
 				slog.Warn("animetosho: failed to get subs for entry",
 					"entry_id", entry.ID, "error", err)
@@ -286,7 +286,7 @@ func (p *Provider) searchEntries(ctx context.Context,
 // episode is used.
 func (p *Provider) getSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
-	season, episode int,
+	season, episode, absEpisode int,
 ) ([]api.Subtitle, error) {
 	slog.Debug("animetosho fetching entry subtitles", "entry_id", entryID)
 
@@ -296,7 +296,7 @@ func (p *Provider) getSubtitlesForEntry(ctx context.Context,
 		return nil, err
 	}
 
-	return filterAttachments(result, languages, season, episode), nil
+	return filterAttachments(result, languages, season, episode, absEpisode), nil
 }
 
 // entryDetail holds the JSON structure returned by the AnimeTosho entry API.
@@ -345,9 +345,9 @@ func filterCompleteEntries(entries []feedEntry) []feedEntry {
 // used. For single-file entries, all subtitle attachments are returned.
 // Pure function extracted from getSubtitlesForEntry for testability.
 func filterAttachments(result entryDetail, languages []string,
-	season, episode int,
+	season, episode, absEpisode int,
 ) []api.Subtitle {
-	files := matchFiles(result.Files, season, episode)
+	files := matchFiles(result.Files, season, episode, absEpisode)
 
 	var subs []api.Subtitle
 	for _, file := range files {
@@ -401,7 +401,7 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (api.Subtitle
 // For single-file entries (per-episode releases), returns all files.
 // For multi-file entries (season packs), returns only files whose filename
 // contains the matching S##E## pattern.
-func matchFiles(files []entryFile, season, episode int) []entryFile {
+func matchFiles(files []entryFile, season, episode, absEpisode int) []entryFile {
 	if len(files) <= 1 {
 		return files
 	}
@@ -409,7 +409,7 @@ func matchFiles(files []entryFile, season, episode int) []entryFile {
 	// Multi-file entry: filter to the matching episode.
 	var matched []entryFile
 	for _, f := range files {
-		if fileMatchesEpisode(f.Filename, season, episode) {
+		if fileMatchesEpisode(f.Filename, season, episode, absEpisode) {
 			matched = append(matched, f)
 		}
 	}
@@ -430,9 +430,11 @@ func matchFiles(files []entryFile, season, episode int) []entryFile {
 // matching the target season and episode. Also matches standalone episode
 // numbers for anime (e.g. " - 01 " or " E01"). The e## pattern requires
 // a non-letter character before it to avoid false positives inside words
-// like "Release01". Only falls back to absolute patterns when no S##E##
-// pattern exists in the filename.
-func fileMatchesEpisode(filename string, season, episode int) bool {
+// like "Release01". Only falls back to standalone patterns when no S##E##
+// pattern exists in the filename, probing the AIRED number first and then the
+// ABSOLUTE number (batch entries dominantly name files by absolute number,
+// e.g. "[Group] Show - 26.mkv" for S02E01).
+func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
 	if filename == "" {
 		return false
 	}
@@ -450,19 +452,28 @@ func fileMatchesEpisode(filename string, season, episode int) bool {
 	// Also try matching " - EP " or " - NN " patterns common in anime.
 	// Only match if the entry has no S##E## pattern at all (pure absolute).
 	if len(matches) == 0 {
-		lower := strings.ToLower(filename)
-		epStr := fmt.Sprintf("e%02d", episode)
-		padded := fmt.Sprintf(" %02d ", episode)
-		dashPad := fmt.Sprintf(" - %02d", episode)
-		// Require word boundary before "e##" to avoid matching inside words
-		// like "Release01" or "Premiere08".
-		idx := strings.Index(lower, epStr)
-		epMatch := idx >= 0 && (idx == 0 || lower[idx-1] < 'a' || lower[idx-1] > 'z')
-		if epMatch ||
-			strings.Contains(lower, padded) ||
-			strings.Contains(lower, dashPad) {
+		if standaloneNumberMatch(filename, episode) {
+			return true
+		}
+		if absEpisode > 0 && absEpisode != episode &&
+			standaloneNumberMatch(filename, absEpisode) {
 			return true
 		}
 	}
 	return false
+}
+
+// standaloneNumberMatch probes a filename for the standalone episode-number
+// patterns common in anime naming: "e##" (word boundary before it, so
+// "Release01" never matches), " ## ", and " - ##".
+func standaloneNumberMatch(filename string, number int) bool {
+	lower := strings.ToLower(filename)
+	epStr := fmt.Sprintf("e%02d", number)
+	padded := fmt.Sprintf(" %02d ", number)
+	dashPad := fmt.Sprintf(" - %02d", number)
+	idx := strings.Index(lower, epStr)
+	if idx >= 0 && (idx == 0 || lower[idx-1] < 'a' || lower[idx-1] > 'z') {
+		return true
+	}
+	return strings.Contains(lower, padded) || strings.Contains(lower, dashPad)
 }

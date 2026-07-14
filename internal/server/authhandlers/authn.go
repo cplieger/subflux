@@ -28,7 +28,12 @@ var _ SessionStore = authstore.AuthStore(nil)
 type Authenticator struct {
 	Store SessionStore
 	// Bypass reports whether all authentication is disabled (nil means never).
-	Bypass      func() bool
+	Bypass func() bool
+	// Timeouts, when non-nil, resolves the session idle/absolute timeouts per
+	// request (the server wires it to the live, hot-reloadable config so a
+	// settings change takes effect without a restart). When nil, the static
+	// IdleTimeout/AbsTimeout fields below are used.
+	Timeouts    func() (idle, absolute time.Duration)
 	IdleTimeout time.Duration
 	AbsTimeout  time.Duration
 }
@@ -77,10 +82,15 @@ func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (use
 }
 
 // verifiers returns the ordered credential verifiers: subflux session cookie,
-// then the library's API-key verifier.
+// then the library's API-key verifier. Session timeouts come from the Timeouts
+// provider when set (live config), falling back to the static fields.
 func (a *Authenticator) verifiers() []auth.CredentialVerifier {
+	idle, absolute := a.IdleTimeout, a.AbsTimeout
+	if a.Timeouts != nil {
+		idle, absolute = a.Timeouts()
+	}
 	return []auth.CredentialVerifier{
-		&sessionVerifier{store: a.Store, idleTimeout: a.IdleTimeout, absTimeout: a.AbsTimeout},
+		&sessionVerifier{store: a.Store, idleTimeout: idle, absTimeout: absolute},
 		auth.NewAPIKeyVerifier(a.Store),
 	}
 }

@@ -1,5 +1,5 @@
 // Package authhandlers provides shared types and utilities for the server's
-// authentication handler cluster: login, TOTP, WebAuthn, OIDC, admin user
+// authentication handler cluster: login, WebAuthn, OIDC, admin user
 // management, and security management (password change, API keys, passkeys).
 package authhandlers
 
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// CeremonyTTL is the maximum age for pending TOTP and WebAuthn sessions.
+	// CeremonyTTL is the maximum age for pending WebAuthn sessions.
 	CeremonyTTL = authwebauthn.CeremonyTimeout
 
 	// MaxCeremonySessions caps the in-memory ceremony maps to prevent OOM
@@ -163,7 +163,7 @@ func GenerateCeremonyToken() (string, error) {
 	return string(dst[:]), nil
 }
 
-// Cleanup removes expired pending TOTP and WebAuthn sessions.
+// Cleanup removes expired pending WebAuthn sessions.
 // Called periodically by the server.
 func (cs *CeremonyStore) Cleanup() {
 	now := time.Now()

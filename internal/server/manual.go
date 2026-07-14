@@ -9,9 +9,8 @@ import (
 
 // manualStore documents the api.Store methods used by manual search/download handlers.
 type manualStore interface {
-	IsManuallyLocked(ctx context.Context, mediaType api.MediaType, mediaID, language string) (bool, error)
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string) error
+	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
 }
 
 // Compile-time assertion: api.Store satisfies manualStore.

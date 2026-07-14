@@ -12,19 +12,39 @@ type BackoffStore interface {
 }
 
 // DownloadStore groups subtitle download record persistence.
+//
+// subtitle_state rows are keyed by the (media_type, media_id, language,
+// variant) quad, so CurrentScore is answered per variant: an fr/forced
+// download never shadows the fr/standard score. DownloadedRefs deliberately
+// stays language-scoped (all variants): it feeds the manual-search popup's
+// "on disk" markers, and the popup lists every variant of the language.
 type DownloadStore interface {
 	SaveDownload(ctx context.Context, rec *DownloadRecord) error
 	DownloadedRefs(ctx context.Context, mediaType MediaType, mediaID, language string) ([]DownloadedRef, error)
-	CurrentScore(ctx context.Context, mediaType MediaType, mediaID, language string) (score int, mediaImported time.Time, found bool, err error)
+	CurrentScore(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) (score int, mediaImported time.Time, found bool, err error)
 }
 
-// ManualLockStore groups manual override lock persistence.
+// ManualLockStore groups manual override lock persistence. Locks live on the
+// (media_type, media_id, language, variant) quad: a manual forced download
+// locks only the forced target, leaving standard/hi automation untouched.
+//
+// Methods documented as accepting an empty variant treat "" as "any/all
+// variants of the language"; the rest require an exact variant.
 type ManualLockStore interface {
-	IsManuallyLocked(ctx context.Context, mediaType MediaType, mediaID, language string) (bool, error)
-	ClearManualLock(ctx context.Context, mediaType MediaType, mediaID, language string) error
-	ManualDownloadCount(ctx context.Context, mediaType MediaType, mediaID, language string) (int, error)
-	ManualSubtitlePaths(ctx context.Context, mediaType MediaType, mediaID, language string) ([]string, error)
-	NextManualNumber(ctx context.Context, mediaType MediaType, mediaID, language string) int
+	// IsManuallyLocked reports whether the quad has a manual row. An empty
+	// variant asks whether ANY variant of the language is locked.
+	IsManuallyLocked(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) (bool, error)
+	// ClearManualLock clears the quad's lock. An empty variant clears the
+	// locks of ALL variants of the language.
+	ClearManualLock(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) error
+	// ManualDownloadCount counts the quad's manual rows (exact variant).
+	ManualDownloadCount(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) (int, error)
+	// ManualSubtitlePaths returns the manual rows' file paths. An empty
+	// variant returns the paths of ALL variants of the language.
+	ManualSubtitlePaths(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) ([]string, error)
+	// NextManualNumber returns the next manual ordinal for the quad (exact
+	// variant): movie.fr.1.srt and movie.fr.forced.1.srt count independently.
+	NextManualNumber(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) int
 }
 
 // QueryStore groups read-only state inspection methods.

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/cplieger/ssrf/v2"
@@ -217,11 +216,6 @@ func (p *Provider) parseRow(rowHTML string, languages []string) (api.Subtitle, b
 		return api.Subtitle{}, false
 	}
 
-	ratingStr := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[0][1], ""))
-	var rating int
-	if n, atoiErr := strconv.Atoi(ratingStr); atoiErr == nil {
-		rating = n
-	}
 	subLang := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[1][1], ""))
 	release := strings.TrimSpace(tagStripRe.ReplaceAllString(tds[2][1], ""))
 	release = strings.TrimPrefix(release, "subtitle ")
@@ -244,7 +238,6 @@ func (p *Provider) parseRow(rowHTML string, languages []string) (api.Subtitle, b
 		Language:    lang,
 		ReleaseName: release,
 		DownloadURL: pageLink,
-		Score:       rating,
 		HearingImp:  hi,
 		MatchedBy:   api.MatchByIMDB,
 	}, true

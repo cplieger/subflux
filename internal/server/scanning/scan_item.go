@@ -11,9 +11,11 @@ import (
 )
 
 // ScanEpisode searches for subtitles for a single episode.
-// Returns the scan outcome and the language codes that had at least one
-// subtitle downloaded.
-func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (outcome ScanOutcome, foundLangs []string) {
+// Returns the scan outcome, the language codes whose group actually ran
+// (searchedLangs — the only langs the season tracker may record), and the
+// language codes that had at least one subtitle downloaded (foundLangs, a
+// subset of searchedLangs).
+func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (outcome ScanOutcome, searchedLangs, foundLangs []string) {
 	label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 	slog.Debug("scan: processing episode",
 		"media", label, "imdb", series.ImdbID,
@@ -40,13 +42,19 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 			}
 		}
 		if len(result.Paths) > 0 {
-			return ScanFound, result.FoundLangs
+			return ScanFound, result.SearchedLangs, result.FoundLangs
 		}
 	}
 	if result.Searched == 0 {
-		return ScanSkipped, nil
+		if result.BackedOff > 0 {
+			// Every language needing a search had all providers in adaptive
+			// backoff: no query ran, so this is neither skipped-as-covered
+			// nor searched-with-no-result.
+			return ScanBackedOff, nil, nil
+		}
+		return ScanSkipped, nil, nil
 	}
-	return ScanNoResult, nil
+	return ScanNoResult, result.SearchedLangs, nil
 }
 
 // ScanMovie searches for subtitles for a single movie.
@@ -81,6 +89,9 @@ func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, 
 		}
 	}
 	if result.Searched == 0 {
+		if result.BackedOff > 0 {
+			return ScanBackedOff
+		}
 		return ScanSkipped
 	}
 	return ScanNoResult

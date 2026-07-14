@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/cplieger/atomicfile/v2"
@@ -134,17 +135,29 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atomic write: temp file + rename prevents corruption on crash.
-	if err := atomicWriteConfig(r.Context(), configPath, data); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "write config")
+	// Apply BEFORE persisting: a config that parses but fails wiring (bad
+	// provider key, invalid arr URL) must not land on disk, or the running
+	// state silently diverges from the file and the next restart drops into
+	// unconfigured mode unexpectedly. On a reload failure nothing changed —
+	// neither the live state nor the file.
+	if err := h.hotReload(r.Context(), newCfg); err != nil {
+		slog.Error("hot reload failed, config not saved", "error", err)
+		h.alerts.RecordPersistent("config",
+			"Config rejected (hot reload failed): "+err.Error())
+		api.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), api.CodeConfigReloadFailed)
 		return
 	}
 
-	if err := h.hotReload(r.Context(), newCfg); err != nil {
-		slog.Error("hot reload failed, config saved but not applied", "error", err)
+	// Atomic write: temp file + rename prevents corruption on crash. A write
+	// failure here leaves the NEW config applied in memory but the OLD file
+	// on disk (a restart reverts) — rarer and safer than the reverse, and
+	// reported loudly so the operator can free disk space and re-save.
+	if err := atomicWriteConfig(r.Context(), configPath, data); err != nil {
+		slog.Error("config applied but not persisted", "error", err)
 		h.alerts.RecordPersistent("config",
-			"Hot reload failed: "+err.Error())
-		api.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), api.CodeConfigReloadFailed)
+			"Config applied but NOT saved to disk (a restart will revert it): "+err.Error())
+		api.InternalErrorC(w, r, fmt.Errorf("config applied but not persisted: %w", err),
+			api.CodeInternalError, "stage", "write config")
 		return
 	}
 
@@ -202,9 +215,11 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	// filesystem. This endpoint is admin-only and read-only (os.Stat),
 	// but the explicit guard satisfies CodeQL's go/path-injection rule
 	// and prevents the cleaned/uncleaned mismatch a caller might rely on.
+	// The check is per SEGMENT, not a substring match: a directory name that
+	// merely begins with two dots (e.g. "/media/..extras") is legitimate.
 	p = filepath.Clean(p)
-	if strings.Contains(p, "..") {
-		api.WriteJSON(w, pathValidationResponse{Error: "path must not contain '..'"})
+	if slices.Contains(strings.Split(p, string(filepath.Separator)), "..") {
+		api.WriteJSON(w, pathValidationResponse{Error: "path must not contain a '..' segment"})
 		return
 	}
 

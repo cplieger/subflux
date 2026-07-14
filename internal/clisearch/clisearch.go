@@ -114,9 +114,11 @@ type ProviderLoader interface {
 	LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]api.Provider, error)
 }
 
-// DownloadRecorder persists download records. Satisfied by *store.DB.
+// DownloadRecorder persists download records and their applied sync offsets.
+// Satisfied by *boltstore.DB.
 type DownloadRecorder interface {
 	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
+	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 }
 
 // Deps holds the external dependencies needed by RunSearch.
@@ -300,7 +302,7 @@ func downloadSubtitle(ctx context.Context, engine api.SearchEngine, sc api.Score
 			fmt.Printf("  Download failed: %v\n", dlErr)
 			return
 		}
-		data, _ = engine.SyncAndPostProcess(ctx, data, item.FilePath, lang,
+		data, syncOffsetMs := engine.SyncAndPostProcess(ctx, data, item.FilePath, lang,
 			api.VariantFromFlags(chosen.Sub.HearingImp, chosen.Sub.Forced))
 		if len(data) == 0 {
 			fmt.Println("  Post-processing produced empty subtitle, skipping write")
@@ -315,6 +317,7 @@ func downloadSubtitle(ctx context.Context, engine api.SearchEngine, sc api.Score
 		fmt.Printf("  Saved: %s\n", subPath)
 
 		recordDownload(ctx, req, item, &chosen, subPath, lang, pickN, recorder)
+		recordSyncOffset(ctx, recorder, subPath, syncOffsetMs)
 		return
 	}
 	fmt.Printf("  Provider %s not found in loaded providers\n", chosen.Sub.Provider)

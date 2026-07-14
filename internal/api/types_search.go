@@ -148,7 +148,6 @@ type Subtitle struct {
 	Year        int         // year from provider (0 if unknown)
 	Season      int         // season from provider (0 if unknown or movie)
 	Episode     int         // episode from provider (0 if unknown or movie)
-	Score       int
 	HearingImp  bool
 	Forced      bool
 }
@@ -166,7 +165,9 @@ type ScoredResult struct {
 type SearchResult struct {
 	Paths           []string // Subtitle files downloaded.
 	FoundLangs      []string // Language codes that had at least one subtitle downloaded.
+	SearchedLangs   []string // Language codes whose group actually ran (not skipped); superset of FoundLangs.
 	Searched        int      // Languages where providers were actually queried.
 	Skipped         int      // Languages skipped (subs already exist, not eligible for upgrade).
+	BackedOff       int      // Languages that needed a search but had every provider in adaptive backoff (no query ran).
 	CoverageChanged bool     // True if RecordSubtitleFiles detected changes on disk.
 }

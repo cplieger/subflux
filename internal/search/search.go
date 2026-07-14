@@ -324,10 +324,11 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 	// internally for provider concurrency, and singleflight deduplicates
 	// identical provider queries across languages.
 	type langResult struct {
-		lang     string
-		paths    []string
-		searched int
-		skipped  int
+		lang      string
+		paths     []string
+		searched  int
+		skipped   int
+		backedOff int
 	}
 	langResults := make([]langResult, len(langOrder))
 
@@ -339,9 +340,12 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 			if err := ctx.Err(); err != nil {
 				return nil
 			}
-			paths, searched, skipped := e.searchLangGroup(ctx, req, langTargets,
+			paths, searched, skipped, backedOff := e.searchLangGroup(ctx, req, langTargets,
 				videoPath, mediaType, mediaID, &existing, &searchCfg, upgradeCutoff)
-			langResults[idx] = langResult{paths: paths, searched: searched, skipped: skipped, lang: lang}
+			langResults[idx] = langResult{
+				paths: paths, searched: searched, skipped: skipped,
+				backedOff: backedOff, lang: lang,
+			}
 			return nil
 		})
 	}
@@ -350,7 +354,16 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 	for _, lr := range langResults {
 		result.Searched += lr.searched
 		result.Skipped += lr.skipped
+		result.BackedOff += lr.backedOff
 		result.Paths = append(result.Paths, lr.paths...)
+		// SearchedLangs feeds the season early-termination tracker: only
+		// languages whose group actually ran may accrue a no-result streak.
+		// A lang skipped here (covered on disk, manual lock, not eligible) or
+		// fully backed off (zero provider queries) must never count as
+		// searched-with-no-result.
+		if lr.searched > 0 {
+			result.SearchedLangs = append(result.SearchedLangs, lr.lang)
+		}
 		if len(lr.paths) > 0 {
 			result.FoundLangs = append(result.FoundLangs, lr.lang)
 		}

@@ -100,12 +100,13 @@ func SkipResumed(item ScanItem, recent map[string]bool, stats *api.ScanStats) bo
 	if !recent[mediaID] {
 		return false
 	}
+	// Resume-skipped items count ONLY as skipped: no provider query ran, so
+	// also bumping Searched would overstate the work done in the completion
+	// summary (the separate "resumed" log counter already reports them).
 	if item.Ep != nil {
 		stats.EpisodesSkipped++
-		stats.EpisodesSearched++
 	} else {
 		stats.MoviesSkipped++
-		stats.MoviesSearched++
 	}
 	return true
 }

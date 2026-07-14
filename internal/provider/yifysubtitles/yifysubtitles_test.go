@@ -274,9 +274,6 @@ func TestParseResults(t *testing.T) {
 		if sub.MatchedBy != "imdb" {
 			t.Errorf("MatchedBy = %q, want %q", sub.MatchedBy, "imdb")
 		}
-		if sub.Score != 8 {
-			t.Errorf("Score = %d, want 8", sub.Score)
-		}
 		if sub.HearingImp {
 			t.Error("HearingImp = true, want false")
 		}
@@ -297,33 +294,20 @@ func TestParseResults(t *testing.T) {
 		}
 	})
 
-	t.Run("non-numeric rating defaults to zero", func(t *testing.T) {
+	t.Run("non-numeric rating cell tolerated", func(t *testing.T) {
 		t.Parallel()
+		// The rating column is ignored (the scorer never consumed provider
+		// scores); a non-numeric cell must not break row parsing.
 		html := makeRow("bad", "English", `/subtitle/tt789`, "release", false)
 		got := p.parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}
-		if got[0].Score != 0 {
-			t.Errorf("Score = %d, want 0", got[0].Score)
-		}
 	})
 
-	t.Run("negative rating parsed", func(t *testing.T) {
+	t.Run("html tags stripped from language", func(t *testing.T) {
 		t.Parallel()
-		html := makeRow("-3", "English", `/subtitle/tt800`, "release", false)
-		got := p.parseResults(html, []string{"en"})
-		if len(got) != 1 {
-			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		if got[0].Score != -3 {
-			t.Errorf("Score = %d, want -3", got[0].Score)
-		}
-	})
-
-	t.Run("html tags stripped from rating and language", func(t *testing.T) {
-		t.Parallel()
-		// Rating wrapped in a span, language wrapped in a flag span.
+		// Language wrapped in a flag span.
 		html := `<tr>` +
 			`<td><span class="rating">7</span></td>` +
 			`<td><span class="flag-en"></span>English</td>` +
@@ -334,9 +318,6 @@ func TestParseResults(t *testing.T) {
 		got := p.parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
-		}
-		if got[0].Score != 7 {
-			t.Errorf("Score = %d, want 7", got[0].Score)
 		}
 		if got[0].ReleaseName != "Tagged.Release" {
 			t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Tagged.Release")

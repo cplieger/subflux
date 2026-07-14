@@ -37,14 +37,21 @@ func (p *Poller) processPollImport(
 	ctx context.Context, ls *LiveState, path string,
 	buildFn func() (*ImportResult, error),
 	refreshFn func(ctx context.Context, id int) error,
-) {
+) (retryable bool) {
 	if !p.precheckImportPath(ctx, ls, path) {
-		return
+		return false
 	}
 
 	result, err := buildFn()
-	if err != nil || result == nil {
-		return
+	if err != nil {
+		// Transient arr failure (metadata fetch): the caller holds the poll
+		// watermark back (bounded by maxImportRetries) so the entry is
+		// re-fetched next cycle instead of dropped until the next full scan.
+		return true
+	}
+	if result == nil {
+		// Deliberate skip (e.g. excluded by tag): processed, never retried.
+		return false
 	}
 
 	// Re-verify file exists after arr API calls (race window: 200-800ms).
@@ -70,7 +77,11 @@ func (p *Poller) processPollImport(
 		p.deps.Events.Publish(events.Event{
 			Type: events.CoverageUpdate,
 			Data: events.CoverageEvent{
-				MediaType: api.MediaType(result.Source),
+				// The event carries the MEDIA type ("episode"/"movie"), not the
+				// poll source ("sonarr"/"radarr"): the client wire decoder
+				// rejects source names, which silently killed the targeted
+				// row-refresh path for poller-driven downloads.
+				MediaType: result.Req.MediaType,
 				MediaID:   mediaID,
 			},
 		})
@@ -81,13 +92,14 @@ func (p *Poller) processPollImport(
 			}
 		}
 	}
+	return false
 }
 
 // processSonarrImport handles a single Sonarr import event from the history API.
-func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) {
+func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
 	path := entry.ImportedPath()
 
-	p.processPollImport(ctx, ls, path,
+	return p.processPollImport(ctx, ls, path,
 		func() (*ImportResult, error) {
 			series, err := ls.Sonarr.GetSeriesByID(ctx, entry.SeriesID)
 			if err != nil {
@@ -131,10 +143,10 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 }
 
 // processRadarrImport handles a single Radarr import event from the history API.
-func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) {
+func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
 	path := entry.ImportedPath()
 
-	p.processPollImport(ctx, ls, path,
+	return p.processPollImport(ctx, ls, path,
 		func() (*ImportResult, error) {
 			movie, err := ls.Radarr.GetMovieByID(ctx, entry.MovieID)
 			if err != nil {

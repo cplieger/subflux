@@ -18,7 +18,7 @@ package server
 //	public           — no auth at all (health, metrics, static assets,
 //	                   credential-establishing flows: /api/auth/login,
 //	                   /api/auth/setup, OIDC redirect/callback, WebAuthn
-//	                   login begin/finish, TOTP verify, logout).
+//	                   login begin/finish, logout).
 //	user             — requireAuth. Handlers in this chain may rely on
 //	                   UserFromContext returning a non-nil, enabled user.
 //	admin            — requireAuth + requireRole(admin).
@@ -96,9 +96,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	public.Add("/metrics", s.metrics.Handler())
 
 	// Credential-establishing flows. Every endpoint here either creates
-	// a session (login, setup, OIDC callback, TOTP verify, WebAuthn login
-	// finish) or prepares one (OIDC redirect, WebAuthn login begin). The
-	// client is by definition unauthenticated when calling these.
+	// a session (login, setup, OIDC callback, WebAuthn login finish) or
+	// prepares one (OIDC redirect, WebAuthn login begin). The client is
+	// by definition unauthenticated when calling these.
 	public.Add("GET /api/auth/setup", s.authH.HandleSetupStatus)
 	public.Add("POST /api/auth/setup", s.authH.HandleSetupCreate)
 	public.Add("POST /api/auth/login", s.authH.HandleLogin)
@@ -116,8 +116,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	// Self-service account endpoints. These never delete credentials or
 	// mint long-lived tokens, so reauth is not required here. Operations
-	// that confirm credentials (changePassword, totpConfirm, webauthn
-	// register finish) carry their own in-band proof and also live here.
+	// that confirm credentials (changePassword, webauthn register finish)
+	// carry their own in-band proof and also live here.
 	user.Add("GET /api/auth/me", s.authH.HandleAuthMe)
 	user.Add("PUT /api/auth/password", s.authH.HandleChangePassword)
 	user.Add("GET /api/auth/passkeys", s.authH.HandleListPasskeys)

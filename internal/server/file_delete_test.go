@@ -131,7 +131,7 @@ func TestHandleDeleteFile_invalid_path_returns_403(t *testing.T) {
 		db:       &qhMockStore{},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: cfg})
 
@@ -158,11 +158,11 @@ func (m *deleteFileTrackingStore) DeleteSubtitleFile(_ context.Context, _ api.Me
 	return nil
 }
 
-func (m *deleteFileTrackingStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string) ([]string, error) {
+func (m *deleteFileTrackingStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) ([]string, error) {
 	return nil, nil
 }
 
-func (m *deleteFileTrackingStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string) error {
+func (m *deleteFileTrackingStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
 	return nil
 }
 
@@ -174,7 +174,7 @@ func TestHandleDeleteFile_default_variant_is_standard(t *testing.T) {
 		stores:   storeFacade{file: db},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -211,7 +211,7 @@ func TestHandleBulkDeleteFiles_db_error_returns_500(t *testing.T) {
 		stores:   storeFacade{file: db},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -239,11 +239,11 @@ func (m *deleteExtTrackingStore) DeleteSubtitleFile(_ context.Context, _ api.Med
 	return nil
 }
 
-func (m *deleteExtTrackingStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string) ([]string, error) {
+func (m *deleteExtTrackingStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) ([]string, error) {
 	return nil, nil
 }
 
-func (m *deleteExtTrackingStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string) error {
+func (m *deleteExtTrackingStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
 	return nil
 }
 
@@ -298,7 +298,7 @@ func TestDeleteExternalFile_succeeds_for_nonexistent_file(t *testing.T) {
 		stores:   storeFacade{file: db},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -336,11 +336,11 @@ func (m *bulkDeleteDataStore) DeleteSubtitleFile(_ context.Context, _ api.MediaT
 	return nil
 }
 
-func (m *bulkDeleteDataStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string) ([]string, error) {
+func (m *bulkDeleteDataStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) ([]string, error) {
 	return nil, nil
 }
 
-func (m *bulkDeleteDataStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string) error {
+func (m *bulkDeleteDataStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
 	return nil
 }
 
@@ -369,7 +369,7 @@ func TestHandleBulkDeleteFiles_deletes_external_skips_embedded(t *testing.T) {
 		stores:   storeFacade{file: db},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -427,7 +427,7 @@ func TestHandleDeleteFile_explicit_variant_passed_through(t *testing.T) {
 		stores:   storeFacade{file: db},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 

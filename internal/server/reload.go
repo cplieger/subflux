@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
@@ -95,6 +96,20 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 	// Re-parse the trusted-proxy set from the new config so client-IP
 	// resolution reflects the hot-reloaded value without a restart.
 	s.applyTrustedProxies()
+
+	// Push the new session timeouts into the auth-store sweeper so eviction
+	// uses the same cutoffs the request-path validator now enforces (the
+	// validator reads live config; a stale sweeper would hard-logout
+	// sessions early). Same optional-capability pattern as backupStore.
+	if ts, ok := s.authStore.(interface {
+		SetSessionTimeouts(idle, absolute time.Duration)
+	}); ok {
+		ts.SetSessionTimeouts(newCfg.SessionIdleTimeout(), newCfg.SessionAbsoluteTimeout())
+	}
+
+	// Re-apply the SSE client cap on the running hub (admission-time enforced;
+	// existing streams above a lowered cap drain naturally).
+	s.events.SetMaxClients(sseClientCap(newCfg))
 
 	// Mark as configured. This is the transition point when the server
 	// starts in unconfigured mode and the user saves a valid config.
