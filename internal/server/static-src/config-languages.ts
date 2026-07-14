@@ -38,7 +38,7 @@ function cfgFieldEl(label: string, element: HTMLElement, tip: string | undefined
 
 // --- Exported functions ---
 
-export function variantSelect(id: string | null, value: string | undefined): HTMLSelectElement {
+function variantSelect(id: string | null, value: string | undefined): HTMLSelectElement {
   const sel = el("select", { id, className: "variant-select" }) as HTMLSelectElement;
   for (const v of SUBTITLE_VARIANTS) {
     sel.appendChild(option(v.value, v.label));

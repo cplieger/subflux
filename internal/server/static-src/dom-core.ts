@@ -10,7 +10,7 @@ export function show(el: HTMLElement | null): void {
   }
 }
 
-export function hide(el: HTMLElement | null): void {
+function hide(el: HTMLElement | null): void {
   if (el) {
     el.hidden = true;
   }

@@ -127,7 +127,7 @@ export function connect(): void {
   });
 }
 
-export function disconnect(): void {
+function disconnect(): void {
   if (eventSource) {
     eventSource.close();
     eventSource = null;
