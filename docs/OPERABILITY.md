@@ -30,21 +30,25 @@ in the container logs.
 
 3. Restart the container. It creates a fresh empty store on startup.
 
-4. Wait for one full scan cycle (runs after the 30s startup delay). Library state is rebuilt automatically from the filesystem:
+4. Wait for one full scan cycle (runs after the 30s startup delay).
+   Library state is rebuilt automatically from the filesystem:
    - `subtitle_state` (auto rows) - detected from on-disk subtitle files
    - `subtitle_files` - inventoried from media directories
    - `scan_state` - populated as each item is scanned
    - `search_attempts` - starts empty (all items immediately eligible)
 
-5. Recreate auth (users, passkeys, and API keys are lost):
+5. Recreate auth (users, passkeys, and API keys are lost). With an empty
+   auth store the server is back in the first-boot state: open the web UI
+   and the setup page prompts you to create the admin account again.
+   Alternatively, configure OIDC in `config.yaml` to skip local auth
+   entirely.
 
-   ```sh
-   docker exec subflux subflux reset-password --user admin
-   ```
+   Note: `subflux reset-password --user <name>` resets the password of an
+   EXISTING user (it answers 404 for an unknown username); it does not
+   create accounts, so it cannot bootstrap a fresh store.
 
-   This creates the admin user via the first-boot flow if none exist. Alternatively, configure OIDC in `config.yaml` to skip local auth entirely.
-
-6. Re-apply any manual locks if needed (manual locks and sync offsets are not recoverable from the filesystem).
+6. Re-apply any manual locks if needed (manual locks and sync offsets
+   are not recoverable from the filesystem).
 
 ### What is lost
 
@@ -65,12 +69,16 @@ in the container logs.
 
 ### When to compact
 
-bbolt reuses free pages internally but never shrinks the file. Monitor the Prometheus metrics:
+bbolt reuses free pages internally but never shrinks the file. Monitor
+the Prometheus metrics:
 
-- `subflux_store_freelist_bytes` / `subflux_store_file_bytes` ratio exceeds ~50% (significant free space not returned to the OS)
+- `subflux_store_freelist_bytes` / `subflux_store_file_bytes` ratio
+  exceeds ~50% (significant free space not returned to the OS)
 - Or the file size exceeds 100 MB (unusually large for a subtitle metadata store)
 
-Under normal operation, compaction is rarely needed. It becomes relevant only after sustained high-churn workloads (mass reconcile + re-scan cycles, bulk library reorganization).
+Under normal operation, compaction is rarely needed. It becomes relevant
+only after sustained high-churn workloads (mass reconcile + re-scan
+cycles, bulk library reorganization).
 
 ### Compaction procedure
 
@@ -104,9 +112,21 @@ Under normal operation, compaction is rarely needed. It becomes relevant only af
 
 ### Notes
 
-- The `bbolt` CLI is available in the container image. On the host: `go install go.etcd.io/bbolt/cmd/bbolt@latest`.
-- Compaction rewrites the file sequentially, reclaiming all free pages. The resulting file contains only live data.
-- Do not run compaction while the container is running (bbolt holds an exclusive file lock).
+- The `bbolt` CLI is NOT inside the container image (distroless, single
+  binary). Run it on the host against the mounted config volume:
+  `go install go.etcd.io/bbolt/cmd/bbolt@latest`, or use a throwaway
+  container, e.g.
+
+  ```sh
+  docker run --rm -v /path/to/config:/config golang:alpine sh -c \
+    'go install go.etcd.io/bbolt/cmd/bbolt@latest && \
+     bbolt compact -o /config/subflux-compact.bolt /config/subflux.bolt'
+  ```
+
+- Compaction rewrites the file sequentially, reclaiming all free pages.
+  The resulting file contains only live data.
+- Do not run compaction while the container is running (bbolt holds an
+  exclusive file lock).
 
 ---
 
@@ -114,7 +134,10 @@ Under normal operation, compaction is rarely needed. It becomes relevant only af
 
 ### Background
 
-ext4 with the `fast_commit` feature (enabled by default on recent kernels) had a bug that could corrupt mmap'd files (including bbolt) on unclean shutdown. This affects the bbolt store because bbolt memory-maps its data file for reads.
+ext4 with the `fast_commit` feature (enabled by default on recent kernels)
+had a bug that could corrupt mmap'd files (including bbolt) on unclean
+shutdown. This affects the bbolt store because bbolt memory-maps its data
+file for reads.
 
 ### Fixed versions
 
@@ -141,7 +164,8 @@ Must be >= 5.10.94 or >= 5.15.17 (within the respective branch).
 
 ### ZFS hosts
 
-Not affected. ZFS uses its own copy-on-write transaction model and is not ext4. No action needed on TrueNAS or other ZFS-backed Docker hosts.
+Not affected. ZFS uses its own copy-on-write transaction model and is not
+ext4. No action needed on TrueNAS or other ZFS-backed Docker hosts.
 
 ### If running on an affected kernel
 
@@ -166,3 +190,38 @@ docker logs subflux 2>&1 | grep -i "store opened"
 ```
 
 No `invalid database` or `checksum` errors in the first few lines of output.
+
+---
+
+## 4. Leftover SQLite-era files
+
+Installs upgraded across the SQLite-to-bbolt cutover still hold the old
+SQLite files. Nothing in the bbolt engine reads, prunes, or deletes them —
+they are frozen dead weight (bounded at roughly the old database size plus
+`backup.retention` snapshot copies of it). Up to four patterns exist:
+
+| File | What it is |
+| ---- | ---------- |
+| `/config/subflux.db` | the old live SQLite database |
+| `subflux.db-wal`, `subflux.db-shm` | WAL sidecars (unclean last shutdown) |
+| `subflux-<timestamp>.db` | `VACUUM INTO` snapshots (if backups were on) |
+
+Snapshots live in `backup.path` if you configured one, otherwise **next to
+the database in `/config`** (the default). The backup pruner now only
+manages `subflux-*.bolt`, so `.db` snapshots are never removed
+automatically.
+
+Once you are confident you will not roll back to a pre-bbolt version,
+remove them manually:
+
+```sh
+# Default setup (snapshots next to the database):
+rm /config/subflux.db /config/subflux.db-wal /config/subflux.db-shm /config/subflux-*.db
+
+# If backup.path pointed somewhere else, also:
+rm <backup.path>/subflux-*.db
+```
+
+`rm` will report "No such file" for patterns you never had (e.g. the WAL
+sidecars after a clean shutdown, or snapshots if backups were never
+enabled); that is expected and harmless.
