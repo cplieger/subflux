@@ -82,8 +82,22 @@ func extractFFmpegPCMFiltered(ctx context.Context, path string, startMs, duratio
 	// Close stdout pipe before waiting to prevent deadlock.
 	stdout.Close()
 
+	// A failed ffmpeg (killed, cancelled, decode error) must fail the
+	// extraction even when partial samples were read: correlating against
+	// truncated audio yields a confidently WRONG offset, which is worse than
+	// no sync. This matches the subtitle-extraction wrapper, which also
+	// treats a Wait error as fatal.
+	//
+	// Exception: when the sample cap was reached, readPCMSamples stops
+	// consuming stdout, so ffmpeg dies with a broken pipe (or is killed by
+	// WaitDelay after the early close). That is OUR doing, not an extraction
+	// failure — the full requested window was read — so a capped read
+	// tolerates the Wait error.
 	if waitErr := cmd.Wait(); waitErr != nil {
-		slog.Debug("ffmpeg wait", "error", waitErr)
+		if len(samples) < maxSamples {
+			return nil, fmt.Errorf("ffmpeg audio extract: %w", waitErr)
+		}
+		slog.Debug("ffmpeg wait after sample cap reached", "error", waitErr)
 	}
 
 	slog.Debug("ffmpeg PCM extracted",
