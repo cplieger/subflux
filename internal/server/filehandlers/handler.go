@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
@@ -19,8 +18,8 @@ import (
 type FileStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant, source api.SubtitleSource, path string) error
-	ManualSubtitlePaths(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]string, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string) error
+	ManualSubtitlePaths(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) ([]string, error)
+	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
 	HistoryMediaIDs(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error)
 }
 
@@ -168,7 +167,7 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("delete file: db cleanup failed", "error", err)
 	}
 
-	h.maybeRevertManualLock(ctx, api.MediaType(mediaType), mediaID, language)
+	h.maybeRevertManualLock(ctx, api.MediaType(mediaType), mediaID, language, api.Variant(variant))
 
 	h.deps.Events.Publish(events.Event{
 		Type: events.CoverageUpdate,
@@ -216,19 +215,17 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	}
 
 	deleted := 0
-	langs := make(map[string]bool)
+	affected := make(map[lockQuad]bool)
 	for i := range rows {
 		row := &rows[i]
 		if h.deleteExternalFile(ctx, ls.Cfg, req.MediaType, row) {
-			langs[row.MediaID+"|"+row.Language] = true
+			affected[lockQuad{mediaID: row.MediaID, language: row.Language, variant: api.Variant(row.Variant)}] = true
 			deleted++
 		}
 	}
 
-	for key := range langs {
-		if i := strings.LastIndexByte(key, '|'); i >= 0 {
-			h.maybeRevertManualLock(ctx, req.MediaType, key[:i], key[i+1:])
-		}
+	for q := range affected {
+		h.maybeRevertManualLock(ctx, req.MediaType, q.mediaID, q.language, q.variant)
 	}
 
 	slog.Info("bulk delete completed",
@@ -305,10 +302,20 @@ func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider
 	return true
 }
 
+// lockQuad identifies a (media_id, language, variant) whose manual lock may
+// need reverting after its files were deleted. Locks live per variant, so the
+// bulk-delete revert sweep is keyed by the full quad, not just the language.
+type lockQuad struct {
+	mediaID  string
+	language string
+	variant  api.Variant
+}
+
 // maybeRevertManualLock checks if there are any remaining manual subtitle
-// files on disk for a media+language. If none remain, clears the manual lock.
-func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string) {
-	paths, err := h.deps.Store.ManualSubtitlePaths(ctx, mediaType, mediaID, language)
+// files on disk for a media+language+variant quad. If none remain, clears
+// that quad's manual lock (sibling variants keep theirs).
+func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) {
+	paths, err := h.deps.Store.ManualSubtitlePaths(ctx, mediaType, mediaID, language, variant)
 	if err != nil {
 		slog.Warn("maybeRevertManualLock: failed to get paths", "error", err)
 		return
@@ -318,11 +325,11 @@ func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.Media
 			return
 		}
 	}
-	if err := h.deps.Store.ClearManualLock(ctx, mediaType, mediaID, language); err != nil {
+	if err := h.deps.Store.ClearManualLock(ctx, mediaType, mediaID, language, variant); err != nil {
 		slog.Warn("failed to clear manual lock after delete",
-			"media_id", mediaID, "lang", language, "error", err)
+			"media_id", mediaID, "lang", language, "variant", variant, "error", err)
 	} else if len(paths) > 0 {
 		slog.Info("manual lock cleared (no manual files remain on disk)",
-			"media_id", mediaID, "lang", language)
+			"media_id", mediaID, "lang", language, "variant", variant)
 	}
 }

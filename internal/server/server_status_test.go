@@ -144,7 +144,7 @@ func TestHandleManualDownload_path_validation_failure(t *testing.T) {
 		db:       &qhMockStore{},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		events:   events.New(),
+		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: cfg})
 	s.manualH = manualops.NewHandler(manualops.HandlerDeps{

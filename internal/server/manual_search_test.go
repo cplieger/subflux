@@ -120,8 +120,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	}
 
 	var result struct {
-		Results        []manualops.SearchResult `json:"results"`
-		ManuallyLocked bool                     `json:"manually_locked"`
+		Results []manualops.SearchResult `json:"results"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -133,9 +132,6 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	if result.Results[0].Score < result.Results[1].Score {
 		t.Errorf("results not sorted: scores %d, %d",
 			result.Results[0].Score, result.Results[1].Score)
-	}
-	if result.ManuallyLocked {
-		t.Error("manually_locked = true, want false")
 	}
 }
 

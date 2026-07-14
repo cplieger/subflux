@@ -93,21 +93,23 @@ type targetState struct {
 	isUpgrade    bool
 }
 
-// shouldSkipLang checks if a language should be skipped for a media item.
-// Returns a reason string if skipped, empty string if search should proceed.
-func (e *Engine) shouldSkipLang(ctx context.Context, mediaType api.MediaType, mediaID, title, lang string) string {
-	locked, err := e.store.IsManuallyLocked(ctx, mediaType, mediaID, lang)
+// targetLocked checks the per-variant manual lock for one target. Locks live
+// on the (media_type, media_id, language, variant) quad, so a manual forced
+// download blocks only the forced target while standard/hi automation
+// continues. A store error fails CLOSED (treated as locked and skipped), the
+// same conservative stance the store itself takes.
+func (e *Engine) targetLocked(ctx context.Context, mediaType api.MediaType, mediaID, title, lang string, variant api.Variant) bool {
+	locked, err := e.store.IsManuallyLocked(ctx, mediaType, mediaID, lang, variant)
 	if err != nil {
-		slog.Warn("IsManuallyLocked failed, skipping",
-			"media", title, "lang", lang, "error", err)
-		return "db error"
+		slog.Warn("IsManuallyLocked failed, skipping target",
+			"media", title, "lang", lang, "variant", variant, "error", err)
+		return true
 	}
 	if locked {
-		slog.Debug("manually locked, skipping",
-			"media", title, "lang", lang)
-		return "manually locked"
+		slog.Debug("manually locked, skipping target",
+			"media", title, "lang", lang, "variant", variant)
 	}
-	return ""
+	return locked
 }
 
 // buildTargetStates computes the search state for each target in a language group.
@@ -132,6 +134,12 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 			allowed[p.Name()] = struct{}{}
 		}
 		states[i].allowedProvs = allowed
+
+		// A manually locked target (per-variant lock) never searches; the
+		// other variants of the language group are decided independently.
+		if e.targetLocked(ctx, mediaType, mediaID, label, lang, t.Variant) {
+			continue
+		}
 
 		needsSearch, isUpgrade, currentScore := decideTargetAction(
 			ctx, existing, searchCfg, e, mediaType, mediaID, lang,
@@ -158,10 +166,10 @@ func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *
 	}
 	// ForceUpgrade bypasses the normal upgrade eligibility check.
 	if forceUpgrade {
-		score, _, found, err := e.store.CurrentScore(ctx, mediaType, mediaID, lang)
+		score, _, found, err := e.store.CurrentScore(ctx, mediaType, mediaID, lang, variant)
 		if err != nil {
 			slog.Warn("CurrentScore failed during force upgrade",
-				"media", label, "lang", lang, "error", err)
+				"media", label, "lang", lang, "variant", variant, "error", err)
 			return true, true, 0
 		}
 		if found {

@@ -26,7 +26,15 @@ func (s *Server) initHandlers() {
 			return s.db.GetPollTimestamp(ctx, key)
 		},
 		func(ctx context.Context, key api.PollKey, t time.Time) error {
-			return s.db.SetPollTimestamp(ctx, key, t)
+			err := s.db.SetPollTimestamp(ctx, key, t)
+			// The poll heartbeat writes every cycle, making it the earliest
+			// detector of a disk-full store between daily reconciles; classify
+			// the error and raise the persistent operator alert here instead of
+			// waiting for the next maintenance window.
+			if err != nil {
+				(&serveradapter.AlertAdapter{A: s.alerts}).RecordStoreWriteError(err)
+			}
+			return err
 		},
 	)
 	s.queryH = queryhandlers.New(queryhandlers.Deps{

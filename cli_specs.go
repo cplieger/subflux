@@ -97,11 +97,12 @@ var cliSpecs = map[string]cliparse.Spec{
 	cmdUnlock: {
 		Name:     cmdUnlock,
 		Synopsis: "Remove a manual download lock",
-		Help:     "Clears the lock so the next scan can re-evaluate this item.",
+		Help:     "Clears the lock so the next scan can re-evaluate this item. Locks are held per variant; omit --variant to clear all variants for the language.",
 		Flags: []cliparse.Flag{
 			{Name: cmdType, Help: "Media type (episode|movie)", Required: true},
 			{Name: "id", Help: "Media id (e.g. tt0903747-s01e01)", Required: true},
 			{Name: cmdLang, Help: "Language code", Required: true},
+			{Name: "variant", Help: "Variant to unlock (standard|hi|forced); default all variants"},
 			formatFlag,
 		},
 	},
@@ -137,8 +138,8 @@ var cliSpecs = map[string]cliparse.Spec{
 	},
 	cmdResetPassword: {
 		Name:     cmdResetPassword,
-		Synopsis: "Reset a user's password (interactive)",
-		Help:     "Prompts for the new password on stdin. Requires DB access (run on the host, not via the API).",
+		Synopsis: "Reset an existing user's password (interactive)",
+		Help:     "Prompts for the new password on stdin, then applies it through the running server's localhost-only admin endpoint (bbolt holds an exclusive file lock, so the store cannot be opened directly). Run on the same host as the server, e.g. via docker exec. The user must already exist.",
 		Flags: []cliparse.Flag{
 			{Name: "user", Help: "Username", Required: true},
 		},
@@ -146,7 +147,7 @@ var cliSpecs = map[string]cliparse.Spec{
 	cmdGenerateAPIKey: {
 		Name:     cmdGenerateAPIKey,
 		Synopsis: "Generate a new API key for a user",
-		Help:     "Prints the API key once; only the SHA-256 hash is stored.",
+		Help:     "Prints the API key once; only the SHA-256 hash is stored. Applies through the running server's localhost-only admin endpoint (run on the same host, e.g. via docker exec).",
 		Flags: []cliparse.Flag{
 			{Name: "user", Help: "Username", Required: true},
 			{Name: "label", Help: "Label for tracking key usage", Required: true},

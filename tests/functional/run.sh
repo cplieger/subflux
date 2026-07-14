@@ -717,8 +717,7 @@ test_mock_provider() {
   log "=== Mock Provider Modes ==="
   local r count
 
-  apply_mock_config "static" '      result_count: "5"
-      score_base: "80"'
+  apply_mock_config "static" '      result_count: "5"'
   r=$(api_get "/api/search?title=Test+Movie&year=2024&lang=en&type=movie")
   sync_status
   assert_status 200 "Mock static: search"

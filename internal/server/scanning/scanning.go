@@ -103,7 +103,8 @@ type ScanOutcome = api.ScanOutcome
 
 // Scan outcome constants re-exported from api for local use.
 const (
-	ScanFound    = api.ScanFound
-	ScanSkipped  = api.ScanSkipped
-	ScanNoResult = api.ScanNoResult
+	ScanFound     = api.ScanFound
+	ScanSkipped   = api.ScanSkipped
+	ScanNoResult  = api.ScanNoResult
+	ScanBackedOff = api.ScanBackedOff
 )

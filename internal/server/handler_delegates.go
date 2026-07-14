@@ -110,12 +110,12 @@ func (p *fileStoreProxy) DeleteSubtitleFile(ctx context.Context, mt api.MediaTyp
 	return p.s.stores.file.DeleteSubtitleFile(ctx, mt, mediaID, lang, v, src, path)
 }
 
-func (p *fileStoreProxy) ManualSubtitlePaths(ctx context.Context, mt api.MediaType, mediaID, lang string) ([]string, error) {
-	return p.s.stores.file.ManualSubtitlePaths(ctx, mt, mediaID, lang)
+func (p *fileStoreProxy) ManualSubtitlePaths(ctx context.Context, mt api.MediaType, mediaID, lang string, variant api.Variant) ([]string, error) {
+	return p.s.stores.file.ManualSubtitlePaths(ctx, mt, mediaID, lang, variant)
 }
 
-func (p *fileStoreProxy) ClearManualLock(ctx context.Context, mt api.MediaType, mediaID, lang string) error {
-	return p.s.stores.file.ClearManualLock(ctx, mt, mediaID, lang)
+func (p *fileStoreProxy) ClearManualLock(ctx context.Context, mt api.MediaType, mediaID, lang string, variant api.Variant) error {
+	return p.s.stores.file.ClearManualLock(ctx, mt, mediaID, lang, variant)
 }
 
 func (p *fileStoreProxy) HistoryMediaIDs(ctx context.Context, mt api.MediaType, prefix string) ([]string, error) {

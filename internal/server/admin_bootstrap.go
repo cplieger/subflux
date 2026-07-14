@@ -144,12 +144,19 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 // is needed, matching the first-boot recovery use case.
 func (s *Server) requireLocalhost(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// authhandlers.ClientIP resolves through the shared trusted-proxy set.
-		// Unconfigured it returns the unspoofable socket peer (loopback for a
-		// same-host docker exec). Behind a trusted proxy it resolves the real
-		// client from X-Forwarded-For, which is then non-loopback and correctly
-		// rejected — a request arriving via the proxy is not a local call.
-		ip := net.ParseIP(authhandlers.ClientIP(r))
+		// Check the raw SOCKET PEER, never the proxy-aware resolver. The
+		// trusted-proxy ClientIP consults X-Forwarded-For when the peer is in
+		// a trusted CIDR, so any host in that subnet could forge
+		// "X-Forwarded-For: 127.0.0.1" and reach this unauthenticated
+		// endpoint. The socket peer cannot be spoofed: a same-host docker
+		// exec connects from loopback directly, and a request arriving via a
+		// reverse proxy has the proxy's (non-loopback) address and is
+		// correctly rejected — a proxied request is not a local call.
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr
+		}
+		ip := net.ParseIP(host)
 		if ip == nil || !ip.IsLoopback() {
 			api.ForbiddenC(w, r, api.CodeForbidden, "admin bootstrap is localhost-only")
 			return

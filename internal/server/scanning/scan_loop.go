@@ -89,18 +89,23 @@ func RunFullScan(ctx context.Context, deps *Deps, ls *LiveState) {
 		"episodes", stats.EpisodesSearched, "movies", stats.MoviesSearched,
 		"found", totalFound, "resumed", resumed,
 		"duration", dur.String())
-	deps.Alerts.RecordInfo(
-		fmt.Sprintf("Scan complete: %d found, %d searched in %s",
-			totalFound,
-			stats.EpisodesSearched+stats.MoviesSearched,
-			dur.String()))
+	summary := fmt.Sprintf("Scan complete: %d found, %d searched in %s",
+		totalFound,
+		stats.EpisodesSearched+stats.MoviesSearched,
+		dur.String())
+	if backedOff := stats.EpisodesBackedOff + stats.MoviesBackedOff; backedOff > 0 {
+		summary += fmt.Sprintf(" (%d backed off)", backedOff)
+	}
+	deps.Alerts.RecordInfo(summary)
 	slog.Info("scan results: episodes",
 		"searched", stats.EpisodesSearched, "found", stats.EpisodesFound,
 		"skipped", stats.EpisodesSkipped, "no_result", stats.EpisodesNoResult,
+		"backed_off", stats.EpisodesBackedOff,
 		"series_skipped", stats.SeriesSkipped)
 	slog.Info("scan results: movies",
 		"searched", stats.MoviesSearched, "found", stats.MoviesFound,
-		"skipped", stats.MoviesSkipped, "no_result", stats.MoviesNoResult)
+		"skipped", stats.MoviesSkipped, "no_result", stats.MoviesNoResult,
+		"backed_off", stats.MoviesBackedOff)
 	deps.Metrics.RecordScan(
 		stats.EpisodesSearched+stats.MoviesSearched,
 		totalFound, time.Since(start))
@@ -168,17 +173,19 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 		return
 	}
 
-	outcome, foundLangs := ScanEpisode(ctx, deps, ls, series, ep)
+	outcome, searchedLangs, foundLangs := ScanEpisode(ctx, deps, ls, series, ep)
 
 	seasonEpCount := api.SeasonEpisodeFileCount(series, ep.SeasonNumber)
 	recordEpisodeOutcomes(tracker, series.ImdbID, ep.SeasonNumber,
-		langs, foundLangs, outcome, seasonEpCount)
+		searchedLangs, foundLangs, seasonEpCount)
 
 	switch outcome {
 	case ScanFound:
 		stats.EpisodesFound++
 	case ScanSkipped:
 		stats.EpisodesSkipped++
+	case ScanBackedOff:
+		stats.EpisodesBackedOff++
 	default:
 		stats.EpisodesNoResult++
 	}
@@ -190,24 +197,20 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 }
 
 // recordEpisodeOutcomes records the per-language scan result for an episode's
-// season. When foundLangs is non-empty, each target language is recorded as
-// ScanFound when a subtitle was downloaded for it and ScanNoResult otherwise;
-// when no language had a subtitle, the raw scan outcome is recorded for every
-// target language.
+// season, over ONLY the languages whose group actually ran (searchedLangs). A
+// language skipped for this episode — covered on disk, manually locked, or not
+// a target at all — is not recorded, so it can never accrue a false no-result
+// streak that early-terminates the season for episodes that genuinely need it.
+// Each searched language records ScanFound when a subtitle was downloaded for
+// it and ScanNoResult otherwise.
 func recordEpisodeOutcomes(tracker *seasonTracker, imdbID string, season int,
-	langs, foundLangs []string, outcome ScanOutcome, seasonEpCount int,
+	searchedLangs, foundLangs []string, seasonEpCount int,
 ) {
-	if len(foundLangs) == 0 {
-		for _, lang := range langs {
-			tracker.recordOutcome(imdbID, season, lang, outcome, seasonEpCount)
-		}
-		return
-	}
 	foundSet := make(map[string]struct{}, len(foundLangs))
 	for _, l := range foundLangs {
 		foundSet[l] = struct{}{}
 	}
-	for _, lang := range langs {
+	for _, lang := range searchedLangs {
 		if _, ok := foundSet[lang]; ok {
 			tracker.recordOutcome(imdbID, season, lang, ScanFound, seasonEpCount)
 		} else {
@@ -225,6 +228,8 @@ func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
 		stats.MoviesFound++
 	case ScanSkipped:
 		stats.MoviesSkipped++
+	case ScanBackedOff:
+		stats.MoviesBackedOff++
 	default:
 		stats.MoviesNoResult++
 	}

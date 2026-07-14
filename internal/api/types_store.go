@@ -45,6 +45,7 @@ type DownloadRecord struct {
 	MediaType    MediaType
 	MediaID      string
 	Language     string
+	Variant      Variant // subtitle variant (standard/hi/forced); empty is normalized to standard
 	ProviderName ProviderID
 	ReleaseName  string
 	Path         string
@@ -76,6 +77,7 @@ type StateEntry struct {
 	Title         string     `json:"title"`
 	MediaID       string     `json:"media_id"`
 	Language      string     `json:"language"`
+	Variant       Variant    `json:"variant"`
 	Provider      ProviderID `json:"provider"`
 	Path          string     `json:"path"`
 	ReleaseName   string     `json:"release_name"`
@@ -99,11 +101,12 @@ type BackoffEntry struct {
 	Failures  int        `json:"failures"`
 }
 
-// ManualLockEntry represents a manually locked media+language pair.
+// ManualLockEntry represents a manually locked media+language+variant quad.
 type ManualLockEntry struct {
 	MediaType MediaType `json:"media_type"`
 	MediaID   string    `json:"media_id"`
 	Language  string    `json:"language"`
+	Variant   Variant   `json:"variant"`
 	Count     int       `json:"count"`
 }
 
@@ -160,12 +163,14 @@ type ScanStats struct {
 	TotalMovies       int
 	TotalMovieFiles   int // Movies with hasFile=true.
 
-	// Post-scan outcomes for episodes.
-	EpisodesSearched  int // Episodes where providers were queried.
+	// Post-scan outcomes for episodes. EpisodesSearched counts every episode
+	// the scan loop processed (it drives progress reporting); the other
+	// fields are its per-outcome buckets.
+	EpisodesSearched  int // Episodes processed by the scan loop.
 	EpisodesSkipped   int // Episodes with existing subs (no search needed).
 	EpisodesFound     int // Episodes where a subtitle was downloaded.
 	EpisodesNoResult  int // Episodes searched but no subtitle found.
-	EpisodesBackedOff int // Episodes where all providers were backed off.
+	EpisodesBackedOff int // Episodes where every needed provider was in adaptive backoff (no query ran).
 	SeriesSkipped     int // Series skipped by show-level pre-check.
 
 	// Post-scan outcomes for movies.

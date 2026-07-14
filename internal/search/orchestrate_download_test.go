@@ -453,7 +453,7 @@ func TestSearchTargets_hash_match_skips_sync(t *testing.T) {
 
 // --- all providers backed off ---
 
-func TestSearchTargets_all_providers_backed_off_returns_searched(t *testing.T) {
+func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T) {
 	t.Parallel()
 
 	backedStore := &mockStoreWithBackoff{
@@ -482,9 +482,17 @@ func TestSearchTargets_all_providers_backed_off_returns_searched(t *testing.T) {
 	if len(result.Paths) != 0 {
 		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
 	}
-	// When all providers are backed off, the target counts as searched (not skipped).
-	if result.Searched != 1 {
-		t.Errorf("SearchTargets().Searched = %d, want 1", result.Searched)
+	// When all providers are backed off, the target counts in its OWN
+	// category: not searched (no provider query ran, so it must not feed the
+	// season tracker or the searched stats) and not skipped-as-covered.
+	if result.Searched != 0 {
+		t.Errorf("SearchTargets().Searched = %d, want 0", result.Searched)
+	}
+	if result.BackedOff != 1 {
+		t.Errorf("SearchTargets().BackedOff = %d, want 1", result.BackedOff)
+	}
+	if len(result.SearchedLangs) != 0 {
+		t.Errorf("SearchTargets().SearchedLangs = %v, want empty", result.SearchedLangs)
 	}
 	// Adaptive skip should be recorded for each backed-off provider.
 	if metrics.adaptiveSkips.Load() != 2 {

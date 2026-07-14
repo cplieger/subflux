@@ -24,10 +24,10 @@ func (e *Engine) checkUpgradeEligibility(
 			"media", title, "lang", lang)
 		return 0, false
 	}
-	score, mediaImported, found, err := e.store.CurrentScore(ctx, mediaType, mediaID, lang)
+	score, mediaImported, found, err := e.store.CurrentScore(ctx, mediaType, mediaID, lang, variant)
 	if err != nil {
 		slog.Warn("CurrentScore failed, skipping upgrade check",
-			"media", title, "lang", lang, "error", err)
+			"media", title, "lang", lang, "variant", variant, "error", err)
 		return 0, false
 	}
 	if !found || mediaImported.Before(cutoff) || score >= e.cfg.Scores().Hash {
@@ -44,9 +44,11 @@ func (e *Engine) checkUpgradeEligibility(
 
 // logNoResults logs the appropriate message when no results meet the minimum
 // score threshold, distinguishing between upgrade and initial search cases.
+// Backoff recording is gated by the lang-group-shared noResultRecorded guard
+// (one provider query per group = at most one backoff step per group).
 func (e *Engine) logNoResults(ctx context.Context, state *targetState, scored []scoredSub,
 	outcome *searchOutcome, mediaType api.MediaType, mediaID, lang, label string,
-	minScore int,
+	minScore int, noResultRecorded *bool,
 ) {
 	bestScore := 0
 	if len(scored) > 0 {
@@ -63,8 +65,11 @@ func (e *Engine) logNoResults(ctx context.Context, state *targetState, scored []
 			"media", label, "lang", lang,
 			"variant", state.variant,
 			"best", bestScore, "min", minScore)
-		e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
-			label, outcome.succeeded())
+		if !*noResultRecorded {
+			*noResultRecorded = true
+			e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
+				label, outcome.succeeded())
+		}
 	}
 }
 

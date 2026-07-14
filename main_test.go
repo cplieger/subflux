@@ -10,34 +10,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-func TestEnvOr_returns_env_value_when_set(t *testing.T) {
-	t.Setenv("TEST_ENVOR_KEY", "from-env")
-
-	got := envOr("TEST_ENVOR_KEY", "fallback")
-	if got != "from-env" {
-		t.Errorf("envOr(%q, %q) = %q, want %q",
-			"TEST_ENVOR_KEY", "fallback", got, "from-env")
-	}
-}
-
-func TestEnvOr_returns_fallback_when_unset(t *testing.T) {
-	got := envOr("TEST_ENVOR_UNSET_KEY_12345", "fallback")
-	if got != "fallback" {
-		t.Errorf("envOr(%q, %q) = %q, want %q",
-			"TEST_ENVOR_UNSET_KEY_12345", "fallback", got, "fallback")
-	}
-}
-
-func TestEnvOr_returns_fallback_when_empty(t *testing.T) {
-	t.Setenv("TEST_ENVOR_EMPTY", "")
-
-	got := envOr("TEST_ENVOR_EMPTY", "fallback")
-	if got != "fallback" {
-		t.Errorf("envOr(%q, %q) = %q, want %q",
-			"TEST_ENVOR_EMPTY", "fallback", got, "fallback")
-	}
-}
-
 func TestSetupLogging_valid_level(t *testing.T) {
 	setupLogging("debug", "text")
 

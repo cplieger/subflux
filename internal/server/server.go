@@ -108,7 +108,7 @@ func New(db api.Store, reg api.ProviderRegistry, opts ...Option) *Server {
 			dl:    db,
 		},
 		registry: reg,
-		events:   events.New(),
+		events:   events.New(events.DefaultMaxSSEClients),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		authDeps: authDeps{
@@ -130,6 +130,9 @@ func New(db api.Store, reg api.ProviderRegistry, opts ...Option) *Server {
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
 	}
+	// Apply the configured SSE client cap when a config option supplied one
+	// (hot reload re-applies later changes).
+	s.events.SetMaxClients(sseClientCap(s.state().cfg))
 	s.initHandlers()
 	return s
 }
@@ -152,17 +155,18 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker, wa *we
 	s.webauthn = wa
 	s.oidcProvider = oidc
 
-	idle := config.DefaultSessionIdleTimeout
-	abs := config.DefaultSessionAbsoluteTimeout
-	if ls := s.state(); ls != nil && ls.cfg != nil {
-		idle = ls.cfg.SessionIdleTimeout()
-		abs = ls.cfg.SessionAbsoluteTimeout()
-	}
 	s.authenticator = &authhandlers.Authenticator{
-		Store:       store,
-		IdleTimeout: idle,
-		AbsTimeout:  abs,
-		Bypass:      s.authBypass,
+		Store:  store,
+		Bypass: s.authBypass,
+		// Resolve session timeouts from the LIVE config per request so a
+		// hot-reloaded settings change takes effect without a restart
+		// (a startup-time copy would silently ignore later edits).
+		Timeouts: func() (idle, absolute time.Duration) {
+			if ls := s.state(); ls != nil && ls.cfg != nil {
+				return ls.cfg.SessionIdleTimeout(), ls.cfg.SessionAbsoluteTimeout()
+			}
+			return config.DefaultSessionIdleTimeout, config.DefaultSessionAbsoluteTimeout
+		},
 	}
 
 	s.authH = &authhandlers.Handler{

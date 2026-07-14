@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // backupStore is the narrow capability the backup runner needs from the store.
@@ -65,6 +66,9 @@ func (s *Server) runOneBackup(ctx context.Context) {
 	start := time.Now()
 	if err := bs.BackupInto(ctx, dest); err != nil {
 		slog.Error("backup failed", "dest", dest, "error", err)
+		// A failed snapshot is another early disk-full signal; classify it so
+		// the persistent operator alert fires between maintenance windows.
+		(&serveradapter.AlertAdapter{A: s.alerts}).RecordStoreWriteError(err)
 		return
 	}
 	dur := time.Since(start)

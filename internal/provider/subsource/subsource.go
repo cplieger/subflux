@@ -294,7 +294,16 @@ type subtitleResponse struct {
 // --- API calls ---
 
 func (p *Provider) searchTitle(ctx context.Context, req *api.SearchRequest) (int, error) {
-	cacheKey := "title:" + req.ImdbID
+	// The key must carry EVERY input that changes the query: the title (the
+	// alternative-title fallback retries with a different req.Title, and an
+	// ImdbID-only key would turn those retries into cache hits on the primary
+	// title's miss) and the season (SubSource has per-season title pages, so
+	// an S01-scoped id must not answer an S02 lookup).
+	season := 0
+	if req.MediaType == api.MediaTypeEpisode {
+		season = req.Season
+	}
+	cacheKey := fmt.Sprintf("title:%s:%s:%d", req.ImdbID, strings.ToLower(req.Title), season)
 	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
 		return p.searchTitleUncached(ctx, req)
 	})

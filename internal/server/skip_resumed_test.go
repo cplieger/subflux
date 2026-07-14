@@ -55,8 +55,11 @@ func TestSkipResumed_movie_in_recent(t *testing.T) {
 	if stats.MoviesSkipped != 1 {
 		t.Errorf("MoviesSkipped = %d, want 1", stats.MoviesSkipped)
 	}
-	if stats.MoviesSearched != 1 {
-		t.Errorf("MoviesSearched = %d, want 1", stats.MoviesSearched)
+	// Resume-skipped items count only as skipped: no provider query ran, so
+	// Searched must not move (the completion summary would otherwise
+	// overstate the work done).
+	if stats.MoviesSearched != 0 {
+		t.Errorf("MoviesSearched = %d, want 0 (resume-skip is not a search)", stats.MoviesSearched)
 	}
 	if stats.EpisodesSkipped != 0 {
 		t.Errorf("EpisodesSkipped = %d, want 0 (movie path)", stats.EpisodesSkipped)
@@ -99,8 +102,9 @@ func TestSkipResumed_episode_in_recent(t *testing.T) {
 	if stats.EpisodesSkipped != 1 {
 		t.Errorf("EpisodesSkipped = %d, want 1", stats.EpisodesSkipped)
 	}
-	if stats.EpisodesSearched != 1 {
-		t.Errorf("EpisodesSearched = %d, want 1", stats.EpisodesSearched)
+	// Resume-skipped items count only as skipped (see the movie variant).
+	if stats.EpisodesSearched != 0 {
+		t.Errorf("EpisodesSearched = %d, want 0 (resume-skip is not a search)", stats.EpisodesSearched)
 	}
 	if stats.MoviesSkipped != 0 {
 		t.Errorf("MoviesSkipped = %d, want 0 (episode path)", stats.MoviesSkipped)
@@ -145,8 +149,9 @@ func TestSkipResumed_stats_accumulate(t *testing.T) {
 
 	scanning.SkipResumed(item, recent, stats)
 
-	if stats.MoviesSearched != 6 {
-		t.Errorf("MoviesSearched = %d, want 6 (5+1)", stats.MoviesSearched)
+	// Only Skipped accumulates; Searched stays untouched by a resume skip.
+	if stats.MoviesSearched != 5 {
+		t.Errorf("MoviesSearched = %d, want 5 (unchanged)", stats.MoviesSearched)
 	}
 	if stats.MoviesSkipped != 3 {
 		t.Errorf("MoviesSkipped = %d, want 3 (2+1)", stats.MoviesSkipped)

@@ -25,20 +25,18 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	targets []api.SubtitleTarget, videoPath string, mediaType api.MediaType, mediaID string,
 	existing *existingSubs, searchCfg *api.SearchConfig,
 	upgradeCutoff time.Time,
-) (paths []string, searched, skipped int) {
+) (paths []string, searched, skipped, backedOff int) {
 	lang := targets[0].Code
 	label := req.MediaLabel()
 
-	if reason := e.shouldSkipLang(ctx, mediaType, mediaID, label, lang); reason != "" {
-		skipped = len(targets)
-		return paths, searched, skipped
-	}
-
+	// Manual locks are checked per target (per variant) inside
+	// buildTargetStates: a locked variant is excluded while its siblings keep
+	// searching, so there is no language-level lock gate here.
 	states, anyNeedsSearch := e.buildTargetStates(ctx, req, targets, existing,
 		searchCfg, mediaType, mediaID, lang, label, upgradeCutoff)
 	if !anyNeedsSearch {
 		skipped = len(targets)
-		return paths, searched, skipped
+		return paths, searched, skipped, backedOff
 	}
 
 	// Collect the union of providers across all targets that need searching.
@@ -48,8 +46,12 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 		slog.Info("all providers backed off",
 			"media", label, "lang", lang,
 			"total_providers", len(unionProvs))
-		searched = len(targets)
-		return paths, searched, skipped
+		// The group needed a search but zero provider queries ran: its own
+		// category, NOT "searched" — counting it as searched fed synthetic
+		// no-result evidence into the season tracker and overstated the scan
+		// summary every cycle a 7-day backoff overlapped a 24h scan.
+		backedOff = len(targets)
+		return paths, searched, skipped, backedOff
 	}
 
 	// Single provider query for this language.
@@ -70,7 +72,12 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	}
 	outcome.results = kept
 
-	// Process each target variant from the shared results.
+	// Process each target variant from the shared results. ONE provider query
+	// ran for the whole language group, so adaptive backoff is recorded at
+	// most once per group: the guard is shared across the variant targets
+	// (each variant recording independently would advance the backoff ladder
+	// two steps per scan for a two-variant language).
+	noResultRecorded := false
 	for i := range states {
 		if !states[i].needsSearch {
 			skipped++
@@ -79,12 +86,12 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 		searched++
 
 		path := e.processTargetVariant(ctx, req, &states[i],
-			&outcome, videoPath, mediaType, mediaID, lang, label)
+			&outcome, videoPath, mediaType, mediaID, lang, label, &noResultRecorded)
 		if path != "" {
 			paths = append(paths, path)
 		}
 	}
-	return paths, searched, skipped
+	return paths, searched, skipped, backedOff
 }
 
 // processTargetVariant filters, scores, and downloads a subtitle for one
@@ -95,6 +102,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchRequest,
 	state *targetState, outcome *searchOutcome,
 	videoPath string, mediaType api.MediaType, mediaID, lang, label string,
+	noResultRecorded *bool,
 ) string {
 	// Filter by variant.
 	filtered, variantFallback := filterByVariant(
@@ -115,8 +123,11 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchReques
 				"media", label, "media_id", mediaID,
 				"lang", lang, "variant", state.variant,
 				"searched", outcome.succeeded())
-			e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
-				label, outcome.succeeded())
+			if !*noResultRecorded {
+				*noResultRecorded = true
+				e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
+					label, outcome.succeeded())
+			}
 		}
 		return ""
 	}
@@ -131,7 +142,7 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchReques
 	aboveMin := filterByScore(scored, minScore)
 	if len(aboveMin) == 0 {
 		e.logNoResults(ctx, state, scored, outcome, mediaType, mediaID,
-			lang, label, minScore)
+			lang, label, minScore, noResultRecorded)
 		return ""
 	}
 

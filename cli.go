@@ -37,11 +37,17 @@ func runCLISearch() int {
 		defer db.Close(context.Background())
 	}
 
-	if err := clisearch.RunSearch(context.Background(), os.Args[2:], clisearch.Deps{
+	deps := clisearch.Deps{
 		Cfg:      cfg,
 		Registry: newProviderRegistry(),
-		Store:    db,
-	}); err != nil {
+	}
+	// Assign the store only when Open succeeded: a direct `Store: db` with a
+	// nil *boltstore.DB would produce a typed-nil interface that defeats the
+	// recorder's nil check and panics on the first record attempt.
+	if db != nil {
+		deps.Store = db
+	}
+	if err := clisearch.RunSearch(context.Background(), os.Args[2:], deps); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}

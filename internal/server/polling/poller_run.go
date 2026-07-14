@@ -2,7 +2,9 @@ package polling
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,7 +61,23 @@ type Poller struct {
 	stateFunc StateFunc
 
 	tagCache *cache.Cache[map[int]struct{}]
+
+	// importRetries counts consecutive transient failures per history entry
+	// (key "source:entryID"), so the poll watermark is held back for a
+	// bounded number of cycles instead of either dropping a failed import
+	// permanently or retrying it forever. Guarded by retryMu: PollOnce polls
+	// Sonarr and Radarr concurrently. Entries are deleted on success or
+	// give-up, so the map only ever holds currently-failing items.
+	importRetries map[string]int
+	retryMu       sync.Mutex
 }
+
+// maxImportRetries is how many poll cycles a transiently-failing import
+// (arr metadata fetch error, e.g. Sonarr restarting mid-poll) holds the
+// watermark back before the poller gives up on it. Three retries at the
+// default 30s interval rides out a typical arr restart; anything longer is
+// left to the next scheduled full scan, which covers the item anyway.
+const maxImportRetries = 3
 
 // NewPoller creates a Poller with the given dependencies. In
 // unconfigured mode (server.New called without WithConfig) stateFunc
@@ -76,9 +94,10 @@ func NewPoller(deps Deps, stateFunc StateFunc) *Poller { //nolint:gocritic // hu
 		ttl = 2 * ls.Cfg.PollInterval()
 	}
 	return &Poller{
-		deps:      deps,
-		stateFunc: stateFunc,
-		tagCache:  cache.New[map[int]struct{}](ttl),
+		deps:          deps,
+		stateFunc:     stateFunc,
+		tagCache:      cache.New[map[int]struct{}](ttl),
+		importRetries: make(map[string]int),
 	}
 }
 
@@ -199,7 +218,7 @@ func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 		searchCfg.ExcludeArrTags, ls.Cfg.PollInterval())
 
 	seen := make(map[string]bool)
-	var latest time.Time
+	var latest, oldestFailed time.Time
 
 	for _, entry := range entries {
 		if entry.Date.After(latest) {
@@ -211,16 +230,21 @@ func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 		}
 		seen[path] = true
 
-		p.processSonarrImport(ctx, ls, &entry, excludeIDs)
+		if p.processSonarrImport(ctx, ls, &entry, excludeIDs) &&
+			p.noteImportFailure(retryKey(PollSourceSonarr, entry.ID), path) {
+			if oldestFailed.IsZero() || entry.Date.Before(oldestFailed) {
+				oldestFailed = entry.Date
+			}
+		} else {
+			p.clearImportRetry(retryKey(PollSourceSonarr, entry.ID))
+		}
 
 		if err := httputil.SleepCtx(ctx, scanDelay); err != nil {
 			return len(entries)
 		}
 	}
 
-	if !latest.IsZero() {
-		p.deps.PollCache.Set(ctx, api.PollKeySonarr, latest.Add(time.Millisecond))
-	}
+	p.advanceWatermark(ctx, api.PollKeySonarr, since, latest, oldestFailed)
 	return len(entries)
 }
 
@@ -246,7 +270,7 @@ func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 	excludeIDs := p.getExcludeTagIDs(ctx, ls.Radarr, string(PollSourceRadarr),
 		searchCfg.ExcludeArrTags, ls.Cfg.PollInterval())
 
-	var latest time.Time
+	var latest, oldestFailed time.Time
 
 	for _, entry := range entries {
 		if entry.Date.After(latest) {
@@ -257,15 +281,74 @@ func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 			continue
 		}
 
-		p.processRadarrImport(ctx, ls, &entry, excludeIDs)
+		if p.processRadarrImport(ctx, ls, &entry, excludeIDs) &&
+			p.noteImportFailure(retryKey(PollSourceRadarr, entry.ID), path) {
+			if oldestFailed.IsZero() || entry.Date.Before(oldestFailed) {
+				oldestFailed = entry.Date
+			}
+		} else {
+			p.clearImportRetry(retryKey(PollSourceRadarr, entry.ID))
+		}
 
 		if err := httputil.SleepCtx(ctx, scanDelay); err != nil {
 			return len(entries)
 		}
 	}
 
-	if !latest.IsZero() {
-		p.deps.PollCache.Set(ctx, api.PollKeyRadarr, latest.Add(time.Millisecond))
-	}
+	p.advanceWatermark(ctx, api.PollKeyRadarr, since, latest, oldestFailed)
 	return len(entries)
+}
+
+// retryKey is the importRetries map key for one history entry.
+func retryKey(source PollSource, entryID int) string {
+	return fmt.Sprintf("%s:%d", source, entryID)
+}
+
+// noteImportFailure records one transient failure for the entry and reports
+// whether it should be retried (hold the watermark) or given up. After
+// maxImportRetries consecutive failures the entry is abandoned with a WARN —
+// the next scheduled full scan covers the item — and its counter is cleared.
+func (p *Poller) noteImportFailure(key, path string) bool {
+	p.retryMu.Lock()
+	p.importRetries[key]++
+	attempt := p.importRetries[key]
+	if attempt >= maxImportRetries {
+		delete(p.importRetries, key)
+	}
+	p.retryMu.Unlock()
+
+	if attempt >= maxImportRetries {
+		slog.Warn("poll: giving up on import after repeated arr metadata failures; the next full scan covers it",
+			"path", path, "attempts", maxImportRetries)
+		return false
+	}
+	slog.Debug("poll: import failed transiently, will retry next cycle",
+		"path", path, "attempt", attempt)
+	return true
+}
+
+// clearImportRetry drops the retry counter for an entry that succeeded (or
+// was permanently skipped).
+func (p *Poller) clearImportRetry(key string) {
+	p.retryMu.Lock()
+	delete(p.importRetries, key)
+	p.retryMu.Unlock()
+}
+
+// advanceWatermark persists the poll cursor after a pass. Normally it moves
+// just past the newest entry; while a transiently-failed entry is being
+// retried it is held just BEFORE that entry so the next GetHistorySince
+// re-fetches it. Entries after the failed one are re-fetched too — that is
+// cheap and bounded: re-processing an already-handled import finds its
+// targets covered and skips, and the hold lasts at most maxImportRetries
+// cycles. The cursor never moves backward past `since`.
+func (p *Poller) advanceWatermark(ctx context.Context, key api.PollKey, since, latest, oldestFailed time.Time) {
+	target := latest
+	if !oldestFailed.IsZero() {
+		target = oldestFailed.Add(-time.Millisecond)
+	}
+	if target.IsZero() || !target.After(since) {
+		return
+	}
+	p.deps.PollCache.Set(ctx, key, target.Add(time.Millisecond))
 }

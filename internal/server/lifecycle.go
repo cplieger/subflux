@@ -51,6 +51,11 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	context.AfterFunc(ctx, func() {
 		s.ready.Set(false)
 		slog.Info("shutting down HTTP server", "sse_clients", s.events.ClientCount())
+		// Drain the SSE hub: cancel every live stream and refuse reconnects
+		// with 503. Without this, long-lived event streams count as in-flight
+		// requests and hold webhttp.Run's graceful drain open for the whole
+		// grace budget on every shutdown.
+		s.events.Shutdown()
 	})
 
 	// onShutdown runs after Run drains in-flight requests (within the same grace

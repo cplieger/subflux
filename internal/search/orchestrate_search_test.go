@@ -318,32 +318,40 @@ func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 	}
 }
 
-// --- shouldSkipLang ---
+// --- targetLocked ---
 
-func TestShouldSkipLang_manual_lock_returns_reason(t *testing.T) {
+func TestTargetLocked_manual_lock_true(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{manualLocked: true}
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	reason := e.shouldSkipLang(context.Background(), "movie", "tt123", "Test", "fr")
-	if reason == "" {
-		t.Error("shouldSkipLang() returned empty reason for locked item, want non-empty")
-	}
-	if reason != "manually locked" {
-		t.Errorf("shouldSkipLang() = %q, want %q", reason, "manually locked")
+	if !e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+		t.Error("targetLocked() = false for locked quad, want true")
 	}
 }
 
-func TestShouldSkipLang_not_locked_returns_empty(t *testing.T) {
+func TestTargetLocked_not_locked_false(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{manualLocked: false}
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	reason := e.shouldSkipLang(context.Background(), "movie", "tt123", "Test", "fr")
-	if reason != "" {
-		t.Errorf("shouldSkipLang() = %q, want empty (not locked)", reason)
+	if e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+		t.Error("targetLocked() = true, want false (not locked)")
+	}
+}
+
+// TestTargetLocked_store_error_fails_closed asserts a lock-check error is
+// treated as locked (fail closed), matching the store's own stance.
+func TestTargetLocked_store_error_fails_closed(t *testing.T) {
+	t.Parallel()
+	ms := &mockStoreLockErr{}
+	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+
+	if !e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+		t.Error("targetLocked() = false on store error, want true (fail closed)")
 	}
 }
 

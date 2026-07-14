@@ -23,17 +23,6 @@ const (
 	codecSSA     = "ssa"
 )
 
-const (
-	// langUndefined is the ISO 639-2 code for undefined language,
-	// used to skip tracks without a language.
-	langUndefined = "und"
-
-	// embeddedScore is the fixed score for embedded subtitles.
-	// Set above the 0-100 release attribute range so embedded subs
-	// always outrank downloaded subs (matches Bazarr behavior).
-	embeddedScore = 360
-)
-
 // Factory creates an embedded subtitle provider from settings.
 func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	ps := provider.FromMap(settings)
@@ -88,7 +77,6 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 			MatchedBy:   api.MatchByEmbedded,
 			HearingImp:  t.hearingImpaired,
 			Forced:      t.forced,
-			Score:       embeddedScore,
 		})
 	}
 
@@ -173,18 +161,14 @@ func (p *Provider) isIgnoredCodec(codec string) bool {
 // normalizeTrack converts ffprobe track metadata into a subTrack.
 // Returns nil if the track should be skipped (undefined language).
 func normalizeTrack(index int, codec, lang, name string, forced, hi bool) *subTrack {
-	if lang == "" || lang == langUndefined {
-		return nil
-	}
-
-	// Extract primary subtag from BCP 47 tags (e.g. "en-US" → "en").
-	if i := strings.IndexByte(lang, '-'); i > 0 {
-		lang = lang[:i]
-	}
-
-	lang2 := classify.Alpha2FromAlpha3(lang)
+	// Delegate to the canonical ffprobe-tag normalizer (lowercasing,
+	// "und"/"undetermined" → empty, BCP 47 primary subtag, alpha3→alpha2).
+	// A hand-rolled copy here previously drifted: it compared "und" before
+	// lowercasing, so tags like "UND" or "UNDETERMINED" leaked through as
+	// real coverage languages.
+	lang2 := ffmpeg.NormalizeFFprobeLang(lang, classify.Alpha2FromAlpha3)
 	if lang2 == "" {
-		lang2 = lang
+		return nil
 	}
 
 	if !hi {

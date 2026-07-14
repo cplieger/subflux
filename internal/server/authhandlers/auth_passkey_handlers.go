@@ -264,11 +264,17 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	if errPK != nil {
 		slog.Warn("delete passkey: passkey count", "error", errPK)
 	}
-	cfg := h.Config()
+	// Reachable in unconfigured mode, where Config() is nil: treat OIDC as
+	// disabled so it is never counted as a remaining auth method we cannot
+	// verify (conservative: refuses the delete rather than stranding the user).
+	oidcEnabled := false
+	if cfg := h.Config(); cfg != nil {
+		oidcEnabled = cfg.OIDCEnabled()
+	}
 	hasPassword := user.PasswordHash != ""
 	oidcLinked := user.OIDCSub != ""
 
-	if !auth.CanDisableAuthMethod(auth.MethodPasskey, hasPassword, passkeyCount-1, cfg.OIDCEnabled(), oidcLinked) {
+	if !auth.CanDisableAuthMethod(auth.MethodPasskey, hasPassword, passkeyCount-1, oidcEnabled, oidcLinked) {
 		api.ConflictC(w, r, api.CodeConflict, "cannot remove last authentication method")
 		return
 	}

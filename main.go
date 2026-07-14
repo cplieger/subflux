@@ -309,8 +309,11 @@ func runConfiguredServer(cfg *config.Config) int {
 	}
 	defer db.Close(ctx)
 
-	// Build auth store over the shared bbolt handle and start its sweeper.
+	// Build auth store over the shared bbolt handle and start its sweeper,
+	// seeded with the configured session timeouts so eviction matches the
+	// request-path validator (hot reload re-applies them on change).
 	authDB := authstore.New(db.BoltDB())
+	authDB.SetSessionTimeouts(cfg.SessionIdleTimeout(), cfg.SessionAbsoluteTimeout())
 	if err := authDB.Open(); err != nil {
 		slog.Error("failed to start auth sweeper", "error", err)
 		return 1
@@ -462,14 +465,6 @@ func newWireFunc(reg api.ProviderRegistry) wiring.Func {
 			search.WithTracks(embedded.ProviderDirect{}))
 		return engine, sc, providers, nil
 	}
-}
-
-// envOr returns the value of the environment variable key, or fallback if unset/empty.
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
 
 // --- Logging ---

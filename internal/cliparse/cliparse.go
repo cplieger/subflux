@@ -108,6 +108,11 @@ func PrintRootHelp(w io.Writer, specs []Spec) {
 		fmt.Fprintf(w, "  %-*s  %s\n", maxName, s.Name, s.Synopsis)
 	}
 	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Environment:")
+	fmt.Fprintln(w, "  SUBFLUX_URL      Server base URL for remote commands (default http://127.0.0.1:8374)")
+	fmt.Fprintln(w, "  SUBFLUX_API_KEY  API key sent as X-API-Key (required when the server has auth enabled;")
+	fmt.Fprintln(w, "                   create one with 'subflux generate-api-key' or in the web UI)")
+	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use 'subflux <command> --help' for command-specific flags.")
 }
 

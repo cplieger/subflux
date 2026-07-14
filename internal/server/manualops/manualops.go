@@ -44,10 +44,11 @@ type SearchDeps struct {
 }
 
 // SearchStore is the narrow store interface for manual search operations.
+// ClearManualLock takes a variant; an empty variant means "all variants of
+// the language" (see api.ManualLockStore).
 type SearchStore interface {
-	IsManuallyLocked(ctx context.Context, mediaType api.MediaType, mediaID, language string) (bool, error)
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string) error
+	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
 }
 
 // ActivityTracker manages activity lifecycle.
@@ -92,6 +93,18 @@ type LiveState struct {
 	Providers []api.Provider
 }
 
+// isValidLockVariant accepts the canonical variants plus empty (empty means
+// "all variants" on clear-lock). Anything else is rejected so a typo never
+// silently no-ops against a variant that cannot exist.
+func isValidLockVariant(v api.Variant) bool {
+	switch v {
+	case "", api.VariantStandard, api.VariantHI, api.VariantForced:
+		return true
+	default:
+		return false
+	}
+}
+
 // IsValidLangCode rejects language codes that are too long, contain path
 // separators, traversal sequences, or control characters (including null
 // bytes that cause path truncation).
@@ -111,7 +124,9 @@ func NotifyError(deps *SearchDeps, source, alertMsg, uiMsg string) {
 	deps.Events.PublishNotify(events.NotifyError, uiMsg)
 }
 
-// RunClearLock clears the manual lock for a media+language combination.
-func RunClearLock(ctx context.Context, deps *SearchDeps, mediaType, mediaID, language string) error {
-	return deps.DB.ClearManualLock(ctx, api.MediaType(mediaType), mediaID, language)
+// RunClearLock clears the manual lock for a media+language combination. An
+// empty variant clears the locks of every variant of the language; a specific
+// variant clears only that quad's lock.
+func RunClearLock(ctx context.Context, deps *SearchDeps, mediaType, mediaID, language string, variant api.Variant) error {
+	return deps.DB.ClearManualLock(ctx, api.MediaType(mediaType), mediaID, language, variant)
 }

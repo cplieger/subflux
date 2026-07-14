@@ -448,9 +448,6 @@ func TestFilterSubtitleData_does_not_set_variant_fields(t *testing.T) {
 	if got[0].DownloadURL != "" {
 		t.Errorf("filterSubtitleData() DownloadURL = %q, want empty", got[0].DownloadURL)
 	}
-	if got[0].Score != 0 {
-		t.Errorf("filterSubtitleData() Score = %d, want 0", got[0].Score)
-	}
 }
 
 func TestHdbLangToISO_standard_codes_return_identity(t *testing.T) {

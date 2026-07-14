@@ -53,7 +53,7 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 // DownloadStore is the narrow store interface for manual download operations.
 type DownloadStore interface {
 	SearchStore
-	NextManualNumber(ctx context.Context, mediaType api.MediaType, mediaID, language string) int
+	NextManualNumber(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) int
 	UpsertSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID string, sf *api.SubtitleFile) error
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error

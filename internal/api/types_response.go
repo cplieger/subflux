@@ -11,6 +11,13 @@ const (
 	ScanFound    ScanOutcome = "found"
 	ScanSkipped  ScanOutcome = "skipped"
 	ScanNoResult ScanOutcome = "none"
+	// ScanBackedOff means every language target that needed a search had all
+	// of its providers in adaptive backoff, so no provider was queried at
+	// all. Distinct from ScanNoResult ("we looked, nothing found") and
+	// ScanSkipped ("nothing needed a search"): "we already know there is
+	// probably nothing, so we didn't look". Never recorded in the season
+	// early-termination tracker and counted in its own stats bucket.
+	ScanBackedOff ScanOutcome = "backed_off"
 )
 
 // --- API response types ---

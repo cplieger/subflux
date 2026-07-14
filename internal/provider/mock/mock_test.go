@@ -282,9 +282,6 @@ func TestFactory_invalid_numeric_settings_use_defaults(t *testing.T) {
 	if mock.flakyRate != 0.5 {
 		t.Errorf("flakyRate = %f, want 0.5 (default)", mock.flakyRate)
 	}
-	if mock.scoreBase != 50 {
-		t.Errorf("scoreBase = %d, want 50 (default)", mock.scoreBase)
-	}
 }
 
 func TestSearch_season_pack_multiple_languages(t *testing.T) {
@@ -330,11 +327,10 @@ func TestSearch_season_pack_language_filter(t *testing.T) {
 	}
 }
 
-func TestFactory_delay_and_score_settings(t *testing.T) {
+func TestFactory_delay_setting(t *testing.T) {
 	t.Parallel()
 	p, err := Factory(context.Background(), map[string]any{
-		"delay_ms":   "100",
-		"score_base": "75",
+		"delay_ms": "100",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -342,9 +338,6 @@ func TestFactory_delay_and_score_settings(t *testing.T) {
 	mock := p.(*mockProvider)
 	if mock.delay != 100*time.Millisecond {
 		t.Errorf("delay = %v, want 100ms", mock.delay)
-	}
-	if mock.scoreBase != 75 {
-		t.Errorf("scoreBase = %d, want 75", mock.scoreBase)
 	}
 }
 
@@ -399,9 +392,9 @@ func TestSearch_hi_and_forced_flags(t *testing.T) {
 	}
 }
 
-func TestSearch_score_decrements(t *testing.T) {
+func TestSearch_result_count(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), map[string]any{"result_count": "3", "score_base": "60"})
+	p, _ := Factory(context.Background(), map[string]any{"result_count": "3"})
 	subs, err := p.Search(context.Background(), &api.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
@@ -412,12 +405,6 @@ func TestSearch_score_decrements(t *testing.T) {
 	}
 	if len(subs) != 3 {
 		t.Fatalf("got %d results, want 3", len(subs))
-	}
-	wantScores := []int{60, 55, 50}
-	for i, want := range wantScores {
-		if subs[i].Score != want {
-			t.Errorf("subs[%d].Score = %d, want %d", i, subs[i].Score, want)
-		}
 	}
 }
 
@@ -435,11 +422,11 @@ func TestApplyDelay_context_cancelled(t *testing.T) {
 func TestSchema_returns_all_fields(t *testing.T) {
 	t.Parallel()
 	fields := Schema()
-	if len(fields) != 12 {
-		t.Errorf("Schema() returned %d fields, want 12", len(fields))
+	if len(fields) != 11 {
+		t.Errorf("Schema() returned %d fields, want 11", len(fields))
 	}
 	wantKeys := []string{
-		"mode", "delay_ms", "result_count", "score_base",
+		"mode", "delay_ms", "result_count",
 		"languages", "include_hash", "hearing_impaired", "forced",
 		"error_message", "download_error", "subtitle_content", "flaky_rate",
 	}
@@ -455,7 +442,7 @@ func TestSchema_returns_all_fields(t *testing.T) {
 
 func TestSearch_slow_mode_timer_outlasts_short_context(t *testing.T) {
 	t.Parallel()
-	p := &mockProvider{mode: "slow", resultCount: 1, scoreBase: 50}
+	p := &mockProvider{mode: "slow", resultCount: 1}
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	req := &api.SearchRequest{
