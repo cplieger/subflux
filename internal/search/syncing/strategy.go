@@ -13,8 +13,10 @@ import (
 )
 
 // SyncAgainstReference aligns subtitle timing against an embedded reference
-// subtitle in the video container. Audio-based sync and external SRT sync
-// are only available as manual actions from the web UI.
+// subtitle in the video container. This is the only strategy tried here;
+// audio-based sync enters the auto path separately via the engine's
+// audio_sync_fallback (see Engine.syncSubtitle), and external SRT sync is
+// manual-only from the web UI.
 func SyncAgainstReference(ctx context.Context, data []byte, videoPath, lang string, mapper subsync.LangMapper, minConf ...float64) subsync.SyncResult {
 	threshold := float64(api.DefaultSyncMinConfidence)
 	if len(minConf) > 0 && minConf[0] > 0 {
