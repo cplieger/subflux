@@ -230,14 +230,8 @@ func (p *Poller) pollSonarr(ctx context.Context, ls *LiveState) int {
 		}
 		seen[path] = true
 
-		if p.processSonarrImport(ctx, ls, &entry, excludeIDs) &&
-			p.noteImportFailure(retryKey(PollSourceSonarr, entry.ID), path) {
-			if oldestFailed.IsZero() || entry.Date.Before(oldestFailed) {
-				oldestFailed = entry.Date
-			}
-		} else {
-			p.clearImportRetry(retryKey(PollSourceSonarr, entry.ID))
-		}
+		retryable := p.processSonarrImport(ctx, ls, &entry, excludeIDs)
+		p.trackImportOutcome(PollSourceSonarr, entry.ID, entry.Date, path, retryable, &oldestFailed)
 
 		if err := httputil.SleepCtx(ctx, scanDelay); err != nil {
 			return len(entries)
@@ -281,14 +275,8 @@ func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 			continue
 		}
 
-		if p.processRadarrImport(ctx, ls, &entry, excludeIDs) &&
-			p.noteImportFailure(retryKey(PollSourceRadarr, entry.ID), path) {
-			if oldestFailed.IsZero() || entry.Date.Before(oldestFailed) {
-				oldestFailed = entry.Date
-			}
-		} else {
-			p.clearImportRetry(retryKey(PollSourceRadarr, entry.ID))
-		}
+		retryable := p.processRadarrImport(ctx, ls, &entry, excludeIDs)
+		p.trackImportOutcome(PollSourceRadarr, entry.ID, entry.Date, path, retryable, &oldestFailed)
 
 		if err := httputil.SleepCtx(ctx, scanDelay); err != nil {
 			return len(entries)
@@ -302,6 +290,21 @@ func (p *Poller) pollRadarr(ctx context.Context, ls *LiveState) int {
 // retryKey is the importRetries map key for one history entry.
 func retryKey(source PollSource, entryID int) string {
 	return fmt.Sprintf("%s:%d", source, entryID)
+}
+
+// trackImportOutcome records the retry outcome for one processed history
+// entry. A retryable failure notes it (advancing oldestFailed to the earliest
+// failed entry date so the watermark holds there); success — or a failure
+// that exhausted its retry budget inside noteImportFailure — clears the
+// entry's retry counter so the watermark can move past it.
+func (p *Poller) trackImportOutcome(source PollSource, entryID int, entryDate time.Time, path string, retryable bool, oldestFailed *time.Time) {
+	if retryable && p.noteImportFailure(retryKey(source, entryID), path) {
+		if oldestFailed.IsZero() || entryDate.Before(*oldestFailed) {
+			*oldestFailed = entryDate
+		}
+		return
+	}
+	p.clearImportRetry(retryKey(source, entryID))
 }
 
 // noteImportFailure records one transient failure for the entry and reports

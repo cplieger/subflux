@@ -142,25 +142,3 @@ func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duratio
 		return err
 	})
 }
-
-// RetryWithBackoff retries fn with jittered exponential backoff.
-func RetryWithBackoff[T any](ctx context.Context, maxAttempts int, baseDelay time.Duration,
-	label string, fn func(ctx context.Context) (T, error),
-) (T, error) {
-	return httpx.RetryWithBackoff(ctx, maxAttempts, baseDelay, label, func(ctx context.Context) (T, error) {
-		result, err := fn(ctx)
-		if err == nil {
-			return result, nil
-		}
-		// Bridge api.* errors to httpx.* so httpx.IsTransient classifies correctly.
-		var authErr *api.AuthError
-		if errors.As(err, &authErr) {
-			return result, httpx.Permanent(err)
-		}
-		var rlErr *api.RateLimitError
-		if errors.As(err, &rlErr) {
-			return result, httpx.Permanent(err)
-		}
-		return result, err
-	})
-}

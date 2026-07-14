@@ -535,22 +535,28 @@ type stateQuadInfo struct {
 // serves the index-only reads (GetManualLocks, HistoryMediaIDs), which answer
 // from the index walk without dereferencing primaries. ok is false for a key
 // too short to hold the id or missing the quad components.
-func splitStateQuadKey(key []byte) (mt api.MediaType, mid, lang string, variant api.Variant, id int64, ok bool) {
+func splitStateQuadKey(key []byte) (quad stateQuadInfo, id int64, ok bool) {
 	if len(key) < 8 {
-		return "", "", "", "", 0, false
+		return stateQuadInfo{}, 0, false
 	}
 	v, vok := kv.DecodeBe64(key[len(key)-8:])
 	if !vok {
-		return "", "", "", "", 0, false
+		return stateQuadInfo{}, 0, false
 	}
 	// The bytes before the id are quadPrefix(mt,mid,lang,variant) = mt 0x00
 	// mid 0x00 lang 0x00 variant 0x00, so Split yields [mt, mid, lang,
 	// variant, ""] (trailing empty from the separator).
 	parts := kv.Split(key[:len(key)-8])
 	if len(parts) < 5 {
-		return "", "", "", "", 0, false
+		return stateQuadInfo{}, 0, false
 	}
-	return api.MediaType(parts[0]), parts[1], parts[2], api.Variant(parts[3]), int64(v), true //nolint:gosec // G115: inverse of stateKey suffix
+	quad = stateQuadInfo{
+		mt:      api.MediaType(parts[0]),
+		mid:     parts[1],
+		lang:    parts[2],
+		variant: api.Variant(parts[3]),
+	}
+	return quad, int64(v), true //nolint:gosec // G115: inverse of stateKey suffix
 }
 
 // asciiLower lowercases only the ASCII letters A-Z, matching SQLite's default
@@ -773,15 +779,15 @@ func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 		}
 		c := idx.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			mt, mid, lang, variant, _, ok := splitStateQuadKey(k)
+			quad, _, ok := splitStateQuadKey(k)
 			if !ok {
 				return fmt.Errorf("boltstore: malformed ix_state_quad key %x", k)
 			}
 			manual, _, _, pok := decodeStateProjection(v)
 			if !pok {
-				return fmt.Errorf("boltstore: malformed ix_state_quad projection for %s/%s/%s/%s", mt, mid, lang, variant)
+				return fmt.Errorf("boltstore: malformed ix_state_quad projection for %s/%s/%s/%s", quad.mt, quad.mid, quad.lang, quad.variant)
 			}
-			acc.add(stateQuadInfo{mt: mt, mid: mid, lang: lang, variant: variant}, manual)
+			acc.add(quad, manual)
 		}
 		acc.flush()
 		return nil
@@ -864,21 +870,21 @@ func (d *DB) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, mediaID
 			return errors.New("boltstore: ix_state_quad bucket not found")
 		}
 		return idx.ForEach(func(k, _ []byte) error {
-			mt, mid, _, _, _, ok := splitStateQuadKey(k)
+			quad, _, ok := splitStateQuadKey(k)
 			if !ok {
 				return nil
 			}
-			if mt != mediaType {
+			if quad.mt != mediaType {
 				return nil
 			}
-			if !asciiHasPrefixFold(mid, mediaIDPrefix) {
+			if !asciiHasPrefixFold(quad.mid, mediaIDPrefix) {
 				return nil
 			}
-			if _, dup := seen[mid]; dup {
+			if _, dup := seen[quad.mid]; dup {
 				return nil
 			}
-			seen[mid] = struct{}{}
-			ids = append(ids, mid)
+			seen[quad.mid] = struct{}{}
+			ids = append(ids, quad.mid)
 			return nil
 		})
 	})

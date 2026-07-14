@@ -77,10 +77,10 @@ func TestProp_keyEncodeParse(t *testing.T) {
 		if gotID, ok := stateQuadKeyID(qk); !ok || gotID != id {
 			rt.Errorf("stateQuadKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
 		}
-		gmt, gmid, glang, gvariant, gid, ok := splitStateQuadKey(qk)
-		if !ok || gmt != mt || gmid != mid || glang != lang || gvariant != variant || gid != id {
-			rt.Errorf("splitStateQuadKey = (%s, %q, %q, %q, %d, %v), want (%s, %q, %q, %q, %d, true)",
-				gmt, gmid, glang, gvariant, gid, ok, mt, mid, lang, variant, id)
+		gquad, gid, ok := splitStateQuadKey(qk)
+		if !ok || gquad.mt != mt || gquad.mid != mid || gquad.lang != lang || gquad.variant != variant || gid != id {
+			rt.Errorf("splitStateQuadKey = (%+v, %d, %v), want ({%s %q %q %q}, %d, true)",
+				gquad, gid, ok, mt, mid, lang, variant, id)
 		}
 
 		// stateVideoKey splits back into (videoPath, id) and carries videoPrefix.

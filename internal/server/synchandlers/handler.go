@@ -81,37 +81,46 @@ type syncOffsetRequest struct {
 
 // --- Handlers ---
 
-// HandleSyncAudio handles POST /api/sync/audio.
-func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	if !httphelpers.RequirePOST(w, r) {
-		return
-	}
-
+// decodeSyncAudioRequest decodes and gates a sync-audio request: POST only,
+// JSON body, both paths present and library-validated, and the ASS/SSA apply
+// refusal. ok=false means the response has already been written.
+//
+// The ASS/SSA gate exists because the writeback path serializes cues as SRT
+// dialogue only, which would silently destroy styling, signs, and karaoke
+// and leave SRT content under an .ass name. Dry-run is still allowed so the
+// computed offset can be inspected. Lift the gate only when a
+// format-preserving ASS writer exists.
+func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (syncAudioRequest, bool) {
 	var req syncAudioRequest
+	if !httphelpers.RequirePOST(w, r) {
+		return req, false
+	}
 	if !httphelpers.DecodeJSONBody(w, r, &req, maxBodySize) {
-		return
+		return req, false
 	}
 	if req.SubtitlePath == "" || req.VideoPath == "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, "subtitle_path and video_path required")
-		return
+		return req, false
 	}
-
 	if !h.validatePath(w, r, req.VideoPath, "video path") {
-		return
+		return req, false
 	}
 	if !h.validatePath(w, r, req.SubtitlePath, "subtitle path") {
-		return
+		return req, false
 	}
-
-	// ASS/SSA apply is refused: the writeback path serializes cues as SRT
-	// dialogue only, which would silently destroy styling, signs, and karaoke
-	// and leave SRT content under an .ass name. Dry-run is still allowed so
-	// the computed offset can be inspected. Lift this gate only when a
-	// format-preserving ASS writer exists.
 	if !req.DryRun && isASSSubtitlePath(req.SubtitlePath) {
 		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat,
 			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
+		return req, false
+	}
+	return req, true
+}
+
+// HandleSyncAudio handles POST /api/sync/audio.
+func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	req, ok := h.decodeSyncAudioRequest(w, r)
+	if !ok {
 		return
 	}
 

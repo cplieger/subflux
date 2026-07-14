@@ -174,21 +174,8 @@ func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes
 	if old == nil {
 		return false, nil
 	}
-	if len(indexes) > 0 {
-		var oldVal T
-		if err := Decode(old, &oldVal); err != nil {
-			return false, fmt.Errorf("kv: decode prior %s value for delete: %w", primaryBucket, err)
-		}
-		for i := range indexes {
-			ix := &indexes[i]
-			ib := tx.Bucket([]byte(ix.Bucket))
-			if ib == nil {
-				return false, fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
-			}
-			if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
-				return false, fmt.Errorf("kv: delete index %q: %w", ix.Bucket, err)
-			}
-		}
+	if err := deleteIndexEntries(tx, primaryBucket, key, old, indexes); err != nil {
+		return false, err
 	}
 	if err := pb.Delete(key); err != nil {
 		return false, fmt.Errorf("kv: delete primary %q: %w", primaryBucket, err)
@@ -199,6 +186,32 @@ func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes
 		}
 	}
 	return true, nil
+}
+
+// deleteIndexEntries removes the secondary-index entries the prior record at
+// key contributed, deriving each entry key from the decoded old value. The
+// mirror of reindexPrior for the delete path: with no declared indexes it is
+// a no-op (a corrupt prior value cannot block its own deletion), while
+// indexed buckets fail closed on an undecodable prior.
+func deleteIndexEntries[T any](tx *bolt.Tx, primaryBucket string, key, old []byte, indexes []IndexSpec[T]) error {
+	if len(indexes) == 0 {
+		return nil
+	}
+	var oldVal T
+	if err := Decode(old, &oldVal); err != nil {
+		return fmt.Errorf("kv: decode prior %s value for delete: %w", primaryBucket, err)
+	}
+	for i := range indexes {
+		ix := &indexes[i]
+		ib := tx.Bucket([]byte(ix.Bucket))
+		if ib == nil {
+			return fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
+		}
+		if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
+			return fmt.Errorf("kv: delete index %q: %w", ix.Bucket, err)
+		}
+	}
+	return nil
 }
 
 // GetUint64 reads an 8-byte big-endian scalar (a counter or a schema version)
