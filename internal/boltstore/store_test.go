@@ -22,6 +22,9 @@ func allExpectedBuckets() [][]byte {
 }
 
 // openTemp opens a fresh store under a per-test temp dir and registers Close.
+// StrictMode makes bbolt run a full consistency check after every commit —
+// far too slow for production but exactly right for tests, turning any page
+// or freelist corruption into an immediate panic at the offending commit.
 func openTemp(t *testing.T) (*DB, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "subflux.bolt")
@@ -29,6 +32,7 @@ func openTemp(t *testing.T) (*DB, string) {
 	if err != nil {
 		t.Fatalf("Open(%q) error: %v", path, err)
 	}
+	db.db.StrictMode = true
 	t.Cleanup(func() { _ = db.Close(context.Background()) })
 	return db, path
 }

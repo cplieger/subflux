@@ -65,13 +65,22 @@ func TestProp_keyEncodeParse(t *testing.T) {
 			rt.Errorf("parseStateKey(stateKey(%d)) = (%d, %v), want (%d, true)", id, gotID, ok, id)
 		}
 
-		// stateTripleKey carries the triple prefix and the trailing id parses back.
-		tk := stateTripleKey(mt, mid, lang, id)
-		if !bytes.HasPrefix(tk, triplePrefix(mt, mid, lang)) {
-			rt.Errorf("stateTripleKey missing its triplePrefix")
+		// stateQuadKey carries the quad AND triple prefixes, its components
+		// split back, and the trailing id parses back.
+		qk := stateQuadKey(mt, mid, lang, variant, id)
+		if !bytes.HasPrefix(qk, quadPrefix(mt, mid, lang, variant)) {
+			rt.Errorf("stateQuadKey missing its quadPrefix")
 		}
-		if gotID, ok := stateTripleKeyID(tk); !ok || gotID != id {
-			rt.Errorf("stateTripleKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
+		if !bytes.HasPrefix(qk, triplePrefix(mt, mid, lang)) {
+			rt.Errorf("stateQuadKey missing its triplePrefix (all-variant scans)")
+		}
+		if gotID, ok := stateQuadKeyID(qk); !ok || gotID != id {
+			rt.Errorf("stateQuadKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
+		}
+		gmt, gmid, glang, gvariant, gid, ok := splitStateQuadKey(qk)
+		if !ok || gmt != mt || gmid != mid || glang != lang || gvariant != variant || gid != id {
+			rt.Errorf("splitStateQuadKey = (%s, %q, %q, %q, %d, %v), want (%s, %q, %q, %q, %d, true)",
+				gmt, gmid, glang, gvariant, gid, ok, mt, mid, lang, variant, id)
 		}
 
 		// stateVideoKey splits back into (videoPath, id) and carries videoPrefix.
@@ -171,6 +180,10 @@ func TestProp_codecRoundTrip(t *testing.T) {
 		case 1:
 			rec := stateRec{
 				ID:            rapid.Int64Range(1, 1<<55).Draw(rt, "id"),
+				MediaType:     api.MediaType(genComponent(rt, "mt")),
+				MediaID:       genComponent(rt, "mid"),
+				Language:      genComponent(rt, "lang"),
+				Variant:       api.Variant(genComponent(rt, "variant")),
 				Provider:      api.ProviderID(genComponent(rt, "provider")),
 				ReleaseName:   genComponent(rt, "release"),
 				Path:          genComponent(rt, "path"),
@@ -188,7 +201,6 @@ func TestProp_codecRoundTrip(t *testing.T) {
 		case 2:
 			rec := fileRec{
 				Codec:     genComponent(rt, "codec"),
-				OffsetMs:  rapid.Int64Range(-100000, 100000).Draw(rt, "offset"),
 				UpdatedAt: genTime(rt, "updated"),
 			}
 			assertRecStable(rt, &rec)

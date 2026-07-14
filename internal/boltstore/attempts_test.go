@@ -44,18 +44,18 @@ func readAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api
 	return rec, found
 }
 
-// dueIndexLen counts the entries in ix_attempts_due (used to assert the due
-// index is maintained alongside the primary write).
-func dueIndexLen(t *testing.T, db *DB) int {
+// attemptRowCount counts the rows in the search_attempts primary bucket (used
+// to assert increments stay on one row).
+func attemptRowCount(t *testing.T, db *DB) int {
 	t.Helper()
 	var n int
 	if err := db.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket([]byte(bucketIxAttemptsDue)).ForEach(func(_, _ []byte) error {
+		return tx.Bucket([]byte(bucketSearchAttempts)).ForEach(func(_, _ []byte) error {
 			n++
 			return nil
 		})
 	}); err != nil {
-		t.Fatalf("dueIndexLen: %v", err)
+		t.Fatalf("attemptRowCount: %v", err)
 	}
 	return n
 }
@@ -69,8 +69,8 @@ func defaultParams() api.BackoffParams {
 }
 
 // TestRecordNoResult_newRow asserts a first no-result inserts a row with
-// failures=1, next_retry = now + InitialDelay, maintains ix_attempts_due, and
-// bumps the attempts counter (Requirement 2.1).
+// failures=1, next_retry = now + InitialDelay, and bumps the attempts counter
+// (Requirement 2.1).
 func TestRecordNoResult_newRow(t *testing.T) {
 	db, _ := openTemp(t)
 	bp := defaultParams()
@@ -95,8 +95,8 @@ func TestRecordNoResult_newRow(t *testing.T) {
 	if got := rec.NextRetry.Sub(rec.LastTried); got != bp.InitialDelay {
 		t.Errorf("next_retry - last_tried = %v, want InitialDelay %v", got, bp.InitialDelay)
 	}
-	if n := dueIndexLen(t, db); n != 1 {
-		t.Errorf("ix_attempts_due entries = %d, want 1", n)
+	if n := attemptRowCount(t, db); n != 1 {
+		t.Errorf("search_attempts rows = %d, want 1", n)
 	}
 
 	var attempts int64
@@ -139,9 +139,9 @@ func TestRecordNoResult_incrementsExponential(t *testing.T) {
 			t.Errorf("call %d: next_retry-last_tried = %v, want %v", k, got, want[k-1])
 		}
 	}
-	// All increments stay on one row, so the due index and counter stay at 1.
-	if n := dueIndexLen(t, db); n != 1 {
-		t.Errorf("ix_attempts_due entries = %d, want 1", n)
+	// All increments stay on one row.
+	if n := attemptRowCount(t, db); n != 1 {
+		t.Errorf("search_attempts rows = %d, want 1", n)
 	}
 }
 

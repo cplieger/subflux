@@ -90,10 +90,22 @@ func PutIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, value *T, 
 // the stale secondary-index entries it contributed, so they do not outlive the
 // value about to overwrite them. It reports whether a prior record existed,
 // which the caller uses to bump counters only on a genuine insert.
+//
+// The prior value is decoded ONLY when index entries must be derived from it.
+// With no declared indexes, existence alone answers the counter question, so
+// an undecodable (corrupt) prior value cannot poison the key: the overwrite
+// simply replaces it, which is the self-heal path for derived buckets like
+// subtitle_files. For INDEXED buckets a corrupt prior still fails closed by
+// design — its stale index keys cannot be derived, and silently orphaning a
+// projection-bearing entry (e.g. a manual-lock flag) is worse than a loud
+// error.
 func reindexPrior[T any](tx *bolt.Tx, pb *bolt.Bucket, primaryBucket string, key []byte, indexes []IndexSpec[T]) (existed bool, err error) {
 	old := pb.Get(key)
 	if old == nil {
 		return false, nil
+	}
+	if len(indexes) == 0 {
+		return true, nil
 	}
 	var oldVal T
 	if derr := Decode(old, &oldVal); derr != nil {
@@ -147,6 +159,12 @@ func addCounters(tx *bolt.Tx, counters []CounterSpec) error {
 // reads the prior value to derive the exact index entries to delete. It returns
 // existed=false (and makes no changes) when the key is absent, so a delete of a
 // missing key is a no-op and the operation is idempotent.
+//
+// As in [PutIndexed], the prior value is decoded only when index entries must
+// be derived from it: with no declared indexes a corrupt prior value cannot
+// block its own deletion (the self-heal path for unindexed derived buckets),
+// while indexed buckets keep failing closed so stale index entries are never
+// silently orphaned.
 func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes []IndexSpec[T], counters []CounterSpec) (existed bool, err error) {
 	pb := tx.Bucket([]byte(primaryBucket))
 	if pb == nil {
@@ -156,18 +174,20 @@ func DeleteIndexed[T any](tx *bolt.Tx, primaryBucket string, key []byte, indexes
 	if old == nil {
 		return false, nil
 	}
-	var oldVal T
-	if err := Decode(old, &oldVal); err != nil {
-		return false, fmt.Errorf("kv: decode prior %s value for delete: %w", primaryBucket, err)
-	}
-	for i := range indexes {
-		ix := &indexes[i]
-		ib := tx.Bucket([]byte(ix.Bucket))
-		if ib == nil {
-			return false, fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
+	if len(indexes) > 0 {
+		var oldVal T
+		if err := Decode(old, &oldVal); err != nil {
+			return false, fmt.Errorf("kv: decode prior %s value for delete: %w", primaryBucket, err)
 		}
-		if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
-			return false, fmt.Errorf("kv: delete index %q: %w", ix.Bucket, err)
+		for i := range indexes {
+			ix := &indexes[i]
+			ib := tx.Bucket([]byte(ix.Bucket))
+			if ib == nil {
+				return false, fmt.Errorf("kv: index bucket %q not found", ix.Bucket)
+			}
+			if err := ib.Delete(ix.Key(key, &oldVal)); err != nil {
+				return false, fmt.Errorf("kv: delete index %q: %w", ix.Bucket, err)
+			}
 		}
 	}
 	if err := pb.Delete(key); err != nil {

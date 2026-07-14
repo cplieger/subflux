@@ -16,7 +16,7 @@ import (
 // This file proves the secondary-index maintenance invariant for the boltstore
 // wiring helpers in index.go: after any sequence of put/delete operations, every
 // index bucket equals what a full re-scan of its primary would produce (no
-// stale, duplicate, or missing entries), the ix_state_triple projection matches
+// stale, duplicate, or missing entries), the ix_state_quad projection matches
 // the primary record's (manual, score, provider), and the maintained meta
 // counters equal a full primary count. Keys are drawn from small pools so the
 // random sequences force collisions, updates, and deletes.
@@ -29,20 +29,24 @@ type tripleKey struct {
 	lang string
 }
 
-// statePool binds each surrogate id to exactly one triple (an id belongs to a
-// single triple for its whole life). "tt1" appears under two languages to force
-// triple-prefix collisions in ix_state_triple.
+// statePool binds each surrogate id to exactly one language triple; together
+// with variantPool it binds each id to exactly one QUAD (an id belongs to a
+// single quad for its whole life). "tt1" appears under two languages to force
+// prefix collisions in ix_state_quad, and the variant cycle makes one triple
+// carry two different variants (quad-boundary collisions within a language).
 var statePool = []tripleKey{
 	{api.MediaTypeMovie, "tt1", "en"},
 	{api.MediaTypeMovie, "tt1", "fr"},
 	{api.MediaTypeEpisode, "tt2", "en"},
 }
 
-// tripleFor maps a surrogate id to its (deterministic) triple, so both the
-// write path and the verification re-derive the same ix_state_triple key
-// without a separate model.
-func tripleFor(id int64) tripleKey {
-	return statePool[int(id-1)%len(statePool)]
+var variantPool = []api.Variant{api.VariantStandard, api.VariantForced}
+
+// quadFor maps a surrogate id to its (deterministic) quad, so both the write
+// path and the verification re-derive the same ix_state_quad key without a
+// separate model.
+func quadFor(id int64) (tripleKey, api.Variant) {
+	return statePool[int(id-1)%len(statePool)], variantPool[int(id-1)%len(variantPool)]
 }
 
 var providerPool = []api.ProviderID{
@@ -97,6 +101,7 @@ func openPropDB(rt *rapid.T) *DB {
 	if err != nil {
 		rt.Fatalf("Open(%q): %v", path, err)
 	}
+	db.db.StrictMode = true // consistency check every commit (test-only)
 	rt.Cleanup(func() { _ = db.Close(context.Background()) })
 	return db
 }
@@ -139,7 +144,7 @@ func compareIndex(rt *rapid.T, name string, want, got map[string]string) {
 
 // TestIndexHelpers_indexEqualsRescan is the index-equals-rescan property test
 // (design Requirement 8.1). It drives a random op sequence through the typed
-// wiring helpers, then asserts every index bucket, the ix_state_triple
+// wiring helpers, then asserts every index bucket, the ix_state_quad
 // projection, and the maintained counters all agree with a full primary
 // re-scan.
 func TestIndexHelpers_indexEqualsRescan(t *testing.T) {
@@ -153,7 +158,6 @@ func TestIndexHelpers_indexEqualsRescan(t *testing.T) {
 
 		if err := db.db.View(func(tx *bolt.Tx) error {
 			verifyStateIndexes(rt, tx)
-			verifyAttemptIndex(rt, tx)
 			verifyScanIndex(rt, tx)
 			verifyCounters(rt, tx)
 			return nil
@@ -178,9 +182,13 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 		switch op {
 		case "putStateAuto", "putStateManual":
 			id := rapid.Int64Range(1, 4).Draw(rt, "stateID")
-			tr := tripleFor(id)
+			tr, variant := quadFor(id)
 			rec := stateRec{
 				ID:            id,
+				MediaType:     tr.mt,
+				MediaID:       tr.mid,
+				Language:      tr.lang,
+				Variant:       variant,
 				Provider:      rapid.SampledFrom(providerPool).Draw(rt, "stateProvider"),
 				ReleaseName:   rapid.SampledFrom([]string{"", "Rel.A", "Rel.B"}).Draw(rt, "release"),
 				Score:         rapid.IntRange(0, 100).Draw(rt, "score"),
@@ -188,11 +196,10 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 				VideoPath:     rapid.SampledFrom(videoPathPool).Draw(rt, "videoPath"),
 				MediaImported: timeAtHour(rapid.IntRange(0, 12).Draw(rt, "imported")),
 			}
-			return putState(tx, tr.mt, tr.mid, tr.lang, &rec)
+			return putState(tx, &rec)
 		case "deleteState":
 			id := rapid.Int64Range(1, 4).Draw(rt, "delStateID")
-			tr := tripleFor(id)
-			_, err := deleteState(tx, tr.mt, tr.mid, tr.lang, id)
+			_, err := deleteState(tx, id)
 			return err
 		case "putAttempt":
 			tr := rapid.SampledFrom(statePool).Draw(rt, "attemptTriple")
@@ -222,7 +229,6 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 			f := rapid.SampledFrom(fileSpecPool).Draw(rt, "putFileSpec")
 			rec := fileRec{
 				Codec:     rapid.SampledFrom([]string{"subrip", "ass", ""}).Draw(rt, "codec"),
-				OffsetMs:  int64(rapid.IntRange(-500, 500).Draw(rt, "offset")),
 				UpdatedAt: timeAtHour(rapid.IntRange(0, 12).Draw(rt, "updatedAt")),
 			}
 			return putSubtitleFile(tx, f.key(), &rec)
@@ -241,12 +247,12 @@ func drawAndApplyOp(rt *rapid.T, db *DB) {
 
 // verifyStateIndexes derives the three subtitle_state indexes from a full
 // primary re-scan and compares them to the live buckets. It additionally
-// cross-checks the ix_state_triple projected value by decoding it and comparing
+// cross-checks the ix_state_quad projected value by decoding it and comparing
 // (manual, score, provider) back to the primary record, so the projection
 // cannot silently drift.
 func verifyStateIndexes(rt *rapid.T, tx *bolt.Tx) {
 	rt.Helper()
-	wantTriple := map[string]string{}
+	wantQuad := map[string]string{}
 	wantImported := map[string]string{}
 	wantVideo := map[string]string{}
 
@@ -261,63 +267,54 @@ func verifyStateIndexes(rt *rapid.T, tx *bolt.Tx) {
 			rt.Errorf("subtitle_state: decode id %d: %v", id, err)
 			return nil
 		}
-		tr := tripleFor(id)
-		wantTriple[string(stateTripleKey(tr.mt, tr.mid, tr.lang, id))] = string(encodeStateProjection(rec.Manual, rec.Score, rec.Provider))
+		// The quad index key derives from the record's own quad fields (the
+		// self-contained value); assert those fields still match the pool
+		// binding the write path used, so a drifted write can't hide behind a
+		// verification that trusts the record.
+		tr, variant := quadFor(id)
+		if rec.MediaType != tr.mt || rec.MediaID != tr.mid || rec.Language != tr.lang || rec.Variant != variant {
+			rt.Errorf("subtitle_state id %d: stored quad (%s/%s/%s/%s) != pool quad (%s/%s/%s/%s)",
+				id, rec.MediaType, rec.MediaID, rec.Language, rec.Variant, tr.mt, tr.mid, tr.lang, variant)
+		}
+		wantQuad[string(stateQuadKey(rec.MediaType, rec.MediaID, rec.Language, rec.Variant, id))] = string(encodeStateProjection(rec.Manual, rec.Score, rec.Provider))
 		wantImported[string(stateImportedKey(rec.MediaImported, id))] = ""
 		wantVideo[string(stateVideoKey(rec.VideoPath, id))] = ""
 		return nil
 	})
 
-	compareIndex(rt, "ix_state_triple", wantTriple, bucketMap(tx, bucketIxStateTriple))
+	compareIndex(rt, "ix_state_quad", wantQuad, bucketMap(tx, bucketIxStateQuad))
 	compareIndex(rt, "ix_state_imported", wantImported, bucketMap(tx, bucketIxStateImported))
 	compareIndex(rt, "ix_state_video", wantVideo, bucketMap(tx, bucketIxStateVideo))
 
-	// Projection cross-check: every triple index value must decode to the
+	// Projection cross-check: every quad index value must decode to the
 	// primary record's (manual, score, provider).
-	_ = tx.Bucket([]byte(bucketIxStateTriple)).ForEach(func(k, v []byte) error {
-		id, ok := stateTripleKeyID(k)
+	_ = tx.Bucket([]byte(bucketIxStateQuad)).ForEach(func(k, v []byte) error {
+		id, ok := stateQuadKeyID(k)
 		if !ok {
-			rt.Errorf("ix_state_triple: malformed key %x", k)
+			rt.Errorf("ix_state_quad: malformed key %x", k)
 			return nil
 		}
 		manual, score, provider, ok := decodeStateProjection(v)
 		if !ok {
-			rt.Errorf("ix_state_triple: undecodable projection for id %d: %x", id, v)
+			rt.Errorf("ix_state_quad: undecodable projection for id %d: %x", id, v)
 			return nil
 		}
 		raw := tx.Bucket([]byte(bucketSubtitleState)).Get(stateKey(id))
 		if raw == nil {
-			rt.Errorf("ix_state_triple: entry for id %d has no primary row", id)
+			rt.Errorf("ix_state_quad: entry for id %d has no primary row", id)
 			return nil
 		}
 		var rec stateRec
 		if err := decodeRec(raw, &rec); err != nil {
-			rt.Errorf("ix_state_triple: decode primary id %d: %v", id, err)
+			rt.Errorf("ix_state_quad: decode primary id %d: %v", id, err)
 			return nil
 		}
 		if manual != rec.Manual || score != rec.Score || provider != rec.Provider {
-			rt.Errorf("ix_state_triple projection for id %d = (manual=%v, score=%d, provider=%q), want (%v, %d, %q)",
+			rt.Errorf("ix_state_quad projection for id %d = (manual=%v, score=%d, provider=%q), want (%v, %d, %q)",
 				id, manual, score, provider, rec.Manual, rec.Score, rec.Provider)
 		}
 		return nil
 	})
-}
-
-// verifyAttemptIndex derives ix_attempts_due from the search_attempts primary
-// and compares it to the live bucket.
-func verifyAttemptIndex(rt *rapid.T, tx *bolt.Tx) {
-	rt.Helper()
-	want := map[string]string{}
-	_ = tx.Bucket([]byte(bucketSearchAttempts)).ForEach(func(k, v []byte) error {
-		var rec attemptRec
-		if err := decodeRec(v, &rec); err != nil {
-			rt.Errorf("search_attempts: decode %x: %v", k, err)
-			return nil
-		}
-		want[string(attemptsDueKey(rec.NextRetry, k))] = ""
-		return nil
-	})
-	compareIndex(rt, "ix_attempts_due", want, bucketMap(tx, bucketIxAttemptsDue))
 }
 
 // verifyScanIndex derives ix_scan_at from the scan_state primary and compares

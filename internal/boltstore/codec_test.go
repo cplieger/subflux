@@ -17,10 +17,10 @@ func TestRecordRoundTrip(t *testing.T) {
 		roundTrip(t, &attemptRec{LastTried: time.Unix(1, 0).UTC(), NextRetry: time.Unix(2, 0).UTC(), Failures: 7})
 	})
 	t.Run("stateRec", func(t *testing.T) {
-		roundTrip(t, &stateRec{ID: 1, Provider: api.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", ReleaseTag: "WEB", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
+		roundTrip(t, &stateRec{ID: 1, MediaType: api.MediaTypeEpisode, MediaID: "tt1-s02e03", Language: "fr", Variant: api.VariantStandard, Provider: api.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", ReleaseTag: "WEB", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
 	})
 	t.Run("fileRec", func(t *testing.T) {
-		roundTrip(t, &fileRec{Codec: "ass", OffsetMs: 1234, UpdatedAt: time.Unix(5, 0).UTC()})
+		roundTrip(t, &fileRec{Codec: "ass", UpdatedAt: time.Unix(5, 0).UTC()})
 	})
 	t.Run("scanRec", func(t *testing.T) {
 		roundTrip(t, &scanRec{Title: "M", AudioLang: "ja", Season: 1, Episode: 9, ScannedAt: time.Unix(7, 0).UTC()})
@@ -88,8 +88,10 @@ func TestBucketDecodeMode(t *testing.T) {
 	}
 }
 
-// TestCheckSchemaVersion covers the detect-and-refuse policy: fresh and
-// equal-or-lower stored versions pass; a newer stored version is refused.
+// TestCheckSchemaVersion covers the detect-and-refuse policy: a fresh file and
+// an equal stored version pass; ANY mismatch is refused, because the version
+// only moves on a breaking change and no migration exists in either direction
+// (additive value changes never bump it).
 func TestCheckSchemaVersion(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -100,7 +102,7 @@ func TestCheckSchemaVersion(t *testing.T) {
 	}{
 		{name: "fresh-file", stored: 0, present: false, current: 1, wantErr: false},
 		{name: "equal", stored: 1, present: true, current: 1, wantErr: false},
-		{name: "older-additive", stored: 1, present: true, current: 2, wantErr: false},
+		{name: "older-breaking", stored: 1, present: true, current: 2, wantErr: true},
 		{name: "newer-breaking", stored: 2, present: true, current: 1, wantErr: true},
 	}
 	for _, tc := range cases {

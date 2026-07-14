@@ -13,7 +13,7 @@ import (
 // 4.3), manual count (Requirement 15.6), manual paths (Requirement 15.6), and
 // NextManualNumber = max ordinal + 1 with a no-manual base case (Requirement
 // 4.4). IsManuallyLocked / ManualDownloadCount are asserted to answer from the
-// ix_state_triple projection without dereferencing primaries (Requirement
+// ix_state_quad projection without dereferencing primaries (Requirement
 // 18.3).
 
 // saveManual appends a manual row for the default triple with the given path
@@ -42,7 +42,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := context.Background()
 
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang)
+	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (empty): %v", err)
 	}
@@ -54,7 +54,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang)
+	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (auto only): %v", err)
 	}
@@ -64,7 +64,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 
 	// A manual row locks it.
 	saveManual(t, db, testProv, "Manual.Release", "/media/test.fr.1.srt", 70)
-	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang)
+	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (manual): %v", err)
 	}
@@ -93,7 +93,7 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 		beforeIDs[r.ID] = r
 	}
 
-	if err := db.ClearManualLock(ctx, testMT, testMID, testLang); err != nil {
+	if err := db.ClearManualLock(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil {
 		t.Fatalf("ClearManualLock: %v", err)
 	}
 
@@ -124,14 +124,14 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 	}
 
 	// The lock is gone and the manual count is zero.
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang)
+	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("IsManuallyLocked after clear: %v", err)
 	}
 	if locked {
 		t.Error("triple still locked after ClearManualLock")
 	}
-	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang)
+	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("ManualDownloadCount after clear: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestClearManualLock_noManualRowsIsNoop(t *testing.T) {
 	}
 	before := readTripleRows(t, db, testMT, testMID, testLang)
 
-	if err := db.ClearManualLock(ctx, testMT, testMID, testLang); err != nil {
+	if err := db.ClearManualLock(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil {
 		t.Fatalf("ClearManualLock (no manual rows): %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestManualDownloadCount(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := context.Background()
 
-	if got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang); err != nil || got != 0 {
+	if got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil || got != 0 {
 		t.Fatalf("empty count = (%d, %v), want (0, nil)", got, err)
 	}
 
@@ -190,7 +190,7 @@ func TestManualDownloadCount(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
-	got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang)
+	got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.Empty", "", 60)
 
-	paths, err := db.ManualSubtitlePaths(ctx, testMT, testMID, testLang)
+	paths, err := db.ManualSubtitlePaths(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("ManualSubtitlePaths: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestNextManualNumber(t *testing.T) {
 	ctx := context.Background()
 
 	// Base case: no manual rows -> 1.
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang); got != 1 {
+	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
 		t.Errorf("NextManualNumber (empty) = %d, want 1", got)
 	}
 
@@ -238,14 +238,14 @@ func TestNextManualNumber(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang); got != 1 {
+	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
 		t.Errorf("NextManualNumber (auto only) = %d, want 1", got)
 	}
 
 	// Manual rows at ordinals 1 and 3 -> next is 4 (max + 1).
 	saveManual(t, db, testProv, "Manual.1", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, testProv, "Manual.3", "/media/test.fr.3.srt", 72)
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang); got != 4 {
+	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 4 {
 		t.Errorf("NextManualNumber = %d, want 4 (max ordinal 3 + 1)", got)
 	}
 }
@@ -259,13 +259,13 @@ func TestNextManualNumber_variantPaths(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.hi", "/media/test.fr.hi.5.srt", 70)
 	saveManual(t, db, testProv, "Manual.forced", "/media/test.fr.forced.2.srt", 72)
 
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang); got != 6 {
+	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 6 {
 		t.Errorf("NextManualNumber (variant paths) = %d, want 6 (max ordinal 5 + 1)", got)
 	}
 }
 
 // TestManualLock_servedFromProjectionWithoutPrimaries asserts IsManuallyLocked
-// and ManualDownloadCount answer purely from the ix_state_triple projection: it
+// and ManualDownloadCount answer purely from the ix_state_quad projection: it
 // removes the primary subtitle_state rows while leaving the index in place, and
 // the two methods still report the manual state correctly (Requirement 18.3).
 func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
@@ -275,7 +275,7 @@ func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
-	// Delete every primary subtitle_state row but leave ix_state_triple intact,
+	// Delete every primary subtitle_state row but leave ix_state_quad intact,
 	// so a method that dereferenced primaries would see nothing. The projection
 	// alone must still carry the manual flag.
 	if err := db.db.Update(func(tx *bolt.Tx) error {
@@ -297,14 +297,14 @@ func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 		t.Fatalf("clearing primaries: %v", err)
 	}
 
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang)
+	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
 	if !locked {
 		t.Error("IsManuallyLocked = false with primaries removed; it dereferenced primaries instead of the projection")
 	}
-	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang)
+	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}

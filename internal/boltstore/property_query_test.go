@@ -383,6 +383,7 @@ func openTempAt(t *testing.T, dir string) *DB {
 	if err != nil {
 		t.Fatalf("Open(%q): %v", path, err)
 	}
+	db.db.StrictMode = true // consistency check every commit (test-only)
 	t.Cleanup(func() { _ = db.Close(context.Background()) })
 	return db
 }

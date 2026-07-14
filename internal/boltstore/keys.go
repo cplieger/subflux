@@ -32,8 +32,7 @@ const (
 // path and dereference back to a primary key.
 const (
 	// Core-domain indexes.
-	bucketIxAttemptsDue   = "ix_attempts_due"   // attemptsDueKey -> (empty)
-	bucketIxStateTriple   = "ix_state_triple"   // stateTripleKey -> projection
+	bucketIxStateQuad     = "ix_state_quad"     // stateQuadKey -> projection
 	bucketIxStateImported = "ix_state_imported" // stateImportedKey -> (empty)
 	bucketIxStateVideo    = "ix_state_video"    // stateVideoKey -> (empty)
 	bucketIxScanAt        = "ix_scan_at"        // scanAtKey -> (empty)
@@ -53,7 +52,7 @@ var (
 		[]byte(bucketSearchAttempts), []byte(bucketSubtitleState),
 		[]byte(bucketSubtitleFiles), []byte(bucketScanState),
 		[]byte(bucketSyncOffsets), []byte(bucketPollState), []byte(bucketMeta),
-		[]byte(bucketIxAttemptsDue), []byte(bucketIxStateTriple),
+		[]byte(bucketIxStateQuad),
 		[]byte(bucketIxStateImported), []byte(bucketIxStateVideo),
 		[]byte(bucketIxScanAt),
 	}
@@ -106,8 +105,34 @@ func parseStateKey(key []byte) (id int64, ok bool) {
 //
 // The trailing separator is what guarantees component-boundary safety: a prefix
 // scan for lang "fr" cannot match a key whose language merely starts with "fr".
+// For search_attempts it is the full row prefix (backoff has no variant
+// dimension); for ix_state_quad it spans ALL variants of the language, which is
+// exactly what the language-scoped reads (DownloadedRefs, any-variant lock
+// checks) want.
 func triplePrefix(mt api.MediaType, mid, lang string) []byte {
 	return append(kv.Join(string(mt), mid, lang), kv.Sep)
+}
+
+// quadPrefix builds the (media_type, media_id, language, variant) scan prefix:
+//
+//	mt 0x00 mid 0x00 lang 0x00 variant 0x00
+//
+// It extends triplePrefix by the variant component, so a quad scan for
+// fr/standard never matches fr/forced rows, and triplePrefix remains a strict
+// prefix of every quad key (language-wide scans keep working).
+func quadPrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte {
+	return append(kv.Join(string(mt), mid, lang, string(variant)), kv.Sep)
+}
+
+// statePrefix returns the ix_state_quad scan prefix for a state read: the
+// exact-variant quadPrefix, or the all-variants triplePrefix when variant is
+// empty. It is the single place the "empty variant means every variant of the
+// language" convention of the lock-domain reads is implemented.
+func statePrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte {
+	if variant == "" {
+		return triplePrefix(mt, mid, lang)
+	}
+	return quadPrefix(mt, mid, lang, variant)
 }
 
 // mediaPrefix builds the (media_type, media_id) scan prefix:
@@ -169,29 +194,20 @@ func pollStateKey(k api.PollKey) []byte {
 	return []byte(k)
 }
 
-// --- ix_attempts_due (search_attempts secondary) ---
+// --- ix_state_quad (subtitle_state secondary) ---
 
-// attemptsDueKey builds a due-order index key: be64(next_retry) 0x00 primary,
-// where primary is the [attemptKey] it dereferences. A forward cursor walks in
-// ascending next_retry order and a Seek to be64(cutoff) lands exactly.
-func attemptsDueKey(nextRetry time.Time, primary []byte) []byte {
-	return kv.TimeIndexKey(nextRetry, primary)
+// stateQuadKey builds the quad index key: mt 0x00 mid 0x00 lang 0x00 variant
+// 0x00 be64(id). It shares quadPrefix / triplePrefix / mediaPrefix, so all rows
+// for a quad, a language, or a media item are a prefix scan; the trailing
+// be64(id) makes each entry unique and dereferences to the primary.
+func stateQuadKey(mt api.MediaType, mid, lang string, variant api.Variant, id int64) []byte {
+	return append(quadPrefix(mt, mid, lang, variant), stateKey(id)...)
 }
 
-// --- ix_state_triple (subtitle_state secondary) ---
-
-// stateTripleKey builds the triple index key: mt 0x00 mid 0x00 lang 0x00
-// be64(id). It shares triplePrefix / mediaPrefix, so all rows for a triple (or
-// a media item) are a prefix scan; the trailing be64(id) makes each entry
-// unique and dereferences to the primary.
-func stateTripleKey(mt api.MediaType, mid, lang string, id int64) []byte {
-	return append(triplePrefix(mt, mid, lang), stateKey(id)...)
-}
-
-// stateTripleKeyID extracts the surrogate id from the trailing 8 bytes of a
-// stateTripleKey so a prefix walk can dereference the primary. ok is false for
+// stateQuadKeyID extracts the surrogate id from the trailing 8 bytes of a
+// stateQuadKey so a prefix walk can dereference the primary. ok is false for
 // a key shorter than the 8-byte id.
-func stateTripleKeyID(key []byte) (id int64, ok bool) {
+func stateQuadKeyID(key []byte) (id int64, ok bool) {
 	if len(key) < 8 {
 		return 0, false
 	}

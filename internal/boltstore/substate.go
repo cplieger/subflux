@@ -15,28 +15,30 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the subtitle_state domain: the DownloadStore, ManualLockStore,
-// HistoryStore, and the state-query half of QueryStore. SaveDownload is
-// implemented here (task 4.1); the remaining methods are stubs replaced across
-// tasks 4.2-4.4.
+// This file holds the subtitle_state domain: the DownloadStore,
+// ManualLockStore, HistoryStore, and the state-query half of QueryStore.
 
 // SaveDownload records (or upgrades) a subtitle download in one write
-// transaction, preserving the old SQLite store's observable behaviour:
+// transaction, preserving the old SQLite store's observable behaviour while
+// keying state by the (media_type, media_id, language, variant) quad:
 //
-//   - It first clears ALL adaptive-backoff rows for the triple (success clears
-//     backoff), each through the deleteAttempt chokepoint so the ix_attempts_due
-//     index and the attempts counter stay consistent (Requirement 3.3).
+//   - It first clears ALL adaptive-backoff rows for the language triple
+//     (success clears backoff; backoff has no variant dimension), each through
+//     the deleteAttempt chokepoint so the attempts counter stays consistent
+//     (Requirement 3.3).
 //   - For an AUTO download (Meta.Manual false), it updates every existing auto
-//     row for the triple in place, preserving each row's original
-//     media_imported and surrogate id (Requirement 3.1); if no auto row exists
-//     it inserts a fresh one with media_imported = now (Requirement 3.2).
-//     Reconcile can produce multiple auto rows for a triple, so all are updated,
-//     matching the old `UPDATE ... WHERE manual = 0` that touched every match.
+//     row for the QUAD in place, preserving each row's original media_imported
+//     and surrogate id (Requirement 3.1); if no auto row exists for the quad it
+//     inserts a fresh one with media_imported = now (Requirement 3.2). An
+//     fr/forced download therefore never overwrites the fr/standard auto row.
 //   - For a MANUAL download (Meta.Manual true), it always appends a new manual
-//     row (the manual row is the automation lock), storing rec.Path verbatim so
-//     the row's ordinal equals the ordinal the handler already encoded in the
-//     filename (Requirement 4.5); the ordinal is authoritative in rec.Path and
-//     is never re-derived from the bucket here.
+//     row (the manual row is the quad's automation lock), storing rec.Path
+//     verbatim so the row's ordinal equals the ordinal the handler already
+//     encoded in the filename (Requirement 4.5); the ordinal is authoritative
+//     in rec.Path and is never re-derived from the bucket here.
+//
+// An empty rec.Variant is normalized to VariantStandard, so legacy callers
+// that predate the variant dimension keep writing standard rows.
 //
 // All mutations route through the putState / deleteAttempt index-maintenance
 // chokepoints, so the secondary indexes and the maintained meta counters are
@@ -46,35 +48,40 @@ func (d *DB) SaveDownload(_ context.Context, rec *api.DownloadRecord) error {
 	if m == nil {
 		m = &api.DownloadMeta{}
 	}
+	variant := rec.Variant
+	if variant == "" {
+		variant = api.VariantStandard
+	}
 	slog.Debug("SaveDownload",
 		"media_type", rec.MediaType, "media_id", rec.MediaID,
-		"lang", rec.Language, "provider", rec.ProviderName,
+		"lang", rec.Language, "variant", variant, "provider", rec.ProviderName,
 		"release", rec.ReleaseName, "score", rec.Score,
 		"manual", m.Manual)
 
 	return d.db.Update(func(tx *bolt.Tx) error {
-		// Clear adaptive search state for every provider on the triple: we got
-		// what we needed, so the triple is no longer backed off.
+		// Clear adaptive search state for every provider on the language
+		// triple: we got what we needed, so the language is no longer backed
+		// off (search_attempts has no variant dimension).
 		if err := clearTripleBackoff(tx, rec.MediaType, rec.MediaID, rec.Language); err != nil {
 			return err
 		}
 		if m.Manual {
 			// Manual rows are always appended (they act as the lock); the
 			// ordinal lives in rec.Path and is stored verbatim.
-			return insertStateRow(tx, rec, m, true, time.Now())
+			return insertStateRow(tx, rec, m, variant, true, time.Now())
 		}
-		return saveAutoRow(tx, rec, m)
+		return saveAutoRow(tx, rec, m, variant)
 	})
 }
 
-// saveAutoRow upserts the auto (manual=false) rows for a triple. It updates
+// saveAutoRow upserts the auto (manual=false) rows for a quad. It updates
 // every existing auto row in place, preserving that row's id and
 // media_imported and only overwriting the mutable download fields (matching the
 // old `UPDATE subtitle_state SET ... WHERE manual = 0` which left media_imported
-// untouched). When the triple has no auto row it inserts a fresh one with
+// untouched). When the quad has no auto row it inserts a fresh one with
 // media_imported = now.
-func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta) error {
-	rows, err := collectTripleRows(tx, rec.MediaType, rec.MediaID, rec.Language)
+func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, variant api.Variant) error {
+	rows, err := collectStateRows(tx, rec.MediaType, rec.MediaID, rec.Language, variant)
 	if err != nil {
 		return err
 	}
@@ -84,8 +91,9 @@ func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta) erro
 		if sr.Manual {
 			continue // never overwrite a manual lock row
 		}
-		// Preserve sr.ID, sr.MediaImported, and sr.Manual (false); overwrite the
-		// mutable download fields, mirroring the old auto-upgrade UPDATE.
+		// Preserve sr.ID, sr.MediaImported, sr.Manual (false), and the quad;
+		// overwrite the mutable download fields, mirroring the old
+		// auto-upgrade UPDATE.
 		sr.Provider = rec.ProviderName
 		sr.ReleaseName = rec.ReleaseName
 		sr.Score = rec.Score
@@ -96,7 +104,7 @@ func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta) erro
 		sr.Episode = m.Episode
 		sr.ReleaseTag = m.ReleaseTag
 		sr.VideoPath = m.VideoPath
-		if err := putState(tx, rec.MediaType, rec.MediaID, rec.Language, &sr); err != nil {
+		if err := putState(tx, &sr); err != nil {
 			return err
 		}
 		updated = true
@@ -104,15 +112,15 @@ func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta) erro
 	if updated {
 		return nil
 	}
-	// No auto row existed: insert one with media_imported = now.
-	return insertStateRow(tx, rec, m, false, time.Now())
+	// No auto row existed for the quad: insert one with media_imported = now.
+	return insertStateRow(tx, rec, m, variant, false, time.Now())
 }
 
 // insertStateRow allocates a surrogate id and inserts a new subtitle_state row
-// for the triple via the putState chokepoint (which maintains ix_state_triple,
+// for the quad via the putState chokepoint (which maintains ix_state_quad,
 // ix_state_imported, ix_state_video and the downloads counter). manual marks the
 // row as auto (false) or a manual lock (true); imported sets media_imported.
-func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, manual bool, imported time.Time) error {
+func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, variant api.Variant, manual bool, imported time.Time) error {
 	sb := tx.Bucket([]byte(bucketSubtitleState))
 	if sb == nil {
 		return errors.New("boltstore: subtitle_state bucket not found")
@@ -123,6 +131,10 @@ func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, m
 	}
 	sr := stateRec{
 		ID:            int64(id), //nolint:gosec // G115: surrogate id from NextSequence, positive and bounded
+		MediaType:     rec.MediaType,
+		MediaID:       rec.MediaID,
+		Language:      rec.Language,
+		Variant:       variant,
 		Provider:      rec.ProviderName,
 		ReleaseName:   rec.ReleaseName,
 		Path:          rec.Path,
@@ -136,29 +148,31 @@ func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, m
 		VideoPath:     m.VideoPath,
 		MediaImported: imported,
 	}
-	return putState(tx, rec.MediaType, rec.MediaID, rec.Language, &sr)
+	return putState(tx, &sr)
 }
 
-// collectTripleRows returns every subtitle_state record under the (mt, mid,
-// lang) triple by walking ix_state_triple and dereferencing each primary. It is
-// a lock-bearing read (the auto-vs-manual partition decides whether a manual
-// lock is overwritten), so it FAILS CLOSED on a primary decode error rather
-// than tolerantly skipping. It is shared by the subtitle_state domain methods
-// (tasks 4.1-4.4).
-func collectTripleRows(tx *bolt.Tx, mt api.MediaType, mid, lang string) ([]stateRec, error) {
-	idx := tx.Bucket([]byte(bucketIxStateTriple))
+// collectStateRows returns every subtitle_state record under the (mt, mid,
+// lang, variant) quad — or, when variant is empty, under every variant of the
+// language — by walking ix_state_quad and dereferencing each primary. The
+// records are self-contained (they carry their quad), so callers rewrite them
+// through putState directly. It is a lock-bearing read (the auto-vs-manual
+// partition decides whether a manual lock is overwritten), so it FAILS CLOSED
+// on a primary decode error rather than tolerantly skipping. It is shared by
+// the subtitle_state domain methods (tasks 4.1-4.4).
+func collectStateRows(tx *bolt.Tx, mt api.MediaType, mid, lang string, variant api.Variant) ([]stateRec, error) {
+	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
-		return nil, errors.New("boltstore: ix_state_triple bucket not found")
+		return nil, errors.New("boltstore: ix_state_quad bucket not found")
 	}
 	sb := tx.Bucket([]byte(bucketSubtitleState))
 	if sb == nil {
 		return nil, errors.New("boltstore: subtitle_state bucket not found")
 	}
-	prefix := triplePrefix(mt, mid, lang)
+	prefix := statePrefix(mt, mid, lang, variant)
 	var out []stateRec
 	c := idx.Cursor()
 	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-		id, ok := stateTripleKeyID(k)
+		id, ok := stateQuadKeyID(k)
 		if !ok {
 			continue // malformed index key; skip defensively
 		}
@@ -176,7 +190,7 @@ func collectTripleRows(tx *bolt.Tx, mt api.MediaType, mid, lang string) ([]state
 }
 
 // clearTripleBackoff deletes every search_attempts row under the triple (any
-// provider, including an empty-provider row) and its ix_attempts_due entry via
+// provider, including an empty-provider row) via
 // the deleteAttempt chokepoint, matching the old
 // `DELETE FROM search_attempts WHERE media_type = ? AND media_id = ? AND language = ?`.
 // Keys are collected before deletion (bbolt skips the next key if you delete
@@ -224,29 +238,31 @@ func parseManualOrdinal(path string) (int, bool) {
 }
 
 // DownloadedRefs returns every distinct (release_name, provider) pair already
-// downloaded for the triple, across BOTH auto and manual rows, excluding rows
-// whose release_name is empty. It mirrors the old SQLite
-// `SELECT DISTINCT release_name, provider FROM subtitle_state WHERE ... AND
-// release_name <> ”` (Requirement 3.5): the manual-search popup uses it to
-// mark every previously-saved subtitle as already on disk, not just the most
-// recent one. An empty release_name can never match a search result's
-// non-empty ReleaseName, so it is dropped (matching the legacy WHERE clause).
+// downloaded for the language, across BOTH auto and manual rows of EVERY
+// variant, excluding rows whose release_name is empty. It mirrors the old
+// SQLite `SELECT DISTINCT release_name, provider FROM subtitle_state WHERE ...
+// AND release_name <> ”` (Requirement 3.5): the manual-search popup uses it to
+// mark every previously-saved subtitle as already on disk, and the popup lists
+// all variants of the language, so this read is deliberately language-scoped
+// (empty-variant scan). An empty release_name can never match a search
+// result's non-empty ReleaseName, so it is dropped (matching the legacy WHERE
+// clause).
 //
-// release_name lives on the primary row, not in the ix_state_triple projection
-// (which carries only manual/score/provider), so this walks the triple via the
-// shared collectTripleRows helper, which dereferences each primary and fails
-// closed on a decode error. Distinctness is preserved with first-seen
-// ordering over the triple scan (ascending surrogate id).
+// release_name lives on the primary row, not in the ix_state_quad projection
+// (which carries only manual/score/provider), so this walks the language via
+// the shared collectStateRows helper, which dereferences each primary and
+// fails closed on a decode error. Distinctness is preserved with first-seen
+// ordering over the scan (ascending (variant, surrogate id)).
 func (d *DB) DownloadedRefs(_ context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error) {
 	var out []api.DownloadedRef
 	seen := make(map[api.DownloadedRef]struct{})
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectTripleRows(tx, mediaType, mediaID, language)
+		rows, err := collectStateRows(tx, mediaType, mediaID, language, "")
 		if err != nil {
 			return err
 		}
 		for i := range rows {
-			r := rows[i]
+			r := &rows[i]
 			if r.ReleaseName == "" {
 				continue // legacy/empty release name never matches a result
 			}
@@ -265,26 +281,27 @@ func (d *DB) DownloadedRefs(_ context.Context, mediaType api.MediaType, mediaID,
 	return out, nil
 }
 
-// CurrentScore returns the highest auto-row (manual=false) score for the
-// triple, that winning row's media_imported, and a found flag that is false
-// when the triple has no auto row. It mirrors the old SQLite
+// CurrentScore returns the highest auto-row (manual=false) score for the quad,
+// that winning row's media_imported, and a found flag that is false when the
+// quad has no auto row. It mirrors the old SQLite
 // `SELECT score, media_imported FROM subtitle_state WHERE ... AND manual = 0
-// ORDER BY score DESC LIMIT 1` (Requirement 3.4): manual rows are ignored, and
-// no auto row means (0, zero-time, false, nil) with no error.
+// ORDER BY score DESC LIMIT 1` (Requirement 3.4), refined per variant: manual
+// rows are ignored, an fr/forced row never answers for fr/standard, and no
+// auto row means (0, zero-time, false, nil) with no error.
 //
-// The ix_state_triple projection carries the score but not media_imported, so
-// the winning row is dereferenced via the shared collectTripleRows helper
+// The ix_state_quad projection carries the score but not media_imported, so
+// the winning row is dereferenced via the shared collectStateRows helper
 // (which fails closed on a decode error). On a score tie the first row in
-// triple-scan order (ascending surrogate id) wins, a deterministic choice the
+// quad-scan order (ascending surrogate id) wins, a deterministic choice the
 // contract leaves open.
-func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, language string) (score int, mediaImported time.Time, found bool, err error) {
+func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error) {
 	err = d.db.View(func(tx *bolt.Tx) error {
-		rows, derr := collectTripleRows(tx, mediaType, mediaID, language)
+		rows, derr := collectStateRows(tx, mediaType, mediaID, language, variant)
 		if derr != nil {
 			return derr
 		}
 		for i := range rows {
-			r := rows[i]
+			r := &rows[i]
 			if r.Manual {
 				continue // auto rows only
 			}
@@ -302,48 +319,52 @@ func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, l
 	return score, mediaImported, found, nil
 }
 
-// walkTripleProjection walks ix_state_triple for the (mt, mid, lang) triple and
-// invokes fn with each entry's decoded (manual, score, provider) projection,
-// WITHOUT dereferencing the primary subtitle_state row. It is the index-only
-// read path that lets IsManuallyLocked and ManualDownloadCount answer the
-// "manual" question from a single index walk (Requirement 18.3): the projection
-// value carries the manual flag, so neither method touches a primary.
+// walkStateProjection walks ix_state_quad for the (mt, mid, lang, variant)
+// quad — or every variant of the language when variant is empty — and invokes
+// fn with each entry's decoded (manual, score, provider) projection, WITHOUT
+// dereferencing the primary subtitle_state row. It is the index-only read path
+// that lets IsManuallyLocked and ManualDownloadCount answer the "manual"
+// question from a single index walk (Requirement 18.3): the projection value
+// carries the manual flag, so neither method touches a primary.
 //
 // These are lock-bearing reads, so a malformed projection value FAILS CLOSED
-// (Requirement 13.4): it returns an error and the caller treats the triple as
+// (Requirement 13.4): it returns an error and the caller treats the quad as
 // locked rather than silently dropping the entry. decodeStateProjection only
 // returns ok=false for a value shorter than the fixed manual+score prefix,
 // which a correctly maintained index can never produce.
-func walkTripleProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, fn func(manual bool, score int, provider api.ProviderID)) error {
-	idx := tx.Bucket([]byte(bucketIxStateTriple))
+func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, variant api.Variant, fn func(manual bool, score int, provider api.ProviderID)) error {
+	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
-		return errors.New("boltstore: ix_state_triple bucket not found")
+		return errors.New("boltstore: ix_state_quad bucket not found")
 	}
-	prefix := triplePrefix(mt, mid, lang)
+	prefix := statePrefix(mt, mid, lang, variant)
 	c := idx.Cursor()
 	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 		manual, score, provider, ok := decodeStateProjection(v)
 		if !ok {
-			return fmt.Errorf("boltstore: malformed ix_state_triple projection for triple %s/%s/%s", mt, mid, lang)
+			return fmt.Errorf("boltstore: malformed ix_state_quad projection for %s/%s/%s/%s", mt, mid, lang, variant)
 		}
 		fn(manual, score, provider)
 	}
 	return nil
 }
 
-// IsManuallyLocked reports whether the triple has at least one manual row, so it
-// should be excluded from all automated actions. It mirrors the old SQLite
-// `SELECT EXISTS(... WHERE ... AND manual = 1)` (Requirement 4.2).
+// IsManuallyLocked reports whether the quad has at least one manual row, so it
+// should be excluded from all automated actions. An empty variant asks whether
+// ANY variant of the language is locked (the language-level summary the manual
+// search popup shows). It mirrors the old SQLite
+// `SELECT EXISTS(... WHERE ... AND manual = 1)` (Requirement 4.2), refined per
+// variant.
 //
-// The answer comes purely from the ix_state_triple projection's manual flag via
-// walkTripleProjection, so no primary subtitle_state row is dereferenced
+// The answer comes purely from the ix_state_quad projection's manual flag via
+// walkStateProjection, so no primary subtitle_state row is dereferenced
 // (Requirement 18.3). As a lock-bearing read it fails closed: if the projection
-// cannot be read the triple is reported locked AND the error is returned, so a
+// cannot be read the quad is reported locked AND the error is returned, so a
 // decode fault can never silently unlock an item (Requirement 13.4).
-func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaID, language string) (bool, error) {
+func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (bool, error) {
 	locked := false
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkTripleProjection(tx, mediaType, mediaID, language, func(manual bool, _ int, _ api.ProviderID) {
+		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
 			if manual {
 				locked = true
 			}
@@ -355,24 +376,25 @@ func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaI
 	return locked, nil
 }
 
-// ClearManualLock removes the triple's manual lock so automated scans and
-// upgrades resume. It is NON-destructive: it flips each manual row's flag to
-// auto (manual=false) and rewrites the row, preserving its id, path, score,
-// provider, release_name, and media_imported, so the rows stay visible to
-// GetState and DownloadedRefs (Requirement 4.3). This mirrors the old SQLite
-// `UPDATE subtitle_state SET manual = 0 WHERE ... AND manual = 1`, which was a
-// flag flip, not a delete.
+// ClearManualLock removes the quad's manual lock so automated scans and
+// upgrades resume; an empty variant clears the locks of EVERY variant of the
+// language (the CLI/API "unlock this item+language" default). It is
+// NON-destructive: it flips each manual row's flag to auto (manual=false) and
+// rewrites the row, preserving its id, path, score, provider, release_name,
+// and media_imported, so the rows stay visible to GetState and DownloadedRefs
+// (Requirement 4.3). This mirrors the old SQLite `UPDATE subtitle_state SET
+// manual = 0 WHERE ... AND manual = 1`, which was a flag flip, not a delete.
 //
-// Each flipped row routes through the putState chokepoint, so the
-// ix_state_triple projection is rewritten with manual=false in the same
-// transaction (the row keeps its id, so its other index entries are unchanged
-// and the downloads counter is not double-counted). A triple with no manual row
-// is a no-op.
-func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID, language string) error {
+// Each flipped row routes through the putState chokepoint (the record carries
+// its own quad), so the ix_state_quad projection is rewritten
+// with manual=false in the same transaction (the row keeps its id, so its
+// other index entries are unchanged and the downloads counter is not
+// double-counted). A quad with no manual row is a no-op.
+func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error {
 	slog.Debug("ClearManualLock",
-		"media_type", mediaType, "media_id", mediaID, "lang", language)
+		"media_type", mediaType, "media_id", mediaID, "lang", language, "variant", variant)
 	return d.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectTripleRows(tx, mediaType, mediaID, language)
+		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
 		if err != nil {
 			return err
 		}
@@ -382,7 +404,7 @@ func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID
 				continue // only flip the manual lock rows
 			}
 			sr.Manual = false
-			if err := putState(tx, mediaType, mediaID, language, &sr); err != nil {
+			if err := putState(tx, &sr); err != nil {
 				return err
 			}
 		}
@@ -390,15 +412,15 @@ func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID
 	})
 }
 
-// ManualDownloadCount returns how many manual rows exist for the triple,
-// mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND manual = 1`
-// (Requirement 15.6). Like IsManuallyLocked it is served purely from the
-// ix_state_triple projection's manual flag via walkTripleProjection, with no
-// primary dereference (Requirement 18.3).
-func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, mediaID, language string) (int, error) {
+// ManualDownloadCount returns how many manual rows exist for the quad (exact
+// variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
+// manual = 1` (Requirement 15.6). Like IsManuallyLocked it is served purely
+// from the ix_state_quad projection's manual flag via walkStateProjection,
+// with no primary dereference (Requirement 18.3).
+func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (int, error) {
 	count := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkTripleProjection(tx, mediaType, mediaID, language, func(manual bool, _ int, _ api.ProviderID) {
+		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
 			if manual {
 				count++
 			}
@@ -411,23 +433,25 @@ func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, med
 }
 
 // ManualSubtitlePaths returns the subtitle file paths from every manual row for
-// the triple, excluding rows with an empty path, mirroring the old SQLite
+// the quad — or every variant of the language when variant is empty —
+// excluding rows with an empty path, mirroring the old SQLite
 // `SELECT path ... WHERE ... AND manual = 1 AND path != ”` (Requirement 15.6).
-// maybeRevertManualLock uses it to check which manual files still exist on disk.
+// maybeRevertManualLock uses it (exact variant) to check which manual files
+// still exist on disk.
 //
-// The path lives on the primary row, not in the ix_state_triple projection
-// (which carries only manual/score/provider), so this walks the triple via the
-// shared collectTripleRows helper, which dereferences each primary and fails
+// The path lives on the primary row, not in the ix_state_quad projection
+// (which carries only manual/score/provider), so this walks the quad via the
+// shared collectStateRows helper, which dereferences each primary and fails
 // closed on a decode error.
-func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, mediaID, language string) ([]string, error) {
+func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) ([]string, error) {
 	var paths []string
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectTripleRows(tx, mediaType, mediaID, language)
+		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
 		if err != nil {
 			return err
 		}
 		for i := range rows {
-			r := rows[i]
+			r := &rows[i]
 			if r.Manual && r.Path != "" {
 				paths = append(paths, r.Path)
 			}
@@ -440,27 +464,30 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 	return paths, nil
 }
 
-// NextManualNumber returns the next manual subtitle ordinal for the triple: one
-// greater than the highest ordinal currently encoded in the triple's manual
-// paths, or 1 when the triple has no manual row (Requirement 4.4). It mirrors
-// the old SQLite `COALESCE(MAX(<ordinal>), 0) + 1 ... WHERE ... AND manual = 1`.
+// NextManualNumber returns the next manual subtitle ordinal for the quad: one
+// greater than the highest ordinal currently encoded in the quad's manual
+// paths, or 1 when the quad has no manual row (Requirement 4.4). It mirrors
+// the old SQLite `COALESCE(MAX(<ordinal>), 0) + 1 ... WHERE ... AND manual = 1`
+// refined per variant: movie.fr.1.srt (standard) and movie.fr.forced.1.srt
+// (forced) advance independent sequences, matching the variant-aware manual
+// file naming.
 //
-// The ordinal lives on the primary path, so this walks the triple via
-// collectTripleRows and parses each manual row's ordinal with the shared
+// The ordinal lives on the primary path, so this walks the quad via
+// collectStateRows and parses each manual row's ordinal with the shared
 // parseManualOrdinal helper (rows whose path has no trailing ordinal, including
 // empty paths, contribute nothing, matching the legacy CAST of a non-numeric
 // suffix to 0). The contract has no error channel, so a read fault falls back
 // to ManualDownloadCount + 1, and to 1 if that also fails, matching the old
 // store's degraded path.
-func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaID, language string) int {
+func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) int {
 	maxOrdinal := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectTripleRows(tx, mediaType, mediaID, language)
+		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
 		if err != nil {
 			return err
 		}
 		for i := range rows {
-			r := rows[i]
+			r := &rows[i]
 			if !r.Manual {
 				continue
 			}
@@ -472,7 +499,7 @@ func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaI
 	})
 	if err != nil {
 		slog.Warn("NextManualNumber scan failed, falling back to count", "error", err)
-		count, cerr := d.ManualDownloadCount(context.Background(), mediaType, mediaID, language)
+		count, cerr := d.ManualDownloadCount(context.Background(), mediaType, mediaID, language, variant)
 		if cerr != nil {
 			return 1
 		}
@@ -492,59 +519,38 @@ const defaultQueryLimit = 1000
 // old store's CodeQL-friendly allocation.
 const preallocCap = 256
 
-// stateTripleInfo carries the (media_type, media_id, language) a subtitle_state
-// row belongs to. Those three components are NOT stored in stateRec (they live
-// only in the ix_state_triple key), so GetState recovers them from the triple
-// index to filter on type/language and to populate the api.StateEntry.
-type stateTripleInfo struct {
-	mt   api.MediaType
-	mid  string
-	lang string
+// stateQuadInfo is a comparable (media_type, media_id, language, variant)
+// tuple used as a grouping/map key by the index-only reads (GetManualLocks'
+// accumulator) and reconcile's per-quad grouping. Row-bearing reads take the
+// quad from the self-contained stateRec instead.
+type stateQuadInfo struct {
+	mt      api.MediaType
+	mid     string
+	lang    string
+	variant api.Variant
 }
 
-// splitStateTripleKey parses an ix_state_triple key (mt 0x00 mid 0x00 lang 0x00
-// be64(id)) back into its triple components and surrogate id. ok is false for a
-// key too short to hold the id or missing the triple components.
-func splitStateTripleKey(key []byte) (mt api.MediaType, mid, lang string, id int64, ok bool) {
+// splitStateQuadKey parses an ix_state_quad key (mt 0x00 mid 0x00 lang 0x00
+// variant 0x00 be64(id)) back into its quad components and surrogate id. It
+// serves the index-only reads (GetManualLocks, HistoryMediaIDs), which answer
+// from the index walk without dereferencing primaries. ok is false for a key
+// too short to hold the id or missing the quad components.
+func splitStateQuadKey(key []byte) (mt api.MediaType, mid, lang string, variant api.Variant, id int64, ok bool) {
 	if len(key) < 8 {
-		return "", "", "", 0, false
+		return "", "", "", "", 0, false
 	}
 	v, vok := kv.DecodeBe64(key[len(key)-8:])
 	if !vok {
-		return "", "", "", 0, false
+		return "", "", "", "", 0, false
 	}
-	// The bytes before the id are triplePrefix(mt,mid,lang) = mt 0x00 mid 0x00
-	// lang 0x00, so Split yields [mt, mid, lang, ""] (trailing empty from the
-	// separator).
+	// The bytes before the id are quadPrefix(mt,mid,lang,variant) = mt 0x00
+	// mid 0x00 lang 0x00 variant 0x00, so Split yields [mt, mid, lang,
+	// variant, ""] (trailing empty from the separator).
 	parts := kv.Split(key[:len(key)-8])
-	if len(parts) < 4 {
-		return "", "", "", 0, false
+	if len(parts) < 5 {
+		return "", "", "", "", 0, false
 	}
-	return api.MediaType(parts[0]), parts[1], parts[2], int64(v), true //nolint:gosec // G115: inverse of stateKey suffix
-}
-
-// buildStateTripleMap walks ix_state_triple once and returns an id -> triple
-// lookup so GetState can recover each row's (media_type, media_id, language)
-// without storing them in the primary record. A malformed index key is skipped
-// defensively (a correctly maintained index never produces one).
-func buildStateTripleMap(tx *bolt.Tx) (map[int64]stateTripleInfo, error) {
-	idx := tx.Bucket([]byte(bucketIxStateTriple))
-	if idx == nil {
-		return nil, errors.New("boltstore: ix_state_triple bucket not found")
-	}
-	out := make(map[int64]stateTripleInfo)
-	err := idx.ForEach(func(k, _ []byte) error {
-		mt, mid, lang, id, ok := splitStateTripleKey(k)
-		if !ok {
-			return nil
-		}
-		out[id] = stateTripleInfo{mt: mt, mid: mid, lang: lang}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+	return api.MediaType(parts[0]), parts[1], parts[2], api.Variant(parts[3]), int64(v), true //nolint:gosec // G115: inverse of stateKey suffix
 }
 
 // asciiLower lowercases only the ASCII letters A-Z, matching SQLite's default
@@ -592,14 +598,15 @@ func asciiHasPrefixFold(s, prefix string) bool {
 	return strings.HasPrefix(asciiLower(s), asciiLower(prefix))
 }
 
-// stateEntryFrom assembles an api.StateEntry from the triple components (which
-// live in the index key) and the decoded primary record.
-func stateEntryFrom(tr stateTripleInfo, sr *stateRec) api.StateEntry {
+// stateEntryFrom assembles an api.StateEntry from a decoded (self-contained)
+// primary record.
+func stateEntryFrom(sr *stateRec) api.StateEntry {
 	return api.StateEntry{
 		ID:            sr.ID,
-		MediaType:     tr.mt,
-		MediaID:       tr.mid,
-		Language:      tr.lang,
+		MediaType:     sr.MediaType,
+		MediaID:       sr.MediaID,
+		Language:      sr.Language,
+		Variant:       sr.Variant,
 		Provider:      sr.Provider,
 		ReleaseName:   sr.ReleaseName,
 		Score:         sr.Score,
@@ -614,29 +621,15 @@ func stateEntryFrom(tr stateTripleInfo, sr *stateRec) api.StateEntry {
 }
 
 // matchStateRow resolves one ix_state_imported entry (indexKey) to its
-// api.StateEntry and applies the query's triple- and primary-borne filters. It
-// returns matched=false to skip the row on any index/primary drift, a
-// filtered-out row, or a tolerated decode skip; derr is non-nil only on a
-// fail-closed decode error. Extracted from GetState so the reverse-walk loop
-// stays a thin offset/limit pager over the matched rows.
-func (d *DB) matchStateRow(sb *bolt.Bucket, triples map[int64]stateTripleInfo, q *api.StateQuery, indexKey []byte) (entry api.StateEntry, matched bool, derr error) {
+// api.StateEntry and applies the query's filters against the decoded
+// (self-contained) primary record. It returns matched=false to skip the row on
+// any index/primary drift, a filtered-out row, or a tolerated decode skip;
+// derr is non-nil only on a fail-closed decode error. Extracted from GetState
+// so the reverse-walk loop stays a thin offset/limit pager over the matched
+// rows.
+func (d *DB) matchStateRow(sb *bolt.Bucket, q *api.StateQuery, indexKey []byte) (entry api.StateEntry, matched bool, derr error) {
 	_, primary, ok := kv.SplitTimeIndexKey(indexKey)
 	if !ok {
-		return api.StateEntry{}, false, nil
-	}
-	id, ok := parseStateKey(primary)
-	if !ok {
-		return api.StateEntry{}, false, nil
-	}
-	tr, ok := triples[id]
-	if !ok {
-		return api.StateEntry{}, false, nil // index drift: no triple for this id
-	}
-	// Triple-borne filters (cheap; no primary deref needed yet).
-	if q.MediaType != "" && tr.mt != q.MediaType {
-		return api.StateEntry{}, false, nil
-	}
-	if q.Language != "" && tr.lang != q.Language {
 		return api.StateEntry{}, false, nil
 	}
 	raw := sb.Get(primary)
@@ -651,21 +644,26 @@ func (d *DB) matchStateRow(sb *bolt.Bucket, triples map[int64]stateTripleInfo, q
 	if skip {
 		return api.StateEntry{}, false, nil
 	}
-	// Primary-borne filters.
+	if q.MediaType != "" && sr.MediaType != q.MediaType {
+		return api.StateEntry{}, false, nil
+	}
+	if q.Language != "" && sr.Language != q.Language {
+		return api.StateEntry{}, false, nil
+	}
 	if q.Provider != "" && sr.Provider != q.Provider {
 		return api.StateEntry{}, false, nil
 	}
 	if q.Search != "" && !asciiContainsFold(sr.Title, q.Search) {
 		return api.StateEntry{}, false, nil
 	}
-	return stateEntryFrom(tr, &sr), true, nil
+	return stateEntryFrom(&sr), true, nil
 }
 
 // GetState returns subtitle-state rows matching the query, most-recently-
 // imported first. It mirrors the old SQLite GetState (Requirement 8.4, 15.1,
 // 15.2, 15.3):
 //
-//   - Filters by media_type, language (both carried in the ix_state_triple key)
+//   - Filters by media_type, language (both carried in the ix_state_quad key)
 //     and provider (carried in the primary row); zero-value fields mean no
 //     filter.
 //   - Title search is a case-insensitive CONTAINS match in which the user's
@@ -681,12 +679,12 @@ func (d *DB) matchStateRow(sb *bolt.Bucket, triples map[int64]stateTripleInfo, q
 //     friendly path: a page costs O(offset + limit) index steps regardless of
 //     table size, with no full primary scan or sort.
 //
-// media_type and language are NOT stored in stateRec, so a one-time
-// ix_state_triple walk (buildStateTripleMap) recovers each row's triple; the
-// primary is then dereferenced for the remaining fields and the provider/title
-// filters. A row whose primary cannot be decoded is skipped with a warning
-// (subtitle_state is a derived bucket the next scan rebuilds; this is not a
-// lock-bearing read).
+// The record is self-contained (it carries its quad), so the page walk
+// dereferences and decodes ONLY the rows it visits — a page costs
+// O(offset + limit) index steps plus that many primary decodes, independent
+// of table size. A row whose primary cannot be decoded is skipped with a
+// warning (subtitle_state is a derived bucket the next scan rebuilds; this is
+// not a lock-bearing read).
 func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
 	slog.Debug("GetState",
 		"media_type", q.MediaType, "lang", q.Language,
@@ -701,10 +699,6 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 
 	var out []api.StateEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
-		triples, err := buildStateTripleMap(tx)
-		if err != nil {
-			return err
-		}
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
 			return errors.New("boltstore: subtitle_state bucket not found")
@@ -713,7 +707,8 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 		if imp == nil {
 			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
-		out, err = d.collectStatePage(imp, sb, triples, q, limit, offset)
+		var err error
+		out, err = d.collectStatePage(imp, sb, q, limit, offset)
 		return err
 	})
 	if err != nil {
@@ -729,7 +724,7 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 // (which applies the query's filters), skips the first `offset` matched rows,
 // and collects up to `limit` entries. It preallocates a fixed, modest capacity
 // rather than one derived from the untrusted limit; append grows it as needed.
-func (d *DB) collectStatePage(imp, sb *bolt.Bucket, triples map[int64]stateTripleInfo, q *api.StateQuery, limit, offset int) ([]api.StateEntry, error) {
+func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *api.StateQuery, limit, offset int) ([]api.StateEntry, error) {
 	out := make([]api.StateEntry, 0, preallocCap)
 	skipped := 0
 	c := imp.Cursor()
@@ -737,7 +732,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, triples map[int64]stateTripl
 		if len(out) >= limit {
 			break
 		}
-		entry, matched, derr := d.matchStateRow(sb, triples, q, k)
+		entry, matched, derr := d.matchStateRow(sb, q, k)
 		if derr != nil {
 			return nil, derr
 		}
@@ -754,38 +749,39 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, triples map[int64]stateTripl
 	return out, nil
 }
 
-// GetManualLocks returns one entry per manually locked triple (a triple with at
+// GetManualLocks returns one entry per manually locked quad (a quad with at
 // least one manual row), each carrying its manual-row count, ordered by
 // media_type then media_id. It mirrors the old SQLite
 // `SELECT media_type, media_id, language, COUNT(*) ... WHERE manual = 1
 // GROUP BY media_type, media_id, language ORDER BY media_type, media_id`
-// (Requirement 15.5).
+// (Requirement 15.5), refined per variant: an fr/forced lock and an
+// fr/standard lock list as separate entries.
 //
-// It is served entirely from the ix_state_triple projection: the manual flag
-// lives in the projection value and the triple components in the key, so no
-// primary subtitle_state row is dereferenced. Walking ix_state_triple visits
-// entries in (mt, mid, lang, id) byte order, so accumulating per triple yields
-// groups already ordered by (media_type, media_id) — a deterministic
+// It is served entirely from the ix_state_quad projection: the manual flag
+// lives in the projection value and the quad components in the key, so no
+// primary subtitle_state row is dereferenced. Walking ix_state_quad visits
+// entries in (mt, mid, lang, variant, id) byte order, so accumulating per quad
+// yields groups already ordered by (media_type, media_id) — a deterministic
 // refinement of the old ORDER BY. As a lock-bearing read it FAILS CLOSED: an
 // undecodable projection aborts the read rather than silently dropping a lock.
 func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 	var acc manualLockAccumulator
 	err := d.db.View(func(tx *bolt.Tx) error {
-		idx := tx.Bucket([]byte(bucketIxStateTriple))
+		idx := tx.Bucket([]byte(bucketIxStateQuad))
 		if idx == nil {
-			return errors.New("boltstore: ix_state_triple bucket not found")
+			return errors.New("boltstore: ix_state_quad bucket not found")
 		}
 		c := idx.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			mt, mid, lang, _, ok := splitStateTripleKey(k)
+			mt, mid, lang, variant, _, ok := splitStateQuadKey(k)
 			if !ok {
-				return fmt.Errorf("boltstore: malformed ix_state_triple key %x", k)
+				return fmt.Errorf("boltstore: malformed ix_state_quad key %x", k)
 			}
 			manual, _, _, pok := decodeStateProjection(v)
 			if !pok {
-				return fmt.Errorf("boltstore: malformed ix_state_triple projection for %s/%s/%s", mt, mid, lang)
+				return fmt.Errorf("boltstore: malformed ix_state_quad projection for %s/%s/%s/%s", mt, mid, lang, variant)
 			}
-			acc.add(mt, mid, lang, manual)
+			acc.add(stateQuadInfo{mt: mt, mid: mid, lang: lang, variant: variant}, manual)
 		}
 		acc.flush()
 		return nil
@@ -796,35 +792,34 @@ func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 	return acc.out, nil
 }
 
-// manualLockAccumulator groups consecutive ix_state_triple entries (which are
-// sorted by (mt, mid, lang, id), so a triple's rows are contiguous) into one
-// api.ManualLockEntry per triple that has at least one manual row, carrying the
-// manual-row count.
+// manualLockAccumulator groups consecutive ix_state_quad entries (which are
+// sorted by (mt, mid, lang, variant, id), so a quad's rows are contiguous)
+// into one api.ManualLockEntry per quad that has at least one manual row,
+// carrying the manual-row count.
 type manualLockAccumulator struct {
-	curMT   api.MediaType
-	curMID  string
-	curLang string
+	cur     stateQuadInfo
 	out     []api.ManualLockEntry
 	curCnt  int
 	haveCur bool
 }
 
-// flush emits the triple currently being accumulated, if it had any manual row.
+// flush emits the quad currently being accumulated, if it had any manual row.
 func (a *manualLockAccumulator) flush() {
 	if a.haveCur && a.curCnt > 0 {
 		a.out = append(a.out, api.ManualLockEntry{
-			MediaType: a.curMT, MediaID: a.curMID, Language: a.curLang, Count: a.curCnt,
+			MediaType: a.cur.mt, MediaID: a.cur.mid, Language: a.cur.lang,
+			Variant: a.cur.variant, Count: a.curCnt,
 		})
 	}
 }
 
-// add folds one ix_state_triple entry into the accumulator: when the triple
+// add folds one ix_state_quad entry into the accumulator: when the quad
 // changes it flushes the previous tally and starts a fresh one, then counts the
 // entry when it is a manual row.
-func (a *manualLockAccumulator) add(mt api.MediaType, mid, lang string, manual bool) {
-	if !a.haveCur || mt != a.curMT || mid != a.curMID || lang != a.curLang {
+func (a *manualLockAccumulator) add(quad stateQuadInfo, manual bool) {
+	if !a.haveCur || quad != a.cur {
 		a.flush()
-		a.haveCur, a.curMT, a.curMID, a.curLang, a.curCnt = true, mt, mid, lang, 0
+		a.haveCur, a.cur, a.curCnt = true, quad, 0
 	}
 	if manual {
 		a.curCnt++
@@ -856,20 +851,20 @@ func (d *DB) Stats(_ context.Context) (downloads, attempts int, err error) {
 // ESCAPE '\']` (Requirement 8.4): the prefix match is case-insensitive (ASCII)
 // with the user's %/_/\ treated literally (asciiHasPrefixFold).
 //
-// The media_type and media_id live in the ix_state_triple key, so the distinct
-// set is built from a single ix_state_triple walk without dereferencing any
-// primary. Walking in (mt, mid, lang, id) byte order yields ids in ascending
-// order; first-seen dedup keeps each id once.
+// The media_type and media_id live in the ix_state_quad key, so the distinct
+// set is built from a single ix_state_quad walk without dereferencing any
+// primary. Walking in (mt, mid, lang, variant, id) byte order yields ids in
+// ascending order; first-seen dedup keeps each id once.
 func (d *DB) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error) {
 	var ids []string
 	seen := make(map[string]struct{})
 	err := d.db.View(func(tx *bolt.Tx) error {
-		idx := tx.Bucket([]byte(bucketIxStateTriple))
+		idx := tx.Bucket([]byte(bucketIxStateQuad))
 		if idx == nil {
-			return errors.New("boltstore: ix_state_triple bucket not found")
+			return errors.New("boltstore: ix_state_quad bucket not found")
 		}
 		return idx.ForEach(func(k, _ []byte) error {
-			mt, mid, _, _, ok := splitStateTripleKey(k)
+			mt, mid, _, _, _, ok := splitStateQuadKey(k)
 			if !ok {
 				return nil
 			}

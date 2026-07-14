@@ -32,13 +32,23 @@ type attemptRec struct {
 }
 
 // stateRec is the subtitle_state value, keyed by the be64(id) surrogate. The
-// media_type, media_id, and language are NOT stored here: they are carried by
-// the ix_state_triple index key (mt 0x00 mid 0x00 lang 0x00 be64(id)), so a
-// state read takes those from the index walk and the rest from this record.
-// Together they reconstruct an api.StateEntry. Provider is api.ProviderID to
-// match api.DownloadRecord.ProviderName / api.StateEntry.Provider exactly.
+// value is SELF-CONTAINED: it carries the (media_type, media_id, language,
+// variant) quad and the surrogate id even though both also appear in the
+// ix_state_quad index key and the primary key respectively. That duplication
+// is deliberate: reads that start from a surrogate id (GetState's reverse
+// ix_state_imported walk, DeleteStateByPaths' ix_state_video walk, reconcile's
+// primary scan) recover the quad from one decode instead of rebuilding an
+// id -> quad map from a full index walk, and a row dumped by the bbolt CLI is
+// meaningful on its own. The putState chokepoint derives the ix_state_quad key
+// FROM these value fields, so key and value can never disagree. Provider is
+// api.ProviderID to match api.DownloadRecord.ProviderName /
+// api.StateEntry.Provider exactly.
 type stateRec struct {
 	MediaImported time.Time      `json:"media_imported"`
+	MediaType     api.MediaType  `json:"media_type"`
+	MediaID       string         `json:"media_id"`
+	Language      string         `json:"language"`
+	Variant       api.Variant    `json:"variant"`
 	Provider      api.ProviderID `json:"provider"`
 	ReleaseName   string         `json:"release_name"`
 	Path          string         `json:"path"`
@@ -56,11 +66,12 @@ type stateRec struct {
 // fileRec is the subtitle_files value. The media_type, media_id, language,
 // variant, source, and path all live in the key (so per-media coverage is a
 // key-only prefix walk), leaving only these fields in the value. With the key
-// components they reconstruct an api.SubtitleEntry.
+// components they reconstruct an api.SubtitleEntry. A subtitle's cumulative
+// sync offset is NOT stored here: it lives solely in the sync_offsets bucket
+// (keyed by bare path), which GetSubtitleFiles joins at read time.
 type fileRec struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Codec     string    `json:"codec"`
-	OffsetMs  int64     `json:"offset_ms"`
 }
 
 // scanRec is the scan_state value, one row per (media_type, media_id) carried
@@ -110,8 +121,18 @@ func decodeRecord[T any](mode kv.DecodeMode, bucket string, key, data []byte, v 
 
 const (
 	// coreSchemaVersion is the core-domain (search_attempts, subtitle_state,
-	// subtitle_files, scan_state, sync_offsets, poll_state) value-schema
-	// version this build writes and understands.
+	// subtitle_files, scan_state, sync_offsets, poll_state) schema version
+	// this build writes and understands.
+	//
+	// v1 is the first (and, pre-release, only) core schema: subtitle_state
+	// keyed by a be64 surrogate id with a self-contained value (the record
+	// carries its own media_type/media_id/language/variant quad, and every
+	// state index key derives from the value), the ix_state_quad /
+	// ix_state_imported / ix_state_video indexes, and no secondary index on
+	// search_attempts. The counter was reset to 1 before the first release
+	// (the internal pre-release iterations that bumped it never shipped);
+	// any dev file stamped with a higher version is refused like any other
+	// mismatch — delete it and let state rebuild.
 	coreSchemaVersion uint64 = 1
 
 	// authSchemaVersion is the auth-domain (auth_users, auth_passkeys,
@@ -122,8 +143,8 @@ const (
 
 // meta-bucket scalar keys for the two schema versions. Kept as separate keys so
 // the core and auth schemas evolve independently. There is NO migration by
-// design (clean break); these exist only for detect-and-refuse on a future
-// breaking change.
+// design (clean break); these exist only for detect-and-refuse on a breaking
+// change in either direction.
 var (
 	metaKeyCoreSchemaVersion = []byte("core_schema_version")
 	metaKeyAuthSchemaVersion = []byte("auth_schema_version")
@@ -154,11 +175,13 @@ func writeSchemaVersion(tx *bolt.Tx, key []byte, version uint64) error {
 }
 
 // checkSchemaVersion applies the detect-and-refuse policy: an absent version
-// (fresh file) is accepted, an equal-or-lower stored version is accepted
-// (lower is forward-compatible since value changes are additive by design),
-// and a stored version NEWER than current is refused, because the file was
-// written by a future build whose schema this build does not understand and
-// there is no migration path. domain names the schema for the error message.
+// (fresh file) is accepted, an equal stored version is accepted, and ANY
+// mismatch is refused — the version only ever moves on a breaking change
+// (additive value changes do not bump it), and no migration exists in either
+// direction by design. A stored version newer than current means the file was
+// written by a future build; older means this build's schema left it behind
+// (e.g. the v2 variant key dimension). domain names the schema for the error
+// message.
 func checkSchemaVersion(domain string, stored uint64, present bool, current uint64) error {
 	if !present {
 		return nil
@@ -167,6 +190,12 @@ func checkSchemaVersion(domain string, stored uint64, present bool, current uint
 		return fmt.Errorf("boltstore: %s schema version %d on disk is newer than this build's %d; "+
 			"the store was written by a newer version and cannot be opened (no downgrade migration exists)",
 			domain, stored, current)
+	}
+	if stored < current {
+		return fmt.Errorf("boltstore: %s schema version %d on disk is older than this build's %d "+
+			"and no migration exists (clean-break policy); delete the database file and let subflux "+
+			"rebuild it (state and coverage repopulate on the next scan; auth users/passkeys/API keys "+
+			"must be recreated)", domain, stored, current)
 	}
 	return nil
 }

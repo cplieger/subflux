@@ -100,16 +100,40 @@ func (s *Store) sweepLoop(interval time.Duration, done chan struct{}) {
 	}
 }
 
+// SetSessionTimeouts overrides the sweeper's session idle/absolute timeouts
+// with configured values. The composition root calls it after loading config,
+// and the server's hot reload calls it again when the settings change, so the
+// sweeper evicts on the SAME cutoffs the request-path session validator
+// enforces (sweeper eviction of an in-memory session is a hard logout, so a
+// shorter sweeper timeout would silently cap a longer configured one).
+// Non-positive values leave the current timeout unchanged. Safe for concurrent
+// use with a running sweeper.
+func (s *Store) SetSessionTimeouts(idle, absolute time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if idle > 0 {
+		s.idleTimeout = idle
+	}
+	if absolute > 0 {
+		s.absTimeout = absolute
+	}
+}
+
 // sweepOnce evicts expired sessions and OIDC states in one pass. The underlying
 // CleanupExpired* methods already log their eviction counts at DEBUG, so this
 // only adds error logging (also DEBUG, matching their convention) and never
-// duplicates the per-eviction lines.
+// duplicates the per-eviction lines. The timeout fields are snapshotted under
+// the read lock because SetSessionTimeouts may update them concurrently.
 func (s *Store) sweepOnce(now time.Time) {
+	s.mu.RLock()
+	idle, absolute, oidcTTL := s.idleTimeout, s.absTimeout, s.oidcTTL
+	s.mu.RUnlock()
+
 	ctx := context.Background()
-	if _, err := s.CleanupExpiredSessions(ctx, now, s.idleTimeout, s.absTimeout); err != nil {
+	if _, err := s.CleanupExpiredSessions(ctx, now, idle, absolute); err != nil {
 		slog.Debug("auth sweeper: session cleanup failed", "error", err)
 	}
-	if _, err := s.CleanupExpiredOIDCStates(ctx, now, s.oidcTTL); err != nil {
+	if _, err := s.CleanupExpiredOIDCStates(ctx, now, oidcTTL); err != nil {
 		slog.Debug("auth sweeper: oidc cleanup failed", "error", err)
 	}
 }
