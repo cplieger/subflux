@@ -8,7 +8,7 @@ export function fieldId(sectionKey: string, fieldKey: string): string {
   return `cfg-${sectionKey}-${fieldKey}`;
 }
 
-export function resolveFieldValue(
+function resolveFieldValue(
   sectionKey: string,
   field: SchemaField,
   sections: Record<string, string>,
@@ -388,7 +388,7 @@ export function renderRawSection(name: string, raw: string): HTMLElement {
   return sec;
 }
 
-export function extractTopLevelValue(configText: string, key: string): string {
+function extractTopLevelValue(configText: string, key: string): string {
   for (const line of configText.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith(`${key}:`) && !line.startsWith(" ")) {
@@ -434,11 +434,7 @@ export function cfgField(
   );
 }
 
-export function cfgFieldEl(
-  label: string,
-  element: HTMLElement,
-  tip: string | undefined,
-): HTMLElement {
+function cfgFieldEl(label: string, element: HTMLElement, tip: string | undefined): HTMLElement {
   const lbl = el("label", null, label);
   if (tip) {
     lbl.setAttribute("data-tip", tip);

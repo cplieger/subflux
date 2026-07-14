@@ -19,7 +19,7 @@ export interface DetailConfig {
 
 // Single-payload event map (one payload object per event). Events whose
 // payload type is `undefined` are emitted with no payload argument.
-export interface EventMap {
+interface EventMap {
   "open:series": { item: CoverageItem | SeriesItem; skipPush?: boolean };
   "open:movie": { item: CoverageItem | MovieDetail; skipPush?: boolean };
   "panel:configure": { visible: boolean; detail?: DetailConfig };

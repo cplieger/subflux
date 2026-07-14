@@ -61,7 +61,7 @@ export function closeConfig(): void {
   }
 }
 
-export async function loadConfig(): Promise<void> {
+async function loadConfig(): Promise<void> {
   try {
     // /api/config returns text/yaml on success; keep raw fetch.
     // The other two return JSON and go through apiGet.

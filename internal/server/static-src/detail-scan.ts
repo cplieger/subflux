@@ -38,7 +38,7 @@ const scanAction = apiAction<string, ScanResponse>({
  * @param btn - button element (icon slot swapped to spinner/check/close)
  * @param onOk - optional callback with parsed JSON on success
  */
-export async function triggerScan(
+async function triggerScan(
   url: string,
   btn: HTMLButtonElement | null,
   onOk?: (data: ScanResponse) => void,

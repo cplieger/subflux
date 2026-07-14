@@ -9,7 +9,6 @@ import { closeDialog as uipCloseDialog, wireBackdropDismiss } from "@cplieger/ui
 import { confirm as uipConfirm } from "@cplieger/ui-primitives/confirm";
 
 export { el };
-export type { AttrValue } from "@cplieger/reactive";
 
 export function text(s: string): Text {
   return document.createTextNode(s);
