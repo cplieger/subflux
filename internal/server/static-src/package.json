@@ -36,5 +36,10 @@
     "@cplieger/fetch": "1.1.2",
     "@cplieger/reactive": "1.2.4",
     "@cplieger/ui-primitives": "2.1.2"
+  },
+  "overrides": {
+    "typed-rest-client": {
+      "qs": "6.15.2"
+    }
   }
 }
