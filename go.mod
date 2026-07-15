@@ -9,7 +9,7 @@ require (
 	github.com/cplieger/health v1.2.0
 	github.com/cplieger/httpx/v2 v2.5.0
 	github.com/cplieger/metrics/v2 v2.3.0
-	github.com/cplieger/slogx v1.1.1
+	github.com/cplieger/slogx v1.2.0
 	github.com/cplieger/ssrf/v2 v2.0.7
 	github.com/cplieger/webhttp v1.7.0
 	github.com/cplieger/wiregen v1.3.4
