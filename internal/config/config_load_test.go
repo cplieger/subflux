@@ -172,6 +172,41 @@ providers:
 	}
 }
 
+// TestLoadFromBytes_env_expansion_is_structure_safe pins the post-parse
+// expansion contract (yamlenv): an environment value full of YAML syntax lands
+// as an inert string value and can neither inject keys nor truncate the
+// document — the weakness the former pre-parse os.Expand had.
+func TestLoadFromBytes_env_expansion_is_structure_safe(t *testing.T) {
+	// Not parallel: t.Setenv modifies process environment.
+	evil := "k\"\nproviders:\n  os:\n    enabled: false\n# comment"
+	t.Setenv("SUBFLUX_TEST_EVIL", evil)
+	data := `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "${SUBFLUX_TEST_EVIL}"
+languages:
+  rules:
+    - audio: en
+      subtitles:
+        - code: fr
+  default:
+    - code: en
+providers:
+  os:
+    enabled: true
+`
+	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+	}
+	if cfg.Sonarr.APIKey != evil {
+		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.Sonarr.APIKey, evil)
+	}
+	if p := cfg.Providers["os"]; !p.Enabled {
+		t.Error("providers.os.enabled flipped to false: the expanded value rewrote document structure")
+	}
+}
+
 func TestLoadFromBytes_env_expansion_unset_preserved(t *testing.T) {
 	t.Parallel()
 	data := `
