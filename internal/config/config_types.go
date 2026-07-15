@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
 	"go.yaml.in/yaml/v3"
@@ -209,9 +211,17 @@ const (
 	LogFormatText LogFormat = "text"
 )
 
-// ValidLogFormat returns true if the format is a recognized value.
+// ValidLogFormat returns true if the format is a recognized value, judged by
+// slogx.ParseFormat — the same case-insensitive, trimming normalization
+// setupLogging applies when it consumes the value — so validation and
+// consumption cannot drift. The empty string is "unset" (the caller falls back
+// to the default), not a valid value.
 func ValidLogFormat(f LogFormat) bool {
-	return f == LogFormatJSON || f == LogFormatText
+	if strings.TrimSpace(string(f)) == "" {
+		return false
+	}
+	_, ok := slogx.ParseFormat(string(f), slogx.JSON)
+	return ok
 }
 
 // LoggingConfig controls log output.

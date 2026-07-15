@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/envx/yamlenv"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
 	"go.yaml.in/yaml/v3"
@@ -62,18 +63,10 @@ func parseMul(s string, unit time.Duration, name string) (time.Duration, error) 
 	return time.Duration(ns), nil
 }
 
-func expandEnvSafe(key string) string {
-	if !isAllowedEnvVar(key) {
-		return "${" + key + "}"
-	}
-	if val, ok := os.LookupEnv(key); ok {
-		return val
-	}
-	return "${" + key + "}"
-}
-
 // isAllowedEnvVar returns true if the env var name is safe to expand.
-// Only SUBFLUX_* vars and common deployment vars are allowed.
+// Only SUBFLUX_* vars and common deployment vars are allowed. It is the
+// allowlist policy LoadFromBytes hands to yamlenv.Expand (the shared
+// post-parse, string-values-only expansion engine).
 func isAllowedEnvVar(key string) bool {
 	if strings.HasPrefix(key, "SUBFLUX_") {
 		return true
@@ -249,11 +242,29 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 		return nil, fmt.Errorf("config data %w: %d bytes (max %d)", ErrConfigTooLarge, len(data), maxConfigSize)
 	}
 
-	expanded := os.Expand(string(data), expandEnvSafe)
+	// Parse FIRST, then expand ${VAR} references inside string scalar VALUES
+	// only (yamlenv.Expand). The former pre-parse text expansion (os.Expand
+	// over the raw bytes) let an environment value containing YAML syntax — a
+	// quote, a newline, a '#' — change the document structure or truncate the
+	// value; the post-parse walk makes that impossible. Only the braced ${VAR}
+	// form expands now: unbraced $VAR, mapping keys, and non-string scalars
+	// stay byte-for-byte literal.
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse YAML: %w", err)
+	}
 
 	cfg := newWithDefaults()
-	if err := yaml.Unmarshal([]byte(expanded), cfg); err != nil {
-		return nil, fmt.Errorf("parse YAML: %w", err)
+	// An empty document (zero node) keeps the defaults, matching the former
+	// yaml.Unmarshal(empty, cfg) no-op.
+	if doc.Kind != 0 {
+		if unresolved := yamlenv.Expand(&doc, isAllowedEnvVar); len(unresolved) > 0 {
+			slog.Warn("config references environment variables that are not set; the literal ${VAR} is kept",
+				"vars", strings.Join(unresolved, ","))
+		}
+		if err := doc.Decode(cfg); err != nil {
+			return nil, fmt.Errorf("parse YAML: %w", err)
+		}
 	}
 
 	if err := expandVariants(cfg); err != nil {

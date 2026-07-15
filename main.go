@@ -469,14 +469,13 @@ func newWireFunc(reg api.ProviderRegistry) wiring.Func {
 
 // --- Logging ---
 
-// setupLogging configures the global slog default with the given level and format.
-// Unrecognized levels default to info; format "json" selects JSON output.
+// setupLogging configures the global slog default with the given level and
+// format, both parsed through slogx (ParseLevel / ParseFormat) so validation
+// and consumption share one normalization. An unrecognized or empty value
+// falls back to the documented defaults (info / json).
 func setupLogging(level, format string) {
 	lvl, _ := slogx.ParseLevel(level, slog.LevelInfo)
-	f := slogx.Text
-	if format == "json" {
-		f = slogx.JSON
-	}
+	f, _ := slogx.ParseFormat(format, slogx.JSON)
 	slogx.Setup(slogx.Options{Format: f, Level: lvl})
 }
 
