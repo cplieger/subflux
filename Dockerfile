@@ -139,7 +139,7 @@ RUN mkdir -p node_modules/@cplieger/ui-primitives && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/ui-primitives/-/ui-primitives-${CPLIEGER_UI_PRIMITIVES_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/ui-primitives --strip-components=1
 # renovate: datasource=npm depName=@cplieger/fetch
-ARG CPLIEGER_FETCH_VERSION=1.1.2
+ARG CPLIEGER_FETCH_VERSION=1.1.3
 RUN mkdir -p node_modules/@cplieger/fetch && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/fetch/-/fetch-${CPLIEGER_FETCH_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/fetch --strip-components=1
