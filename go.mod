@@ -11,7 +11,7 @@ require (
 	github.com/cplieger/metrics/v2 v2.3.0
 	github.com/cplieger/slogx v1.3.0
 	github.com/cplieger/ssrf/v2 v2.0.7
-	github.com/cplieger/webhttp v1.7.0
+	github.com/cplieger/webhttp v1.8.0
 	github.com/cplieger/wiregen v1.3.4
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
