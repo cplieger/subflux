@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/slogx/capture"
 )
 
 // newSessionStore returns a Store wired over a bootstrapped, shared bbolt
@@ -315,7 +316,7 @@ func TestSessions_concurrentAccess(t *testing.T) {
 func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	s := newSessionStore(t)
 	ctx := context.Background()
-	logs := captureLogs(t)
+	logs := capture.Default(t)
 	now := time.Now().UTC()
 	idle := time.Hour
 	abs := 24 * time.Hour
@@ -331,7 +332,7 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("evicted = %d, want 0", n)
 	}
-	if got := countMsg(logs(), "expired sessions cleaned"); got != 0 {
+	if got := logs.CountExact("expired sessions cleaned"); got != 0 {
 		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
 	}
 
@@ -346,7 +347,7 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("evicted = %d, want 1", n)
 	}
-	if got := countMsg(logs(), "expired sessions cleaned"); got != 1 {
+	if got := logs.CountExact("expired sessions cleaned"); got != 1 {
 		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)
 	}
 }

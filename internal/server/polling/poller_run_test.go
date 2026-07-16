@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -335,27 +336,27 @@ func TestNewPoller_longInterval_TTL_caches(t *testing.T) {
 // Within the poll interval and with no arr clients, PollOnce emits neither the
 // "poll cycle error" nor the "poll cycle exceeded interval" WARN.
 func TestPollOnce_no_spurious_warns_within_interval(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg} // nil arrs: g.Wait() returns nil, cycle is fast
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	p.PollOnce(context.Background())
-	if sink.has(slog.LevelWarn, "poll cycle error") {
+	if hasRecord(sink, slog.LevelWarn, "poll cycle error") {
 		t.Errorf("unexpected WARN 'poll cycle error' for a clean cycle")
 	}
-	if sink.has(slog.LevelWarn, "poll cycle exceeded interval") {
+	if hasRecord(sink, slog.LevelWarn, "poll cycle exceeded interval") {
 		t.Errorf("unexpected WARN 'poll cycle exceeded interval' within the interval")
 	}
 }
 
 // A cycle whose duration exceeds the (zero) poll interval emits the exceeded WARN.
 func TestPollOnce_warns_when_exceeds_interval(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	cfg := &mockCfg{interval: 0, langs: []string{"en"}} // any elapsed dur > 0 exceeds
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	p.PollOnce(context.Background())
-	if !sink.has(slog.LevelWarn, "poll cycle exceeded interval") {
+	if !hasRecord(sink, slog.LevelWarn, "poll cycle exceeded interval") {
 		t.Errorf("want WARN 'poll cycle exceeded interval' with a 0 interval")
 	}
 }
