@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -264,11 +265,11 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 	if err := s.CreateAPIKey(ctx, key); err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
-	logs := captureLogs(t)
+	logs := capture.Default(t)
 	if err := s.DeleteAPIKey(ctx, key.ID, 1); err != nil {
 		t.Fatalf("DeleteAPIKey: %v", err)
 	}
-	if got := countMsg(logs(), "api key deleted"); got != 1 {
+	if got := logs.CountExact("api key deleted"); got != 1 {
 		t.Errorf(`successful owner delete logged "api key deleted" %d times, want 1`, got)
 	}
 }

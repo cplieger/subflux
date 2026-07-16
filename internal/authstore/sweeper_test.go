@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -190,16 +191,15 @@ func TestSweeper_doubleOpenStartsOneGoroutine(t *testing.T) {
 // logs no failure: the in-memory cleanups always succeed, so neither the
 // session nor the OIDC "cleanup failed" line may appear.
 func TestSweepOnce_noSpuriousFailureLogsOnHealthySweep(t *testing.T) {
-	logs := captureLogs(t)
+	logs := capture.Default(t)
 	s := newSweeperStore(t, time.Hour) // interval unused; sweepOnce is called directly
 
 	s.sweepOnce(time.Now()) // healthy sweep: both cleanups succeed (return nil)
 
-	recs := logs()
-	if n := countMsg(recs, "auth sweeper: session cleanup failed"); n != 0 {
+	if n := logs.CountExact("auth sweeper: session cleanup failed"); n != 0 {
 		t.Errorf("session cleanup failure logged %d times on a healthy sweep, want 0", n)
 	}
-	if n := countMsg(recs, "auth sweeper: oidc cleanup failed"); n != 0 {
+	if n := logs.CountExact("auth sweeper: oidc cleanup failed"); n != 0 {
 		t.Errorf("oidc cleanup failure logged %d times on a healthy sweep, want 0", n)
 	}
 }
@@ -209,19 +209,27 @@ func TestSweepOnce_noSpuriousFailureLogsOnHealthySweep(t *testing.T) {
 // started-sweeper log records that default rather than 0.
 func TestSweeper_zeroIntervalUsesDefault(t *testing.T) {
 	s := newSweeperStore(t, 0)
-	logs := captureLogs(t)
+	logs := capture.Default(t)
 	if err := s.Open(); err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
 	var found bool
-	for _, r := range logs() {
-		if r.msg != "auth sweeper started" {
+	for _, r := range logs.Records() {
+		if r.Message != "auth sweeper started" {
 			continue
 		}
 		found = true
-		iv, ok := r.attrs["interval"]
+		var iv slog.Value
+		var ok bool
+		r.Attrs(func(a slog.Attr) bool {
+			if a.Key == "interval" {
+				iv, ok = a.Value, true
+				return false
+			}
+			return true
+		})
 		if !ok {
 			t.Fatal(`"auth sweeper started" log has no "interval" attribute`)
 		}

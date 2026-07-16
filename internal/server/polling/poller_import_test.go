@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi"
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -87,28 +88,28 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 
 // A failed DeleteStateByPaths cleanup (video file gone) must be WARN-logged.
 func TestProcessPollImport_warns_when_cleanup_errors(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(errStore{}), stateFunc: func() *LiveState { return ls }}
 	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-err.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
-	if !sink.has(slog.LevelWarn, "poll: cleanup failed") {
+	if !hasRecord(sink, slog.LevelWarn, "poll: cleanup failed") {
 		t.Errorf("cleanup error: want WARN 'poll: cleanup failed'")
 	}
 }
 
 // A successful cleanup must not emit the cleanup-failed WARN.
 func TestProcessPollImport_silent_when_cleanup_ok(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-ok.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
-	if sink.has(slog.LevelWarn, "poll: cleanup failed") {
+	if hasRecord(sink, slog.LevelWarn, "poll: cleanup failed") {
 		t.Errorf("cleanup ok: unexpected WARN 'poll: cleanup failed'")
 	}
 }
@@ -196,28 +197,28 @@ func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 
 // A failed arr refresh notification must be WARN-logged.
 func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	video := tempVideo(t)
 	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/x.srt"}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return errors.New("notify boom") })
-	if !sink.has(slog.LevelWarn, "failed to notify arr") {
+	if !hasRecord(sink, slog.LevelWarn, "failed to notify arr") {
 		t.Errorf("refreshFn error: want WARN 'failed to notify arr'")
 	}
 }
 
 // A successful arr refresh must not emit the notify-failed WARN.
 func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
-	sink := captureLogs(t)
+	sink := capture.Default(t)
 	video := tempVideo(t)
 	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/x.srt"}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return nil })
-	if sink.has(slog.LevelWarn, "failed to notify arr") {
+	if hasRecord(sink, slog.LevelWarn, "failed to notify arr") {
 		t.Errorf("refreshFn ok: unexpected WARN 'failed to notify arr'")
 	}
 }

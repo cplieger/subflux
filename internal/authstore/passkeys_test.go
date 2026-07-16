@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -421,11 +422,11 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 	if err := s.CreatePasskey(ctx, cred); err != nil {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
-	logs := captureLogs(t)
+	logs := capture.Default(t)
 	if err := s.DeletePasskey(ctx, cred.ID, 1); err != nil {
 		t.Fatalf("DeletePasskey: %v", err)
 	}
-	if got := countMsg(logs(), "passkey deleted"); got != 1 {
+	if got := logs.CountExact("passkey deleted"); got != 1 {
 		t.Errorf(`successful owner delete logged "passkey deleted" %d times, want 1`, got)
 	}
 }
