@@ -34,7 +34,7 @@
   "dependencies": {
     "@cplieger/actions": "2.0.13",
     "@cplieger/fetch": "1.1.3",
-    "@cplieger/reactive": "1.2.4",
+    "@cplieger/reactive": "1.2.5",
     "@cplieger/ui-primitives": "2.1.2"
   },
   "overrides": {
