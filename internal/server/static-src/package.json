@@ -32,7 +32,7 @@
     "vitest": "4.1.10"
   },
   "dependencies": {
-    "@cplieger/actions": "3.1.0",
+    "@cplieger/actions": "3.1.1",
     "@cplieger/fetch": "2.1.0",
     "@cplieger/reactive": "1.2.5",
     "@cplieger/ui-primitives": "3.0.0"
