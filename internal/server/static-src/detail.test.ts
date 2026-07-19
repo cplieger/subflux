@@ -81,9 +81,7 @@ function makeSeasons(t1: string, t2: string, t3: string): SeasonGroup[] {
     },
     {
       season: 2,
-      episodes: [
-        { id: 201, season: 2, episode: 1, title: t3, has_file: true },
-      ],
+      episodes: [{ id: 201, season: 2, episode: 1, title: t3, has_file: true }],
     },
   ];
 }
@@ -258,10 +256,7 @@ describe("detail: openMovieDetail", () => {
     expect(frCovBefore).toBe(DASH); // movie empty badge has no lang prefix
 
     // Refresh (new movie object, same tmdb_id): fr now covered, en unchanged.
-    openMovieDetail(
-      makeMovie(50, [movieSub("en", 90), movieSub("fr", 85)]),
-      true,
-    );
+    openMovieDetail(makeMovie(50, [movieSub("en", 90), movieSub("fr", 85)]), true);
 
     // REUSE: same <tbody> node.
     expect(movieTbody()).toBe(tbody);

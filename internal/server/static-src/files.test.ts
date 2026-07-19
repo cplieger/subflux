@@ -99,10 +99,7 @@ describe("files: renderFiles", () => {
     // The old key `${media_id}-${language}-${source}` collided here
     // ("tmdb-5-fr-external" for both) and dropped the second row; the FileRef
     // key includes the manual-sibling ordinal, keeping both.
-    mockListFiles.mockResolvedValueOnce([
-      extFile("tmdb-5", "fr"),
-      extFile("tmdb-5", "fr", 1),
-    ]);
+    mockListFiles.mockResolvedValueOnce([extFile("tmdb-5", "fr"), extFile("tmdb-5", "fr", 1)]);
 
     openFileManager("movie", "tmdb-5", "Movie", "/");
     await tick();

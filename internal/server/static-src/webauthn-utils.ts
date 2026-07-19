@@ -3,7 +3,7 @@
 
 import { webauthnSignalData } from "./wire/client.gen.js";
 
-export function base64urlToBuffer(b64: string): ArrayBuffer {
+function base64urlToBuffer(b64: string): ArrayBuffer {
   const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
   const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
   const bytes = new Uint8Array(binary.length);

@@ -26,15 +26,15 @@ ORACLE_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0@sha256:ed034a8bf0b24ded0cbbac07e
 # as the invoking user so the output is not root-owned; the SDK gets a
 # writable throwaway HOME for its build artifacts.
 docker run --rm \
-	--user "$(id -u):$(id -g)" \
-	-v "$PWD/..:/oracle:z" \
-	-w /oracle/oracle \
-	-e HOME=/tmp \
-	-e DOTNET_CLI_HOME=/tmp \
-	-e XDG_DATA_HOME=/tmp/.local/share \
-	-e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-	-e DOTNET_NOLOGO=1 \
-	"$ORACLE_IMAGE" \
-	dotnet run oracle.cs -- patterns.json corpus.json ../dotnet_oracle.json
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD/..:/oracle:z" \
+  -w /oracle/oracle \
+  -e HOME=/tmp \
+  -e DOTNET_CLI_HOME=/tmp \
+  -e XDG_DATA_HOME=/tmp/.local/share \
+  -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+  -e DOTNET_NOLOGO=1 \
+  "$ORACLE_IMAGE" \
+  dotnet run oracle.cs -- patterns.json corpus.json ../dotnet_oracle.json
 
 echo "regenerated $(cd .. && pwd)/dotnet_oracle.json"
