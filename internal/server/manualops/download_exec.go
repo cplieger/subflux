@@ -16,9 +16,12 @@ import (
 const DownloadTimeout = 5 * time.Minute
 
 // RunDownload performs the actual download, post-processing, and save.
+// actID is the download's activity entry: on a successful save the entry's
+// detail is updated with the saved subtitle path, which is how activity
+// consumers (the remote CLI's poll loop) learn where the file landed.
 // Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	prov api.Provider, req *DownloadRequest,
+	prov api.Provider, req *DownloadRequest, actID string,
 ) bool {
 	// Download the subtitle.
 	sub := api.Subtitle{
@@ -50,28 +53,28 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		return false
 	}
 
-	// Sync timing against existing reference subtitle.
+	// Sync timing against existing reference subtitle. The video path was
+	// resolved server-side from the MediaRef by the handler (S7).
 	variant := api.VariantFromFlags(req.HearingImp, req.Forced)
-	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.FilePath, req.Language, variant)
+	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
 
 	// Resolve media IDs for coverage tracking and history recording.
 	mediaType := req.MediaType
 	coverageMediaID, historyMediaID := ResolveMediaIDs(ctx, ls, mediaType, req.ArrID, req.Season, req.Episode)
 
-	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
-	// independent sequences, matching the variant-aware manual file naming.
-	n := db.NextManualNumber(ctx, mediaType, historyMediaID, req.Language, variant)
-	subPath := api.ManualSubtitlePath(req.FilePath, req.Language, n, req.HearingImp, req.Forced)
+	// The display title is an arr HTTP lookup; resolve it BEFORE taking the
+	// per-quad path reservation so no remote call runs under the gate.
+	title := LookupMediaTitle(ctx, ls, mediaType, req.ArrID)
 
-	// Atomic write: temp file + rename prevents corruption on crash.
-	if _, err := atomicfile.WriteFile(ctx, subPath, data); err != nil {
-		slog.Error("manual download: write failed", "path", subPath, "error", err)
-		NotifyError(deps, "manual", "Write failed for manual subtitle download",
-			"Write failed for subtitle download")
+	subPath, ok := commitNumberedSubtitle(ctx, deps, db, req, historyMediaID, title, variant, data)
+	if !ok {
 		return false
 	}
 
-	slog.Info("manual download saved", "path", subPath, "number", n)
+	// Record the saved path as the activity entry's detail: the completion
+	// datum the CLI's poll loop (and the activity UI) reports. Counters stay
+	// zero — downloads have no progress steps.
+	deps.Activity.Progress(actID, 0, 0, subPath)
 
 	// Update coverage and notify arr.
 	effectiveMediaID := coverageMediaID
@@ -87,17 +90,58 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		}
 	}
 
-	// Record in history.
-	isManual := !req.TopPick
+	// Publish success events.
+	deps.Events.PublishNotify(events.NotifySuccess, "Subtitle downloaded")
+	deps.Events.PublishCoverageUpdate(mediaType, effectiveMediaID, req.Language, string(req.Provider))
+
+	return true
+}
+
+// commitNumberedSubtitle allocates the quad's next ordinal, writes the
+// subtitle bytes to the numbered path, and records the download in history
+// — all under the quad's downloadPathGate reservation. Holding the gate
+// across allocation, atomic write, AND history insertion is the point:
+// ordinal discovery (NextManualNumber reads the recorded paths) always
+// sees the previous holder's committed row, so two concurrent downloads
+// for the same quad can never claim the same number and overwrite each
+// other's file. Only local disk and bbolt work runs under the gate.
+//
+// Returns ok=false only when the file write failed (the download fails); a
+// history-recording failure warns and keeps the saved file, matching the
+// previous non-fatal behavior.
+func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore,
+	req *DownloadRequest, historyMediaID, title string, variant api.Variant, data []byte,
+) (subPath string, ok bool) {
+	unlock := downloadPathGate.lock(downloadQuadKey(req.MediaType, historyMediaID, req.Language, variant))
+	defer unlock()
+
+	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
+	// independent sequences, matching the variant-aware manual file naming.
+	n := db.NextManualNumber(ctx, req.MediaType, historyMediaID, req.Language, variant)
+	subPath = api.ManualSubtitlePath(req.VideoPath(), req.Language, n, req.HearingImp, req.Forced)
+
+	// Atomic write: temp file + rename prevents corruption on crash.
+	if _, err := atomicfile.WriteFile(ctx, subPath, data); err != nil {
+		slog.Error("manual download: write failed", "path", subPath, "error", err)
+		NotifyError(deps, "manual", "Write failed for manual subtitle download",
+			"Write failed for subtitle download")
+		return "", false
+	}
+
+	slog.Info("manual download saved", "path", subPath, "number", n)
+
+	// Record in history. A top pick records as auto (manual=false) but
+	// still occupies a numbered path, which is why ordinal discovery scans
+	// every row's path regardless of the Manual flag.
 	meta := &api.DownloadMeta{
-		Manual:    isManual,
-		VideoPath: req.FilePath,
+		Manual:    !req.TopPick,
+		VideoPath: req.VideoPath(),
 		Season:    req.Season,
 		Episode:   req.Episode,
-		Title:     LookupMediaTitle(ctx, ls, mediaType, req.ArrID),
+		Title:     title,
 	}
 	if err := db.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType:    mediaType,
+		MediaType:    req.MediaType,
 		MediaID:      historyMediaID,
 		Language:     req.Language,
 		Variant:      variant,
@@ -110,12 +154,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		slog.Warn("failed to record manual download", "error", err)
 		deps.Alerts.RecordWarn("manual", "Download saved but history recording failed")
 	}
-
-	// Publish success events.
-	deps.Events.PublishNotify(events.NotifySuccess, "Subtitle downloaded")
-	deps.Events.PublishCoverageUpdate(mediaType, effectiveMediaID, req.Language, string(req.Provider), subPath)
-
-	return true
+	return subPath, true
 }
 
 // ResolveMediaIDs determines the coverage and history media IDs for a manual

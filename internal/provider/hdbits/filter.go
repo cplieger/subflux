@@ -1,16 +1,14 @@
 package hdbits
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/cplieger/jsonx"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
@@ -32,16 +30,28 @@ type hdbSubtitleItem struct {
 // of silently materializing as subtitle ID "0".
 type flexInt int
 
+// idPolicy is the id decode policy: the jsonx strict core with null and
+// "" rejected instead of tolerated as 0, and ids required positive —
+// id 0 would silently build a getdox.php?id=0&passkey=... download URL.
+var idPolicy = func() jsonx.Policy {
+	p := jsonx.Strict()
+	p.Null = jsonx.Reject
+	p.EmptyString = jsonx.Reject
+	p.MinValue = 1
+	return p
+}()
+
+// UnmarshalJSON implements json.Unmarshaler for flexInt. The receiver is
+// reset first so a reused decode target never retains a stale id: on error
+// it stays 0 (no partial value), and a duplicate key's later tolerated value
+// would clear an earlier decode if the policy ever gains a Zero disposition —
+// the same invariants the jsonx field types pin (jsonx.StrictInt) and the
+// sibling consumers apply.
 func (f *flexInt) UnmarshalJSON(data []byte) error {
-	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
-		return errors.New("flexInt: null is not a valid id")
-	}
-	n, err := provider.ParseFlexInt(data)
+	*f = 0
+	n, err := jsonx.ParseInt64(data, idPolicy)
 	if err != nil {
-		return err
-	}
-	if n <= 0 {
-		return fmt.Errorf("flexInt: non-positive id %d", n)
+		return fmt.Errorf("flexInt: %w", err)
 	}
 	*f = flexInt(n)
 	return nil

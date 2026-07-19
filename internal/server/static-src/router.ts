@@ -2,8 +2,6 @@
 
 import * as store from "./store.js";
 import { $, el, icon, input, select } from "./dom.js";
-import { patch } from "@cplieger/reactive";
-import { apiGet } from "./api-client.js";
 import { openConfig } from "./config.js";
 import {
   loadCoverage,
@@ -17,7 +15,7 @@ import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
 import { viewTransition, setDocTitle } from "./utils.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
-import type { CoverageItem, SeasonGroup } from "./api-types.js";
+import type { CoverageItem } from "./api-types.js";
 
 // --- Page navigation and client-side routing ---
 
@@ -30,14 +28,10 @@ function prepareDetailView(): void {
     ctrl.style.display = "none";
   }
   $.libHeading.textContent = "";
-  const out = $.coverageContent;
-  const skel = document.createDocumentFragment();
-  for (let i = 0; i < 4; i++) {
-    skel.appendChild(
-      el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-    );
-  }
-  patch(out, skel);
+  // No eager skeleton here: the detail/files loaders own their loading paint
+  // via skeletonTiming (150ms show-delay + 300ms min-visible), so a cached
+  // load swaps content in directly without a skeleton flash. The previous
+  // view simply remains during the show-delay window.
 }
 
 const covTypeFilter = select("cov-type-filter");
@@ -158,21 +152,10 @@ async function handleSeriesSync(m: RegExpMatchArray): Promise<void> {
   });
 }
 
-async function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
+function handleSeriesFiles(m: RegExpMatchArray): Promise<void> {
   const tvdbId = Number(m[1]);
-  await withSeries(m, async (s) => {
-    const epPaths = new Map<string, string>();
-    const seasons = (await apiGet<SeasonGroup[]>(`/api/media/series/${s.id}/episodes`)) ?? [];
-    for (const sg of seasons) {
-      for (const ep of sg.episodes ?? []) {
-        if (ep.has_file && ep.path) {
-          const sn = String(sg.season).padStart(2, "0");
-          const en = String(ep.episode).padStart(2, "0");
-          epPaths.set(`tvdb-${tvdbId}-s${sn}e${en}`, ep.path);
-        }
-      }
-    }
-    openFileManager("episode", `tvdb-${tvdbId}-`, s.title, `/series/${tvdbId}`, epPaths, s.id);
+  return withSeries(m, (s) => {
+    openFileManager("episode", `tvdb-${tvdbId}-`, s.title, `/series/${tvdbId}`, s.id);
   });
 }
 
@@ -210,14 +193,7 @@ async function handleMovieSync(m: RegExpMatchArray): Promise<void> {
 async function handleMovieFiles(m: RegExpMatchArray): Promise<void> {
   const tmdbId = Number(m[1]);
   await withMovie(m, (mv) => {
-    openFileManager(
-      "movie",
-      `tmdb-${tmdbId}`,
-      mv.title,
-      `/movie/${tmdbId}`,
-      new Map([["", mv.path ?? ""]]),
-      mv.id,
-    );
+    openFileManager("movie", `tmdb-${tmdbId}`, mv.title, `/movie/${tmdbId}`, mv.id);
   });
 }
 

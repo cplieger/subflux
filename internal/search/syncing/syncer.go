@@ -21,6 +21,11 @@ type SyncResult = subsync.SyncResult
 
 // Syncer implements SubtitleSyncer using the subsync library.
 type Syncer struct {
+	// Exec runs the heavy alignment computation. Nil means in-process
+	// (LangMapper applies); server mode installs the syncworker client for
+	// process isolation (P13).
+	Exec SyncExec
+
 	// LangMapper maps ISO 639-3 codes to ISO 639-1 for ffprobe track selection.
 	LangMapper subsync.LangMapper
 
@@ -29,7 +34,13 @@ type Syncer struct {
 	MinConfidence float64
 }
 
-// Sync adjusts subtitle timing against a reference. Returns the
+// exec resolves the effective executor: the configured one, or in-process.
+func (s Syncer) exec() SyncExec {
+	if s.Exec != nil {
+		return s.Exec
+	}
+	return InProcessExec{LangMapper: s.LangMapper}
+}
 
 // WriteSRT serializes cues to SRT format. Delegates to subsync.WriteSRT.
 func WriteSRT(buf *bytes.Buffer, cues []subsync.Cue) error {
@@ -38,7 +49,7 @@ func WriteSRT(buf *bytes.Buffer, cues []subsync.Cue) error {
 
 // Sync returns the (possibly modified) data and the applied offset in milliseconds.
 func (s Syncer) Sync(ctx context.Context, data []byte, videoPath, lang string) (synced []byte, offsetMs int64) {
-	result := SyncAgainstReference(ctx, data, videoPath, lang, s.LangMapper, s.MinConfidence)
+	result := s.exec().Reference(ctx, data, videoPath, lang, s.MinConfidence)
 	if !result.Applied() || result.Cues == nil {
 		return data, 0
 	}

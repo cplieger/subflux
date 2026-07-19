@@ -42,24 +42,30 @@ func TestAlignWithSplits_constant_offset(t *testing.T) {
 	}
 }
 
-func TestAlignWithSplits_single_segment_fallback(t *testing.T) {
+func TestAlignWithSplits_no_split_emits_no_candidate(t *testing.T) {
 	t.Parallel()
-	// When all cues have the same offset, detectSplits returns a single
-	// segment (len(splits) <= 1), triggering the Sync fallback path.
-	// Use a very high penalty to force a single segment.
+	// When all cues share one offset, detectSplits returns a single segment
+	// (len(splits) <= 1). The constant-offset hypothesis is already the
+	// offset generator's candidate, so the split generator must emit
+	// nothing: zero confidence and unchanged cues (R1.1). A very high
+	// penalty forces the single segment.
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 3*time.Second)
 	result := alignWithSplits(context.Background(), ref, inc, 1e12)
 	if result.Method != MethodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
-	if result.Confidence != ConfidenceModerate {
-		t.Errorf("expected moderate confidence for single-segment fallback, got %f",
+	if result.Confidence != ConfidenceNone {
+		t.Errorf("expected no candidate (zero confidence) for no-split input, got %f",
 			float64(result.Confidence))
 	}
-	// The offset should be close to -3000ms (shifting inc back to align with ref).
-	if result.Offset < -3500 || result.Offset > -2500 {
-		t.Errorf("expected offset ~-3000ms, got %d", result.Offset)
+	if result.Offset != 0 {
+		t.Errorf("expected no correction (offset 0), got %d", result.Offset)
+	}
+	for i := range inc {
+		if result.Cues[i] != inc[i] {
+			t.Fatalf("cue %d changed: got %+v, want input unchanged", i, result.Cues[i])
+		}
 	}
 }
 
@@ -92,6 +98,18 @@ func TestAlignWithSplits_two_segments(t *testing.T) {
 	}
 	if len(result.Cues) != 20 {
 		t.Fatalf("expected 20 cues, got %d", len(result.Cues))
+	}
+	// Multi-segment results carry the segments out as a transform descriptor.
+	if result.Source != SourceSplit {
+		t.Errorf("source = %v, want split", result.Source)
+	}
+	if result.Transform.Kind != TransformSegments {
+		t.Errorf("transform kind = %v, want segments", result.Transform.Kind)
+	}
+	// Tiny-segment merging can collapse detected splits, so only the
+	// descriptor's presence is guaranteed, not a segment count.
+	if len(result.Transform.Segments) < 1 {
+		t.Errorf("transform segments = %d, want >= 1", len(result.Transform.Segments))
 	}
 }
 
@@ -394,6 +412,73 @@ func TestSegmentConfidence_overlap_ratio_capped(t *testing.T) {
 	}
 }
 
+func TestOverlapTotal(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		corr        []TimeSpan
+		ref         []TimeSpan
+		wantOverlap float64
+		wantRef     float64
+	}{
+		{
+			// Each reference span accumulates the UNION of all corrected
+			// spans overlapping it: two adjacent 5s corrected spans fully
+			// cover a 10s reference span (previously only the first
+			// counted, rating the pair 0.5).
+			name:        "reference span covered by two adjacent corrected spans counts fully",
+			corr:        []TimeSpan{{Start: 0, End: 5000}, {Start: 5000, End: 10000}},
+			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			wantOverlap: 10000,
+			wantRef:     10000,
+		},
+		{
+			// (0,6000) and (4000,10000) overlap each other by 2000; the
+			// union is 10000, never 12000.
+			name:        "overlapping corrected spans are not double-counted",
+			corr:        []TimeSpan{{Start: 0, End: 6000}, {Start: 4000, End: 10000}},
+			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			wantOverlap: 10000,
+			wantRef:     10000,
+		},
+		{
+			// A corrected span fully contained in the already-covered
+			// stretch contributes nothing.
+			name:        "contained corrected span adds nothing",
+			corr:        []TimeSpan{{Start: 0, End: 8000}, {Start: 2000, End: 3000}},
+			ref:         []TimeSpan{{Start: 0, End: 10000}},
+			wantOverlap: 8000,
+			wantRef:     10000,
+		},
+		{
+			// One corrected span may overlap consecutive reference spans;
+			// it counts against each (per-span union, per-span cap).
+			name:        "one corrected span overlaps consecutive reference spans",
+			corr:        []TimeSpan{{Start: 0, End: 3000}},
+			ref:         []TimeSpan{{Start: 0, End: 1000}, {Start: 2000, End: 3000}},
+			wantOverlap: 2000,
+			wantRef:     2000,
+		},
+		{
+			name:        "disjoint spans overlap zero",
+			corr:        []TimeSpan{{Start: 5000, End: 6000}},
+			ref:         []TimeSpan{{Start: 0, End: 1000}},
+			wantOverlap: 0,
+			wantRef:     1000,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotOverlap, gotRef := overlapTotal(tt.corr, tt.ref)
+			if gotOverlap != tt.wantOverlap || gotRef != tt.wantRef {
+				t.Errorf("overlapTotal = (%v, %v), want (%v, %v)",
+					gotOverlap, gotRef, tt.wantOverlap, tt.wantRef)
+			}
+		})
+	}
+}
+
 func TestAlignSegments_preserves_text(t *testing.T) {
 	t.Parallel()
 	inc := []Cue{
@@ -465,6 +550,12 @@ func TestAlignWithSplits_three_segments(t *testing.T) {
 	}
 	if len(result.Cues) != 30 {
 		t.Errorf("expected 30 cues, got %d", len(result.Cues))
+	}
+	if result.Transform.Kind != TransformSegments {
+		t.Errorf("transform kind = %v, want segments", result.Transform.Kind)
+	}
+	if got, want := len(result.Transform.Segments), 2; got < want {
+		t.Errorf("transform segments = %d, want >= %d", got, want)
 	}
 }
 

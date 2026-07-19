@@ -66,19 +66,16 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	_, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
 		"unknown": {Enabled: true},
 	})
-	// Unknown provider is skipped, but with no other providers loaded
-	// the result is a shaped "no providers loaded" error with counts.
-	if err == nil {
-		t.Fatal("LoadAll() expected error when only unknown providers exist")
+	// Unknown provider is skipped with a warning; zero providers loading is
+	// a valid state (embedded detection and coverage only), not an error.
+	if err != nil {
+		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "no providers loaded") {
-		t.Errorf("error = %q, want substring %q", err, "no providers loaded")
-	}
-	if !strings.Contains(err.Error(), "unknown=1") {
-		t.Errorf("error = %q, want substring %q (shaped count)", err, "unknown=1")
+	if len(providers) != 0 {
+		t.Errorf("LoadAll() returned %d providers, want 0", len(providers))
 	}
 }
 
@@ -155,17 +152,16 @@ func TestLoadAll_no_providers_loaded(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	_, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
 		"test": {Enabled: false},
 	})
-	if err == nil {
-		t.Fatal("LoadAll() expected error when no providers loaded")
+	// All-disabled is a deliberate, valid state after the embedded-detector
+	// separation: no error, zero providers.
+	if err != nil {
+		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "no providers loaded") {
-		t.Errorf("error = %q, want substring %q", err, "no providers loaded")
-	}
-	if !strings.Contains(err.Error(), "disabled=1") {
-		t.Errorf("error = %q, want substring %q (shaped count)", err, "disabled=1")
+	if len(providers) != 0 {
+		t.Errorf("LoadAll() returned %d providers, want 0", len(providers))
 	}
 }
 
@@ -173,12 +169,12 @@ func TestLoadAll_empty_config(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	_, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{})
-	if err == nil {
-		t.Fatal("LoadAll() expected error for empty config")
+	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{})
+	if err != nil {
+		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "no providers loaded") {
-		t.Errorf("error = %q, want substring %q", err, "no providers loaded")
+	if len(providers) != 0 {
+		t.Errorf("LoadAll() returned %d providers, want 0", len(providers))
 	}
 }
 

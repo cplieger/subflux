@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
 )
 
 func TestValidateDownloadRequest(t *testing.T) {
@@ -20,45 +21,50 @@ func TestValidateDownloadRequest(t *testing.T) {
 	}{
 		{
 			name:    "valid request defaults media type to movie",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", FilePath: "/f", Language: "en"},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en"},
 			wantErr: nil,
 			wantMT:  api.MediaTypeMovie,
 		},
 		{
-			name:    "valid request preserves explicit media type",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", FilePath: "/f", Language: "en", MediaType: api.MediaTypeEpisode},
+			name:    "valid episode request preserves explicit media type",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: api.MediaTypeEpisode, Season: 1, Episode: 2},
 			wantErr: nil,
 			wantMT:  api.MediaTypeEpisode,
 		},
 		{
 			name:    "missing provider",
-			req:     DownloadRequest{SubtitleID: "1", FilePath: "/f", Language: "en"},
+			req:     DownloadRequest{SubtitleID: "1", ArrID: 42, Language: "en"},
 			wantErr: ErrMissingRequired,
 		},
 		{
 			name:    "missing subtitle_id",
-			req:     DownloadRequest{Provider: "os", FilePath: "/f", Language: "en"},
+			req:     DownloadRequest{Provider: "os", ArrID: 42, Language: "en"},
 			wantErr: ErrMissingRequired,
 		},
 		{
-			name:    "missing file_path",
+			name:    "missing media_id (arr ref replaces file_path)",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", Language: "en"},
 			wantErr: ErrMissingRequired,
 		},
 		{
 			name:    "missing language",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", FilePath: "/f"},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42},
 			wantErr: ErrMissingRequired,
 		},
 		{
 			name:    "invalid language code",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", FilePath: "/f", Language: "en/../.."},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en/../.."},
 			wantErr: ErrInvalidLangCode,
 		},
 		{
 			name:    "invalid media type",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", FilePath: "/f", Language: "en", MediaType: "invalid"},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: "invalid"},
 			wantErr: ErrInvalidMediaType,
+		},
+		{
+			name:    "episode without episode number",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: api.MediaTypeEpisode},
+			wantErr: ErrMissingEpisode,
 		},
 	}
 	for _, tt := range tests {
@@ -126,9 +132,32 @@ func TestBuildSearchResults_caps_at_MaxResults(t *testing.T) {
 	for i := range scored {
 		scored[i] = api.ScoredResult{Sub: api.Subtitle{Provider: "p", Language: "eng"}, Score: i}
 	}
-	results := BuildSearchResults(scored, nil)
+	results := BuildSearchResults(scored, nil, nil)
 	if len(results) != MaxResults {
 		t.Errorf("len(results) = %d, want %d", len(results), MaxResults)
+	}
+}
+
+// BuildSearchResults computes each result's tier server-side via the
+// injected scorer; a nil scorer (pre-wire state) leaves tiers empty.
+func TestBuildSearchResults_computes_tier(t *testing.T) {
+	t.Parallel()
+	scored := []api.ScoredResult{
+		{Sub: api.Subtitle{Provider: "os", ReleaseName: "A"}, Score: 85},
+		{Sub: api.Subtitle{Provider: "os", ReleaseName: "B"}, Score: 0},
+	}
+	sc := scorer.New(&api.DefaultScores)
+	results := BuildSearchResults(scored, nil, sc)
+	if results[0].Tier != api.TierExcellent {
+		t.Errorf("Tier for score 85 = %q, want %q", results[0].Tier, api.TierExcellent)
+	}
+	if results[1].Tier != api.TierNone {
+		t.Errorf("Tier for score 0 = %q, want %q", results[1].Tier, api.TierNone)
+	}
+
+	noScorer := BuildSearchResults(scored, nil, nil)
+	if noScorer[0].Tier != "" {
+		t.Errorf("Tier with nil scorer = %q, want empty", noScorer[0].Tier)
 	}
 }
 
@@ -139,7 +168,7 @@ func TestBuildSearchResults_marks_on_disk(t *testing.T) {
 		{Sub: api.Subtitle{Provider: "os", ReleaseName: "Other.2024", Language: "eng"}, Score: 70},
 	}
 	refs := []api.DownloadedRef{{Provider: "os", ReleaseName: "Movie.2024"}}
-	results := BuildSearchResults(scored, refs)
+	results := BuildSearchResults(scored, refs, nil)
 	if !results[0].OnDisk {
 		t.Error("first result should be marked OnDisk")
 	}
@@ -171,17 +200,17 @@ func TestQueryInt(t *testing.T) {
 func TestParseSearchQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name         string
-		query        string
-		wantLang     string
-		wantType     api.MediaType
-		wantFilePath string
-		wantTitle    string
-		wantImdb     string
-		wantSeason   int
-		wantEpisode  int
-		wantYear     int
-		wantRelease  string
+		name        string
+		query       string
+		wantLang    string
+		wantType    api.MediaType
+		wantTitle   string
+		wantImdb    string
+		wantSeason  int
+		wantEpisode int
+		wantYear    int
+		wantArrID   int
+		wantRelease string
 	}{
 		{
 			name:        "explicit movie with all fields",
@@ -218,20 +247,19 @@ func TestParseSearchQuery(t *testing.T) {
 			wantSeason: 1,
 		},
 		{
-			name:         "file populates release when release absent",
-			query:        "type=movie&file=/media/Movie.2024.mkv",
-			wantLang:     "en",
-			wantType:     api.MediaTypeMovie,
-			wantFilePath: "/media/Movie.2024.mkv",
-			wantRelease:  "/media/Movie.2024.mkv",
+			name:      "media_id (arr id) parsed for server-side resolution",
+			query:     "type=movie&media_id=42&title=X",
+			wantLang:  "en",
+			wantType:  api.MediaTypeMovie,
+			wantTitle: "X",
+			wantArrID: 42,
 		},
 		{
-			name:         "explicit release is not overwritten by file",
-			query:        "type=movie&file=/media/Movie.mkv&release=Real.Release",
-			wantLang:     "en",
-			wantType:     api.MediaTypeMovie,
-			wantFilePath: "/media/Movie.mkv",
-			wantRelease:  "Real.Release",
+			name:        "file param is gone: ignored, never a path",
+			query:       "type=movie&file=/media/Movie.mkv&release=Real.Release",
+			wantLang:    "en",
+			wantType:    api.MediaTypeMovie,
+			wantRelease: "Real.Release",
 		},
 		{
 			name:        "negative and non-numeric ints clamp to zero",
@@ -247,15 +275,15 @@ func TestParseSearchQuery(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := httptest.NewRequest(http.MethodGet, "/api/search?"+tt.query, nil)
-			req, lang, mediaType, filePath := ParseSearchQuery(r)
+			req, lang, mediaType, arrID := ParseSearchQuery(r)
 			if lang != tt.wantLang {
 				t.Errorf("lang = %q, want %q", lang, tt.wantLang)
 			}
 			if mediaType != tt.wantType {
 				t.Errorf("mediaType = %q, want %q", mediaType, tt.wantType)
 			}
-			if filePath != tt.wantFilePath {
-				t.Errorf("filePath = %q, want %q", filePath, tt.wantFilePath)
+			if arrID != tt.wantArrID {
+				t.Errorf("arrID = %d, want %d", arrID, tt.wantArrID)
 			}
 			if req.Title != tt.wantTitle {
 				t.Errorf("Title = %q, want %q", req.Title, tt.wantTitle)

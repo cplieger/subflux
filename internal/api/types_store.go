@@ -25,6 +25,11 @@ type ScanRecord struct {
 	AudioLang string
 	Season    int
 	Episode   int
+	// Searched records whether provider work actually ran to completion for
+	// this stamp. False for inventory-only visits (scan skip paths record
+	// coverage without searching); the resume set and staleness displays can
+	// distinguish "we looked at the disk" from "we searched providers".
+	Searched bool
 }
 
 // --- Store types (canonical, moved from store package) ---

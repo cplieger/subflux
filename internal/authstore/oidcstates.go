@@ -27,11 +27,11 @@ import (
 //     strict (exclusive) cutoff comparison as sessions.go's
 //     CleanupExpiredSessions.
 //
-// The oidcRec.expiresAt field (defined in authdb.go) holds the record's
-// CREATION instant in this in-memory design: there is no per-state TTL at
-// create time, so expiry is enforced relative to the maxAge passed to
-// CleanupExpiredOIDCStates (driven by the background sweeper, task 8.7),
-// mirroring the absolute-timeout pattern sessions use against CreatedAt.
+// The oidcRec.createdAt field (defined in authdb.go) holds the record's
+// creation instant: there is no per-state TTL at create time, so expiry is
+// enforced relative to the maxAge passed to CleanupExpiredOIDCStates (driven
+// by the background sweeper, task 8.7), mirroring the absolute-timeout
+// pattern sessions use against CreatedAt.
 
 // errOIDCStateNotFound is the not-found signal returned by ConsumeOIDCState when
 // no live state matches: the state was never created, was already consumed
@@ -46,7 +46,7 @@ var errOIDCStateNotFound = errors.New("authstore: oidc state not found")
 func (s *Store) CreateOIDCState(_ context.Context, state, nonce, codeVerifier, redirectURI string) error {
 	s.mu.Lock()
 	s.oidc[state] = &oidcRec{
-		expiresAt:    time.Now().UTC(),
+		createdAt:    time.Now().UTC(),
 		nonce:        nonce,
 		codeVerifier: codeVerifier,
 		redirectURI:  redirectURI,
@@ -84,7 +84,7 @@ func (s *Store) CleanupExpiredOIDCStates(_ context.Context, now time.Time, maxAg
 	var total int64
 	s.mu.Lock()
 	for state, rec := range s.oidc {
-		if rec == nil || rec.expiresAt.Before(cutoff) {
+		if rec == nil || rec.createdAt.Before(cutoff) {
 			delete(s.oidc, state)
 			total++
 		}

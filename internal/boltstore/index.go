@@ -54,6 +54,15 @@ var (
 	metaKeyFileCount     = []byte("cnt_subtitle_files") // subtitle_files row count
 )
 
+// coreCounterKeys lists every CORE-owned meta counter key. A destructive core
+// migration step (resetCorePreserving, migrate.go) clears exactly these so the
+// counters restart consistently against the emptied buckets; the auth stamp
+// and any non-core meta keys stay untouched. Keep this list in step with the
+// counter declarations above.
+func coreCounterKeys() [][]byte {
+	return [][]byte{metaKeyDownloadCount, metaKeyAttemptCount, metaKeyFileCount}
+}
+
 // appendFillPercent is the bbolt Bucket.FillPercent applied to the
 // append-heavy buckets (subtitle_state's monotonic surrogate keys, the
 // time-ordered ix_state_imported and ix_scan_at). bbolt splits pages at 50%

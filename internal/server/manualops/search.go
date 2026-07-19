@@ -5,14 +5,17 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
 )
 
-// ParseSearchQuery extracts search parameters from the request URL.
-func ParseSearchQuery(r *http.Request) (req api.SearchRequest, lang string, mediaType api.MediaType, filePath string) {
+// ParseSearchQuery extracts search parameters from the request URL. The
+// optional media_id parameter is the ARR internal ID (Radarr movie ID /
+// Sonarr series ID): with season/episode it forms the MediaRef the handler
+// resolves server-side for hash computation — the former client-supplied
+// ?file= path parameter is gone (S7).
+func ParseSearchQuery(r *http.Request) (req api.SearchRequest, lang string, mediaType api.MediaType, arrID int) {
 	q := r.URL.Query()
 	lang = q.Get("lang")
 	if lang == "" {
@@ -44,11 +47,7 @@ func ParseSearchQuery(r *http.Request) (req api.SearchRequest, lang string, medi
 		TvdbID:          QueryInt(q, "tvdb"),
 	}
 
-	filePath = q.Get("file")
-	if filePath != "" && req.ReleaseName == "" {
-		req.ReleaseName = filePath
-	}
-	return req, lang, mediaType, filePath
+	return req, lang, mediaType, QueryInt(q, "media_id")
 }
 
 // QueryInt parses a URL query parameter as a non-negative integer,
@@ -88,8 +87,10 @@ func TryComputeHash(ctx context.Context, ls *LiveState, req *api.SearchRequest, 
 		"path", filePath, "hash", hash, "size", size)
 }
 
-// BuildSearchResults converts scored results to API response format.
-func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef) []SearchResult {
+// BuildSearchResults converts scored results to API response format. sc
+// supplies the server-computed tier label per score (a nil scorer — only
+// possible before the first successful wire — leaves tiers empty).
+func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef, sc api.Scorer) []SearchResult {
 	if len(scored) > MaxResults {
 		scored = scored[:MaxResults]
 	}
@@ -104,11 +105,16 @@ func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef) []S
 			ReleaseName: sr.Sub.ReleaseName,
 			Provider:    sr.Sub.Provider,
 		}]
+		var tier api.ScoreTier
+		if sc != nil {
+			tier = sc.ScoreToTier(sr.Score)
+		}
 		results[i] = SearchResult{
 			Provider:    sr.Sub.Provider,
 			Language:    sr.Sub.Language,
 			ReleaseName: sr.Sub.ReleaseName,
 			Score:       sr.Score,
+			Tier:        tier,
 			Matches:     sr.Matches,
 			MatchedBy:   string(sr.Sub.MatchedBy),
 			HearingImp:  sr.Sub.HearingImp,
@@ -136,20 +142,18 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	mediaID := api.BuildMediaID(req)
 	TryComputeHash(ctx, ls, req, filePath)
 
-	// Search all providers in parallel (skip embedded — those are already on disk).
-	// Each provider gets its own 15s timeout so a slow provider doesn't block others.
-	const perProviderTimeout = 15 * time.Second
+	// Search all providers in parallel. Each provider gets its own timeout
+	// so a slow provider doesn't block others; the value is shared with the
+	// CLI search path via api.DefaultManualProviderTimeout to prevent
+	// silent divergence.
 	type provResult struct {
 		subs []api.Subtitle
 	}
 	results := make([]provResult, len(ls.Providers))
 	g, gctx := errgroup.WithContext(ctx)
 	for i, p := range ls.Providers {
-		if p.Name() == api.ProviderNameEmbedded {
-			continue
-		}
 		g.Go(func() error {
-			pctx, cancel := context.WithTimeout(gctx, perProviderTimeout)
+			pctx, cancel := context.WithTimeout(gctx, api.DefaultManualProviderTimeout)
 			defer cancel()
 			subs, err := p.Search(pctx, req)
 			if err != nil {
@@ -197,6 +201,6 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	}
 
 	return ManualSearchResponse{
-		Results: BuildSearchResults(scored, refs),
+		Results: BuildSearchResults(scored, refs, ls.Scorer),
 	}
 }

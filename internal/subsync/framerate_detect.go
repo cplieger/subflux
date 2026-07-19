@@ -62,7 +62,7 @@ var defaultFramerateConfig = framerateConfig{
 // 3. Try known framerate ratios first (fast, high confidence)
 // 4. Fall back to golden-section search if no known ratio matches
 func correctFramerate(ctx context.Context, reference, incorrect []Cue, videoPath string) SyncResult {
-	noResult := SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate}
+	noResult := SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate, Source: SourceFramerate}
 
 	if len(reference) < defaultFramerateConfig.MinCues || len(incorrect) < defaultFramerateConfig.MinCues {
 		return noResult
@@ -217,6 +217,8 @@ func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2,
 		Rate:       bestPair.Ratio,
 		Confidence: confidence,
 		Method:     MethodFramerate,
+		Source:     SourceFramerate,
+		Transform:  Transform{Kind: TransformFramerate, Ratio: bestPair.Ratio},
 	}, true
 }
 

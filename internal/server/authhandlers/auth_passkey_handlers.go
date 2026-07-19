@@ -25,17 +25,9 @@ func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type passkeyInfo struct {
-		CreatedAt      time.Time `json:"created_at"`
-		Name           string    `json:"name"`
-		Transport      string    `json:"transport,omitempty"`
-		ID             int64     `json:"id"`
-		BackupEligible bool      `json:"backup_eligible"`
-	}
-
-	out := make([]passkeyInfo, 0, len(creds))
+	out := make([]PasskeyInfo, 0, len(creds))
 	for i := range creds {
-		out = append(out, passkeyInfo{
+		out = append(out, PasskeyInfo{
 			ID:             creds[i].ID,
 			Name:           creds[i].Name,
 			Transport:      creds[i].Transport,
@@ -52,7 +44,8 @@ func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 // HandleWebAuthnSignalData handles GET /api/auth/webauthn/signal-data — returns
 // the WebAuthn signal data needed by the browser for credential management.
 func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Request) {
-	if !h.requireWebAuthn(w) {
+	wa, ok := h.requireWebAuthn(w)
+	if !ok {
 		return
 	}
 
@@ -84,7 +77,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 	}
 
 	api.WriteJSON(w, api.SignalData{
-		RPID:          h.WebAuthn.Config.RPID,
+		RPID:          wa.Config.RPID,
 		UserID:        userID,
 		CredentialIDs: credIDs,
 		Name:          user.Username,
@@ -103,7 +96,8 @@ func Base64URLEncode(data []byte) string {
 // initiates passkey registration. Requires password verification before issuing
 // the creation challenge to prevent unauthorized credential provisioning.
 func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Request) {
-	if !h.requireWebAuthn(w) {
+	wa, ok := h.requireWebAuthn(w)
+	if !ok {
 		return
 	}
 
@@ -151,7 +145,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	creation, sessionData, err := authwebauthn.BeginRegistration(h.WebAuthn, webauthnUser)
+	creation, sessionData, err := authwebauthn.BeginRegistration(wa, webauthnUser)
 	if err != nil {
 		slog.Error("webauthn register: begin", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -185,7 +179,8 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 // HandleWebAuthnRegisterFinish handles POST /api/auth/webauthn/register/finish —
 // completes passkey registration, stores the new credential, and emits an audit record.
 func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Request) {
-	if !h.requireWebAuthn(w) {
+	wa, ok := h.requireWebAuthn(w)
+	if !ok {
 		return
 	}
 
@@ -211,7 +206,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	credential, err := authwebauthn.FinishRegistration(h.WebAuthn, webauthnUser, sessData, r)
+	credential, err := authwebauthn.FinishRegistration(wa, webauthnUser, sessData, r)
 	if err != nil {
 		slog.Warn("webauthn register finish: failed", "error", err)
 		api.BadRequestC(w, r, api.CodeWebAuthnRegisterFailed, "registration failed")

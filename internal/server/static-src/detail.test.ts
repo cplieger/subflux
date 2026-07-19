@@ -5,9 +5,10 @@ import { describe, it, vi, beforeEach, expect } from "vitest";
 // strips a vi.fn's implementation before each test. Any mock whose behavior
 // must persist across tests (resolved values, factory shapes, no-op handlers
 // called at module load) MUST be a PLAIN function, not a vi.fn().
-vi.mock("./api-client.js", () => ({
-  apiGet: () => Promise.resolve(null),
-  apiGetArray: () => Promise.resolve([]),
+vi.mock("./wire/client.gen.js", () => ({
+  mediaEpisodes: () => Promise.resolve(null),
+  coverageSeriesDetail: () => Promise.resolve([]),
+  stateIDs: () => Promise.resolve(null),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
 vi.mock("./bus.js", () => ({
@@ -32,6 +33,7 @@ vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: () => undefined,
   triggerSeasonScan: () => undefined,
   triggerMovieScan: () => undefined,
+  applyScanButtonState: () => undefined,
 }));
 vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: () => undefined }));
 vi.mock("./store.js", () => ({
@@ -73,18 +75,20 @@ function makeSeasons(t1: string, t2: string, t3: string): SeasonGroup[] {
     {
       season: 1,
       episodes: [
-        { episode: 1, title: t1, has_file: true, path: "/tv/s01e01.mkv" },
-        { episode: 2, title: t2, has_file: true, path: "/tv/s01e02.mkv" },
+        { id: 101, season: 1, episode: 1, title: t1, has_file: true },
+        { id: 102, season: 1, episode: 2, title: t2, has_file: true },
       ],
     },
     {
       season: 2,
-      episodes: [{ episode: 1, title: t3, has_file: true, path: "/tv/s02e01.mkv" }],
+      episodes: [
+        { id: 201, season: 2, episode: 1, title: t3, has_file: true },
+      ],
     },
   ];
 }
 
-function epSub(mediaId: string, score: number, path: string): SubtitleEntry {
+function epSub(mediaId: string, score: number, ordinal = 0): SubtitleEntry {
   return {
     media_id: mediaId,
     language: "en",
@@ -92,7 +96,7 @@ function epSub(mediaId: string, score: number, path: string): SubtitleEntry {
     source: "external",
     codec: "srt",
     score,
-    path,
+    ordinal,
   };
 }
 
@@ -113,7 +117,7 @@ function makeMovie(tmdbId: number, subs: SubtitleEntry[]): MovieDetail {
   };
 }
 
-function movieSub(language: string, score: number, path: string): SubtitleEntry {
+function movieSub(language: string, score: number, ordinal = 0): SubtitleEntry {
   return {
     media_id: "tmdb-50",
     language,
@@ -121,7 +125,7 @@ function movieSub(language: string, score: number, path: string): SubtitleEntry 
     source: "external",
     codec: "srt",
     score,
-    path,
+    ordinal,
   };
 }
 
@@ -162,7 +166,7 @@ describe("detail: renderSeriesDetail", () => {
   it("initial render builds season heads, column headers, and episode rows", () => {
     const series = makeSeries(100, "Show A");
     const seasons = makeSeasons("Pilot", "Second", "Return");
-    const subs = [epSub("tvdb-100-s01e01", 80, "/tv/s01e01.en.srt")];
+    const subs = [epSub("tvdb-100-s01e01", 80)];
 
     renderSeriesDetail(series, seasons, subs, new Set());
 
@@ -180,7 +184,7 @@ describe("detail: renderSeriesDetail", () => {
     const seasons = makeSeasons("Pilot", "Second", "Return");
 
     // Initial: only S01E01 covered.
-    renderSeriesDetail(series, seasons, [epSub("tvdb-101-s01e01", 80, "/a.srt")], new Set());
+    renderSeriesDetail(series, seasons, [epSub("tvdb-101-s01e01", 80)], new Set());
 
     const tbody = seriesTbody();
     const e1Before = tbody.children.item(2); // S01E01 — covered, will NOT change
@@ -196,7 +200,7 @@ describe("detail: renderSeriesDetail", () => {
     renderSeriesDetail(
       series,
       seasons,
-      [epSub("tvdb-101-s01e01", 80, "/a.srt"), epSub("tvdb-101-s01e02", 70, "/b.srt")],
+      [epSub("tvdb-101-s01e01", 80), epSub("tvdb-101-s01e02", 70)],
       new Set(),
     );
 
@@ -239,7 +243,7 @@ describe("detail: openMovieDetail", () => {
 
   it("coverage refresh repaints only the changed language row and keeps row identity", () => {
     // Initial: en covered, fr uncovered.
-    openMovieDetail(makeMovie(50, [movieSub("en", 90, "/m.en.srt")]));
+    openMovieDetail(makeMovie(50, [movieSub("en", 90)]));
 
     const tbody = movieTbody();
     expect(tbody.children.length).toBe(2); // en, fr (target order)
@@ -255,7 +259,7 @@ describe("detail: openMovieDetail", () => {
 
     // Refresh (new movie object, same tmdb_id): fr now covered, en unchanged.
     openMovieDetail(
-      makeMovie(50, [movieSub("en", 90, "/m.en.srt"), movieSub("fr", 85, "/m.fr.srt")]),
+      makeMovie(50, [movieSub("en", 90), movieSub("fr", 85)]),
       true,
     );
 
@@ -271,7 +275,7 @@ describe("detail: openMovieDetail", () => {
   });
 
   it("switching to a different movie rebuilds the table", () => {
-    openMovieDetail(makeMovie(60, [movieSub("en", 90, "/a.en.srt")]));
+    openMovieDetail(makeMovie(60, [movieSub("en", 90)]));
     const tbodyA = movieTbody();
     const aRow = tbodyA.children.item(0); // en row of movie A
     expect(aRow instanceof HTMLElement).toBe(true);
@@ -279,7 +283,7 @@ describe("detail: openMovieDetail", () => {
     // Different movie id -> REBUILD: keyed <table> forces patch to replace the
     // table (and its freshly-bound <tbody>), so A's rows are gone and the live
     // binding is attached to the in-DOM node rather than a detached one.
-    openMovieDetail(makeMovie(61, [movieSub("en", 80, "/b.en.srt")]));
+    openMovieDetail(makeMovie(61, [movieSub("en", 80)]));
     const tbodyB = movieTbody();
 
     expect(tbodyB).not.toBe(tbodyA);

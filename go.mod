@@ -3,16 +3,20 @@ module github.com/cplieger/subflux
 go 1.26.5
 
 require (
-	github.com/cplieger/arrapi v1.5.4
+	// arrapi v1.7.0 is UNPUBLISHED (latest tag: v1.6.0): it ships the
+	// capture-side StatusError body sanitization via runesafe. See go.work
+	// for the local dev resolution until the tag lands.
+	github.com/cplieger/arrapi v1.7.0
 	github.com/cplieger/atomicfile/v2 v2.1.3
-	github.com/cplieger/auth/v2 v2.0.7
+	github.com/cplieger/auth/v2 v2.1.0
 	github.com/cplieger/health v1.3.0
-	github.com/cplieger/httpx/v2 v2.6.0
-	github.com/cplieger/metrics/v2 v2.3.0
+	// runesafe v1.1.0 is published (Untrusted provenance type +
+	// IsUnsafeNonASCII); resolved from the proxy, no go.work rider.
+	github.com/cplieger/runesafe v1.1.0
 	github.com/cplieger/slogx v1.3.0
-	github.com/cplieger/ssrf/v2 v2.0.7
-	github.com/cplieger/webhttp v1.8.0
-	github.com/cplieger/wiregen v1.3.4
+	github.com/cplieger/ssrf/v3 v3.0.0
+	github.com/cplieger/webhttp v1.9.0
+	github.com/cplieger/wiregen/v2 v2.0.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
 	github.com/ulikunitz/xz v0.5.15
@@ -22,11 +26,21 @@ require (
 	pgregory.net/rapid v1.3.0
 )
 
-require github.com/cplieger/envx/yamlenv v1.0.0
+require github.com/cplieger/envx/yamlenv v1.1.0
+
+require github.com/cplieger/metrics/v3 v3.0.0
+
+require github.com/cplieger/httpx/v3 v3.0.0
+
+require github.com/cplieger/jsonx v1.1.0
+
+require github.com/evanw/esbuild v0.28.1
+
+require golang.org/x/term v0.45.0
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
-	github.com/cplieger/envx v1.2.0
+	github.com/cplieger/envx v1.2.1
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
@@ -43,3 +57,5 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 )
+
+replace github.com/cplieger/wiregen/v2 => ../wiregen

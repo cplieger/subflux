@@ -1,5 +1,6 @@
 import { el, option, icon } from "./dom.js";
-import { extractYAMLValue, extractYAMLBlock, formatDurationCfg } from "./config-yaml.js";
+import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
+import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
 import { prettyLabel } from "./utils.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import type { ParsedConfig } from "./store.js";
@@ -8,35 +9,54 @@ export function fieldId(sectionKey: string, fieldKey: string): string {
   return `cfg-${sectionKey}-${fieldKey}`;
 }
 
+/**
+ * Format a Go duration (nanoseconds) into a human-readable string.
+ * Values from /api/config/parsed arrive as Go nanosecond numbers; strings
+ * (YAML duration literals like "30s" from the structured config) pass
+ * through unchanged.
+ */
+export function formatDurationCfg(ns: number | string): string {
+  if (!ns) {
+    return "";
+  }
+  // Go durations come as nanoseconds in JSON.
+  if (typeof ns === "number") {
+    const secs = Math.floor(ns / 1e9);
+    if (secs === 0) {
+      return "";
+    }
+    if (secs < 60) {
+      return `${secs}s`;
+    }
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) {
+      return `${mins}m`;
+    }
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) {
+      return `${hrs}h`;
+    }
+    return `${Math.floor(hrs / 24)}D`;
+  }
+  return ns;
+}
+
 function resolveFieldValue(
   sectionKey: string,
   field: SchemaField,
-  sections: Record<string, string>,
-  pc: ParsedConfig,
-  configText: string,
+  pc: ParsedConfig | null,
 ): string {
-  // For top-level keys like poll_interval, the section IS the value line.
+  // For top-level keys like poll_interval, the section IS the value.
   if (sectionKey === "poll_interval" && field.key === "poll_interval") {
-    return (
-      (extractYAMLValue(sections[sectionKey] ?? "", "poll_interval") ||
-        extractTopLevelValue(configText, "poll_interval") ||
-        field.default) ??
-      ""
-    );
+    return cfgScalar("poll_interval") || (field.default ?? "");
   }
-  // For scoring, values are nested under "weights:".
+  // For scoring, values are nested under "weights".
   if (sectionKey === "scoring") {
-    const weightsRaw = extractYAMLBlock(sections[sectionKey] ?? "", "weights");
-    if (weightsRaw) {
-      const v = extractYAMLValue(weightsRaw, field.key);
-      if (v) {
-        return v;
-      }
-    }
-    return field.default ?? "";
+    return cfgSubValue("scoring", "weights", field.key) || (field.default ?? "");
   }
-  // Try parsed config first (accurate after env expansion).
-  const parsed = (pc as Record<string, unknown>)[sectionKey] ?? pc;
+  // Try parsed config first (accurate after env expansion). A null pc (parsed
+  // config not fetched yet / fetch failed) resolves like an empty one.
+  const parsed = pc === null ? {} : ((pc as unknown as Record<string, unknown>)[sectionKey] ?? pc);
   const parsedRec = parsed as Record<string, unknown>;
   // Try camelCase and snake_case variants.
   const camel = field.key.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
@@ -57,31 +77,23 @@ function resolveFieldValue(
     }
     return `${val as string | number | boolean}`;
   }
-  // Fall back to raw YAML extraction.
-  const raw = sections[sectionKey] ?? "";
-  const yamlVal = extractYAMLValue(raw, field.key);
-  if (yamlVal) {
-    return yamlVal;
+  // Fall back to the structured config sections.
+  const structVal = cfgValue(sectionKey, field.key);
+  if (structVal) {
+    return structVal;
   }
   return field.default ?? "";
 }
 
-export function renderFieldsSection(
-  schema: SchemaSection,
-  sections: Record<string, string>,
-  pc: ParsedConfig,
-  configText: string,
-): HTMLElement {
+export function renderFieldsSection(schema: SchemaSection, pc: ParsedConfig | null): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
   const hasEnableKey = !!schema.enable_key;
 
   // Section header with optional toggle.
   if (hasEnableKey) {
-    const raw = sections[schema.key] ?? "";
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
-    const enableVal = extractYAMLValue(raw, schema.enable_key!);
     // Default to true for backward compat (omitted = enabled).
-    const isEnabled = enableVal !== "false";
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
+    const isEnabled = cfgBool(schema.key, schema.enable_key!, true);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
     const toggleId = fieldId(schema.key, schema.enable_key!);
     const toggle = cfgToggle(toggleId, isEnabled);
@@ -95,22 +107,28 @@ export function renderFieldsSection(
     );
     sec.appendChild(header);
 
-    // Content container that collapses when disabled.
+    // Content container that collapses when disabled. Region-only disclosure
+    // (trigger: null): the checkbox toggle is the visible control — its
+    // checked state already conveys the collapse, so it gets no aria-expanded
+    // — while the primitive drives the animated height + aria-hidden/inert on
+    // the region (the old display:none snap left no a11y relationship at all).
     const content = el("div", { className: "cfg-body" });
-    if (!isEnabled) {
-      content.style.display = "none";
-    }
+    const contentCtl = createDisclosure(null, content, { open: isEnabled });
     const toggleInput = toggle.querySelector("input");
     if (toggleInput) {
       toggleInput.addEventListener("change", () => {
-        content.style.display = toggleInput.checked ? "" : "none";
+        if (toggleInput.checked) {
+          contentCtl.open();
+        } else {
+          contentCtl.close();
+        }
       });
     }
-    renderFieldsInto(content, schema, sections, pc, configText);
+    renderFieldsInto(content, schema, pc);
     sec.appendChild(content);
   } else {
     sec.appendChild(el("div", { className: "cfg-title" }, schema.title));
-    renderFieldsInto(sec, schema, sections, pc, configText);
+    renderFieldsInto(sec, schema, pc);
   }
   return sec;
 }
@@ -191,9 +209,7 @@ function wireRequires(
 function renderFieldsInto(
   container: HTMLElement,
   schema: SchemaSection,
-  sections: Record<string, string>,
-  pc: ParsedConfig,
-  configText: string,
+  pc: ParsedConfig | null,
 ): void {
   const fieldEls: Record<string, HTMLElement> = {};
   // Collect unique groups for sub-headers.
@@ -211,7 +227,7 @@ function renderFieldsInto(
       if (field.type === "bool") {
         // This bool field becomes the group header toggle.
         const groupId = fieldId(schema.key, field.key);
-        const value = resolveFieldValue(schema.key, field, sections, pc, configText);
+        const value = resolveFieldValue(schema.key, field, pc);
         const isOn = value === "true";
         const toggle = cfgToggle(groupId, isOn);
         const groupHeader = el(
@@ -224,18 +240,21 @@ function renderFieldsInto(
         );
         container.appendChild(groupHeader);
 
-        // Group content container.
+        // Group content container — same region-only disclosure pattern as
+        // the section body above (the group header toggle is a checkbox).
         const groupContent = el("div", {
           className: "cfg-body",
           id: `cfg-group-${field.group}`,
         });
-        if (!isOn) {
-          groupContent.style.display = "none";
-        }
+        const groupCtl = createDisclosure(null, groupContent, { open: isOn });
         const grpInput = toggle.querySelector("input");
         if (grpInput) {
           grpInput.addEventListener("change", () => {
-            groupContent.style.display = grpInput.checked ? "" : "none";
+            if (grpInput.checked) {
+              groupCtl.open();
+            } else {
+              groupCtl.close();
+            }
           });
         }
         container.appendChild(groupContent);
@@ -245,7 +264,7 @@ function renderFieldsInto(
     }
 
     const id = fieldId(schema.key, field.key);
-    const value = resolveFieldValue(schema.key, field, sections, pc, configText);
+    const value = resolveFieldValue(schema.key, field, pc);
     const fieldEl = renderField(id, field, value);
     fieldEls[field.key] = fieldEl;
 
@@ -290,26 +309,11 @@ export function renderField(id: string, field: SchemaField, value: string): HTML
   );
 }
 
-export function renderListSection(
-  schema: SchemaSection,
-  sections: Record<string, string>,
-): HTMLElement {
+export function renderListSection(schema: SchemaSection): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
   sec.appendChild(el("div", { className: "cfg-title" }, schema.title));
 
-  const raw = sections[schema.key] ?? "";
-  const items: string[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- ")) {
-      items.push(
-        trimmed
-          .substring(2)
-          .trim()
-          .replace(/^["']|["']$/g, ""),
-      );
-    }
-  }
+  const items = cfgList(schema.key);
 
   const container = el("div", { id: `${schema.key}-list` });
 
@@ -356,22 +360,15 @@ export function renderListSection(
 
   sec.appendChild(container);
   sec.appendChild(addBtn);
-
-  // Hidden textarea for round-trip.
-  const ta = el(
-    "textarea",
-    {
-      id: `section-${schema.key}`,
-      className: "cfg-textarea",
-      hidden: true,
-    },
-    raw,
-  );
-  sec.appendChild(ta);
   return sec;
 }
 
-export function renderRawSection(name: string, raw: string): HTMLElement {
+// renderRawSection displays a config section the schema does not know
+// (a hand-added top-level key). Display-only: the UI save regenerates the
+// file from schema-driven form values, so unknown sections are not round-
+// tripped (unchanged, documented behavior). Shown as pretty-printed JSON
+// now that the raw YAML text never reaches the browser.
+export function renderRawSection(name: string, value: unknown): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
   sec.appendChild(el("div", { className: "cfg-title" }, prettyLabel(name)));
   const ta = el(
@@ -382,26 +379,10 @@ export function renderRawSection(name: string, raw: string): HTMLElement {
       spellcheck: "false",
       rows: "6",
     },
-    raw,
+    JSON.stringify(value, null, 2),
   );
   sec.appendChild(ta);
   return sec;
-}
-
-function extractTopLevelValue(configText: string, key: string): string {
-  for (const line of configText.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith(`${key}:`) && !line.startsWith(" ")) {
-      let val = trimmed.substring(key.length + 1).trim();
-      // Strip inline comments.
-      const commentIdx = val.indexOf(" #");
-      if (commentIdx >= 0) {
-        val = val.substring(0, commentIdx).trim();
-      }
-      return val.replace(/^["']|["']$/g, "");
-    }
-  }
-  return "";
 }
 
 // --- Config form helpers ---

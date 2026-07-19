@@ -4,43 +4,62 @@ import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { el, text, icon, $ } from "./dom.js";
-import { apiGetArray, apiGetRaw, apiGetTyped } from "./api-client.js";
+import { fillPath } from "./api-client.js";
+import {
+  listActivity,
+  listAlertsRaw,
+  providerTimeouts,
+  stateStats,
+  PATH_CANCEL_ACTIVITY,
+  PATH_DISMISS_ACTIVITY,
+  PATH_DISMISS_ALERT,
+} from "./wire/client.gen.js";
 import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
-import { decodeStats, decodeProvidersResponse, decodeActivityEntry } from "./wire/decoders.gen.js";
 import type {
+  Alert,
   Stats as StatsType,
   ProvidersResponse as ProvidersResponseType,
 } from "./wire/types.gen.js";
 import { fmtTime } from "./utils.js";
-import { EMBEDDED_PROVIDER } from "./constants.js";
 import type { ActivityEntry } from "./api-types.js";
+import { runningScans } from "./scan-scope.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
+import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
 import { patch, reconcile } from "@cplieger/reactive";
 
-interface Alert {
-  id: number;
-  level: string;
-  message: string;
-  source: string;
-  kind: string;
-  persistent: boolean;
-  time: string;
-  created_at: string;
-}
-
-// Stats and ProvidersResponse types now come from validators.ts so the
+// Alert, Stats, and ProvidersResponse are the generated wire types, so the
 // runtime decoder + the type stay in lockstep. The local re-export keeps
 // the existing references in this file working.
 type Stats = StatsType;
 type ProvidersResponse = ProvidersResponseType;
 
 const toastedActivities = new Set<string>();
+// First-successful-poll marker for toast seeding: entries already terminal
+// on the FIRST response are historical and seed silently; entries reaching a
+// terminal state on any LATER response toast. A "toasted set is empty"
+// marker would misclassify the first real completion as historical whenever
+// the first response held only running activities.
+let activitiesInitialized = false;
 const dismissedActivities = new Set<string>();
+
+// Optimistic "stopping…" overlay: activity ids whose stop was dispatched but
+// whose terminal (cancelled) state has not arrived yet. Honesty note: a stop
+// ends the scan after the item IN FLIGHT completes — for single-item scopes
+// that is the whole scan, so this state may sit for minutes.
+const stoppingActivities = new Set<string>();
 
 // The status popup is a @cplieger/ui-primitives popover anchored to the status
 // button (replacing the native Popover API). Held here so isPopupOpen() and the
 // background poll can query/refresh it.
 let statusPopover: MenuPopover | null = null;
+
+// First-open anti-flicker controller for the popup skeleton, settled by the
+// first renderPopup after opening. showDelay 0 (an empty popup at min-height
+// would be worse than an instant skeleton) + the fleet's 300ms min-visible so
+// a fast poll can't flash it. deferredPaint holds the newest paint while a
+// min-visible commit is still pending, so a poll burst can't paint stale rows.
+let popupSkeleton: SkeletonTimingController | null = null;
+let deferredPaint: (() => void) | null = null;
 
 // requires @cplieger/ui-primitives >= 2.1.0 (popover stretch mode); verified
 // locally via a node_modules overlay until released.
@@ -49,16 +68,22 @@ export function initStatusPopover(): void {
     // Panel role is "group" (not a menu), so leave haspopup at its default
     // ("true") — there is no dedicated "group" aria-haspopup token.
     onOpen: () => {
-      // First open: paint the skeleton, then poll. This was the native `toggle`
-      // listener in app.ts before the popover migration.
-      if (!$.statusPopup.children.length) {
-        const skel = document.createDocumentFragment();
-        for (let i = 0; i < 2; i++) {
-          skel.appendChild(
-            el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-          );
-        }
-        patch($.statusPopup, skel);
+      // First open: anti-flicker skeleton (see popupSkeleton above), then
+      // poll. This was the native `toggle` listener in app.ts before the
+      // popover migration.
+      if (!$.statusPopup.children.length && popupSkeleton === null) {
+        popupSkeleton = skeletonTiming(
+          () => {
+            const skel = document.createDocumentFragment();
+            for (let i = 0; i < 2; i++) {
+              skel.appendChild(
+                el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+              );
+            }
+            patch($.statusPopup, skel);
+          },
+          { showDelayMs: 0, minVisibleMs: 300 },
+        );
       }
       void pollStatus();
     },
@@ -86,15 +111,9 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
   if (providers.enabled) {
     const cfg = store.get("config");
     const totalEnabled = cfg
-      ? Object.entries(cfg.providers ?? {}).filter(
-          ([name, enabled]) => enabled && name !== EMBEDDED_PROVIDER,
-        ).length
+      ? Object.entries(cfg.providers).filter(([, enabled]) => enabled).length
       : 0;
-    const timedOut = providers.providers
-      ? Object.entries(providers.providers).filter(
-          ([name, p]) => p.timed_out && name !== EMBEDDED_PROVIDER,
-        ).length
-      : 0;
+    const timedOut = Object.entries(providers.providers).filter(([, p]) => p.timed_out).length;
     if (totalEnabled > 0) {
       parts.push(`${totalEnabled - timedOut}/${totalEnabled} providers`);
     }
@@ -107,12 +126,12 @@ function buildStatsSummary(stats: Stats | null, providers: ProvidersResponse): H
 
 // --- ActivityEntry & alerts polling ---
 
-/** Compute timed-out provider names (excluding embedded). */
+/** Compute timed-out provider names. */
 function timedOutProviders(providers: ProvidersResponse): string[] {
   const ongoing: string[] = [];
-  if (providers.enabled && providers.providers) {
+  if (providers.enabled) {
     for (const [name, status] of Object.entries(providers.providers)) {
-      if (status.timed_out && name !== EMBEDDED_PROVIDER) {
+      if (status.timed_out) {
         ongoing.push(name);
       }
     }
@@ -192,7 +211,11 @@ function processActivitySideEffects(
   activities: ActivityEntry[],
   isActive: boolean,
 ): void {
-  if (toastedActivities.size === 0 && Array.isArray(activities)) {
+  if (!activitiesInitialized) {
+    // First successful poll: whatever is already done predates this page
+    // load — seed it as historical (even when the snapshot has no done
+    // entries at all) so only LATER completions toast.
+    activitiesInitialized = true;
     for (const a of activities) {
       if (a.done) {
         toastedActivities.add(a.id);
@@ -215,7 +238,15 @@ function processActivitySideEffects(
           a.action !== "Manual Download" &&
           a.action !== "Audio Sync"
         ) {
-          notify.success(a.detail);
+          // Distinct terminal signals: a cancelled or failed scan must not
+          // produce a success toast.
+          if (a.cancelled) {
+            notify.info(`Stopped: ${a.detail}`);
+          } else if (a.failed) {
+            notify.error(`Failed: ${a.detail}`);
+          } else {
+            notify.success(a.detail);
+          }
         }
       }
     }
@@ -237,12 +268,12 @@ export const pollStatusAction = defineAction<undefined, undefined>({
     const unconfigured = store.get("isUnconfigured");
     const popupVisible = isPopupOpen();
 
-    // Always fetch alerts and activity. Alerts go through the RAW helper so a
+    // Always fetch alerts and activity. Alerts go through the RAW flavor so a
     // network-level failure (status 0, not an abort) is distinguishable from
     // "no alerts": an unreachable server must show the offline state, not
     // coalesce to a green "Healthy" — the status button would otherwise be at
     // its most reassuring exactly when the app is down.
-    const alertsRes = await apiGetRaw<Alert[]>("/api/alerts", signal);
+    const alertsRes = await listAlertsRaw({ signal });
     if (!alertsRes.ok && alertsRes.status === 0) {
       if (!signal.aborted) {
         setOfflineStatus($.statusBtn, popupVisible);
@@ -250,14 +281,35 @@ export const pollStatusAction = defineAction<undefined, undefined>({
       return;
     }
     const alerts = (alertsRes.ok ? alertsRes.data : null) ?? [];
-    const activities = (await apiGetArray("/api/activity", decodeActivityEntry, signal)) ?? [];
+    const activities = (await listActivity({ signal })) ?? [];
 
-    let providers: ProvidersResponse = { enabled: false };
+    // Publish the running-scans-by-scope map derived from the structured
+    // scope fields. This is the load-bearing restoration/catch-up path: a
+    // fresh poll rebuilds it with zero SSE events seen (reconnects create a
+    // fresh EventSource that sends no Last-Event-ID). Scan buttons subscribe
+    // via detail-scan.ts. Also reconcile the optimistic "stopping…" overlay:
+    // entries that reached a terminal state (or vanished) leave the set.
+    store.set("runningScansByScope", runningScans(activities));
+    if (stoppingActivities.size > 0) {
+      const live = new Set<string>();
+      for (const a of activities) {
+        if (!a.done) {
+          live.add(a.id);
+        }
+      }
+      for (const id of stoppingActivities) {
+        if (!live.has(id)) {
+          stoppingActivities.delete(id);
+        }
+      }
+    }
+
+    let providers: ProvidersResponse = { enabled: false, providers: {} };
     let stats: Stats | null = null;
     if (!unconfigured && popupVisible) {
       const [providersRes, statsRes] = await Promise.all([
-        apiGetTyped("/api/providers/timeout", decodeProvidersResponse, signal),
-        apiGetTyped("/api/state/stats", decodeStats, signal),
+        providerTimeouts({ signal }),
+        stateStats({ signal }),
       ]);
       if (providersRes) {
         providers = providersRes;
@@ -266,11 +318,7 @@ export const pollStatusAction = defineAction<undefined, undefined>({
         stats = statsRes;
       }
     } else if (!unconfigured) {
-      const providersRes = await apiGetTyped(
-        "/api/providers/timeout",
-        decodeProvidersResponse,
-        signal,
-      );
+      const providersRes = await providerTimeouts({ signal });
       if (providersRes) {
         providers = providersRes;
       }
@@ -302,9 +350,19 @@ export async function pollStatus(): Promise<void> {
 }
 
 // buildActivityItem constructs a single activity row for the status popup.
-function buildActivityItem(a: ActivityEntry): HTMLElement {
+// Terminal states render DISTINCTLY: completed (check), cancelled (stop
+// glyph, muted), failed (warning) — a cancelled or failed scan must never
+// wear the success check. Running scan entries carry the stop control.
+// Exported for tests.
+export function buildActivityItem(a: ActivityEntry): HTMLElement {
+  const stopping = !a.done && stoppingActivities.has(a.id);
+
   let statusIcon: HTMLElement;
-  if (a.done) {
+  if (a.done && a.cancelled) {
+    statusIcon = el("span", { className: "act-icon act-cancelled" }, icon("stop"));
+  } else if (a.done && a.failed) {
+    statusIcon = el("span", { className: "act-icon act-failed" }, icon("warning"));
+  } else if (a.done) {
     statusIcon = el("span", { className: "act-icon act-done" }, icon("check"));
   } else if (a.queued) {
     statusIcon = el("span", { className: "act-icon act-queued" }, icon("hourglass"));
@@ -319,7 +377,11 @@ function buildActivityItem(a: ActivityEntry): HTMLElement {
   const titleText = a.source === "scheduled" ? "Scheduled search" : "Manual search";
 
   let timerSpan: HTMLElement | null;
-  if (a.done && a.ended_at) {
+  if (a.done && a.cancelled) {
+    timerSpan = el("span", { className: "live-timer" }, " \u00B7 stopped");
+  } else if (a.done && a.failed) {
+    timerSpan = el("span", { className: "live-timer" }, " \u00B7 failed");
+  } else if (a.done && a.ended_at) {
     timerSpan = el(
       "span",
       { className: "live-timer" },
@@ -327,6 +389,10 @@ function buildActivityItem(a: ActivityEntry): HTMLElement {
     );
   } else if (a.done) {
     timerSpan = null;
+  } else if (stopping) {
+    // Optimistic post-dispatch state. End-of-current-item semantics: for a
+    // single-item scope this may honestly sit here for minutes.
+    timerSpan = el("span", { className: "live-timer" }, " \u00B7 stopping\u2026");
   } else if (a.queued) {
     timerSpan = el("span", { className: "live-timer" }, " \u00B7 queued");
   } else {
@@ -340,23 +406,43 @@ function buildActivityItem(a: ActivityEntry): HTMLElement {
     );
   }
 
-  const dismissBtn =
-    a.done || a.queued
-      ? el(
-          "button",
-          {
-            type: "button",
-            className: "close-btn ghost",
-            "aria-label": a.queued ? "Cancel" : "Dismiss",
-            "data-tip": a.queued ? "Cancel queued search" : null,
-            onclick: (e: MouseEvent) => {
-              e.stopPropagation();
-              dismissActivity(a.id);
-            },
-          },
-          icon("close"),
-        )
-      : null;
+  // Running scan entries get the stop control (canonical home per the S12
+  // ruling): confirm-less graceful stop, rendered per the object-level role
+  // (full scans are admin-stoppable only). Queued entries keep the dismiss
+  // cancel; done entries the dismiss button.
+  let actionBtn: HTMLElement | null = null;
+  if (a.done || a.queued) {
+    actionBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "close-btn ghost",
+        "aria-label": a.queued ? "Cancel" : "Dismiss",
+        "data-tip": a.queued ? "Cancel queued search" : null,
+        onclick: (e: MouseEvent) => {
+          e.stopPropagation();
+          dismissActivity(a.id);
+        },
+      },
+      icon("close"),
+    );
+  } else if (a.cancellable && (a.required_role !== "admin" || store.get("isAdmin"))) {
+    actionBtn = el(
+      "button",
+      {
+        type: "button",
+        className: "close-btn ghost",
+        "aria-label": "Stop scan",
+        "data-tip": "Stop after the current item",
+        disabled: stopping,
+        onclick: (e: MouseEvent) => {
+          e.stopPropagation();
+          requestStopScan(a.id, e.currentTarget as HTMLButtonElement | null);
+        },
+      },
+      icon("stop"),
+    );
+  }
 
   const itemClass = a.done || a.queued ? "pop-item pop-act pop-done" : "pop-item pop-act";
   return el(
@@ -365,9 +451,43 @@ function buildActivityItem(a: ActivityEntry): HTMLElement {
     statusIcon,
     el("span", { className: "act-title" }, titleText, timerSpan),
     el("span", { className: "act-detail" }, a.detail || ""),
-    dismissBtn,
+    actionBtn,
   );
 }
+
+/** Dispatch a graceful stop for a running scan with the optimistic
+ *  "stopping…" state; the terminal cancelled entry arriving via poll (or a
+ *  failed dispatch reverting the overlay) reconciles the row. */
+function requestStopScan(id: string, btn: HTMLButtonElement | null): void {
+  stoppingActivities.add(id);
+  if (btn) {
+    btn.disabled = true;
+  }
+  const item = document.querySelector(`[data-act-id="${CSS.escape(id)}"]`);
+  const timer = item?.querySelector(".live-timer");
+  if (timer) {
+    timer.textContent = " \u00B7 stopping\u2026";
+  }
+  void cancelActivityAction.dispatch(id).then((r) => {
+    if (r === null) {
+      // Stop rejected (network failure, or the scan finished first): revert
+      // the optimistic overlay; the poll repaints the row's true state.
+      stoppingActivities.delete(id);
+    }
+    void pollStatus();
+  });
+}
+
+/** Stop a running background scan. Silent on failure (no toast): the row
+ *  reverting from "stopping…" plus the next poll's true state is the
+ *  feedback. Dedupe guards rapid double-clicks; the endpoint is idempotent
+ *  (204 for already-stopping) anyway. */
+const cancelActivityAction = apiAction<string>({
+  name: "activity.cancel",
+  request: (id) => ({ method: "POST", path: fillPath(PATH_CANCEL_ACTIVITY, { id }) }),
+  dedupe: (id) => `activity.cancel:${id}`,
+  error: false,
+});
 
 function buildAlertItem(a: Alert): HTMLElement {
   const dismissBtn = el(
@@ -441,26 +561,9 @@ function buildPopupItems(
     items.push({ key: `act-${a.id}`, build: () => buildActivityItem(a) });
   }
 
-  if (providers.enabled && providers.providers?.[EMBEDDED_PROVIDER]) {
-    const emb = providers.providers[EMBEDDED_PROVIDER];
-    if (emb.last_error) {
-      const errMsg = emb.last_error.replace(/detect embedded subs: /g, "");
-      items.push({
-        key: "emb-err",
-        build: () =>
-          el(
-            "div",
-            { className: "pop-item" },
-            el("span", { className: "level-warn" }, "Embedded detection: "),
-            text(errMsg),
-          ),
-      });
-    }
-  }
-
   if (ongoing.length > 0) {
     for (const name of ongoing) {
-      const p = providers.providers?.[name];
+      const p = providers.providers[name];
       if (!p) {
         continue;
       }
@@ -530,11 +633,32 @@ function renderPopup(
   ongoing: string[],
   isActive: boolean,
 ): void {
-  const items = buildPopupItems(stats, providers, activities, alerts, ongoing, isActive);
-  reconcile($.statusPopup, items, {
-    key: (item) => item.key,
-    mount: (item) => item.build(),
-  });
+  const paint = (): void => {
+    const items = buildPopupItems(stats, providers, activities, alerts, ongoing, isActive);
+    reconcile($.statusPopup, items, {
+      key: (item) => item.key,
+      mount: (item) => item.build(),
+    });
+    // Content changed after placement — re-clamp against the real height
+    // (no-op while the popup is closed).
+    statusPopover?.reposition();
+  };
+  if (popupSkeleton !== null) {
+    // First data after open: honor the skeleton's min-visible window.
+    deferredPaint = paint;
+    const s = popupSkeleton;
+    popupSkeleton = null;
+    s.commit(() => {
+      deferredPaint?.();
+      deferredPaint = null;
+    });
+  } else if (deferredPaint !== null) {
+    // A newer poll landed before the min-visible commit fired: supersede the
+    // queued paint so the deferred commit renders the freshest data.
+    deferredPaint = paint;
+  } else {
+    paint();
+  }
 }
 
 /** Play the authored exit animation (fade + slide + collapse) on a popup row,
@@ -562,24 +686,34 @@ function dismissActivity(id: string): void {
     }
     animateDismiss(item);
   }
-  // Fire and forget; next poll will filter it out. Silent error: the
-  // dismissedActivities set above already hides the row optimistically;
-  // a server failure surfaces only as the row reappearing on next poll.
-  void dismissActivityAction.dispatch(id);
+  // Optimistic hide with rollback: on success the server prunes the entry
+  // and the set entry is moot; on terminal failure (retries exhausted) the
+  // id must LEAVE the client-side set — it is permanent otherwise, so the
+  // row could never reappear — and a refresh poll repaints the true state.
+  // The action's error notification reports the failure.
+  void dismissActivityAction.dispatch(id).then((r) => {
+    if (r === null) {
+      dismissedActivities.delete(id);
+      void pollStatus();
+    }
+  });
 }
 
-/** Dismiss an activity. Silent (no toast) — UI feedback is the spinner
- *  swap + dismissedActivities Set hiding the row until next poll.
- *  retryNetwork handles transient blips: a quick disconnect would
- *  otherwise leave the row hidden but never actually dismissed
- *  server-side. dedupe protects against rapid double-click. */
+/** Dismiss an activity. retryNetwork + RETRY_STANDARD absorb transient
+ *  blips (a quick disconnect would otherwise leave the row hidden but never
+ *  actually dismissed server-side); a terminal failure surfaces the action
+ *  error notification and dismissActivity rolls the optimistic hide back.
+ *  dedupe protects against rapid double-click. */
 const dismissActivityAction = apiAction<string>({
   name: "activity.dismiss",
-  request: (id) => ({ method: "DELETE", path: `/api/activity?id=${encodeURIComponent(id)}` }),
+  request: (id) => ({
+    method: "DELETE",
+    path: `${PATH_DISMISS_ACTIVITY}?id=${encodeURIComponent(id)}`,
+  }),
   dedupe: (id) => `activity.dismiss:${id}`,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
-  error: false,
+  error: "Dismiss failed",
 });
 
 async function dismissAlert(id: number): Promise<void> {
@@ -593,7 +727,7 @@ async function dismissAlert(id: number): Promise<void> {
  *  prevents rapid-click duplicate deletes against the same alert id. */
 const dismissAlertAction = apiAction<number>({
   name: "alerts.dismiss",
-  request: (id) => ({ method: "DELETE", path: `/api/alerts?id=${id}` }),
+  request: (id) => ({ method: "DELETE", path: `${PATH_DISMISS_ALERT}?id=${id}` }),
   dedupe: (id) => `alerts.dismiss:${id}`,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,

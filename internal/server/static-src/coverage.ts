@@ -9,16 +9,16 @@
 
 import * as store from "./store.js";
 import { $, el, text, icon, errDiv, input, select, insertNavButton } from "./dom.js";
-import { apiGetTyped } from "./api-client.js";
+import { coverageSeries, coverageMovies } from "./wire/client.gen.js";
 import { registerCleanup } from "@cplieger/actions";
-import { decodeSeriesItem, decodeMovieItem } from "./wire/decoders.gen.js";
-import { decodeArray } from "./validators.js";
 import { clickableRow, emptyState, langName, coverageMediaId, fmtLangVariant } from "./utils.js";
 import { on, emit, BusEvent } from "./bus.js";
 import type { DetailConfig } from "./bus.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
+import { applyScanButtonState } from "./detail-scan.js";
+import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
 import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
-import { skeletonTiming } from "./skeleton-timing.js";
+import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 
 // --- Coverage view ---
 
@@ -72,11 +72,9 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   coverageAbort?.abort();
   coverageAbort = new AbortController();
   const { signal: sig } = coverageAbort;
-  const decodeSeriesList = (v: unknown) => decodeArray(v, decodeSeriesItem, "$.series");
-  const decodeMovieList = (v: unknown) => decodeArray(v, decodeMovieItem, "$.movies");
   const [series, movies] = await Promise.all([
-    apiGetTyped("/api/coverage/series", decodeSeriesList, sig),
-    apiGetTyped("/api/coverage/movies", decodeMovieList, sig),
+    coverageSeries({ signal: sig }),
+    coverageMovies({ signal: sig }),
   ]);
   if (sig.aborted) {
     return coverage.items();
@@ -124,7 +122,9 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
           () => {
             patch(out, coverageSkeleton());
           },
-          { signal: ctrl.signal },
+          // The library default is min-visible 0; subflux keeps its 300ms
+          // never-blink window explicitly.
+          { minVisibleMs: 300, signal: ctrl.signal },
         )
       : null;
   try {
@@ -313,20 +313,24 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
     );
   } else {
     const scanEvent = isSeries ? BusEvent.ScanSeries : BusEvent.ScanMovie;
-    actionBtn = el(
+    const scanBtn = el(
       "button",
       {
         type: "button",
         className: "ghost",
         "data-tip": "Auto: scan and download missing subtitles",
+        "data-scan-scope": isSeries ? seriesScopeKey(item.id) : movieScopeKey(item.id),
         onclick: (e: MouseEvent) => {
           e.stopPropagation();
-          emit(scanEvent, { item, btn: e.currentTarget as HTMLButtonElement | null });
+          emit(scanEvent, { item });
         },
       },
       icon("search"),
       el("span", { className: "btn-text" }, " Search"),
-    );
+    ) as HTMLButtonElement;
+    // Rows painted while a scan runs restore the disabled+spinner state.
+    applyScanButtonState(scanBtn);
+    actionBtn = scanBtn;
   }
 
   const openDetail = isSeries

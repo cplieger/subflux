@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -297,7 +298,9 @@ type trackDetector struct {
 	tracks []api.EmbeddedTrack
 }
 
-func (d trackDetector) DetectTracks(_ context.Context, _ string) []api.EmbeddedTrack { return d.tracks }
+func (d trackDetector) DetectTracks(_ context.Context, _ string) ([]api.EmbeddedTrack, error) {
+	return d.tracks, nil
+}
 
 func TestDetectExisting_embedded_tracks(t *testing.T) {
 	t.Parallel()
@@ -310,7 +313,10 @@ func TestDetectExisting_embedded_tracks(t *testing.T) {
 		{Lang: "de", Codec: "subrip", HearingImpaired: false, Forced: true},
 	}}
 
-	result := detectExisting(context.Background(), videoPath, detector, nil)
+	result, err := detectExisting(context.Background(), videoPath, detector, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 
 	if len(result.Embedded) != 3 {
 		t.Fatalf("detectExisting(context.Background(), ).Embedded = %d tracks, want 3", len(result.Embedded))
@@ -328,12 +334,39 @@ func TestDetectExisting_embedded_tracks(t *testing.T) {
 
 func TestDetectExisting_empty_video_path(t *testing.T) {
 	t.Parallel()
-	result := detectExisting(context.Background(), "", noopDetector{}, nil)
+	result, err := detectExisting(context.Background(), "", noopDetector{}, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 	if len(result.Embedded) != 0 {
 		t.Errorf("detectExisting(context.Background(), \"\").Embedded = %d, want 0", len(result.Embedded))
 	}
 	if len(result.External) != 0 {
 		t.Errorf("detectExisting(context.Background(), \"\").External = %d, want 0", len(result.External))
+	}
+}
+
+// A detector failure surfaces as the returned error while external subs are
+// still scanned (partial in-memory result for fail-open search): "error"
+// stays distinguishable from "no tracks" end to end.
+func TestDetectExisting_detector_error_partial_result(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	videoPath := filepath.Join(dir, "movie.mkv")
+	if err := os.WriteFile(filepath.Join(dir, "movie.en.srt"), []byte("sub"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	result, err := detectExisting(context.Background(), videoPath,
+		errDetector{err: errors.New("ffprobe exploded")}, nil)
+	if err == nil {
+		t.Fatal("detectExisting() error = nil, want detector error")
+	}
+	if len(result.Embedded) != 0 {
+		t.Errorf("Embedded = %d tracks, want 0 on detector error", len(result.Embedded))
+	}
+	if len(result.External) != 1 {
+		t.Errorf("External = %d, want 1 (external scan still runs fail-open)", len(result.External))
 	}
 }
 
@@ -384,7 +417,10 @@ func TestDetectExisting_multiple_extensions(t *testing.T) {
 		}
 	}
 
-	result := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 	if len(result.External) != 4 {
 		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 4 (all extensions)", len(result.External))
 	}
@@ -401,7 +437,10 @@ func TestDetectExisting_no_matching_subs(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 	if len(result.External) != 0 {
 		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 0 (no match)", len(result.External))
 	}
@@ -599,84 +638,57 @@ func TestHasExternalSubtitle(t *testing.T) {
 
 // --- IgnoredCodecsFromConfig ---
 
+// ignoredCodecConfig satisfies the resolver's minimal interface.
 type ignoredCodecConfig struct {
-	providers map[api.ProviderID]api.ProviderCfg
+	policy api.EmbeddedPolicy
 }
 
-func (c *ignoredCodecConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg { return c.providers }
+func (c *ignoredCodecConfig) EmbeddedPolicy() api.EmbeddedPolicy { return c.policy }
 
 func TestIgnoredCodecsFromConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		providers map[api.ProviderID]api.ProviderCfg
-		want      map[string]bool
-		name      string
+		want   map[string]bool
+		name   string
+		policy api.EmbeddedPolicy
 	}{
 		{
-			name:      "no embedded provider",
-			providers: map[api.ProviderID]api.ProviderCfg{"opensubtitles": {Settings: map[string]any{"api_key": "x"}}},
-			want:      nil,
+			name:   "zero policy returns nil",
+			policy: api.EmbeddedPolicy{},
+			want:   nil,
 		},
 		{
-			name:      "embedded provider with nil settings",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: nil}},
-			want:      nil,
+			name:   "ignore_pgs only",
+			policy: api.EmbeddedPolicy{IgnorePGS: true},
+			want:   map[string]bool{"pgs": true},
 		},
 		{
-			name:      "no ignore flags set",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{}}},
-			want:      nil,
+			name:   "ignore_vobsub only",
+			policy: api.EmbeddedPolicy{IgnoreVobSub: true},
+			want:   map[string]bool{"vobsub": true},
 		},
 		{
-			name:      "ignore_pgs only",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{"ignore_pgs": true}}},
-			want:      map[string]bool{"pgs": true},
+			name:   "ignore_ass adds both ass and ssa",
+			policy: api.EmbeddedPolicy{IgnoreASS: true},
+			want:   map[string]bool{"ass": true, "ssa": true},
 		},
 		{
-			name:      "ignore_vobsub only",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{"ignore_vobsub": true}}},
-			want:      map[string]bool{"vobsub": true},
+			name:   "all ignore flags set",
+			policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true},
+			want:   map[string]bool{"pgs": true, "vobsub": true, "ass": true, "ssa": true},
 		},
 		{
-			name:      "ignore_ass adds both ass and ssa",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{"ignore_ass": true}}},
-			want:      map[string]bool{"ass": true, "ssa": true},
-		},
-		{
-			name: "all ignore flags set",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{
-				"ignore_pgs":    true,
-				"ignore_vobsub": true,
-				"ignore_ass":    true,
-			}}},
-			want: map[string]bool{"pgs": true, "vobsub": true, "ass": true, "ssa": true},
-		},
-		{
-			name: "false flags return nil",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{
-				"ignore_pgs":    false,
-				"ignore_vobsub": false,
-				"ignore_ass":    false,
-			}}},
-			want: nil,
-		},
-		{
-			name:      "string true accepted by SettingBool",
-			providers: map[api.ProviderID]api.ProviderCfg{"embedded": {Settings: map[string]any{"ignore_pgs": "true"}}},
-			want:      map[string]bool{"pgs": true},
-		},
-		{
-			name:      "nil providers map",
-			providers: nil,
-			want:      nil,
+			name:   "defaults (pgs+vobsub) reach the policy exactly as documented",
+			policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
+			want:   map[string]bool{"pgs": true, "vobsub": true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			cfg := &ignoredCodecConfig{providers: tt.providers}
+			cfg := &ignoredCodecConfig{policy: tt.policy}
 			got := IgnoredCodecsFromConfig(cfg)
 			if tt.want == nil {
 				if got != nil {
@@ -692,6 +704,66 @@ func TestIgnoredCodecsFromConfig(t *testing.T) {
 				if got[k] != v {
 					t.Errorf("IgnoredCodecsFromConfig()[%q] = %v, want %v", k, got[k], v)
 				}
+			}
+		})
+	}
+}
+
+// TestIgnoredCodecs_never_ignore_text_codecs pins the policy invariant that
+// text codecs always stay usable regardless of the ignore flags (previously a
+// property on the fake provider's isIgnoredCodec; the rule now lives here).
+func TestIgnoredCodecs_never_ignore_text_codecs(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		cfg := &ignoredCodecConfig{policy: api.EmbeddedPolicy{
+			IgnorePGS:    rapid.Bool().Draw(t, "ignorePGS"),
+			IgnoreVobSub: rapid.Bool().Draw(t, "ignoreVobSub"),
+			IgnoreASS:    rapid.Bool().Draw(t, "ignoreASS"),
+		}}
+		ignored := IgnoredCodecsFromConfig(cfg)
+		for _, codec := range []string{"srt", "webvtt", "mov_text", "ttml"} {
+			if ignored[codec] {
+				t.Errorf("IgnoredCodecsFromConfig()[%q] = true; text codecs must never be ignored", codec)
+			}
+		}
+	})
+}
+
+// TestEmbeddedPolicy_satisfaction_matrix is the policy table required by the
+// detector-separation design: (codec, ignore flags) → satisfies/needs-search,
+// asserted through the REAL engine seam (resolver → existingSubs.hasSubtitle).
+func TestEmbeddedPolicy_satisfaction_matrix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		codec     string
+		policy    api.EmbeddedPolicy
+		satisfies bool
+	}{
+		{name: "pgs_ignored", codec: "pgs", policy: api.EmbeddedPolicy{IgnorePGS: true}, satisfies: false},
+		{name: "pgs_not_ignored", codec: "pgs", policy: api.EmbeddedPolicy{}, satisfies: true},
+		{name: "vobsub_ignored", codec: "vobsub", policy: api.EmbeddedPolicy{IgnoreVobSub: true}, satisfies: false},
+		{name: "vobsub_not_ignored", codec: "vobsub", policy: api.EmbeddedPolicy{}, satisfies: true},
+		{name: "ass_ignored", codec: "ass", policy: api.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
+		{name: "ssa_ignored", codec: "ssa", policy: api.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
+		{name: "ass_not_ignored", codec: "ass", policy: api.EmbeddedPolicy{}, satisfies: true},
+		{name: "srt_always_usable", codec: "srt", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true}, satisfies: true},
+		{name: "defaults_pgs_triggers_search", codec: "pgs", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: false},
+		{name: "defaults_ass_usable", codec: "ass", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			existing := existingSubs{
+				Embedded:      []embeddedSub{{Lang: "en", Codec: tt.codec}},
+				IgnoredCodecs: IgnoredCodecsFromConfig(&ignoredCodecConfig{policy: tt.policy}),
+			}
+			got := existing.hasSubtitle("en", api.VariantStandard)
+			if got != tt.satisfies {
+				t.Errorf("hasSubtitle(en, standard) with codec=%q policy=%+v = %v, want %v",
+					tt.codec, tt.policy, got, tt.satisfies)
 			}
 		})
 	}

@@ -88,47 +88,23 @@ func TestBucketDecodeMode(t *testing.T) {
 	}
 }
 
-// TestCheckSchemaVersion covers the detect-and-refuse policy: a fresh file and
-// an equal stored version pass; ANY mismatch is refused, because the version
-// only moves on a breaking change and no migration exists in either direction
-// (additive value changes never bump it).
-func TestCheckSchemaVersion(t *testing.T) {
-	cases := []struct {
-		name    string
-		stored  uint64
-		current uint64
-		present bool
-		wantErr bool
-	}{
-		{name: "fresh-file", stored: 0, present: false, current: 1, wantErr: false},
-		{name: "equal", stored: 1, present: true, current: 1, wantErr: false},
-		{name: "older-breaking", stored: 1, present: true, current: 2, wantErr: true},
-		{name: "newer-breaking", stored: 2, present: true, current: 1, wantErr: true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := checkSchemaVersion("core", tc.stored, tc.present, tc.current)
-			if (err != nil) != tc.wantErr {
-				t.Errorf("checkSchemaVersion(%d, %v, %d) err=%v, wantErr=%v", tc.stored, tc.present, tc.current, err, tc.wantErr)
-			}
-		})
-	}
-}
-
-// TestSchemaVersion_readWriteVerify exercises the meta-bucket schema-version
-// helpers against a real bbolt file: a fresh DB verifies clean, a write then
-// reads back, and a planted future version is refused.
-func TestSchemaVersion_readWriteVerify(t *testing.T) {
+// TestSchemaVersion_readWrite exercises the strict stamp reader and the write
+// helper against a real bbolt file: a fresh DB reads as missing (never
+// malformed), a write reads back present, and a planted non-8-byte value reads
+// as malformed — the distinction the fail-closed open policy builds on. The
+// open-level policy itself (refuse newer / malformed / missing-in-populated)
+// is covered by the guard fixtures in migrate_test.go.
+func TestSchemaVersion_readWrite(t *testing.T) {
 	db := openTempDB(t)
 
-	// Fresh DB: meta bucket absent -> not present, verify passes.
+	// Fresh DB: meta bucket absent -> missing.
 	if err := db.View(func(tx *bolt.Tx) error {
-		if _, present := readSchemaVersion(tx, metaKeyCoreSchemaVersion); present {
-			t.Error("fresh DB should report core schema version absent")
+		if _, st := readStamp(tx, metaKeyCoreSchemaVersion); st != stampMissing {
+			t.Errorf("fresh DB core stamp state = %v, want missing", st)
 		}
-		return verifySchemaVersions(tx)
+		return nil
 	}); err != nil {
-		t.Fatalf("verify on fresh DB: %v", err)
+		t.Fatalf("read on fresh DB: %v", err)
 	}
 
 	// Create the meta bucket and write both current versions.
@@ -145,23 +121,28 @@ func TestSchemaVersion_readWriteVerify(t *testing.T) {
 	}
 
 	if err := db.View(func(tx *bolt.Tx) error {
-		v, present := readSchemaVersion(tx, metaKeyCoreSchemaVersion)
-		if !present || v != coreSchemaVersion {
-			t.Errorf("core schema read = (%d, %v), want (%d, true)", v, present, coreSchemaVersion)
+		v, st := readStamp(tx, metaKeyCoreSchemaVersion)
+		if st != stampPresent || v != coreSchemaVersion {
+			t.Errorf("core schema read = (%d, %v), want (%d, present)", v, st, coreSchemaVersion)
 		}
-		return verifySchemaVersions(tx)
+		return nil
 	}); err != nil {
-		t.Fatalf("verify after write: %v", err)
+		t.Fatalf("read after write: %v", err)
 	}
 
-	// Plant a future core version; verify must refuse.
+	// Plant a non-8-byte stamp: strictly malformed, never treated as absent.
 	if err := db.Update(func(tx *bolt.Tx) error {
-		return writeSchemaVersion(tx, metaKeyCoreSchemaVersion, coreSchemaVersion+1)
+		return tx.Bucket([]byte(bucketMeta)).Put(metaKeyCoreSchemaVersion, []byte("bogus"))
 	}); err != nil {
-		t.Fatalf("plant future version: %v", err)
+		t.Fatalf("plant malformed stamp: %v", err)
 	}
-	if err := db.View(verifySchemaVersions); err == nil {
-		t.Error("verifySchemaVersions should refuse a future core schema version")
+	if err := db.View(func(tx *bolt.Tx) error {
+		if _, st := readStamp(tx, metaKeyCoreSchemaVersion); st != stampMalformed {
+			t.Errorf("malformed core stamp state = %v, want malformed", st)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("read malformed stamp: %v", err)
 	}
 }
 

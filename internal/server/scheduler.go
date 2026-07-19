@@ -18,21 +18,18 @@ func (s *Server) runScheduler(ctx context.Context) {
 	scheduler.Run(ctx, deps)
 }
 
-// runFullScan delegates to the scheduler package's RunFullScan.
-func (s *Server) runFullScan(ctx context.Context) {
-	deps := s.schedulerDeps()
-	scheduler.RunFullScan(ctx, deps)
-}
-
 // schedulerDeps builds the scheduler.Deps from Server fields.
 func (s *Server) schedulerDeps() *scheduler.Deps {
 	return &scheduler.Deps{
 		DB:               s.db,
+		ScanDB:           s.db,
+		Backoff:          s.db,
 		Metrics:          s.metrics,
 		ReconcileMetrics: s.metrics,
 		Events:           &serveradapter.ScanEventAdapter{E: s.events},
 		Activity:         &serveradapter.ActivityAdapter{A: s.activity},
 		Alerts:           &serveradapter.AlertAdapter{A: s.alerts},
+		Stops:            &s.stops,
 		ShowSkipCache:    s.showSkipCache,
 		StateFunc: func() *scheduler.LiveState {
 			ls := s.state()
@@ -49,10 +46,11 @@ func (s *Server) schedulerDeps() *scheduler.Deps {
 	}
 }
 
-// runAuthCleanup runs periodic cleanup of auth ceremonies and the session
-// activity debouncer. Expired sessions and OIDC states are now evicted by
-// the auth store's built-in sweeper (internal/authstore/sweeper.go), so
-// this goroutine only handles the non-auth-store concerns.
+// runAuthCleanup runs periodic cleanup of pending auth ceremonies. Expired
+// sessions and OIDC states are evicted by the auth store's built-in sweeper
+// (internal/authstore/sweeper.go), and session-activity throttling state is
+// pruned inside the library's session verifier, so this goroutine only
+// handles the ceremony store.
 func (s *Server) runAuthCleanup(ctx context.Context) {
 	ticker := time.NewTicker(authCleanupInterval)
 	defer ticker.Stop()
@@ -60,7 +58,6 @@ func (s *Server) runAuthCleanup(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			s.ceremonies.Cleanup()
-			s.sessDebounce.prune(time.Now())
 		case <-ctx.Done():
 			return
 		}

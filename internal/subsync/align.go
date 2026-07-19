@@ -37,6 +37,14 @@ const maxAlignSpans = 10_000
 // extreme timestamps force the bucket sort → merge sort fallback.
 const maxAlignEvents = 16_000_000
 
+// maxBucketRangeMs caps the bucket-sort delta array at 32M float64 entries
+// (~256 MB — the same memory class as maxAlignEvents). Larger offset ranges
+// only arise from pathological or crafted timestamps (32M ms ≈ 9 hours of
+// offset), where the event-based merge sort computes the same peak without
+// the dense allocation; a single align call must never approach the 1 GiB
+// container envelope on its own.
+const maxBucketRangeMs = 32_000_000
+
 // alignConstantOffset finds the single best constant time shift to align
 // the "incorrect" subtitle spans to the "reference" spans.
 //
@@ -107,8 +115,9 @@ func spanScore(r, s TimeSpan) float64 {
 func alignBucketSort(ctx context.Context, ref, inc []TimeSpan, minOffset, maxOffset int64) int64 {
 	size := maxOffset - minOffset + 1
 
-	// 100M float64 entries ~ 800 MB; fall back to merge sort to avoid OOM.
-	if size > 100_000_000 {
+	// Bounded dense allocation (~256 MB max, see maxBucketRangeMs); fall
+	// back to the event-based merge sort beyond it to avoid OOM.
+	if size > maxBucketRangeMs {
 		slog.Warn("alignment range too large, falling back to merge sort",
 			"range_ms", size)
 		return alignMergeSort(ctx, ref, inc, minOffset)

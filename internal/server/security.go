@@ -1,17 +1,15 @@
 // Package server — Content-Security-Policy construction.
 //
 // The CSP is computed once at startup from the embedded HTML entrypoints
-// rather than hardcoded, so the two inline <head> scripts — the
-// <script type="importmap"> block and the anti-FOUC <script data-theme-init>
-// IIFE (@cplieger/ui-primitives' themeInitSnippet output) — are each allowed
-// by an exact sha256 hash. Under default-src 'self' an inline script has no
-// exception, so without a matching script-src hash the browser blocks it:
-// blocking the import map makes every bare-specifier import
-// (@cplieger/actions, @cplieger/reactive) fail to resolve so the page never
-// boots (breaking the login / first-boot wizard), and blocking the theme-init
-// script flashes the wrong theme before the stylesheets load. Deriving each
-// hash from the embedded file means an edit (even a whitespace-only reformat)
-// needs no hand-updated constant.
+// rather than hardcoded, so the inline <head> script — the anti-FOUC
+// <script data-theme-init> IIFE (@cplieger/ui-primitives' themeInitSnippet
+// output) — is allowed by an exact sha256 hash. Under default-src 'self' an
+// inline script has no exception, so without a matching script-src hash the
+// browser blocks it and the page flashes the wrong theme before the
+// stylesheets load. Deriving the hash from the embedded file means an edit
+// (even a whitespace-only reformat) needs no hand-updated constant. (The
+// former second inline script, the importmap, is gone: cmd/bundle resolves
+// every bare specifier at build time.)
 package server
 
 import (
@@ -24,21 +22,17 @@ import (
 )
 
 // cspTemplate is the policy applied to every response, with a single %s
-// placeholder for the space-joined sha256 tokens of the inline <head> scripts
-// (the importmap and the anti-FOUC theme-init IIFE).
+// placeholder for the space-joined sha256 tokens of the inline <head>
+// theme-init scripts.
 //
-//	script-src 'self' <hashes>  external app/theme modules + the hashed inline
-//	                            importmap and anti-FOUC theme-init scripts
+//	script-src 'self' <hashes>  the bundled entry modules + the hashed inline
+//	                            anti-FOUC theme-init scripts
 //	style-src  'unsafe-inline'  theme tokens + dynamic badge/coverage fills
 //	media-src  'self' blob:     MSE video preview (URL.createObjectURL(MediaSource))
 const cspTemplate = "default-src 'self'; " +
 	"script-src 'self' %s; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"media-src 'self' blob:"
-
-// importMapRe captures the content between the inline importmap script
-// tags. (?s) so the JSON body may span multiple lines.
-var importMapRe = regexp.MustCompile(`(?s)<script type="importmap">(.*?)</script>`)
 
 // themeInitRe captures the content of the inline anti-FOUC theme-init script
 // (marked with the data-theme-init attribute). Its body is the verbatim output
@@ -49,9 +43,9 @@ var importMapRe = regexp.MustCompile(`(?s)<script type="importmap">(.*?)</script
 var themeInitRe = regexp.MustCompile(`(?s)<script data-theme-init>(.*?)</script>`)
 
 // cspInlineScriptFiles are the embedded HTML entrypoints whose inline <head>
-// scripts the CSP must allow. Both currently ship the identical importmap +
-// theme-init snippet; hashing each independently keeps the policy correct if
-// they diverge.
+// scripts the CSP must allow. Both currently ship the identical theme-init
+// snippet; hashing each independently keeps the policy correct if they
+// diverge.
 var cspInlineScriptFiles = []string{indexHTML, loginHTML}
 
 // inlineScriptHashes returns the unique CSP-quoted sha256 tokens for the inline
@@ -83,20 +77,16 @@ func inlineScriptHashes(staticFS fs.FS, files []string, re *regexp.Regexp, what 
 }
 
 // buildCSPPolicy assembles the full CSP from the embedded HTML entrypoints'
-// inline importmap and anti-FOUC theme-init scripts. Called once at startup.
+// inline anti-FOUC theme-init scripts. Called once at startup.
 func buildCSPPolicy(staticFS fs.FS) (string, error) {
-	importMap, err := inlineScriptHashes(staticFS, cspInlineScriptFiles, importMapRe, "importmap")
-	if err != nil {
-		return "", err
-	}
 	themeInit, err := inlineScriptHashes(staticFS, cspInlineScriptFiles, themeInitRe, "theme-init")
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(cspTemplate, importMap+" "+themeInit), nil
+	return fmt.Sprintf(cspTemplate, themeInit), nil
 }
 
-// mustBuildCSPPolicy is buildCSPPolicy-or-panic. The importmap is an
+// mustBuildCSPPolicy is buildCSPPolicy-or-panic. The theme-init snippet is an
 // embedded compile-time constant, so a failure is a build error that must
 // surface immediately (mirrors mustSub for the embed itself).
 func mustBuildCSPPolicy(staticFS fs.FS) string {

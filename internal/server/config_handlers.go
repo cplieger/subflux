@@ -1,11 +1,9 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
-	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -27,44 +25,11 @@ func configFilePath() string {
 	return cfgFilePath
 }
 
-// atomicWriteConfig writes data to path atomically with 0o600 permissions.
-func atomicWriteConfig(ctx context.Context, path string, data []byte, _ string) error {
-	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600))
-	return err
-}
-
-// handleGetConfig delegates to the confighandlers subpackage.
-func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	s.configH.HandleGetConfig(w, r)
-}
-
-// handleSaveConfig delegates to the confighandlers subpackage.
-func (s *Server) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
-	s.configH.HandleSaveConfig(w, r)
-}
-
-// handleResetConfig delegates to the confighandlers subpackage.
-func (s *Server) handleResetConfig(w http.ResponseWriter, r *http.Request) {
-	s.configH.HandleResetConfig(w, r)
-}
-
-// handleConfigSchema delegates to the confighandlers subpackage.
-func (s *Server) handleConfigSchema(w http.ResponseWriter, r *http.Request) {
-	s.configH.HandleConfigSchema(w, r)
-}
-
 // --- Alert API handlers ---
 
-// handleGetAlerts returns visible alerts or dispatches DELETE to dismiss.
-func (s *Server) handleGetAlerts(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodDelete {
-		s.handleDismissAlert(w, r)
-		return
-	}
-	if !requireGET(w, r) {
-		return
-	}
-
+// handleGetAlerts handles GET /api/alerts. Method dispatch lives in
+// routes.go (GET here, DELETE on handleDismissAlert) like every other route.
+func (s *Server) handleGetAlerts(w http.ResponseWriter, _ *http.Request) {
 	visible := s.alerts.VisibleAlerts()
 	api.WriteJSON(w, visible)
 }
@@ -90,7 +55,11 @@ func (s *Server) handleDismissAlert(w http.ResponseWriter, r *http.Request) {
 
 // --- Activity API handlers ---
 
-// handleGetActivity returns the most recent activity entries.
+// handleGetActivity returns the most recent activity entries. Running
+// entries survive the page cap unconditionally — a busy system must never
+// hide a live cancellable scan (UI restoration depends on seeing it) — and
+// each running entry carries the serialization-time cancellable flag merged
+// from the stop registry.
 func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 	s.activity.PruneCompleted(activity.DefaultPruneAge)
 
@@ -100,7 +69,22 @@ func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	if len(src) > activityPageSize {
-		src = src[len(src)-activityPageSize:]
+		// Prepend running entries older than the page window, preserving
+		// chronological order.
+		page := src[len(src)-activityPageSize:]
+		out := make([]activity.Entry, 0, len(page))
+		for i := range src[:len(src)-activityPageSize] {
+			if !src[i].Done {
+				out = append(out, src[i])
+			}
+		}
+		out = append(out, page...)
+		src = out
+	}
+	for i := range src {
+		if !src[i].Done {
+			src[i].Cancellable = s.stops.Cancellable(src[i].ID)
+		}
 	}
 	api.WriteJSON(w, src)
 }

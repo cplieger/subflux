@@ -123,8 +123,8 @@ const DefaultProviderPriority = 99
 const DefaultProviderConcurrency = 4
 
 // DefaultManualProviderTimeout is the per-provider search timeout for
-// CLI and manual searches. Shared between clisearch and manualops to
-// prevent silent divergence.
+// manual searches (the /api/search path, which also serves the remote
+// CLI's search subcommand).
 const DefaultManualProviderTimeout = 30 * time.Second
 
 // MaxSafeFileBytes is the maximum file size (10 MB) for config files,
@@ -223,10 +223,9 @@ type SchemaSection struct {
 
 // ProviderSchema describes a single provider's settings fields.
 type ProviderSchema struct {
-	Name          string        `json:"name"`
-	Label         string        `json:"label"`
-	Settings      []SchemaField `json:"settings,omitempty"`
-	AlwaysEnabled bool          `json:"always_enabled,omitempty"`
+	Name     string        `json:"name"`
+	Label    string        `json:"label"`
+	Settings []SchemaField `json:"settings,omitempty"`
 }
 
 // --- Language rules (JSON-serializable for settings UI) ---

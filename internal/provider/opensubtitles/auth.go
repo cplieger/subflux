@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/ssrf/v2"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/ssrf/v3"
 )
 
 const (
@@ -64,7 +64,7 @@ func (p *Provider) login(ctx context.Context) error {
 		slog.Warn("opensubtitles login failed", "error", err)
 		return fmt.Errorf("login: %w", err)
 	}
-	defer func() { httputil.DrainClose(body) }()
+	defer func() { httpx.DrainClose(body) }()
 
 	var resp loginResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
@@ -76,7 +76,7 @@ func (p *Provider) login(ctx context.Context) error {
 		return errors.New("empty token in login response")
 	}
 
-	if resp.BaseURL != "" && !isValidServerHost(resp.BaseURL) {
+	if resp.BaseURL != "" && !isValidServerHost(resp.BaseURL.Raw()) {
 		slog.Warn("opensubtitles: rejecting suspicious server redirect",
 			"base_url", resp.BaseURL)
 		resp.BaseURL = ""
@@ -84,7 +84,7 @@ func (p *Provider) login(ctx context.Context) error {
 
 	p.tokenMu.Lock()
 	p.token = resp.Token
-	p.serverHost = resp.BaseURL
+	p.serverHost = resp.BaseURL.Raw()
 	p.vip = resp.User.VIP
 	p.tokenTime = time.Now()
 	host := p.serverHost

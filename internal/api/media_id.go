@@ -98,6 +98,31 @@ func appendPadded2(b []byte, n int) []byte {
 	return b
 }
 
+// BuildSeasonIDPrefix returns the media ID prefix shared by every episode of
+// one season, mirroring BuildEpisodeID's format through the episode
+// separator (e.g. "tvdb-123-s05e"). BuildEpisodeID(tvdb, imdb, season, N)
+// has this prefix for every N in 0-99, so backoff and state rows for a
+// season are one prefix scan. Returns "" when neither ID is available
+// (matching BuildEpisodeID's unidentified-media fallback shape only per
+// season would be meaninglessly broad).
+func BuildSeasonIDPrefix(tvdbID int, imdbID string, season int) string {
+	if tvdbID == 0 && imdbID == "" {
+		return ""
+	}
+	var buf [32]byte
+	b := buf[:0]
+	if tvdbID != 0 {
+		b = append(b, "tvdb-"...)
+		b = strconv.AppendInt(b, int64(tvdbID), 10)
+	} else {
+		b = append(b, imdbID...)
+	}
+	b = append(b, "-s"...)
+	b = appendPadded2(b, season)
+	b = append(b, 'e')
+	return string(b)
+}
+
 // BuildSeriesPrefix returns the media ID prefix for all episodes of a series.
 // Used by coverage and missing-count queries to match all episodes via LIKE.
 func BuildSeriesPrefix(tvdbID int, imdbID string) string {

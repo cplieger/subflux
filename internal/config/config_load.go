@@ -123,6 +123,11 @@ func newWithDefaults() *Config {
 			RemoveEmpty:      true,
 			SyncSubtitles:    true,
 		},
+		EmbeddedSubtitles: yamlEmbeddedConfig{
+			IgnorePGS:    defaults.EmbeddedIgnorePGS,
+			IgnoreVobSub: defaults.EmbeddedIgnoreVobSub,
+			IgnoreASS:    defaults.EmbeddedIgnoreASS,
+		},
 	}
 }
 
@@ -214,24 +219,6 @@ func expandTargetList(targets []yamlSubtitleTarget, ruleCtx string) ([]yamlSubti
 	return result, nil
 }
 
-// forceEmbeddedProvider ensures the embedded provider is always enabled.
-// Users can configure its settings but cannot disable it.
-func forceEmbeddedProvider(cfg *Config) {
-	if cfg.Providers == nil {
-		cfg.Providers = make(map[api.ProviderID]yamlProviderCfg)
-	}
-	p := cfg.Providers[api.ProviderNameEmbedded]
-	p.Enabled = true
-	if p.Settings == nil {
-		p.Settings = map[string]any{
-			api.EmbeddedSettingIgnorePGS:    true,
-			api.EmbeddedSettingIgnoreVobSub: true,
-			api.EmbeddedSettingIgnoreASS:    false,
-		}
-	}
-	cfg.Providers[api.ProviderNameEmbedded] = p
-}
-
 // LoadFromBytes parses config from raw YAML bytes.
 func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	if err := ctx.Err(); err != nil {
@@ -251,7 +238,10 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	// stay byte-for-byte literal.
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse YAML: %w", err)
+		// Syntax errors from yaml.v3 are structural today, but the raw
+		// document can hold pasted literal secrets; sanitize for the same
+		// redact-everything stance as the post-expansion decode below.
+		return nil, fmt.Errorf("parse YAML: %w", yamlenv.SanitizeDecodeError(err))
 	}
 
 	cfg := newWithDefaults()
@@ -263,16 +253,13 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 				"vars", strings.Join(unresolved, ","))
 		}
 		if err := doc.Decode(cfg); err != nil {
-			return nil, fmt.Errorf("parse YAML: %w", err)
+			return nil, fmt.Errorf("parse YAML: %w", sanitizeDecodeErr(err))
 		}
 	}
 
 	if err := expandVariants(cfg); err != nil {
 		return nil, err
 	}
-
-	// Embedded provider is always on; force-enable with defaults if absent.
-	forceEmbeddedProvider(cfg)
 
 	if err := validate(ctx, cfg); err != nil {
 		slog.Warn("config validation failed", "error", err)
@@ -282,6 +269,20 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	cfg.buildCaches(ctx)
 
 	return cfg, nil
+}
+
+// sanitizeDecodeErr redacts yaml.v3's own decode errors before they reach
+// the two operator-facing surfaces (the startup log and the PUT /api/config
+// response body): a *yaml.TypeError entry embeds a backtick-quoted excerpt
+// of the offending scalar, which after yamlenv.Expand may be an expanded
+// ${VAR} secret. Errors raised by this package's own UnmarshalYAML
+// implementations (Duration's "invalid duration ...") pass through
+// unchanged: their vocabulary is app-owned and pinned by tests.
+func sanitizeDecodeErr(err error) error {
+	if _, ok := errors.AsType[*yaml.TypeError](err); ok || strings.HasPrefix(err.Error(), "yaml:") {
+		return yamlenv.SanitizeDecodeError(err)
+	}
+	return err
 }
 
 // buildCaches pre-computes lookup structures after config is fully loaded.

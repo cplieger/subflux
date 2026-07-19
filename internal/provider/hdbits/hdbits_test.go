@@ -320,6 +320,28 @@ func TestFlexInt_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestFlexInt_reset_on_reuse(t *testing.T) {
+	t.Parallel()
+
+	// A reused receiver must not retain a stale id: the reset-first
+	// invariant (matching jsonx field types and sibling consumers) keeps
+	// the value 0 when a later decode fails, instead of leaving the
+	// previous id in place.
+	var got flexInt
+	if err := json.Unmarshal([]byte(`42`), &got); err != nil {
+		t.Fatalf("Unmarshal(42) unexpected error: %v", err)
+	}
+	if int(got) != 42 {
+		t.Fatalf("Unmarshal(42) = %d, want 42", got)
+	}
+	if err := json.Unmarshal([]byte(`"abc"`), &got); err == nil {
+		t.Fatal(`Unmarshal("abc") expected error`)
+	}
+	if int(got) != 0 {
+		t.Errorf(`after failed decode, receiver = %d, want 0 (stale value retained)`, got)
+	}
+}
+
 func TestFlexInt_in_struct(t *testing.T) {
 	t.Parallel()
 

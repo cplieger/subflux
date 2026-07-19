@@ -252,3 +252,67 @@ func TestMatchBreakdown_excludes_zero_weight_match(t *testing.T) {
 		})
 	}
 }
+
+// TestCategories_row_coherence pins the merged category table that the match
+// builder, the breakdown, and internal/scorer all derive from. With a Scores
+// struct assigning a distinct sentinel weight to every category, each row's
+// SetMatch must surface exactly its own key and weight in the breakdown.
+// This catches accessor mismatches (e.g. edition reading the season_pack
+// weight) that the default weights cannot detect because some categories
+// share a value.
+func TestCategories_row_coherence(t *testing.T) {
+	t.Parallel()
+
+	scores := api.Scores{
+		Hash:             1,
+		Source:           2,
+		ReleaseGroup:     3,
+		StreamingService: 4,
+		VideoCodec:       5,
+		HDR:              6,
+		Edition:          7,
+		SeasonPack:       8,
+	}
+	wantWeights := map[string]int{
+		"source":            2,
+		"release_group":     3,
+		"streaming_service": 4,
+		"video_codec":       5,
+		"hdr":               6,
+		"edition":           7,
+		"season_pack":       8,
+	}
+
+	if len(Categories) != len(wantWeights) {
+		t.Fatalf("len(Categories) = %d, want %d", len(Categories), len(wantWeights))
+	}
+	seen := make(map[string]bool)
+	for _, c := range Categories {
+		want, ok := wantWeights[c.Key]
+		if !ok {
+			t.Errorf("unexpected category key %q", c.Key)
+			continue
+		}
+		if seen[c.Key] {
+			t.Errorf("duplicate category key %q", c.Key)
+		}
+		seen[c.Key] = true
+
+		if got := c.Weight(&scores); got != want {
+			t.Errorf("Categories[%q].Weight = %d, want %d", c.Key, got, want)
+		}
+		var m api.MatchSet
+		if c.Match(m) {
+			t.Errorf("Categories[%q].Match(zero MatchSet) = true, want false", c.Key)
+		}
+		c.SetMatch(&m)
+		if !c.Match(m) {
+			t.Errorf("Categories[%q].SetMatch does not set the bit Match reads", c.Key)
+		}
+		got := MatchBreakdown(&scores, m)
+		if len(got) != 1 || got[c.Key] != want {
+			t.Errorf("MatchBreakdown after SetMatch(%q) = %v, want map[%s:%d]",
+				c.Key, got, c.Key, want)
+		}
+	}
+}

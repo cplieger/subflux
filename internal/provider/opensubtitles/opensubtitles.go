@@ -15,7 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
@@ -60,11 +61,12 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	if ps.APIKey == "" {
 		return nil, errors.New("opensubtitles: api_key required")
 	}
-	// Override default: OpenSubtitles defaults to use_hash=true when not specified.
+	// use_hash's default (true) is declared ONCE, in the providerEntries
+	// schema entry: the registry normalizes absent declared fields from
+	// their schema Default before this factory runs (P14). A bare map here
+	// (unit tests, direct construction) therefore reads false — the typed
+	// accessor's zero — not the product default.
 	useHash := ps.UseHash
-	if _, ok := settings[string(provider.KeyUseHash)]; !ok {
-		useHash = true
-	}
 	includeAI := provider.SettingBool(settings, provider.KeyIncludeAI, false)
 
 	// Channel-based token bucket: capacity 1, pre-filled so the first request
@@ -223,7 +225,7 @@ func (p *Provider) CountShowSubtitles(ctx context.Context, imdbID, lang string) 
 		slog.Warn("opensubtitles show count failed", "imdb", imdbID, "lang", lang, "error", err)
 		return 0, fmt.Errorf("show count: %w", err)
 	}
-	defer func() { httputil.DrainClose(body) }()
+	defer func() { httpx.DrainClose(body) }()
 
 	var resp searchResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
@@ -268,7 +270,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 			"file_id", fileID, "error", err)
 		return nil, fmt.Errorf("request download: %w", err)
 	}
-	defer httputil.DrainClose(body)
+	defer httpx.DrainClose(body)
 
 	var dlResp downloadResponse
 	if err := json.NewDecoder(body).Decode(&dlResp); err != nil {

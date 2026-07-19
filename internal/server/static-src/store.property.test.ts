@@ -20,8 +20,7 @@ import * as store from "./store.js";
 // keys this file uses.
 function resetStoreKeys(): void {
   store.set("currentPage", "");
-  store.set("scanInFlight", false);
-  store.set("refreshPending", false);
+  store.set("configChecked", false);
   store.set("needsRefresh", false);
   store.set("isUnconfigured", false);
   store.set("isReady", false);
@@ -32,8 +31,8 @@ describe("store property", () => {
     fc.assert(
       fc.property(fc.boolean(), (v) => {
         resetStoreKeys();
-        store.set("scanInFlight", v);
-        expect(store.get("scanInFlight")).toBe(v);
+        store.set("configChecked", v);
+        expect(store.get("configChecked")).toBe(v);
       }),
     );
   });
@@ -59,14 +58,14 @@ describe("store property", () => {
         // the property is too strong: subscribers don't fire on no-op
         // sets, and a sequence of all-same-as-current values produces
         // no notifications.
-        store.set("scanInFlight", !finalVal);
+        store.set("configChecked", !finalVal);
         let observed: boolean | undefined;
-        const unsub = store.subscribe("scanInFlight", (v) => {
+        const unsub = store.subscribe("configChecked", (v) => {
           observed = v;
         });
         try {
           for (const v of values) {
-            store.set("scanInFlight", v);
+            store.set("configChecked", v);
           }
           expect(observed).toBe(finalVal);
         } finally {
@@ -81,13 +80,13 @@ describe("store property", () => {
       fc.property(fc.array(fc.boolean(), { minLength: 1, maxLength: 50 }), (values) => {
         resetStoreKeys();
         const observed: boolean[] = [];
-        const unsub = store.subscribe("scanInFlight", (v) => {
+        const unsub = store.subscribe("configChecked", (v) => {
           observed.push(v);
         });
         try {
           store.batch(() => {
             for (const v of values) {
-              store.set("scanInFlight", v);
+              store.set("configChecked", v);
             }
           });
           // At most one notification fired (could be zero if final value
@@ -109,12 +108,12 @@ describe("store property", () => {
       fc.property(fc.array(fc.boolean(), { minLength: 1, maxLength: 20 }), (values) => {
         resetStoreKeys();
         let count = 0;
-        const unsub = store.subscribe("scanInFlight", () => {
+        const unsub = store.subscribe("configChecked", () => {
           count += 1;
         });
         unsub();
         for (const v of values) {
-          store.set("scanInFlight", v);
+          store.set("configChecked", v);
         }
         expect(count).toBe(0);
       }),

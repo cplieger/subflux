@@ -9,13 +9,14 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/search/timeout"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
 
 // SearchMetrics is the narrow observability interface consumed by the search
-// engine. Only the 3 methods actually called are required; the concrete
+// engine. Only the 4 methods actually called are required; the concrete
 // *metrics.Metrics satisfies this via structural typing.
 //
 //nolint:revive // name is established API; renaming would break consumers
@@ -23,6 +24,10 @@ type SearchMetrics interface {
 	RecordSearch(provider api.ProviderID, dur time.Duration, err error)
 	RecordDownload(provider api.ProviderID, err error)
 	AdaptiveSkip()
+	// RecordEmbeddedDetectorError counts a failed embedded track probe
+	// (subflux_embedded_detector_errors_total). Context cancellation is
+	// excluded by the caller.
+	RecordEmbeddedDetectorError()
 }
 
 // FileWriter abstracts atomic file writes, decoupling the search engine from
@@ -66,6 +71,8 @@ type Engine struct {
 	tracks          TrackDetector
 	fileWriter      FileWriter
 	timeout         timeout.ProviderHealth
+	gate            *mediaGate
+	syncExec        syncing.SyncExec
 	searchGroup     singleflight.Group
 	hashGroup       singleflight.Group
 	providersByName map[api.ProviderID]api.Provider
@@ -89,6 +96,11 @@ func WithScorer(s api.Scorer) Option { return func(e *Engine) { e.scorer = s } }
 
 // WithSyncer sets the subtitle syncer.
 func WithSyncer(s SubtitleSyncer) Option { return func(e *Engine) { e.syncer = s } }
+
+// WithSyncExec sets the executor for the engine's own heavy sync calls (the
+// audio fallback). Defaults to in-process; server mode installs the
+// sync-worker client so alignment memory lives in a disposable child (P13).
+func WithSyncExec(x syncing.SyncExec) Option { return func(e *Engine) { e.syncExec = x } }
 
 // WithTracks sets the track detector.
 func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t } }
@@ -117,7 +129,7 @@ func (atomicWriter) WriteFile(ctx context.Context, path string, data []byte) err
 // New creates a search engine. The providers slice is required; all other
 // dependencies are supplied via functional options.
 func New(providers []api.Provider, opts ...Option) *Engine {
-	e := &Engine{providers: providers}
+	e := &Engine{providers: providers, gate: newMediaGate(), syncExec: syncing.InProcessExec{}}
 	for _, o := range opts {
 		o(e)
 	}
@@ -137,6 +149,9 @@ func New(providers []api.Provider, opts ...Option) *Engine {
 	}
 	if e.syncer == nil {
 		panic("search.New: WithSyncer is required")
+	}
+	if e.tracks == nil {
+		panic("search.New: WithTracks is required (use embedded.Detector{} or search.NoopDetector{})")
 	}
 	if e.timeout == nil {
 		cooldown := e.cfg.Search().ProviderTimeout
@@ -221,13 +236,13 @@ func (e *Engine) SimulateScore(mediaType api.MediaType, videoRelease, subRelease
 		ReleaseName: subRelease,
 		MatchedBy:   matchedBy,
 	})
-	score, scoreNoHash := e.scorer.Score(&video, api.SubtitleInfo{
+	score, scoreNoHash := e.scorer.Score(api.SubtitleInfo{
 		HashVerifiable: matchedBy == api.MatchByHash,
 	}, matches)
 	return api.ScoreResult{
 		Score:       score,
 		ScoreNoHash: scoreNoHash,
-		Tier:        e.scorer.ScoreToTier(score, mediaType),
+		Tier:        e.scorer.ScoreToTier(score),
 	}
 }
 
@@ -243,11 +258,50 @@ func groupTargetsByLang(targets []api.SubtitleTarget) (groups map[string][]api.S
 	return groups, order
 }
 
-// recordScanArtifacts records the subtitle files discovered on disk and the
-// scan state for coverage tracking, returning whether coverage changed. It is
-// a no-op (returns false) for unidentified media with an empty mediaID.
-func (e *Engine) recordScanArtifacts(ctx context.Context, mediaType api.MediaType,
-	mediaID string, req *api.SearchRequest, existing existingSubs,
+// detectExistingObserved probes local subtitles and applies the engine's
+// detector-error policy (embedded-detector separation, R2.3): a failed probe
+// is WARN-logged with a bounded path attribute and counted in
+// subflux_embedded_detector_errors_total — context cancellation is excluded
+// from both — and probeOK=false tells the caller to SKIP the coverage
+// replacement for this video: RecordSubtitleFiles is a full-set replacement,
+// so recording the empty embedded portion of a failed probe would delete
+// valid persisted rows. The search itself continues fail-open with the
+// partial in-memory result (external subs are still scanned).
+func (e *Engine) detectExistingObserved(ctx context.Context, videoPath string) (existing existingSubs, probeOK bool) {
+	existing, err := detectExisting(ctx, videoPath, e.tracks, IgnoredCodecsFromConfig(e.cfg))
+	if err == nil {
+		return existing, true
+	}
+	if ctx.Err() == nil && !errors.Is(err, context.Canceled) {
+		slog.Warn("embedded track detection failed; keeping last coverage snapshot",
+			"path", boundLogPath(videoPath), "error", err)
+		if e.metrics != nil {
+			e.metrics.RecordEmbeddedDetectorError()
+		}
+	}
+	return existing, false
+}
+
+// maxLogPathLen bounds the path attribute on detector-error log lines.
+const maxLogPathLen = 256
+
+// boundLogPath caps a path for use as a log attribute, keeping the tail
+// (the identifying filename end) when truncation is needed.
+func boundLogPath(p string) string {
+	if len(p) <= maxLogPathLen {
+		return p
+	}
+	return "..." + p[len(p)-maxLogPathLen:]
+}
+
+// recordCoverageInventory records the subtitle files discovered on disk for
+// coverage tracking, returning whether coverage changed. This is deliberately
+// PRE-work state: the inventory describes what the visit observed on disk,
+// which is correct however the search itself ends. The scanned_at stamp is
+// the post-work half (stampScanState) — splitting the two is what keeps the
+// resume stamp honest (P5). No-op (returns false) for unidentified media.
+func (e *Engine) recordCoverageInventory(ctx context.Context, mediaType api.MediaType,
+	mediaID string, existing existingSubs,
 ) bool {
 	if mediaID == "" {
 		return false
@@ -258,6 +312,22 @@ func (e *Engine) recordScanArtifacts(ctx context.Context, mediaType api.MediaTyp
 		slog.Warn("failed to record subtitle files",
 			"media_id", mediaID, "error", err)
 	}
+	return changed
+}
+
+// stampScanState upserts the scan_state row for a media item. For searches
+// this runs POST-work so the scanned_at stamp attests provider work that
+// actually completed: a process exit mid-item leaves no fresh stamp, and the
+// next scheduled scan revisits the item instead of resume-skipping unfinished
+// work. searched=false records an inventory-only visit (scan skip paths that
+// refreshed coverage without querying providers). No-op for unidentified
+// media.
+func (e *Engine) stampScanState(ctx context.Context, mediaType api.MediaType,
+	mediaID string, req *api.SearchRequest, searched bool,
+) {
+	if mediaID == "" {
+		return
+	}
 	if err := e.store.RecordScanState(ctx, &api.ScanRecord{
 		MediaType: mediaType,
 		MediaID:   mediaID,
@@ -265,11 +335,45 @@ func (e *Engine) recordScanArtifacts(ctx context.Context, mediaType api.MediaTyp
 		AudioLang: req.AudioLang,
 		Season:    req.Season,
 		Episode:   req.Episode,
+		Searched:  searched,
 	}); err != nil {
 		slog.Warn("failed to record scan state",
 			"media_id", mediaID, "error", err)
 	}
+}
+
+// InventoryCoverage implements the local-only half of api.SubtitleSearcher:
+// it refreshes the on-disk/embedded subtitle inventory for a media item and
+// stamps its scan state as inventoried-not-searched, with zero provider
+// work. Scan skip paths (season early stop, show-level skip) call this so
+// coverage badges stay truthful for items the scanner deliberately does not
+// search: "skip" means skip PROVIDER work, not local bookkeeping.
+func (e *Engine) InventoryCoverage(ctx context.Context, req *api.SearchRequest, videoPath string) bool {
+	mediaType := req.MediaType
+	mediaID := api.BuildMediaID(req)
+	if mediaID == "" {
+		return false
+	}
+	unlock := e.gate.lock(gateKey(mediaType, mediaID))
+	defer unlock()
+
+	req.VideoPath = videoPath
+	existing, probeOK := e.detectExistingObserved(ctx, videoPath)
+	var changed bool
+	// A failed embedded probe skips the full-set coverage replacement so
+	// the last complete snapshot survives (detectExistingObserved doc).
+	if probeOK {
+		changed = e.recordCoverageInventory(ctx, mediaType, mediaID, existing)
+	}
+	if ctx.Err() == nil {
+		e.stampScanState(ctx, mediaType, mediaID, req, false)
+	}
 	return changed
+}
+
+// gateKey builds the mediaGate key for a media item.
+func gateKey(mediaType api.MediaType, mediaID string) string {
+	return string(mediaType) + "\x00" + mediaID
 }
 
 // SearchTargets searches for subtitles using resolved SubtitleTargets.
@@ -290,6 +394,14 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 	mediaType := req.MediaType
 	mediaID := api.BuildMediaID(req)
 
+	// Serialize work on the same media item across the scheduled scan, the
+	// history poller, and manual scans (P4). Unidentified media (empty
+	// mediaID) has no stable identity to key on and skips the gate.
+	if mediaID != "" {
+		unlock := e.gate.lock(gateKey(mediaType, mediaID))
+		defer unlock()
+	}
+
 	if req.VideoHash == "" && videoPath != "" {
 		if hash, size, err := e.HashFile(ctx, videoPath); err == nil {
 			req.VideoHash = hash
@@ -300,12 +412,18 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 		}
 	}
 
-	existing := detectExisting(ctx, videoPath, e.tracks, IgnoredCodecsFromConfig(e.cfg))
+	existing, probeOK := e.detectExistingObserved(ctx, videoPath)
 
 	var result api.SearchResult
 
-	// Record discovered subtitle files and scan state for coverage tracking.
-	result.CoverageChanged = e.recordScanArtifacts(ctx, mediaType, mediaID, req, existing)
+	// Record the discovered subtitle files for coverage tracking (pre-work:
+	// the inventory is valid however the search ends; see P5 split note on
+	// recordCoverageInventory). A failed embedded probe skips the full-set
+	// replacement so the last complete snapshot survives; the search itself
+	// continues fail-open with the partial in-memory result.
+	if probeOK {
+		result.CoverageChanged = e.recordCoverageInventory(ctx, mediaType, mediaID, existing)
+	}
 
 	searchCfg := e.cfg.Search()
 	upgradeCutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
@@ -322,15 +440,9 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 
 	// Process language groups concurrently. Each group already uses errgroup
 	// internally for provider concurrency, and singleflight deduplicates
-	// identical provider queries across languages.
-	type langResult struct {
-		lang      string
-		paths     []string
-		searched  int
-		skipped   int
-		backedOff int
-	}
-	langResults := make([]langResult, len(langOrder))
+	// identical provider queries across languages. Each group produces one
+	// typed api.LangOutcome; the tracker and stats consume those directly.
+	result.Langs = make([]api.LangOutcome, len(langOrder))
 
 	g := new(errgroup.Group)
 	g.SetLimit(4) // Cap concurrent language groups.
@@ -340,33 +452,18 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 			if err := ctx.Err(); err != nil {
 				return nil
 			}
-			paths, searched, skipped, backedOff := e.searchLangGroup(ctx, req, langTargets,
+			result.Langs[idx] = e.searchLangGroup(ctx, req, langTargets,
 				videoPath, mediaType, mediaID, &existing, &searchCfg, upgradeCutoff)
-			langResults[idx] = langResult{
-				paths: paths, searched: searched, skipped: skipped,
-				backedOff: backedOff, lang: lang,
-			}
 			return nil
 		})
 	}
 	_ = g.Wait()
 
-	for _, lr := range langResults {
-		result.Searched += lr.searched
-		result.Skipped += lr.skipped
-		result.BackedOff += lr.backedOff
-		result.Paths = append(result.Paths, lr.paths...)
-		// SearchedLangs feeds the season early-termination tracker: only
-		// languages whose group actually ran may accrue a no-result streak.
-		// A lang skipped here (covered on disk, manual lock, not eligible) or
-		// fully backed off (zero provider queries) must never count as
-		// searched-with-no-result.
-		if lr.searched > 0 {
-			result.SearchedLangs = append(result.SearchedLangs, lr.lang)
-		}
-		if len(lr.paths) > 0 {
-			result.FoundLangs = append(result.FoundLangs, lr.lang)
-		}
+	// Stamp scanned_at post-work, and only when the work ran to completion:
+	// a cancellation mid-item must not mark the item recently-scanned, or a
+	// restart would resume-skip unfinished work for a full cycle (P5).
+	if ctx.Err() == nil {
+		e.stampScanState(ctx, mediaType, mediaID, req, true)
 	}
 
 	return result, nil

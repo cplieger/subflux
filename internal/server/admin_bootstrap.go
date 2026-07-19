@@ -2,12 +2,12 @@ package server
 
 import (
 	"log/slog"
-	"net"
 	"net/http"
 	"time"
 
 	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/webhttp"
 )
@@ -15,8 +15,11 @@ import (
 // handleAdminBootstrap serves CLI auth commands (reset-password, generate-api-key)
 // routed through the running server. bbolt's exclusive OS file lock prevents the
 // CLI from opening the store directly while the server holds it, so the CLI posts
-// to this endpoint instead. Access is restricted to loopback (127.0.0.1 / ::1)
-// so only processes on the same host (i.e. docker exec) can call it.
+// to this endpoint instead. It is served ONLY on the Unix-socket admin plane
+// (see AdminHandler); the kernel's socket custody — a 0700 directory only
+// same-container processes can traverse — is the security boundary, so the
+// handler itself requires no credentials (matching the first-boot recovery
+// use case via docker exec).
 func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Action   string `json:"action"`
@@ -138,29 +141,34 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	api.WriteJSON(w, map[string]string{keyStatus: "ok", "key": plaintext})
 }
 
-// requireLocalhost is a middleware that rejects requests not originating from
-// loopback (127.0.0.1 or ::1). This guards the admin bootstrap endpoint so
-// only processes on the same host (docker exec) can call it — no auth token
-// is needed, matching the first-boot recovery use case.
-func (s *Server) requireLocalhost(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check the raw SOCKET PEER, never the proxy-aware resolver. The
-		// trusted-proxy ClientIP consults X-Forwarded-For when the peer is in
-		// a trusted CIDR, so any host in that subnet could forge
-		// "X-Forwarded-For: 127.0.0.1" and reach this unauthenticated
-		// endpoint. The socket peer cannot be spoofed: a same-host docker
-		// exec connects from loopback directly, and a request arriving via a
-		// reverse proxy has the proxy's (non-loopback) address and is
-		// correctly rejected — a proxied request is not a local call.
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			host = r.RemoteAddr
-		}
-		ip := net.ParseIP(host)
-		if ip == nil || !ip.IsLoopback() {
-			api.ForbiddenC(w, r, api.CodeForbidden, "admin bootstrap is localhost-only")
-			return
-		}
-		next(w, r)
-	}
+// AdminHandler returns the admin-plane handler: a one-route mux serving
+// POST /api/admin/bootstrap, wrapped in the same access-log/request-ID and
+// panic-recovery middleware the TCP mux uses (the body limit is inside the
+// handler via webhttp.DecodeBody, exactly as on the TCP plane). main.go
+// serves it on a second http.Server bound to the Unix socket in the 0700
+// directory config.AdminSocketDir — kernel socket custody replaces the
+// former requireLocalhost peer-address check, so the zero-credential
+// bootstrap channel is unreachable over every TCP path (netns-sharing peers
+// and proxied clients included). Both configured and unconfigured server
+// modes expose it.
+func (s *Server) AdminHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST "+config.AdminBootstrapURLPath, s.handleAdminBootstrap)
+	return webhttp.Chain(mux,
+		webhttp.Logging(
+			webhttp.WithLogger(slog.Default()),
+		),
+		webhttp.Recoverer(
+			webhttp.WithRecoverLogger(slog.Default()),
+			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),
+		),
+	)
+}
+
+// RecordPersistentAlert records a manually-dismissable operator alert.
+// Exported for the composition root: main.go owns the admin-socket listener
+// lifecycle and reports its failure as a persistent alert here (degraded
+// mode — bootstrap unavailable — rather than fatal).
+func (s *Server) RecordPersistentAlert(source, msg string) {
+	s.alerts.RecordPersistent(source, msg)
 }

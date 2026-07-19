@@ -54,6 +54,18 @@ func (c *Config) SyncConfig() api.SyncConfig {
 	return sc
 }
 
+// EmbeddedPolicy returns the typed embedded subtitle codec policy from the
+// top-level embedded_subtitles section. This is the single config source for
+// the search engine's ignored-codec decision (the detector takes no settings
+// and always returns every track).
+func (c *Config) EmbeddedPolicy() api.EmbeddedPolicy {
+	return api.EmbeddedPolicy{
+		IgnorePGS:    c.EmbeddedSubtitles.IgnorePGS,
+		IgnoreVobSub: c.EmbeddedSubtitles.IgnoreVobSub,
+		IgnoreASS:    c.EmbeddedSubtitles.IgnoreASS,
+	}
+}
+
 // ProviderConfigs returns the provider configuration map.
 func (c *Config) ProviderConfigs() map[api.ProviderID]api.ProviderCfg {
 	if c.cachedProviderConfigs != nil {

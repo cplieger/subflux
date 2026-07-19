@@ -22,17 +22,9 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type apiKeyInfo struct {
-		CreatedAt time.Time `json:"created_at"`
-		KeyPrefix string    `json:"key_prefix"`
-		KeySuffix string    `json:"key_suffix"`
-		Label     string    `json:"label"`
-		ID        int64     `json:"id"`
-	}
-
-	out := make([]apiKeyInfo, 0, len(keys))
+	out := make([]APIKeyInfo, 0, len(keys))
 	for _, k := range keys {
-		out = append(out, apiKeyInfo{
+		out = append(out, APIKeyInfo{
 			ID:        k.ID,
 			KeyPrefix: k.KeyPrefix,
 			KeySuffix: k.KeySuffix,

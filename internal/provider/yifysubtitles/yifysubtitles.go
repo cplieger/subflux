@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
@@ -179,7 +179,7 @@ func (p *Provider) fetchPage(ctx context.Context, pageURL string) (string, error
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20)) // 2 MB HTML page limit
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)) // HTML page limit
 	if err != nil {
 		return "", err
 	}

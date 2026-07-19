@@ -30,8 +30,8 @@ func TestSearchTargets_manually_locked_skips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 }
 
@@ -59,8 +59,8 @@ func TestSearchTargets_adaptive_backoff_skips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 	if metrics.adaptiveSkips.Load() != 1 {
 		t.Errorf("adaptiveSkips = %d, want 1", metrics.adaptiveSkips.Load())
@@ -87,8 +87,8 @@ func TestSearchTargets_no_results_records_failure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 	if !ms.failureCalled {
 		t.Error("RecordNoResult not called after no results")
@@ -126,11 +126,11 @@ func TestSearchTargets_success_downloads_and_saves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets() returned %d paths, want 1", len(result.Paths()))
 	}
-	if _, err := os.Stat(result.Paths[0]); err != nil {
-		t.Errorf("subtitle file not found at %q: %v", result.Paths[0], err)
+	if _, err := os.Stat(result.Paths()[0]); err != nil {
+		t.Errorf("subtitle file not found at %q: %v", result.Paths()[0], err)
 	}
 	if !ms.successCalled {
 		t.Error("SaveDownload not called")
@@ -172,8 +172,8 @@ func TestSearchTargets_hi_fallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1 (HI fallback)", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets() returned %d paths, want 1 (HI fallback)", len(result.Paths()))
 	}
 }
 
@@ -208,8 +208,8 @@ func TestSearchTargets_forced_subs_filtered_out(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 	if !ms.failureCalled {
 		t.Error("RecordNoResult not called after forced-only results")
@@ -243,8 +243,8 @@ func TestSearchTargets_below_min_score(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 }
 
@@ -427,8 +427,8 @@ func TestSearchTargets_existing_regular_subtitle_skips(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// Should skip because subtitle already exists.
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 }
 
@@ -459,8 +459,8 @@ func TestSearchTargets_download_failure_continues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 }
 
@@ -483,8 +483,8 @@ func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 	if ms.failureCalled {
 		t.Error("RecordNoResult called, want no backoff for errored providers")
@@ -512,8 +512,8 @@ func TestSearchTargets_partial_failure_records_for_succeeded_only(t *testing.T) 
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
 	// The "good" provider responded with no results, so backoff is recorded.
 	if !ms.failureCalled {
@@ -557,8 +557,8 @@ func TestSearchTargets_exact_min_score_is_accepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Errorf("SearchTargets() returned %d paths, want 1 (exact min score)", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Errorf("SearchTargets() returned %d paths, want 1 (exact min score)", len(result.Paths()))
 	}
 }
 
@@ -818,10 +818,17 @@ func TestSearchTargets_counts_searched_and_skipped(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// "fr" should be skipped (existing sub), "en" should be searched.
-	if result.Skipped != 1 {
-		t.Errorf("SearchTargets().Skipped = %d, want 1", result.Skipped)
+	kinds := map[string]api.LangOutcomeKind{}
+	for _, o := range result.Langs {
+		kinds[o.Lang] = o.Kind
 	}
-	if result.Searched != 1 {
-		t.Errorf("SearchTargets().Searched = %d, want 1", result.Searched)
+	if kinds["fr"] != api.LangSkipped {
+		t.Errorf("fr outcome = %v, want %v", kinds["fr"], api.LangSkipped)
+	}
+	if kinds["en"] != api.LangSearched {
+		t.Errorf("en outcome = %v, want %v", kinds["en"], api.LangSearched)
+	}
+	if got := result.TargetsSearched(); got != 1 {
+		t.Errorf("SearchTargets().TargetsSearched() = %d, want 1", got)
 	}
 }

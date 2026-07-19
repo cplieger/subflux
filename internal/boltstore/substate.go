@@ -220,6 +220,16 @@ func clearTripleBackoff(tx *bolt.Tx, mt api.MediaType, mid, lang string) error {
 // returns ok=false when no trailing numeric component is present. Shared by the
 // manual-lock methods (task 4.3) and used to assert SaveDownload stores the
 // path's ordinal unchanged (Requirement 4.5).
+//
+// Guard note: the digit-run heuristic assumes the app's own naming schemes.
+// Auto rows CAN carry ordinals (a top-pick manual download records a
+// numbered path on an auto row), which is why NextManualNumber scans every
+// row; the plain auto form (video.lang[.variant].srt) always ends in a
+// language or variant token, never digits, so it can never parse as an
+// ordinal. A future path format whose basename legitimately ends in digits
+// before .srt (e.g. a release name like "...1923.srt" written verbatim)
+// would parse as an ordinal — revisit this parser before widening any
+// subtitle path format.
 func parseManualOrdinal(path string) (int, bool) {
 	s := strings.TrimSuffix(path, ".srt")
 	i := len(s)
@@ -465,20 +475,26 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 }
 
 // NextManualNumber returns the next manual subtitle ordinal for the quad: one
-// greater than the highest ordinal currently encoded in the quad's manual
-// paths, or 1 when the quad has no manual row (Requirement 4.4). It mirrors
-// the old SQLite `COALESCE(MAX(<ordinal>), 0) + 1 ... WHERE ... AND manual = 1`
-// refined per variant: movie.fr.1.srt (standard) and movie.fr.forced.1.srt
-// (forced) advance independent sequences, matching the variant-aware manual
-// file naming.
+// greater than the highest ordinal currently encoded in ANY of the quad's
+// row paths, or 1 when no row carries an ordinal (Requirement 4.4). Ordinal
+// discovery deliberately ignores the Manual flag: a top-pick manual download
+// records as an AUTO row (manual=false, auto-mode semantics) yet occupies a
+// numbered path, so a manual-only scan would hand the next download the same
+// number and the atomic write would overwrite the top pick's file. Rows the
+// app numbered are what reserve ordinals, however they are flagged; plain
+// auto rows (movie.fr.srt) have no trailing ordinal and contribute nothing.
+// Sequences stay per variant: movie.fr.1.srt (standard) and
+// movie.fr.forced.1.srt (forced) advance independently, matching the
+// variant-aware manual file naming.
 //
 // The ordinal lives on the primary path, so this walks the quad via
-// collectStateRows and parses each manual row's ordinal with the shared
-// parseManualOrdinal helper (rows whose path has no trailing ordinal, including
-// empty paths, contribute nothing, matching the legacy CAST of a non-numeric
-// suffix to 0). The contract has no error channel, so a read fault falls back
-// to ManualDownloadCount + 1, and to 1 if that also fails, matching the old
-// store's degraded path.
+// collectStateRows and parses each row's ordinal with the shared
+// parseManualOrdinal helper (rows whose path has no trailing ordinal,
+// including empty paths, contribute nothing, matching the legacy CAST of a
+// non-numeric suffix to 0). The contract has no error channel, so a read
+// fault falls back to ManualDownloadCount + 1, and to 1 if that also fails,
+// matching the old store's degraded path (the count-based fallback cannot
+// see auto-row ordinals; it only runs on a primary decode fault).
 func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) int {
 	maxOrdinal := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
@@ -487,11 +503,7 @@ func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaI
 			return err
 		}
 		for i := range rows {
-			r := &rows[i]
-			if !r.Manual {
-				continue
-			}
-			if n, ok := parseManualOrdinal(r.Path); ok && n > maxOrdinal {
+			if n, ok := parseManualOrdinal(rows[i].Path); ok && n > maxOrdinal {
 				maxOrdinal = n
 			}
 		}
@@ -858,35 +870,42 @@ func (d *DB) Stats(_ context.Context) (downloads, attempts int, err error) {
 // with the user's %/_/\ treated literally (asciiHasPrefixFold).
 //
 // The media_type and media_id live in the ix_state_quad key, so the distinct
-// set is built from a single ix_state_quad walk without dereferencing any
-// primary. Walking in (mt, mid, lang, variant, id) byte order yields ids in
-// ascending order; first-seen dedup keeps each id once.
+// set is answered key-only via a bounded skip-scan: seek to the media-type
+// prefix, emit the id under the cursor, then leapfrog directly past that id's
+// remaining rows (its 0x00 separator bumped to 0x01 seeks to the first key of
+// the NEXT id, including ids that textually extend this one). Cost is one
+// seek per distinct id instead of one visit per row, ids arrive in ascending
+// byte order, and no dedup map is needed. Measured at the 52k-episode
+// reference shape: ~8.9x faster for the later-sorting media type (movies) and
+// at parity in the single-language worst case (see query_scale_bench_test.go).
 func (d *DB) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error) {
 	var ids []string
-	seen := make(map[string]struct{})
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateQuad))
 		if idx == nil {
 			return errors.New("boltstore: ix_state_quad bucket not found")
 		}
-		return idx.ForEach(func(k, _ []byte) error {
+		mtPrefix := append([]byte(mediaType), 0x00)
+		c := idx.Cursor()
+		k, _ := c.Seek(mtPrefix)
+		for k != nil && bytes.HasPrefix(k, mtPrefix) {
 			quad, _, ok := splitStateQuadKey(k)
 			if !ok {
-				return nil
+				// Malformed key: skip the single entry, matching the
+				// pre-skip-scan behavior of tolerating stray rows.
+				k, _ = c.Next()
+				continue
 			}
-			if quad.mt != mediaType {
-				return nil
+			if asciiHasPrefixFold(quad.mid, mediaIDPrefix) {
+				ids = append(ids, quad.mid)
 			}
-			if !asciiHasPrefixFold(quad.mid, mediaIDPrefix) {
-				return nil
-			}
-			if _, dup := seen[quad.mid]; dup {
-				return nil
-			}
-			seen[quad.mid] = struct{}{}
-			ids = append(ids, quad.mid)
-			return nil
-		})
+			next := make([]byte, 0, len(mtPrefix)+len(quad.mid)+1)
+			next = append(next, mtPrefix...)
+			next = append(next, quad.mid...)
+			next = append(next, 0x01)
+			k, _ = c.Seek(next)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

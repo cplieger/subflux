@@ -115,9 +115,18 @@ var pcmBufPool = sync.Pool{
 	New: func() any { b := make([]byte, 32768); return &b },
 }
 
+// initialPCMBufSamples is the up-front sample capacity for readPCMSamples:
+// one minute of audio (~960 KB as int16). Preallocating maxSamples up
+// front cost ~200 MB for every whole-file extraction (durationMs=0 →
+// cap 100M samples) regardless of actual media length; instead the
+// buffer starts at one minute and grows geometrically via append, up to
+// the unchanged maxSamples cap. Segment extractions whose cap is below
+// one minute still preallocate exactly and never reallocate.
+const initialPCMBufSamples = PCMSampleRate * 60
+
 // readPCMSamples reads int16 little-endian PCM samples from r up to maxSamples.
 func readPCMSamples(r io.Reader, maxSamples int) []int16 {
-	samples := make([]int16, 0, maxSamples)
+	samples := make([]int16, 0, min(maxSamples, initialPCMBufSamples))
 	bufp, _ := pcmBufPool.Get().(*[]byte)
 	buf := *bufp
 	defer pcmBufPool.Put(bufp)

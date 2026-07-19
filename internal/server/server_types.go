@@ -2,12 +2,9 @@ package server
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"sync/atomic"
 
-	"github.com/cplieger/auth/v2"
-	authoidc "github.com/cplieger/auth/v2/oidc"
 	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
@@ -33,26 +30,31 @@ import (
 
 // --- Types ---
 
-// liveState holds all fields that are atomically swapped during hot reload.
+// liveState holds all fields that are atomically swapped during activation
+// (cold boot and hot reload share the swap; see activate.go). WebAuthn and
+// the OIDC slot ride the snapshot so auth capabilities resolve per request
+// from the CURRENT config instead of a boot-time copy.
 type liveState struct {
 	cfg       api.ConfigProvider
 	engine    api.SearchEngine
 	scorer    api.Scorer
 	sonarr    api.SonarrClient
 	radarr    api.RadarrClient
+	webauthn  *webauthn.WebAuthn
+	oidc      *oidcSlot
 	providers []api.Provider
 }
 
 // storeFacade groups the narrow store interfaces.
 type storeFacade struct {
-	file  filehandlers.FileStore
 	query queryhandlers.QueryStore
-	cov   coveragehandlers.CoverageStore
-	sync  syncStore
-	dl    downloadStore
+	sync  synchandlers.SyncStore
 }
 
 // authDeps groups authentication and session management dependencies.
+// WebAuthn and the OIDC provider deliberately do NOT live here: they are
+// config-derived capabilities carried by the live snapshot (liveState) and
+// resolved per request, so a hot config edit takes effect without a restart.
 type authDeps struct {
 	authStore     authstore.AuthStore
 	adminDB       authhandlers.AuthAdminStore
@@ -60,14 +62,8 @@ type authDeps struct {
 	oidcDB        authhandlers.OIDCStore
 	authenticator sessionAuthenticator
 	rateLimiter   ratelimit.Checker
-	webauthn      *webauthn.WebAuthn
-	oidcProvider  *authoidc.Provider
-	oidcCfg       *auth.OIDCConfig
 	ceremonies    *authhandlers.CeremonyStore
-	sessDebounce  *sessionActivityDebouncer
-	sessBatcher   *sessionActivityBatcher
 	authH         *authhandlers.Handler
-	oidcInit      oidcLazyInit
 }
 
 // pollDeps groups history-polling subsystem dependencies.
@@ -80,13 +76,17 @@ type pollDeps struct {
 type scanSubsystem struct {
 	scanH         *scanning.Handler
 	showSkipCache *showskip.Cache
-	scanGuard     scanning.ScanGuard
+	// stops tracks the live stop callbacks of running background scans
+	// (activity-id keyed); composed with the activity log by the cancel
+	// endpoint and the activity GET's cancellable merge.
+	stops     activity.StopRegistry
+	scanGuard scanning.ScanGuard
 }
 
 // previewDeps groups video/poster preview subsystem dependencies.
 type previewDeps struct {
 	ffmpegSem    *semaphore.Weighted
-	posterClient *http.Client
+	posterClient *posterClient
 }
 
 // Server is the main application server.
@@ -118,26 +118,39 @@ type Server struct {
 	mediaH       *mediahandlers.Handler
 	scanSubsystem
 	authDeps
+	// logSetup re-runs the process-global logging setup on a logging-section
+	// change (injected by the composition root via WithLogSetup; the server
+	// package never owns slog configuration itself).
+	logSetup func(level, format string)
+	// launchWorkers overrides the background-worker launch inside the
+	// workersOnce latch. Nil means the real worker set (launchWorkerSet);
+	// tests inject a counter to assert launch cardinality.
+	launchWorkers func()
 	defaultConfig []byte
-	bgWg          sync.WaitGroup
-	serverPort    int
-	queryHOnce    sync.Once
-	mediaHOnce    sync.Once
-	fileHOnce     sync.Once
-	coverageHOnce sync.Once
-	reloadMu      sync.Mutex
-	ready         webhttp.Ready
-	configured    atomic.Bool
-	scanning      atomic.Bool
+	// routeRegs records every route registration (group + pattern) made by
+	// registerRoutes; the wirespec consistency test compares it against the
+	// endpoint table.
+	routeRegs  []routeReg
+	bgWg       sync.WaitGroup
+	serverPort int
+	reloadMu   sync.Mutex
+	// workersOnce is the background-worker latch: the worker set launches at
+	// most once per process, after the first successful activation.
+	workersOnce sync.Once
+	ready       webhttp.Ready
+	configured  atomic.Bool
+	scanning    atomic.Bool
 }
 
 // Option configures a Server during construction.
 type Option func(*Server)
 
-// WithConfig sets the initial configuration and arr clients.
-func WithConfig(cfg api.ConfigProvider, sonarr api.SonarrClient, radarr api.RadarrClient) Option {
+// WithConfig sets the initial configuration. Config-only by design: arr
+// clients (and every other config-derived capability) are constructed by
+// activation in both boot modes, never handed in from outside.
+func WithConfig(cfg api.ConfigProvider) Option {
 	return func(s *Server) {
-		ls := &liveState{cfg: cfg, sonarr: sonarr, radarr: radarr}
+		ls := &liveState{cfg: cfg}
 		s.live.Store(ls)
 		s.configured.Store(true)
 	}
@@ -175,3 +188,10 @@ func WithArrClientFactories(
 
 // WithDefaultConfig sets the embedded default config bytes.
 func WithDefaultConfig(cfg []byte) Option { return func(s *Server) { s.defaultConfig = cfg } }
+
+// WithLogSetup injects the process-global logging setup so activation can
+// re-apply a changed logging section without a restart. Owned by the
+// composition root (main.go's setupLogging).
+func WithLogSetup(f func(level, format string)) Option {
+	return func(s *Server) { s.logSetup = f }
+}

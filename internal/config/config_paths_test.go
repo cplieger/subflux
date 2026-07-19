@@ -34,11 +34,15 @@ func TestMediaRoots_empty(t *testing.T) {
 func TestValidatePath(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no_roots_allows_all", func(t *testing.T) {
+	t.Run("no_roots_refuses", func(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{}
-		if err := cfg.ValidatePath(context.Background(), "/any/path"); err != nil {
-			t.Errorf("ValidatePath() with no roots: unexpected error: %v", err)
+		err := cfg.ValidatePath(context.Background(), "/any/path")
+		if err == nil {
+			t.Fatal("ValidatePath() with no roots = nil, want refusal error (fail closed, matching RemoveUnderRoot)")
+		}
+		if !errors.Is(err, ErrPathNotAllowed) {
+			t.Errorf("ValidatePath() error = %v, want ErrPathNotAllowed", err)
 		}
 	})
 

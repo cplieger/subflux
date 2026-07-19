@@ -2,10 +2,31 @@ package cliparse
 
 import (
 	"bytes"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// fuzzSpec declares every flag the seed corpus uses so fuzzed inputs reach
+// the interesting parse paths (typed values, bools, `=` forms) instead of
+// all dying on the unknown-flag check.
+func fuzzSpec() *Spec {
+	return &Spec{
+		Name: "test",
+		Flags: []Flag{
+			{Name: "host"},
+			{Name: "lang"},
+			{Name: "imdb"},
+			{Name: "key"},
+			{Name: "flag"},
+			{Name: "another"},
+			{Name: "value"},
+			{Name: "port", Type: "int"},
+			{Name: "season", Type: "int"},
+			{Name: "download", Type: "bool"},
+		},
+	}
+}
 
 func FuzzParseArgs(f *testing.F) {
 	f.Add("--host localhost --port 8080")
@@ -37,23 +58,27 @@ func FuzzParseArgs(f *testing.F) {
 				args = append(args, cur)
 			}
 		}
-		params, dl := ParseArgs(args)
-		if params == nil {
-			t.Fatal("params should never be nil")
+		params, err := ParseAndValidate(args, fuzzSpec())
+		if err != nil {
+			return
 		}
-		for k := range params {
-			if k == "" {
-				t.Error("empty key in params")
+		// Bool consistency: the parser must never report download=true
+		// unless a --download token (bare or =value form) is present.
+		hasDownloadToken := false
+		for _, a := range args {
+			if a == "--download" || strings.HasPrefix(a, "--download=") {
+				hasDownloadToken = true
+				break
 			}
 		}
-		// download flag consistency. The parser pairs `--key value` greedily,
-		// so a "--download" token immediately after another flag is consumed
-		// as that flag's value (a deliberate contract — see clisearch's
-		// TestParseArgs_preserves_all_key_value_pairs). The honest invariant
-		// is therefore one-directional: the parser must never report
-		// download=true unless the token is actually present.
-		if dl && !slices.Contains(args, "--download") {
+		if params.Bool("download") && !hasDownloadToken {
 			t.Errorf("download set but --download absent from args: %q", args)
+		}
+		// Typed access must not panic and must round-trip validated ints.
+		if v := params.String("port"); v != "" {
+			if _, atoiErr := strconv.Atoi(v); atoiErr != nil {
+				t.Errorf("validated --port value %q does not re-parse: %v", v, atoiErr)
+			}
 		}
 	})
 }
@@ -97,6 +122,7 @@ func FuzzValidate(f *testing.F) {
 	f.Add("")
 	f.Add("--help")
 	f.Add("--hlp")
+	f.Add("--timeout 30s --verbose --count 3")
 	spec := &Spec{
 		Name: "test",
 		Flags: []Flag{
@@ -113,9 +139,16 @@ func FuzzValidate(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, raw string) {
 		args := strings.Fields(raw)
-		params, _ := ParseArgs(args)
-		// Should never panic
-		_ = Validate(args, params, spec)
+		// Must never panic; errors are expected for arbitrary input.
+		params, err := ParseAndValidate(args, spec)
+		if err != nil {
+			return
+		}
+		// Success implies every typed accessor is safe to call.
+		_ = params.Int("port")
+		_ = params.Int("season")
+		_ = params.Bool("verbose")
+		_ = params.String("host")
 	})
 }
 

@@ -17,10 +17,10 @@ func TestParseManualSearchQuery(t *testing.T) {
 		url         string
 		wantLang    string
 		wantType    api.MediaType
-		wantFile    string
 		wantTitle   string
 		wantRelease string
 		wantImdb    string
+		wantArrID   int
 		wantTmdb    int
 		wantTvdb    int
 		wantYear    int
@@ -33,8 +33,8 @@ func TestParseManualSearchQuery(t *testing.T) {
 		},
 		{
 			name:     "all_params",
-			url:      "/api/search?title=Breaking+Bad&imdb=tt0903747&tmdb=1396&tvdb=81189&lang=fr&type=episode&year=2008&season=1&episode=3&release=Breaking.Bad.S01E03&file=/media/bb.mkv",
-			wantLang: "fr", wantType: "episode", wantFile: "/media/bb.mkv",
+			url:      "/api/search?title=Breaking+Bad&imdb=tt0903747&tmdb=1396&tvdb=81189&lang=fr&type=episode&year=2008&season=1&episode=3&release=Breaking.Bad.S01E03&media_id=17",
+			wantLang: "fr", wantType: "episode", wantArrID: 17,
 			wantTitle: "Breaking Bad", wantRelease: "Breaking.Bad.S01E03",
 			wantImdb: "tt0903747", wantTmdb: 1396, wantTvdb: 81189,
 			wantYear: 2008, wantSeason: 1, wantEpisode: 3,
@@ -48,17 +48,11 @@ func TestParseManualSearchQuery(t *testing.T) {
 			wantLang: "en", wantType: "episode", // season+episode params present → infers episode
 		},
 		{
-			name: "file_sets_release_name", url: "/api/search?file=/media/Movie.2024.1080p.mkv",
-			wantLang: "en", wantType: "movie", wantFile: "/media/Movie.2024.1080p.mkv",
-			wantRelease: "/media/Movie.2024.1080p.mkv",
+			name: "legacy_file_param_ignored", url: "/api/search?file=/media/Movie.2024.1080p.mkv",
+			wantLang: "en", wantType: "movie",
 		},
 		{
-			name: "release_takes_priority_over_file", url: "/api/search?release=Custom.Release&file=/media/movie.mkv",
-			wantLang: "en", wantType: "movie", wantFile: "/media/movie.mkv",
-			wantRelease: "Custom.Release",
-		},
-		{
-			name: "negative_numbers_ignored", url: "/api/search?year=-1&season=-5&episode=-10&tmdb=-100&tvdb=-200",
+			name: "negative_numbers_ignored", url: "/api/search?year=-1&season=-5&episode=-10&tmdb=-100&tvdb=-200&media_id=-4",
 			wantLang: "en", wantType: "episode", // season+episode params present → infers episode
 		},
 	}
@@ -67,7 +61,7 @@ func TestParseManualSearchQuery(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, tc.url, http.NoBody)
-			req, lang, mediaType, filePath := manualops.ParseSearchQuery(r)
+			req, lang, mediaType, arrID := manualops.ParseSearchQuery(r)
 
 			if lang != tc.wantLang {
 				t.Errorf("lang = %q, want %q", lang, tc.wantLang)
@@ -75,8 +69,8 @@ func TestParseManualSearchQuery(t *testing.T) {
 			if mediaType != tc.wantType {
 				t.Errorf("mediaType = %q, want %q", mediaType, tc.wantType)
 			}
-			if filePath != tc.wantFile {
-				t.Errorf("filePath = %q, want %q", filePath, tc.wantFile)
+			if arrID != tc.wantArrID {
+				t.Errorf("arrID = %d, want %d", arrID, tc.wantArrID)
 			}
 			if tc.wantTitle != "" && req.Title != tc.wantTitle {
 				t.Errorf("req.Title = %q, want %q", req.Title, tc.wantTitle)
@@ -117,7 +111,7 @@ func TestBuildManualSearchResults_basic(t *testing.T) {
 	refs := []api.DownloadedRef{
 		{ReleaseName: "Movie.2024.srt", Provider: "os"},
 	}
-	results := manualops.BuildSearchResults(scored, refs)
+	results := manualops.BuildSearchResults(scored, refs, nil)
 
 	if len(results) != 2 {
 		t.Fatalf("manualops.BuildSearchResults() returned %d results, want 2", len(results))
@@ -174,7 +168,7 @@ func TestBuildManualSearchResults_limits_to_max(t *testing.T) {
 		}
 	}
 
-	results := manualops.BuildSearchResults(scored, nil)
+	results := manualops.BuildSearchResults(scored, nil, nil)
 
 	if len(results) != manualops.MaxResults {
 		t.Errorf("manualops.BuildSearchResults() returned %d results, want %d (capped)",
@@ -185,7 +179,7 @@ func TestBuildManualSearchResults_limits_to_max(t *testing.T) {
 func TestBuildManualSearchResults_empty_input(t *testing.T) {
 	t.Parallel()
 
-	results := manualops.BuildSearchResults(nil, nil)
+	results := manualops.BuildSearchResults(nil, nil, nil)
 
 	if len(results) != 0 {
 		t.Errorf("manualops.BuildSearchResults(nil) returned %d results, want 0", len(results))
@@ -199,7 +193,7 @@ func TestBuildManualSearchResults_fewer_than_10(t *testing.T) {
 		{Sub: api.Subtitle{Provider: "os", Language: "fr", ID: "1"}, Score: 100},
 	}
 
-	results := manualops.BuildSearchResults(scored, nil)
+	results := manualops.BuildSearchResults(scored, nil, nil)
 
 	if len(results) != 1 {
 		t.Errorf("manualops.BuildSearchResults() returned %d results, want 1", len(results))
@@ -216,7 +210,7 @@ func TestBuildManualSearchResults_on_disk_requires_both_provider_and_release(t *
 	// Same provider, different release.
 	results := manualops.BuildSearchResults(scored, []api.DownloadedRef{
 		{ReleaseName: "Different.srt", Provider: "os"},
-	})
+	}, nil)
 	if results[0].OnDisk {
 		t.Error("OnDisk = true with matching provider but different release, want false")
 	}
@@ -224,7 +218,7 @@ func TestBuildManualSearchResults_on_disk_requires_both_provider_and_release(t *
 	// Different provider, same release.
 	results = manualops.BuildSearchResults(scored, []api.DownloadedRef{
 		{ReleaseName: "Movie.srt", Provider: "yify"},
-	})
+	}, nil)
 	if results[0].OnDisk {
 		t.Error("OnDisk = true with different provider but matching release, want false")
 	}
@@ -252,7 +246,7 @@ func TestBuildManualSearchResults_multiple_historical_matches(t *testing.T) {
 		{ReleaseName: "Movie.2024.BluRay-GRP", Provider: "os"},
 		{ReleaseName: "Movie.2024.WEB-DL-OTHER", Provider: "subdl"},
 	}
-	results := manualops.BuildSearchResults(scored, refs)
+	results := manualops.BuildSearchResults(scored, refs, nil)
 
 	if !results[0].OnDisk {
 		t.Error("results[0] OnDisk = false, want true (first historical entry)")

@@ -18,6 +18,26 @@ const (
 	// DefaultDBPath is the container-internal bbolt database file path.
 	// Core and auth buckets live in the same file; no separate auth path.
 	DefaultDBPath = "/config/subflux.bolt"
+
+	// AdminSocketDir is the private runtime directory holding the admin
+	// bootstrap Unix socket. The directory (0700, owned by the effective
+	// UID) is the custody boundary: only in-container processes running as
+	// the server's user can traverse into it, so the zero-credential
+	// bootstrap channel is unreachable over every TCP path. Deliberately
+	// under /tmp (in-container overlayfs in the shipped composes — never a
+	// volume mount), NOT under /config: /config is a user-controlled volume
+	// where a socket path would outlive the container and cross the mount
+	// trust boundary. A future read_only deployment profile must add
+	// tmpfs: /tmp or both this socket and the health marker fail.
+	AdminSocketDir = "/tmp/subflux-admin"
+	// AdminSocketPath is the Unix domain socket the admin bootstrap server
+	// listens on, inside AdminSocketDir.
+	AdminSocketPath = AdminSocketDir + "/admin.sock"
+	// AdminBootstrapURLPath is the one route served on the admin socket.
+	// Hand-written here (not generated apipaths): the endpoint is
+	// deliberately off the wirespec table, so config owns the path string
+	// for both main.go and the CLI socket client.
+	AdminBootstrapURLPath = "/api/admin/bootstrap"
 )
 
 // ErrPathNotAllowed is returned when a path is not under any configured media_roots.
@@ -29,12 +49,16 @@ func (c *Config) MediaRoots() []string { return c.MediaRootDirs }
 // ValidatePath checks that a file path is under one of the configured
 // media roots using pre-opened os.Root handles for symlink-safe containment.
 // Returns an error if the path escapes all roots.
-// If no media roots are configured, all paths are allowed.
+//
+// If no media roots are configured the check FAILS CLOSED, matching
+// RemoveUnderRoot: earlier versions allowed every path in that case,
+// which turned an unset media_roots into an allow-all for
+// request-supplied preview/sync/manual-download paths. Admins who want
+// path-based operations must configure media_roots.
 func (c *Config) ValidatePath(ctx context.Context, path string) error {
 	if len(c.MediaRootDirs) == 0 {
-		slog.Debug("media_roots not configured, all paths allowed",
-			"path", path)
-		return nil
+		slog.Warn("ValidatePath: refused, no media_roots configured", "path", path)
+		return fmt.Errorf("path %q: %w (no media_roots configured)", path, ErrPathNotAllowed)
 	}
 	for i, root := range c.MediaRootDirs {
 		if err := ctx.Err(); err != nil {

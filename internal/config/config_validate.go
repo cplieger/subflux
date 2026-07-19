@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,8 +18,10 @@ import (
 // Sentinel errors for the most common config validation failures.
 // These enable errors.Is dispatch instead of string matching.
 var (
-	// ErrNoProvider indicates no subtitle provider is enabled.
-	ErrNoProvider = errors.New("at least one provider must be enabled")
+	// ErrEmbeddedProviderRemoved indicates a legacy embedded-provider config
+	// shape (alpha hard cutover, no migration path): the fail-fast message is
+	// guidance to the new section, not a compatibility path.
+	ErrEmbeddedProviderRemoved = errors.New("providers.embedded has been replaced by the top-level embedded_subtitles section")
 
 	// ErrNoArr indicates neither Sonarr nor Radarr is configured.
 	ErrNoArr = errors.New("at least one of sonarr or radarr must be configured")
@@ -40,6 +43,9 @@ var (
 
 	// ErrPostProcessConfig indicates an invalid post-processing configuration.
 	ErrPostProcessConfig = errors.New("invalid post-processing configuration")
+
+	// ErrScoringConfig indicates an invalid scoring configuration.
+	ErrScoringConfig = errors.New("invalid scoring configuration")
 
 	// ErrMissingAPIKey indicates a required API key is not configured.
 	ErrMissingAPIKey = errors.New("API key required")
@@ -116,14 +122,21 @@ func validate(ctx context.Context, cfg *Config) error {
 	var ve ValidationErrors
 	ve.Add(validateArrs(cfg))
 	ve.Add(validateLanguages(&cfg.Languages))
+	ve.Add(validateEmbeddedCutover(cfg))
+	// Zero enabled acquisition providers is a VALID configuration (embedded
+	// detection and coverage only), not an error: the former ErrNoProvider
+	// guard was dead code while the fake embedded provider was force-enabled
+	// pre-validation, and enforcing it after the detector separation would
+	// suddenly reject embedded-only setups.
 	if !hasEnabledProvider(cfg.Providers) {
-		ve.Add(ErrNoProvider)
+		slog.Warn("no acquisition providers enabled; embedded detection and coverage only")
 	}
 	ve.Add(validateDurationConstraints([]durationConstraint{
 		{"poll_interval", cfg.PollIntervalCfg.D, defaults.MinPollInterval, false},
 	}))
 	ve.Add(validateSearch(&cfg.SearchCfg))
 	ve.Add(validateAdaptive(&cfg.AdaptiveCfg))
+	ve.Add(validateScoring(cfg.Scoring.Weights))
 	if cfg.PostProcessing.AudioSyncFallback && !cfg.PostProcessing.SyncSubtitles {
 		ve.Add(fmt.Errorf("%w: %w", ErrPostProcessConfig, &FieldDependencyError{
 			Field:     "post_processing.audio_sync_fallback",
@@ -143,7 +156,7 @@ func validate(ctx context.Context, cfg *Config) error {
 		ve.Add(errors.New("auth.basic_enabled: password login cannot be disabled unless oidc_enabled is true (otherwise no one could log in); a CLI override can re-enable it"))
 	}
 	if len(cfg.MediaRootDirs) == 0 {
-		slog.Warn("media_roots not configured, all paths will be allowed")
+		slog.Warn("media_roots not configured, path-based operations (preview, sync, manual download, subtitle deletion) will be refused")
 	} else {
 		for _, root := range cfg.MediaRootDirs {
 			if err := ctx.Err(); err != nil {
@@ -156,6 +169,42 @@ func validate(ctx context.Context, cfg *Config) error {
 			}
 		}
 	}
+	return ve.Err()
+}
+
+// legacyEmbeddedProvider is the retired provider ID of the pre-separation
+// fake embedded provider, kept only to detect legacy config shapes.
+const legacyEmbeddedProvider = api.ProviderID("embedded")
+
+// validateEmbeddedCutover rejects the legacy embedded-provider config shapes
+// with a targeted error naming the move (alpha hard cutover, R3.2/R3.3):
+//   - a providers.embedded section (any content), and
+//   - "embedded" in any language-rule provider include/exclude list.
+//
+// Silently editing an include list would be dangerous — an emptied include
+// means "all providers", which would broaden a deliberate no-network rule —
+// so erroring is both safer and simpler than rewriting user config.
+func validateEmbeddedCutover(cfg *Config) error {
+	var ve ValidationErrors
+	if _, ok := cfg.Providers[legacyEmbeddedProvider]; ok {
+		ve.Add(ErrEmbeddedProviderRemoved)
+	}
+	checkTargets := func(context string, targets []yamlSubtitleTarget) {
+		for _, t := range targets {
+			if slices.Contains(t.Providers, legacyEmbeddedProvider) {
+				ve.Add(fmt.Errorf("%w: remove %q from the providers list (%s, code=%s)",
+					ErrEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
+			}
+			if slices.Contains(t.Exclude, legacyEmbeddedProvider) {
+				ve.Add(fmt.Errorf("%w: remove %q from the exclude list (%s, code=%s)",
+					ErrEmbeddedProviderRemoved, legacyEmbeddedProvider, context, t.Code))
+			}
+		}
+	}
+	for _, rule := range cfg.Languages.Rules {
+		checkTargets("rule audio="+rule.Audio, rule.Subtitles)
+	}
+	checkTargets("languages.default", cfg.Languages.Default)
 	return ve.Err()
 }
 
@@ -202,6 +251,55 @@ func validateBackup(c *yamlBackupConfig) error {
 		}
 	}
 	return ve.Err()
+}
+
+// validateScoring checks custom scoring weights against the documented
+// invariants (api.Scores / api.DefaultScores in types_scoring.go): every
+// weight must be non-negative, and the hash weight — which the scorer
+// returns directly for a verified hash match, bypassing attribute
+// scoring — must not be outranked by any attribute-only match. The
+// maximum attribute-only score per media type is the sum of the
+// applicable non-hash weights (movies use edition, episodes use
+// season_pack). The defaults keep hash (100) above both sums (98);
+// validation requires hash >= sum, the minimal relation that preserves
+// the documented "hash match is authoritative" ordering. A nil weights
+// block means the defaults are in use and is always valid.
+func validateScoring(w *api.Scores) error {
+	if w == nil {
+		return nil
+	}
+	var ve ValidationErrors
+	weights := []struct {
+		name  string
+		value int
+	}{
+		{"hash", w.Hash},
+		{"source", w.Source},
+		{"release_group", w.ReleaseGroup},
+		{"streaming_service", w.StreamingService},
+		{"video_codec", w.VideoCodec},
+		{"hdr", w.HDR},
+		{"edition", w.Edition},
+		{"season_pack", w.SeasonPack},
+	}
+	for _, f := range weights {
+		if f.value < 0 {
+			ve.Add(configFieldErr("scoring."+f.name,
+				fmt.Sprintf("scoring.%s must be non-negative, got %d", f.name, f.value)))
+		}
+	}
+	common := w.Source + w.ReleaseGroup + w.StreamingService + w.VideoCodec + w.HDR
+	movieSum := common + w.Edition
+	episodeSum := common + w.SeasonPack
+	if w.Hash < movieSum || w.Hash < episodeSum {
+		ve.Add(configFieldErr("scoring.hash",
+			fmt.Sprintf("scoring.hash (%d) must be >= the maximum attribute-only score (movies %d, episodes %d) so a hash match always outranks attribute matches",
+				w.Hash, movieSum, episodeSum)))
+	}
+	if err := ve.Err(); err != nil {
+		return fmt.Errorf("%w: %w", ErrScoringConfig, err)
+	}
+	return nil
 }
 
 // validateLogging checks that log level and format are recognized values.

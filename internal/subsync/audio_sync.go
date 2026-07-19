@@ -27,15 +27,12 @@ type AudioSyncHints struct {
 
 	// IsASS indicates the subtitle was ASS-extracted (clean cues, no tag remnants).
 	IsASS bool
-
-	// DisableVAD skips the GMM VAD fallback (Strategy D). Used for benchmarking
-	// to measure the energy-only pipeline's accuracy.
-	DisableVAD bool
 }
 
-// Audio sync offset limits. The correlation can produce arbitrarily large
 // audioSyncConfig consolidates all audio sync tuning parameters for
-// inspectability and testability.
+// inspectability and testability. The correlation can produce arbitrarily
+// large offsets, so results are clamped by the MaxOffset/MinOffset limits
+// below.
 type audioSyncConfig struct {
 	MaxOffsetPct int64          // percentage of audio duration
 	MaxOffsetMs  int64          // hard ceiling in milliseconds

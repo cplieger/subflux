@@ -45,7 +45,6 @@ func (p ProviderID) String() string { return string(p) }
 // Provider name constants (canonical SSOT). All packages MUST reference these
 // instead of declaring local string literals.
 const (
-	ProviderNameEmbedded      ProviderID = "embedded"
 	ProviderNameMock          ProviderID = "mock"
 	ProviderNameHDBits        ProviderID = "hdbits"
 	ProviderNameOpenSubtitles ProviderID = "opensubtitles"
@@ -57,16 +56,21 @@ const (
 	ProviderNameGestdown      ProviderID = "gestdown"
 )
 
-// --- Embedded provider setting keys (SSOT) ---
+// --- Embedded subtitle policy (typed search policy, from config) ---
 
-// EmbeddedSettingIgnorePGS is the setting key controlling PGS subtitle filtering.
-const EmbeddedSettingIgnorePGS = "ignore_pgs"
-
-// EmbeddedSettingIgnoreVobSub is the setting key controlling VobSub subtitle filtering.
-const EmbeddedSettingIgnoreVobSub = "ignore_vobsub"
-
-// EmbeddedSettingIgnoreASS is the setting key controlling ASS/SSA subtitle filtering.
-const EmbeddedSettingIgnoreASS = "ignore_ass"
+// EmbeddedPolicy is the typed search policy for embedded subtitle codecs,
+// resolved from the top-level embedded_subtitles config section. The
+// detector always returns every normalized track; this policy decides
+// which codecs count as "present but not usable" for target satisfaction
+// (they stay visible in coverage but trigger external search).
+type EmbeddedPolicy struct {
+	// IgnorePGS excludes PGS bitmap subs (Blu-ray) from target satisfaction.
+	IgnorePGS bool
+	// IgnoreVobSub excludes VobSub bitmap subs (DVD) from target satisfaction.
+	IgnoreVobSub bool
+	// IgnoreASS excludes ASS/SSA styled subs (anime) from target satisfaction.
+	IgnoreASS bool
+}
 
 // SearchRequest holds the parameters for a subtitle search across providers.
 type SearchRequest struct {
@@ -76,7 +80,7 @@ type SearchRequest struct {
 	AlternativeTitles []string // from Sonarr/Radarr alternateTitles
 	EpisodeTitle      string   // Episode title from Sonarr (for identity validation across numbering schemes)
 	ReleaseName       string
-	VideoPath         string   // Absolute path to the video file (for embedded provider and sync)
+	VideoPath         string   // Absolute path to the video file (for embedded track detection and sync)
 	VideoHash         string   // OpenSubtitles hash
 	AudioLang         string   // resolved audio language (for coverage tracking)
 	Languages         []string // ISO 639-1 codes to search for
@@ -122,12 +126,11 @@ type MatchMethod string
 
 // Match method constants. Canonical source for all packages.
 const (
-	MatchByHash     MatchMethod = "hash"
-	MatchByIMDB     MatchMethod = "imdb"
-	MatchByTitle    MatchMethod = "title"
-	MatchByTVDB     MatchMethod = "tvdb"
-	MatchByTMDB     MatchMethod = "tmdb"
-	MatchByEmbedded MatchMethod = "embedded"
+	MatchByHash  MatchMethod = "hash"
+	MatchByIMDB  MatchMethod = "imdb"
+	MatchByTitle MatchMethod = "title"
+	MatchByTVDB  MatchMethod = "tvdb"
+	MatchByTMDB  MatchMethod = "tmdb"
 )
 
 // String implements fmt.Stringer.
@@ -161,13 +164,96 @@ type ScoredResult struct {
 
 // --- Search result ---
 
-// SearchResult holds the outcome of a SearchTargets call.
+// LangOutcomeKind classifies what happened for one language group in a
+// SearchTargets call. Exactly one kind applies per language.
+type LangOutcomeKind string
+
+// Language-group outcome kinds.
+const (
+	// LangSearched: providers were actually queried for this language.
+	LangSearched LangOutcomeKind = "searched"
+	// LangSkipped: nothing needed a search (covered on disk, manually
+	// locked, or not eligible for upgrade).
+	LangSkipped LangOutcomeKind = "skipped"
+	// LangBackedOff: the language needed a search but every provider was in
+	// adaptive backoff, so no query ran. Distinct from both other kinds; it
+	// must never feed no-result evidence into the season tracker.
+	LangBackedOff LangOutcomeKind = "backed_off"
+)
+
+// LangOutcome is the typed per-language result of a SearchTargets call. It
+// replaces the former parallel FoundLangs/SearchedLangs slices and aggregate
+// counters: each language carries its own classification and evidence, so
+// consumers (season tracker, scan stats, coverage events) read one structure
+// instead of reconstructing sets from slice pairs.
+type LangOutcome struct {
+	Lang     string          // ISO 639-1 language code
+	Kind     LangOutcomeKind // what happened for this language group
+	Paths    []string        // subtitle files downloaded for this language
+	Searched int             // variant targets processed against provider results
+	Skipped  int             // variant targets skipped within the group
+	// Queried counts the provider queries the group's single sweep actually
+	// issued (successful or erroring; providers skipped by the health
+	// timeout never sent a request and don't count). Zero for skipped and
+	// backed-off groups. Distinct from Searched, which counts VARIANT
+	// targets processed against results and stays positive even when the
+	// sweep issued no query (every eligible provider timed out).
+	Queried int
+}
+
+// Found reports whether at least one subtitle was downloaded for the language.
+func (o *LangOutcome) Found() bool { return len(o.Paths) > 0 }
+
+// SearchResult holds the outcome of a SearchTargets call: one typed entry
+// per language group plus the coverage-inventory flag.
 type SearchResult struct {
-	Paths           []string // Subtitle files downloaded.
-	FoundLangs      []string // Language codes that had at least one subtitle downloaded.
-	SearchedLangs   []string // Language codes whose group actually ran (not skipped); superset of FoundLangs.
-	Searched        int      // Languages where providers were actually queried.
-	Skipped         int      // Languages skipped (subs already exist, not eligible for upgrade).
-	BackedOff       int      // Languages that needed a search but had every provider in adaptive backoff (no query ran).
-	CoverageChanged bool     // True if RecordSubtitleFiles detected changes on disk.
+	Langs           []LangOutcome // one entry per language group, in target order
+	CoverageChanged bool          // true if RecordSubtitleFiles detected changes on disk
+}
+
+// Paths returns every subtitle file downloaded across all language groups.
+func (r *SearchResult) Paths() []string {
+	var paths []string
+	for i := range r.Langs {
+		paths = append(paths, r.Langs[i].Paths...)
+	}
+	return paths
+}
+
+// TargetsSearched returns the number of variant targets that ran against
+// provider results across all language groups.
+func (r *SearchResult) TargetsSearched() int {
+	n := 0
+	for i := range r.Langs {
+		n += r.Langs[i].Searched
+	}
+	return n
+}
+
+// TargetsBackedOff returns the number of language groups that needed a
+// search but had every provider in adaptive backoff.
+func (r *SearchResult) TargetsBackedOff() int {
+	n := 0
+	for i := range r.Langs {
+		if r.Langs[i].Kind == LangBackedOff {
+			n++
+		}
+	}
+	return n
+}
+
+// ProviderQueried reports whether at least one provider query was actually
+// issued during the call, across all language groups. This is the inter-item
+// pacing signal: the scan delay exists to space real provider traffic, so an
+// item that touched no provider (fully covered, locked, in adaptive backoff,
+// or with every eligible provider health-timed-out) must not pay it.
+// Deliberately not keyed on TargetsSearched(): that counts variant targets
+// and stays positive even when the sweep sent zero requests.
+func (r *SearchResult) ProviderQueried() bool {
+	for i := range r.Langs {
+		if r.Langs[i].Queried > 0 {
+			return true
+		}
+	}
+	return false
 }

@@ -8,12 +8,16 @@ interface MockActionDef {
   optimistic?: (args: unknown) => unknown;
 }
 
-// Hoisted so the api-client mock factory closes over the same fn the test
-// configures with mockResolvedValueOnce(...).
-const { mockApiGet } = vi.hoisted(() => ({ mockApiGet: vi.fn() }));
+// Hoisted so the generated-client mock factory closes over the same fn the
+// test configures with mockResolvedValueOnce(...).
+const { mockListFiles } = vi.hoisted(() => ({ mockListFiles: vi.fn() }));
 
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
-vi.mock("./api-client.js", () => ({ apiGet: mockApiGet }));
+vi.mock("./wire/client.gen.js", () => ({
+  listFiles: mockListFiles,
+  PATH_DELETE_FILE: "/api/files",
+  PATH_BULK_DELETE_FILES: "/api/files/bulk",
+}));
 // Plain functions (NOT vi.fn): vitest config has mockReset/clearMocks/
 // restoreMocks=true, which strips a vi.fn's implementation before each test.
 // The dispatch must keep calling def.optimistic, so it cannot be a vi.fn.
@@ -39,35 +43,38 @@ vi.mock("./dom.js", async (importOriginal) => {
 
 import { openFileManager } from "./files.js";
 
-// Mirrors files.ts's unexported FileEntry (only the fields the row builder and
-// the collection key read matter here).
+// Mirrors the wire FileEntry fields files.ts consumes (only the fields the
+// row builder and the collection key read matter here). No paths on the
+// wire (S7): ordinal separates manual siblings sharing a quad.
 interface FileEntry {
   source: string;
   media_id: string;
   language: string;
   variant: string;
   codec: string;
-  path: string;
+  name: string;
+  ordinal: number;
   offset_ms: number;
   size: number;
 }
 
-function extFile(media_id: string, language: string, path: string): FileEntry {
+function extFile(media_id: string, language: string, ordinal = 0): FileEntry {
   return {
     source: "external",
     media_id,
     language,
     variant: "standard",
     codec: "srt",
-    path,
+    name: `movie.${language}${ordinal > 0 ? `.${ordinal}` : ""}.srt`,
+    ordinal,
     offset_ms: 0,
     size: 1024,
   };
 }
 
-// openFileManager() fire-and-forgets loadFiles(); apiGet is mocked and resolves
-// on a microtask, so one macrotask turn settles the whole load -> setAll ->
-// render chain. A delete click's confirm/dispatch settle the same way.
+// openFileManager() fire-and-forgets loadFiles(); listFiles is mocked and
+// resolves on a microtask, so one macrotask turn settles the whole load ->
+// setAll -> render chain. A delete click's confirm/dispatch settle the same way.
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 function reqTbody(): HTMLTableSectionElement {
@@ -80,8 +87,8 @@ function reqTbody(): HTMLTableSectionElement {
 
 describe("files: renderFiles", () => {
   beforeEach(() => {
-    mockApiGet.mockReset();
-    mockApiGet.mockResolvedValue([]);
+    mockListFiles.mockReset();
+    mockListFiles.mockResolvedValue([]);
     // ensureMounted() renders into #coverageContent; the bulk-delete button is
     // appended to #coveragePanel .card-head, both of which must exist.
     document.body.innerHTML =
@@ -90,11 +97,11 @@ describe("files: renderFiles", () => {
 
   it("two external files for the same media_id+language render as two rows", async () => {
     // The old key `${media_id}-${language}-${source}` collided here
-    // ("tmdb-5-fr-external" for both) and dropped the second row; keying on the
-    // unique `path` keeps both.
-    mockApiGet.mockResolvedValueOnce([
-      extFile("tmdb-5", "fr", "/media/Movie.fr.srt"),
-      extFile("tmdb-5", "fr", "/media/Movie.fr.1.srt"),
+    // ("tmdb-5-fr-external" for both) and dropped the second row; the FileRef
+    // key includes the manual-sibling ordinal, keeping both.
+    mockListFiles.mockResolvedValueOnce([
+      extFile("tmdb-5", "fr"),
+      extFile("tmdb-5", "fr", 1),
     ]);
 
     openFileManager("movie", "tmdb-5", "Movie", "/");
@@ -106,10 +113,10 @@ describe("files: renderFiles", () => {
   it("single-row delete removes exactly one <tr> and preserves order (node identity stable)", async () => {
     // No videoPaths passed, so each row carries only the delete button.
     // Movie sort is by language: en, es, fr.
-    mockApiGet.mockResolvedValueOnce([
-      extFile("tmdb-7", "en", "/media/Movie.en.srt"),
-      extFile("tmdb-7", "fr", "/media/Movie.fr.srt"),
-      extFile("tmdb-7", "es", "/media/Movie.es.srt"),
+    mockListFiles.mockResolvedValueOnce([
+      extFile("tmdb-7", "en"),
+      extFile("tmdb-7", "fr"),
+      extFile("tmdb-7", "es"),
     ]);
 
     openFileManager("movie", "tmdb-7", "Movie", "/");

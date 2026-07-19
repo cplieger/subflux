@@ -6,14 +6,16 @@ export type {
   MediaType,
   ActivityEntry,
   CoverageTarget,
-  KeyGenerated,
+  EpisodeItem,
   MeResponse,
   MovieItem,
   ProviderSchema,
   SchemaField,
   SchemaSection,
+  SeasonGroup,
   SeriesItem,
   SubtitleEntry,
+  SyncAudioResponse,
 } from "./wire/types.gen.js";
 
 import type { MovieItem, CoverageTarget, SubtitleEntry } from "./wire/types.gen.js";
@@ -38,7 +40,6 @@ export interface CoverageItem {
   // Movie-only
   tmdb_id?: number;
   has_file?: boolean;
-  path?: string;
   scene_name?: string;
   in_cinemas?: string;
   digital_release?: string;
@@ -51,25 +52,3 @@ export interface CoverageItem {
 
 /** Narrowed MovieItem with required id+title for detail views and bus events. */
 export type MovieDetail = MovieItem & { id: number; title: string };
-
-/** Audio sync response from POST /api/sync. */
-export interface AudioSyncResponse {
-  readonly applied: boolean;
-  readonly offset_ms: number;
-  readonly confidence: number;
-}
-
-/** Episode detail for series drill-down. */
-export interface Episode {
-  episode: number;
-  absolute_episode?: number;
-  title?: string;
-  has_file: boolean;
-  path?: string;
-}
-
-/** Season group for series drill-down. */
-export interface SeasonGroup {
-  season: number;
-  episodes?: Episode[];
-}

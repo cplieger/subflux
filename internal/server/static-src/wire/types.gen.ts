@@ -2,17 +2,58 @@
 
 export type ActivitySource = "scheduled" | "manual";
 
+export type AlertKind = "persistent" | "transient";
+
+export type AlertLevel = "error" | "warn" | "info";
+
+export type ErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "method_not_allowed" | "conflict" | "payload_too_large" | "rate_limited" | "bad_gateway" | "service_unavailable" | "internal_error" | "auth_invalid_credentials" | "auth_account_disabled" | "auth_account_not_setup" | "auth_password_too_short" | "auth_password_breached" | "auth_session_invalid" | "auth_session_required" | "auth_role_required" | "auth_apikey_invalid" | "auth_apikey_disabled" | "auth_csrf" | "webauthn_session_invalid" | "webauthn_register_failed" | "webauthn_assertion_failed" | "webauthn_unsupported_origin" | "oidc_state_invalid" | "oidc_nonce_invalid" | "oidc_exchange_failed" | "oidc_userinfo_failed" | "oidc_account_not_provisioned" | "setup_already_complete" | "setup_password_invalid" | "config_invalid" | "config_unreachable_arr" | "config_yaml_parse" | "config_too_large" | "config_reload_failed" | "scan_in_progress" | "scan_no_targets" | "search_in_progress" | "search_provider_disabled" | "search_no_results" | "download_failed" | "unlock_not_held" | "path_not_allowed" | "media_not_found" | "subtitle_not_found" | "preview_unavailable" | "sync_unsupported_format" | "sync_no_reference" | "sync_low_confidence" | "subtitle_extension_not_allowed" | "query_invalid_filter" | "query_limit_exceeded" | "provider_timed_out" | "provider_not_configured" | "arr_unreachable";
+
+export type EventType = "coverage" | "notify" | "scan:start" | "scan:done";
+
 export type MediaType = "movie" | "episode" | "series";
 
 export type NotifyLevel = "error" | "success" | "info";
 
+export type Outcome = "completed" | "failed" | "cancelled" | "shutdown";
+
 export type Role = "admin" | "user";
+
+export type ScanKind = "series" | "season" | "movie" | "item" | "full";
 
 export type ScoreTier = "excellent" | "good" | "acceptable" | "minimal" | "none";
 
 export type Variant = "standard" | "hi" | "forced";
 
-/** Entry represents an ongoing or recent action. */
+/**
+ * EventData is a sealed interface restricting Event.Data to known payload types.
+ * Implementors: CoverageEvent, NotifyEvent, ScanEvent.
+ * //
+ * The wiregen directive below emits the TS union
+ * (export type EventData = CoverageEvent | NotifyEvent | ScanEvent) plus its
+ * runtime decoders; the discriminator is the SSE envelope's "type" key
+ * (Event.Type), which is also the named SSE event the browser dispatches on.
+ * //
+ */
+export type EventData = CoverageEvent | NotifyEvent | ScanEvent;
+
+/** APIKeyInfo is one entry of the GET /api/auth/apikeys response. */
+export interface APIKeyInfo {
+  created_at: string;
+  key_prefix: string;
+  key_suffix: string;
+  label: string;
+  id: number;
+}
+
+/**
+ * Entry represents an ongoing or recent action.
+ * //
+ * Scan entries additionally carry their structured scope (Kind, MediaType,
+ * MediaID, Season, Episode) and the role required to cancel them
+ * (RequiredRole: user for per-item scans, admin for full scans). Cancellable
+ * is a serialization-time flag merged from the StopRegistry by the activity
+ * GET handler; it is never persisted on the stored entry.
+ */
 export interface ActivityEntry {
   started_at: string;
   ended_at?: string;
@@ -20,22 +61,79 @@ export interface ActivityEntry {
   action: string;
   detail: string;
   source: ActivitySource;
+  kind?: ScanKind;
+  media_type?: MediaType;
+  required_role?: Role;
+  media_id?: number;
+  season?: number;
+  episode?: number;
+  current?: number;
+  total?: number;
   done: boolean;
   queued?: boolean;
   cancelled?: boolean;
   failed?: boolean;
-  current?: number;
-  total?: number;
+  cancellable?: boolean;
 }
 
-/** CoverageEvent is the data payload for coverage updates. */
+/** AdminUserCreatedResponse is the JSON response after admin creates a user. */
+export interface AdminUserCreatedResponse {
+  username: string;
+  email: string;
+  role: Role;
+  id: number;
+}
+
+/** Alert represents an actionable error or informational message. */
+export interface Alert {
+  time: string;
+  level: AlertLevel;
+  message: string;
+  source: string;
+  kind: AlertKind;
+  id: number;
+  dismissed: boolean;
+}
+
+/** AudioRuleJSON is a JSON-friendly audio rule. */
+export interface AudioRule {
+  audio: string;
+  subtitles: SubtitleTarget[];
+}
+
+/** BackoffEntry represents an item in adaptive search backoff. */
+export interface BackoffEntry {
+  last_tried: string;
+  next_retry: string;
+  media_type: MediaType;
+  media_id: string;
+  language: string;
+  provider: string;
+  failures: number;
+}
+
+/**
+ * BulkDeleteRequest is the typed body for DELETE /api/files/bulk: the media
+ * item whose external subtitle files are all deleted. MediaID keeps the
+ * store-ID semantics of the listing (exact ID, or a "tvdb-<id>-" series
+ * prefix covering every episode).
+ */
+export interface BulkDeleteRequest {
+  media_type: MediaType;
+  media_id: string;
+}
+
+/**
+ * CoverageEvent is the data payload for coverage updates. It deliberately
+ * carries no file path (S7: no filesystem paths on the wire; the UI keys
+ * refreshes on media identity alone).
+ */
 export interface CoverageEvent {
   media_type: MediaType;
   media_id: string;
   language: string;
   variant: string;
   source: string;
-  path?: string;
 }
 
 /** TargetCoverage tracks coverage for a single expected subtitle target. */
@@ -45,6 +143,87 @@ export interface CoverageTarget {
   have: number;
   have_ignored: number;
   total: number;
+}
+
+/**
+ * DeleteFileRequest is the typed body for DELETE /api/files: either the
+ * FileRef fields addressing one stored subtitle file, or a server-minted
+ * orphan handle from the listing (mutually exclusive; orphan_handle wins).
+ */
+export interface DeleteFileRequest {
+  media_type?: MediaType;
+  media_id?: string;
+  language?: string;
+  variant?: string;
+  source?: string;
+  orphan_handle?: string;
+  ordinal?: number;
+}
+
+/** DownloadAccepted is the typed 202 Accepted response for manual downloads. */
+export interface DownloadAccepted {
+  activity_id: string;
+  status: string;
+}
+
+/**
+ * DownloadRequest holds the parsed fields for a manual download. The video
+ * is addressed by MediaRef only (media_type + media_id [arr ID] +
+ * season/episode); the server resolves the video file path from the arr —
+ * the wire carries no file path (S7). videoPath is the server-resolved
+ * value, set by the handler after resolution, never decoded from JSON.
+ */
+export interface DownloadRequest {
+  provider: string;
+  subtitle_id: string;
+  language: string;
+  release_name?: string;
+  media_type?: MediaType;
+  score?: number;
+  season?: number;
+  episode?: number;
+  media_id?: number;
+  top_pick?: boolean;
+  hearing_impaired?: boolean;
+  forced?: boolean;
+}
+
+/**
+ * EpisodeItem is the JSON shape for a single episode. It carries no file
+ * path (S7): clients address the video by MediaRef (series arr ID + season +
+ * episode) and the server resolves paths.
+ */
+export interface EpisodeItem {
+  title: string;
+  scene_name?: string;
+  id: number;
+  season: number;
+  episode: number;
+  scene_season?: number;
+  scene_episode?: number;
+  absolute_episode?: number;
+  has_file: boolean;
+}
+
+/**
+ * FileEntry is the JSON shape for the file manager API. It carries no
+ * filesystem paths: (media_id, language, variant, source, ordinal) is the
+ * FileRef identity a client echoes back to address the file; Name is the
+ * display basename. Orphan rows (on disk, no store row) additionally carry
+ * the single-use OrphanHandle and only Name/Size beside it.
+ */
+export interface FileEntry {
+  media_id: string;
+  language: string;
+  variant: string;
+  source: string;
+  codec?: string;
+  name?: string;
+  orphan_handle?: string;
+  score?: number;
+  ordinal?: number;
+  offset_ms?: number;
+  size?: number;
 }
 
 /** KeyGenerated is the JSON response after generating an API key. */
@@ -57,10 +236,38 @@ export interface KeyGenerated {
   id: number;
 }
 
+/**
+ * LanguageRulesJSON is the language rules in a JSON-serializable format
+ * for the settings UI.
+ */
+export interface LanguageRules {
+  rules?: AudioRule[];
+  default?: SubtitleTarget[];
+}
+
 /** LoginSuccess is the JSON response after successful login. */
 export interface LoginSuccess {
   redirect: string;
   user: MeResponse;
+}
+
+/** ManualLockEntry represents a manually locked media+language+variant quad. */
+export interface ManualLockEntry {
+  media_type: MediaType;
+  media_id: string;
+  language: string;
+  variant: Variant;
+  count: number;
+}
+
+/**
+ * ManualSearchResponse is the typed response from RunSearch. It deliberately
+ * carries no lock state: manual locks are invisible infrastructure ("a manual
+ * pick is never overwritten"), not a user-facing concept, so the popup has
+ * nothing to display about them.
+ */
+export interface ManualSearchResponse {
+  results: SearchResult[];
 }
 
 /** MeResponse is the JSON response for GET /api/auth/me. */
@@ -74,11 +281,14 @@ export interface MeResponse {
   can_link_oidc: boolean;
 }
 
-/** MovieItem is the coverage summary for one movie. */
+/**
+ * MovieItem is the coverage summary for one movie. It carries no file path
+ * (S7): clients address the video by MediaRef (id = arr ID) and the server
+ * resolves paths.
+ */
 export interface MovieItem {
   title: string;
   imdb_id?: string;
-  path?: string;
   scene_name?: string;
   in_cinemas?: string;
   digital_release?: string;
@@ -100,6 +310,38 @@ export interface NotifyEvent {
   text: string;
 }
 
+/**
+ * ParsedConfig is the GET /api/config/parsed response: the live parsed
+ * configuration in UI-consumable form. Adaptive and Search carry the
+ * config package's structs verbatim (their Go field names are the wire
+ * keys); they are typed loosely here to keep this package decoupled from
+ * the config internals.
+ */
+export interface ParsedConfig {
+  adaptive: unknown;
+  search: unknown;
+  providers: Record<string, boolean>;
+  sonarr_url?: string;
+  radarr_url?: string;
+  language_rules: LanguageRules;
+  ignored_codecs?: string[];
+  languages: string[];
+  scores: Scores;
+  post_processing: PostProcessConfig;
+  configured: boolean;
+  sonarr_configured: boolean;
+  radarr_configured: boolean;
+}
+
+/** PasskeyInfo is one entry of the GET /api/auth/passkeys response. */
+export interface PasskeyInfo {
+  created_at: string;
+  name: string;
+  transport?: string;
+  id: number;
+  backup_eligible: boolean;
+}
+
 /** PasskeyRegistered is the JSON response after successful passkey registration. */
 export interface PasskeyRegistered {
   created_at: string;
@@ -108,12 +350,43 @@ export interface PasskeyRegistered {
   id: number;
 }
 
+/** PathValidationResponse is the JSON response for path validation requests. */
+export interface PathValidationResponse {
+  error?: string;
+  valid: boolean;
+}
+
+/** PostProcessConfig controls subtitle post-processing. */
+export interface PostProcessConfig {
+  strip_hi: boolean;
+  strip_tags: boolean;
+  normalize_utf8: boolean;
+  clean_whitespace: boolean;
+  normalize_endings: boolean;
+  remove_empty: boolean;
+}
+
+/** PreviewStartResponse is the typed response for HandlePreviewStart. */
+export interface PreviewStartResponse {
+  description: string;
+  start_seconds: number;
+}
+
+/**
+ * ProviderInfo is one entry of the GET /api/providers response: a registered
+ * provider's config-enabled flag and whether it is currently loaded.
+ */
+export interface ProviderInfo {
+  name: string;
+  enabled: boolean;
+  loaded: boolean;
+}
+
 /** ProviderSchema describes a single provider's settings fields. */
 export interface ProviderSchema {
   name: string;
   label: string;
   settings?: SchemaField[];
-  always_enabled?: boolean;
 }
 
 /** ProviderStatus is the state of a single provider's timeout. */
@@ -127,22 +400,85 @@ export interface ProviderStatus {
 
 /** ProvidersResponse is the JSON response for GET /api/providers/timeout. */
 export interface ProvidersResponse {
-  providers?: Record<string, ProviderStatus>;
+  providers: Record<string, ProviderStatus>;
   enabled: boolean;
+}
+
+/**
+ * ResolveCandidate is one ambiguity candidate; Year disambiguates equal
+ * titles.
+ */
+export interface ResolveCandidate {
+  media_type: MediaType;
+  title: string;
+  media_id: number;
+  year?: number;
+}
+
+/**
+ * ResolveResponse is the typed result of GET /api/search/resolve. Exactly
+ * one of the following holds: Resolved with Items (success), Candidates
+ * (ambiguous — the client disambiguates), or all empty (no match).
+ */
+export interface ResolveResponse {
+  items?: ResolvedItem[];
+  candidates?: ResolveCandidate[];
+  resolved: boolean;
+}
+
+/**
+ * ResolveSearchIDs carries the stable identifiers of a resolved item for
+ * the follow-up search call.
+ */
+export interface ResolveSearchIDs {
+  imdb?: string;
+  tvdb?: number;
+  tmdb?: number;
+}
+
+/**
+ * ResolvedItem is one searchable media item: an episode of the matched
+ * series (file-bearing only) or the matched movie. MediaID is the arr ID
+ * (Sonarr series ID / Radarr movie ID) — the same identity the search and
+ * download endpoints consume.
+ */
+export interface ResolvedItem {
+  media_type: MediaType;
+  title: string;
+  search_ids: ResolveSearchIDs;
+  media_id: number;
+  year?: number;
+  season?: number;
+  episode?: number;
+}
+
+/**
+ * ScanAccepted is the typed 202 Accepted response for scan starts. The scan
+ * executes in a server-owned background goroutine; GET /api/activity is the
+ * status monitor for the returned activity id (RFC 9110 202 guidance).
+ * Deliberately a separate type from manualops.DownloadAccepted: the two docs
+ * diverge.
+ */
+export interface ScanAccepted {
+  activity_id: string;
+  status: string;
 }
 
 /**
  * ScanEvent is the data payload for scan:start and scan:done. Action and
  * Detail mirror the activity log entry (e.g. "Full Scan" / "Searching
  * library for missing subtitles"). Source is "scheduled" or "manual".
- * Succeeded is meaningful only on scan:done; false indicates the scan
- * ended via activity.fail rather than activity.end.
+ * ActivityID correlates the event with its activity entry. Outcome is
+ * meaningful only on scan:done and carries the four-valued terminal outcome
+ * (completed | failed | cancelled | shutdown) — a cancelled scan is neither
+ * a success nor a failure.
  */
 export interface ScanEvent {
   action: string;
   detail: string;
   source: ActivitySource;
-  succeeded?: boolean;
+  activity_id?: string;
+  outcome?: Outcome;
 }
 
 /** SchemaField describes a single configuration field for the UI. */
@@ -190,6 +526,49 @@ export interface ScorePreview {
   score_no_hash: number;
 }
 
+/**
+ * Scores defines the weight for each release attribute match type.
+ * //
+ * Identity fields (series, season, episode, title, year) are not
+ * scored here; they are enforced by the provider query (identity
+ * gate). Resolution is excluded; its signal is captured by source +
+ * release_group.
+ * //
+ * Movie-only: Edition. For episodes, edition=0 and season_pack takes
+ * its place. Applicable non-hash weights sum to 98 for each media
+ * type. Hash match bypasses attribute scoring entirely (score = 100).
+ */
+export interface Scores {
+  hash: number;
+  source: number;
+  release_group: number;
+  streaming_service: number;
+  video_codec: number;
+  hdr: number;
+  edition: number;
+  season_pack: number;
+}
+
+/** SearchResult is a single result returned by the manual search API. */
+export interface SearchResult {
+  matches?: Record<string, number>;
+  provider: string;
+  language: string;
+  release_name: string;
+  matched_by: string;
+  subtitle_id: string;
+  /**
+ * Tier is the score's quality-tier label, computed server-side by the
+ * scorer (same table as /api/score): the remote CLI renders it and has
+ * no scorer of its own.
+ */
+  tier: ScoreTier;
+  score: number;
+  hearing_impaired: boolean;
+  forced: boolean;
+  on_disk: boolean;
+}
+
 /** SearchTarget describes a single subtitle search target in the API response. */
 export interface SearchTarget {
   min_score?: number;
@@ -204,6 +583,12 @@ export interface SearchTargets {
   orig_lang: string;
   audio_langs: string[];
   targets: SearchTarget[];
+}
+
+/** SeasonGroup groups episodes by season number. */
+export interface SeasonGroup {
+  episodes: EpisodeItem[];
+  season: number;
 }
 
 /** SeriesItem is the coverage summary for one TV series. */
@@ -269,16 +654,121 @@ export interface Stats {
   partial: boolean;
 }
 
-/** SubtitleEntry is the JSON shape returned by coverage queries. */
+/**
+ * StatusResponse is the canonical {"status": "..."} operation-result body
+ * used by action endpoints (scan triggers, resets, logout).
+ */
+export interface StatusResponse {
+  status: string;
+}
+
+/** StructuredConfig is the wire shape both structured endpoints share. */
+export interface StructuredConfig {
+  sections: Record<string, unknown>;
+  /**
+ * SecretsPresent lists the dotted schema paths of secrets that hold a
+ * non-empty value in the config file (e.g. "sonarr.api_key",
+ * "providers.opensubtitles.settings.password"). GET-only metadata: the
+ * values themselves stay redacted-empty, but the first-boot wizard needs
+ * presence to distinguish "key saved" from "key missing" for its
+ * satisfied/ping decisions. Ignored on save.
+ */
+  secrets_present?: string[];
+}
+
+/**
+ * SubtitleEntry is a subtitle-file row from coverage queries. On the wire it
+ * carries NO filesystem paths (S7: clients address files by typed reference,
+ * never by path); Path and VideoPath stay populated for in-process consumers
+ * (file listing size stat, deletion, reconciliation) but are json-omitted.
+ * Ordinal is the manual-sibling number parsed from the row's filename
+ * (api.ManualOrdinal) — together with (media_type, media_id, language,
+ * variant, source) it forms the wire FileRef the client echoes back to
+ * address this exact file.
+ */
 export interface SubtitleEntry {
   media_id: string;
   language: string;
   variant: string;
   source: string;
   codec?: string;
-  path?: string;
-  video_path?: string;
   score?: number;
+  ordinal?: number;
   offset_ms?: number;
+}
+
+/** SubtitleTargJSON is a JSON-friendly subtitle target. */
+export interface SubtitleTarget {
+  min_score?: number;
+  code: string;
+  variant?: string;
+  variants?: string[];
+  providers?: string[];
+  exclude?: string[];
+}
+
+/**
+ * SyncAudioRequest is the typed body for POST /api/sync/audio: the FileRef
+ * of the subtitle to align (the server resolves the subtitle path from the
+ * store row and the video path from the same media) plus the dry-run flag.
+ */
+export interface SyncAudioRequest {
+  media_type: MediaType;
+  media_id: string;
+  language: string;
+  variant?: string;
+  source?: string;
+  ordinal?: number;
+  dry_run?: boolean;
+}
+
+/** SyncAudioResponse is the typed response for POST /api/sync/audio. */
+export interface SyncAudioResponse {
+  method: string;
+  offset_ms: number;
+  confidence: number;
+  applied: boolean;
+}
+
+/**
+ * SyncOffsetRequest is the typed body for POST /api/sync/offset: the FileRef
+ * of the subtitle plus the absolute cumulative offset to apply.
+ */
+export interface SyncOffsetRequest {
+  media_type: MediaType;
+  media_id: string;
+  language: string;
+  variant?: string;
+  source?: string;
+  ordinal?: number;
+  offset_ms: number;
+}
+
+/** UserInfo is one entry of the GET /api/auth/users response. */
+export interface UserInfo {
+  created_at: string;
+  username: string;
+  email: string;
+  role: Role;
+  id: number;
+  enabled: boolean;
+}
+
+/**
+ * WebAuthnLoginBeginResponse wraps WebAuthn assertion options with a session token.
+ * Used for login ceremonies.
+ */
+export interface WebAuthnLoginBeginResponse {
+  publicKey?: { publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string };
+  session_token: string;
+}
+
+/**
+ * WebAuthnRegisterBeginResponse wraps WebAuthn creation options with a session token.
+ * Used for passkey registration ceremonies.
+ */
+export interface WebAuthnRegisterBeginResponse {
+  publicKey?: { publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string };
+  session_token: string;
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/animetosho"
 	"github.com/cplieger/subflux/internal/provider/betaseries"
-	"github.com/cplieger/subflux/internal/provider/embedded"
 	"github.com/cplieger/subflux/internal/provider/gestdown"
 	"github.com/cplieger/subflux/internal/provider/hdbits"
 	"github.com/cplieger/subflux/internal/provider/mock"
@@ -56,23 +55,6 @@ type providerEntry struct {
 
 // providerEntries is the declarative list of all built-in providers.
 var providerEntries = []providerEntry{
-	{
-		name: api.ProviderNameEmbedded, label: "Embedded", factory: embedded.Factory,
-		fields: []api.ProviderSchemaField{
-			{
-				Key: "ignore_pgs", Label: "Ignore PGS", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Exclude PGS bitmap subs from search results (Blu-ray). Still tracked in coverage.",
-			},
-			{
-				Key: "ignore_vobsub", Label: "Ignore VobSub", Type: fieldTypeBool, Default: fieldDefaultTrue,
-				Help: "Exclude VobSub bitmap subs from search results (DVD). Still tracked in coverage.",
-			},
-			{
-				Key: "ignore_ass", Label: "Ignore ASS", Type: fieldTypeBool, Default: fieldDefaultFalse,
-				Help: "Skip ASS/SSA styled subs (anime)",
-			},
-		},
-	},
 	{
 		name: api.ProviderNameHDBits, label: "HDBits", factory: hdbits.Factory,
 		fields: []api.ProviderSchemaField{

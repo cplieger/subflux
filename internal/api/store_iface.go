@@ -72,6 +72,12 @@ type CoverageStore interface {
 	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
 	TotalSubtitleFiles(ctx context.Context) (int, error)
 	LastScanTime(ctx context.Context) (string, error)
+	// Scan-cycle mark (duration-aware resume): set when a full scan begins,
+	// cleared on normal completion. A dangling mark means the previous cycle
+	// was interrupted; ScanCycleStart returns the zero time when absent.
+	ScanCycleStart(ctx context.Context) (time.Time, error)
+	SetScanCycleStart(ctx context.Context, t time.Time) error
+	ClearScanCycleStart(ctx context.Context) error
 }
 
 // SyncOffsetStore groups subtitle timing adjustment persistence.

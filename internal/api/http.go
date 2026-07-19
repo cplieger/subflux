@@ -48,7 +48,8 @@ const (
 	// httputil.ContentTypeJSON but defined locally to avoid a circular import.
 	contentTypeJSON = "application/json"
 
-	// KeyStatus is the canonical JSON key for operation result status responses.
+	// KeyStatus is the canonical JSON key for operation result status
+	// responses (StatusResponse is the typed carrier).
 	// Used by server, scanning, and confighandlers packages.
 	KeyStatus = "status"
 
@@ -112,8 +113,8 @@ func JSONError(w http.ResponseWriter, err error, code int) {
 // error string is safe to surface verbatim AND a stable machine-
 // readable code is meaningful for the client. Delegates to webhttp.WriteError
 // so the envelope and its request-id population match writeError.
-func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code, msg string) {
-	webhttp.WriteError(w, r, status, code, msg)
+func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
+	webhttp.WriteError(w, r, status, string(code), msg)
 }
 
 // Ok writes a 200 {"ok": true} response — the standard "action succeeded" reply
@@ -123,10 +124,16 @@ func Ok(w http.ResponseWriter) {
 	webhttp.Ok(w)
 }
 
+// StatusResponse is the canonical {"status": "..."} operation-result body
+// used by action endpoints (scan triggers, resets, logout).
+type StatusResponse struct {
+	Status string `json:"status"`
+}
+
 // writeError is the single place all named error helpers funnel through. It
 // delegates to webhttp.WriteError, which builds the {error,code,request_id}
 // envelope and pulls the request id from r's context (nil-safe on r). The wire
 // shape is identical to the previous hand-built errorResponse.
-func writeError(w http.ResponseWriter, r *http.Request, status int, code, msg string) {
-	webhttp.WriteError(w, r, status, code, msg)
+func writeError(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
+	webhttp.WriteError(w, r, status, string(code), msg)
 }

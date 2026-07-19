@@ -33,23 +33,32 @@ func (s *Sonarr) GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]st
 	}
 	logSeriesSummary(allSeries, excludeTagIDs)
 
-	results, err := s.collectWantedEpisodes(ctx, allSeries, excludeTagIDs)
-	if err != nil {
-		return err
+	results, failedSeries := s.collectWantedEpisodes(ctx, allSeries, excludeTagIDs)
+	if failedSeries > 0 {
+		// Surface the partial-library condition in the scan summary: without
+		// this, a repeatedly-failing series silently converts to "no wanted
+		// episodes" and the scan reports ordinary completion.
+		slog.Warn("scan covers a partial library: episode fetches failed for some series",
+			"failed_series", failedSeries,
+			"collected_series", len(results))
 	}
 	return dispatchEpisodes(ctx, results, fn)
 }
 
 // collectWantedEpisodes fetches episodes for every non-excluded series with
 // bounded parallelism and returns the series that have at least one episode
-// needing a subtitle search.
-func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.Series, excludeTagIDs map[int]struct{}) ([]seriesEpisodes, error) {
+// needing a subtitle search, plus the count of series whose episode fetch
+// failed. It cannot fail: a series whose fetch errors is logged, counted, and
+// skipped (see fetchWantedForSeries), so the scan always proceeds with
+// whatever was collected.
+func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.Series, excludeTagIDs map[int]struct{}) ([]seriesEpisodes, int) {
 	var (
-		mu      sync.Mutex
-		results []seriesEpisodes
+		mu           sync.Mutex
+		results      []seriesEpisodes
+		failedSeries int
 	)
 
-	g, gctx := errgroup.WithContext(ctx)
+	var g errgroup.Group
 	g.SetLimit(episodeFetchConcurrency)
 
 	for i := range allSeries {
@@ -58,39 +67,43 @@ func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.S
 		}
 		ser := allSeries[i]
 		g.Go(func() error {
-			wanted := s.fetchWantedForSeries(gctx, &ser)
-			if len(wanted) > 0 {
-				mu.Lock()
+			wanted, ok := s.fetchWantedForSeries(ctx, &ser)
+			mu.Lock()
+			switch {
+			case !ok:
+				failedSeries++
+			case len(wanted) > 0:
 				results = append(results, seriesEpisodes{series: ser, episodes: wanted})
-				mu.Unlock()
 			}
+			mu.Unlock()
 			return nil
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	return results, nil
+	// The closures never return an error (skip-and-continue policy), so Wait
+	// is used purely as a bounded-parallelism barrier.
+	_ = g.Wait()
+	return results, failedSeries
 }
 
 // fetchWantedForSeries fetches one series' episodes and returns those needing a
-// subtitle search. A fetch error is logged and the series skipped (returns nil)
-// so one failing series doesn't abort the scan.
-func (s *Sonarr) fetchWantedForSeries(ctx context.Context, ser *arrapi.Series) []arrapi.Episode {
+// subtitle search. A fetch error is logged and the series skipped (ok=false)
+// so one failing series doesn't abort the scan; the caller counts the failure
+// so the scan summary can report the partial library.
+func (s *Sonarr) fetchWantedForSeries(ctx context.Context, ser *arrapi.Series) (wanted []arrapi.Episode, ok bool) {
 	episodes, err := s.GetEpisodes(ctx, ser.ID)
 	if err != nil {
 		slog.Warn("failed to get episodes after retries, skipping series",
 			"series", ser.Title, "series_id", ser.ID, "error", err)
-		return nil
+		return nil, false
 	}
-	wanted := make([]arrapi.Episode, 0, len(episodes))
+	wanted = make([]arrapi.Episode, 0, len(episodes))
 	for i := range episodes {
 		if wantedEpisode(&episodes[i]) {
 			wanted = append(wanted, episodes[i])
 		}
 	}
-	return wanted
+	return wanted, true
 }
 
 // dispatchEpisodes invokes fn for every collected episode sequentially,

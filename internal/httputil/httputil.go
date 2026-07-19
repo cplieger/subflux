@@ -1,5 +1,5 @@
 // Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx/v2; this package
+// Behavioral logic is delegated to github.com/cplieger/httpx/v3; this package
 // retains application-specific constants and thin adapters that bridge httpx
 // error types to the internal api.* error types used across the codebase.
 package httputil
@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/httpx/v2"
+	"github.com/cplieger/httpx/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -92,53 +92,29 @@ func IsTransient(err error) bool {
 	return httpx.IsTransient(err)
 }
 
-// RedactTransportError unwraps *url.Error and redacts the secret.
-func RedactTransportError(err error, prefix, secret string) error {
-	return httpx.RedactTransportError(err, prefix, secret)
-}
-
-// RedactSecret replaces occurrences of secret in err's message with "REDACTED".
-func RedactSecret(err error, secret string) error {
-	return httpx.RedactSecret(err, secret)
-}
-
-// SleepCtx sleeps for the given duration or returns early if the context is cancelled.
-func SleepCtx(ctx context.Context, d time.Duration) error {
-	return httpx.SleepCtx(ctx, d)
-}
-
-// DrainClose reads remaining bytes from rc before closing it.
-func DrainClose(rc io.ReadCloser) {
-	httpx.DrainClose(rc)
-}
-
 // LimitedBody wraps resp.Body with a read cap while preserving Close.
 func LimitedBody(resp *http.Response) io.ReadCloser {
 	return httpx.LimitedBody(resp, MaxDownloadBytes)
 }
 
-// JitteredBackoff returns a jittered duration in [backoff/2, backoff].
-func JitteredBackoff(backoff time.Duration) time.Duration {
-	return httpx.JitteredBackoff(backoff)
-}
-
-// SafeDouble doubles a duration while guarding against int64 overflow.
-func SafeDouble(d time.Duration) time.Duration {
-	return httpx.SafeDouble(d)
-}
-
 // RetryOnRateLimit retries fn up to maxAttempts times when it returns a
-// *api.RateLimitError. Bridges the api.RateLimitError type to httpx.RateLimitError.
+// *api.RateLimitError. Bridges the api.RateLimitError type to
+// httpx.RateLimitError and runs httpx's rate-limit-only retry mode (v3's
+// Do + WithRateLimitOnly, which absorbed the v2 RetryOnRateLimit helper):
+// only rate limits are retried — waiting min(hint, maxWait) — and every
+// other error, transient included, returns immediately (transient retry is
+// the caller's outer wrapper's job).
 func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duration, fn func() error) error {
-	return httpx.RetryOnRateLimit(ctx, maxAttempts, maxWait, func(_ context.Context) error {
+	_, err := httpx.Do(ctx, func(context.Context) (struct{}, error) {
 		err := fn()
 		if err == nil {
-			return nil
+			return struct{}{}, nil
 		}
 		var rl *api.RateLimitError
 		if errors.As(err, &rl) {
-			return &httpx.RateLimitError{Msg: rl.Msg, RetryAfter: rl.RetryAfter}
+			return struct{}{}, &httpx.RateLimitError{Msg: rl.Msg, RetryAfter: rl.RetryAfter}
 		}
-		return err
-	})
+		return struct{}{}, err
+	}, httpx.WithRateLimitOnly(maxWait), httpx.WithMaxAttempts(maxAttempts))
+	return err
 }

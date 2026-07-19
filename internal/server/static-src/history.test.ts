@@ -1,16 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, it, vi, beforeEach, expect } from "vitest";
 
-// One controllable dispatch mock backs the history.load apiAction. Per-call
-// page returns are queued with dispatch.mockResolvedValueOnce(...). Hoisted so
-// the vi.mock factory below can close over the same reference history.ts
-// captures at import time (apiAction is called once on module load).
+// One controllable mock backs the generated listState function history.ts
+// fetches pages through. Per-call page returns are queued with
+// dispatch.mockResolvedValueOnce(...). Hoisted so the vi.mock factory below
+// can close over the same reference history.ts captures at import time.
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 
-vi.mock("@cplieger/actions", () => ({
-  apiAction: vi.fn(() => ({ dispatch })),
-  retryNetwork: vi.fn((fn: unknown) => fn),
-  RETRY_STANDARD: {},
+vi.mock("./wire/client.gen.js", () => ({
+  listState: dispatch,
 }));
 vi.mock("./bus.js", () => ({
   on: vi.fn(() => () => {
@@ -22,13 +20,14 @@ vi.mock("./bus.js", () => ({
 
 import { reloadHistory } from "./history.js";
 
-// Mirrors history.ts's unexported HistoryEntry (only the fields buildHistoryRow
-// reads matter for the assertions here).
+// Mirrors the wire StateEntry fields buildHistoryRow reads (only those matter
+// for the assertions here).
 interface Entry {
   id: number;
   media_id: string;
   media_type: string;
   language: string;
+  variant: string;
   provider: string;
   release_name: string;
   title: string;
@@ -44,6 +43,7 @@ function makeEntry(id: number): Entry {
     media_id: `tmdb-${id}`,
     media_type: "movie",
     language: "en",
+    variant: "standard",
     provider: "opensubtitles",
     release_name: `Release ${id}`,
     title: `Title ${id}`,

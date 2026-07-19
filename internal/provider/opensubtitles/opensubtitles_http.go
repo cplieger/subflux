@@ -3,13 +3,13 @@ package opensubtitles
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/cplieger/runesafe"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 )
@@ -110,7 +110,7 @@ func (p *Provider) invalidateTokenOn401(err error) {
 	p.tokenMu.Lock()
 	p.token = ""
 	p.tokenMu.Unlock()
-	slog.Warn("opensubtitles: token invalidated after 401", "reason", authErr.Error())
+	slog.Warn("opensubtitles: token invalidated after 401", "reason", runesafe.Sanitize(authErr.Error()))
 }
 
 // doPostUnauthed performs a rate-limited POST request to the default
@@ -151,19 +151,15 @@ func (p *Provider) setHeaders(req *http.Request) {
 	}
 }
 
-// checkStatus maps HTTP status codes to descriptive errors.
+// checkStatus maps OpenSubtitles HTTP responses to typed errors. 406 is the
+// OpenSubtitles-specific daily download-quota signal, mapped to RateLimitError
+// with the quota reset (next UTC midnight) as fallback when no Retry-After
+// hint is present. Everything else defers to httputil.CheckHTTPStatus, which
+// handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError for
+// other 4xx/5xx. 401s surface as *api.AuthError, which the call sites'
+// invalidateTokenOn401 hook uses to force a fresh login.
 func checkStatus(resp *http.Response) error {
-	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
-		return nil
-	case http.StatusUnauthorized:
-		return &api.AuthError{Msg: "authentication failed (401)"}
-	case http.StatusTooManyRequests:
-		return &api.RateLimitError{
-			Msg:        "rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
-		}
-	case http.StatusNotAcceptable:
+	if resp.StatusCode == http.StatusNotAcceptable {
 		retryAfter := httputil.ParseRetryAfter(resp)
 		if retryAfter == 0 {
 			retryAfter = untilNextUTCMidnight(time.Now())
@@ -172,16 +168,8 @@ func checkStatus(resp *http.Response) error {
 			Msg:        "download limit exceeded (406)",
 			RetryAfter: retryAfter,
 		}
-	default:
-		if resp.StatusCode >= 400 {
-			body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1024))
-			if readErr != nil || len(body) == 0 {
-				return fmt.Errorf("HTTP %d", resp.StatusCode)
-			}
-			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, body)
-		}
-		return nil
 	}
+	return httputil.CheckHTTPStatus(resp)
 }
 
 // untilNextUTCMidnight returns the duration from now until the next UTC midnight.

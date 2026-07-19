@@ -135,7 +135,7 @@ func TestProcessPollImport_search_success(t *testing.T) {
 		StatsCache: statsCache,
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/sub.srt"}, CoverageChanged: true}}
+	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	p := &Poller{
 		deps:      deps,
@@ -170,7 +170,7 @@ func TestProcessPollImport_search_success(t *testing.T) {
 // refreshFn (arr rescan notify) runs only when subtitle paths were downloaded.
 func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/x.srt"}, CoverageChanged: false}}
+	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	calls := 0
 	p.processPollImport(context.Background(), ls, video,
@@ -184,7 +184,7 @@ func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 // A coverage-only change with no downloaded paths must not notify arr.
 func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Paths: nil, CoverageChanged: true}}
+	engine := &mockEngine{result: api.SearchResult{CoverageChanged: true}}
 	p, ls := importPoller(engine)
 	calls := 0
 	p.processPollImport(context.Background(), ls, video,
@@ -199,7 +199,7 @@ func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/x.srt"}, CoverageChanged: false}}
+	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
@@ -213,7 +213,7 @@ func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Paths: []string{"/x.srt"}, CoverageChanged: false}}
+	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
@@ -249,7 +249,7 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
 			cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-			engine := &mockEngine{result: api.SearchResult{Paths: []string{"/sub.srt"}, CoverageChanged: true}}
+			engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 			ls := &LiveState{Cfg: cfg, Engine: engine, Sonarr: sonarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
@@ -286,7 +286,7 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
 			cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-			engine := &mockEngine{result: api.SearchResult{Paths: []string{"/sub.srt"}, CoverageChanged: true}}
+			engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 			ls := &LiveState{Cfg: cfg, Engine: engine, Radarr: radarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 

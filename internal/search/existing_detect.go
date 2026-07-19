@@ -7,30 +7,42 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
 // --- Detection ---
 
-// detectExisting scans for existing subtitles around a video file.
-// Uses native MKV/MP4 parsing for embedded sub detection (with HI/forced
-// flags) and filesystem glob for external subtitle files.
-func detectExisting(ctx context.Context, videoPath string, detector TrackDetector, ignoredCodecs map[string]bool) existingSubs {
+// detectExisting scans for existing subtitles around a video file: the
+// injected TrackDetector for embedded tracks (with HI/forced flags) and a
+// filesystem glob for external subtitle files.
+//
+// A detector failure is returned alongside the PARTIAL result (external
+// subs are still scanned) so the caller can continue fail-open while
+// keeping "error" distinguishable from "no tracks" — the engine's error
+// policy (WARN + metric + coverage-replacement skip) lives in
+// Engine.detectExistingObserved.
+func detectExisting(ctx context.Context, videoPath string, detector TrackDetector, ignoredCodecs map[string]bool) (existingSubs, error) {
 	var result existingSubs
 	result.IgnoredCodecs = ignoredCodecs
 
 	if videoPath == "" {
-		return result
+		return result, nil
 	}
 
-	detectEmbeddedTracks(ctx, videoPath, detector, &result)
+	detectErr := detectEmbeddedTracks(ctx, videoPath, detector, &result)
 	scanExternalSubs(videoPath, &result)
 
-	return result
+	return result, detectErr
 }
 
 // detectEmbeddedTracks runs the track detector and populates result.Embedded.
-func detectEmbeddedTracks(ctx context.Context, videoPath string, detector TrackDetector, result *existingSubs) {
-	tracks := detector.DetectTracks(ctx, videoPath)
+// Returns the detector error, if any; the result is left without embedded
+// tracks in that case.
+func detectEmbeddedTracks(ctx context.Context, videoPath string, detector TrackDetector, result *existingSubs) error {
+	tracks, err := detector.DetectTracks(ctx, videoPath)
+	if err != nil {
+		return err
+	}
 	for _, t := range tracks {
 		result.Embedded = append(result.Embedded, embeddedSub{
 			Lang:   t.Lang,
@@ -54,12 +66,12 @@ func detectEmbeddedTracks(ctx context.Context, videoPath string, detector TrackD
 		slog.Debug("embedded tracks found",
 			"count", len(tracks), "langs", langs)
 	}
+	return nil
 }
 
-// subtitleExtSet references the canonical set from the api package.
-var subtitleExtSet = api.SubtitleExtsOnDisk
-
 // scanExternalSubs finds external subtitle files on disk and populates result.External.
+// The recognized extensions come from the subtitle-extension authority's
+// onDisk capability view (internal/subtitleext).
 func scanExternalSubs(videoPath string, result *existingSubs) {
 	base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
 	escapedBase := globEscape(base)
@@ -71,7 +83,7 @@ func scanExternalSubs(videoPath string, result *existingSubs) {
 	}
 	for _, match := range allMatches {
 		ext := strings.ToLower(filepath.Ext(match))
-		if !subtitleExtSet[ext] {
+		if !subtitleext.OnDisk(ext) {
 			continue
 		}
 		sub := parseExternalSubPath(match, base, ext)

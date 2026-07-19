@@ -43,13 +43,15 @@ func (e *Engine) checkUpgradeEligibility(
 }
 
 // logNoResults logs the appropriate message when no results meet the minimum
-// score threshold, distinguishing between upgrade and initial search cases.
-// Backoff recording is gated by the lang-group-shared noResultRecorded guard
-// (one provider query per group = at most one backoff step per group).
-func (e *Engine) logNoResults(ctx context.Context, state *targetState, scored []scoredSub,
-	outcome *searchOutcome, mediaType api.MediaType, mediaID, lang, label string,
-	minScore int, noResultRecorded *bool,
-) {
+// score threshold, distinguishing between upgrade and initial search cases,
+// and reports whether this counts as a genuine no-result (non-upgrade only).
+// Adaptive-backoff recording moved to the caller's per-language-group
+// aggregation in searchLangGroup: one provider query per group = at most one
+// backoff step per group, without threading a shared *bool through the
+// variant pipeline.
+func logNoResults(state *targetState, scored []scoredSub,
+	lang, label string, minScore int,
+) (noResult bool) {
 	bestScore := 0
 	if len(scored) > 0 {
 		bestScore = scored[0].score
@@ -60,17 +62,13 @@ func (e *Engine) logNoResults(ctx context.Context, state *targetState, scored []
 			"variant", state.variant,
 			"current", state.currentScore,
 			"best", bestScore)
-	} else {
-		slog.Info("no results above min score",
-			"media", label, "lang", lang,
-			"variant", state.variant,
-			"best", bestScore, "min", minScore)
-		if !*noResultRecorded {
-			*noResultRecorded = true
-			e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
-				label, outcome.succeeded())
-		}
+		return false
 	}
+	slog.Info("no results above min score",
+		"media", label, "lang", lang,
+		"variant", state.variant,
+		"best", bestScore, "min", minScore)
+	return true
 }
 
 // --- Pipeline filtering ---

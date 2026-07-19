@@ -11,6 +11,7 @@
 <title>Subflux — Sign In</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script data-theme-init>(function(){try{var c=localStorage.getItem("subflux-theme");if(c!=="light"&&c!=="dark"&&c!=="system"){c="system";}var r=c==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):c;document.documentElement.setAttribute("data-theme",r);}catch(e){document.documentElement.setAttribute("data-theme",window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}})();</script>
+<link rel="stylesheet" href="/ui-primitives.css" fetchpriority="high">
 <link rel="stylesheet" href="/login.css">
 </head>
 <body>
@@ -80,6 +81,15 @@
   </div>
 </main>
 
+<!-- Setup incomplete: non-admin landing notice -->
+<main id="setupNoticePage" class="auth-page" hidden aria-label="Setup incomplete">
+  <div class="auth-card">
+    <h2>Setup is not finished</h2>
+    <p role="status">Subflux is not fully configured yet. An administrator needs to finish
+      the setup before you can use it — check back once that's done.</p>
+  </div>
+</main>
+
 <!-- Setup: Step 2 - Configuration wizard -->
 <main id="configWizardPage" class="auth-page auth-page-wide" hidden aria-label="Configuration wizard">
   <h2 class="wizard-title">Configure Subflux</h2>
@@ -96,21 +106,6 @@
   </div>
 </main>
 
-<script type="importmap">
-{
-  "imports": {
-    "@cplieger/actions": "/vendor/cplieger-actions/index.js",
-    "@cplieger/fetch": "/vendor/cplieger-fetch/index.js",
-    "@cplieger/reactive": "/vendor/cplieger-reactive/index.js",
-    "@cplieger/ui-primitives/toast": "/vendor/cplieger-ui-primitives/toast/index.js",
-    "@cplieger/ui-primitives/tooltip": "/vendor/cplieger-ui-primitives/tooltip.js",
-    "@cplieger/ui-primitives/dialog": "/vendor/cplieger-ui-primitives/dialog.js",
-    "@cplieger/ui-primitives/confirm": "/vendor/cplieger-ui-primitives/confirm.js",
-    "@cplieger/ui-primitives/theme": "/vendor/cplieger-ui-primitives/theme.js",
-    "@cplieger/ui-primitives/view-transition": "/vendor/cplieger-ui-primitives/view-transition.js"
-  }
-}
-</script>
 <script type="module" src="/login.js"></script>
 </body>
 </html>

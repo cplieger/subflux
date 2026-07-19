@@ -1,0 +1,144 @@
+# Repo-specific workflow (not synced from cplieger/ci).
+#
+# Boots the real subflux binary with a mock-provider config (no Sonarr/Radarr,
+# no media fixtures, auth disabled) and runs the arr-free subset of the
+# functional HTTP suite (tests/functional/run.sh) against it. Sections that
+# need a live arr or media files (media_browser, coverage, scans, sync,
+# poster_proxy, real_providers, state, files, manual_search, post_processing,
+# embedded_settings, exclude_tags, manual_download) stay dev-box-only.
+#
+# Not a required check: docs-only PRs may skip it via the paths filter without
+# blocking merge (the required `validate` gate lives in ci.yaml, which must
+# never be path-filtered).
+name: Functional
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/server/static/**'
+      - 'tests/functional/**'
+      - '.github/workflows/functional.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/server/static/**'
+      - 'tests/functional/**'
+      - '.github/workflows/functional.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: functional-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  functional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build subflux
+        run: go build -o /tmp/subflux .
+
+      # Container-internal fixed paths: the binary reads /config/config.yaml
+      # and writes /config/subflux.bolt. media_roots is only stat'd (warn on
+      # miss), but create /media anyway to keep the boot log clean.
+      - name: Prepare runtime dirs and boot config
+        run: |
+          sudo mkdir -p /config /media
+          sudo chown "$USER" /config
+          cat > /config/config.yaml <<'EOF'
+          # CI boot config: mirrors the suite's apply_mock_config template so
+          # config saves never change the arr URL/key pair (unchanged arrs are
+          # not pinged on save; validation never dials them at boot).
+          sonarr:
+            enabled: true
+            url: "http://sonarr:8989"
+            api_key: "ci-mock-sonarr-key"
+          radarr:
+            enabled: true
+            url: "http://radarr:7878"
+            api_key: "ci-mock-radarr-key"
+          media_roots:
+            - /media
+          poll_interval: 999h
+          languages:
+            default:
+              - code: en
+              - code: fr
+          embedded_subtitles:
+            ignore_pgs: true
+            ignore_vobsub: true
+          providers:
+            mock:
+              enabled: true
+              priority: 1
+              settings:
+                mode: "static"
+          search:
+            scan_interval: 999h
+            scan_delay: 5s
+            upgrade_enabled: false
+          adaptive:
+            initial_delay: 1s
+            max_delay: 5s
+            backoff_multiplier: 2
+            max_attempts: 3
+          scoring:
+            weights:
+              hash: 100
+              source: 28
+              release_group: 23
+              streaming_service: 14
+              edition: 15
+              video_codec: 10
+              hdr: 8
+              season_pack: 15
+          auth:
+            disable_auth: true
+          logging:
+            level: info
+            format: json
+          EOF
+
+      - name: Boot subflux
+        run: |
+          /tmp/subflux > /tmp/subflux.log 2>&1 &
+          echo $! > /tmp/subflux.pid
+
+      # run.sh's wait_ready polls /api/health for up to 30s before the first
+      # section, so no separate readiness step is needed.
+      - name: Run arr-free functional sections
+        run: |
+          for section in health auth config providers scoring backoff \
+            mock_provider provider_errors config_validation language_rules \
+            adaptive_config hot_reload; do
+            echo "::group::section: $section"
+            if ! bash tests/functional/run.sh --section "$section" \
+              --url http://127.0.0.1:8374; then
+              echo "::endgroup::"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done
+
+      - name: Server log
+        if: always()
+        run: |
+          tail -n 200 /tmp/subflux.log || true
+          kill "$(cat /tmp/subflux.pid)" 2>/dev/null || true

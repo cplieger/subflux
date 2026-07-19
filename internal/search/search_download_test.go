@@ -237,7 +237,10 @@ func TestDetectExisting_finds_external_subs(t *testing.T) {
 		}
 	}
 
-	result := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 
 	if len(result.External) != 3 {
 		t.Fatalf("detectExisting(context.Background(), ) found %d external subs, want 3", len(result.External))
@@ -285,7 +288,10 @@ func TestDetectExisting_ignores_empty_lang_segment(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if err != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", err)
+	}
 	if len(result.External) != 0 {
 		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 0 (empty lang filtered)", len(result.External))
 	}

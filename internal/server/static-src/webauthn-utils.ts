@@ -1,8 +1,7 @@
 // webauthn-utils.ts — Shared WebAuthn helpers (base64url encoding, Signal API).
 // Single source of truth; imported by login.ts and security.ts.
 
-import { apiGetTyped } from "./api-client.js";
-import { decodeSignalData } from "./wire/decoders.gen.js";
+import { webauthnSignalData } from "./wire/client.gen.js";
 
 export function base64urlToBuffer(b64: string): ArrayBuffer {
   const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
@@ -23,13 +22,46 @@ export function bufferToBase64url(buf: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** Convert WebAuthn REQUEST (login) options from their wire shape (WebAuthn
+ *  Level 3 JSON: base64url strings) to the buffer shape
+ *  navigator.credentials.get expects. Mutates in place and re-types. */
+export function requestOptionsFromJSON(
+  json: PublicKeyCredentialRequestOptionsJSON,
+): PublicKeyCredentialRequestOptions {
+  const pk = json as unknown as PublicKeyCredentialRequestOptions;
+  pk.challenge = base64urlToBuffer(json.challenge);
+  if (json.allowCredentials) {
+    for (const cred of json.allowCredentials) {
+      (cred as unknown as PublicKeyCredentialDescriptor).id = base64urlToBuffer(cred.id);
+    }
+  }
+  return pk;
+}
+
+/** Convert WebAuthn CREATION (registration) options from their wire shape to
+ *  the buffer shape navigator.credentials.create expects. Mutates in place
+ *  and re-types. */
+export function creationOptionsFromJSON(
+  json: PublicKeyCredentialCreationOptionsJSON,
+): PublicKeyCredentialCreationOptions {
+  const pk = json as unknown as PublicKeyCredentialCreationOptions;
+  pk.challenge = base64urlToBuffer(json.challenge);
+  pk.user.id = base64urlToBuffer(json.user.id);
+  if (json.excludeCredentials) {
+    for (const cred of json.excludeCredentials) {
+      (cred as unknown as PublicKeyCredentialDescriptor).id = base64urlToBuffer(cred.id);
+    }
+  }
+  return pk;
+}
+
 export async function sendWebAuthnSignals(): Promise<void> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
     if (!window.PublicKeyCredential) {
       return;
     }
-    const data = await apiGetTyped("/api/auth/webauthn/signal-data", decodeSignalData);
+    const data = await webauthnSignalData();
     if (!data) {
       return;
     }

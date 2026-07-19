@@ -322,6 +322,9 @@ search:
 	if !strings.Contains(err.Error(), "invalid duration") {
 		t.Errorf("error = %q, want 'invalid duration'", err)
 	}
+	if strings.Contains(err.Error(), "not_a_duration") {
+		t.Errorf("error = %q, must withhold the offending value (may be an expanded secret)", err)
+	}
 }
 
 func TestDuration_YAML_unmarshal_non_string_node(t *testing.T) {

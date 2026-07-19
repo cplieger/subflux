@@ -32,7 +32,7 @@ func TestNopConfigContract(t *testing.T) {
 	if cfg.ProviderPriority("x") != 0 {
 		t.Fatal("ProviderPriority: expected 0")
 	}
-	if cfg.ProviderConfigs() != nil {
-		t.Fatal("ProviderConfigs: expected nil for zero NopConfig")
+	if cfg.EmbeddedPolicy() != (api.EmbeddedPolicy{}) {
+		t.Fatal("EmbeddedPolicy: expected zero policy for zero NopConfig")
 	}
 }

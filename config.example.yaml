@@ -75,18 +75,22 @@ languages:
     - code: fr
 
 # ---------------------------------------------------------------------------
+# Embedded subtitles
+# ---------------------------------------------------------------------------
+
+# Embedded track detection is always active (local ffprobe inspection, not a
+# provider). These settings decide which codecs count as usable subtitles:
+# ignored codecs stay visible in coverage but trigger external search.
+embedded_subtitles:
+  ignore_pgs: true # PGS bitmap subs (Blu-ray) don't satisfy a target
+  ignore_vobsub: true # VobSub bitmap subs (DVD) don't satisfy a target
+  ignore_ass: false # ASS/SSA styled subs (anime) count as usable
+
+# ---------------------------------------------------------------------------
 # Subtitle providers
 # ---------------------------------------------------------------------------
 
 providers:
-  # Embedded is always active. These settings control which bitmap formats
-  # are excluded from search results. All tracks (including bitmap) still
-  # appear in coverage tracking regardless of these settings.
-  embedded:
-    settings:
-      ignore_pgs: true # exclude PGS bitmap subs from search (Blu-ray)
-      ignore_vobsub: true # exclude VobSub bitmap subs from search (DVD)
-      ignore_ass: false # exclude ASS/SSA styled subs from search (anime)
   hdbits:
     enabled: false
     priority: 1 # tiebreaker: lower = more trusted
@@ -140,7 +144,7 @@ providers:
 search:
   scan_interval: 24h # time between scan completions (minimum 1h)
   provider_timeout: 1h # cooldown after a provider fails repeatedly (minimum 1h)
-  scan_delay: 5s # delay between items during scans (minimum 5s)
+  scan_delay: 5s # delay after items that queried providers during scans (minimum 5s; items needing no provider work skip it)
   upgrade_enabled: true # search for better subtitles during scans
   upgrade_window_days: 7 # only upgrade subtitles for this many days
   exclude_arr_tags: # skip media with these Sonarr/Radarr tags

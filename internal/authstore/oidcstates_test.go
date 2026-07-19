@@ -26,7 +26,7 @@ func newOIDCStore(t *testing.T) *Store {
 func putOIDC(s *Store, state string, ts time.Time) {
 	s.mu.Lock()
 	s.oidc[state] = &oidcRec{
-		expiresAt:    ts,
+		createdAt:    ts,
 		nonce:        "n-" + state,
 		codeVerifier: "v-" + state,
 		redirectURI:  "/cb/" + state,

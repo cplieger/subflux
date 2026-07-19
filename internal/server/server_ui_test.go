@@ -82,3 +82,23 @@ func TestHandleUI_directory_path_serves_index(t *testing.T) {
 		t.Errorf("handleUI(/icons/) Content-Type = %q, want text/html (directory fallback)", ct)
 	}
 }
+
+func TestHandleUI_gz_sibling_not_addressable(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+
+	// The precompressed .gz siblings are a transport encoding served for
+	// their base asset, never resources of their own: a direct request
+	// falls through to the SPA fallback like any unknown path.
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodGet, "/app.js.gz", http.NoBody)
+	rec := httptest.NewRecorder()
+	s.handleUI(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("handleUI(/app.js.gz) status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Errorf("handleUI(/app.js.gz) Content-Type = %q, want text/html (fallback)", ct)
+	}
+}

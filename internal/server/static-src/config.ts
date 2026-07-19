@@ -1,29 +1,29 @@
-// config.ts — Settings dialog, schema renderers, language builder, YAML helpers.
+// config.ts — Settings dialog, schema renderers, language builder,
+// structured-config form building.
 
 import * as store from "./store.js";
 import type { ParsedConfig } from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
-import { el, dialog, closeDialog, $ } from "./dom.js";
+import { el, dialog, confirm, $ } from "./dom.js";
+import { createDialog, type DialogController } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
-import { apiGet, apiGetArray } from "./api-client.js";
-import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
-  apiAction,
-  bindLoadingState,
-  defineAction,
-  ActionError,
-  classifyFetchError,
-  retryNetwork,
-  RETRY_STANDARD,
-} from "@cplieger/actions";
+  configParsed,
+  configStructured,
+  configSchema as fetchConfigSchema,
+  PATH_RESET_CONFIG,
+  PATH_SAVE_CONFIG_STRUCTURED,
+} from "./wire/client.gen.js";
+import type { StructuredConfig } from "./wire/types.gen.js";
+import { apiAction, bindLoadingState, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { pollStatus } from "./status.js";
 import { YAML_TIMEOUT_MS } from "./constants.js";
-import { parseYAMLSections } from "./config-yaml.js";
+import { setCfgSections, cfgSectionEntries, cfgValue } from "./config-values.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import { buildLanguagesSection, serializeLanguagesFromForm } from "./config-languages.js";
-import { renderProvidersSection, renderEmbeddedSection, genProviders } from "./config-providers.js";
+import { renderProvidersSection, genProviders } from "./config-providers.js";
 import {
   fieldId,
   renderFieldsSection,
@@ -31,49 +31,71 @@ import {
   renderRawSection,
 } from "./config-renderers.js";
 
-let config = "";
 let configSchema: SchemaSection[] | null = null;
 const cfgDlg: HTMLDialogElement = dialog("configDialog");
 
 // --- Config drawer ---
+
+// Dismissal (backdrop + Escape) is the dialog primitive's: createDialog wires
+// drag-safe backdrop dismissal (a drag-select ending on the backdrop no longer
+// closes settings) and Escape through ONE canDismiss guard — unconfigured mode
+// refuses dismissal (toast + stay open, wiring stays armed), replacing the
+// hand-rolled click/cancel/keydown listener trio that app.ts used to carry.
+// Created lazily on first open/close so importing this module in a DOM
+// without #configDialog (unit tests) stays side-effect-free, like the old
+// hand-rolled wiring.
+let cfgCtlCache: DialogController | null = null;
+function cfgCtl(): DialogController {
+  cfgCtlCache ??= createDialog(cfgDlg, {
+    canDismiss: (): boolean => {
+      if (store.get("isUnconfigured")) {
+        notify.error("Save a valid configuration before closing settings");
+        return false;
+      }
+      return true;
+    },
+    onClose: (): void => {
+      // The close (backdrop, Escape, the X button, or programmatic) has
+      // finished its fade — restore the URL if we're still parked on
+      // /settings. Replaces the old 260ms post-closeDialog timeout and the
+      // cancel-path navigate.
+      if (location.pathname === "/settings") {
+        history.replaceState(null, "", "/");
+      }
+    },
+  });
+  return cfgCtlCache;
+}
 
 export function openConfig(skipPush?: boolean): void {
   if (!skipPush) {
     history.pushState(null, "", "/settings");
   }
   void loadConfig();
-  cfgDlg.showModal();
+  cfgCtl().open();
 }
 
 export function closeConfig(): void {
   // Block closing when unconfigured; user must save a valid config first.
+  // (Programmatic close bypasses the canDismiss guard, so it lives here too.)
   if (store.get("isUnconfigured")) {
     notify.error("Save a valid configuration before closing settings");
     return;
   }
-  const finish = closeDialog(cfgDlg);
-  if (finish && location.pathname === "/settings") {
-    setTimeout(() => {
-      if (location.pathname === "/settings") {
-        history.replaceState(null, "", "/");
-      }
-    }, 260);
-  }
+  cfgCtl().close();
 }
 
 async function loadConfig(): Promise<void> {
   try {
-    // /api/config returns text/yaml on success; keep raw fetch.
-    // The other two return JSON and go through apiGet.
     const cfgSignal = AbortSignal.timeout(YAML_TIMEOUT_MS);
-    const [rawRes, parsed, schema] = await Promise.all([
-      fetch("/api/config", { signal: cfgSignal }),
-      apiGet<ParsedConfig>("/api/config/parsed", cfgSignal),
-      apiGetArray("/api/config/schema", decodeSchemaSection, cfgSignal),
+    const [structured, parsed, schema] = await Promise.all([
+      configStructured({ signal: cfgSignal }),
+      configParsed({ signal: cfgSignal }),
+      fetchConfigSchema({ signal: cfgSignal }),
     ]);
-    // Don't throw on raw config failure; render with defaults so the
-    // user can fix a broken or unreadable config via the UI.
-    config = rawRes.ok ? await rawRes.text() : "";
+    // Don't throw on structured-config failure; render with schema defaults
+    // so the user can fix a broken or unreadable config via the UI.
+    setCfgSections(structured?.sections ?? {});
     if (parsed) {
       store.batch(() => {
         store.set("config", parsed);
@@ -85,11 +107,10 @@ async function loadConfig(): Promise<void> {
     }
     renderConfigForm();
 
-    // Auto-open settings when unconfigured so the user can set up.
-    if (store.get("isUnconfigured")) {
-      if (!cfgDlg.open) {
-        cfgDlg.showModal();
-      }
+    // Auto-open settings when unconfigured so the user can set up — through
+    // the controller, so the open path is uniform with openConfig().
+    if (store.get("isUnconfigured") && !cfgDlg.open) {
+      cfgCtl().open();
     }
     $.configClose.style.display = store.get("isUnconfigured") ? "none" : "";
   } catch (e: unknown) {
@@ -110,10 +131,13 @@ async function loadConfig(): Promise<void> {
 }
 
 export async function saveConfig(): Promise<void> {
-  buildConfigFromForm();
+  const sections = buildSectionsFromForm(configSchema ?? []);
+  if (!(await confirmRPIDChange(sections))) {
+    return;
+  }
   const wasUnconfigured = store.get("isUnconfigured");
-  const r = await saveConfigAction.dispatch(config);
-  if (r === null) {
+  const o = await saveConfigAction.dispatch(sections).outcome;
+  if (o.status !== "success") {
     return;
   }
   void initLanguages();
@@ -126,48 +150,70 @@ export async function saveConfig(): Promise<void> {
   closeConfig();
 }
 
-/** Save the config dialog's YAML body. text/yaml content type means the
- *  apiAction adapter (which assumes JSON) doesn't fit; defineAction with
- *  a custom run() does. dedupe protects against rapid Save clicks.
- *  retryNetwork covers transient blips. The error message is computed
- *  via configSaveError() to map server codes to user-friendly text. */
-const saveConfigAction = defineAction<string, unknown>({
+/** confirmRPIDChange guards a WebAuthn RP ID edit (a guarded edit, not a
+ *  transparent one): passkeys are scoped to their RP ID, so changing it
+ *  locks out passkey-only sign-ins until users re-register. Returns false
+ *  when the user backs out. Setting an RP ID for the first time needs no
+ *  warning — there are no credentials to strand. */
+async function confirmRPIDChange(sections: Record<string, unknown>): Promise<boolean> {
+  const oldRPID = cfgValue("auth", "webauthn_rp_id").trim();
+  if (oldRPID === "") {
+    return true;
+  }
+  const auth = sections["auth"];
+  const raw =
+    typeof auth === "object" && auth !== null && !Array.isArray(auth)
+      ? (auth as Record<string, unknown>)["webauthn_rp_id"]
+      : undefined;
+  const newRPID = typeof raw === "string" ? raw.trim() : "";
+  if (newRPID === oldRPID) {
+    return true;
+  }
+  return confirm(
+    "Change WebAuthn RP ID?",
+    `Existing passkeys are bound to "${oldRPID}" and will STOP working after this change; ` +
+      "affected users must sign in with their password and re-register their passkeys.",
+    "Change RP ID",
+  );
+}
+
+/** Save the form's structured sections as JSON to the structured endpoint
+ *  (the server merges empty secrets, serializes canonical YAML, validates,
+ *  and hot-reloads). dedupe protects against rapid Save clicks. retryNetwork
+ *  covers transient blips. decodeError maps the server's JSON error envelope
+ *  through configSaveError() to user-friendly text; transport failures
+ *  (status 0) keep the framework's default network/timeout codes. */
+const saveConfigAction = apiAction<Record<string, unknown>>({
   name: "config.save",
   dedupe: true,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
-  run: async (yamlBody, signal) => {
-    let r: Response;
-    try {
-      r = await fetch("/api/config", {
-        method: "PUT",
-        body: yamlBody,
-        headers: { "Content-Type": "text/yaml" },
-        signal: AbortSignal.any([signal, AbortSignal.timeout(YAML_TIMEOUT_MS)]),
-      });
-    } catch (e) {
-      throw classifyFetchError(e, signal);
+  timeout: YAML_TIMEOUT_MS,
+  request: (sections) => ({
+    method: "PUT",
+    path: PATH_SAVE_CONFIG_STRUCTURED,
+    body: { sections } satisfies StructuredConfig,
+  }),
+  decodeError: (info) => {
+    const body = (info.body ?? {}) as { error?: string; code?: string };
+    const errArg: { error?: string; code?: string } = {};
+    if (body.error !== undefined) {
+      errArg.error = body.error;
     }
-    if (!r.ok) {
-      const body = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
-      const errArg: { error?: string; code?: string } = {};
-      if (body.error !== undefined) {
-        errArg.error = body.error;
-      }
-      if (body.code !== undefined) {
-        errArg.code = body.code;
-      }
-      const msg = configSaveError(errArg);
-      const opts: { status: number; code?: string } = { status: r.status };
-      if (body.code !== undefined) {
-        opts.code = body.code;
-      }
-      throw new ActionError(msg, opts);
+    if (body.code !== undefined) {
+      errArg.code = body.code;
     }
-    return undefined;
+    return {
+      kind: "error",
+      error: {
+        message: configSaveError(errArg),
+        status: info.status,
+        ...(body.code !== undefined && { code: body.code }),
+      },
+    };
   },
   success: "Configuration saved",
-  // The error message produced in run() is already user-friendly (via
+  // The error message produced by decodeError is already user-friendly (via
   // configSaveError); pass it through verbatim instead of prepending the
   // action's name.
   error: (_args, err) => err.message,
@@ -214,7 +260,7 @@ const CONFIG_SAVE_ERRORS: readonly { code: ErrorCode; msg: string }[] = [
   },
   {
     code: ErrorCode.ConfigReloadFailed,
-    msg: "Configuration saved but not applied. Check server logs for details.",
+    msg: "Configuration could not be applied and was not saved. Check server logs for details.",
   },
 ];
 
@@ -231,7 +277,7 @@ function configSaveError(err: { error?: string; code?: string }): string {
  *  the entire form); keep it as a non-optimistic action with toast. */
 const resetConfigAction = apiAction<undefined>({
   name: "config.reset",
-  request: () => ({ method: "POST", path: "/api/config/reset" }),
+  request: () => ({ method: "POST", path: PATH_RESET_CONFIG }),
   dedupe: true, // double-click protection
   success: "Config reset to defaults",
   error: "Reset failed",
@@ -253,13 +299,12 @@ function renderConfigForm(): void {
     patch(body, el("p", null, "Loading schema\u2026"));
     return;
   }
-  const sections = parseYAMLSections(config.split("\n"));
-  const pc: ParsedConfig = store.get("config") ?? {};
+  const pc: ParsedConfig | null = store.get("config");
   const isUnconfigured = store.get("isUnconfigured");
   // Distinguish truly empty config (first-time setup) from a config
   // that exists but failed validation (badly configured).
-  const hasRawConfig = config.trim().length > 0;
-  const isFirstSetup = isUnconfigured && !hasRawConfig;
+  const hasConfig = cfgSectionEntries().length > 0;
+  const isFirstSetup = isUnconfigured && !hasConfig;
   const frag = document.createDocumentFragment();
   const rendered = new Set<string>();
 
@@ -282,7 +327,7 @@ function renderConfigForm(): void {
     );
     const banner = el("div", { className: "cfg-banner" }, bannerText, resetBtn);
     frag.appendChild(banner);
-  } else if (isUnconfigured && hasRawConfig) {
+  } else if (isUnconfigured && hasConfig) {
     // Config exists but failed validation; show a warning banner.
     const banner = el(
       "div",
@@ -295,20 +340,19 @@ function renderConfigForm(): void {
   for (const schema of configSchema) {
     rendered.add(schema.key);
     if (schema.type === "providers") {
-      frag.appendChild(renderEmbeddedSection(schema, sections));
-      frag.appendChild(renderProvidersSection(schema, sections));
+      frag.appendChild(renderProvidersSection(schema));
     } else if (schema.type === "languages") {
       frag.appendChild(buildLanguagesSection());
     } else if (schema.type === "list") {
-      frag.appendChild(renderListSection(schema, sections));
+      frag.appendChild(renderListSection(schema));
     } else {
-      frag.appendChild(renderFieldsSection(schema, sections, pc, config));
+      frag.appendChild(renderFieldsSection(schema, pc));
     }
   }
 
-  for (const [name, content] of Object.entries(sections)) {
+  for (const [name, value] of cfgSectionEntries()) {
     if (!rendered.has(name)) {
-      frag.appendChild(renderRawSection(name, content));
+      frag.appendChild(renderRawSection(name, value));
     }
   }
   patch(body, frag);
@@ -422,41 +466,47 @@ export function markRequiredFields(sections: SchemaSection[], body: HTMLElement)
 
 // --- Schema-driven section renderers (extracted to config-renderers.ts) ---
 
-// --- YAML helpers (imported from config-yaml.ts) ---
+// --- Form -> structured sections ---
 
-function buildConfigFromForm(): void {
-  if (!configSchema) {
-    return;
-  }
-  const parts: string[] = [];
-  for (const schema of configSchema) {
+// buildSectionsFromForm reads the rendered form back into the structured
+// sections payload for PUT /api/config/structured. One entry per schema
+// section, typed JSON values instead of YAML text. Schema is injected so the
+// builder is a pure function of (schema, DOM) and directly testable.
+export function buildSectionsFromForm(schemaSections: SchemaSection[]): Record<string, unknown> {
+  const sections: Record<string, unknown> = {};
+  for (const schema of schemaSections) {
     if (schema.type === "providers") {
-      parts.push(genProviders(schema));
+      sections[schema.key] = genProviders(schema);
     } else if (schema.type === "languages") {
-      parts.push(serializeLanguagesFromForm());
+      sections[schema.key] = serializeLanguagesFromForm();
     } else if (schema.type === "list") {
-      parts.push(genList(schema));
+      sections[schema.key] = genList(schema);
     } else if (schema.key === "poll_interval") {
+      // Top-level scalar section. An empty input is omitted (the old
+      // emitter's bare `poll_interval:` decoded to the server default).
       const f = document.getElementById(
         fieldId(schema.key, "poll_interval"),
       ) as HTMLInputElement | null;
-      parts.push(`poll_interval: ${f ? f.value : "30s"}`);
+      const v = f ? f.value : "30s";
+      if (v) {
+        sections[schema.key] = v;
+      }
     } else if (schema.key === "scoring") {
-      parts.push(genScoring(schema));
+      sections[schema.key] = genScoring(schema);
     } else {
-      parts.push(genFields(schema));
+      sections[schema.key] = genFields(schema);
     }
   }
-  config = `${parts.join("\n\n")}\n`;
+  return sections;
 }
 
-function genFields(schema: SchemaSection): string {
-  const lines: string[] = [`${schema.key}:`];
+function genFields(schema: SchemaSection): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   if (schema.enable_key) {
     const t = document.getElementById(
       fieldId(schema.key, schema.enable_key),
     ) as HTMLInputElement | null;
-    lines.push(`  ${schema.enable_key}: ${t ? String(t.checked) : "true"}`);
+    out[schema.enable_key] = t ? t.checked : true;
   }
   for (const field of schema.fields ?? []) {
     if (field.key === schema.enable_key) {
@@ -468,56 +518,67 @@ function genFields(schema: SchemaSection): string {
       continue;
     }
     if (field.type === "bool") {
-      lines.push(`  ${field.key}: ${String(f.checked)}`);
+      out[field.key] = f.checked;
     } else if (field.key === "exclude_arr_tags") {
-      const tags = f.value
+      out[field.key] = f.value
         .split(",")
         .map((s: string) => s.trim())
         .filter(Boolean);
-      if (tags.length === 0) {
-        lines.push("  exclude_arr_tags: []");
-      } else {
-        lines.push("  exclude_arr_tags:");
-        for (const tag of tags) {
-          lines.push(`    - ${tag}`);
-        }
-      }
-    } else if (field.type === "secret" && !f.value) {
-      lines.push(`  ${field.key}: ""`);
+    } else if (field.type === "secret") {
+      // Always sent, "" when empty: the server merges the stored secret
+      // for empty values (schema-driven).
+      out[field.key] = f.value;
+    } else if (f.value === "") {
+      // Empty optional scalars are omitted — the old emitter's bare
+      // `key:` decoded to a YAML null, which the server treats the same.
+      continue;
+    } else if (field.type === "number") {
+      const n = Number(f.value);
+      // Non-numeric text rides through as a string so the server rejects
+      // it with config_invalid, like the old raw-YAML emit did.
+      out[field.key] = Number.isFinite(n) ? n : f.value;
     } else {
-      lines.push(`  ${field.key}: ${f.value || ""}`);
+      // text/select/duration values stay strings ("30s", "info", ...).
+      out[field.key] = f.value;
     }
   }
-  return lines.join("\n");
+  return out;
 }
 
-function genScoring(schema: SchemaSection): string {
-  const lines: string[] = ["scoring:", "  weights:"];
+function genScoring(schema: SchemaSection): Record<string, unknown> {
+  const weights: Record<string, unknown> = {};
   for (const field of schema.fields ?? []) {
     const f = document.getElementById(fieldId(schema.key, field.key)) as HTMLInputElement | null;
-    lines.push(`    ${field.key}: ${f ? f.value : (field.default ?? "0")}`);
+    const raw = f ? f.value : (field.default ?? "0");
+    if (raw === "") {
+      // Omitted weight keeps the server-side default, matching the old
+      // emitter's bare `key:` null.
+      continue;
+    }
+    const n = Number(raw);
+    weights[field.key] = Number.isFinite(n) ? n : raw;
   }
-  return lines.join("\n");
+  return { weights };
 }
 
-function genList(schema: SchemaSection): string {
+function genList(schema: SchemaSection): string[] {
   const listEl = document.getElementById(`${schema.key}-list`);
-  const lines: string[] = [`${schema.key}:`];
+  const items: string[] = [];
   if (listEl) {
     for (const inp of Array.from(listEl.querySelectorAll<HTMLInputElement>('input[type="text"]'))) {
       const v = inp.value.trim();
       if (v) {
-        lines.push(`  - ${v}`);
+        items.push(v);
       }
     }
   }
-  return lines.join("\n");
+  return items;
 }
 
 // --- Language/provider initialization ---
 
 export async function initLanguages(): Promise<void> {
-  const cfg = await apiGet<ParsedConfig>("/api/config/parsed");
+  const cfg = await configParsed();
   if (cfg) {
     store.batch(() => {
       store.set("config", cfg);

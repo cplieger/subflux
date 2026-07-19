@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/httpx/v3"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
 )
 
 func TestFactory_requires_api_key(t *testing.T) {
@@ -387,7 +387,7 @@ func TestRedactAPIKey_strips_secret_from_error_message(t *testing.T) {
 
 	p := &Provider{apiKey: "supersecret32hex"}
 	in := fmt.Errorf("Get https://api.subsource.net/api/v1/subtitles?api_key=%s: dial tcp: i/o timeout", p.apiKey)
-	got := httputil.RedactSecret(in, p.apiKey)
+	got := httpx.RedactSecret(in, p.apiKey)
 	if got == nil {
 		t.Fatal("redactAPIKey returned nil for non-nil input")
 	}
@@ -404,7 +404,7 @@ func TestRedactAPIKey_pass_through_when_apikey_absent_from_message(t *testing.T)
 
 	p := &Provider{apiKey: "supersecret32hex"}
 	in := errors.New("some error that does not leak the secret")
-	got := httputil.RedactSecret(in, p.apiKey)
+	got := httpx.RedactSecret(in, p.apiKey)
 	if got.Error() != in.Error() {
 		t.Errorf("redactAPIKey mutated safe error: got %q, want %q", got.Error(), in.Error())
 	}
@@ -414,12 +414,12 @@ func TestRedactAPIKey_nil_and_empty_apikey(t *testing.T) {
 	t.Parallel()
 
 	p := &Provider{apiKey: ""}
-	if got := httputil.RedactSecret(nil, p.apiKey); got != nil {
+	if got := httpx.RedactSecret(nil, p.apiKey); got != nil {
 		t.Errorf("redactAPIKey(nil) = %v, want nil", got)
 	}
 
 	in := errors.New("anything")
-	if got := httputil.RedactSecret(in, p.apiKey); got.Error() != in.Error() {
+	if got := httpx.RedactSecret(in, p.apiKey); got.Error() != in.Error() {
 		t.Errorf("redactAPIKey with empty apiKey mutated error: got %q", got.Error())
 	}
 }

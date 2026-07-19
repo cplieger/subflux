@@ -63,6 +63,9 @@ type SearchConfigProvider interface {
 	Adaptive() AdaptiveConfig
 	PostProcessConfig() PostProcessConfig
 	SyncConfig() SyncConfig
+	// EmbeddedPolicy returns the typed embedded subtitle codec policy
+	// from the top-level embedded_subtitles config section.
+	EmbeddedPolicy() EmbeddedPolicy
 }
 
 // AuthConfigProvider provides authentication configuration.

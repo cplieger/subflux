@@ -405,7 +405,10 @@ func TestCheckUpgradeEligibility_perfect_score_not_eligible(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	existing := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	existing, detErr := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if detErr != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", detErr)
+	}
 	searchCfg := mc.Search()
 	cutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
 
@@ -440,7 +443,10 @@ func TestCheckUpgradeEligibility_no_store_record_not_eligible(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	existing := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	existing, detErr := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	if detErr != nil {
+		t.Fatalf("detectExisting() unexpected error: %v", detErr)
+	}
 	searchCfg := mc.Search()
 	cutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
 

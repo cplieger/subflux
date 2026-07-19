@@ -39,6 +39,18 @@ func (*panicStore) GetBackoffByPrefix(context.Context, api.MediaType, string) ([
 	panic("not implemented")
 }
 
+func (*panicStore) ScanCycleStart(context.Context) (time.Time, error) {
+	panic("not implemented")
+}
+
+func (*panicStore) SetScanCycleStart(context.Context, time.Time) error {
+	panic("not implemented")
+}
+
+func (*panicStore) ClearScanCycleStart(context.Context) error {
+	panic("not implemented")
+}
+
 func (*panicStore) SaveDownload(context.Context, *api.DownloadRecord) error {
 	panic("not implemented")
 }

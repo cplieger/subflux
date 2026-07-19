@@ -14,6 +14,17 @@ import (
 
 const hashBlockSize = 65536
 
+// hasDotDotSegment reports whether p contains ".." as a whole path segment
+// (real traversal), as opposed to a filename that merely contains two dots.
+func hasDotDotSegment(p string) bool {
+	for _, seg := range strings.Split(p, string(filepath.Separator)) {
+		if seg == ".." {
+			return true
+		}
+	}
+	return false
+}
+
 var hashBufPool = sync.Pool{
 	New: func() any {
 		b := make([]byte, hashBlockSize)
@@ -28,9 +39,11 @@ func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64,
 	// Validate the path locally so CodeQL's go/path-injection analyzer
 	// can prove safety without tracking the media-root scan that
 	// produced `path`. Read-only hashing still warrants the guard:
-	// reject non-absolute paths and ".." traversal segments.
+	// reject non-absolute paths and ".." traversal segments. Only whole
+	// ".." segments are traversal — a filename merely containing ".."
+	// (e.g. "Show.S01E01..720p.mkv") is legitimate and must still hash.
 	clean := filepath.Clean(path)
-	if !filepath.IsAbs(clean) || strings.Contains(clean, "..") {
+	if !filepath.IsAbs(clean) || hasDotDotSegment(clean) {
 		return "", 0, fmt.Errorf("hashFile: unsafe path %q", path)
 	}
 	f, err := os.Open(clean)

@@ -13,11 +13,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// errReader is an io.Reader that always returns an error.
-type errReader struct{}
-
-func (errReader) Read([]byte) (int, error) { return 0, errors.New("read error") }
-
 // --- Header Setting ---
 
 func TestSetHeaders(t *testing.T) {
@@ -73,17 +68,16 @@ func TestCheckStatus(t *testing.T) {
 		{name: "201 Created returns nil", statusCode: 201, body: "", wantErr: false, wantMsg: "", wantType: ""},
 		{name: "204 No Content returns nil", statusCode: 204, body: "", wantErr: false, wantMsg: "", wantType: ""},
 		{name: "301 redirect returns nil", statusCode: 301, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "401 unauthorized", statusCode: 401, body: "", wantErr: true, wantMsg: "authentication failed (401)", wantType: "auth"},
+		{name: "401 unauthorized", statusCode: 401, body: "", wantErr: true, wantMsg: "invalid API key (401)", wantType: "auth"},
 		{name: "429 rate limited", statusCode: 429, body: "", wantErr: true, wantMsg: "rate limited (429)", wantType: "ratelimit"},
 		{name: "406 download limit", statusCode: 406, body: "", wantErr: true, wantMsg: "download limit exceeded (406)", wantType: "ratelimit"},
-		{name: "500 server error with body", statusCode: 500, body: "internal error", wantErr: true, wantMsg: "HTTP 500: internal error", wantType: ""},
-		{name: "400 bad request with body", statusCode: 400, body: "bad request", wantErr: true, wantMsg: "HTTP 400: bad request", wantType: ""},
-		{name: "403 forbidden with empty body", statusCode: 403, body: "", wantErr: true, wantMsg: "HTTP 403", wantType: ""},
+		{name: "500 server error ignores body", statusCode: 500, body: "internal error", wantErr: true, wantMsg: "HTTP 500", wantType: ""},
+		{name: "400 bad request ignores body", statusCode: 400, body: "bad request", wantErr: true, wantMsg: "HTTP 400", wantType: ""},
+		{name: "403 forbidden is auth error", statusCode: 403, body: "", wantErr: true, wantMsg: "access denied (403)", wantType: "auth"},
 		{name: "202 Accepted returns nil", statusCode: 202, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "body truncated at 1024 bytes", statusCode: 500, body: strings.Repeat("x", 2000), wantErr: true, wantMsg: "HTTP 500: " + strings.Repeat("x", 1024), wantType: ""},
 		{name: "304 Not Modified returns nil", statusCode: 304, body: "", wantErr: false, wantMsg: "", wantType: ""},
 		{name: "399 returns nil", statusCode: 399, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "503 service unavailable with body", statusCode: 503, body: "service down", wantErr: true, wantMsg: "HTTP 503: service down", wantType: ""},
+		{name: "503 service unavailable", statusCode: 503, body: "service down", wantErr: true, wantMsg: "HTTP 503", wantType: ""},
 		{name: "404 not found no body", statusCode: 404, body: "", wantErr: true, wantMsg: "HTTP 404", wantType: ""},
 	}
 
@@ -126,22 +120,6 @@ func TestCheckStatus(t *testing.T) {
 		})
 	}
 
-	t.Run("body read error falls back to status only", func(t *testing.T) {
-		t.Parallel()
-		resp := &http.Response{
-			StatusCode: http.StatusBadGateway,
-			Body:       io.NopCloser(errReader{}),
-		}
-		defer resp.Body.Close()
-		err := checkStatus(resp)
-		if err == nil {
-			t.Fatal("checkStatus() expected error")
-		}
-		want := "HTTP 502"
-		if err.Error() != want {
-			t.Errorf("checkStatus() error = %q, want %q", err.Error(), want)
-		}
-	})
 }
 
 func TestCheckStatus_parses_retry_after_seconds_on_429(t *testing.T) {

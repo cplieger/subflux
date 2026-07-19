@@ -196,34 +196,11 @@
   line-height: 1;
 }
 
-.wiz-info::before {
-  content: attr(data-tip);
-  position: absolute;
-  inset-block-end: calc(100% + 0.375rem);
-  inset-inline-start: 50%;
-  translate: -50%;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-3) 0.6rem;
-  font-size: var(--text-xs);
-  font-weight: 400;
-  max-width: 15rem;
-  width: max-content;
-  box-shadow: 0 0.25rem 1rem var(--shadow-color);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-micro) var(--ease-micro);
-  white-space: normal;
-  text-align: start;
-  z-index: 10;
-}
-
-.wiz-info:hover::before,
-.wiz-info:focus::before {
-  opacity: 1;
-}
+/* The info tooltip itself is the delegated @cplieger/ui-primitives tooltip
+ * (initTooltips in login.ts, reading the same data-tip attribute as the app
+ * page) — the old CSS-only ::before tooltip had no viewport clamping, no
+ * aria-describedby wiring, and no shared delay behavior. Skin comes from
+ * 16-uip-skin.css, bundled into login.css via the MANIFEST. */
 
 /* ================================================================
    11. Arr subsection
@@ -284,13 +261,12 @@
   color: var(--text);
 }
 
-.wiz-prov-body {
+/* .wiz-prov-body is a uip-disclosure-region (animated height collapse); the
+ * padding + separator live on the inner wrapper so the collapsed region is
+ * truly zero-height (chrome on the region itself would render at height: 0). */
+.wiz-prov-inner {
   padding: var(--sp-4) var(--sp-5);
   border-block-start: 1px solid var(--border);
-}
-
-.wiz-prov-body[hidden] {
-  display: none;
 }
 
 /* ================================================================
@@ -490,4 +466,85 @@
 
 .wizard-dot.done {
   background: var(--muted);
+}
+
+/* ================================================================
+   15. Review & finish screen (collapsed-step summary, R3.5/R3.9)
+   ================================================================ */
+
+.wiz-review-intro,
+.wiz-offer-reason {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin-block-end: var(--sp-5);
+}
+
+.wiz-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.wiz-review-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+}
+
+.wiz-review-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.wiz-review-status {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* Edit affordance: compact ghost button, overriding .auth-card width */
+.auth-card .wiz-review-edit {
+  width: auto;
+  min-width: 0;
+  height: 1.5rem;
+  padding: 0 var(--sp-3);
+  background: var(--ghost);
+  color: var(--text-2);
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+
+.auth-card .wiz-review-edit:hover {
+  background: var(--ghost-hover);
+  color: var(--text);
+}
+
+/* ================================================================
+   16. Passkey offer (post-activation final screen)
+   ================================================================ */
+
+.wiz-offer-actions {
+  display: flex;
+  gap: var(--sp-4);
+  margin-block-start: var(--sp-5);
+}
+
+.wiz-offer-actions button {
+  width: auto;
+  min-width: 8rem;
+}
+
+.wiz-offer-actions button.ghost {
+  background: var(--ghost);
+  color: var(--text-2);
+}
+
+.wiz-offer-actions button.ghost:hover {
+  background: var(--ghost-hover);
+  color: var(--text);
 }

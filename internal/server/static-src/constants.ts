@@ -12,7 +12,8 @@ export const ROUTE_TRANSITION_MS = 200;
 // Default subtitle variant value — the sentinel used when no variant is specified.
 export const DEFAULT_VARIANT = "standard" as const;
 
-// Built-in embedded subtitle provider name.
+// Coverage source string for subtitles embedded in the video container
+// (mirrors Go's api.SourceEmbedded; persisted in subtitle_files rows).
 export const EMBEDDED_PROVIDER = "embedded" as const;
 
 // Concurrency limit for season audio sync (parallel requests).

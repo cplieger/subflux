@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	extmetrics "github.com/cplieger/metrics/v2"
+	extmetrics "github.com/cplieger/metrics/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -25,6 +25,7 @@ type Metrics struct {
 	scanFound    *extmetrics.Counter
 	scanDur      *extmetrics.Gauge
 	adaptSkips   *extmetrics.Counter
+	embDetErrs   *extmetrics.Counter
 	httpRequests *extmetrics.LabeledCounter
 	httpDuration *extmetrics.Histogram
 	httpPanics   *extmetrics.Counter
@@ -42,6 +43,10 @@ type Metrics struct {
 	// Mode observability.
 	configured *extmetrics.Gauge
 
+	// Poll-cursor durability (S13): >0 while a cursor's durable persist is
+	// failing (in-memory position ahead of disk; restart would replay).
+	pollCursorsDirty *extmetrics.Gauge
+
 	totalSearch atomic.Int64
 }
 
@@ -54,13 +59,14 @@ func New() *Metrics {
 		errors:       extmetrics.NewLabeledCounter("search_errors_total", "Total search errors by provider", labels),
 		downloads:    extmetrics.NewLabeledCounter("downloads_total", "Total subtitle downloads by provider", labels),
 		dlErrors:     extmetrics.NewLabeledCounter("download_errors_total", "Total download errors by provider", labels),
-		durations:    extmetrics.NewLabeledHistogram("search_duration_seconds", "Search duration", labels, extmetrics.WithBuckets(extmetrics.APIBuckets)),
+		durations:    extmetrics.NewLabeledHistogram("search_duration_seconds", "Search duration", labels, extmetrics.WithBuckets(extmetrics.APIBuckets())),
 		imports:      extmetrics.NewLabeledCounter("imports_detected_total", "Total imports detected by source", []string{"source"}),
 		scansTotal:   extmetrics.NewCounter("scans_total", "Total full scans completed"),
 		scanItems:    extmetrics.NewCounter("scan_items_total", "Total items scanned"),
 		scanFound:    extmetrics.NewCounter("scan_found_total", "Total subtitles found during scans"),
 		scanDur:      extmetrics.NewGauge("scan_duration_seconds", "Last scan duration in seconds"),
 		adaptSkips:   extmetrics.NewCounter("adaptive_skips_total", "Total items skipped by adaptive search"),
+		embDetErrs:   extmetrics.NewCounter("embedded_detector_errors_total", "Total embedded track detector failures (context cancellations excluded)"),
 		httpRequests: extmetrics.NewLabeledCounter("http_requests_total", "Total HTTP requests", []string{"method", "path", "status"}),
 		httpDuration: extmetrics.NewHistogram("http_request_duration_seconds", "HTTP request latency"),
 		httpPanics:   extmetrics.NewCounter("http_panics_total", "Total HTTP handler panics recovered by the Recoverer middleware"),
@@ -76,6 +82,8 @@ func New() *Metrics {
 
 		// Mode observability.
 		configured: extmetrics.NewGauge("configured", "1 when a valid configuration is active, 0 in unconfigured mode"),
+
+		pollCursorsDirty: extmetrics.NewGauge("poll_cursors_dirty", "Number of poll cursors whose durable persist is failing (in-memory ahead of disk)"),
 	}
 
 	m.registry = extmetrics.NewRegistry("subflux")
@@ -90,6 +98,7 @@ func New() *Metrics {
 	m.registry.RegisterCounter(m.scanFound)
 	m.registry.RegisterGauge(m.scanDur)
 	m.registry.RegisterCounter(m.adaptSkips)
+	m.registry.RegisterCounter(m.embDetErrs)
 	m.registry.RegisterLabeledCounter(m.httpRequests)
 	m.registry.RegisterHistogram(m.httpDuration)
 	m.registry.RegisterCounter(m.httpPanics)
@@ -101,8 +110,15 @@ func New() *Metrics {
 	m.registry.RegisterGauge(m.backupLastSuccess)
 	m.registry.RegisterGauge(m.backupDuration)
 	m.registry.RegisterGauge(m.configured)
+	m.registry.RegisterGauge(m.pollCursorsDirty)
 
 	return m
+}
+
+// SetPollCursorsDirty records how many poll cursors currently have a failing
+// durable persist (S13 dirty-cursor observability; 0 when healthy).
+func (m *Metrics) SetPollCursorsDirty(n int) {
+	m.pollCursorsDirty.Set(float64(n))
 }
 
 // RecordSearch records a search attempt for a provider.
@@ -154,6 +170,12 @@ func (m *Metrics) RecordPanic() {
 // AdaptiveSkip records an item skipped by adaptive search.
 func (m *Metrics) AdaptiveSkip() {
 	m.adaptSkips.Inc()
+}
+
+// RecordEmbeddedDetectorError counts a failed embedded track probe. The
+// search engine excludes context cancellations before calling this.
+func (m *Metrics) RecordEmbeddedDetectorError() {
+	m.embDetErrs.Inc()
 }
 
 // TotalSearches returns the cumulative search count across all providers.

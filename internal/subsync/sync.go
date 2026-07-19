@@ -149,10 +149,12 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 	g.Go(func() error {
 		cues, offset := syncCues(gctx, reference, incorrect)
 		r := SyncResult{
-			Cues:   cues,
-			Offset: offset.Milliseconds(),
-			Rate:   1.0,
-			Method: MethodOffset,
+			Cues:      cues,
+			Offset:    offset.Milliseconds(),
+			Rate:      1.0,
+			Method:    MethodOffset,
+			Source:    SourceOffset,
+			Transform: Transform{Kind: TransformShift, Shift: offset.Milliseconds()},
 		}
 		r.Confidence = constantOffsetConfidence(reference, incorrect, offset)
 		candidates[2] = r
@@ -172,13 +174,15 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 	// by these strategies — they signal failure via Confidence=0).
 	_ = g.Wait()
 
-	// Filter out zero-confidence results.
+	// Filter out zero-confidence results, then reject malformed candidates
+	// (nil, wrong-length, or non-monotonic corrected cues) before arbitration.
 	live := candidates[:0]
 	for _, c := range candidates {
 		if c.Confidence > ConfidenceNone {
 			live = append(live, c)
 		}
 	}
+	live = filterValidCandidates(live, incorrect)
 
 	if len(live) == 0 {
 		slog.Debug("reference sync: all strategies returned zero confidence",
@@ -193,19 +197,20 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 		}
 	}
 
-	// Vote: strategies that agree on a similar offset reinforce each other.
+	// Vote: candidates whose corrected cues agree reinforce each other.
 	winner := voteOnCandidates(live, reference, incorrect)
 
 	slog.Info("sync voting complete",
 		"candidates", len(live),
 		"winner", winner.Method,
 		"offset_ms", winner.Offset,
-		"confidence", float64(winner.Confidence))
+		"confidence", float64(winner.Confidence),
+		"transform", winner.Transform.Digest(),
+		"rating", alignmentRating(reference, winner.Cues))
 
 	return winner
 }
 
-// voteCluster groups sync strategy results with similar offsets.
 // constantOffsetConfidence estimates confidence for a constant offset sync
 // by measuring how well the shifted subtitles overlap with the reference.
 func constantOffsetConfidence(reference, incorrect []Cue, offset time.Duration) Confidence {

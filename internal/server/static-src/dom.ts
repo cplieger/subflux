@@ -6,7 +6,7 @@
 // call sites are unchanged.
 import { el } from "@cplieger/reactive";
 import { closeDialog as uipCloseDialog, wireBackdropDismiss } from "@cplieger/ui-primitives/dialog";
-import { confirm as uipConfirm } from "@cplieger/ui-primitives/confirm";
+import { ask } from "@cplieger/ui-primitives/ask";
 
 export { el };
 
@@ -178,15 +178,15 @@ export function select(id: string): HTMLSelectElement {
   return document.getElementById(id) as HTMLSelectElement;
 }
 
-// Promise-based confirmation, delegating to @cplieger/ui-primitives' confirm
-// primitive (its own reused, lazily-created <dialog class="uip-confirm">).
-// subflux always supplies a title; `confirmLabel` maps to the OK button.
-// Cancel / Escape / backdrop-click all resolve false. The skin styles the
-// `.uip-confirm` dialog (which inherits subflux's base dialog chrome) + its
-// parts to match the previous look. Signature kept as (title, message, label)
-// so the files.ts / security.ts call sites are unchanged.
+// Promise-based confirmation, delegating to @cplieger/ui-primitives' ask
+// primitive (boolean shape; its own reused, lazily-created
+// <dialog class="uip-ask">). subflux always supplies a title; `confirmLabel`
+// maps to the OK button. Cancel / Escape / backdrop-click all resolve false.
+// The skin styles the `.uip-ask` dialog (which inherits subflux's base dialog
+// chrome) + its parts to match the previous look. Signature kept as (title,
+// message, label) so the files.ts / security.ts call sites are unchanged.
 export function confirm(title: string, message: string, confirmLabel?: string): Promise<boolean> {
-  return uipConfirm(message, confirmLabel !== undefined ? { title, confirmLabel } : { title });
+  return ask(message, confirmLabel !== undefined ? { title, confirmLabel } : { title });
 }
 
 // Insert an element into the card header, before the arr link if present.

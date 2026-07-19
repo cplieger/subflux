@@ -1,64 +1,53 @@
 // config-providers.ts — Provider-section renderers extracted from config.ts.
 
 import { el } from "./dom.js";
-import { apiGetTyped } from "./api-client.js";
-import { extractYAMLValue, extractYAMLBlock, parseProviderBlocks } from "./config-yaml.js";
-import type { ProviderSchema, SchemaSection } from "./api-types.js";
-import { decodeProvidersResponse } from "./wire/decoders.gen.js";
+import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
+import { providerTimeouts } from "./wire/client.gen.js";
+import { cfgProviderBlock, scalarString } from "./config-values.js";
+import type { SchemaSection } from "./api-types.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
-import { EMBEDDED_PROVIDER } from "./constants.js";
 
 // --- Inline interfaces for provider API shapes ---
 
 // --- Provider section renderers ---
 
-export function renderProvidersSection(
-  schema: SchemaSection,
-  sections: Record<string, string>,
-): HTMLElement {
+export function renderProvidersSection(schema: SchemaSection): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
   sec.appendChild(el("div", { className: "cfg-title" }, schema.title));
-  const raw = sections["providers"] ?? "";
-  const blocks = parseProviderBlocks(raw);
 
   for (const prov of schema.providers ?? []) {
-    if (prov.name === EMBEDDED_PROVIDER) {
-      continue;
-    }
-    const block = blocks[prov.name] ?? "";
+    const block = cfgProviderBlock(prov.name);
     const card = el("div", { className: "provider" });
-    const isEnabled = block !== "" && extractYAMLValue(block, "enabled") !== "false";
+    // A present block without `enabled: false` counts as enabled; a missing
+    // block is disabled (same as the old per-provider text blocks).
+    const isEnabled = block !== undefined && block.enabled !== false;
 
     const headerItems: HTMLElement[] = [el("span", null, prov.label)];
     headerItems.push(cfgToggle(`cfg-prov-${prov.name}-enabled`, isEnabled));
     card.appendChild(el("div", { className: "provider-head" }, ...headerItems));
 
+    // Region-only disclosure (the header checkbox is the visible control):
+    // animated height + aria-hidden/inert instead of the display:none snap.
     const details = el("div", { className: "provider-body" });
-    if (!isEnabled) {
-      details.style.display = "none";
-    }
+    const detailsCtl = createDisclosure(null, details, { open: isEnabled });
 
-    const priVal = extractYAMLValue(block, "priority");
+    const priVal = block?.priority !== undefined ? String(block.priority) : "";
     details.appendChild(
       cfgField(
         `cfg-prov-${prov.name}-priority`,
         "Priority",
         "number",
-        priVal || "",
+        priVal,
         "99",
         "Tiebreaker when subtitles have equal scores. Lower = more trusted.",
       ),
     );
 
     if (prov.settings) {
-      const settingsRaw = extractYAMLBlock(block, "settings");
+      const settings = block?.settings;
       for (const sf of prov.settings) {
         const fid = `cfg-prov-${prov.name}-s-${sf.key}`;
-        let val = "";
-        if (settingsRaw) {
-          val = extractYAMLValue(settingsRaw, sf.key);
-        }
-        details.appendChild(renderField(fid, sf, val));
+        details.appendChild(renderField(fid, sf, scalarString(settings?.[sf.key])));
       }
     }
 
@@ -67,22 +56,23 @@ export function renderProvidersSection(
     const toggle = card.querySelector<HTMLInputElement>(`#cfg-prov-${prov.name}-enabled`);
     if (toggle) {
       toggle.addEventListener("change", () => {
-        details.style.display = toggle.checked ? "" : "none";
+        if (toggle.checked) {
+          detailsCtl.open();
+        } else {
+          detailsCtl.close();
+        }
       });
     }
     sec.appendChild(card);
   }
 
   // Async: fetch provider health and show status badges.
-  apiGetTyped("/api/providers/timeout", decodeProvidersResponse)
+  providerTimeouts()
     .then((data) => {
       if (!data?.providers) {
         return;
       }
       for (const [name, status] of Object.entries(data.providers)) {
-        if (name === EMBEDDED_PROVIDER) {
-          continue;
-        }
         const header = sec.querySelector(`#${CSS.escape(`cfg-prov-${name}-enabled`)}`);
         if (!header) {
           continue;
@@ -113,56 +103,45 @@ export function renderProvidersSection(
   return sec;
 }
 
-// Render embedded subtitle settings as a standalone section with
-// simple toggles (not a provider card).
-export function renderEmbeddedSection(
-  schema: SchemaSection,
-  sections: Record<string, string>,
-): HTMLElement {
-  const sec = el("div", { className: "cfg-section" });
-  sec.appendChild(el("div", { className: "cfg-title" }, "Embedded Subtitles"));
-
-  const raw = sections["providers"] ?? "";
-  const blocks = parseProviderBlocks(raw);
-  const embProv = (schema.providers ?? []).find(
-    (p: ProviderSchema) => p.name === EMBEDDED_PROVIDER,
-  );
-  if (!embProv?.settings) {
-    return sec;
+// settingScalar mirrors the YAML scalar inference the old text emitter got
+// for free: a numeric-looking value becomes a number (flexint-style settings
+// stayed ints through the YAML round-trip), "true"/"false" become booleans,
+// empty stays "" (the old emitter wrote a literal ""), anything else stays a
+// string.
+function settingScalar(v: string): unknown {
+  if (v === "true") {
+    return true;
   }
-
-  const block = blocks[EMBEDDED_PROVIDER] ?? "";
-  const settingsRaw = extractYAMLBlock(block, "settings");
-
-  for (const sf of embProv.settings) {
-    const fid = `cfg-prov-embedded-s-${sf.key}`;
-    let val = "";
-    if (settingsRaw) {
-      val = extractYAMLValue(settingsRaw, sf.key);
-    }
-    sec.appendChild(renderField(fid, sf, val));
+  if (v === "false") {
+    return false;
   }
-  return sec;
+  if (v !== "" && /^-?\d+(\.\d+)?$/.test(v)) {
+    return Number(v);
+  }
+  return v;
 }
 
-export function genProviders(schema: SchemaSection): string {
-  const lines: string[] = ["providers:"];
+// genProviders builds the providers section for the structured save,
+// mirroring what the old YAML emitter produced: priority only when set,
+// settings always emitted per rendered field. Empty secret settings ride
+// as "" so the server merges the stored value (schema-driven).
+export function genProviders(schema: SchemaSection): Record<string, unknown> {
+  const providers: Record<string, unknown> = {};
   for (const prov of schema.providers ?? []) {
-    lines.push(`  ${prov.name}:`);
-    if (!prov.always_enabled) {
-      const enEl = document.getElementById(
-        `cfg-prov-${prov.name}-enabled`,
-      ) as HTMLInputElement | null;
-      lines.push(`    enabled: ${enEl ? String(enEl.checked) : "false"}`);
-      const priEl = document.getElementById(
-        `cfg-prov-${prov.name}-priority`,
-      ) as HTMLInputElement | null;
-      if (priEl?.value) {
-        lines.push(`    priority: ${priEl.value}`);
-      }
+    const block: Record<string, unknown> = {};
+    const enEl = document.getElementById(
+      `cfg-prov-${prov.name}-enabled`,
+    ) as HTMLInputElement | null;
+    block["enabled"] = enEl ? enEl.checked : false;
+    const priEl = document.getElementById(
+      `cfg-prov-${prov.name}-priority`,
+    ) as HTMLInputElement | null;
+    if (priEl?.value) {
+      const pri = Number(priEl.value);
+      block["priority"] = Number.isFinite(pri) ? pri : priEl.value;
     }
     if (prov.settings && prov.settings.length > 0) {
-      lines.push("    settings:");
+      const settings: Record<string, unknown> = {};
       for (const sf of prov.settings) {
         const fEl = document.getElementById(
           `cfg-prov-${prov.name}-s-${sf.key}`,
@@ -170,17 +149,17 @@ export function genProviders(schema: SchemaSection): string {
         if (!fEl) {
           continue;
         }
-        let val: string;
         if (fEl.type === "checkbox") {
-          val = String(fEl.checked);
-        } else if (sf.secret && !fEl.value) {
-          val = '""';
+          settings[sf.key] = fEl.checked;
         } else {
-          val = fEl.value || '""';
+          // Covers empty secrets too: "" tells the server to keep the
+          // stored secret value.
+          settings[sf.key] = settingScalar(fEl.value);
         }
-        lines.push(`      ${sf.key}: ${val}`);
       }
+      block["settings"] = settings;
     }
+    providers[prov.name] = block;
   }
-  return lines.join("\n");
+  return providers;
 }

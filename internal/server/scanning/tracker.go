@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/showskip"
@@ -29,6 +30,7 @@ type seasonKey struct {
 type seasonTracker struct {
 	counter api.ShowSubtitleCounter
 	cache   *showskip.Cache
+	seed    seedDeps
 	seasons map[seasonKey]*seasonState
 	mu      sync.Mutex
 }
@@ -38,10 +40,32 @@ type seasonState struct {
 	earlyStop bool
 }
 
-func newSeasonTracker(counter api.ShowSubtitleCounter, cache *showskip.Cache) *seasonTracker {
+// BackoffPrefixReader is the narrow store surface earlyStop seeding needs:
+// the season's existing adaptive-backoff rows by media-id prefix.
+type BackoffPrefixReader interface {
+	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
+}
+
+// seedDeps carries what earlyStop seeding reads. The seed is recomputed from
+// live store rows at each season's first recorded outcome — nothing new is
+// persisted, so every existing freshness mechanism (ladder expiry, success
+// clears, drift cleanup, reconcile, new episodes having no rows) deflates it
+// automatically. A zero seedDeps (nil Backoff) disables seeding.
+type seedDeps struct {
+	Backoff     BackoffPrefixReader
+	Enabled     map[api.ProviderID]struct{} // live enabled provider set
+	MaxAttempts int                         // adaptive max attempts (0 = time-window only)
+	Now         func() time.Time
+}
+
+func newSeasonTracker(counter api.ShowSubtitleCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
+	if seed.Now == nil {
+		seed.Now = time.Now
+	}
 	return &seasonTracker{
 		counter: counter,
 		cache:   cache,
+		seed:    seed,
 		seasons: make(map[seasonKey]*seasonState),
 	}
 }
@@ -136,7 +160,7 @@ func (st *seasonTracker) shouldSkipEpisode(imdbID string, season int, langs []st
 	return true
 }
 
-func (st *seasonTracker) recordOutcome(imdbID string, season int, lang string, outcome ScanOutcome, seasonEpCount int) {
+func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, season int, lang string, seasonIDPrefix string, outcome ScanOutcome, seasonEpCount int) {
 	if imdbID == "" {
 		return
 	}
@@ -145,7 +169,14 @@ func (st *seasonTracker) recordOutcome(imdbID string, season int, lang string, o
 	defer st.mu.Unlock()
 	s, ok := st.seasons[key]
 	if !ok {
-		s = &seasonState{}
+		// First outcome for this (season, lang): pre-fill the counter from
+		// the store's existing active-backoff evidence, so a season already
+		// saturated with recorded misses trips after its FIRST fresh
+		// no-result instead of re-paying a full threshold of provider
+		// queries every scan (the drain phase). Seeding fills the counter
+		// only — earlyStop is never seeded as a fact, and a found result
+		// still resets everything below.
+		s = &seasonState{noResults: st.seedCount(ctx, key, seasonIDPrefix)}
 		st.seasons[key] = s
 	}
 	switch outcome {
@@ -168,4 +199,69 @@ func (st *seasonTracker) recordOutcome(imdbID string, season int, lang string, o
 			"no_results", s.noResults, "threshold", threshold,
 			"season_episodes", seasonEpCount)
 	}
+}
+
+// seedCount counts the season's episodes that are FULLY suppressed by
+// adaptive backoff for this language: every currently-enabled provider has
+// an active backoff row for the episode. Two binding constraints keep this
+// safe: (1) an episode counts only when it has ZERO currently-eligible
+// providers under the live provider set — a newly added provider has no rows
+// anywhere, so its presence instantly zeroes every seed; (2) the value only
+// pre-fills the counter — the caller's found-reset and threshold logic stay
+// authoritative. Rows stop counting the moment they expire (NextRetry
+// passes), a download succeeds (SaveDownload clears the triple), config
+// drift clears them, or reconcile wipes the item, so the re-check cadence is
+// bounded by the ladder's max delay. Callers hold st.mu.
+func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDPrefix string) int {
+	if st.seed.Backoff == nil || seasonIDPrefix == "" || len(st.seed.Enabled) == 0 {
+		return 0
+	}
+	entries, err := st.seed.Backoff.GetBackoffByPrefix(ctx, api.MediaTypeEpisode, seasonIDPrefix)
+	if err != nil {
+		slog.Warn("season tracker seed: backoff read failed, seeding 0",
+			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang, "error", err)
+		return 0
+	}
+	now := st.seed.Now()
+	activeByEpisode := make(map[string]map[api.ProviderID]struct{})
+	for i := range entries {
+		en := &entries[i]
+		if en.Language != key.Lang {
+			continue
+		}
+		if _, enabled := st.seed.Enabled[en.Provider]; !enabled {
+			continue
+		}
+		if !backoffActive(en, st.seed.MaxAttempts, now) {
+			continue
+		}
+		m := activeByEpisode[en.MediaID]
+		if m == nil {
+			m = make(map[api.ProviderID]struct{})
+			activeByEpisode[en.MediaID] = m
+		}
+		m[en.Provider] = struct{}{}
+	}
+	count := 0
+	for _, provs := range activeByEpisode {
+		if len(provs) == len(st.seed.Enabled) {
+			count++
+		}
+	}
+	if count > 0 {
+		slog.Debug("season tracker seeded from active backoff",
+			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang,
+			"suppressed_episodes", count)
+	}
+	return count
+}
+
+// backoffActive reports whether a backoff row currently suppresses its
+// provider: the failure count reached the adaptive max-attempts ceiling
+// (permanent until cleared) or the retry window has not yet passed.
+func backoffActive(en *api.BackoffEntry, maxAttempts int, now time.Time) bool {
+	if maxAttempts > 0 && en.Failures >= maxAttempts {
+		return true
+	}
+	return en.NextRetry.After(now)
 }

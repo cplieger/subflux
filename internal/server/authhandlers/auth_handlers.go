@@ -97,7 +97,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// fail (invalid cookie, race against expiry) — emit the audit event
 	// with empty user in that case rather than skip it.
 	user := ""
-	token := ReadSessionCookie(r)
+	token := SessionCookie.ReadCookie(r)
 	if token != "" {
 		if sess, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && sess != nil {
 			if u, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && u != nil {
@@ -109,7 +109,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ClearSessionCookie(w, r)
+	SessionCookie.ClearCookie(w, r)
 	api.Ok(w)
 	Audit(r, slog.LevelInfo, AuditLogout, true, user)
 }

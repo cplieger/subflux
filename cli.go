@@ -7,77 +7,132 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/cliparse"
-	"github.com/cplieger/subflux/internal/clisearch"
 	"github.com/cplieger/subflux/internal/config"
 	"go.yaml.in/yaml/v3"
+	"golang.org/x/term"
 )
 
-// runCLISearch performs a manual subtitle search from the command line.
-// Returns 0 on success, 1 on runtime failure (config load, search error).
-func runCLISearch() int {
-	setupLogging("info", "text")
-
-	cfg, err := config.Load(context.Background(), configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "config error: %v\n", err)
-		return 1
-	}
-
-	db, dbErr := boltstore.Open(dbPath)
-	if dbErr != nil {
-		fmt.Fprintf(os.Stderr, "warning: database unavailable: %v\n", dbErr)
-	}
-	if db != nil {
-		defer db.Close(context.Background())
-	}
-
-	deps := clisearch.Deps{
-		Cfg:      cfg,
-		Registry: newProviderRegistry(),
-	}
-	// Assign the store only when Open succeeded: a direct `Store: db` with a
-	// nil *boltstore.DB would produce a typed-nil interface that defeats the
-	// recorder's nil check and panics on the first record attempt.
-	if db != nil {
-		deps.Store = db
-	}
-	if err := clisearch.RunSearch(context.Background(), os.Args[2:], deps); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return 1
-	}
-	return 0
-}
-
 // --- CLI Auth Commands ---
+
+// adminSocketRequest posts a JSON body to the admin bootstrap endpoint over
+// the Unix-socket admin plane (config.AdminSocketPath). These commands are
+// same-container by construction (the socket is only reachable from inside
+// the container as the server's UID), so SUBFLUX_URL does not participate:
+// the transport dials the socket directly and the URL host is a placeholder.
+// The request context is cancelled on SIGINT/SIGTERM so Ctrl+C aborts
+// cleanly.
+func adminSocketRequest(body []byte) (data []byte, status int, err error) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", config.AdminSocketPath)
+			},
+		},
+	}
+	defer client.CloseIdleConnections()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"http://admin.sock"+config.AdminBootstrapURLPath, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf(
+			"server admin socket unreachable at %s — is the server running in this container? (%w)",
+			config.AdminSocketPath, err)
+	}
+	defer resp.Body.Close()
+	data, err = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, 0, fmt.Errorf("read response: %w", err)
+	}
+	return data, resp.StatusCode, nil
+}
 
 // runCLIResetPassword resets a user's password via stdin.
 // Usage: subflux reset-password --user <username>
 // Returns 0 on success, 1 on runtime failure.
-func runCLIResetPassword() int {
-	params, _ := cliparse.ParseArgs(os.Args[2:])
-	if err := doResetPassword(params["user"]); err != nil {
+func runCLIResetPassword(p cliparse.Params) int {
+	if err := doResetPassword(p.String("user")); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
 	return 0
 }
 
-func doResetPassword(username string) error {
-	fmt.Fprint(os.Stderr, "New password: ")
-	scanner := bufio.NewScanner(os.Stdin)
+// maxPasswordLen bounds the password read from stdin, in bytes. The server
+// rejects passwords over 128 characters (auth.PasswordMaxLength), so 1 KiB
+// comfortably covers every acceptable password while keeping the read
+// bounded. Error paths report only lengths, never the password itself.
+const maxPasswordLen = 1024
+
+// readPassword reads the new password from f. On an interactive terminal
+// it reads with echo disabled — the password must not appear on screen or
+// in terminal recordings — and prints the newline the suppressed echo
+// swallowed. Non-TTY input (deliberate piping/automation) falls back to a
+// bounded single-line read.
+func readPassword(f *os.File) (string, error) {
+	fd := int(f.Fd())
+	if !term.IsTerminal(fd) {
+		return readPasswordLine(f)
+	}
+	b, err := term.ReadPassword(fd)
+	fmt.Fprintln(os.Stderr) // terminate the prompt line the disabled echo left open
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+	if len(b) > maxPasswordLen {
+		return "", fmt.Errorf("password exceeds %d bytes", maxPasswordLen)
+	}
+	return string(b), nil
+}
+
+// readPasswordLine is the non-TTY password read: the first line of r,
+// bounded at maxPasswordLen bytes. Extracted from readPassword so the
+// piped path is unit-testable (a real PTY is impractical in unit tests).
+func readPasswordLine(r io.Reader) (string, error) {
+	scanner := bufio.NewScanner(r)
+	// +2 admits a maxPasswordLen-byte line plus its \r\n so the explicit
+	// length check below owns the boundary error.
+	scanner.Buffer(make([]byte, 0, 256), maxPasswordLen+2)
 	if !scanner.Scan() {
 		if scanErr := scanner.Err(); scanErr != nil {
-			return fmt.Errorf("failed to read password: %w", scanErr)
+			if errors.Is(scanErr, bufio.ErrTooLong) {
+				return "", fmt.Errorf("password exceeds %d bytes", maxPasswordLen)
+			}
+			return "", fmt.Errorf("failed to read password: %w", scanErr)
 		}
-		return errors.New("failed to read password")
+		return "", errors.New("failed to read password")
 	}
-	password := scanner.Text()
+	if len(scanner.Bytes()) > maxPasswordLen {
+		return "", fmt.Errorf("password exceeds %d bytes", maxPasswordLen)
+	}
+	return scanner.Text(), nil
+}
+
+func doResetPassword(username string) error {
+	fmt.Fprint(os.Stderr, "New password: ")
+	password, err := readPassword(os.Stdin)
+	if err != nil {
+		return err
+	}
 
 	body, err := json.Marshal(map[string]string{
 		"action":   "reset-password",
@@ -88,9 +143,9 @@ func doResetPassword(username string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	data, status, ok := cliRequest(http.MethodPost, "/api/admin/bootstrap", bytes.NewReader(body))
-	if !ok {
-		return errors.New("failed to connect to server")
+	data, status, err := adminSocketRequest(body)
+	if err != nil {
+		return err
 	}
 	if status >= 300 {
 		return fmt.Errorf("server error (%d): %s", status, string(data))
@@ -103,9 +158,8 @@ func doResetPassword(username string) error {
 // runCLIGenerateAPIKey generates an API key for a user.
 // Usage: subflux generate-api-key --user <username> --label <label>
 // Returns 0 on success, 1 on runtime failure.
-func runCLIGenerateAPIKey() int {
-	params, _ := cliparse.ParseArgs(os.Args[2:])
-	if err := doGenerateAPIKey(params["user"], params["label"]); err != nil {
+func runCLIGenerateAPIKey(p cliparse.Params) int {
+	if err := doGenerateAPIKey(p.String("user"), p.String("label")); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
@@ -122,9 +176,9 @@ func doGenerateAPIKey(username, label string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	data, status, ok := cliRequest(http.MethodPost, "/api/admin/bootstrap", bytes.NewReader(body))
-	if !ok {
-		return errors.New("failed to connect to server")
+	data, status, err := adminSocketRequest(body)
+	if err != nil {
+		return err
 	}
 	if status >= 300 {
 		return fmt.Errorf("server error (%d): %s", status, string(data))
@@ -145,7 +199,7 @@ func doGenerateAPIKey(username, label string) error {
 // auth.basic_enabled: true in the config file. Lockout recovery for when
 // password login was disabled and the OIDC path is unavailable.
 // Returns 0 on success, 1 on runtime failure.
-func runCLIEnablePasswordLogin() int {
+func runCLIEnablePasswordLogin(cliparse.Params) int {
 	if err := doEnablePasswordLogin(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1

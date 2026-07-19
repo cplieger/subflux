@@ -69,13 +69,13 @@ func TestOpen_bootstrapsAllBuckets(t *testing.T) {
 				t.Errorf("bucket %q missing after Open", name)
 			}
 		}
-		core, corePresent := readSchemaVersion(tx, metaKeyCoreSchemaVersion)
-		if !corePresent || core != coreSchemaVersion {
-			t.Errorf("core schema version = (%d, present=%v), want (%d, true)", core, corePresent, coreSchemaVersion)
+		core, coreState := readStamp(tx, metaKeyCoreSchemaVersion)
+		if coreState != stampPresent || core != coreSchemaVersion {
+			t.Errorf("core schema version = (%d, state=%v), want (%d, present)", core, coreState, coreSchemaVersion)
 		}
-		authV, authPresent := readSchemaVersion(tx, metaKeyAuthSchemaVersion)
-		if !authPresent || authV != authSchemaVersion {
-			t.Errorf("auth schema version = (%d, present=%v), want (%d, true)", authV, authPresent, authSchemaVersion)
+		authV, authState := readStamp(tx, metaKeyAuthSchemaVersion)
+		if authState != stampPresent || authV != authSchemaVersion {
+			t.Errorf("auth schema version = (%d, state=%v), want (%d, present)", authV, authState, authSchemaVersion)
 		}
 		return nil
 	})

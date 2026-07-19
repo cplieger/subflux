@@ -129,6 +129,15 @@ func (*NopStore) GetScanStates(context.Context, api.MediaType, string) ([]api.Sc
 	return nil, nil
 }
 
+// ScanCycleStart returns the zero time (no cycle mark stored).
+func (*NopStore) ScanCycleStart(context.Context) (time.Time, error) { return time.Time{}, nil }
+
+// SetScanCycleStart is a no-op.
+func (*NopStore) SetScanCycleStart(context.Context, time.Time) error { return nil }
+
+// ClearScanCycleStart is a no-op.
+func (*NopStore) ClearScanCycleStart(context.Context) error { return nil }
+
 // RecentlyScanned returns the set of media IDs scanned after the given cutoff time.
 func (*NopStore) RecentlyScanned(context.Context, time.Time) (map[string]bool, error) {
 	return nil, nil

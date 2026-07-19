@@ -50,6 +50,20 @@ type searchOutcome struct {
 	providers []providerResult
 }
 
+// attempted returns the number of providers the sweep actually queried
+// (success or error). Providers skipped by the health timeout never issued
+// a request, so they don't count: inter-item scan pacing keys on this via
+// api.LangOutcome.Queried.
+func (o *searchOutcome) attempted() int {
+	n := 0
+	for _, p := range o.providers {
+		if p.outcome != providerTimeout {
+			n++
+		}
+	}
+	return n
+}
+
 // succeeded returns the names of providers that returned results without error.
 func (o *searchOutcome) succeeded() []api.ProviderID {
 	var names []api.ProviderID

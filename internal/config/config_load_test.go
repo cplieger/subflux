@@ -490,3 +490,85 @@ func TestBuildCaches_opens_valid_media_root(t *testing.T) {
 		t.Fatalf("buildCaches(live ctx, 1 valid root): len(cachedRoots) = %d, want 1", len(cfg.cachedRoots))
 	}
 }
+
+// --- Decode-error sanitization (yamlenv.SanitizeDecodeError) ---
+
+// TestLoadFromBytes_decode_error_redacts_expanded_secret pins the leak fix:
+// a ${VAR} secret expanded into a scalar that then fails the typed decode
+// must NOT survive into the returned error, which reaches the startup log
+// and the PUT /api/config response body verbatim. Pre-fix, the yaml.v3
+// TypeError entry embedded the expanded value as a backtick-quoted excerpt.
+func TestLoadFromBytes_decode_error_redacts_expanded_secret(t *testing.T) {
+	// t.Setenv: cannot be parallel.
+	const secret = "hunter2-expanded-secret-value"
+	t.Setenv("SUBFLUX_TEST_SECRET", secret)
+	data := `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "test"
+languages:
+  rules:
+    - audio: en
+      subtitles:
+        - code: fr
+  default:
+    - code: en
+providers:
+  opensubtitles:
+    enabled: true
+    priority: ${SUBFLUX_TEST_SECRET}
+    settings:
+      api_key: "test"
+`
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes() expected decode error for non-numeric priority")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Errorf("LoadFromBytes() error leaks the expanded secret: %q", err)
+	}
+	if !strings.Contains(err.Error(), "parse YAML") {
+		t.Errorf("LoadFromBytes() error = %q, want the parse YAML prefix kept", err)
+	}
+}
+
+// TestLoadFromBytes_syntax_error_withholds_document_text pins the same
+// redact-everything stance on the pre-expansion parse: a syntax error in a
+// document holding a pasted literal secret keeps only value-independent
+// structure (the line locator), never document text.
+func TestLoadFromBytes_syntax_error_withholds_document_text(t *testing.T) {
+	t.Parallel()
+	data := "sonarr:\n  api_key: \"pasted-literal-secret\"\n\t\tbad: tab-indent\n"
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes() expected syntax error for tab indentation")
+	}
+	if strings.Contains(err.Error(), "pasted-literal-secret") {
+		t.Errorf("LoadFromBytes() error leaks document text: %q", err)
+	}
+}
+
+// TestLoadFromBytes_duration_error_vocabulary_passes_through pins the
+// sanitizer gate: errors from this package's own UnmarshalYAML
+// implementations are app-owned vocabulary and keep reaching the operator
+// (only yaml.v3's own excerpt-bearing errors are rebuilt) — but the
+// offending value itself is withheld at the source: after yamlenv.Expand
+// it may be an expanded ${VAR} secret, and this error reaches the startup
+// log and the PUT /api/config response body
+// (see TestDuration_YAML_unmarshal_invalid_duration_string).
+func TestLoadFromBytes_duration_error_vocabulary_passes_through(t *testing.T) {
+	t.Parallel()
+	data := minimalValidYAML() + `search:
+  provider_timeout: "not_a_duration"
+`
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes() expected error for invalid duration")
+	}
+	if !strings.Contains(err.Error(), "invalid duration") {
+		t.Errorf("LoadFromBytes() error = %q, want app-owned 'invalid duration' kept", err)
+	}
+	if strings.Contains(err.Error(), "not_a_duration") {
+		t.Errorf("LoadFromBytes() error = %q, must withhold the offending value (may be an expanded secret)", err)
+	}
+}

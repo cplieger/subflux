@@ -113,15 +113,17 @@ const MinCuesForSync = 5
 type SyncResult struct {
 	Method     SyncMethod // MethodNone, MethodOffset, MethodFramerate, MethodSplit, MethodAudio, MethodCrosslang
 	Cues       []Cue
-	Offset     int64      // milliseconds (constant offset applied)
-	Confidence Confidence // quality of the sync
-	Rate       float64    // framerate ratio applied (1.0 = no change)
+	Transform  Transform       // descriptor of the correction applied to Cues (voted candidates)
+	Offset     int64           // milliseconds (constant offset applied)
+	Confidence Confidence      // quality of the sync (calibrated; gates read this)
+	Rate       float64         // framerate ratio applied (1.0 = no change)
+	Source     CandidateSource // generating strategy identity (voted candidates)
 }
 
 // Applied returns true if the sync actually changed the subtitle timing.
 // Checks offset (constant shift), rate (framerate correction), and split
 // method (multi-segment alignment where no single offset/rate captures the change).
-func (r SyncResult) Applied() bool {
+func (r *SyncResult) Applied() bool {
 	if r.Offset != 0 {
 		return true
 	}
@@ -136,6 +138,6 @@ func (r SyncResult) Applied() bool {
 // ShouldApply returns true if the confidence is high enough to use the result.
 // Threshold: ShouldApplyThreshold (moderate confidence or better). This is the
 // post-hoc check used by callers after sync completes.
-func (r SyncResult) ShouldApply() bool {
+func (r *SyncResult) ShouldApply() bool {
 	return r.Confidence >= ShouldApplyThreshold
 }

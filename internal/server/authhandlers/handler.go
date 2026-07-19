@@ -30,17 +30,22 @@ type AuthConfig interface {
 // Handler holds all dependencies for the auth handler family.
 // Constructed by the server package and stored on the Server struct.
 type Handler struct {
-	Store        authstore.AuthStore
-	AdminDB      AuthAdminStore
-	SecDB        SecurityStore
-	OidcDB       OIDCStore
-	RateLimiter  ratelimit.Checker
-	WebAuthn     *webauthn.WebAuthn // may be nil
-	OIDCResolver func() *authoidc.Provider
-	Ceremonies   *CeremonyStore
-	Config       func() AuthConfig // returns current config (hot-reloadable)
-	Configured   func() bool       // returns whether server has valid config
-	HTTPClient   *http.Client      // shared client for outbound requests (HIBP, etc.)
+	Store       authstore.AuthStore
+	AdminDB     AuthAdminStore
+	SecDB       SecurityStore
+	OidcDB      OIDCStore
+	RateLimiter ratelimit.Checker
+	// WebAuthnResolver resolves the current WebAuthn instance from the live
+	// snapshot per request (may resolve nil: RP ID unset or construction
+	// degraded). A direct field would freeze the boot-time instance across
+	// hot config edits; the resolver is the same seam OIDCResolver and
+	// Config already use.
+	WebAuthnResolver func() *webauthn.WebAuthn
+	OIDCResolver     func() *authoidc.Provider
+	Ceremonies       *CeremonyStore
+	Config           func() AuthConfig // returns current config (hot-reloadable)
+	Configured       func() bool       // returns whether server has valid config
+	HTTPClient       *http.Client      // shared client for outbound requests (HIBP, etc.)
 	// migrateMu serializes OIDC link-migrations so the last-local-admin check
 	// and the password clear are atomic within this (single-binary) process.
 	migrateMu sync.Mutex
@@ -111,7 +116,7 @@ func (h *Handler) createAndSetSession(w http.ResponseWriter, r *http.Request,
 	if err := h.Store.CreateSession(r.Context(), sess); err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
-	SetSessionCookie(w, r, token, 0)
+	SessionCookie.SetCookie(w, r, token, 0)
 	slog.Info("login successful", "username", user.Username, "method", authMethod, "ip", sess.IPAddress)
 	return nil
 }
@@ -171,13 +176,19 @@ func ValidateAndHashPassword(ctx context.Context, password, username string, pas
 	return h, "", nil
 }
 
-// requireWebAuthn checks that WebAuthn is configured and writes a 400 error if not.
-func (h *Handler) requireWebAuthn(w http.ResponseWriter) bool {
-	if h.WebAuthn == nil {
-		api.BadRequestC(w, nil, api.CodeBadRequest, "WebAuthn not configured")
-		return false
+// requireWebAuthn resolves the current WebAuthn instance from the live
+// snapshot, writing a 400 error and returning ok=false when WebAuthn is not
+// configured (no RP ID, cold-boot degrade, or no resolver wired in tests).
+func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bool) {
+	var wa *webauthn.WebAuthn
+	if h.WebAuthnResolver != nil {
+		wa = h.WebAuthnResolver()
 	}
-	return true
+	if wa == nil {
+		api.BadRequestC(w, nil, api.CodeBadRequest, "WebAuthn not configured")
+		return nil, false
+	}
+	return wa, true
 }
 
 // consumeWebAuthnSession reads the session token from the request header,

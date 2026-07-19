@@ -5,8 +5,7 @@ import (
 )
 
 // The HTTP handlers (HandleMediaSeries, HandleMediaMovies, HandleMediaEpisodes)
-// are exercised end-to-end through the server root's delegate tests
-// (internal/server/media_handlers_test.go). These white-box tests cover the
+// are exercised in media_http_test.go. These white-box tests cover the
 // package's pure helpers directly, including edge cases the handler-level tests
 // don't reach.
 
@@ -97,7 +96,7 @@ func TestGroupEpisodesBySeason_empty_returns_empty(t *testing.T) {
 
 func TestGroupEpisodesBySeason_sorts_seasons_ascending(t *testing.T) {
 	t.Parallel()
-	eps := []episodeItem{
+	eps := []EpisodeItem{
 		{ID: 1, SeasonNumber: 2, EpisodeNumber: 1},
 		{ID: 2, SeasonNumber: 1, EpisodeNumber: 1},
 		{ID: 3, SeasonNumber: 3, EpisodeNumber: 1},
@@ -115,7 +114,7 @@ func TestGroupEpisodesBySeason_sorts_seasons_ascending(t *testing.T) {
 func TestGroupEpisodesBySeason_specials_sort_first(t *testing.T) {
 	t.Parallel()
 	// Season 0 holds specials; the ascending sort places them before season 1.
-	eps := []episodeItem{
+	eps := []EpisodeItem{
 		{ID: 1, SeasonNumber: 1, EpisodeNumber: 1},
 		{ID: 2, SeasonNumber: 0, EpisodeNumber: 1},
 	}
@@ -130,7 +129,7 @@ func TestGroupEpisodesBySeason_specials_sort_first(t *testing.T) {
 
 func TestGroupEpisodesBySeason_sorts_episodes_within_season(t *testing.T) {
 	t.Parallel()
-	eps := []episodeItem{
+	eps := []EpisodeItem{
 		{ID: 1, SeasonNumber: 1, EpisodeNumber: 3},
 		{ID: 2, SeasonNumber: 1, EpisodeNumber: 1},
 		{ID: 3, SeasonNumber: 1, EpisodeNumber: 2},
@@ -151,7 +150,7 @@ func TestGroupEpisodesBySeason_sorts_episodes_within_season(t *testing.T) {
 
 func TestGroupEpisodesBySeason_preserves_episode_count_per_season(t *testing.T) {
 	t.Parallel()
-	eps := []episodeItem{
+	eps := []EpisodeItem{
 		{ID: 1, SeasonNumber: 1, EpisodeNumber: 1},
 		{ID: 2, SeasonNumber: 1, EpisodeNumber: 2},
 		{ID: 3, SeasonNumber: 2, EpisodeNumber: 1},

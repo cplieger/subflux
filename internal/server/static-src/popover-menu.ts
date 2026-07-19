@@ -4,14 +4,14 @@
 // so the old `08-popover.css` `@media (width < 600px)` switch between the
 // content-sized desktop dropdown and the full-width flush mobile dropdown moves
 // HERE: we pick `stretch: "viewport"` (full-bleed) vs content-sized from a
-// matchMedia check and rebuild the controller when the query flips (both
-// `stretch` and the measured mobile offset are fixed at construction time). The
-// ui-primitives author flagged this exact migration point.
+// matchMedia check and PATCH the live controller when the query flips via
+// setOptions (an open panel repositions in place — no dispose-and-rebuild,
+// no reopen dance).
 //
-// requires @cplieger/ui-primitives >= 2.1.0 (popover stretch mode); verified
+// requires @cplieger/ui-primitives >= 2.2.0 (popover setOptions); verified
 // locally via a node_modules overlay until released.
 
-import { createPopover, type PopoverController } from "@cplieger/ui-primitives/popover";
+import { createPopover, type PlacementOptions } from "@cplieger/ui-primitives/popover";
 
 // Full-width flush dropdown breakpoint. Matches the popover breakpoint the old
 // `08-popover.css` used, NOT the 700px nav-button container-query breakpoint.
@@ -25,6 +25,9 @@ export interface MenuPopover {
   toggle(): void;
   hide(): void;
   readonly isOpen: boolean;
+  /** Re-measure + re-clamp after a content change while open (no-op when
+   *  closed). onOpen rebuilds already reposition automatically. */
+  reposition(): void;
   dispose(): void;
 }
 
@@ -59,47 +62,54 @@ export function createMenuPopover(
   const narrow = window.matchMedia(NARROW_QUERY);
   const header = anchor.closest("header");
 
-  let controller = build();
-
-  function build(): PopoverController {
-    const stretched = narrow.matches;
-    // Mobile: sit flush below the header bar. The old popover anchored to the
-    // header, not the button; measuring button→header bottom keeps ARIA on the
-    // button while positioning as if anchored to the header.
-    let offset = DESKTOP_OFFSET;
-    if (stretched) {
-      offset = header
-        ? Math.max(
-            0,
-            Math.round(
-              header.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom,
-            ),
-          )
-        : 0;
+  // The breakpoint-dependent placement subset. Mobile: full-bleed, flush to
+  // the viewport edges, and sitting flush below the header bar — the old
+  // popover anchored to the HEADER, not the button, so the offset is measured
+  // from the button's bottom to the header's bottom (ARIA stays on the button
+  // while positioning as if anchored to the header). Desktop: content-sized,
+  // gapped below the button. `stretch: undefined` in the desktop patch is the
+  // documented setOptions idiom for clearing full-bleed mode.
+  const placementFor = (): {
+    [K in "stretch" | "offset" | "margin"]: PlacementOptions[K] | undefined;
+  } => {
+    if (!narrow.matches) {
+      return { stretch: undefined, offset: DESKTOP_OFFSET, margin: 8 };
     }
-    return createPopover(anchor, panel, {
-      placement: "bottom",
-      align: "end",
-      offset,
-      margin: stretched ? 0 : 8,
-      haspopup: opts.haspopup ?? true,
-      ...(stretched ? { stretch: "viewport" as const } : {}),
-      ...(opts.onOpen ? { onOpen: opts.onOpen } : {}),
-    });
-  }
+    const offset = header
+      ? Math.max(
+          0,
+          Math.round(header.getBoundingClientRect().bottom - anchor.getBoundingClientRect().bottom),
+        )
+      : 0;
+    return { stretch: "viewport", offset, margin: 0 };
+  };
+
+  const initial = placementFor();
+  const controller = createPopover(anchor, panel, {
+    placement: "bottom",
+    align: "end",
+    ...(initial.offset !== undefined ? { offset: initial.offset } : {}),
+    ...(initial.margin !== undefined ? { margin: initial.margin } : {}),
+    ...(initial.stretch !== undefined ? { stretch: initial.stretch } : {}),
+    haspopup: opts.haspopup ?? true,
+    onOpen: (): void => {
+      opts.onOpen?.();
+      // The open hook typically rebuilds the panel's content (menu rebuild,
+      // status skeleton), and placement ran BEFORE it — re-measure + re-clamp
+      // against the real height, per the popover contract for content changes.
+      controller.reposition();
+    },
+  });
 
   // Positioning is JS-driven, so the desktop/mobile switch is a matchMedia
-  // handler, not a CSS media query. `stretch` and the measured offset are fixed
-  // at construction, so rebuild the controller when the query flips; reopen if
-  // it was open so a resize across the breakpoint doesn't drop the panel.
-  narrow.addEventListener("change", () => {
-    const wasOpen = controller.isOpen;
-    controller.dispose();
-    controller = build();
-    if (wasOpen) {
-      controller.show();
-    }
-  });
+  // handler, not a CSS media query: merge-patch the LIVE controller. An open
+  // panel repositions immediately and keeps its dismissal state. Named (not
+  // inline) so dispose() can remove it — an anonymous listener would outlive
+  // the controller and patch a disposed one on the next breakpoint flip.
+  const onBreakpointChange = (): void => {
+    controller.setOptions(placementFor());
+  };
+  narrow.addEventListener("change", onBreakpointChange);
 
   return {
     toggle: (): void => {
@@ -111,7 +121,11 @@ export function createMenuPopover(
     get isOpen(): boolean {
       return controller.isOpen;
     },
+    reposition: (): void => {
+      controller.reposition();
+    },
     dispose: (): void => {
+      narrow.removeEventListener("change", onBreakpointChange);
       controller.dispose();
     },
   };

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/runesafe"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -427,7 +428,7 @@ func TestCheckAPIStatus_cant_find_returns_nil_no_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			resp := &apiResponse{Status: false, Error: tt.errMsg}
+			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
 
 			got, err := checkAPIStatus(resp, "Test Movie")
 			if err != nil {
@@ -453,7 +454,7 @@ func TestCheckAPIStatus_other_error_returns_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			resp := &apiResponse{Status: false, Error: tt.errMsg}
+			resp := &apiResponse{Status: false, Error: runesafe.Untrusted(tt.errMsg)}
 
 			got, err := checkAPIStatus(resp, "Test Movie")
 			if err == nil {

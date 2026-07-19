@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
@@ -132,9 +132,15 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 		return nil, err
 	}
 
-	data, readErr := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	// cap+1 detect-and-error idiom (see anidb's anime-list fetch): a payload
+	// at the cap is far more likely truncated than exactly-cap-sized, and a
+	// silently truncated archive would fail extraction with a confusing error.
+	data, readErr := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes+1))
 	if readErr != nil {
 		return nil, readErr
+	}
+	if int64(len(data)) > httputil.MaxDownloadBytes {
+		return nil, fmt.Errorf("animetosho: download exceeded %d bytes", httputil.MaxDownloadBytes)
 	}
 
 	slog.Debug("animetosho download complete",

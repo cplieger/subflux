@@ -16,23 +16,15 @@ import (
 // RegistryErrorKind categorizes registry loading failures.
 type RegistryErrorKind int
 
-const (
-	// ErrProviderInit indicates a provider factory returned an error.
-	ErrProviderInit RegistryErrorKind = iota + 1
-	// ErrNoProviders indicates no providers were loaded.
-	ErrNoProviders
-)
+// ErrProviderInit indicates a provider factory returned an error.
+const ErrProviderInit RegistryErrorKind = iota + 1
 
 // String returns a human-readable name for the error kind.
 func (k RegistryErrorKind) String() string {
-	switch k {
-	case ErrProviderInit:
+	if k == ErrProviderInit {
 		return "provider_init"
-	case ErrNoProviders:
-		return "no_providers"
-	default:
-		return fmt.Sprintf("RegistryErrorKind(%d)", int(k))
 	}
+	return fmt.Sprintf("RegistryErrorKind(%d)", int(k))
 }
 
 // Compile-time assertion: RegistryErrorKind satisfies fmt.Stringer.
@@ -42,23 +34,14 @@ var _ fmt.Stringer = RegistryErrorKind(0)
 type RegistryError struct {
 	Err      error          // underlying error for ErrProviderInit
 	Provider api.ProviderID // non-empty for ErrProviderInit
-	// Counts for ErrNoProviders diagnostics.
-	Configured int
-	Disabled   int
-	Unknown    int
-	Kind       RegistryErrorKind
+	Kind     RegistryErrorKind
 }
 
 func (e *RegistryError) Error() string {
-	switch e.Kind {
-	case ErrProviderInit:
+	if e.Kind == ErrProviderInit {
 		return fmt.Sprintf("init provider %s: %v", e.Provider, e.Err)
-	case ErrNoProviders:
-		return fmt.Sprintf("no providers loaded (configured=%d, disabled=%d, unknown=%d)",
-			e.Configured, e.Disabled, e.Unknown)
-	default:
-		return fmt.Sprintf("registry error: %s", e.Kind)
 	}
+	return fmt.Sprintf("registry error: %s", e.Kind)
 }
 
 func (e *RegistryError) Unwrap() error { return e.Err }
@@ -126,15 +109,16 @@ func (r *Registry) Schema(name api.ProviderID) (string, []api.ProviderSchemaFiel
 // deterministic ordering.
 // Unknown provider names are skipped with a warning (a typo in config
 // should not prevent all other providers from loading).
-// Each provider is wrapped with download retry logic (3 attempts, 2s
-// initial backoff) to handle transient HTTP 5xx errors.
+// Providers are returned unwrapped; download retry wrapping (WrapRetryAll)
+// is applied by the composition root (main.go wiring).
 //
 // LoadAll reads only cfg.Enabled and cfg.Settings from each entry.
 // Other ProviderCfg fields (if added) will not affect provider loading.
 //
-// If no providers end up being loaded, the returned error names the
-// specific cause (configured/disabled/unknown counts) so operators can
-// distinguish a typo from a deliberate all-disabled state.
+// Zero providers loading is NOT an error: a config with no enabled
+// acquisition providers is a valid "embedded detection and coverage only"
+// setup. The counts are WARN-logged so operators can still distinguish a
+// typo (unknown>0) from a deliberate all-disabled state.
 func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]api.Provider, error) {
 	toLoad, disabled, unknown := r.classifyProviders(providers)
 
@@ -152,12 +136,9 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api
 		if len(errs) > 0 {
 			return nil, errors.Join(errs...)
 		}
-		return nil, &RegistryError{
-			Kind:       ErrNoProviders,
-			Configured: len(providers),
-			Disabled:   disabled,
-			Unknown:    unknown,
-		}
+		slog.Warn("no acquisition providers loaded; embedded detection and coverage only",
+			"configured", len(providers), "disabled", disabled, "unknown", unknown)
+		return nil, nil
 	}
 	slog.Info("providers loaded", "count", len(result), "errors", len(errs))
 	if len(errs) > 0 {
@@ -209,7 +190,11 @@ func (r *Registry) buildProviders(ctx context.Context, toLoad []api.ProviderID, 
 				results[i] = loadResult{name: name, err: ctx.Err()}
 				return nil // don't cancel siblings; partial success
 			}
-			p, err := r.factories[name](ctx, providers[name].Settings)
+			// The registered schema declaration is the single source of
+			// setting defaults (P14): absent declared fields are filled from
+			// their schema Default before the factory ever sees the map.
+			settings := NormalizeSettings(r.schemas[name], providers[name].Settings)
+			p, err := r.factories[name](ctx, settings)
 			if err != nil {
 				results[i] = loadResult{name: name, err: err}
 			} else {

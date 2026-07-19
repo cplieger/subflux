@@ -45,6 +45,7 @@ func (d *DB) RecordScanState(_ context.Context, rec *api.ScanRecord) error {
 		AudioLang: rec.AudioLang,
 		Season:    rec.Season,
 		Episode:   rec.Episode,
+		Searched:  rec.Searched,
 		ScannedAt: time.Now().UTC(),
 	}
 	return d.db.Update(func(tx *bolt.Tx) error {
@@ -90,6 +91,7 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 				Season:    sr.Season,
 				Episode:   sr.Episode,
 				AudioLang: sr.AudioLang,
+				Searched:  sr.Searched,
 				ScannedAt: sr.ScannedAt.UTC().Format(scanTimeLayout),
 			})
 		}
@@ -167,4 +169,62 @@ func (d *DB) LastScanTime(_ context.Context) (string, error) {
 		return "", err
 	}
 	return result, nil
+}
+
+// --- Scan-cycle mark (duration-aware resume) ---
+
+// metaKeyScanCycleStart is the meta-bucket key holding the in-progress full
+// scan's start time (RFC3339Nano). Present = a scan cycle is running (or was
+// interrupted); absent = the last cycle completed normally. See the scanning
+// package's ScanStore contract.
+var metaKeyScanCycleStart = []byte("scan_cycle_start")
+
+// ScanCycleStart returns the persisted cycle-start mark, or the zero time
+// with no error when no mark is stored. An unparsable stored value is
+// surfaced as an error rather than silently treated as absent.
+func (d *DB) ScanCycleStart(_ context.Context) (time.Time, error) {
+	var result time.Time
+	err := d.db.View(func(tx *bolt.Tx) error {
+		mb := tx.Bucket([]byte(bucketMeta))
+		if mb == nil {
+			return errors.New("boltstore: meta bucket not found")
+		}
+		v := mb.Get(metaKeyScanCycleStart)
+		if v == nil {
+			return nil
+		}
+		t, perr := time.Parse(time.RFC3339Nano, string(v))
+		if perr != nil {
+			return fmt.Errorf("parse scan cycle mark: %w", perr)
+		}
+		result = t
+		return nil
+	})
+	if err != nil {
+		return time.Time{}, err
+	}
+	return result, nil
+}
+
+// SetScanCycleStart persists the cycle-start mark (RFC3339Nano), overwriting
+// any prior mark.
+func (d *DB) SetScanCycleStart(_ context.Context, t time.Time) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
+		mb := tx.Bucket([]byte(bucketMeta))
+		if mb == nil {
+			return errors.New("boltstore: meta bucket not found")
+		}
+		return mb.Put(metaKeyScanCycleStart, []byte(t.Format(time.RFC3339Nano)))
+	})
+}
+
+// ClearScanCycleStart removes the cycle-start mark. Idempotent.
+func (d *DB) ClearScanCycleStart(_ context.Context) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
+		mb := tx.Bucket([]byte(bucketMeta))
+		if mb == nil {
+			return errors.New("boltstore: meta bucket not found")
+		}
+		return mb.Delete(metaKeyScanCycleStart)
+	})
 }

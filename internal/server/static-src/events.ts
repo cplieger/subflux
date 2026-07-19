@@ -8,15 +8,23 @@ import { fetchAndMergeCoverage } from "./coverage.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { registerCleanup } from "@cplieger/actions";
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
+import { PATH_EVENTS } from "./wire/client.gen.js";
 import { decodeCoverageEvent, decodeNotifyEvent, decodeScanEvent } from "./wire/decoders.gen.js";
+import type { EventData } from "./wire/types.gen.js";
 import type { Decoder } from "./validators.js";
 
 // --- Typed SSE event payloads ---
 
-// SSE frames arrive as { type, data: <event> }. Decode the inner payload
-// through the generated wire decoders (validates shape; returns null on a
-// malformed frame so a bad event can't throw out of a listener).
-function decodeSSE<T>(e: MessageEvent, decoder: Decoder<T>): T | null {
+// SSE frames arrive as { type, data: <event> } where data is one variant of
+// the generated EventData union (the sealed events.EventData interface).
+// Each named-SSE listener already knows its variant, so it decodes the inner
+// payload directly through that variant's generated decoder; the T extends
+// EventData bound keeps a non-union decoder out of this path. (The generated
+// decodeEventDataPayload adapter covers consumers that need to dispatch on
+// the discriminator at runtime; the per-event listeners here don't.)
+// Returns null on a malformed frame so a bad event can't throw out of a
+// listener.
+function decodeSSE<T extends EventData>(e: MessageEvent, decoder: Decoder<T>): T | null {
   try {
     const env = JSON.parse(e.data as string) as { data?: unknown };
     return decoder(env.data);
@@ -43,7 +51,7 @@ export function connect(): void {
   // guarantees deterministic teardown for tests + soft-navigation cases.
   registerCleanup(disconnect);
 
-  eventSource = new EventSource("/api/events");
+  eventSource = new EventSource(PATH_EVENTS);
 
   eventSource.addEventListener("open", () => {
     reconnectAttempt = 0;
@@ -102,12 +110,14 @@ export function connect(): void {
     notify.info(`Scan started: ${label}`);
   });
 
-  // scan:done triggers an immediate status refresh so the button and
-  // popup update without waiting up to one poll interval. The existing
-  // pollStatus pipeline already handles completion toasts via its own
-  // transition detector, so we do not surface a second toast here.
+  // scan:done triggers an immediate status refresh so buttons and the popup
+  // update without waiting up to one poll interval (the poll republishes
+  // runningScansByScope and its transition detector owns completion toasts),
+  // plus a DataInvalidate so coverage counts reconcile after any terminal
+  // outcome — completed, failed, or cancelled alike.
   eventSource.addEventListener("scan:done", () => {
     void pollStatus();
+    emit(BusEvent.DataInvalidate);
   });
 
   eventSource.addEventListener("error", () => {

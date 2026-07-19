@@ -82,13 +82,14 @@ func (m *mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { retur
 func (m *mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
 
 type mockCfg struct {
-	targets  []api.SubtitleTarget
-	langs    []string
-	interval time.Duration
+	targets   []api.SubtitleTarget
+	langs     []string
+	interval  time.Duration
+	scanDelay time.Duration
 }
 
 func (m *mockCfg) PollInterval() time.Duration                    { return m.interval }
-func (m *mockCfg) Search() api.SearchConfig                       { return api.SearchConfig{ScanDelay: time.Millisecond} }
+func (m *mockCfg) Search() api.SearchConfig                       { return api.SearchConfig{ScanDelay: m.scanDelay} }
 func (m *mockCfg) ValidatePath(_ context.Context, _ string) error { return nil }
 func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
 	return m.targets
@@ -102,6 +103,10 @@ type mockEngine struct {
 
 func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
 	return m.result, m.err
+}
+
+func (m *mockEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
+	return false
 }
 
 func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
@@ -396,28 +401,46 @@ func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
 	}
 }
 
-// --- pollSonarr / pollRadarr entry processing ---
+// --- detection + execution entry processing ---
 
-// pollSonarr processes each non-empty imported path; a missing file triggers a
-// DeleteStateByPaths cleanup.
-func TestPollSonarr_processes_nonEmpty_path(t *testing.T) {
+// drainOne pops one queued batch and executes it synchronously, failing the
+// test when detection enqueued nothing.
+func drainOne(t *testing.T, p *Poller) {
+	t.Helper()
+	select {
+	case b := <-p.work:
+		p.executeBatch(context.Background(), &b)
+	default:
+		t.Fatal("no batch queued; detection did not enqueue")
+	}
+}
+
+// A detected batch, once executed, processes each non-empty imported path; a
+// missing file triggers a DeleteStateByPaths cleanup.
+func TestDetectExecute_sonarr_processes_nonEmpty_path(t *testing.T) {
 	store := &mockStore{}
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/one.mkv")}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
-	p.pollSonarr(context.Background(), ls)
+	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+		t.Fatalf("detectSonarr = %d, want 1", got)
+	}
+	if len(store.deletedPaths) != 0 {
+		t.Fatalf("detection performed execution work (deletes = %d, want 0 before drain)", len(store.deletedPaths))
+	}
+	drainOne(t, p)
 	if len(store.deletedPaths) != 1 {
-		t.Fatalf("pollSonarr deletes = %d, want 1", len(store.deletedPaths))
+		t.Fatalf("executeBatch deletes = %d, want 1", len(store.deletedPaths))
 	}
 	if store.deletedPaths[0][0] != "/nonexistent/one.mkv" {
 		t.Errorf("deleted path = %q, want /nonexistent/one.mkv", store.deletedPaths[0][0])
 	}
 }
 
-// pollSonarr continues to every entry (it does not stop after the first) when
-// the context is not cancelled. Two missing-file entries => two cleanups.
-func TestPollSonarr_continues_after_each_entry(t *testing.T) {
+// The executor continues to every entry (it does not stop after the first)
+// when the context is not cancelled. Two missing-file entries => two cleanups.
+func TestDetectExecute_continues_after_each_entry(t *testing.T) {
 	store := &mockStore{}
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{
@@ -426,19 +449,68 @@ func TestPollSonarr_continues_after_each_entry(t *testing.T) {
 	}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
-	p.pollSonarr(context.Background(), ls)
+	p.detectSonarr(context.Background(), ls)
+	drainOne(t, p)
 	if len(store.deletedPaths) != 2 {
-		t.Fatalf("pollSonarr deletes = %d, want 2", len(store.deletedPaths))
+		t.Fatalf("executeBatch deletes = %d, want 2", len(store.deletedPaths))
 	}
 }
 
-// pollRadarr processes a successful history fetch and returns the entry count.
-func TestPollRadarr_processes_on_success(t *testing.T) {
+// Detection stays on schedule while a batch is still queued: a second
+// detection fetches history again immediately (from the advanced in-memory
+// cursor) instead of waiting for execution — the P12 decoupling.
+func TestDetect_fetches_while_batch_queued(t *testing.T) {
+	store := &mockStore{}
+	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
+	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/one.mkv")}}
+	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
+	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
+
+	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+		t.Fatalf("first detect = %d, want 1", got)
+	}
+	// Batch 1 is queued, NOT executed. Detection must still run: the mock
+	// returns the same entry regardless of since, so a second detect
+	// observing it proves the fetch happened while work was pending.
+	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+		t.Fatalf("second detect while batch queued = %d, want 1 (detection must not block on execution)", got)
+	}
+}
+
+// A full executor queue defers the batch: the detection cursor stays put so
+// the same entries are re-fetched next cycle, and nothing is lost.
+func TestDetect_queue_full_defers_batch(t *testing.T) {
+	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
+	entry := histEntry("/nonexistent/one.mkv")
+	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{entry}}
+	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
+	p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
+
+	// Fill the queue with placeholder batches.
+	for range cap(p.work) {
+		p.work <- sourceBatch{source: PollSourceRadarr, key: api.PollKeyRadarr}
+	}
+	before := p.detectSince(context.Background(), api.PollKeySonarr)
+	p.detectSonarr(context.Background(), ls)
+	after := p.detectSince(context.Background(), api.PollKeySonarr)
+	if !after.Equal(before) {
+		t.Errorf("detection cursor advanced %v -> %v despite deferred batch; deferred entries would be lost", before, after)
+	}
+}
+
+// detectRadarr observes a successful history fetch, enqueues it, and returns
+// the entry count; executing the batch processes the entry.
+func TestDetectExecute_radarr_processes_on_success(t *testing.T) {
+	store := &mockStore{}
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	radarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/movie.mkv")}}
 	ls := &LiveState{Cfg: cfg, Radarr: radarr}
-	p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
-	if got := p.pollRadarr(context.Background(), ls); got != 1 {
-		t.Errorf("pollRadarr on success = %d, want 1", got)
+	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
+	if got := p.detectRadarr(context.Background(), ls); got != 1 {
+		t.Errorf("detectRadarr on success = %d, want 1", got)
+	}
+	drainOne(t, p)
+	if len(store.deletedPaths) != 1 {
+		t.Fatalf("executeBatch deletes = %d, want 1", len(store.deletedPaths))
 	}
 }

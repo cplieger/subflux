@@ -65,3 +65,27 @@ func TestReadPCMSamples_stopsAtMaxWithinRead(t *testing.T) {
 		t.Fatalf("readPCMSamples(6 bytes, max=2) len = %d, want 2", len(got))
 	}
 }
+
+// A huge maxSamples (the whole-file durationMs=0 path uses 100M) must not be
+// preallocated up front: the buffer starts at initialPCMBufSamples and grows
+// only as data arrives. Guards against reintroducing the ~200 MB prealloc.
+func TestReadPCMSamples_largeMaxDoesNotPreallocateCap(t *testing.T) {
+	got := readPCMSamples(bytes.NewReader([]byte{0x01, 0x00, 0x02, 0x00}), 100_000_000)
+	if len(got) != 2 {
+		t.Fatalf("readPCMSamples(4 bytes, max=100M) len = %d, want 2", len(got))
+	}
+	if cap(got) > initialPCMBufSamples {
+		t.Errorf("readPCMSamples(4 bytes, max=100M) cap = %d, want <= %d (no cap-sized prealloc)",
+			cap(got), initialPCMBufSamples)
+	}
+}
+
+// A cap smaller than the initial buffer still reads and truncates exactly at
+// the cap (segment extractions preallocate exactly as before).
+func TestReadPCMSamples_smallCapUnchanged(t *testing.T) {
+	data := make([]byte, 64) // 32 samples available
+	got := readPCMSamples(bytes.NewReader(data), 8)
+	if len(got) != 8 {
+		t.Fatalf("readPCMSamples(64 bytes, max=8) len = %d, want 8", len(got))
+	}
+}

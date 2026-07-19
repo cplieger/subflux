@@ -330,6 +330,42 @@ func TestSyncWithOptions_nil_opts_uses_defaults(t *testing.T) {
 	}
 }
 
+// TestSyncWithOptions_gate_reads_calibrated_confidence proves the absolute
+// confidence gate is fed the winner's calibrated confidence untouched: a
+// sub-threshold reference winner is returned with exactly the confidence
+// the vote produced (never a rating), so both consumer gates — the
+// reference-sync sync_min_confidence gate and the audio-fallback
+// ShouldApplyThreshold — compare against calibrated values.
+func TestSyncWithOptions_gate_reads_calibrated_confidence(t *testing.T) {
+	t.Parallel()
+	ref := makeLongCues(30, 10*time.Minute)
+	inc := ShiftCues(ref, 2*time.Second)
+
+	opts := SyncOptions{
+		EnableFramerate: false,
+		EnableSplits:    false,
+		MinConfidence:   0.99, // above every strategy cap: nothing passes
+	}
+	// referenceSync is deterministic for fixed inputs, so calling it
+	// directly yields the same winner SyncWithOptions gates on.
+	direct := referenceSync(context.Background(), ref, inc, &opts)
+	got := SyncWithOptions(context.Background(), ref, inc, &opts)
+
+	if got.Confidence != direct.Confidence {
+		t.Errorf("gated confidence = %f, want calibrated winner confidence %f",
+			float64(got.Confidence), float64(direct.Confidence))
+	}
+	if got.Confidence >= opts.MinConfidence {
+		t.Fatalf("fixture: confidence %f unexpectedly met the 0.99 gate", float64(got.Confidence))
+	}
+	// The winner's calibrated confidence is capped by its method's ceiling —
+	// a rating (raw overlap fraction of 1.0 here) would exceed it.
+	if cap := DefaultConfidenceCaps.ForMethod(got.Method); got.Confidence > cap {
+		t.Errorf("confidence %f exceeds method cap %f — looks like a rating leaked into Confidence",
+			float64(got.Confidence), float64(cap))
+	}
+}
+
 func TestReferenceSync_no_candidates_returns_original(t *testing.T) {
 	t.Parallel()
 	// Zero-length cues produce totalRef == 0 in constantOffsetConfidence,
