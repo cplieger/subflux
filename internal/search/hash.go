@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -17,12 +18,7 @@ const hashBlockSize = 65536
 // hasDotDotSegment reports whether p contains ".." as a whole path segment
 // (real traversal), as opposed to a filename that merely contains two dots.
 func hasDotDotSegment(p string) bool {
-	for _, seg := range strings.Split(p, string(filepath.Separator)) {
-		if seg == ".." {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(p, string(filepath.Separator)), "..")
 }
 
 var hashBufPool = sync.Pool{

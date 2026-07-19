@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 	pathsFile := filepath.Join(pathsDir, "paths.gen.go")
-	if err := os.WriteFile(pathsFile, []byte(goPaths), 0o644); err != nil {
+	if err := os.WriteFile(pathsFile, []byte(goPaths), 0o600); err != nil {
 		fmt.Fprintf(os.Stderr, "wire-codegen: write %s: %v\n", pathsFile, err)
 		os.Exit(1)
 	}

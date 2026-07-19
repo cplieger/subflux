@@ -39,8 +39,10 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 	rows := make([]rowSpec, 0, series*epsPer+movies+locks)
 	for s := range series {
 		for e := range epsPer {
-			rows = append(rows, rowSpec{api.MediaTypeEpisode,
-				fmt.Sprintf("tt%06d-s01e%02d", 100000+s, e+1), false})
+			rows = append(rows, rowSpec{
+				api.MediaTypeEpisode,
+				fmt.Sprintf("tt%06d-s01e%02d", 100000+s, e+1), false,
+			})
 		}
 	}
 	epRows := len(rows)
@@ -51,7 +53,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 	// auto row plus one manual row).
 	if locks > 0 {
 		stride := max(1, epRows/locks)
-		for i := 0; i < locks; i++ {
+		for i := range locks {
 			src := rows[i*stride%epRows]
 			rows = append(rows, rowSpec{src.mt, src.mid, true})
 		}
@@ -68,7 +70,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 					return err
 				}
 				rec := stateRec{
-					MediaImported: time.Unix(1700000000+int64(seq), 0), //nolint:gosec // G115: bounded test sequence
+					MediaImported: time.Unix(1700000000+int64(seq), 0),
 					MediaType:     r.mt,
 					MediaID:       r.mid,
 					Language:      "fr",
@@ -76,7 +78,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 					Provider:      "opensubtitles",
 					Path:          "/media/x/" + r.mid + ".fr.srt",
 					VideoPath:     "/media/x/" + r.mid + ".mkv",
-					ID:            int64(seq), //nolint:gosec // G115: NextSequence fits
+					ID:            int64(seq),
 					Score:         80,
 					Manual:        r.manual,
 				}
@@ -152,5 +154,4 @@ func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 			}
 		}
 	})
-
 }

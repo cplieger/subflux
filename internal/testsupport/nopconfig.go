@@ -18,21 +18,19 @@ import (
 // lives in search test code to avoid testsupport→search→testsupport import
 // cycles (search test code imports testsupport).
 type NopConfig struct {
+	PathErr      error
 	ProviderCfgs map[api.ProviderID]api.ProviderCfg
+	RadarrCfg    api.ArrConfig
+	SonarrCfg    api.ArrConfig
+	LangRules    api.LanguageRulesJSON
+	Languages    []string
+	Targets      []api.SubtitleTarget
 	SearchConfig api.SearchConfig
 	AdaptiveCfg  api.AdaptiveConfig
 	Sync         api.SyncConfig
-	PostProcess  api.PostProcessConfig
-	// PathErr, when set, is returned by ValidatePath and RemoveUnderRoot,
-	// simulating a path outside the configured media roots.
-	PathErr      error
-	Languages    []string
-	Targets      []api.SubtitleTarget
-	SonarrCfg    api.ArrConfig
-	RadarrCfg    api.ArrConfig
-	LangRules    api.LanguageRulesJSON
 	MinScore     int
 	ProviderPrio int
+	PostProcess  api.PostProcessConfig
 	Embedded     api.EmbeddedPolicy
 }
 

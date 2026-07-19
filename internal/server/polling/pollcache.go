@@ -37,10 +37,10 @@ var _ PollCacher = (*PollCache)(nil)
 type PollCache struct {
 	readFn     func(ctx context.Context, key api.PollKey) (time.Time, error)
 	setFn      func(ctx context.Context, key api.PollKey, t time.Time) error
+	dirty      map[api.PollKey]time.Time
+	dirtyGauge func(n int)
 	shadow     sync.Map
 	dirtyMu    sync.Mutex
-	dirty      map[api.PollKey]time.Time // key -> dirty since
-	dirtyGauge func(n int)               // optional; called under dirtyMu on transitions
 }
 
 // NewPollCache creates a PollCache backed by the given read/set functions.

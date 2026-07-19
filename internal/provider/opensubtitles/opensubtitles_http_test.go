@@ -119,7 +119,6 @@ func TestCheckStatus(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestCheckStatus_parses_retry_after_seconds_on_429(t *testing.T) {

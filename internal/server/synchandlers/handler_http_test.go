@@ -54,6 +54,7 @@ func (fakeProc) NormalizeEncoding(data []byte) []byte { return data }
 func (fakeProc) ParseSRT([]byte) ([]api.SubtitleCue, error) {
 	return []api.SubtitleCue{{Start: time.Second, End: 2 * time.Second, Text: "hi"}}, nil
 }
+
 func (fakeProc) WriteSRT([]api.SubtitleCue) ([]byte, error) {
 	return []byte("1\n00:00:01,000 --> 00:00:02,000\nhi\n"), nil
 }

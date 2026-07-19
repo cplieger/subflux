@@ -30,8 +30,8 @@ type seasonKey struct {
 type seasonTracker struct {
 	counter api.ShowSubtitleCounter
 	cache   *showskip.Cache
-	seed    seedDeps
 	seasons map[seasonKey]*seasonState
+	seed    seedDeps
 	mu      sync.Mutex
 }
 
@@ -53,9 +53,9 @@ type BackoffPrefixReader interface {
 // automatically. A zero seedDeps (nil Backoff) disables seeding.
 type seedDeps struct {
 	Backoff     BackoffPrefixReader
-	Enabled     map[api.ProviderID]struct{} // live enabled provider set
-	MaxAttempts int                         // adaptive max attempts (0 = time-window only)
+	Enabled     map[api.ProviderID]struct{}
 	Now         func() time.Time
+	MaxAttempts int
 }
 
 func newSeasonTracker(counter api.ShowSubtitleCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
@@ -160,7 +160,7 @@ func (st *seasonTracker) shouldSkipEpisode(imdbID string, season int, langs []st
 	return true
 }
 
-func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, season int, lang string, seasonIDPrefix string, outcome ScanOutcome, seasonEpCount int) {
+func (st *seasonTracker) recordOutcome(ctx context.Context, imdbID string, season int, lang, seasonIDPrefix string, outcome ScanOutcome, seasonEpCount int) {
 	if imdbID == "" {
 		return
 	}
@@ -222,11 +222,25 @@ func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDP
 			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang, "error", err)
 		return 0
 	}
+	count := st.countFullySuppressed(entries, key.Lang)
+	if count > 0 {
+		slog.Debug("season tracker seeded from active backoff",
+			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang,
+			"suppressed_episodes", count)
+	}
+	return count
+}
+
+// countFullySuppressed counts the episodes whose ACTIVE backoff rows (for
+// lang) cover every currently-enabled provider — the zero-eligible-provider
+// constraint seedCount's contract requires. Extracted verbatim from
+// seedCount's accumulation loops.
+func (st *seasonTracker) countFullySuppressed(entries []api.BackoffEntry, lang string) int {
 	now := st.seed.Now()
 	activeByEpisode := make(map[string]map[api.ProviderID]struct{})
 	for i := range entries {
 		en := &entries[i]
-		if en.Language != key.Lang {
+		if en.Language != lang {
 			continue
 		}
 		if _, enabled := st.seed.Enabled[en.Provider]; !enabled {
@@ -247,11 +261,6 @@ func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDP
 		if len(provs) == len(st.seed.Enabled) {
 			count++
 		}
-	}
-	if count > 0 {
-		slog.Debug("season tracker seeded from active backoff",
-			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang,
-			"suppressed_episodes", count)
 	}
 	return count
 }

@@ -143,7 +143,7 @@ func secretLineValue(trimmed []byte) (key string, val []byte, ok bool) {
 // forms MergeSecrets fills from the baseline. Only such payloads depend on
 // the baseline's readability.
 func hasKeepSecretLines(newData []byte) bool {
-	for _, line := range bytes.Split(newData, []byte("\n")) {
+	for line := range bytes.SplitSeq(newData, []byte("\n")) {
 		_, val, ok := secretLineValue(bytes.TrimSpace(line))
 		if !ok {
 			continue
