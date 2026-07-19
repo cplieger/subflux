@@ -37,22 +37,22 @@ const (
 
 // Request is the parent->child job description, one per process invocation.
 type Request struct {
-	Version       int     `json:"version"`
 	Op            string  `json:"op"`
-	Data          []byte  `json:"data"` // subtitle bytes (base64 via encoding/json)
 	VideoPath     string  `json:"video_path"`
-	SubtitlePath  string  `json:"subtitle_path,omitempty"`  // audio op: ASS detection hint
-	Lang          string  `json:"lang,omitempty"`           // reference op: exclude language
-	MinConfidence float64 `json:"min_confidence,omitempty"` // reference op: apply threshold
+	SubtitlePath  string  `json:"subtitle_path,omitempty"`
+	Lang          string  `json:"lang,omitempty"`
+	Data          []byte  `json:"data"`
+	Version       int     `json:"version"`
+	MinConfidence float64 `json:"min_confidence,omitempty"`
 }
 
 // Response is the child->parent result envelope. Error is set for protocol
 // or infrastructure failures; strategy-level "no sync found" is NOT an error
 // (it travels as a MethodNone result, exactly like the in-process calls).
 type Response struct {
-	Version int            `json:"version"`
 	Error   string         `json:"error,omitempty"`
 	Result  WireSyncResult `json:"result"`
+	Version int            `json:"version"`
 }
 
 // WireSyncResult is the JSON projection of subsync.SyncResult.

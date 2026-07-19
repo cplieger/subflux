@@ -81,7 +81,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := &http.Server{Handler: s.AdminHandler(), ReadHeaderTimeout: 5 * time.Second}
-	go srv.Serve(ln) //nolint:errcheck // returns on Close
+	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
 
 	client := &http.Client{

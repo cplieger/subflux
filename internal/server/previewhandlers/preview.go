@@ -48,7 +48,7 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 
 	startSec := 0.0
 	if sv := r.URL.Query().Get("start"); sv != "" {
-		if v, err := strconv.ParseFloat(sv, 64); err == nil && v >= 0 && v <= 86400 {
+		if v, perr := strconv.ParseFloat(sv, 64); perr == nil && v >= 0 && v <= 86400 {
 			startSec = v
 		}
 	}
@@ -62,8 +62,8 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	rc := http.NewResponseController(w)
-	if err := rc.SetWriteDeadline(time.Now().Add(previewTimeout)); err != nil {
-		slog.Warn("preview write deadline extension failed, 60s server timeout applies", "error", err)
+	if dlErr := rc.SetWriteDeadline(time.Now().Add(previewTimeout)); dlErr != nil {
+		slog.Warn("preview write deadline extension failed, 60s server timeout applies", "error", dlErr)
 	}
 
 	if buffered {
@@ -376,21 +376,21 @@ func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) 
 
 	var startMs int64
 	if o := r.URL.Query().Get("start"); o != "" {
-		sec, err := strconv.ParseFloat(o, 64)
-		if err == nil {
+		sec, perr := strconv.ParseFloat(o, 64)
+		if perr == nil {
 			startMs = int64(sec * 1000)
 		} else {
-			slog.Debug("preview subtitle: invalid start param", "value", o, "error", err)
+			slog.Debug("preview subtitle: invalid start param", "value", o, "error", perr)
 		}
 	}
 
 	var shiftMs int64
 	if o := r.URL.Query().Get("shift"); o != "" {
-		ms, err := strconv.ParseInt(o, 10, 64)
-		if err == nil {
+		ms, perr := strconv.ParseInt(o, 10, 64)
+		if perr == nil {
 			shiftMs = ms
 		} else {
-			slog.Debug("preview subtitle: invalid shift param", "value", o, "error", err)
+			slog.Debug("preview subtitle: invalid shift param", "value", o, "error", perr)
 		}
 	}
 

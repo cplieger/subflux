@@ -57,36 +57,14 @@ type StateFunc func() *LiveState
 // Poller polls Sonarr/Radarr history APIs for new import events and
 // processes each through the search engine.
 type Poller struct {
-	deps      Deps
-	stateFunc StateFunc
-
-	tagCache *cache.Cache[map[int]struct{}]
-
-	// importRetries counts consecutive transient failures per history entry
-	// (key "source:entryID"), so the poll watermark is held back for a
-	// bounded number of cycles instead of either dropping a failed import
-	// permanently or retrying it forever. Guarded by retryMu: PollOnce polls
-	// Sonarr and Radarr concurrently. Entries are deleted on success or
-	// give-up, so the map only ever holds currently-failing items.
+	deps          Deps
+	stateFunc     StateFunc
+	tagCache      *cache.Cache[map[int]struct{}]
 	importRetries map[string]int
+	work          chan sourceBatch
+	detectHigh    map[api.PollKey]time.Time
 	retryMu       sync.Mutex
-
-	// work carries detected history batches from the detection loop to the
-	// single-worker executor (P12): detection stays on schedule while a
-	// batch executes, so a large import burst never blinds the poller to
-	// subsequent imports. Bounded; when full, a batch is deferred (not
-	// enqueued, detection cursor unmoved) and re-fetched next cycle.
-	work chan sourceBatch
-
-	// detectHigh is the in-memory fetched-through cursor per source: the
-	// durable watermark advances only after EXECUTION (crash replay stays
-	// at-least-once), while detection fetches from max(durable, detectHigh)
-	// so already-queued entries are not re-fetched. After a batch with a
-	// transiently-failed entry, the executor rewinds detectHigh to the
-	// durable watermark (held just below the failed entry), preserving the
-	// fetch-based retry transport and its once-per-cycle spacing exactly.
-	detectHigh map[api.PollKey]time.Time
-	detectMu   sync.Mutex
+	detectMu      sync.Mutex
 }
 
 // sourceBatch is one detection fetch handed to the executor: the entries a
@@ -154,11 +132,9 @@ const (
 // semantics.
 func (p *Poller) Run(ctx context.Context) {
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		p.runExecutor(ctx)
-	}()
+	})
 	defer wg.Wait()
 
 	var lastActivity time.Time
@@ -248,9 +224,9 @@ func (p *Poller) detectSince(ctx context.Context, key api.PollKey) time.Time {
 // fetched-through cursor past it. When the queue is full the batch is
 // deferred instead: the cursor stays put and the same entries are re-fetched
 // next cycle — bounded backpressure with no loss.
-func (p *Poller) enqueue(b sourceBatch) bool {
+func (p *Poller) enqueue(b *sourceBatch) {
 	select {
-	case p.work <- b:
+	case p.work <- *b:
 		var latest time.Time
 		for i := range b.entries {
 			if b.entries[i].Date.After(latest) {
@@ -262,11 +238,9 @@ func (p *Poller) enqueue(b sourceBatch) bool {
 			p.detectHigh[b.key] = latest.Add(time.Millisecond)
 			p.detectMu.Unlock()
 		}
-		return true
 	default:
 		slog.Warn("poll: executor queue full, batch deferred to next cycle",
 			"source", b.source, "entries", len(b.entries))
-		return false
 	}
 }
 
@@ -414,7 +388,7 @@ func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
 	}
 
 	slog.Info("sonarr poll: new events", "count", len(entries))
-	p.enqueue(sourceBatch{
+	p.enqueue(&sourceBatch{
 		source: PollSourceSonarr, key: api.PollKeySonarr,
 		since: since, entries: entries,
 	})
@@ -437,7 +411,7 @@ func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
 	}
 
 	slog.Info("radarr poll: new events", "count", len(entries))
-	p.enqueue(sourceBatch{
+	p.enqueue(&sourceBatch{
 		source: PollSourceRadarr, key: api.PollKeyRadarr,
 		since: since, entries: entries,
 	})

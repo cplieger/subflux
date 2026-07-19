@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"strconv"
 
@@ -198,9 +199,7 @@ func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map
 		return raw
 	}
 	out := make(map[string]any, len(raw)+len(fields))
-	for k, v := range raw {
-		out[k] = v
-	}
+	maps.Copy(out, raw)
 	for _, f := range fields {
 		if f.Default == "" {
 			continue
@@ -208,7 +207,7 @@ func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map
 		if _, present := out[f.Key]; present {
 			continue
 		}
-		out[f.Key] = coerceDefault(f)
+		out[f.Key] = coerceDefault(&f)
 	}
 	return out
 }
@@ -216,7 +215,7 @@ func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map
 // coerceDefault converts a schema field's string Default into the native
 // type its declared Type implies, so normalized maps carry the same value
 // shapes YAML parsing produces.
-func coerceDefault(f api.ProviderSchemaField) any {
+func coerceDefault(f *api.ProviderSchemaField) any {
 	switch f.Type {
 	case "bool":
 		return f.Default == valTrue

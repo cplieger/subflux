@@ -10,8 +10,8 @@ import "sync"
 // contend — deliberately a keyed gate, not a global lock or shared queue:
 // the poller and the scan keep running concurrently on different items.
 type mediaGate struct {
-	mu    sync.Mutex
 	locks map[string]*gateEntry
+	mu    sync.Mutex
 }
 
 type gateEntry struct {

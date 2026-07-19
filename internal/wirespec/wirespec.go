@@ -19,6 +19,8 @@
 package wirespec
 
 import (
+	"net/http"
+
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -45,6 +47,10 @@ const (
 	GroupUserConfigured  = "userConfigured"
 	GroupAdminConfigured = "adminConfigured"
 )
+
+// pathConfig is the raw-YAML config endpoint path, shared by its GET/PUT/POST
+// verb entries in the endpoint table.
+const pathConfig = "/api/config"
 
 // Registry returns the fully-populated wiregen registry: types, enums, name
 // overrides, and the endpoint table.
@@ -167,14 +173,14 @@ func Registry() *wiregen.Registry {
 	// protocol types to the DOM's WebAuthn Level 3 JSON option types makes
 	// that nesting compile-time-visible in the client (it was previously
 	// `unknown` + casts one level short — a masked login/registration break).
-	r.TypeMappings = map[string]string{
+	r.TypeMappings = map[string]string{ //nolint:gosec // G101: WebAuthn protocol TYPE names mapped to TS types; no credential material
 		"github.com/go-webauthn/webauthn/protocol.CredentialAssertion": "{ publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }",
 		"github.com/go-webauthn/webauthn/protocol.CredentialCreation":  "{ publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }",
 	}
 	// Paired decode-time hardening: assert the nested envelope shape (object
 	// with a string challenge) so future go-webauthn wire drift fails loudly
 	// at decode with a JSON path instead of silently breaking the ceremony.
-	r.DecoderMappings = map[string]string{
+	r.DecoderMappings = map[string]string{ //nolint:gosec // G101: decoder snippets keyed by WebAuthn TYPE names; no credential material
 		"github.com/go-webauthn/webauthn/protocol.CredentialAssertion": `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }; })`,
 		"github.com/go-webauthn/webauthn/protocol.CredentialCreation":  `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }; })`,
 	}
@@ -208,299 +214,299 @@ func Endpoints() []wiregen.Endpoint {
 	return []wiregen.Endpoint{
 		// --- public ---
 		{
-			Name: "health", Method: "GET", Path: "/api/health", AuthGroup: GroupPublic,
+			Name: "health", Method: http.MethodGet, Path: "/api/health", AuthGroup: GroupPublic,
 			Response: statusResp, Doc: "Liveness probe; accepts any method server-side.",
 		},
 		{
-			Name: "metrics", Method: "GET", Path: "/metrics", AuthGroup: GroupPublic,
+			Name: "metrics", Method: http.MethodGet, Path: "/metrics", AuthGroup: GroupPublic,
 			Kind: wiregen.KindRaw, Doc: "Prometheus exposition (text).",
 		},
 		{
-			Name: "authSetupStatus", Method: "GET", Path: "/api/auth/setup", AuthGroup: GroupPublic,
+			Name: "authSetupStatus", Method: http.MethodGet, Path: "/api/auth/setup", AuthGroup: GroupPublic,
 			Response: wiregen.TypeRef[api.SetupStatus](),
 		},
 		{
-			Name: "authSetupCreate", Method: "POST", Path: "/api/auth/setup", AuthGroup: GroupPublic,
+			Name: "authSetupCreate", Method: http.MethodPost, Path: "/api/auth/setup", AuthGroup: GroupPublic,
 			HasBody: true, Doc: "Create the initial admin account.",
 		},
 		{
-			Name: "login", Method: "POST", Path: "/api/auth/login", AuthGroup: GroupPublic,
+			Name: "login", Method: http.MethodPost, Path: "/api/auth/login", AuthGroup: GroupPublic,
 			HasBody: true, Response: wiregen.TypeRef[api.LoginSuccess](),
 		},
-		{Name: "logout", Method: "POST", Path: "/api/auth/logout", AuthGroup: GroupPublic},
+		{Name: "logout", Method: http.MethodPost, Path: "/api/auth/logout", AuthGroup: GroupPublic},
 		{
-			Name: "oidcRedirect", Method: "GET", Path: "/api/auth/oidc", AuthGroup: GroupPublic,
+			Name: "oidcRedirect", Method: http.MethodGet, Path: "/api/auth/oidc", AuthGroup: GroupPublic,
 			Kind: wiregen.KindRaw, Doc: "302 redirect into the OIDC provider.",
 		},
 		{
-			Name: "oidcCallback", Method: "GET", Path: "/api/auth/oidc/callback", AuthGroup: GroupPublic,
+			Name: "oidcCallback", Method: http.MethodGet, Path: "/api/auth/oidc/callback", AuthGroup: GroupPublic,
 			Kind: wiregen.KindRaw,
 		},
 		{
-			Name: "oidcLink", Method: "POST", Path: "/api/auth/oidc/link", AuthGroup: GroupPublic,
+			Name: "oidcLink", Method: http.MethodPost, Path: "/api/auth/oidc/link", AuthGroup: GroupPublic,
 			HasBody: true,
 		},
 		{
-			Name: "webauthnLoginBegin", Method: "POST", Path: "/api/auth/webauthn/login/begin",
+			Name: "webauthnLoginBegin", Method: http.MethodPost, Path: "/api/auth/webauthn/login/begin",
 			AuthGroup: GroupPublic, Query: true,
 			Response: wiregen.TypeRef[authhandlers.WebAuthnLoginBeginResponse](),
 		},
 		{
-			Name: "webauthnLoginFinish", Method: "POST", Path: "/api/auth/webauthn/login/finish",
+			Name: "webauthnLoginFinish", Method: http.MethodPost, Path: "/api/auth/webauthn/login/finish",
 			AuthGroup: GroupPublic, Kind: wiregen.KindRaw,
 			Doc: "WebAuthn assertion finish; hand-authored flow (documented non-JSON).",
 		},
 
 		// --- user ---
 		{
-			Name: "events", Method: "GET", Path: "/api/events", AuthGroup: GroupUser,
+			Name: "events", Method: http.MethodGet, Path: "/api/events", AuthGroup: GroupUser,
 			Kind: wiregen.KindSSE, Doc: "Server-sent events stream (EventSource).",
 		},
 		{
-			Name: "me", Method: "GET", Path: "/api/auth/me", AuthGroup: GroupUser,
+			Name: "me", Method: http.MethodGet, Path: "/api/auth/me", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[api.MeResponse](),
 		},
 		{
-			Name: "changePassword", Method: "PUT", Path: "/api/auth/password", AuthGroup: GroupUser,
+			Name: "changePassword", Method: http.MethodPut, Path: "/api/auth/password", AuthGroup: GroupUser,
 			HasBody: true,
 		},
 		{
-			Name: "listPasskeys", Method: "GET", Path: "/api/auth/passkeys", AuthGroup: GroupUser,
+			Name: "listPasskeys", Method: http.MethodGet, Path: "/api/auth/passkeys", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[authhandlers.PasskeyInfo](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "webauthnSignalData", Method: "GET", Path: "/api/auth/webauthn/signal-data",
+			Name: "webauthnSignalData", Method: http.MethodGet, Path: "/api/auth/webauthn/signal-data",
 			AuthGroup: GroupUser, Response: wiregen.TypeRef[api.SignalData](),
 		},
 		{
-			Name: "webauthnRegisterBegin", Method: "POST", Path: "/api/auth/webauthn/register/begin",
+			Name: "webauthnRegisterBegin", Method: http.MethodPost, Path: "/api/auth/webauthn/register/begin",
 			AuthGroup: GroupUser, HasBody: true,
 			Response: wiregen.TypeRef[authhandlers.WebAuthnRegisterBeginResponse](),
 		},
 		{
-			Name: "webauthnRegisterFinish", Method: "POST", Path: "/api/auth/webauthn/register/finish",
+			Name: "webauthnRegisterFinish", Method: http.MethodPost, Path: "/api/auth/webauthn/register/finish",
 			AuthGroup: GroupUser, Kind: wiregen.KindRaw,
 			Doc: "WebAuthn attestation finish; needs the X-WebAuthn-Session header, which the generated client has no seam for.",
 		},
 		{
-			Name: "renamePasskey", Method: "PUT", Path: "/api/auth/passkeys/{id}", AuthGroup: GroupUser,
+			Name: "renamePasskey", Method: http.MethodPut, Path: "/api/auth/passkeys/{id}", AuthGroup: GroupUser,
 			HasBody: true,
 		},
 		{
-			Name: "configSchema", Method: "GET", Path: "/api/config/schema", AuthGroup: GroupUser,
+			Name: "configSchema", Method: http.MethodGet, Path: "/api/config/schema", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[api.SchemaSection](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "validateConfigPath", Method: "POST", Path: "/api/config/validate-path",
+			Name: "validateConfigPath", Method: http.MethodPost, Path: "/api/config/validate-path",
 			AuthGroup: GroupAdmin, HasBody: true,
 			Doc:      "Config-time directory probe; the one deliberate path-accepting endpoint.",
 			Response: wiregen.TypeRef[confighandlers.PathValidationResponse](),
 		},
 		{
-			Name: "listAlerts", Method: "GET", Path: "/api/alerts", AuthGroup: GroupUser,
+			Name: "listAlerts", Method: http.MethodGet, Path: "/api/alerts", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[activity.Alert](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "dismissAlert", Method: "DELETE", Path: "/api/alerts", AuthGroup: GroupUser,
+			Name: "dismissAlert", Method: http.MethodDelete, Path: "/api/alerts", AuthGroup: GroupUser,
 			Query: true,
 		},
 		{
-			Name: "listActivity", Method: "GET", Path: "/api/activity", AuthGroup: GroupUser,
+			Name: "listActivity", Method: http.MethodGet, Path: "/api/activity", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[activity.Entry](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "dismissActivity", Method: "DELETE", Path: "/api/activity", AuthGroup: GroupUser,
+			Name: "dismissActivity", Method: http.MethodDelete, Path: "/api/activity", AuthGroup: GroupUser,
 			Query: true,
 			Doc:   "Dismiss a completed entry or cancel a QUEUED one; never stops running work (see cancelActivity).",
 		},
 		{
-			Name: "cancelActivity", Method: "POST", Path: "/api/activity/{id}/cancel",
+			Name: "cancelActivity", Method: http.MethodPost, Path: "/api/activity/{id}/cancel",
 			AuthGroup: GroupUserConfigured,
 			Doc:       "Gracefully stop a running background scan after the current item. Object-level role: per-item scans any user, full scans admin. 204 stopped/already stopping, 404 unknown, 409 not cancellable.",
 		},
 		{
-			Name: "deletePasskey", Method: "DELETE", Path: "/api/auth/passkeys/{id}",
+			Name: "deletePasskey", Method: http.MethodDelete, Path: "/api/auth/passkeys/{id}",
 			AuthGroup: GroupUser,
 		},
-		{Name: "oidcUnlink", Method: "DELETE", Path: "/api/auth/oidc/link", AuthGroup: GroupUser},
+		{Name: "oidcUnlink", Method: http.MethodDelete, Path: "/api/auth/oidc/link", AuthGroup: GroupUser},
 
 		// --- admin ---
 		{
-			Name: "listUsers", Method: "GET", Path: "/api/auth/users", AuthGroup: GroupAdmin,
+			Name: "listUsers", Method: http.MethodGet, Path: "/api/auth/users", AuthGroup: GroupAdmin,
 			Response: wiregen.TypeRef[authhandlers.UserInfo](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "createUser", Method: "POST", Path: "/api/auth/users", AuthGroup: GroupAdmin,
+			Name: "createUser", Method: http.MethodPost, Path: "/api/auth/users", AuthGroup: GroupAdmin,
 			HasBody: true, Response: wiregen.TypeRef[api.AdminUserCreatedResponse](),
 		},
-		{Name: "deleteUser", Method: "DELETE", Path: "/api/auth/users/{id}", AuthGroup: GroupAdmin},
+		{Name: "deleteUser", Method: http.MethodDelete, Path: "/api/auth/users/{id}", AuthGroup: GroupAdmin},
 		{
-			Name: "listAPIKeys", Method: "GET", Path: "/api/auth/apikeys", AuthGroup: GroupAdmin,
+			Name: "listAPIKeys", Method: http.MethodGet, Path: "/api/auth/apikeys", AuthGroup: GroupAdmin,
 			Response: wiregen.TypeRef[authhandlers.APIKeyInfo](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "generateAPIKey", Method: "POST", Path: "/api/auth/apikeys", AuthGroup: GroupAdmin,
+			Name: "generateAPIKey", Method: http.MethodPost, Path: "/api/auth/apikeys", AuthGroup: GroupAdmin,
 			HasBody: true, Response: wiregen.TypeRef[api.KeyGenerated](),
 		},
-		{Name: "revokeAPIKey", Method: "DELETE", Path: "/api/auth/apikeys/{id}", AuthGroup: GroupAdmin},
+		{Name: "revokeAPIKey", Method: http.MethodDelete, Path: "/api/auth/apikeys/{id}", AuthGroup: GroupAdmin},
 		{
-			Name: "configYAML", Method: "GET", Path: "/api/config", AuthGroup: GroupAdmin,
+			Name: "configYAML", Method: http.MethodGet, Path: pathConfig, AuthGroup: GroupAdmin,
 			Kind: wiregen.KindRaw, Doc: "Raw config YAML (text/plain), secrets redacted.",
 		},
 		{
-			Name: "saveConfigYAML", Method: "PUT", Path: "/api/config", AuthGroup: GroupAdmin,
+			Name: "saveConfigYAML", Method: http.MethodPut, Path: pathConfig, AuthGroup: GroupAdmin,
 			Kind: wiregen.KindRaw, Doc: "Raw config YAML save (text/plain body).",
 		},
 		{
-			Name: "saveConfigYAMLPost", Method: "POST", Path: "/api/config", AuthGroup: GroupAdmin,
+			Name: "saveConfigYAMLPost", Method: http.MethodPost, Path: pathConfig, AuthGroup: GroupAdmin,
 			Kind: wiregen.KindRaw,
 		},
 		{
-			Name: "configStructured", Method: "GET", Path: "/api/config/structured",
+			Name: "configStructured", Method: http.MethodGet, Path: "/api/config/structured",
 			AuthGroup: GroupAdmin, Response: wiregen.TypeRef[confighandlers.StructuredConfig](),
 		},
 		{
-			Name: "saveConfigStructured", Method: "PUT", Path: "/api/config/structured",
+			Name: "saveConfigStructured", Method: http.MethodPut, Path: "/api/config/structured",
 			AuthGroup: GroupAdmin, Request: wiregen.TypeRef[confighandlers.StructuredConfig](),
 			Response: statusResp,
 		},
-		{Name: "resetConfig", Method: "POST", Path: "/api/config/reset", AuthGroup: GroupAdmin},
+		{Name: "resetConfig", Method: http.MethodPost, Path: "/api/config/reset", AuthGroup: GroupAdmin},
 		{
-			Name: "configParsed", Method: "GET", Path: "/api/config/parsed", AuthGroup: GroupAdmin,
+			Name: "configParsed", Method: http.MethodGet, Path: "/api/config/parsed", AuthGroup: GroupAdmin,
 			Response: wiregen.TypeRef[queryhandlers.ParsedConfig](),
 		},
 
 		// --- userConfigured ---
 		{
-			Name: "manualSearch", Method: "GET", Path: "/api/search", AuthGroup: GroupUserConfigured,
+			Name: "manualSearch", Method: http.MethodGet, Path: "/api/search", AuthGroup: GroupUserConfigured,
 			Query: true, Response: wiregen.TypeRef[manualops.ManualSearchResponse](),
 		},
 		{
-			Name: "searchResolve", Method: "GET", Path: "/api/search/resolve",
+			Name: "searchResolve", Method: http.MethodGet, Path: "/api/search/resolve",
 			AuthGroup: GroupUserConfigured, Query: true,
 			Response: wiregen.TypeRef[manualops.ResolveResponse](),
 			Doc:      "Resolve a user query (title/imdb/tmdb, optional type/season/episode) onto arr media items for the remote CLI search.",
 		},
 		{
-			Name: "searchTargets", Method: "GET", Path: "/api/search/targets",
+			Name: "searchTargets", Method: http.MethodGet, Path: "/api/search/targets",
 			AuthGroup: GroupUserConfigured, Query: true,
 			Response: wiregen.TypeRef[api.SearchTargets](),
 		},
 		{
-			Name: "listState", Method: "GET", Path: "/api/state", AuthGroup: GroupUserConfigured,
+			Name: "listState", Method: http.MethodGet, Path: "/api/state", AuthGroup: GroupUserConfigured,
 			Query: true, Response: wiregen.TypeRef[api.StateEntry](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "stateStats", Method: "GET", Path: "/api/state/stats", AuthGroup: GroupUserConfigured,
+			Name: "stateStats", Method: http.MethodGet, Path: "/api/state/stats", AuthGroup: GroupUserConfigured,
 			Response: wiregen.TypeRef[api.Stats](),
 		},
 		{
-			Name: "stateIDs", Method: "GET", Path: "/api/state/ids", AuthGroup: GroupUserConfigured,
+			Name: "stateIDs", Method: http.MethodGet, Path: "/api/state/ids", AuthGroup: GroupUserConfigured,
 			Query: true, RespShape: wiregen.RespStringArray,
 		},
 		{
-			Name: "listBackoff", Method: "GET", Path: "/api/backoff", AuthGroup: GroupUserConfigured,
+			Name: "listBackoff", Method: http.MethodGet, Path: "/api/backoff", AuthGroup: GroupUserConfigured,
 			Response: wiregen.TypeRef[api.BackoffEntry](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "backoffPrefix", Method: "GET", Path: "/api/backoff/prefix",
+			Name: "backoffPrefix", Method: http.MethodGet, Path: "/api/backoff/prefix",
 			AuthGroup: GroupUserConfigured, Query: true,
 		},
 		{
-			Name: "listLocks", Method: "GET", Path: "/api/locks", AuthGroup: GroupUserConfigured,
+			Name: "listLocks", Method: http.MethodGet, Path: "/api/locks", AuthGroup: GroupUserConfigured,
 			Response: wiregen.TypeRef[api.ManualLockEntry](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "listProviders", Method: "GET", Path: "/api/providers", AuthGroup: GroupUserConfigured,
+			Name: "listProviders", Method: http.MethodGet, Path: "/api/providers", AuthGroup: GroupUserConfigured,
 			Response: wiregen.TypeRef[queryhandlers.ProviderInfo](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "providerTimeouts", Method: "GET", Path: "/api/providers/timeout",
+			Name: "providerTimeouts", Method: http.MethodGet, Path: "/api/providers/timeout",
 			AuthGroup: GroupUserConfigured, Response: wiregen.TypeRef[api.ProvidersResponse](),
 		},
 		{
-			Name: "mediaSeries", Method: "GET", Path: "/api/media/series",
+			Name: "mediaSeries", Method: http.MethodGet, Path: "/api/media/series",
 			AuthGroup: GroupUserConfigured,
 			Doc:       "Sonarr series list proxy; response typing intentionally deferred (no UI consumer).",
 		},
 		{
-			Name: "mediaMovies", Method: "GET", Path: "/api/media/movies",
+			Name: "mediaMovies", Method: http.MethodGet, Path: "/api/media/movies",
 			AuthGroup: GroupUserConfigured,
 		},
 		{
-			Name: "mediaEpisodes", Method: "GET", Path: "/api/media/series/{id}/episodes",
+			Name: "mediaEpisodes", Method: http.MethodGet, Path: "/api/media/series/{id}/episodes",
 			AuthGroup: GroupUserConfigured,
 			Response:  wiregen.TypeRef[mediahandlers.SeasonGroup](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "coverageSeries", Method: "GET", Path: "/api/coverage/series",
+			Name: "coverageSeries", Method: http.MethodGet, Path: "/api/coverage/series",
 			AuthGroup: GroupUserConfigured, Response: seriesItem, RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "coverageMovies", Method: "GET", Path: "/api/coverage/movies",
+			Name: "coverageMovies", Method: http.MethodGet, Path: "/api/coverage/movies",
 			AuthGroup: GroupUserConfigured, Response: movieItem, RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "coverageSeriesDetail", Method: "GET", Path: "/api/coverage/series/{tvdbId}",
+			Name: "coverageSeriesDetail", Method: http.MethodGet, Path: "/api/coverage/series/{tvdbId}",
 			AuthGroup: GroupUserConfigured, Response: subtitleEntry, RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "coverageScanState", Method: "GET", Path: "/api/coverage/scan-state",
+			Name: "coverageScanState", Method: http.MethodGet, Path: "/api/coverage/scan-state",
 			AuthGroup: GroupUserConfigured,
 		},
 		{
-			Name: "downloadSubtitle", Method: "POST", Path: "/api/search/download",
+			Name: "downloadSubtitle", Method: http.MethodPost, Path: "/api/search/download",
 			AuthGroup: GroupUserConfigured,
 			Request:   wiregen.TypeRef[manualops.DownloadRequest](),
 			Response:  wiregen.TypeRef[manualops.DownloadAccepted](),
 			Doc:       "Video addressed by MediaRef (media_id = arr ID + season/episode); no file path on the wire.",
 		},
 		{
-			Name: "clearLock", Method: "POST", Path: "/api/search/clear-lock",
+			Name: "clearLock", Method: http.MethodPost, Path: "/api/search/clear-lock",
 			AuthGroup: GroupUserConfigured, HasBody: true,
 		},
 		{
-			Name: "scoreRelease", Method: "POST", Path: "/api/score", AuthGroup: GroupUserConfigured,
+			Name: "scoreRelease", Method: http.MethodPost, Path: "/api/score", AuthGroup: GroupUserConfigured,
 			HasBody: true, Response: wiregen.TypeRef[api.ScorePreview](),
 		},
 		{
-			Name: "listFiles", Method: "GET", Path: "/api/files", AuthGroup: GroupUserConfigured,
+			Name: "listFiles", Method: http.MethodGet, Path: "/api/files", AuthGroup: GroupUserConfigured,
 			Query: true, Response: wiregen.TypeRef[filehandlers.FileEntry](), RespShape: wiregen.RespArray,
 		},
 		{
-			Name: "deleteFile", Method: "DELETE", Path: "/api/files", AuthGroup: GroupAdminConfigured,
+			Name: "deleteFile", Method: http.MethodDelete, Path: "/api/files", AuthGroup: GroupAdminConfigured,
 			Request: wiregen.TypeRef[filehandlers.DeleteFileRequest](),
 			Doc:     "File addressed by FileRef fields or a server-minted orphan_handle; no path on the wire.",
 		},
 		{
-			Name: "bulkDeleteFiles", Method: "DELETE", Path: "/api/files/bulk",
+			Name: "bulkDeleteFiles", Method: http.MethodDelete, Path: "/api/files/bulk",
 			AuthGroup: GroupAdminConfigured,
 			Request:   wiregen.TypeRef[filehandlers.BulkDeleteRequest](),
 		},
 		{
-			Name: "syncAudio", Method: "POST", Path: "/api/sync/audio", AuthGroup: GroupUserConfigured,
+			Name: "syncAudio", Method: http.MethodPost, Path: "/api/sync/audio", AuthGroup: GroupUserConfigured,
 			Request:  wiregen.TypeRef[synchandlers.SyncAudioRequest](),
 			Response: wiregen.TypeRef[synchandlers.SyncAudioResponse](),
 		},
 		{
-			Name: "syncOffset", Method: "POST", Path: "/api/sync/offset", AuthGroup: GroupUserConfigured,
+			Name: "syncOffset", Method: http.MethodPost, Path: "/api/sync/offset", AuthGroup: GroupUserConfigured,
 			Request: wiregen.TypeRef[synchandlers.SyncOffsetRequest](),
 		},
 		{
-			Name: "previewStart", Method: "GET", Path: "/api/preview/start",
+			Name: "previewStart", Method: http.MethodGet, Path: "/api/preview/start",
 			AuthGroup: GroupUserConfigured, Query: true,
 			Response: wiregen.TypeRef[previewhandlers.PreviewStartResponse](),
 		},
 		{
-			Name: "previewSubtitle", Method: "GET", Path: "/api/preview/subtitle",
+			Name: "previewSubtitle", Method: http.MethodGet, Path: "/api/preview/subtitle",
 			AuthGroup: GroupUserConfigured, Kind: wiregen.KindRaw, Doc: "WebVTT text track.",
 		},
 		{
-			Name: "previewVideo", Method: "GET", Path: "/api/preview/video",
+			Name: "previewVideo", Method: http.MethodGet, Path: "/api/preview/video",
 			AuthGroup: GroupUserConfigured, Kind: wiregen.KindRaw, Doc: "Video byte stream.",
 		},
 		{
-			Name: "previewPoster", Method: "GET", Path: "/api/preview/poster",
+			Name: "previewPoster", Method: http.MethodGet, Path: "/api/preview/poster",
 			AuthGroup: GroupUserConfigured, Kind: wiregen.KindRaw, Doc: "Poster image proxy.",
 		},
 
@@ -510,27 +516,27 @@ func Endpoints() []wiregen.Endpoint {
 		// GET /api/activity is the status monitor and completion counts ride
 		// the activity/SSE machinery.
 		{
-			Name: "startScan", Method: "POST", Path: "/api/scan", AuthGroup: GroupAdminConfigured,
+			Name: "startScan", Method: http.MethodPost, Path: "/api/scan", AuthGroup: GroupAdminConfigured,
 			Response: scanAccepted, Doc: "Trigger a full library scan (202 + activity_id; 409 while one runs).",
 		},
 		{
-			Name: "scanSeries", Method: "POST", Path: "/api/scan/series/{id}",
+			Name: "scanSeries", Method: http.MethodPost, Path: "/api/scan/series/{id}",
 			AuthGroup: GroupUserConfigured, Response: scanAccepted,
 		},
 		{
-			Name: "scanSeason", Method: "POST", Path: "/api/scan/season/{id}/{season}",
+			Name: "scanSeason", Method: http.MethodPost, Path: "/api/scan/season/{id}/{season}",
 			AuthGroup: GroupUserConfigured, Response: scanAccepted,
 		},
 		{
-			Name: "scanMovie", Method: "POST", Path: "/api/scan/movie/{id}",
+			Name: "scanMovie", Method: http.MethodPost, Path: "/api/scan/movie/{id}",
 			AuthGroup: GroupUserConfigured, Response: scanAccepted,
 		},
 		{
-			Name: "scanItem", Method: "POST", Path: "/api/scan/item", AuthGroup: GroupUserConfigured,
+			Name: "scanItem", Method: http.MethodPost, Path: "/api/scan/item", AuthGroup: GroupUserConfigured,
 			HasBody: true, Response: scanAccepted,
 		},
 		{
-			Name: "resetProviderTimeouts", Method: "POST", Path: "/api/providers/timeout/reset",
+			Name: "resetProviderTimeouts", Method: http.MethodPost, Path: "/api/providers/timeout/reset",
 			AuthGroup: GroupAdminConfigured,
 		},
 	}
@@ -541,7 +547,7 @@ func Endpoints() []wiregen.Endpoint {
 // registrations (Go 1.22 ServeMux trailing-slash patterns whose handlers
 // parse the suffix themselves) and the deliberately method-less routes.
 func RoutePatterns() map[string]string {
-	return map[string]string{
+	return map[string]string{ //nolint:gosec // G101: route path strings for passkey/API-key endpoints; no credential material
 		"health":               "/api/health", // method-less: probes may use any method
 		"metrics":              "/metrics",
 		"renamePasskey":        "PUT /api/auth/passkeys/",

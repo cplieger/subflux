@@ -82,11 +82,11 @@ func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.M
 // (source-family comparison, season-pack detection) leave Extract nil and
 // are handled explicitly in BuildMatches.
 type Category struct {
-	Key      string                   // breakdown/log key, e.g. "release_group"
-	Weight   func(*api.Scores) int    // weight accessor
-	Match    func(api.MatchSet) bool  // match-bit getter
-	SetMatch func(*api.MatchSet)      // match-bit setter
-	Extract  func(ReleaseInfo) string // release attribute; nil = bespoke matching
+	Weight   func(*api.Scores) int
+	Match    func(api.MatchSet) bool
+	SetMatch func(*api.MatchSet)
+	Extract  func(ReleaseInfo) string
+	Key      string
 }
 
 // Categories is the canonical table of scored release-attribute categories,

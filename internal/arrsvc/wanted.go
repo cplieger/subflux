@@ -51,7 +51,7 @@ func (s *Sonarr) GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]st
 // failed. It cannot fail: a series whose fetch errors is logged, counted, and
 // skipped (see fetchWantedForSeries), so the scan always proceeds with
 // whatever was collected.
-func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.Series, excludeTagIDs map[int]struct{}) ([]seriesEpisodes, int) {
+func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.Series, excludeTagIDs map[int]struct{}) (wanted []seriesEpisodes, failed int) {
 	var (
 		mu           sync.Mutex
 		results      []seriesEpisodes

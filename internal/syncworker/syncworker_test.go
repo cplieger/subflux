@@ -141,11 +141,9 @@ func TestClient_concurrency_one(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			c.Audio(context.Background(), []byte(tinySRT), "/v.mkv", "")
-		}()
+		})
 	}
 	wg.Wait()
 	if got := maxSeen.Load(); got != 1 {

@@ -5,14 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/subsync"
-
-	"log/slog"
 )
 
 // maxWorkerRuntime caps a single worker job when the caller's context has no
@@ -36,16 +35,11 @@ const workerWaitDelay = 5 * time.Second
 // and reported as a no-change result — the subtitle stays unsynced, the
 // download proceeds, the server keeps serving.
 type Client struct {
-	sem  chan struct{}
-	exe  string
-	args []string
-	// env overrides the child environment; nil inherits the parent's (the
-	// production default — ffmpeg discovery relies on PATH). Tests use it
-	// for the helper-process re-exec pattern.
-	env []string
-	// spawn runs one job in a child process; a test seam that defaults to
-	// the real exec implementation.
+	sem   chan struct{}
 	spawn func(ctx context.Context, req *Request) (*Response, error)
+	exe   string
+	args  []string
+	env   []string
 }
 
 // Compile-time assertion: the client is a drop-in SyncExec.
@@ -130,7 +124,7 @@ func (c *Client) spawnProcess(ctx context.Context, req *Request) (*Response, err
 		return nil, fmt.Errorf("encode request: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, c.exe, c.args...)
+	cmd := exec.CommandContext(ctx, c.exe, c.args...) //nolint:gosec // G204: c.exe is os.Executable() (this binary) and c.args is the fixed hidden subcommand, both server-owned; no user input reaches the argv
 	cmd.Stdin = bytes.NewReader(payload)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout

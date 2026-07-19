@@ -512,12 +512,18 @@ func TestValidateScoring(t *testing.T) {
 		// Default non-hash sums are 98 for both media types; a tie keeps
 		// the hash match from being outranked, so it is allowed.
 		{name: "hash equal to attribute sums passes", weights: withHash(98), wantErr: false},
-		{name: "hash below attribute sums fails", weights: withHash(97),
-			wantErr: true, errContains: "scoring.hash"},
-		{name: "zero hash with default attributes fails", weights: withHash(0),
-			wantErr: true, errContains: "scoring.hash"},
-		{name: "negative weight fails", weights: &negativeSource,
-			wantErr: true, errContains: "scoring.source must be non-negative"},
+		{
+			name: "hash below attribute sums fails", weights: withHash(97),
+			wantErr: true, errContains: "scoring.hash",
+		},
+		{
+			name: "zero hash with default attributes fails", weights: withHash(0),
+			wantErr: true, errContains: "scoring.hash",
+		},
+		{
+			name: "negative weight fails", weights: &negativeSource,
+			wantErr: true, errContains: "scoring.source must be non-negative",
+		},
 	}
 
 	for _, tt := range tests {
