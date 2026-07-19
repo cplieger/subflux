@@ -57,5 +57,3 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 )
-
-replace github.com/cplieger/wiregen/v2 => ../wiregen

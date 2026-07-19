@@ -115,7 +115,7 @@ export function applyScanButtonState(btn: HTMLButtonElement): void {
 }
 
 /** Sync every annotated scan button in the document with the shared store. */
-export function syncScanButtons(): void {
+function syncScanButtons(): void {
   const running = runningMap();
   document.querySelectorAll<HTMLButtonElement>("button[data-scan-scope]").forEach((btn) => {
     patchScanButton(btn, running);

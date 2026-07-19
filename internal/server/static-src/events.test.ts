@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SSE_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
+// Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
+import type * as BusModule from "./bus.js";
 
 vi.mock("./store.js", () => ({
   get: vi.fn(),
@@ -14,7 +16,7 @@ vi.mock("./coverage.js", () => ({
 vi.mock("./status.js", () => ({ pollStatus: vi.fn(), abortPoll: vi.fn() }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 vi.mock("./bus.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./bus.js")>()),
+  ...(await importOriginal<typeof BusModule>()),
   emit: vi.fn(),
 }));
 
