@@ -7,12 +7,12 @@ require (
 	github.com/cplieger/atomicfile/v2 v2.1.3
 	github.com/cplieger/auth/v2 v2.0.7
 	github.com/cplieger/health v1.3.0
-	github.com/cplieger/httpx/v2 v2.6.0
-	github.com/cplieger/metrics/v2 v2.3.0
+	github.com/cplieger/httpx/v3 v3.1.1
+	github.com/cplieger/metrics/v3 v3.0.0
 	github.com/cplieger/slogx v1.3.0
-	github.com/cplieger/ssrf/v2 v2.0.7
+	github.com/cplieger/ssrf/v3 v3.0.0
 	github.com/cplieger/webhttp v1.8.0
-	github.com/cplieger/wiregen v1.3.4
+	github.com/cplieger/wiregen/v2 v2.0.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
 	github.com/ulikunitz/xz v0.5.15
@@ -23,6 +23,8 @@ require (
 )
 
 require github.com/cplieger/envx/yamlenv v1.0.0
+
+require github.com/cplieger/httpx/v2 v2.6.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect

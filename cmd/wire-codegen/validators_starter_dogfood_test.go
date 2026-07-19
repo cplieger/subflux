@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/wiregen"
+	"github.com/cplieger/wiregen/v2"
 )
 
 // ownedValidatorsPath is subflux's hand-authored validators module, relative to

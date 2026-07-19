@@ -18,7 +18,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/wiregen"
+	"github.com/cplieger/wiregen/v2"
 )
 
 func main() {

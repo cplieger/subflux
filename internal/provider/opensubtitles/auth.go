@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/httputil"
 )
 

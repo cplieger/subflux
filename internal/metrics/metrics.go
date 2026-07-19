@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	extmetrics "github.com/cplieger/metrics/v2"
+	extmetrics "github.com/cplieger/metrics/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 
