@@ -6,16 +6,16 @@ require (
 	// arrapi v1.7.0 is UNPUBLISHED (latest tag: v1.6.0): it ships the
 	// capture-side StatusError body sanitization via runesafe. See go.work
 	// for the local dev resolution until the tag lands.
-	github.com/cplieger/arrapi v1.7.0
-	github.com/cplieger/atomicfile/v2 v2.1.3
+	github.com/cplieger/arrapi v1.7.3
+	github.com/cplieger/atomicfile/v2 v2.2.0
 	github.com/cplieger/auth/v2 v2.1.0
-	github.com/cplieger/health v1.3.0
+	github.com/cplieger/health v1.4.0
 	// runesafe v1.1.0 is published (Untrusted provenance type +
 	// IsUnsafeNonASCII); resolved from the proxy, no go.work rider.
 	github.com/cplieger/runesafe v1.1.0
 	github.com/cplieger/slogx v1.3.0
 	github.com/cplieger/ssrf/v3 v3.0.0
-	github.com/cplieger/webhttp v1.9.0
+	github.com/cplieger/webhttp v1.10.0
 	github.com/cplieger/wiregen/v2 v2.0.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.2.5
@@ -30,7 +30,7 @@ require github.com/cplieger/envx/yamlenv v1.1.0
 
 require github.com/cplieger/metrics/v3 v3.0.0
 
-require github.com/cplieger/httpx/v3 v3.0.0
+require github.com/cplieger/httpx/v3 v3.1.1
 
 require github.com/cplieger/jsonx v1.1.0
 
