@@ -8,7 +8,7 @@ require (
 	// for the local dev resolution until the tag lands.
 	github.com/cplieger/arrapi v1.7.3
 	github.com/cplieger/atomicfile/v2 v2.2.0
-	github.com/cplieger/auth/v2 v2.1.0
+	github.com/cplieger/auth/v2 v2.1.1
 	github.com/cplieger/health v1.4.0
 	// runesafe v1.1.0 is published (Untrusted provenance type +
 	// IsUnsafeNonASCII); resolved from the proxy, no go.work rider.
