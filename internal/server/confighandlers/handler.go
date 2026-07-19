@@ -5,7 +5,6 @@ package confighandlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
@@ -24,8 +24,8 @@ type AlertLog interface {
 	RecordPersistent(source, msg string)
 }
 
-// pathValidationResponse is the JSON response for path validation requests.
-type pathValidationResponse struct {
+// PathValidationResponse is the JSON response for path validation requests.
+type PathValidationResponse struct {
 	Error string `json:"error,omitempty"`
 	Valid bool   `json:"valid"`
 }
@@ -63,6 +63,21 @@ type Handler struct {
 	configured    func() bool
 	configPath    func() string
 	defaultConfig []byte
+
+	// saveMu serializes the COMPLETE config-save transaction across every
+	// entry point that reads or writes the config file (raw PUT, structured
+	// PUT, unconfigured reset): existing-file read + secret merge,
+	// canonicalization, old-state comparison + arr pings, activation
+	// (hotReload), and persistence. Activation alone is serialized by the
+	// server's reload mutex, but without this outer lock two concurrent
+	// saves could interleave publish-A, publish-B, write-B, write-A —
+	// leaving live state on B and the on-disk file on A with both requests
+	// returning 200 — and a structured secret merge could read a stale
+	// baseline generation. Holding a lock across the arr pings and
+	// activation deliberately trades the no-lock-across-IO guideline for
+	// transactional correctness: config saves are admin-rare, and save
+	// order must equal activation order must equal persist order.
+	saveMu sync.Mutex
 }
 
 // New creates a Handler with the given dependencies.
@@ -113,61 +128,36 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configPath := h.configPath()
+	// One save transaction at a time, from the existing-file read through
+	// persistence (see saveMu).
+	h.saveMu.Lock()
+	defer h.saveMu.Unlock()
 
-	// Merge secrets from the existing config file.
-	data = MergeSecrets(data, configPath)
-
-	newCfg, err := h.loadConfig(data)
+	// Merge secrets from the existing config file (textual, key-name
+	// driven: this is the raw-YAML compatibility path; the structured save
+	// merges by schema metadata instead — see structured.go).
+	data, err = MergeSecrets(data, h.configPath())
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeConfigInvalid, "invalid configuration: "+err.Error())
+		// Not the client's fault: the payload relies on keep-semantics
+		// secrets and the server could not read its own existing config.
+		// Fail closed — no save, no activation; details go to the log.
+		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
 		return
 	}
 
-	// Verify arr connectivity when arr config changed or first-time setup.
-	oldCfg := h.state().Cfg
-	if pingErr := h.pingArrIfChanged(r.Context(), "sonarr", newCfg.SonarrConfig(), oldCfg); pingErr != nil {
-		api.BadRequestC(w, r, api.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
-		return
-	}
-	if pingErr := h.pingArrIfChanged(r.Context(), "radarr", newCfg.RadarrConfig(), oldCfg); pingErr != nil {
-		api.BadRequestC(w, r, api.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
-		return
-	}
-
-	// Apply BEFORE persisting: a config that parses but fails wiring (bad
-	// provider key, invalid arr URL) must not land on disk, or the running
-	// state silently diverges from the file and the next restart drops into
-	// unconfigured mode unexpectedly. On a reload failure nothing changed —
-	// neither the live state nor the file.
-	if err := h.hotReload(r.Context(), newCfg); err != nil {
-		slog.Error("hot reload failed, config not saved", "error", err)
-		h.alerts.RecordPersistent("config",
-			"Config rejected (hot reload failed): "+err.Error())
-		api.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), api.CodeConfigReloadFailed)
-		return
-	}
-
-	// Atomic write: temp file + rename prevents corruption on crash. A write
-	// failure here leaves the NEW config applied in memory but the OLD file
-	// on disk (a restart reverts) — rarer and safer than the reverse, and
-	// reported loudly so the operator can free disk space and re-save.
-	if err := atomicWriteConfig(r.Context(), configPath, data); err != nil {
-		slog.Error("config applied but not persisted", "error", err)
-		h.alerts.RecordPersistent("config",
-			"Config applied but NOT saved to disk (a restart will revert it): "+err.Error())
-		api.InternalErrorC(w, r, fmt.Errorf("config applied but not persisted: %w", err),
-			api.CodeInternalError, "stage", "write config")
-		return
-	}
-
-	slog.Info("config saved and hot-reloaded")
-	api.WriteJSON(w, map[string]string{api.KeyStatus: "saved and applied"})
+	h.applyConfig(w, r, data)
 }
 
 // HandleResetConfig writes the default example config to disk.
 // Only allowed when the server is in unconfigured mode.
 func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
+	// Reset writes the config file, so it joins the save transaction: the
+	// lock is taken before the configured() check so a reset racing a save
+	// observes the post-activation state instead of overwriting a config
+	// that just activated.
+	h.saveMu.Lock()
+	defer h.saveMu.Unlock()
+
 	if h.configured() {
 		api.ConflictC(w, r, api.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
 		return
@@ -204,11 +194,11 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 
 	p := strings.TrimSpace(req.Path)
 	if p == "" {
-		api.WriteJSON(w, pathValidationResponse{Error: "path is empty"})
+		api.WriteJSON(w, PathValidationResponse{Error: "path is empty"})
 		return
 	}
 	if !filepath.IsAbs(p) {
-		api.WriteJSON(w, pathValidationResponse{Error: "path must be absolute"})
+		api.WriteJSON(w, PathValidationResponse{Error: "path must be absolute"})
 		return
 	}
 	// Clean the path and reject traversal segments before touching the
@@ -219,21 +209,21 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	// merely begins with two dots (e.g. "/media/..extras") is legitimate.
 	p = filepath.Clean(p)
 	if slices.Contains(strings.Split(p, string(filepath.Separator)), "..") {
-		api.WriteJSON(w, pathValidationResponse{Error: "path must not contain a '..' segment"})
+		api.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
 		return
 	}
 
 	info, err := os.Stat(p)
 	if err != nil {
-		api.WriteJSON(w, pathValidationResponse{Error: "path does not exist"})
+		api.WriteJSON(w, PathValidationResponse{Error: "path does not exist"})
 		return
 	}
 	if !info.IsDir() {
-		api.WriteJSON(w, pathValidationResponse{Error: "path is not a directory"})
+		api.WriteJSON(w, PathValidationResponse{Error: "path is not a directory"})
 		return
 	}
 
-	api.WriteJSON(w, pathValidationResponse{Valid: true})
+	api.WriteJSON(w, PathValidationResponse{Valid: true})
 }
 
 // HandleConfigSchema returns the full configuration schema for the UI.

@@ -36,7 +36,7 @@ func TestScoreToTier(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := engine.ScoreToTier(tt.score, "episode")
+			got := engine.ScoreToTier(tt.score)
 			if got != tt.want {
 				t.Errorf("ScoreToTier(%d) = %q, want %q", tt.score, got, tt.want)
 			}
@@ -48,7 +48,6 @@ func TestScore_hash_match_returns_100(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{HashVerifiable: true}
 	matches := api.MatchSet{
 		Hash:       true,
@@ -56,7 +55,7 @@ func TestScore_hash_match_returns_100(t *testing.T) {
 		Source:     true,
 	}
 
-	score, scoreNoHash := engine.Score(video, sub, matches)
+	score, scoreNoHash := engine.Score(sub, matches)
 
 	if score != api.DefaultScores.Hash {
 		t.Errorf("Score() with hash match = %d, want %d", score, api.DefaultScores.Hash)
@@ -70,14 +69,13 @@ func TestScore_hash_not_verifiable_passes_through(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{HashVerifiable: false}
 	matches := api.MatchSet{
 		Hash:   true,
 		Source: true,
 	}
 
-	score, scoreNoHash := engine.Score(video, sub, matches)
+	score, scoreNoHash := engine.Score(sub, matches)
 
 	// Non-verifiable hash: hash weight + source weight.
 	wantTotal := api.DefaultScores.Hash + api.DefaultScores.Source
@@ -94,14 +92,13 @@ func TestScore_release_attributes_only(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{}
 	matches := api.MatchSet{
 		Source:     true,
 		VideoCodec: true,
 	}
 
-	score, scoreNoHash := engine.Score(video, sub, matches)
+	score, scoreNoHash := engine.Score(sub, matches)
 
 	want := api.DefaultScores.Source + api.DefaultScores.VideoCodec
 	if score != want {
@@ -116,7 +113,6 @@ func TestScore_identity_fields_ignored(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "episode"}
 	sub := api.SubtitleInfo{}
 	// Identity fields (SeriesIMDB, IMDB) are not scored by sumScores.
 	matches := api.MatchSet{
@@ -124,7 +120,7 @@ func TestScore_identity_fields_ignored(t *testing.T) {
 		IMDB:       true,
 	}
 
-	score, _ := engine.Score(video, sub, matches)
+	score, _ := engine.Score(sub, matches)
 
 	if score != 0 {
 		t.Errorf("Score() with identity-only matches = %d, want 0", score)
@@ -135,11 +131,10 @@ func TestScore_empty_matches_returns_zero(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{}
 	matches := api.MatchSet{}
 
-	score, scoreNoHash := engine.Score(video, sub, matches)
+	score, scoreNoHash := engine.Score(sub, matches)
 
 	if score != 0 {
 		t.Errorf("Score(empty matches) = %d, want 0", score)
@@ -153,11 +148,10 @@ func TestScore_edition_contributes_for_movies(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{}
 	matches := api.MatchSet{Edition: true}
 
-	score, _ := engine.Score(video, sub, matches)
+	score, _ := engine.Score(sub, matches)
 
 	if score != api.DefaultScores.Edition {
 		t.Errorf("movie edition score = %d, want %d", score, api.DefaultScores.Edition)
@@ -168,11 +162,10 @@ func TestScore_edition_contributes_for_episodes(t *testing.T) {
 	t.Parallel()
 	engine := New(&api.DefaultScores)
 
-	video := &api.VideoInfo{MediaType: "episode"}
 	sub := api.SubtitleInfo{}
 	matches := api.MatchSet{Edition: true}
 
-	score, _ := engine.Score(video, sub, matches)
+	score, _ := engine.Score(sub, matches)
 
 	if score != api.DefaultScores.Edition {
 		t.Errorf("episode edition score = %d, want %d", score, api.DefaultScores.Edition)
@@ -200,10 +193,9 @@ func TestScore_all_release_attribute_keys(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			video := &api.VideoInfo{MediaType: "movie"}
 			sub := api.SubtitleInfo{}
 
-			score, _ := engine.Score(video, sub, tt.matches)
+			score, _ := engine.Score(sub, tt.matches)
 
 			if score != tt.want {
 				t.Errorf("Score(%s) = %d, want %d", tt.name, score, tt.want)
@@ -217,11 +209,10 @@ func TestNew_uses_custom_weights(t *testing.T) {
 	custom := api.Scores{Hash: 999, Source: 50}
 	engine := New(&custom)
 
-	video := &api.VideoInfo{MediaType: "movie"}
 	sub := api.SubtitleInfo{HashVerifiable: true}
 	matches := api.MatchSet{Hash: true}
 
-	score, _ := engine.Score(video, sub, matches)
+	score, _ := engine.Score(sub, matches)
 	if score != 999 {
 		t.Errorf("Score() with custom hash weight = %d, want 999", score)
 	}
@@ -273,15 +264,13 @@ func TestScore_always_non_negative(t *testing.T) {
 	engine := New(&api.DefaultScores)
 
 	rapid.Check(t, func(t *rapid.T) {
-		mediaType := api.MediaType(rapid.SampledFrom([]string{"episode", "movie"}).Draw(t, "media_type"))
-		video := &api.VideoInfo{MediaType: mediaType}
 		sub := api.SubtitleInfo{
 			HashVerifiable: rapid.Bool().Draw(t, "hash_verifiable"),
 		}
 
 		matches := randomMatchSet(t, allFields, "")
 
-		score, scoreNoHash := engine.Score(video, sub, matches)
+		score, scoreNoHash := engine.Score(sub, matches)
 
 		if score < 0 {
 			t.Errorf("Score() = %d, must be >= 0", score)
@@ -302,13 +291,11 @@ func TestScoreToTier_always_valid(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		score := rapid.IntRange(-100, 1000).Draw(t, "score")
-		mediaType := api.MediaType(rapid.SampledFrom([]string{"episode", "movie"}).Draw(t, "media_type"))
 
-		tier := engine.ScoreToTier(score, mediaType)
+		tier := engine.ScoreToTier(score)
 
 		if !validTiers[tier] {
-			t.Errorf("ScoreToTier(%d, %q) = %q, not a valid tier",
-				score, mediaType, tier)
+			t.Errorf("ScoreToTier(%d) = %q, not a valid tier", score, tier)
 		}
 	})
 }
@@ -318,15 +305,13 @@ func TestScore_scoreNoHash_leq_score(t *testing.T) {
 	engine := New(&api.DefaultScores)
 
 	rapid.Check(t, func(t *rapid.T) {
-		mediaType := api.MediaType(rapid.SampledFrom([]string{"episode", "movie"}).Draw(t, "media_type"))
-		video := &api.VideoInfo{MediaType: mediaType}
 		sub := api.SubtitleInfo{
 			HashVerifiable: rapid.Bool().Draw(t, "hash_verifiable"),
 		}
 
 		matches := randomMatchSet(t, allFields, "")
 
-		score, scoreNoHash := engine.Score(video, sub, matches)
+		score, scoreNoHash := engine.Score(sub, matches)
 
 		if scoreNoHash > score {
 			t.Errorf("scoreNoHash (%d) > score (%d)", scoreNoHash, score)
@@ -339,24 +324,22 @@ func TestScore_adding_release_match_never_decreases_score(t *testing.T) {
 	engine := New(&api.DefaultScores)
 
 	rapid.Check(t, func(t *rapid.T) {
-		mediaType := api.MediaType(rapid.SampledFrom([]string{"episode", "movie"}).Draw(t, "media_type"))
-		video := &api.VideoInfo{MediaType: mediaType}
 		sub := api.SubtitleInfo{}
 
 		baseMatches := randomMatchSet(t, releaseFields, "base_")
 
 		extraIdx := rapid.IntRange(0, len(releaseFields)-1).Draw(t, "extra_idx")
 
-		baseScore, _ := engine.Score(video, sub, baseMatches)
+		baseScore, _ := engine.Score(sub, baseMatches)
 
 		extendedMatches := baseMatches
 		releaseFields[extraIdx].set(&extendedMatches)
 
-		extendedScore, _ := engine.Score(video, sub, extendedMatches)
+		extendedScore, _ := engine.Score(sub, extendedMatches)
 
 		if extendedScore < baseScore {
-			t.Errorf("adding %q decreased score: %d -> %d (media=%s)",
-				releaseFields[extraIdx].name, baseScore, extendedScore, mediaType)
+			t.Errorf("adding %q decreased score: %d -> %d",
+				releaseFields[extraIdx].name, baseScore, extendedScore)
 		}
 	})
 }

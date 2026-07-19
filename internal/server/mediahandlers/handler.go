@@ -113,11 +113,12 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, v)
 }
 
-// MovieItem is the JSON shape returned by GET /api/media/movies.
+// MovieItem is the JSON shape returned by GET /api/media/movies. It carries
+// no file path (S7): clients address the video by MediaRef (id = arr ID) and
+// the server resolves paths.
 type MovieItem struct {
 	Title     string `json:"title"`
 	ImdbID    string `json:"imdb_id,omitempty"`
-	Path      string `json:"path,omitempty"`
 	SceneName string `json:"scene_name,omitempty"`
 	ID        int    `json:"id"`
 	Year      int    `json:"year"`
@@ -153,7 +154,6 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 				HasFile: m.HasFile,
 			}
 			if m.MovieFile != nil {
-				item.Path = m.MovieFile.Path
 				item.SceneName = m.MovieFile.SceneName
 			}
 			out = append(out, item)
@@ -168,10 +168,11 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, v)
 }
 
-// episodeItem is the JSON shape for a single episode.
-type episodeItem struct {
+// EpisodeItem is the JSON shape for a single episode. It carries no file
+// path (S7): clients address the video by MediaRef (series arr ID + season +
+// episode) and the server resolves paths.
+type EpisodeItem struct {
 	Title                 string `json:"title"`
-	Path                  string `json:"path,omitempty"`
 	SceneName             string `json:"scene_name,omitempty"`
 	ID                    int    `json:"id"`
 	SeasonNumber          int    `json:"season"`
@@ -184,7 +185,7 @@ type episodeItem struct {
 
 // SeasonGroup groups episodes by season number.
 type SeasonGroup struct {
-	Episodes []episodeItem `json:"episodes"`
+	Episodes []EpisodeItem `json:"episodes"`
 	Season   int           `json:"season"`
 }
 
@@ -216,9 +217,9 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]episodeItem, 0, len(episodes))
+	out := make([]EpisodeItem, 0, len(episodes))
 	for _, ep := range episodes {
-		item := episodeItem{
+		item := EpisodeItem{
 			ID:                    ep.ID,
 			Title:                 ep.Title,
 			SeasonNumber:          ep.SeasonNumber,
@@ -229,7 +230,6 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 			HasFile:               ep.HasFile,
 		}
 		if ep.EpisodeFile != nil {
-			item.Path = ep.EpisodeFile.Path
 			item.SceneName = ep.EpisodeFile.SceneName
 		}
 		out = append(out, item)
@@ -238,15 +238,15 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 }
 
 // groupEpisodesBySeason groups episodes by season number, sorted ascending.
-func groupEpisodesBySeason(episodes []episodeItem) []SeasonGroup {
-	seasonMap := make(map[int][]episodeItem)
+func groupEpisodesBySeason(episodes []EpisodeItem) []SeasonGroup {
+	seasonMap := make(map[int][]EpisodeItem)
 	for _, ep := range episodes {
 		seasonMap[ep.SeasonNumber] = append(seasonMap[ep.SeasonNumber], ep)
 	}
 	out := make([]SeasonGroup, 0, len(seasonMap))
 	for sn := range seasonMap {
 		eps := seasonMap[sn]
-		slices.SortFunc(eps, func(a, b episodeItem) int {
+		slices.SortFunc(eps, func(a, b EpisodeItem) int {
 			return cmp.Compare(a.EpisodeNumber, b.EpisodeNumber)
 		})
 		out = append(out, SeasonGroup{Season: sn, Episodes: eps})

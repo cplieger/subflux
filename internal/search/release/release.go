@@ -27,7 +27,15 @@ type Info struct {
 }
 
 // ParseReleaseName extracts metadata from a scene/release name.
+//
+// Input is clamped to MaxNameLen bytes before any pattern runs (defense in
+// depth for the layer's measured linear-time gate): a longer name is
+// treated as its MaxNameLen-byte prefix, matching the provider boundary's
+// ClampName semantics, so callers that bypass provider.WrapRetry cannot
+// violate the input bound. Provider-path behavior is unchanged (those
+// names arrive already clamped).
 func ParseReleaseName(name string) Info {
+	name = ClampName(name)
 	if name == "" {
 		return Info{}
 	}

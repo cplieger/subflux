@@ -3,6 +3,9 @@ package confighandlers
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"regexp"
 	"slices"
 	"strings"
@@ -75,42 +78,82 @@ func RedactSecrets(data []byte) []byte {
 	})
 }
 
-// MergeSecrets fills empty secret values in newData from the existing config file.
-func MergeSecrets(newData []byte, configPath string) []byte {
+// MergeSecrets fills empty secret values in newData from the existing config
+// file. An empty or redacted incoming secret means "keep what I have", which
+// makes the baseline's readability a correctness input (the raw-path twin of
+// the structured path's mergeExistingSecrets contract): when newData relies
+// on keep semantics and the existing file cannot be read for any reason other
+// than not existing, silently skipping the merge would persist the empty or
+// placeholder value literally — deleting the secret. Those reads fail closed
+// via errBaselineUnavailable — no save, no activation. A missing file is a
+// true empty baseline (first save), and a payload with no keep-semantics
+// secrets never needs the baseline at all — which also lets a complete
+// payload overwrite, and thereby repair, an unreadable config file.
+func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
 	existing, err := atomicfile.ReadBounded(context.Background(), configPath, 1<<20)
 	if err != nil {
-		return newData
+		if errors.Is(err, fs.ErrNotExist) || !hasKeepSecretLines(newData) {
+			return newData, nil
+		}
+		return nil, fmt.Errorf("%w: read existing config: %w", errBaselineUnavailable, err)
 	}
 
 	oldSecrets := ExtractSecretValues(existing)
 	if len(oldSecrets) == 0 {
-		return newData
+		return newData, nil
 	}
 
 	lines := bytes.Split(newData, []byte("\n"))
 	for i, line := range lines {
 		trimmed := bytes.TrimSpace(line)
-		for _, key := range secretKeyNames {
-			prefix := []byte(key + ": ")
-			if !bytes.HasPrefix(trimmed, prefix) {
-				continue
-			}
-			val := bytes.TrimSpace(trimmed[len(prefix):])
-			stripped := bytes.Trim(val, `"'`)
-			if len(stripped) != 0 && !IsRedactedPlaceholder(stripped) {
-				break
-			}
-			ctxKey := SecretContextKey(lines, i, key)
-			if oldVal, ok := oldSecrets[ctxKey]; ok {
-				indent := len(line) - len(bytes.TrimLeft(line, " "))
-				lines[i] = append(
-					bytes.Repeat([]byte(" "), indent),
-					[]byte(key+": "+oldVal)...)
-			}
-			break
+		key, val, ok := secretLineValue(trimmed)
+		if !ok {
+			continue
+		}
+		stripped := bytes.Trim(val, `"'`)
+		if len(stripped) != 0 && !IsRedactedPlaceholder(stripped) {
+			continue
+		}
+		ctxKey := SecretContextKey(lines, i, key)
+		if oldVal, ok := oldSecrets[ctxKey]; ok {
+			indent := len(line) - len(bytes.TrimLeft(line, " "))
+			lines[i] = append(
+				bytes.Repeat([]byte(" "), indent),
+				[]byte(key+": "+oldVal)...)
 		}
 	}
-	return bytes.Join(lines, []byte("\n"))
+	return bytes.Join(lines, []byte("\n")), nil
+}
+
+// secretLineValue matches one trimmed YAML line against the secret key
+// names: the first matching key returns with the line's raw (space-trimmed)
+// value. The shared line classifier for MergeSecrets and hasKeepSecretLines.
+func secretLineValue(trimmed []byte) (key string, val []byte, ok bool) {
+	for _, k := range secretKeyNames {
+		prefix := []byte(k + ": ")
+		if bytes.HasPrefix(trimmed, prefix) {
+			return k, bytes.TrimSpace(trimmed[len(prefix):]), true
+		}
+	}
+	return "", nil, false
+}
+
+// hasKeepSecretLines reports whether newData carries at least one secret key
+// line with keep semantics — an empty or redaction-placeholder value, the two
+// forms MergeSecrets fills from the baseline. Only such payloads depend on
+// the baseline's readability.
+func hasKeepSecretLines(newData []byte) bool {
+	for _, line := range bytes.Split(newData, []byte("\n")) {
+		_, val, ok := secretLineValue(bytes.TrimSpace(line))
+		if !ok {
+			continue
+		}
+		stripped := bytes.Trim(val, `"'`)
+		if len(stripped) == 0 || IsRedactedPlaceholder(stripped) {
+			return true
+		}
+	}
+	return false
 }
 
 // ExtractSecretValues scans YAML lines and returns a map of context-qualified

@@ -291,6 +291,12 @@ func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType api.MediaType, key, v [
 		Codec:    fr.Codec,
 		Path:     path,
 	}
+	// Wire identity: the manual-sibling ordinal parsed from the filename is
+	// the FileRef component that keeps numbered manual files addressable
+	// without exposing the path (embedded rows have no path -> ordinal 0).
+	if source != string(api.SourceEmbedded) {
+		entry.Ordinal = api.ManualOrdinal(path)
+	}
 	// The applied cumulative offset lives in the sync_offsets bucket (written
 	// by SetSyncOffset after a manual or audio sync), keyed by bare path. Join
 	// it here so the file list and the sync dialog see the real value.

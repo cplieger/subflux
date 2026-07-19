@@ -54,14 +54,24 @@ func (d *DB) BackupInto(ctx context.Context, dest string) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("boltstore: backup: %w", err)
 	}
+	if err := backupDB(ctx, d.db, dest); err != nil {
+		return fmt.Errorf("boltstore: backup: %w", err)
+	}
+	return nil
+}
 
-	// The snapshot file holds the auth buckets (users, passkeys, API keys), so
-	// keep it owner-only (0o600) to match the live store. Symlink targets are
-	// refused (atomicfile's default): a backup dest is always a fresh
-	// timestamped path, never a symlink.
+// backupDB is the snapshot mechanism behind BackupInto, callable on a bare
+// *bbolt.DB handle — which is what the migration runner (migrate.go) needs:
+// the pre-migration snapshot is written during Open, BEFORE the *DB wrapper
+// exists. It streams a consistent tx.WriteTo copy of the whole file into an
+// atomicfile pending file (owner-only 0o600 — the snapshot holds the auth
+// buckets; symlink targets refused, atomicfile's default) and commits it with
+// the fsync + rename + parent-directory-fsync barrier, so dest either holds a
+// complete snapshot or nothing.
+func backupDB(ctx context.Context, db *bolt.DB, dest string) error {
 	pf, err := atomicfile.NewPendingFile(ctx, dest, atomicfile.WithMode(0o600))
 	if err != nil {
-		return fmt.Errorf("boltstore: backup: %w", err)
+		return err
 	}
 	// On any failure before Commit, remove the temp (best-effort). Cleanup is a
 	// no-op after a successful Commit.
@@ -69,18 +79,18 @@ func (d *DB) BackupInto(ctx context.Context, dest string) error {
 
 	// Stream the snapshot under a short read transaction. WriteTo copies the
 	// whole file (live + free pages) at the transaction's consistent view.
-	if err := d.db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *bolt.Tx) error {
 		_, werr := tx.WriteTo(pf)
 		return werr
 	}); err != nil {
-		return fmt.Errorf("boltstore: backup: write snapshot: %w", err)
+		return fmt.Errorf("write snapshot: %w", err)
 	}
 
 	// Commit runs the durability barrier (fsync + close), atomically renames the
-	// temp onto dest, and fsyncs the parent directory — so a partial
-	// "subflux-<ts>.bolt" never lingers for pruning to treat as a valid backup.
+	// temp onto dest, and fsyncs the parent directory — so a partial snapshot
+	// never lingers (for backups, pruning would otherwise treat it as valid).
 	if _, err := pf.Commit(ctx); err != nil {
-		return fmt.Errorf("boltstore: backup: commit %q: %w", dest, err)
+		return fmt.Errorf("commit %q: %w", dest, err)
 	}
 	return nil
 }

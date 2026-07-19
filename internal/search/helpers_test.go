@@ -18,9 +18,15 @@ type Syncer = syncing.Syncer
 // --- Mock implementations ---
 
 // noopDetector implements TrackDetector with no results.
-type noopDetector struct{}
+type noopDetector = NoopDetector
 
-func (noopDetector) DetectTracks(_ context.Context, _ string) []api.EmbeddedTrack { return nil }
+// errDetector implements TrackDetector with a fixed probe failure, for the
+// detector-error fail-open + coverage-retention fixtures.
+type errDetector struct{ err error }
+
+func (d errDetector) DetectTracks(_ context.Context, _ string) ([]api.EmbeddedTrack, error) {
+	return nil, d.err
+}
 
 type mockStore struct {
 	testsupport.NopStore
@@ -58,6 +64,7 @@ func (m *mockStoreLockErr) IsManuallyLocked(_ context.Context, _ api.MediaType, 
 type mockConfig struct {
 	searchCfg   api.SearchConfig
 	adaptiveCfg api.AdaptiveConfig
+	embedded    api.EmbeddedPolicy
 	minScore    int
 }
 
@@ -68,7 +75,7 @@ func (m *mockConfig) ProvidersForTarget(_ *api.SubtitleTarget, all []api.Provide
 func (m *mockConfig) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) int { return m.minScore }
 func (m *mockConfig) Adaptive() api.AdaptiveConfig                                 { return m.adaptiveCfg }
 func (m *mockConfig) Search() api.SearchConfig                                     { return m.searchCfg }
-func (m *mockConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg          { return nil }
+func (m *mockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
 func (m *mockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
 func (m *mockConfig) PostProcessConfig() api.PostProcessConfig {
 	return api.PostProcessConfig{
@@ -88,11 +95,13 @@ type mockMetrics struct {
 	searches      atomic.Int64
 	downloads     atomic.Int64
 	adaptiveSkips atomic.Int64
+	detectorErrs  atomic.Int64
 }
 
 func (m *mockMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) { m.searches.Add(1) }
 func (m *mockMetrics) RecordDownload(_ api.ProviderID, _ error)                { m.downloads.Add(1) }
 func (m *mockMetrics) AdaptiveSkip()                                           { m.adaptiveSkips.Add(1) }
+func (m *mockMetrics) RecordEmbeddedDetectorError()                            { m.detectorErrs.Add(1) }
 func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
 func (m *mockMetrics) RecordImport(_ api.PollKey)                              {}
 func (m *mockMetrics) TotalSearches() int64                                    { return m.searches.Load() }

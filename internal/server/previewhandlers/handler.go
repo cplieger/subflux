@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -40,13 +41,21 @@ type ConfigProvider interface {
 	ValidatePath(ctx context.Context, path string) error
 }
 
-// Deps holds the dependencies for the preview handler family.
+// PosterFetcher performs the poster request. The server implementation owns
+// the private-arr to public-CDN trust-boundary transition.
+type PosterFetcher interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Deps holds the dependencies for the preview handler family. Resolve is
+// the S7 typed-reference resolver: preview endpoints accept FileRef /
+// MediaRef parameters and never a client-supplied path.
 type Deps struct {
 	SubtitleProc SubtitleProcessor
 	FFmpegSem    *semaphore.Weighted
-	PosterClient *http.Client
+	PosterClient PosterFetcher
 	StateFunc    StateFunc
-	ValidatePath func(w http.ResponseWriter, r *http.Request, path, label string) bool
+	Resolve      *resolve.Resolver
 	ReadBounded  func(ctx context.Context, path string, maxBytes int64) ([]byte, error)
 	ServerCtx    func() context.Context
 }

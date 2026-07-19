@@ -33,13 +33,17 @@ func (p *Poller) precheckImportPath(ctx context.Context, ls *LiveState, path str
 }
 
 // processPollImport is the shared logic for Sonarr/Radarr import events.
+// The second return reports whether the search actually queried any
+// provider: executeBatch keys the inter-entry pacing delay on it, so skip
+// paths (gone file, tag-excluded, metadata-fetch failures) and searches that
+// generated no provider traffic don't pay the delay.
 func (p *Poller) processPollImport(
 	ctx context.Context, ls *LiveState, path string,
 	buildFn func() (*ImportResult, error),
 	refreshFn func(ctx context.Context, id int) error,
-) (retryable bool) {
+) (retryable, queried bool) {
 	if !p.precheckImportPath(ctx, ls, path) {
-		return false
+		return false, false
 	}
 
 	result, err := buildFn()
@@ -47,17 +51,17 @@ func (p *Poller) processPollImport(
 		// Transient arr failure (metadata fetch): the caller holds the poll
 		// watermark back (bounded by maxImportRetries) so the entry is
 		// re-fetched next cycle instead of dropped until the next full scan.
-		return true
+		return true, false
 	}
 	if result == nil {
 		// Deliberate skip (e.g. excluded by tag): processed, never retried.
-		return false
+		return false, false
 	}
 
 	// Re-verify file exists after arr API calls (race window: 200-800ms).
 	if _, err := os.Stat(path); err != nil {
 		slog.Debug("poll: video file removed during metadata fetch", "path", path)
-		return retryable
+		return retryable, false
 	}
 
 	slog.Info("poll: import detected",
@@ -65,14 +69,16 @@ func (p *Poller) processPollImport(
 	p.deps.Metrics.RecordImport(api.PollKey(result.Source))
 
 	searchResult, searchErr := ls.Engine.SearchTargets(ctx, result.Req, path, result.Targets)
+	queried = searchResult.ProviderQueried()
 	if searchErr != nil {
 		slog.Error("poll: subtitle search failed",
 			"media", result.Label, "error", searchErr)
 		p.deps.Alerts.RecordWarn(string(result.Source),
 			fmt.Sprintf("Search failed for %s: %v", result.Label, searchErr))
-		return retryable
+		return retryable, queried
 	}
-	if len(searchResult.Paths) > 0 || searchResult.CoverageChanged {
+	searchPaths := searchResult.Paths()
+	if len(searchPaths) > 0 || searchResult.CoverageChanged {
 		mediaID := api.BuildMediaID(result.Req)
 		p.deps.Events.Publish(events.Event{
 			Type: events.CoverageUpdate,
@@ -86,17 +92,17 @@ func (p *Poller) processPollImport(
 			},
 		})
 		p.deps.StatsCache.Invalidate()
-		if len(searchResult.Paths) > 0 && refreshFn != nil {
+		if len(searchPaths) > 0 && refreshFn != nil {
 			if err := refreshFn(ctx, result.RefreshID); err != nil {
 				slog.Warn("failed to notify arr", "id", result.RefreshID, "error", err)
 			}
 		}
 	}
-	return false
+	return false, queried
 }
 
 // processSonarrImport handles a single Sonarr import event from the history API.
-func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
+func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
 	path := entry.ImportedPath()
 
 	return p.processPollImport(
@@ -144,7 +150,7 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 }
 
 // processRadarrImport handles a single Radarr import event from the history API.
-func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable bool) {
+func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *arrapi.HistoryRecord, excludeIDs map[int]struct{}) (retryable, queried bool) {
 	path := entry.ImportedPath()
 
 	return p.processPollImport(

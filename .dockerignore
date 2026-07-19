@@ -5,6 +5,8 @@ dev-config.local.yaml
 dev-run.sh
 .web-lint/
 cmd/
+!cmd/bundle/
+internal/server/static-src/node_modules/
 *.md
 compose.yaml
 *_test.go

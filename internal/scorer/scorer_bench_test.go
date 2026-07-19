@@ -9,10 +9,6 @@ import (
 
 func BenchmarkScore(b *testing.B) {
 	engine := New(&api.DefaultScores)
-	video := &api.VideoInfo{
-		ReleaseGroup: "Movie.2024.1080p.WEB-DL.DDP5.1.H.264-GROUP",
-		MediaType:    api.MediaTypeMovie,
-	}
 
 	cases := []struct {
 		name    string
@@ -33,7 +29,7 @@ func BenchmarkScore(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				engine.Score(video, tc.sub, tc.matches)
+				engine.Score(tc.sub, tc.matches)
 			}
 		})
 	}
@@ -41,27 +37,19 @@ func BenchmarkScore(b *testing.B) {
 
 func BenchmarkScoreParallel(b *testing.B) {
 	engine := New(&api.DefaultScores)
-	video := &api.VideoInfo{
-		ReleaseGroup: "Show.S02E05.720p.BluRay.x264-GROUP",
-		MediaType:    api.MediaTypeEpisode,
-	}
 	matches := api.MatchSet{Source: true, ReleaseGroup: true, VideoCodec: true}
 	sub := api.SubtitleInfo{}
 
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			engine.Score(video, sub, matches)
+			engine.Score(sub, matches)
 		}
 	})
 }
 
 func BenchmarkScoreBatch(b *testing.B) {
 	engine := New(&api.DefaultScores)
-	video := &api.VideoInfo{
-		ReleaseGroup: "Movie.2024.2160p.UHD.BluRay.HDR.DV.DTS-HD.MA.7.1-GROUP",
-		MediaType:    api.MediaTypeMovie,
-	}
 
 	for _, n := range []int{10, 50, 100} {
 		subs := make([]api.SubtitleInfo, n)
@@ -82,7 +70,7 @@ func BenchmarkScoreBatch(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				for i := range n {
-					engine.Score(video, subs[i], matchSets[i])
+					engine.Score(subs[i], matchSets[i])
 				}
 			}
 		})

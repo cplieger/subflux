@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -459,6 +460,84 @@ func TestValidateSearch_download_max_attempts_default(t *testing.T) {
 			_ = validateSearch(&s)
 			if s.DownloadMaxAttempts != tc.want {
 				t.Errorf("validateSearch(DownloadMaxAttempts=%d) -> %d, want %d", tc.in, s.DownloadMaxAttempts, tc.want)
+			}
+		})
+	}
+}
+
+// --- Scoring weights (validateScoring) ---
+
+// TestValidateScoring checks the scoring-weight invariants from
+// api.Scores / api.DefaultScores: non-negative weights, and hash >= the
+// maximum attribute-only sum per media type (so a verified hash match
+// always outranks attribute matches).
+func TestValidateScoring(t *testing.T) {
+	t.Parallel()
+
+	// scoringBase returns a minimal otherwise-valid Config carrying the
+	// given scoring weights (nil = defaults in use).
+	scoringBase := func(w *api.Scores) *Config {
+		return &Config{
+			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			Languages: LanguageRules{
+				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
+				Default: []yamlSubtitleTarget{{Code: "en"}},
+			},
+			Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second},
+			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Scoring:         ScoringConfig{Weights: w},
+		}
+	}
+
+	// withHash returns the default weights with hash overridden.
+	withHash := func(hash int) *api.Scores {
+		w := api.DefaultScores
+		w.Hash = hash
+		return &w
+	}
+
+	defaultsCopy := api.DefaultScores
+	negativeSource := api.DefaultScores
+	negativeSource.Source = -1
+
+	tests := []struct {
+		weights     *api.Scores
+		name        string
+		errContains string
+		wantErr     bool
+	}{
+		{name: "nil weights (defaults) pass", weights: nil, wantErr: false},
+		{name: "explicit default weights pass", weights: &defaultsCopy, wantErr: false},
+		// Default non-hash sums are 98 for both media types; a tie keeps
+		// the hash match from being outranked, so it is allowed.
+		{name: "hash equal to attribute sums passes", weights: withHash(98), wantErr: false},
+		{name: "hash below attribute sums fails", weights: withHash(97),
+			wantErr: true, errContains: "scoring.hash"},
+		{name: "zero hash with default attributes fails", weights: withHash(0),
+			wantErr: true, errContains: "scoring.hash"},
+		{name: "negative weight fails", weights: &negativeSource,
+			wantErr: true, errContains: "scoring.source must be non-negative"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := scoringBase(tt.weights).Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Validate() = nil, want scoring error")
+				}
+				if !errors.Is(err, ErrScoringConfig) {
+					t.Errorf("Validate() error = %v, want ErrScoringConfig", err)
+				}
+				if !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Validate() error = %q, want to contain %q", err, tt.errContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Validate() = %v, want nil", err)
 			}
 		})
 	}

@@ -1,32 +1,58 @@
-// wizard.ts — Setup wizard extracted from login.ts. Invoked via startConfigWizard().
+// wizard.ts — The single first-boot flow (admin creation hands off here):
+// ONE wizard for config-file users and from-scratch users, dynamically
+// accelerated. It boots from the FULL structured config (+ secret presence
+// flags) and config_valid, prefills every step, collapses steps the config
+// already answers (config_valid AND differs-from-example), walks the rest,
+// and finishes with a GET-overlay-PUT of the FULL section map followed by
+// the post-activation passkey offer and a SINGLE navigation into the app.
+// Decision logic lives in wizard-state.ts (pure, vitest-covered); this
+// module owns DOM and flow.
 
 import { patch } from "@cplieger/reactive";
-import { apiGetArray } from "./api-client.js";
-import { decodeSchemaSection } from "./wire/decoders.gen.js";
 import {
-  defineAction,
-  ActionError,
-  classifyFetchError,
-  retryNetwork,
-  RETRY_STANDARD,
-  registerCleanup,
-} from "@cplieger/actions";
+  configSchema,
+  configStructured,
+  webauthnRegisterBegin,
+  webauthnSignalData,
+  PATH_SAVE_CONFIG_STRUCTURED,
+  PATH_WEBAUTHN_REGISTER_FINISH,
+} from "./wire/client.gen.js";
+import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
 import { el, option } from "./dom.js";
 import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT } from "./constants.js";
-import type { ProviderSchema, SchemaSection } from "./api-types.js";
+import type { SchemaSection } from "./api-types.js";
+import type { StructuredConfig } from "./wire/types.gen.js";
+import {
+  type Sections,
+  type StepID,
+  type WizardBoot,
+  type WizardDraft,
+  type WizardModel,
+  buildDraftJSON,
+  buildSaveSections,
+  fastPathAvailable,
+  fingerprintBoot,
+  overlayDraft,
+  parseDraft,
+  prefillModel,
+  satisfiedSteps,
+} from "./wizard-state.js";
+import { bufferToBase64url, creationOptionsFromJSON } from "./webauthn-utils.js";
 import { buildProvidersStep } from "./wizard-providers.js";
 import { buildLanguagesStep } from "./wizard-languages.js";
 import {
   buildArrStep,
   buildMediaRootsStep,
   buildSearchStep,
+  buildScoringStep,
   buildPostProcessStep,
 } from "./wizard-steps.js";
 
 export interface WizardStep {
-  id: string;
+  /** Matrix step id, or "review" for the closing summary screen. */
+  stepId: StepID | "review";
   title: string;
   render: (container: HTMLElement) => void;
   collect: () => void;
@@ -34,23 +60,46 @@ export interface WizardStep {
   validateAsync?: (signal: AbortSignal) => Promise<string>;
 }
 
-interface SetupDraft {
-  wizardIndex: number;
-  wizardValues: Record<string, Record<string, string>>;
-  providerEnabled: Record<string, boolean>;
-  langRules: { audio: string; code: string; variant: string }[];
-  langDefault: { code: string; variant: string }[];
-  mediaRoots: string[];
+/** WizardEntry carries what the login page knows at handoff: the validity
+ *  signal (prefill source is the structured GET) and — memory-only, never
+ *  persisted — the password just used, for the post-activation passkey
+ *  offer (register/begin requires password proof). */
+export interface WizardEntry {
+  configValid: boolean;
+  password?: string;
 }
 
+// --- Module state ---
+
 let fullSchema: SchemaSection[] = [];
-let wizardSteps: WizardStep[] = [];
+let boot: WizardBoot = { sections: {}, secretsPresent: new Set(), configValid: false };
+let bootFingerprint = "";
+let allSteps: WizardStep[] = [];
+let activeSteps: WizardStep[] = [];
 let wizardIndex = 0;
+let touched = new Set<StepID>();
+let setupPassword = "";
+
+// Step-module-facing model bindings (live ES module bindings; reassigned at
+// boot from the prefilled model).
 export let wizardValues: Record<string, Record<string, string>> = {};
 export let providerEnabled: Record<string, boolean> = {};
 export let langRules: { audio: string; code: string; variant: string }[] = [];
 export let langDefault: { code: string; variant: string }[] = [];
 export let mediaRoots: string[] = [];
+
+/** secretSaved reports whether the config file already holds a value for a
+ *  schema secret (dotted path, e.g. "sonarr.api_key"): the steps render a
+ *  saved placeholder and count the credential as present. */
+export function secretSaved(path: string): boolean {
+  return boot.secretsPresent.has(path);
+}
+
+/** bootSections exposes the boot snapshot's sections to the step modules
+ *  (read-only by convention; steps consult it for config-blessed state). */
+export function bootSections(): Sections {
+  return boot.sections;
+}
 
 export function schemaByKey(key: string): SchemaSection | undefined {
   return fullSchema.find((s: SchemaSection) => s.key === key);
@@ -58,38 +107,37 @@ export function schemaByKey(key: string): SchemaSection | undefined {
 
 const DRAFT_KEY = "subflux-setup-draft";
 
-function saveDraft(): void {
-  try {
-    const draft: SetupDraft = {
-      wizardIndex,
-      wizardValues,
-      providerEnabled,
-      langRules,
-      langDefault,
-      mediaRoots,
-    };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  } catch {
-    /* localStorage full or unavailable */
-  }
+function adoptModel(m: WizardModel): void {
+  wizardValues = m.wizardValues;
+  providerEnabled = m.providerEnabled;
+  langRules = m.langRules;
+  langDefault = m.langDefault;
+  mediaRoots = m.mediaRoots;
 }
 
-function loadDraft(): boolean {
+function currentModel(): WizardModel {
+  return { wizardValues, providerEnabled, langRules, langDefault, mediaRoots };
+}
+
+/** saveDraft persists the wizard's progress. The stored model is
+ *  schema-sanitized (buildDraftJSON): secret fields never reach
+ *  localStorage — an abandoned wizard must not leave credentials behind
+ *  across browser restarts. Newly typed secrets are re-entered after a
+ *  reload; saved-secret presence rides the boot presence flags instead. */
+function saveDraft(): void {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) {
-      return false;
-    }
-    const draft = JSON.parse(raw) as SetupDraft;
-    wizardIndex = draft.wizardIndex;
-    wizardValues = draft.wizardValues;
-    providerEnabled = draft.providerEnabled;
-    langRules = draft.langRules;
-    langDefault = draft.langDefault;
-    mediaRoots = draft.mediaRoots;
-    return true;
+    localStorage.setItem(
+      DRAFT_KEY,
+      buildDraftJSON(
+        fullSchema,
+        bootFingerprint,
+        activeSteps[wizardIndex]?.stepId ?? "",
+        [...touched],
+        currentModel(),
+      ),
+    );
   } catch {
-    return false;
+    /* localStorage full or unavailable */
   }
 }
 
@@ -100,6 +148,8 @@ function clearDraft(): void {
     /* ignore */
   }
 }
+
+// --- Shared field builders (consumed by the step modules) ---
 
 export function infoIcon(tip: string): HTMLElement {
   return el("span", {
@@ -173,50 +223,130 @@ export function variantSelect(id: string, value: string): HTMLElement {
   return sel;
 }
 
-export async function startConfigWizard(): Promise<void> {
-  const schema = await apiGetArray("/api/config/schema", decodeSchemaSection);
-  if (!schema) {
-    window.location.href = "/";
+// --- Flow ---
+
+export async function startConfigWizard(entry: WizardEntry): Promise<void> {
+  setupPassword = entry.password ?? "";
+
+  // BOTH fetches must succeed before any wizard state initializes. A failed
+  // structured fetch must never be substituted with {}: Finish PUTs the FULL
+  // section map from the boot snapshot, so an empty baseline would DELETE
+  // every untouched section (logging, backup, auth, trusted_proxies) and
+  // their secrets. A valid unconfigured server answers non-null with empty
+  // sections — null is strictly transport/decode failure.
+  const [schema, structured] = await Promise.all([configSchema(), configStructured()]);
+  if (!schema || !structured) {
+    renderWizardInitError(entry);
     return;
   }
   fullSchema = schema;
-  wizardSteps = [
+
+  const sections: Sections = { ...structured.sections };
+  const present = new Set<string>(structured.secrets_present ?? []);
+  boot = { sections, secretsPresent: present, configValid: entry.configValid };
+  bootFingerprint = fingerprintBoot(sections, [...present]);
+
+  // Fresh prefill from the server snapshot; a fingerprint-valid draft
+  // overlays ONLY its touched fields (a stale or unparseable draft drops).
+  let model = prefillModel(sections);
+  touched = new Set();
+  let draft: WizardDraft | null = null;
+  try {
+    draft = parseDraft(localStorage.getItem(DRAFT_KEY), bootFingerprint);
+  } catch {
+    draft = null;
+  }
+  if (draft) {
+    model = overlayDraft(model, draft);
+    touched = new Set(draft.touched);
+  } else {
+    clearDraft();
+  }
+  adoptModel(model);
+
+  allSteps = [
     buildArrStep(),
     buildMediaRootsStep(),
     buildProvidersStep(),
     buildLanguagesStep(),
     buildSearchStep(),
+    buildScoringStep(),
     buildPostProcessStep(),
   ];
 
-  // Try restoring a saved draft; otherwise start fresh.
-  if (!loadDraft()) {
-    wizardIndex = 0;
-    wizardValues = {};
-    providerEnabled = {};
-    langRules = [];
-    langDefault = [];
-    mediaRoots = [];
-  }
+  // Active walk: steps NOT auto-collapsed by the satisfied gate, plus any
+  // step the draft already touched (never hide the user's own edits), then
+  // the review/finish screen. A fresh volume walks EVERYTHING.
+  const satisfied = satisfiedSteps(boot);
+  const walk = allSteps.filter((s) => {
+    const id = s.stepId as StepID;
+    return !satisfied.has(id) || touched.has(id);
+  });
+  activeSteps = [...walk, buildReviewStep()];
 
-  // Ensure embedded provider is always enabled.
-  const provSection = schemaByKey("providers");
-  if (provSection?.providers) {
-    for (const p of provSection.providers) {
-      if (p.always_enabled) {
-        providerEnabled[p.name] = true;
-      }
+  wizardIndex = 0;
+  if (draft) {
+    const idx = activeSteps.findIndex((s) => s.stepId === draft.stepId);
+    if (idx >= 0) {
+      wizardIndex = idx;
     }
-  }
-
-  // Clamp index in case steps changed since draft was saved.
-  if (wizardIndex >= wizardSteps.length) {
-    wizardIndex = 0;
+  } else if (fastPathAvailable(boot)) {
+    // R3.5: everything mandatory is satisfied — open directly on the
+    // "everything looks configured — finish" summary.
+    wizardIndex = activeSteps.length - 1;
   }
 
   showPage("configWizardPage");
   renderCurrentStep();
   wireWizardNav();
+}
+
+/** renderWizardInitError renders the retryable initialization failure
+ *  state: the wizard page without any step content, navigation, or Finish
+ *  (a Finish from a partial boot snapshot would destroy config), plus a
+ *  Retry button that re-runs the boot fetches. No draft is read or written
+ *  here — nothing may overlay a boot that never happened. */
+function renderWizardInitError(entry: WizardEntry): void {
+  showPage("configWizardPage");
+  for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
+    const b = $(id);
+    if (b) {
+      b.hidden = true;
+    }
+  }
+  $("wizardProgress")?.replaceChildren();
+  showError("wizardError", "Loading the current configuration failed. Nothing has been changed.");
+  const container = $("wizardSection");
+  if (!container) {
+    return;
+  }
+  container.replaceChildren(
+    el("h3", { className: "wizard-section-title" }, "Setup could not start"),
+    el(
+      "p",
+      { className: "wiz-offer-reason" },
+      "The configuration could not be loaded from the server, so the setup steps cannot " +
+        "be shown yet. Check that the server is reachable, then retry.",
+    ),
+    el(
+      "div",
+      { className: "wiz-offer-actions" },
+      el(
+        "button",
+        {
+          type: "button",
+          id: "wizardInitRetry",
+          onclick: (ev: Event) => {
+            const btn = ev.currentTarget as HTMLButtonElement;
+            btn.disabled = true;
+            btn.setAttribute("aria-busy", "true");
+            void startConfigWizard(entry);
+          },
+        },
+        "Retry",
+      ),
+    ),
+  );
 }
 
 function renderCurrentStep(): void {
@@ -225,7 +355,7 @@ function renderCurrentStep(): void {
     return;
   }
   hideError("wizardError");
-  const step = wizardSteps[wizardIndex];
+  const step = activeSteps[wizardIndex];
   if (!step) {
     return;
   }
@@ -256,14 +386,21 @@ function populateStep(container: HTMLElement, step: WizardStep): void {
   updateWizardNav();
 }
 
+/** renderWizardProgress recomputes the accessible progress over the ACTIVE
+ *  walk (collapsed steps are excluded, so counts stay honest — R3.9). */
 function renderWizardProgress(): void {
   const container = $("wizardProgress");
   if (!container) {
     return;
   }
+  const step = activeSteps[wizardIndex];
+  container.setAttribute(
+    "aria-label",
+    `Step ${String(wizardIndex + 1)} of ${String(activeSteps.length)}: ${step?.title ?? ""}`,
+  );
   // Keyed by step index so a step change only flips the changed dots' class
   // (patch syncs className) instead of recreating every dot.
-  const dots = wizardSteps.map((_, i) => {
+  const dots = activeSteps.map((_, i) => {
     const cls =
       i === wizardIndex ? "wizard-dot active" : i < wizardIndex ? "wizard-dot done" : "wizard-dot";
     return el("div", { className: cls, "data-col": String(i) });
@@ -273,18 +410,27 @@ function renderWizardProgress(): void {
 
 function updateWizardNav(): void {
   const isFirst = wizardIndex === 0;
-  const isLast = wizardIndex === wizardSteps.length - 1;
+  const isLast = wizardIndex === activeSteps.length - 1;
   const back = $("wizardBack");
   if (back) {
+    back.hidden = false;
     back.setAttribute("aria-disabled", isFirst ? "true" : "false");
   }
-  if ($("wizardNext")) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
-    $("wizardNext")!.hidden = isLast;
+  const next = $("wizardNext");
+  if (next) {
+    next.hidden = isLast;
   }
-  if ($("wizardFinish")) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
-    $("wizardFinish")!.hidden = !isLast;
+  const finish = $("wizardFinish");
+  if (finish) {
+    finish.hidden = !isLast;
+  }
+}
+
+/** markTouched records a real step visit/edit for the draft overlay and the
+ *  save-time section overlay (the review screen is never "touched"). */
+function markTouched(step: WizardStep): void {
+  if (step.stepId !== "review") {
+    touched.add(step.stepId);
   }
 }
 
@@ -301,9 +447,7 @@ function abortValidation(): void {
 /** Run an awaited wizard operation with visible busy feedback: the nav
  *  buttons are disabled, the active one carries aria-busy and a progress
  *  label ("Checking…"/"Saving…") for the duration, and everything is
- *  restored in a finally. Without this, async path validation and the final
- *  save gave no indication anything was happening, and a second click
- *  silently aborted/restarted the work. */
+ *  restored in a finally. */
 async function withWizardBusy<T>(
   btn: HTMLElement,
   label: string,
@@ -345,8 +489,11 @@ function wireWizardNav(): void {
       return;
     }
     abortValidation();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index validated
-    wizardSteps[wizardIndex]!.collect();
+    const step = activeSteps[wizardIndex];
+    if (step) {
+      step.collect();
+      markTouched(step);
+    }
     saveDraft();
     if (wizardIndex > 0) {
       wizardIndex--;
@@ -357,8 +504,9 @@ function wireWizardNav(): void {
   $("wizardNext")?.addEventListener("click", async () => {
     abortValidation();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index validated
-    const step = wizardSteps[wizardIndex]!;
+    const step = activeSteps[wizardIndex]!;
     step.collect();
+    markTouched(step);
     saveDraft();
     const err = step.validate();
     if (err) {
@@ -384,7 +532,7 @@ function wireWizardNav(): void {
       }
     }
     hideError("wizardError");
-    if (wizardIndex < wizardSteps.length - 1) {
+    if (wizardIndex < activeSteps.length - 1) {
       wizardIndex++;
       renderCurrentStep();
     }
@@ -393,7 +541,81 @@ function wireWizardNav(): void {
   $("wizardFinish")?.addEventListener("click", finishWizard);
 }
 
-// --- Finish wizard ---
+// --- Review / summary step (R3.5 fast path + R3.9 reviewable steps) ---
+
+function buildReviewStep(): WizardStep {
+  return {
+    stepId: "review",
+    title: "Review & Finish",
+    render(container: HTMLElement): void {
+      const satisfied = satisfiedSteps(boot);
+      const intro =
+        fastPathAvailable(boot) && touched.size === 0
+          ? "Everything looks configured. Review any step below, or finish now."
+          : "Review your setup, then finish to activate it.";
+      container.appendChild(el("p", { className: "wiz-review-intro" }, intro));
+
+      const list = el("div", { className: "wiz-review-list", role: "list" });
+      for (const step of allSteps) {
+        const id = step.stepId as StepID;
+        let status: string;
+        if (touched.has(id)) {
+          status = "Updated in this setup";
+        } else if (satisfied.has(id)) {
+          status = "Loaded from your config";
+        } else {
+          status = "Using defaults";
+        }
+        const editBtn = el(
+          "button",
+          {
+            type: "button",
+            className: "ghost wiz-review-edit",
+            "aria-label": `Edit ${step.title}`,
+            onclick: () => {
+              editStep(id);
+            },
+          },
+          "Edit",
+        );
+        list.appendChild(
+          el(
+            "div",
+            { className: "wiz-review-row", role: "listitem" },
+            el("span", { className: "wiz-review-title" }, step.title),
+            el("span", { className: "wiz-review-status" }, status),
+            editBtn,
+          ),
+        );
+      }
+      container.appendChild(list);
+    },
+    collect(): void {
+      /* the review screen edits nothing */
+    },
+    validate(): string {
+      return "";
+    },
+  };
+}
+
+/** editStep jumps to a step from the review screen, splicing collapsed
+ *  steps into the active walk on demand (right before Review). */
+function editStep(id: StepID): void {
+  let idx = activeSteps.findIndex((s) => s.stepId === id);
+  if (idx < 0) {
+    const step = allSteps.find((s) => s.stepId === id);
+    if (!step) {
+      return;
+    }
+    activeSteps.splice(activeSteps.length - 1, 0, step);
+    idx = activeSteps.length - 2;
+  }
+  wizardIndex = idx;
+  renderCurrentStep();
+}
+
+// --- Finish: GET-overlay-PUT the FULL map, then the passkey offer ---
 
 async function finishWizard(): Promise<void> {
   const finishBtn = $("wizardFinish");
@@ -406,217 +628,186 @@ async function finishWizard(): Promise<void> {
 
 async function finishWizardInner(): Promise<void> {
   abortValidation();
-  const step = wizardSteps[wizardIndex];
-  if (step) {
-    step.collect();
-    const err = step.validate();
-    if (err) {
-      showError("wizardError", err);
-      return;
-    }
-    if (step.validateAsync) {
-      validationAbort = new AbortController();
-      const asyncErr = await step.validateAsync(validationAbort.signal);
-      if (validationAbort.signal.aborted) {
-        return;
-      }
-      validationAbort = null;
-      if (asyncErr) {
-        showError("wizardError", asyncErr);
-        return;
-      }
-    }
-  }
   hideError("wizardError");
 
-  const lines: string[] = [];
-
-  // Sonarr.
-  const sv = wizardValues["sonarr"];
-  if (sv && hasFilled(sv)) {
-    lines.push("sonarr:");
-    lines.push("  enabled: true");
-    appendYAML(lines, sv);
-  }
-
-  // Radarr.
-  const rv = wizardValues["radarr"];
-  if (rv && hasFilled(rv)) {
-    lines.push("radarr:");
-    lines.push("  enabled: true");
-    appendYAML(lines, rv);
-  }
-
-  // Media roots (discard empty entries).
-  const validRoots = mediaRoots.filter((p: string) => p.trim() !== "");
-  if (validRoots.length > 0) {
-    lines.push("media_roots:");
-    for (const root of validRoots) {
-      lines.push('  - "' + esc(root.trim()) + '"');
-    }
-  }
-
-  // Search settings.
-  const searchVals = wizardValues["search"];
-  if (searchVals && hasFilled(searchVals)) {
-    lines.push("search:");
-    appendYAML(lines, searchVals);
-  }
-
-  // Adaptive backoff.
-  const adaptiveVals = wizardValues["adaptive"];
-  if (adaptiveVals && Object.keys(adaptiveVals).length > 0) {
-    lines.push("adaptive:");
-    appendYAML(lines, adaptiveVals);
-  }
-
-  // Languages (discard incomplete rows).
-  const vd = langDefault.filter((d: { code: string }) => d.code.trim() !== "");
-  const vr = langRules.filter(
-    (r: { audio: string; code: string }) => r.audio.trim() !== "" && r.code.trim() !== "",
-  );
-  if (vd.length > 0 || vr.length > 0) {
-    lines.push("languages:");
-    if (vr.length > 0) {
-      lines.push("  rules:");
-      for (const rule of vr) {
-        lines.push('    - audio: "' + esc(rule.audio.trim()) + '"');
-        lines.push("      subtitles:");
-        lines.push('        - code: "' + esc(rule.code.trim()) + '"');
-        if (rule.variant && rule.variant !== DEFAULT_VARIANT) {
-          lines.push('          variant: "' + esc(rule.variant) + '"');
-        }
-      }
-    }
-    if (vd.length > 0) {
-      lines.push("  default:");
-      for (const d of vd) {
-        lines.push('    - code: "' + esc(d.code.trim()) + '"');
-        if (d.variant && d.variant !== DEFAULT_VARIANT) {
-          lines.push('      variant: "' + esc(d.variant) + '"');
-        }
-      }
-    }
-  }
-
-  // Providers.
-  const provSection = schemaByKey("providers");
-  if (provSection?.providers) {
-    const enabled = provSection.providers.filter(
-      (p: ProviderSchema) => providerEnabled[p.name] === true,
-    );
-    if (enabled.length > 0) {
-      lines.push("providers:");
-      for (const prov of enabled) {
-        lines.push("  " + prov.name + ":");
-        lines.push("    enabled: true");
-        const pv = wizardValues["prov_" + prov.name];
-        if (pv) {
-          const nonBool: string[] = [];
-          const boolVals: string[] = [];
-          for (const [k, v] of Object.entries(pv)) {
-            if (v.trim() === "") {
-              continue;
-            }
-            if (v === "true" || v === "false") {
-              boolVals.push("      " + k + ": " + v);
-            } else {
-              nonBool.push("      " + k + ": " + yv(v));
-            }
-          }
-          if (nonBool.length > 0 || boolVals.length > 0) {
-            lines.push("    settings:");
-            for (const l of nonBool) {
-              lines.push(l);
-            }
-            for (const l of boolVals) {
-              lines.push(l);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Post-processing.
-  const ppv = wizardValues["post_processing"];
-  if (ppv && Object.keys(ppv).length > 0) {
-    lines.push("post_processing:");
-    appendYAML(lines, ppv);
-  }
-
-  if (lines.length === 0) {
-    clearDraft();
-    window.location.href = "/";
+  // The wizard holds the full boot snapshot and overlays ONLY touched
+  // sections; untouched sections (logging, backup, auth, trusted_proxies,
+  // post_processing, ...) survive by round-trip. Completion is idempotent:
+  // the actions framework retries network blips, a duplicate PUT re-runs
+  // activation harmlessly, and the server's worker latch absorbs it.
+  const sections = buildSaveSections(boot.sections, currentModel(), touched);
+  const o = await saveWizardConfigAction.dispatch(sections).outcome;
+  if (o.status === "error") {
+    showError("wizardError", "Save failed: " + o.error.message);
     return;
   }
-
-  hideError("wizardError");
-  const ok = await saveWizardConfigAction.dispatch(lines.join("\n") + "\n", {
-    onError: (err) => {
-      showError("wizardError", "Save failed: " + err.message);
-    },
-  });
-  if (ok !== null) {
-    clearDraft();
-    window.location.href = "/";
+  if (o.status !== "success") {
+    return;
   }
+  clearDraft();
+  await showPasskeyOffer();
 }
 
-/** Save the wizard's assembled YAML config. text/yaml body needs a custom
- *  run() (apiAction assumes JSON), so we use defineAction here. retryNetwork
- *  + RETRY_STANDARD recover from transient blips during the most important
- *  wizard step. dedupe protects against rapid Finish clicks. error: false
- *  because the wizard surfaces failures inline via showError, not toast. */
-const saveWizardConfigAction = defineAction<string, unknown>({
+/** Save the wizard's full structured section map (the settings-dialog save
+ *  path; zero server changes). retryNetwork + RETRY_STANDARD recover from
+ *  transient blips; dedupe protects against rapid Finish clicks; failures
+ *  surface inline via showError, not toast. */
+const saveWizardConfigAction = apiAction<Sections>({
   name: "wizard.save_config",
   dedupe: true,
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
-  run: async (yamlBody, signal) => {
-    let res: Response;
-    try {
-      res = await fetch("/api/config", {
-        method: "PUT",
-        headers: { "Content-Type": "text/yaml" },
-        body: yamlBody,
-        signal: AbortSignal.any([signal, AbortSignal.timeout(YAML_TIMEOUT_MS)]),
-      });
-    } catch (e) {
-      throw classifyFetchError(e, signal);
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new ActionError(text || `HTTP ${String(res.status)}`, { status: res.status });
-    }
-    return undefined;
-  },
+  timeout: YAML_TIMEOUT_MS,
+  request: (sections) => ({
+    method: "PUT",
+    path: PATH_SAVE_CONFIG_STRUCTURED,
+    body: { sections } satisfies StructuredConfig,
+  }),
   error: false,
 });
 
-function hasFilled(vals: Record<string, string>): boolean {
-  return Object.values(vals).some((v: string) => v.trim() !== "");
+// --- Passkey offer (R3.1: AFTER activation; skip carries the reason) ---
+
+/** navigateToApp is the flow's SINGLE navigation (the wizard lives on
+ *  login.html, a separate document; "no reload tricks" means no loops or
+ *  polling, not zero navigation). */
+function navigateToApp(): void {
+  window.location.href = "/";
 }
 
-function esc(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-}
-
-function yv(val: string): string {
-  if (val === "true" || val === "false") {
-    return val;
+async function showPasskeyOffer(): Promise<void> {
+  const container = $("wizardSection");
+  if (!container) {
+    navigateToApp();
+    return;
   }
-  if (/^\d+$/.test(val)) {
-    return val;
-  }
-  return '"' + esc(val) + '"';
-}
-
-function appendYAML(lines: string[], vals: Record<string, string>): void {
-  for (const [key, val] of Object.entries(vals)) {
-    if (val.trim() === "") {
-      continue;
+  // The offer replaces the wizard chrome: no back/next/finish, no dots.
+  for (const id of ["wizardBack", "wizardNext", "wizardFinish"]) {
+    const b = $(id);
+    if (b) {
+      b.hidden = true;
     }
-    lines.push("  " + key + ": " + yv(val));
+  }
+  $("wizardProgress")?.replaceChildren();
+  hideError("wizardError");
+
+  container.replaceChildren();
+  container.appendChild(el("h3", { className: "wizard-section-title" }, "Add a passkey?"));
+
+  // Availability probe: signal-data 400s while WebAuthn is unconfigured
+  // (a blank install has nil WebAuthn until a config supplies an RP ID).
+  const signal = await webauthnSignalData();
+  // Runtime feature detection; Boolean() widens away the always-defined DOM
+  // typing so the checks below stay honest conditions.
+  const browserSupport = Boolean(window.PublicKeyCredential);
+
+  const continueBtn = el(
+    "button",
+    { type: "button", id: "wizardOfferContinue", onclick: navigateToApp },
+    "Continue to Subflux",
+  );
+
+  if (!signal || !browserSupport || !setupPassword) {
+    let reason: string;
+    if (!signal) {
+      reason =
+        "Passkeys are unavailable: no WebAuthn Relying Party ID is configured. " +
+        "You can set one later under Settings \u2192 Authentication, then add a passkey from the Security dialog.";
+    } else if (!browserSupport) {
+      reason = "This browser does not support passkeys. You can add one later from another device.";
+    } else {
+      reason =
+        "Passkey enrollment needs your password to confirm. You can add one any time from the Security dialog.";
+    }
+    container.appendChild(el("p", { className: "wiz-offer-reason" }, reason));
+    container.appendChild(el("div", { className: "wiz-offer-actions" }, continueBtn));
+    return;
+  }
+
+  container.appendChild(
+    el(
+      "p",
+      { className: "wiz-offer-reason" },
+      "Sign in faster next time with a passkey on this device. You can also add one later from the Security dialog.",
+    ),
+  );
+  const addBtn = el(
+    "button",
+    {
+      type: "button",
+      id: "wizardOfferAdd",
+      onclick: async (ev: Event) => {
+        const btn = ev.currentTarget as HTMLButtonElement;
+        btn.disabled = true;
+        btn.setAttribute("aria-busy", "true");
+        try {
+          if (await registerOfferPasskey()) {
+            navigateToApp();
+          }
+        } finally {
+          btn.disabled = false;
+          btn.removeAttribute("aria-busy");
+        }
+      },
+    },
+    "Add passkey",
+  );
+  const skipBtn = el(
+    "button",
+    { type: "button", className: "ghost", onclick: navigateToApp },
+    "Skip for now",
+  );
+  container.appendChild(el("div", { className: "wiz-offer-actions" }, addBtn, skipBtn));
+}
+
+/** registerOfferPasskey runs the full registration ceremony with the
+ *  remembered password. Idempotent from the flow's perspective: a failure
+ *  leaves the offer on screen with the error inline and skip available. */
+async function registerOfferPasskey(): Promise<boolean> {
+  try {
+    const begin = await webauthnRegisterBegin({ password: setupPassword });
+    if (!begin?.publicKey) {
+      showError("wizardError", "Failed to start passkey registration.");
+      return false;
+    }
+    const publicKey = creationOptionsFromJSON(begin.publicKey.publicKey);
+    const credential = await navigator.credentials.create({ publicKey });
+    if (!credential) {
+      showError("wizardError", "Passkey creation was cancelled.");
+      return false;
+    }
+    const attestation = credential as PublicKeyCredential;
+    const response = attestation.response as AuthenticatorAttestationResponse;
+    // Custom header required (X-WebAuthn-Session): a documented raw-fetch
+    // flow sourcing only the path constant (same as the Security dialog).
+    const finishRes = await fetch(PATH_WEBAUTHN_REGISTER_FINISH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-WebAuthn-Session": begin.session_token,
+      },
+      body: JSON.stringify({
+        id: attestation.id,
+        rawId: bufferToBase64url(attestation.rawId),
+        type: attestation.type,
+        response: {
+          attestationObject: bufferToBase64url(response.attestationObject),
+          clientDataJSON: bufferToBase64url(response.clientDataJSON),
+        },
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!finishRes.ok) {
+      const data = (await finishRes.json().catch(() => ({}))) as { error?: string };
+      showError("wizardError", data.error ?? "Failed to register the passkey.");
+      return false;
+    }
+    return true;
+  } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      return false;
+    }
+    showError("wizardError", "Passkey registration failed.");
+    return false;
   }
 }

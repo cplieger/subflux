@@ -2,19 +2,15 @@
 // API is unchanged: get, set, batch, subscribe, effect, computed.
 
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
+import type { ParsedConfig } from "./wire/types.gen.js";
+import type { RunningScansByScope } from "./scan-scope.js";
 import { createStore } from "@cplieger/reactive";
 
 // --- Typed store key registry ---
 
-export interface ParsedConfig {
-  configured?: boolean;
-  languages?: string[];
-  providers?: Record<string, unknown>;
-  ignored_codecs?: string[];
-  language_rules?: unknown;
-  radarr_url?: string;
-  sonarr_url?: string;
-}
+// ParsedConfig is the generated wire type for GET /api/config/parsed;
+// re-exported here because the store key below is where consumers meet it.
+export type { ParsedConfig } from "./wire/types.gen.js";
 
 interface SeriesContext {
   series: SeriesItem;
@@ -40,8 +36,10 @@ export interface StoreMap {
   ignoredCodecs: Set<string>;
   detailCtx: DetailCtx;
   currentPage: string;
-  scanInFlight: boolean;
-  refreshPending: boolean;
+  // Running/queued background scans keyed by scope, derived from the
+  // activity feed by the status poll (scan-scope.ts). Scan buttons key off
+  // this shared map — never a local in-flight flag.
+  runningScansByScope: RunningScansByScope;
   isUnconfigured: boolean;
   isReady: boolean;
   isAdmin: boolean;

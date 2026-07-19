@@ -14,7 +14,7 @@ import {
 
 export function buildLanguagesStep(): WizardStep {
   return {
-    id: "languages",
+    stepId: "languages",
     title: "Languages",
     render(container: HTMLElement): void {
       container.appendChild(

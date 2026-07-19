@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"syscall"
 	"time"
@@ -11,13 +12,12 @@ import (
 	"github.com/cplieger/arrapi"
 	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/metrics"
-	"github.com/cplieger/subflux/internal/provider/embedded"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/testsupport"
@@ -26,6 +26,26 @@ import (
 // This file holds the package-wide shared test fakes and the test-server
 // builder used across the server suite. Behavior-specific fakes live next to
 // the tests that use them; only the cross-file fakes belong here.
+
+// --- Authenticator double ---
+
+// testAdminUser is the principal bypassAuthenticator resolves every request
+// to (mirrors the library's synthetic bypass admin).
+var testAdminUser = &auth.User{Username: "admin", Role: auth.RoleAdmin, Enabled: true}
+
+// bypassAuthenticator is a sessionAuthenticator double that authenticates
+// every request as testAdminUser, for tests that exercise handlers without
+// standing up real auth state (the double is what the sessionAuthenticator
+// interface exists for).
+type bypassAuthenticator struct{}
+
+func (bypassAuthenticator) Authenticate(*http.Request) (*auth.User, string, error) {
+	return testAdminUser, "", nil
+}
+
+func (bypassAuthenticator) RequireAuth(http.ResponseWriter, *http.Request) (*auth.User, string, bool) {
+	return testAdminUser, "", true
+}
 
 // --- Shared store / config / provider fakes ---
 
@@ -68,6 +88,7 @@ type qhMockConfig struct {
 	targets     []api.SubtitleTarget
 	searchCfg   api.SearchConfig
 	adaptiveCfg api.AdaptiveConfig
+	embedded    api.EmbeddedPolicy
 }
 
 func (m *qhMockConfig) Scores() api.Scores { return api.DefaultScores }
@@ -89,6 +110,7 @@ func (m *qhMockConfig) SonarrConfig() api.ArrConfig                             
 func (m *qhMockConfig) RadarrConfig() api.ArrConfig                                  { return m.radarrCfg }
 func (m *qhMockConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg          { return m.providers }
 func (m *qhMockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
+func (m *qhMockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
 func (m *qhMockConfig) ServerPort() int                                              { return 8374 }
 func (m *qhMockConfig) PollInterval() time.Duration                                  { return 30 * time.Second }
 func (m *qhMockConfig) LoggingLevel() api.LogLevel                                   { return "info" }
@@ -184,15 +206,12 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		search.WithStore(db), search.WithConfig(cfg),
 		search.WithMetrics(metrics.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
-		search.WithTracks(embedded.ProviderDirect{}))
+		search.WithTracks(embedded.Detector{}))
 	s := &Server{
 		db: db,
 		stores: storeFacade{
-			file:  db,
 			query: db,
-			cov:   db,
 			sync:  db,
-			dl:    db,
 		},
 		metrics:  metrics.New(),
 		activity: activity.New(50),
@@ -207,10 +226,10 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		},
 		// Tests exercise handlers directly (injecting users via context) or
 		// via handleUI (no auth needed for static-asset serving). A bypass
-		// authenticator keeps the Server invariant (auth is always wired)
-		// without requiring each test to stand up real auth state.
+		// authenticator double keeps the Server invariant (auth is always
+		// wired) without requiring each test to stand up real auth state.
 		authDeps: authDeps{
-			authenticator: &authhandlers.Authenticator{Bypass: func() bool { return true }},
+			authenticator: bypassAuthenticator{},
 		},
 	}
 	s.configured.Store(true)
@@ -220,7 +239,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		scorer: sc,
 	})
 	s.scanH = s.initScanHandler()
-	s.manualH = s.initManualHandler()
+	s.manualH = s.initManualHandler(s.newResolver())
 	s.configH = confighandlers.New(&confighandlers.Deps{
 		LoadConfig:    s.loadConfig,
 		SchemaFunc:    s.schemaFunc,
@@ -228,8 +247,5 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		Configured:    func() bool { return s.configured.Load() },
 		ConfigPath:    func() string { return cfgFilePath },
 	})
-	// coverageH, fileH, mediaH are lazily initialized by their delegate methods
-	// when first called, reading from s.stores.cov/file at call time. This allows
-	// tests to override s.stores.cov/file after construction.
 	return s
 }

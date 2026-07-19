@@ -72,6 +72,16 @@
   color: var(--ok);
 }
 
+/* Distinct terminal states: a cancelled scan is muted (user choice, not an
+   outcome to celebrate), a failed one wears the error color. */
+.act-icon.act-cancelled {
+  color: var(--muted);
+}
+
+.act-icon.act-failed {
+  color: var(--err);
+}
+
 .act-icon.act-queued {
   color: var(--muted);
 }

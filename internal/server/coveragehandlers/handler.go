@@ -94,11 +94,12 @@ type SeriesItem struct {
 	Excluded   bool                      `json:"excluded,omitempty"`
 }
 
-// MovieItem is the coverage summary for one movie.
+// MovieItem is the coverage summary for one movie. It carries no file path
+// (S7): clients address the video by MediaRef (id = arr ID) and the server
+// resolves paths.
 type MovieItem struct {
 	Title          string                    `json:"title"`
 	ImdbID         string                    `json:"imdb_id,omitempty"`
-	Path           string                    `json:"path,omitempty"`
 	SceneName      string                    `json:"scene_name,omitempty"`
 	InCinemas      string                    `json:"in_cinemas,omitempty"`
 	DigitalRelease string                    `json:"digital_release,omitempty"`
@@ -249,9 +250,8 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 		}
 		tCov := coverage.CountMovieCoverage(movieSubs[mediaID], targets)
 
-		var filePath, sceneName string
+		var sceneName string
 		if m.MovieFile != nil {
-			filePath = m.MovieFile.Path
 			sceneName = m.MovieFile.SceneName
 		}
 
@@ -264,7 +264,6 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			InCinemas:      m.InCinemas,
 			DigitalRelease: m.DigitalRelease,
 			HasFile:        m.HasFile,
-			Path:           filePath,
 			SceneName:      sceneName,
 			AudioLang:      audioLang,
 			Rule:           ruleName,

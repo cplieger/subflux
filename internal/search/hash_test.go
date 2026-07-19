@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"pgregory.net/rapid"
@@ -151,6 +152,42 @@ func TestHashFile_nonexistent(t *testing.T) {
 	_, _, err := hashFile(context.Background(), "/nonexistent/path/to/file.bin")
 	if err == nil {
 		t.Fatal("hashFile(nonexistent) expected error, got nil")
+	}
+}
+
+// TestHashFile_path_guard pins the traversal guard: ".." is rejected only as
+// a whole path segment, so a legitimate filename containing consecutive dots
+// (e.g. "Show.S01E01..720p.mkv") still gets hash matching.
+func TestHashFile_path_guard(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	data := make([]byte, hashBlockSize*2)
+	dotsPath := filepath.Join(dir, "Show.S01E01..720p.mkv")
+	if err := os.WriteFile(dotsPath, data, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cases := []struct {
+		name      string
+		path      string
+		wantGuard bool
+	}{
+		{name: "double dots inside filename accepted", path: dotsPath},
+		{name: "relative dotdot segment rejected", path: "../escape.mkv", wantGuard: true},
+		{name: "relative path rejected", path: "relative/file.mkv", wantGuard: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, _, err := hashFile(context.Background(), c.path)
+			guardErr := err != nil && strings.Contains(err.Error(), "unsafe path")
+			if c.wantGuard && !guardErr {
+				t.Errorf("hashFile(%q) error = %v, want unsafe-path guard rejection", c.path, err)
+			}
+			if !c.wantGuard && err != nil {
+				t.Errorf("hashFile(%q) unexpected error: %v", c.path, err)
+			}
+		})
 	}
 }
 

@@ -208,6 +208,21 @@ func TestAdaptiveSkip_increments(t *testing.T) {
 	}
 }
 
+// --- RecordEmbeddedDetectorError ---
+
+func TestRecordEmbeddedDetectorError_increments(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	m.RecordEmbeddedDetectorError()
+	m.RecordEmbeddedDetectorError()
+
+	body := renderMetrics(t, m)
+	if !strings.Contains(body, "subflux_embedded_detector_errors_total 2") {
+		t.Error("expected embedded_detector_errors_total 2")
+	}
+}
+
 // --- SetConfigured ---
 
 func TestSetConfigured_toggles_gauge(t *testing.T) {

@@ -63,7 +63,7 @@ func goldenSectionSearch(ctx context.Context, reference, incorrect []Cue, observ
 	bestRatio := (lo + hi) / 2
 	if math.Abs(bestRatio-1.0) < 1e-5 {
 		// Ratio is essentially 1.0; no framerate correction needed.
-		return SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate}
+		return SyncResult{Rate: 1.0, Confidence: ConfidenceNone, Method: MethodFramerate, Source: SourceFramerate}
 	}
 
 	corrected := scaleCues(incorrect, bestRatio)
@@ -80,6 +80,8 @@ func goldenSectionSearch(ctx context.Context, reference, incorrect []Cue, observ
 		Rate:       bestRatio,
 		Confidence: confidence,
 		Method:     MethodFramerate,
+		Source:     SourceFramerate,
+		Transform:  Transform{Kind: TransformFramerate, Ratio: bestRatio},
 	}
 }
 

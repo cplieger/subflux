@@ -89,14 +89,17 @@ RUN PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
     && cp ffmpeg_g ffmpeg \
     && cp ffprobe_g ffprobe
 
-# --- TypeScript build (compile static-src/*.ts → static/*.js) ---
+# --- TypeScript type gate (tsc --noEmit over static-src) ---
 # Uses the same tsc (TypeScript 7 native compiler) tarball pattern as
 # apps/vibekit. Now that TS7 shipped stable, renovate tracks the `typescript`
 # npm package and we fetch its per-platform native binary
 # (@typescript/typescript-linux-<arch>, published in lockstep with the
 # metapackage at the same version). Plain alpine here (not golang-alpine)
 # because nothing in this stage needs Go — tsc is a self-contained native
-# binary.
+# binary. This stage only TYPECHECKS (tsconfig.json is noEmit) and fetches
+# the pinned @cplieger client libraries; the bundling itself happens in the
+# Go builder stage via cmd/bundle (esbuild's Go API — see that stage), which
+# consumes this stage's static-src tree with the fetched node_modules.
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS ts-builder
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
@@ -124,60 +127,55 @@ COPY internal/server/static-src/ ./
 # web-terminal-kiro. Extracted to static-src/node_modules/@cplieger/<lib>/ so tsc's
 # bundler resolution finds the package + its types.
 # renovate: datasource=npm depName=@cplieger/actions
-ARG CPLIEGER_ACTIONS_VERSION=2.0.13
+ARG CPLIEGER_ACTIONS_VERSION=3.1.0
+# renovate: datasource=npm depName=@cplieger/reactive
+ARG CPLIEGER_REACTIVE_VERSION=1.2.5
+# renovate: datasource=npm depName=@cplieger/ui-primitives
+ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.0.0
+# renovate: datasource=npm depName=@cplieger/fetch
+ARG CPLIEGER_FETCH_VERSION=2.1.0
+
+# Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
+# client compiles from the ARG-pinned npm tarballs below, while
+# static-src/package.json pins what local dev (tsc + vitest) compiles
+# against — nothing else fails when they disagree, so a manual bump that
+# misses one side would silently ship a lib version dev never ran. Assert
+# every ARG == its package.json pin BEFORE fetching, so the mismatch dies
+# here with a named error. Renovate moves both pins in one grouped PR on the
+# routine path; this gate catches the human bypass.
+RUN check_pin() { \
+      pkg="$1"; want="$2"; \
+      got=$(sed -n "s|.*\"@cplieger/${pkg}\": \"\([^\"]*\)\".*|\1|p" package.json); \
+      : "${got:?pin-gate: no @cplieger/${pkg} pin found in static-src/package.json}"; \
+      if [ "$got" != "$want" ]; then \
+        echo "ERROR ${pkg}-pin-mismatch: static-src/package.json pins @cplieger/${pkg} ${got} but Dockerfile ARG pins ${want}" >&2; \
+        exit 1; \
+      fi; \
+    } && \
+    check_pin actions "$CPLIEGER_ACTIONS_VERSION" && \
+    check_pin reactive "$CPLIEGER_REACTIVE_VERSION" && \
+    check_pin ui-primitives "$CPLIEGER_UI_PRIMITIVES_VERSION" && \
+    check_pin fetch "$CPLIEGER_FETCH_VERSION"
+
 RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/actions --strip-components=1
-# renovate: datasource=npm depName=@cplieger/reactive
-ARG CPLIEGER_REACTIVE_VERSION=1.2.5
 RUN mkdir -p node_modules/@cplieger/reactive && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/reactive/-/reactive-${CPLIEGER_REACTIVE_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/reactive --strip-components=1
-# renovate: datasource=npm depName=@cplieger/ui-primitives
-ARG CPLIEGER_UI_PRIMITIVES_VERSION=2.1.2
 RUN mkdir -p node_modules/@cplieger/ui-primitives && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/ui-primitives/-/ui-primitives-${CPLIEGER_UI_PRIMITIVES_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/ui-primitives --strip-components=1
-# renovate: datasource=npm depName=@cplieger/fetch
-ARG CPLIEGER_FETCH_VERSION=1.1.3
 RUN mkdir -p node_modules/@cplieger/fetch && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/fetch/-/fetch-${CPLIEGER_FETCH_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/fetch --strip-components=1
 
-# Compile app TypeScript and the @cplieger lib TS source in a single layer.
-# App TS emits to ../static via tsconfig.json's outDir; lib TS emits to
-# ../static/vendor/<scope>-<lib>/ for the importmap-based browser resolution
-# (see internal/server/static/index.html). ui-primitives has a subdir export
-# (toast/), so its src/toast/*.ts is compiled alongside src/*.ts; rootDir=src
-# preserves the toast/ layout the importmap points at. Its base stylesheet is
-# copied to ../static/ui-primitives.css (served via <link>, not the CSS bundle).
-RUN /tmp/package/lib/tsc --project tsconfig.json && \
-    /tmp/package/lib/tsc \
-        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
-        --outDir ../static/vendor/cplieger-actions \
-        --rootDir node_modules/@cplieger/actions/src \
-        --skipLibCheck --strict \
-        node_modules/@cplieger/actions/src/*.ts && \
-    /tmp/package/lib/tsc \
-        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
-        --outDir ../static/vendor/cplieger-reactive \
-        --rootDir node_modules/@cplieger/reactive/src \
-        --skipLibCheck --strict \
-        node_modules/@cplieger/reactive/src/*.ts && \
-    /tmp/package/lib/tsc \
-        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
-        --outDir ../static/vendor/cplieger-ui-primitives \
-        --rootDir node_modules/@cplieger/ui-primitives/src \
-        --skipLibCheck --strict \
-        node_modules/@cplieger/ui-primitives/src/*.ts \
-        node_modules/@cplieger/ui-primitives/src/toast/*.ts && \
-    cp node_modules/@cplieger/ui-primitives/css/ui-primitives.css ../static/ui-primitives.css && \
-    /tmp/package/lib/tsc \
-        --ignoreConfig --module ESNext --target ESNext --moduleResolution bundler \
-        --outDir ../static/vendor/cplieger-fetch \
-        --rootDir node_modules/@cplieger/fetch/src \
-        --skipLibCheck --strict \
-        node_modules/@cplieger/fetch/src/*.ts
+# Type gate: tsconfig.json is noEmit, so this only typechecks the app
+# sources against the pinned @cplieger lib sources fetched above — a lib/app
+# type conflict fails the build here, before the Go stage bundles. esbuild
+# (cmd/bundle, Go builder stage) transpiles without typechecking, so this
+# gate is what keeps type errors failing the image build exactly as before.
+RUN /tmp/package/lib/tsc --project tsconfig.json
 
 # --- Go build ---
 FROM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS builder
@@ -189,48 +187,28 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 COPY *.go ./
 COPY config.example.yaml ./
+COPY cmd/bundle/ cmd/bundle/
 COPY internal/ internal/
-COPY --from=ts-builder /src/static/*.js internal/server/static/
-# The lib TS compiles to static/vendor/<scope>-<lib>/ (importmap targets in
-# index.html / login.html). The *.js glob above is non-recursive and skips
-# subdirectories, so copy the vendor subtree explicitly — otherwise go:embed
-# omits it and /vendor/* 404s at runtime, breaking the actions framework.
-COPY --from=ts-builder /src/static/vendor/ internal/server/static/vendor/
-# Same non-recursive-glob caveat: the wiregen output (decoders.gen.js /
-# types.gen.js, imported as ./wire/*.gen.js by login.js + app.js) lives in
-# static/wire/, which the *.js glob skips. Without this, go:embed omits it
-# and /wire/decoders.gen.js 404s — served as the JSON 401 envelope, which
-# the browser rejects as a disallowed module MIME type, so the login /
-# first-boot wizard never boots.
-COPY --from=ts-builder /src/static/wire/ internal/server/static/wire/
-# @cplieger/ui-primitives ships one base stylesheet (structure + motion). It is
-# served standalone at /ui-primitives.css via a <link> (loaded before style.css
-# so the skin split in style.css layers on top) rather than concatenated into
-# the CSS bundle, which is assembled from static-src/css below. The non-recursive
-# *.js glob above skips it, so copy it explicitly or go:embed omits it and
-# /ui-primitives.css 404s (unstyled toasts/tooltips/confirm at runtime).
-COPY --from=ts-builder /src/static/ui-primitives.css internal/server/static/ui-primitives.css
+# The pinned @cplieger client-library sources fetched (and pin-gated) in
+# ts-builder: cmd/bundle resolves the bare `@cplieger/*` import specifiers
+# from static-src/node_modules, exactly like local dev's npm install.
+# (.dockerignore excludes the local node_modules, so this overlay is the
+# only lib source — builds never depend on the dev box's tree.)
+COPY --from=ts-builder /src/static-src/node_modules/ internal/server/static-src/node_modules/
 
-# Concatenate per-feature CSS splits into the served bundles.
-# Naming convention:
-#   MANIFEST          -> style.css  (the main bundle, like vibekit/web-terminal-kiro)
-#   <name>.MANIFEST   -> <name>.css (e.g. login.MANIFEST -> login.css)
-RUN set -eu; \
-    css_src=internal/server/static-src/css; \
-    css_out=internal/server/static; \
-    for manifest in "${css_src}"/*MANIFEST; do \
-        mname=$(basename "${manifest}"); \
-        if [ "${mname}" = "MANIFEST" ]; then \
-            out_name="style.css"; \
-        else \
-            out_name="${mname%.MANIFEST}.css"; \
-        fi; \
-        : > "${css_out}/${out_name}"; \
-        while IFS= read -r line || [ -n "$line" ]; do \
-            case "$line" in ''|\#*) continue ;; esac; \
-            cat "${css_src}/${line}" >> "${css_out}/${out_name}"; \
-        done < "${manifest}"; \
-    done
+# Build the browser client into internal/server/static/ with cmd/bundle
+# (esbuild via its Go API — a Go library, no Node, no npm): app.ts +
+# login.ts bundle to /app.js + /login.js as ESM with code splitting (shared
+# modules become hashed chunks under /chunks/, cached across the login → app
+# transition), the CSS manifests concatenate to style.css / login.css,
+# ui-primitives.css is copied standalone, and every emitted text asset gets
+# a precompressed .gz sibling the server hands to gzip-accepting clients.
+# Types were already gated in ts-builder; esbuild only bundles. go:embed
+# ships the result inside the binary below.
+# hadolint ignore=DL3062
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go run ./cmd/bundle
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

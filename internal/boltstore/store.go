@@ -69,37 +69,11 @@ type DB struct {
 	statFn statFunc
 }
 
-// Open opens (creating if necessary) the bbolt database at path with owner-only
-// (0o600) permissions and a bounded file-lock timeout. The returned *DB owns
-// the handle; the caller must Close it to release the file lock.
-//
-// A held file lock (a second opener of the same file) fails fast within
-// openTimeout rather than blocking indefinitely (Requirement 13.2).
-//
-// In one Update transaction Open then (a) verifies the on-disk schema versions
-// are not from a future, breaking build — refusing to open if so, since no
-// downgrade migration exists — and (b) bootstraps EVERY core and auth bucket.
-// The core store is the single bucket-schema owner: it creates every primary
-// and index bucket from coreBuckets+authBuckets (the auth-domain key builders
-// live in internal/authstore, but the buckets are owned here), so the auth
-// store only ever shares the already-bootstrapped handle. Finally it writes the
-// current core and auth schema versions into meta.
-//
-// The schema versions are written UNCONDITIONALLY to the current value, not
-// only-when-absent. verifySchemaVersions has already refused any stored version
-// that mismatches this build (no migration exists in either direction), so the
-// only values that reach the write are absent (fresh file) or equal (re-open).
-// Setting them to the current value in every case is correct and avoids a
-// read-modify-write branch: after a successful Open the file is, by
-// definition, a current-build file.
-//
-// If the bootstrap Update fails, Open closes the handle before returning so a
-// failed Open never leaks the file lock.
-func Open(path string) (*DB, error) {
-	if path == "" {
-		return nil, errors.New("boltstore: open: path must not be empty")
-	}
-	db, err := bbolt.Open(path, 0o600, &bbolt.Options{
+// openOptions returns the bbolt open options shared by Open and the
+// copy-migration reopen (migrate.go), so a database swapped in by a
+// copy-to-new-file migration step reopens with exactly the production tuning.
+func openOptions() *bbolt.Options {
+	return &bbolt.Options{
 		Timeout: openTimeout,
 		// Freelist as hashmap instead of sorted array: O(1) allocation and no
 		// O(n) sorted-insert on free. etcd runs this in production and bbolt's
@@ -111,27 +85,89 @@ func Open(path string) (*DB, error) {
 		// full-file scan at open, which is instant on a tens-of-MB file.
 		NoFreelistSync:  true,
 		InitialMmapSize: initialMmapSize,
-	})
+	}
+}
+
+// Open opens (creating if necessary) the bbolt database at path with owner-only
+// (0o600) permissions and a bounded file-lock timeout. The returned *DB owns
+// the handle; the caller must Close it to release the file lock.
+//
+// A held file lock (a second opener of the same file) fails fast within
+// openTimeout rather than blocking indefinitely (Requirement 13.2).
+//
+// Open's ordering is explicit (migrate.go owns steps 1-3):
+//
+//  1. Read both schema-version stamps STRICTLY (missing, malformed, older,
+//     current, and newer are distinguished; a populated file with a missing or
+//     malformed stamp, or any stamp newer than this build, refuses to open).
+//  2. Validate the registered migration ladders (a malformed registry fails
+//     the open loudly before any user data is touched).
+//  3. Run any pending forward migration steps, snapshotting the file first.
+//     When both stamps already equal this build's versions — every open but
+//     the first after an upgrade — this is a no-op fast path.
+//  4. Bootstrap EVERY core and auth bucket (CreateBucketIfNotExists) and
+//     re-stamp the current versions. Bucket bootstrap deliberately runs AFTER
+//     the ladder so it cannot pre-create buckets a migration step expects to
+//     create or rename.
+//
+// The core store is the single bucket-schema owner: it creates every primary
+// and index bucket from coreBuckets+authBuckets (the auth-domain key builders
+// live in internal/authstore, but the buckets are owned here), so the auth
+// store only ever shares the already-bootstrapped handle.
+//
+// The schema versions are written UNCONDITIONALLY to the current value, not
+// only-when-absent. The migration runner has already refused a newer stamp and
+// advanced an older one through the ladder, so the only values that reach the
+// write are absent (fresh file) or equal (re-open / just-migrated). Setting
+// them to the current value in every case is correct and avoids a
+// read-modify-write branch: after a successful Open the file is, by
+// definition, a current-build file.
+//
+// If migration or bootstrap fails, Open closes the handle before returning so
+// a failed Open never leaks the OS file lock.
+func Open(path string) (*DB, error) {
+	return openWithDomains(path, coreDomain(), authDomain())
+}
+
+// openWithDomains is Open with injectable migration domains. Production passes
+// the package registries via coreDomain/authDomain; tests inject ladders and
+// target versions through custom domains (never by mutating the package-level
+// registries, which would race under go test).
+func openWithDomains(path string, core, auth *migrationDomain) (*DB, error) {
+	if path == "" {
+		return nil, errors.New("boltstore: open: path must not be empty")
+	}
+	db, err := bbolt.Open(path, 0o600, openOptions())
 	if err != nil {
 		return nil, fmt.Errorf("boltstore: open %q: %w", path, err)
 	}
-	if err := bootstrap(db); err != nil {
-		// Close the handle so a failed Open does not leak the OS file lock.
+	// runMigrations may swap the handle (copy-kind step: close, rename,
+	// reopen); it returns the live handle, or nil when every handle is
+	// already closed (a post-rename failure).
+	db, err = runMigrations(db, core, auth)
+	if err != nil {
+		if db != nil {
+			// Close the handle so a failed Open does not leak the OS file lock.
+			_ = db.Close()
+		}
+		return nil, fmt.Errorf("boltstore: open %q: %w", path, err)
+	}
+	if err := bootstrap(db, core.current, auth.current); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("boltstore: open %q: %w", path, err)
 	}
 	return &DB{db: db, statFn: os.Stat}, nil
 }
 
-// bootstrap runs the one-time-per-open schema check and bucket creation inside a
-// single Update. It is split out of Open so the transaction body stays
-// readable. verifySchemaVersions runs FIRST (detect-and-refuse a future schema)
-// before any bucket is created, so refusing a future file leaves it untouched.
-func bootstrap(db *bbolt.DB) error {
+// bootstrap creates every core and auth bucket and stamps the supplied schema
+// versions, inside a single Update. It runs AFTER the migration ladder
+// (Requirement 1.7): creating buckets ahead of a pending step could pre-create
+// a bucket the step expects to create or rename. The stamp values are the
+// domains' current versions — the package constants in production, a test
+// domain's target under an injected ladder — so a just-migrated file is
+// re-stamped to the value the ladder already reached (a no-op write).
+func bootstrap(db *bbolt.DB, coreCurrent, authCurrent uint64) error {
 	return db.Update(func(tx *bbolt.Tx) error {
-		if err := verifySchemaVersions(tx); err != nil {
-			return err
-		}
 		for _, name := range coreBuckets {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return fmt.Errorf("bootstrap core bucket %q: %w", name, err)
@@ -142,10 +178,10 @@ func bootstrap(db *bbolt.DB) error {
 				return fmt.Errorf("bootstrap auth bucket %q: %w", name, err)
 			}
 		}
-		if err := writeSchemaVersion(tx, metaKeyCoreSchemaVersion, coreSchemaVersion); err != nil {
+		if err := writeSchemaVersion(tx, metaKeyCoreSchemaVersion, coreCurrent); err != nil {
 			return err
 		}
-		return writeSchemaVersion(tx, metaKeyAuthSchemaVersion, authSchemaVersion)
+		return writeSchemaVersion(tx, metaKeyAuthSchemaVersion, authCurrent)
 	})
 }
 

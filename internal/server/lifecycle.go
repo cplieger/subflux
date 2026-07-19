@@ -8,12 +8,14 @@ import (
 	"net/http"
 	pathpkg "path"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/webhttp"
 )
 
@@ -45,10 +47,10 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	}
 	slog.Info("HTTP server listening", "addr", addr)
 
-	// Flip readiness off the instant shutdown is signalled — before webhttp.Run
-	// drains in-flight requests — so /api/health reports unready during the drain
-	// window, preserving the pre-webhttp teardown ordering for load balancers.
-	context.AfterFunc(ctx, func() {
+	// The pre-drain hook flips readiness off before webhttp.Run drains in-flight
+	// requests, so /api/health reports unready during the drain window,
+	// preserving the pre-webhttp teardown ordering for load balancers.
+	preDrain := func(context.Context) {
 		s.ready.Set(false)
 		slog.Info("shutting down HTTP server", "sse_clients", s.events.ClientCount())
 		// Drain the SSE hub: cancel every live stream and refuse reconnects
@@ -56,18 +58,9 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		// requests and hold webhttp.Run's graceful drain open for the whole
 		// grace budget on every shutdown.
 		s.events.Shutdown()
-	})
-
-	// onShutdown runs after Run drains in-flight requests (within the same grace
-	// budget), matching the old ordering where the session batcher stopped after
-	// srv.Shutdown returned.
-	onShutdown := func(context.Context) {
-		if s.sessBatcher != nil {
-			s.sessBatcher.Stop()
-		}
 	}
 
-	if err := webhttp.Run(ctx, srv, ln, onShutdown); err != nil {
+	if err := webhttp.Run(ctx, srv, ln, nil, webhttp.WithPreDrain(preDrain)); err != nil {
 		slog.Error("HTTP server error", "error", err)
 	}
 
@@ -117,6 +110,12 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	return webhttp.Chain(mux,
 		cop.Handler,
+		// Strip X-Forwarded-Proto from requests not arriving via a configured
+		// trusted proxy, BEFORE anything consults it (the per-request session
+		// cookie posture trusts the header; see authhandlers.SessionCookie).
+		// Runs outermost-after-COP so every downstream consumer sees the
+		// sanitized value.
+		authhandlers.SanitizeForwardedProto,
 		webhttp.Logging(
 			webhttp.WithLogger(slog.Default()),
 			webhttp.WithSkipPaths("/api/events"),
@@ -162,17 +161,14 @@ func securityHeadersMW() webhttp.Middleware {
 	)
 }
 
-// cacheControlMW sets Cache-Control: no-store on every response. subflux serves
-// per-user, per-request data (coverage tables, config, auth/session state) that
-// must never be cached by a browser or intermediary. webhttp ships no
-// cache-control feature, so this stays a one-line app-owned middleware, applied
-// innermost in the global chain.
-func cacheControlMW(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		next.ServeHTTP(w, r)
-	})
-}
+// cacheControlMW applies the scoped cache policy (see staticcache.go):
+// per-user data (API responses, HTML entrypoints, SPA fallback) is never
+// cached (`no-store`), while the embedded static assets carry a
+// startup-computed ETag with `no-cache` so browsers revalidate with cheap
+// 304s instead of re-downloading the whole frontend every page load. webhttp
+// ships no cache-control feature, so this stays app-owned, applied innermost
+// in the global chain (every response carries one of the two directives).
+var cacheControlMW = cacheControlFor(staticETags)
 
 // --- Top-level handlers ---
 
@@ -196,49 +192,67 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	webhttp.ReadinessHandler(&s.ready)(w, r)
 }
 
-// asyncActionResponse is the typed 202 Accepted response for async actions.
-type asyncActionResponse struct {
-	Status string `json:"status"`
-}
-
-// asyncAction starts fn in a background goroutine, returning 202 if started,
-// 409 if already running, 405 on non-POST requests.
-func (s *Server) asyncAction(ctx context.Context, w http.ResponseWriter, r *http.Request,
-	flag *atomic.Bool, busyMsg, startedMsg string, fn func(context.Context),
-) {
+// handleScan triggers a full library scan: 202 + activity_id, 405 on
+// non-POST. A duplicate start while a full scan is already running — manual
+// or scheduled; both flavors run through scheduler.PrepareFullScan and carry
+// the ScanKindFull scope — is idempotent (R1.5): it answers 202 with the
+// RUNNING scan's activity id and starts no second scan. The s.scanning
+// CompareAndSwap keeps the ownership semantics for actually starting; the
+// activity log's active full-scan entry is where the running id lives, so
+// the guard pair (flag, entry) needs no extra shared state. The
+// scan-specific fork of the former generic asyncAction helper (this was its
+// only caller): the accept sequence — activity start, stop registration,
+// scan:start — is hoisted into scheduler.PrepareFullScan so the 202 body
+// can carry the activity id.
+func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
-	if !flag.CompareAndSwap(false, true) {
-		api.ConflictC(w, r, api.CodeScanInProgress, busyMsg)
-		return
+	if !s.scanning.CompareAndSwap(false, true) {
+		// Already running: idempotent duplicate answer carrying the live
+		// scan's id. PrepareFullScan creates the entry immediately after
+		// the owner's CAS and it stays active until just before the flag
+		// clears, so this lookup misses only in two sub-microsecond
+		// windows (owner accept, owner teardown).
+		if id, ok := s.activity.ActiveScan(activity.ScanScope{Kind: activity.ScanKindFull}); ok {
+			api.WriteJSONStatus(w, http.StatusAccepted,
+				scanning.ScanAccepted{ActivityID: id, Status: "scan already running"})
+			return
+		}
+		// No active entry: either the previous scan is tearing down (entry
+		// terminal, flag not yet cleared) — retry the acquisition once —
+		// or the owner is inside its accept instant, where conflict is the
+		// honest answer (a re-click lands after the window).
+		if !s.scanning.CompareAndSwap(false, true) {
+			api.ConflictC(w, r, api.CodeScanInProgress, "scan already in progress")
+			return
+		}
 	}
+	actID, run := scheduler.PrepareFullScan(s.schedulerDeps(), activity.SourceManual)
 	s.bgWg.Go(func() {
-		defer flag.Store(false)
-		fn(ctx)
+		defer s.scanning.Store(false)
+		run(s.ctx)
 	})
-	api.WriteJSONStatus(w, http.StatusAccepted, asyncActionResponse{Status: startedMsg})
+	api.WriteJSONStatus(w, http.StatusAccepted,
+		scanning.ScanAccepted{ActivityID: actID, Status: "scan started"})
 }
 
-// handleScan triggers a full scan via asyncAction, guarded by s.scanning.
-func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
-	s.asyncAction(s.ctx, w, r, &s.scanning,
-		"scan already in progress", "scan started",
-		func(ctx context.Context) { s.runFullScan(ctx) })
-}
-
-// handleUI serves the embedded web UI with SPA fallback.
+// handleUI serves the embedded web UI with SPA fallback. Real static files
+// go through serveAsset (ETag revalidation + precompressed .gz variant
+// selection; see staticcache.go); the .gz sibling paths themselves are not
+// addressable and fall through to the fallbacks like any unknown path.
 func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(pathpkg.Clean(r.URL.Path), "/")
 	if p == "" {
 		p = indexHTML
 	}
+	servable := p != indexHTML && p != loginHTML && !strings.HasSuffix(p, ".gz")
 
 	// Static assets are public: serve them directly if present.
-	if p != indexHTML && p != loginHTML {
+	if servable {
 		if info, err := fs.Stat(staticSub, p); err == nil && !info.IsDir() {
-			http.ServeFileFS(w, r, staticSub, p)
+			serveAsset(w, r, staticSub, staticETags, p)
 			return
 		}
 	}
@@ -252,9 +266,11 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authenticated: serve the requested static file or SPA fallback.
-	if info, err := fs.Stat(staticSub, p); err == nil && !info.IsDir() {
-		http.ServeFileFS(w, r, staticSub, p)
+	// Authenticated: an explicit /login.html request is honored (the OIDC
+	// link-on-login ceremony lands there); everything else that isn't a
+	// real asset falls back to the SPA entrypoint.
+	if p == loginHTML {
+		http.ServeFileFS(w, r, staticSub, loginHTML)
 		return
 	}
 	http.ServeFileFS(w, r, staticSub, indexHTML)

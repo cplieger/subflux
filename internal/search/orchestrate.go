@@ -19,15 +19,16 @@ import (
 // multiple variant targets from the shared results. Targets sharing the
 // same language code are queried together to halve API calls (e.g. fr
 // standard + fr forced). Each target's results are filtered by variant,
-// scored, and downloaded independently. Returns saved paths and
-// searched/skipped counters.
+// scored, and downloaded independently. Returns the typed per-language
+// outcome consumed by the season tracker and scan stats.
 func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	targets []api.SubtitleTarget, videoPath string, mediaType api.MediaType, mediaID string,
 	existing *existingSubs, searchCfg *api.SearchConfig,
 	upgradeCutoff time.Time,
-) (paths []string, searched, skipped, backedOff int) {
+) api.LangOutcome {
 	lang := targets[0].Code
 	label := req.MediaLabel()
+	out := api.LangOutcome{Lang: lang}
 
 	// Manual locks are checked per target (per variant) inside
 	// buildTargetStates: a locked variant is excluded while its siblings keep
@@ -35,8 +36,9 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	states, anyNeedsSearch := e.buildTargetStates(ctx, req, targets, existing,
 		searchCfg, mediaType, mediaID, lang, label, upgradeCutoff)
 	if !anyNeedsSearch {
-		skipped = len(targets)
-		return paths, searched, skipped, backedOff
+		out.Kind = api.LangSkipped
+		out.Skipped = len(targets)
+		return out
 	}
 
 	// Collect the union of providers across all targets that need searching.
@@ -47,17 +49,22 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 			"media", label, "lang", lang,
 			"total_providers", len(unionProvs))
 		// The group needed a search but zero provider queries ran: its own
-		// category, NOT "searched" — counting it as searched fed synthetic
+		// kind, NOT "searched" — counting it as searched fed synthetic
 		// no-result evidence into the season tracker and overstated the scan
 		// summary every cycle a 7-day backoff overlapped a 24h scan.
-		backedOff = len(targets)
-		return paths, searched, skipped, backedOff
+		out.Kind = api.LangBackedOff
+		return out
 	}
+	out.Kind = api.LangSearched
 
 	// Single provider query for this language.
 	langReq := *req
 	langReq.Languages = []string{lang}
 	outcome := e.searchProvidersFiltered(ctx, &langReq, eligible)
+	// Record how many providers were actually queried (the health timeout
+	// can zero this even on a "searched" group): the scan loops key the
+	// inter-item pacing delay on real provider traffic, not on Kind.
+	out.Queried = outcome.attempted()
 
 	// Identity validation (shared across all variants).
 	kept, dropped := scoring.FilterByIdentity(outcome.results, req)
@@ -72,38 +79,48 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	}
 	outcome.results = kept
 
-	// Process each target variant from the shared results. ONE provider query
-	// ran for the whole language group, so adaptive backoff is recorded at
-	// most once per group: the guard is shared across the variant targets
-	// (each variant recording independently would advance the backoff ladder
-	// two steps per scan for a two-variant language).
-	noResultRecorded := false
+	// Process each target variant from the shared results.
+	anyNoResult := false
 	for i := range states {
 		if !states[i].needsSearch {
-			skipped++
+			out.Skipped++
 			continue
 		}
-		searched++
+		out.Searched++
 
-		path := e.processTargetVariant(ctx, req, &states[i],
-			&outcome, videoPath, mediaType, mediaID, lang, label, &noResultRecorded)
+		path, noResult := e.processTargetVariant(ctx, req, &states[i],
+			&outcome, videoPath, mediaType, mediaID, lang, label)
 		if path != "" {
-			paths = append(paths, path)
+			out.Paths = append(out.Paths, path)
+		}
+		if noResult {
+			anyNoResult = true
 		}
 	}
-	return paths, searched, skipped, backedOff
+
+	// ONE provider query ran for the whole language group, so adaptive
+	// backoff is recorded at most once per group: recording per variant
+	// would advance the backoff ladder two steps per scan for a two-variant
+	// language. recordProviderNoResults with an empty succeeded set is a
+	// no-op, matching the per-variant guards above.
+	if anyNoResult {
+		e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
+			label, outcome.succeeded())
+	}
+	return out
 }
 
 // processTargetVariant filters, scores, and downloads a subtitle for one
 // variant target from the shared provider results. Applies variant filtering
 // (standard/forced/HI), per-target provider filtering, scoring with upgrade
 // awareness, and iterates download candidates in score order. Returns the
-// saved path or empty string if no suitable subtitle was found.
+// saved path (empty if no suitable subtitle was found) and whether this
+// variant hit a genuine no-result (non-upgrade, providers answered, nothing
+// usable) — the caller records adaptive backoff once per language group.
 func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchRequest,
 	state *targetState, outcome *searchOutcome,
 	videoPath string, mediaType api.MediaType, mediaID, lang, label string,
-	noResultRecorded *bool,
-) string {
+) (path string, noResult bool) {
 	// Filter by variant.
 	filtered, variantFallback := filterByVariant(
 		outcome.results, state.variant)
@@ -123,13 +140,9 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchReques
 				"media", label, "media_id", mediaID,
 				"lang", lang, "variant", state.variant,
 				"searched", outcome.succeeded())
-			if !*noResultRecorded {
-				*noResultRecorded = true
-				e.recordProviderNoResults(ctx, mediaType, mediaID, lang,
-					label, outcome.succeeded())
-			}
+			return "", true
 		}
-		return ""
+		return "", false
 	}
 
 	video := videoInfoFromRequest(req)
@@ -141,9 +154,7 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchReques
 	}
 	aboveMin := filterByScore(scored, minScore)
 	if len(aboveMin) == 0 {
-		e.logNoResults(ctx, state, scored, outcome, mediaType, mediaID,
-			lang, label, minScore, noResultRecorded)
-		return ""
+		return "", logNoResults(state, scored, lang, label, minScore)
 	}
 
 	if state.isUpgrade {
@@ -156,5 +167,5 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchReques
 	}
 
 	return e.downloadBestCandidate(ctx, req, aboveMin,
-		videoPath, mediaType, mediaID, lang, state.variant, label)
+		videoPath, mediaType, mediaID, lang, state.variant, label), false
 }

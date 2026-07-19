@@ -10,20 +10,20 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/cplieger/httpx/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
-	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/provider/dlcache"
+	"github.com/cplieger/subflux/internal/subtitleext"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
@@ -57,10 +57,16 @@ var defaultHDBitsConfig = hdbitsConfig{
 const providerName = api.ProviderNameHDBits
 
 // hdbAcceptedExts lists filename extensions accepted as subtitle content
-// (direct files) or season-pack archives. Matched case-insensitively.
+// (direct files, from the extension authority's archiveInput view) or
+// season-pack archives. Matched case-insensitively.
 var hdbAcceptedExts = func() map[string]bool {
-	m := make(map[string]bool, len(archive.SubtitleExts)+2)
-	maps.Copy(m, archive.SubtitleExts)
+	exts := subtitleext.Extensions()
+	m := make(map[string]bool, len(exts)+2)
+	for _, ext := range exts {
+		if subtitleext.ArchiveInput(ext) {
+			m[ext] = true
+		}
+	}
 	m[".zip"] = true
 	m[".rar"] = true
 	return m
@@ -299,21 +305,21 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodGet, dlURL, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
+		return nil, httpx.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "hdbits download "+subID, p.passkey)
+		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, p.passkey)
 	}
 	defer resp.Body.Close()
 
 	if httpErr := httputil.CheckHTTPStatus(resp); httpErr != nil {
-		return nil, httputil.RedactSecret(httpErr, p.passkey)
+		return nil, httpx.RedactSecret(httpErr, p.passkey)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
 	if err != nil {
-		return nil, httputil.RedactSecret(err, p.passkey)
+		return nil, httpx.RedactSecret(err, p.passkey)
 	}
 
 	p.dlCache.Put(subID, data, func() {

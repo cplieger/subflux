@@ -83,6 +83,11 @@ type scanRec struct {
 	AudioLang string    `json:"audio_lang"`
 	Season    int       `json:"season"`
 	Episode   int       `json:"episode"`
+	// Searched records whether provider work ran to completion for this
+	// stamp (false = inventory-only visit). Additive field: rows written
+	// before it existed decode as false, which reads as "no attested
+	// provider work", the conservative truth.
+	Searched bool `json:"searched,omitempty"`
 }
 
 // sync_offsets stores a bare be64(offset_ms) value (keyed by path) and
@@ -114,10 +119,12 @@ func decodeRecord[T any](mode kv.DecodeMode, bucket string, key, data []byte, v 
 //
 // The core and auth domains version independently via two SEPARATE meta keys,
 // so an additive change to one does not bump the other. This build writes and
-// understands coreSchemaVersion / authSchemaVersion; the actual write-on-
-// bootstrap happens in store.go's bucket bootstrap (task 2.3) using
-// writeSchemaVersion, after verifySchemaVersions has confirmed the on-disk
-// file is not from a future, breaking version.
+// understands coreSchemaVersion / authSchemaVersion. Open reads the stamps
+// strictly (readRequiredVersion in migrate.go: missing, malformed, older,
+// current, and newer are all distinguished), runs any pending migration-ladder
+// steps, and only then bootstraps buckets and re-stamps the current versions
+// (store.go). Additive value changes never bump a version; a breaking change
+// bumps it and ships a ladder step (migrations.go).
 
 const (
 	// coreSchemaVersion is the core-domain (search_attempts, subtitle_state,
@@ -131,86 +138,49 @@ const (
 	// ix_state_imported / ix_state_video indexes, and no secondary index on
 	// search_attempts. The counter was reset to 1 before the first release
 	// (the internal pre-release iterations that bumped it never shipped);
-	// any dev file stamped with a higher version is refused like any other
-	// mismatch — delete it and let state rebuild.
+	// a dev file stamped with a higher version is refused by the
+	// newer-than-binary guard (restore a matching build or a snapshot).
 	coreSchemaVersion uint64 = 1
 
 	// authSchemaVersion is the auth-domain (auth_users, auth_passkeys,
 	// auth_api_keys) value-schema version. It evolves independently of
 	// coreSchemaVersion.
 	authSchemaVersion uint64 = 1
+
+	// coreSchemaBaseVersion is the FIRST core schema version ever shipped:
+	// the fixed floor of the core migration ladder. It NEVER changes once
+	// set; only coreSchemaVersion moves. validateLadder (migrate.go) accepts
+	// an empty core ladder only while coreSchemaVersion still equals this
+	// base — a version bump without a registered base-to-current path
+	// refuses the open.
+	coreSchemaBaseVersion uint64 = 1
+
+	// authSchemaBaseVersion is coreSchemaBaseVersion's auth-domain sibling.
+	authSchemaBaseVersion uint64 = 1
 )
 
 // meta-bucket scalar keys for the two schema versions. Kept as separate keys so
-// the core and auth schemas evolve independently. There is NO migration by
-// design (clean break); these exist only for detect-and-refuse on a breaking
-// change in either direction.
+// the core and auth schemas evolve independently: each migration-ladder step
+// advances exactly its OWN domain's stamp (in the same transaction as the
+// step's transform) and never touches the other domain's key.
 var (
 	metaKeyCoreSchemaVersion = []byte("core_schema_version")
 	metaKeyAuthSchemaVersion = []byte("auth_schema_version")
 )
 
-// readSchemaVersion reads an 8-byte big-endian schema-version scalar from the
-// meta bucket. present is false when the meta bucket is absent (an
-// un-bootstrapped or fresh file) or the key is unset, in which case version is
-// zero.
-func readSchemaVersion(tx *bolt.Tx, key []byte) (version uint64, present bool) {
-	mb := tx.Bucket([]byte(bucketMeta))
-	if mb == nil {
-		return 0, false
-	}
-	return kv.GetUint64(mb, key)
-}
-
 // writeSchemaVersion writes version as an 8-byte big-endian scalar at key in
-// the meta bucket. It is called by the bucket bootstrap (task 2.3) inside the
-// same Update that creates the buckets. It errors if the meta bucket does not
-// exist (bootstrap must create it first).
+// the meta bucket. It is called by the bucket bootstrap (store.go) inside the
+// same Update that creates the buckets, and by the migration runner
+// (migrate.go) to advance a domain's stamp in the same transaction as the
+// step's transform. It errors if the meta bucket does not exist (bootstrap
+// creates it; a populated pre-ladder file always has it, since its stamp was
+// just read from it).
 func writeSchemaVersion(tx *bolt.Tx, key []byte, version uint64) error {
 	mb := tx.Bucket([]byte(bucketMeta))
 	if mb == nil {
 		return fmt.Errorf("boltstore: write schema version: meta bucket %q not found", bucketMeta)
 	}
 	return kv.PutUint64(mb, key, version)
-}
-
-// checkSchemaVersion applies the detect-and-refuse policy: an absent version
-// (fresh file) is accepted, an equal stored version is accepted, and ANY
-// mismatch is refused — the version only ever moves on a breaking change
-// (additive value changes do not bump it), and no migration exists in either
-// direction by design. A stored version newer than current means the file was
-// written by a future build; older means this build's schema left it behind
-// (e.g. the v2 variant key dimension). domain names the schema for the error
-// message.
-func checkSchemaVersion(domain string, stored uint64, present bool, current uint64) error {
-	if !present {
-		return nil
-	}
-	if stored > current {
-		return fmt.Errorf("boltstore: %s schema version %d on disk is newer than this build's %d; "+
-			"the store was written by a newer version and cannot be opened (no downgrade migration exists)",
-			domain, stored, current)
-	}
-	if stored < current {
-		return fmt.Errorf("boltstore: %s schema version %d on disk is older than this build's %d "+
-			"and no migration exists (clean-break policy); delete the database file and let subflux "+
-			"rebuild it (state and coverage repopulate on the next scan; auth users/passkeys/API keys "+
-			"must be recreated)", domain, stored, current)
-	}
-	return nil
-}
-
-// verifySchemaVersions reads both schema-version meta keys and applies
-// checkSchemaVersion to each, returning the first refusal. It is read-only and
-// is run during Open (task 2.3) before any write. A fresh file (no meta bucket
-// yet, or unset keys) passes; the bootstrap then writes the current versions.
-func verifySchemaVersions(tx *bolt.Tx) error {
-	coreStored, corePresent := readSchemaVersion(tx, metaKeyCoreSchemaVersion)
-	if err := checkSchemaVersion("core", coreStored, corePresent, coreSchemaVersion); err != nil {
-		return err
-	}
-	authStored, authPresent := readSchemaVersion(tx, metaKeyAuthSchemaVersion)
-	return checkSchemaVersion("auth", authStored, authPresent, authSchemaVersion)
 }
 
 // --- Decode policy ---

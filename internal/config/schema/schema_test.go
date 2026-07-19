@@ -1,9 +1,11 @@
 package schema
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 func TestSchema_returns_all_sections(t *testing.T) {
@@ -12,7 +14,7 @@ func TestSchema_returns_all_sections(t *testing.T) {
 
 	wantKeys := []string{
 		"sonarr", "radarr", "media_roots", "trusted_proxies", "poll_interval",
-		"languages", "providers", "search", "adaptive",
+		"languages", "embedded_subtitles", "providers", "search", "adaptive",
 		"post_processing", "auth", "scoring", "backup", "logging",
 	}
 	if len(sections) != len(wantKeys) {
@@ -21,6 +23,50 @@ func TestSchema_returns_all_sections(t *testing.T) {
 	for i, want := range wantKeys {
 		if sections[i].Key != want {
 			t.Errorf("Schema()[%d].Key = %q, want %q", i, sections[i].Key, want)
+		}
+	}
+}
+
+// TestSchema_embedded_subtitles_defaults_declared_once pins the P14
+// single-source property at its post-cutover home: the embedded policy
+// defaults (true/true/false) are declared once in the defaults package and
+// rendered into the embedded_subtitles schema section from there — the same
+// constants newWithDefaults feeds the pre-defaulted config decode.
+func TestSchema_embedded_subtitles_defaults_declared_once(t *testing.T) {
+	t.Parallel()
+	sections := Schema(nil)
+	var emb *api.SchemaSection
+	for i := range sections {
+		if sections[i].Key == "embedded_subtitles" {
+			emb = &sections[i]
+			break
+		}
+	}
+	if emb == nil {
+		t.Fatal("Schema() lacks the embedded_subtitles section")
+	}
+	if emb.Type != "fields" {
+		t.Errorf("embedded_subtitles.Type = %q, want fields (standard section renderer)", emb.Type)
+	}
+	want := map[string]string{
+		"ignore_pgs":    strconv.FormatBool(defaults.EmbeddedIgnorePGS),
+		"ignore_vobsub": strconv.FormatBool(defaults.EmbeddedIgnoreVobSub),
+		"ignore_ass":    strconv.FormatBool(defaults.EmbeddedIgnoreASS),
+	}
+	if len(emb.Fields) != len(want) {
+		t.Fatalf("embedded_subtitles has %d fields, want %d", len(emb.Fields), len(want))
+	}
+	for _, f := range emb.Fields {
+		wantDefault, ok := want[f.Key]
+		if !ok {
+			t.Errorf("unexpected field %q in embedded_subtitles section", f.Key)
+			continue
+		}
+		if f.Default != wantDefault {
+			t.Errorf("embedded_subtitles.%s Default = %q, want %q", f.Key, f.Default, wantDefault)
+		}
+		if f.Type != "bool" {
+			t.Errorf("embedded_subtitles.%s Type = %q, want bool", f.Key, f.Type)
 		}
 	}
 }

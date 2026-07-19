@@ -169,13 +169,10 @@ func TestActivityLog_progress_updates_entry(t *testing.T) {
 	id := al.Start("Scan", "initial detail", "scheduled")
 	al.Progress(id, 5, 20, "updated detail")
 
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.EntriesUnsafe()) != 1 {
-		t.Fatalf("entries count = %d, want 1", len(al.EntriesUnsafe()))
+	if n := len(al.Entries()); n != 1 {
+		t.Fatalf("entries count = %d, want 1", n)
 	}
-	e := al.EntriesUnsafe()[0]
+	e, _ := al.Get(id)
 	if e.Current != 5 {
 		t.Errorf("entry.Current = %d, want 5", e.Current)
 	}
@@ -194,10 +191,7 @@ func TestActivityLog_progress_empty_detail_preserves_existing(t *testing.T) {
 	id := al.Start("Scan", "original detail", "scheduled")
 	al.Progress(id, 3, 10, "")
 
-	al.RLock()
-	defer al.RUnlock()
-
-	e := al.EntriesUnsafe()[0]
+	e, _ := al.Get(id)
 	if e.Detail != "original detail" {
 		t.Errorf("entry.Detail = %q, want %q (empty detail should preserve original)",
 			e.Detail, "original detail")
@@ -214,12 +208,8 @@ func TestActivityLog_progress_nonexistent_id_is_noop(t *testing.T) {
 	al.Start("Scan", "detail", "scheduled")
 	al.Progress("nonexistent", 99, 100, "should not appear")
 
-	al.RLock()
-	defer al.RUnlock()
-
-	if al.EntriesUnsafe()[0].Current != 0 {
-		t.Errorf("entry.Current = %d, want 0 (nonexistent ID should not modify)",
-			al.EntriesUnsafe()[0].Current)
+	if got := al.Entries()[0].Current; got != 0 {
+		t.Errorf("entry.Current = %d, want 0 (nonexistent ID should not modify)", got)
 	}
 }
 

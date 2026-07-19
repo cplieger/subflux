@@ -13,7 +13,10 @@
 # Prerequisites:
 #   - subflux running and reachable at SUBFLUX_URL
 #   - subflux auth disabled (auth.disable_auth: true) or API key configured
-#   - Sonarr and Radarr reachable from subflux
+#   - Sonarr and Radarr reachable from subflux (arr-dependent sections only:
+#     media_browser, coverage, scans, sync, poster_proxy, real_providers.
+#     The remaining sections run against a bare instance with the mock
+#     provider — CI runs that subset via .github/workflows/functional.yaml)
 #   - jq installed
 #
 # Usage:
@@ -177,11 +180,29 @@ restore_config() {
   printf '%bSave your config backup and restore manually.%b\n' "$RED" "$NC" >&2
 }
 
-_sonarr_key() { printf '%s' "$ORIGINAL_CONFIG" | grep -A5 'sonarr:' | grep 'api_key:' | sed 's/.*api_key: *//' | tr -d '"' | tr -d "'"; } # REDACTED
-_radarr_key() { printf '%s' "$ORIGINAL_CONFIG" | grep -A5 'radarr:' | grep 'api_key:' | sed 's/.*api_key: *//' | tr -d '"' | tr -d "'"; } # REDACTED
+# Extract the api_key from one top-level arr section of ORIGINAL_CONFIG.
+# Section-scoped on purpose: a naive `grep -A5 'sonarr:'` also matches URL
+# values like http://sonarr:8989, capturing BOTH arr keys (a two-line value
+# that breaks every generated config). The value is the redaction
+# placeholder; the server merges the real key back from disk on save.
+_arr_key() {
+  printf '%s' "$ORIGINAL_CONFIG" | awk -v sec="$1" '
+    index($0, sec ":") == 1 { insec = 1; next }
+    /^[^ #]/ { insec = 0 }
+    insec && /^ *api_key:/ { sub(/^ *api_key: */, ""); print; exit }
+  ' | tr -d '"' | tr -d "'"
+}
+_sonarr_key() { _arr_key sonarr; }
+_radarr_key() { _arr_key radarr; }
 
+# apply_mock_config MODE [MOCK_EXTRA] [TOP_EXTRA] [LANG_RULES]
+# LANG_RULES is emitted inside the languages: block (e.g. a "  rules:" list).
+# It must NOT be passed via TOP_EXTRA: a second top-level languages: key is a
+# duplicate mapping key, which the YAML parser rejects and the save 400s.
+# auth.disable_auth is pinned so hot-reloading this config never re-enables
+# auth mid-suite (the suite's curl helpers send no credentials).
 apply_mock_config() {
-  local mode="$1" mock_extra="${2:-}" top_extra="${3:-}"
+  local mode="$1" mock_extra="${2:-}" top_extra="${3:-}" lang_rules="${4:-}"
   api_put "/api/config" "sonarr:
   enabled: true
   url: \"http://sonarr:8989\"
@@ -197,11 +218,11 @@ languages:
   default:
     - code: en
     - code: fr
+${lang_rules}
+embedded_subtitles:
+  ignore_pgs: true
+  ignore_vobsub: true
 providers:
-  embedded:
-    settings:
-      ignore_pgs: true
-      ignore_vobsub: true
   mock:
     enabled: true
     priority: 1
@@ -227,6 +248,8 @@ scoring:
     video_codec: 10
     hdr: 8
     season_pack: 15
+auth:
+  disable_auth: true
 logging:
   level: debug
   format: json
@@ -321,14 +344,6 @@ test_auth() {
   api_post "/api/auth/login" '{}'
   assert_status 401 "Login: empty body"
 
-  # Login method not allowed
-  _curl -X GET "${SUBFLUX_URL}/api/auth/login"
-  assert_status 405 "Login: GET not allowed"
-
-  # TOTP verify without token
-  api_post "/api/auth/totp" '{"code":"123456","totp_token":"invalid"}'
-  assert_status 401 "TOTP verify: invalid token"
-
   # Logout without session
   api_post "/api/auth/logout"
   assert_status 200 "Logout: no session"
@@ -368,13 +383,6 @@ test_auth() {
     && pass "List users (HTTP $HTTP_STATUS)" \
     || fail "List users: HTTP $HTTP_STATUS"
 
-  # Reauth without session
-  api_post "/api/auth/reauth" '{"method":"password","password":"test"}'
-  sync_status
-  [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "401" ] \
-    && pass "Reauth (HTTP $HTTP_STATUS)" \
-    || fail "Reauth: HTTP $HTTP_STATUS"
-
   # WebAuthn login begin (requires WebAuthn configured)
   api_post "/api/auth/webauthn/login/begin"
   sync_status
@@ -389,9 +397,11 @@ test_auth() {
     && pass "WebAuthn signal data (HTTP $HTTP_STATUS)" \
     || fail "WebAuthn signal data: HTTP $HTTP_STATUS"
 
-  # OIDC redirect (requires OIDC configured)
-  _curl -o /dev/null -w '%{http_code}' "${SUBFLUX_URL}/api/auth/oidc" >"$SF_STATUS" 2>/dev/null || true
-  _read_status
+  # OIDC redirect (302 when configured, 400 when not). _curl already
+  # captures the status; extra -o/-w flags here used to clobber the
+  # status file with the response body.
+  api_get "/api/auth/oidc" >/dev/null
+  sync_status
   [ "$HTTP_STATUS" = "302" ] || [ "$HTTP_STATUS" = "400" ] || [ "$HTTP_STATUS" = "401" ] \
     && pass "OIDC redirect (HTTP $HTTP_STATUS)" \
     || fail "OIDC redirect: HTTP $HTTP_STATUS"
@@ -418,7 +428,7 @@ test_config() {
   sync_status
   assert_status 200 "GET /api/config/parsed"
   assert_json_not_empty "$parsed" ".search" "Parsed has search config"
-  assert_json_not_empty "$parsed" ".logging" "Parsed has logging config"
+  assert_json_not_empty "$parsed" ".providers" "Parsed has providers map"
 
   # Auth config in parsed response
   local auth_enabled
@@ -454,19 +464,51 @@ test_providers() {
   log "=== Providers ==="
   local provs
 
+  # Deterministic list content: enable one credential-free real provider
+  # (gestdown) alongside mock. The visible list must then be EXACTLY that
+  # provider — mock is hidden test infrastructure, and embedded is no longer
+  # an acquisition provider (detector separation), so nothing else may leak
+  # in. A zero-provider config is valid (WARN, not error), so the old
+  # unconditional "non-empty" assertion no longer holds against arbitrary
+  # boot configs.
+  apply_mock_config "static" '  gestdown:
+    enabled: true
+    priority: 2'
+
   provs=$(api_get "/api/providers")
   sync_status
   assert_status 200 "GET /api/providers"
-  assert_json_len "$provs" "." gt 0 "Provider list non-empty"
+  assert_json_len "$provs" "." eq 1 "Visible provider list is exactly the enabled real provider"
+  local has_gestdown
+  has_gestdown=$(printf '%s' "$provs" | jq '[.[] | select(.name=="gestdown")] | length' 2>/dev/null)
+  [ "${has_gestdown:-0}" -eq 1 ] && pass "Gestdown present in provider list" || fail "Gestdown missing from provider list"
 
+  # Mock is internal test infrastructure: functional when enabled, but
+  # deliberately hidden from the settings schema and the provider list.
   local schema_provs has_mock
   schema_provs=$(api_get "/api/config/schema")
   sync_status
   has_mock=$(printf '%s' "$schema_provs" | jq '[.[] | select(.key=="providers") | .providers[] | select(.name=="mock")] | length' 2>/dev/null)
-  [ "${has_mock:-0}" -gt 0 ] && pass "Mock in schema" || fail "Mock not in schema"
+  [ "${has_mock:-0}" -eq 0 ] && pass "Mock hidden from schema" || fail "Mock leaked into schema"
+  has_mock=$(printf '%s' "$provs" | jq '[.[] | select(.name=="mock")] | length' 2>/dev/null)
+  [ "${has_mock:-0}" -eq 0 ] && pass "Mock hidden from provider list" || fail "Mock leaked into provider list"
 
-  api_get "/api/providers/timeout"
+  # Embedded is not an acquisition provider (detector separation): absent by
+  # construction from the provider list, the provider schema, and the
+  # timeout status; the dedicated embedded_subtitles schema section exists.
+  local has_embedded
+  has_embedded=$(printf '%s' "$provs" | jq '[.[] | select(.name=="embedded")] | length' 2>/dev/null)
+  [ "${has_embedded:-0}" -eq 0 ] && pass "Embedded absent from provider list" || fail "Embedded leaked into provider list"
+  has_embedded=$(printf '%s' "$schema_provs" | jq '[.[] | select(.key=="providers") | .providers[] | select(.name=="embedded")] | length' 2>/dev/null)
+  [ "${has_embedded:-0}" -eq 0 ] && pass "Embedded absent from provider schema" || fail "Embedded leaked into provider schema"
+  has_embedded=$(printf '%s' "$schema_provs" | jq '[.[] | select(.key=="embedded_subtitles")] | length' 2>/dev/null)
+  [ "${has_embedded:-0}" -eq 1 ] && pass "embedded_subtitles schema section present" || fail "embedded_subtitles schema section missing"
+
+  local timeouts
+  timeouts=$(api_get "/api/providers/timeout")
   assert_status 200 "GET /api/providers/timeout"
+  has_embedded=$(printf '%s' "$timeouts" | jq '.providers.embedded != null' 2>/dev/null)
+  [ "$has_embedded" != "true" ] && pass "Embedded absent from timeout status" || fail "Embedded leaked into timeout status"
   api_post "/api/providers/timeout/reset"
   assert_status 200 "POST /api/providers/timeout/reset"
 }
@@ -661,6 +703,48 @@ test_manual_search() {
 }
 
 # ===========================================================================
+# SECTION: search_resolve
+# ===========================================================================
+# The remote CLI search's resolution leg: user query -> arr media items.
+# Arr-dependent (lists the live Sonarr/Radarr libraries).
+test_search_resolve() {
+  log "=== Search Resolve ==="
+  local r
+
+  r=$(api_get "/api/search/resolve?title=Inception&type=movie")
+  sync_status
+  assert_status 200 "Resolve: movie by title"
+  assert_json "$r" ".resolved" "true" "Movie resolves"
+  assert_json_len "$r" ".items" eq 1 "Movie yields one item"
+  assert_json "$r" ".items[0].media_type" "movie" "Movie item type"
+  assert_json_not_empty "$r" ".items[0].media_id" "Movie item carries arr id"
+
+  r=$(api_get "/api/search/resolve?title=Breaking+Bad&type=series&season=1&episode=1")
+  sync_status
+  assert_status 200 "Resolve: series narrowed to S01E01"
+  assert_json "$r" ".resolved" "true" "Series resolves"
+  assert_json_len "$r" ".items" eq 1 "Season+episode narrowing yields one item"
+  assert_json "$r" ".items[0].media_type" "episode" "Series expands to episode items"
+
+  r=$(api_get "/api/search/resolve?title=Breaking+Bad")
+  sync_status
+  assert_status 200 "Resolve: absent type falls back series-then-movie"
+  assert_json "$r" ".resolved" "true" "Fallback resolves the series"
+
+  r=$(api_get "/api/search/resolve?title=No-Such-Title-Zzz")
+  sync_status
+  assert_status 200 "Resolve: unknown title answers 200"
+  assert_json "$r" ".resolved" "false" "Unknown title is an empty result"
+
+  api_get "/api/search/resolve?type=movie"
+  assert_status 400 "Resolve: missing identifiers rejected"
+  api_get "/api/search/resolve?title=x&type=album"
+  assert_status 400 "Resolve: invalid type rejected"
+  api_get "/api/search/resolve?tmdb=abc"
+  assert_status 400 "Resolve: non-integer tmdb rejected"
+}
+
+# ===========================================================================
 # SECTION: scoring
 # ===========================================================================
 test_scoring() {
@@ -769,7 +853,7 @@ test_mock_provider() {
   assert_status 200 "Mock lang filter: en query"
   count=$(printf '%s' "$r" | jq '.results | length' 2>/dev/null)
   [ "${count:-0}" -eq 0 ] && pass "Mock lang filter: 0 en results" \
-    || log "Mock lang filter: $count results (may include embedded)"
+    || log "Mock lang filter: $count results"
 
   r=$(api_get "/api/search?title=Test&year=2024&lang=fr&type=movie")
   sync_status
@@ -957,8 +1041,7 @@ test_language_rules() {
   log "=== Language Rule Combinations ==="
   local t tc
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: en
       subtitles:
         - code: fr'
@@ -968,8 +1051,7 @@ test_language_rules() {
   tc=$(printf '%s' "$t" | jq 'length' 2>/dev/null)
   [ "${tc:-0}" -ge 1 ] && pass "Lang: $tc targets" || fail "Lang: 0 targets"
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: en
       subtitles:
         - code: fr
@@ -978,8 +1060,7 @@ test_language_rules() {
   api_get "/api/search/targets?orig_lang=en&audio_langs=en"
   assert_status 200 "Lang: en -> fr,de,es"
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: fr
       subtitles:
         - code: en
@@ -987,8 +1068,7 @@ test_language_rules() {
   api_get "/api/search/targets?orig_lang=fr&audio_langs=fr"
   assert_status 200 "Lang: fr -> en std+forced"
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: en
       subtitles:
         - code: en
@@ -996,8 +1076,7 @@ test_language_rules() {
   api_get "/api/search/targets?orig_lang=en&audio_langs=en"
   assert_status 200 "Lang: en -> en HI"
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: ja
       subtitles:
         - code: en
@@ -1005,8 +1084,7 @@ test_language_rules() {
   api_get "/api/search/targets?orig_lang=ja&audio_langs=ja"
   assert_status 200 "Lang: provider filter"
 
-  apply_mock_config "static" "" 'languages:
-  rules:
+  apply_mock_config "static" "" "" '  rules:
     - audio: en
       subtitles:
         - code: fr
@@ -1021,8 +1099,58 @@ test_language_rules() {
 # ===========================================================================
 # SECTION: scans
 # ===========================================================================
+
+# start_scan <label> <path> [json-body]: POST a scan start, assert the 202 +
+# activity_id contract, and leave the id in SCAN_ACT_ID ("" on failure).
+start_scan() {
+  local label="$1" path="$2" body="${3:-}"
+  SCAN_ACT_ID=""
+  local resp
+  resp=$(api_post "$path" "$body")
+  sync_status # $() ran api_post in a subshell; re-read HTTP_STATUS here
+  if [ "$HTTP_STATUS" != "202" ]; then
+    fail "$label: HTTP $HTTP_STATUS, want 202"
+    return 1
+  fi
+  SCAN_ACT_ID=$(printf '%s' "$resp" | jq -r '.activity_id // empty')
+  if [ -z "$SCAN_ACT_ID" ]; then
+    fail "$label: 202 body carries no activity_id: $resp"
+    return 1
+  fi
+  pass "$label: 202 + activity_id=$SCAN_ACT_ID"
+  return 0
+}
+
+# poll_scan_terminal <label> <activity_id> [timeout_s]: poll GET /api/activity
+# (the 202 contract's status monitor) until the entry reaches a terminal
+# state. Sets SCAN_CANCELLED / SCAN_FAILED ("true"/"false").
+poll_scan_terminal() {
+  local label="$1" id="$2" timeout="${3:-180}" waited=0 row entry_done
+  SCAN_CANCELLED="false"
+  SCAN_FAILED="false"
+  while [ "$waited" -lt "$timeout" ]; do
+    row=$(curl -sf --max-time 10 "${SUBFLUX_URL}/api/activity" 2>/dev/null \
+      | jq -c --arg id "$id" '[.[] | select(.id == $id)] | .[0] // empty')
+    if [ -z "$row" ]; then
+      fail "$label: activity entry $id vanished before terminal state"
+      return 1
+    fi
+    entry_done=$(printf '%s' "$row" | jq -r '.done')
+    if [ "$entry_done" = "true" ]; then
+      SCAN_CANCELLED=$(printf '%s' "$row" | jq -r '.cancelled // false')
+      SCAN_FAILED=$(printf '%s' "$row" | jq -r '.failed // false')
+      pass "$label: terminal after ${waited}s (cancelled=$SCAN_CANCELLED failed=$SCAN_FAILED)"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  fail "$label: not terminal after ${timeout}s"
+  return 1
+}
+
 test_scans() {
-  log "=== Scan Operations ==="
+  log "=== Scan Operations (202 + activity monitor + explicit stop) ==="
   local sid mid eid
 
   apply_mock_config "static" '      result_count: "1"'
@@ -1035,28 +1163,35 @@ test_scans() {
   fi
 
   if [ -n "$sid" ] && [ "$sid" != "null" ]; then
-    local t0 t1
-    t0=$(date +%s)
-    _curl --max-time 120 -X POST "${SUBFLUX_URL}/api/scan/series/${sid}"
-    t1=$(date +%s)
-    _read_status
-    [ "$HTTP_STATUS" = "200" ] && pass "Scan series/$sid (HTTP 200, $((t1 - t0))s)" \
-      || fail "Scan series/$sid: HTTP $HTTP_STATUS"
+    # Series scan: 202 immediately, completion observed via activity polling.
+    if start_scan "Scan series/$sid" "/api/scan/series/${sid}"; then
+      # Idempotent same-scope start: while running/queued, a re-POST returns
+      # the SAME activity id (a completed first scan legitimately mints a new
+      # one, so only assert when the first is still live).
+      local rerun_id running
+      running=$(curl -sf --max-time 10 "${SUBFLUX_URL}/api/activity" 2>/dev/null \
+        | jq -r --arg id "$SCAN_ACT_ID" '[.[] | select(.id == $id and (.done | not))] | length')
+      rerun_id=$(api_post "/api/scan/series/${sid}" | jq -r '.activity_id // empty')
+      if [ "$running" = "1" ]; then
+        [ "$rerun_id" = "$SCAN_ACT_ID" ] \
+          && pass "Idempotent same-scope start returns running id" \
+          || fail "Idempotent start: got id $rerun_id, want $SCAN_ACT_ID"
+      else
+        log "Idempotency probe skipped (first scan already terminal)"
+      fi
+      poll_scan_terminal "Scan series/$sid" "$SCAN_ACT_ID"
+    fi
 
-    api_get "/api/activity"
-    assert_status 200 "Activity after scan"
-
-    t0=$(date +%s)
-    _curl --max-time 120 -X POST "${SUBFLUX_URL}/api/scan/season/${sid}/1"
-    t1=$(date +%s)
-    _read_status
-    [ "$HTTP_STATUS" = "200" ] && pass "Scan season/${sid}/1 (HTTP 200, $((t1 - t0))s)" \
-      || fail "Scan season/${sid}/1: HTTP $HTTP_STATUS"
+    if start_scan "Scan season/${sid}/1" "/api/scan/season/${sid}/1"; then
+      poll_scan_terminal "Scan season/${sid}/1" "$SCAN_ACT_ID"
+    fi
 
     eid=$(curl -sf --max-time 30 "${SUBFLUX_URL}/api/media/series/${sid}/episodes" 2>/dev/null | jq '.[0].id // empty')
     if [ -n "$eid" ] && [ "$eid" != "null" ]; then
-      api_post "/api/scan/item" "{\"media_type\":\"episode\",\"media_id\":${eid},\"season\":1,\"episode\":1}"
-      assert_status 202 "Scan item: episode"
+      if start_scan "Scan item: episode" "/api/scan/item" \
+        "{\"media_type\":\"episode\",\"media_id\":${sid},\"season\":1,\"episode\":1}"; then
+        poll_scan_terminal "Scan item: episode" "$SCAN_ACT_ID"
+      fi
     fi
   else
     skip "No series for scan tests"
@@ -1064,28 +1199,95 @@ test_scans() {
 
   mid=$(curl -sf --max-time 30 "${SUBFLUX_URL}/api/media/movies" 2>/dev/null | jq '.[0].id // empty')
   if [ -n "$mid" ] && [ "$mid" != "null" ]; then
-    api_post "/api/scan/movie/${mid}"
-    assert_status 200 "Scan movie/$mid"
-    api_post "/api/scan/item" "{\"media_type\":\"movie\",\"media_id\":${mid}}"
-    assert_status 202 "Scan item: movie"
+    if start_scan "Scan movie/$mid" "/api/scan/movie/${mid}"; then
+      poll_scan_terminal "Scan movie/$mid" "$SCAN_ACT_ID"
+    fi
+    if start_scan "Scan item: movie" "/api/scan/item" "{\"media_type\":\"movie\",\"media_id\":${mid}}"; then
+      poll_scan_terminal "Scan item: movie" "$SCAN_ACT_ID"
+    fi
   else
     skip "No movies for scan tests"
   fi
 
-  api_post "/api/scan"
-  [ "$HTTP_STATUS" = "202" ] || [ "$HTTP_STATUS" = "409" ] \
-    && pass "Full scan trigger (HTTP $HTTP_STATUS)" \
-    || fail "Full scan: HTTP $HTTP_STATUS"
+  # Full scan + explicit stop: start it, assert the idempotent duplicate
+  # start (R1.5: a second POST answers 202 with the RUNNING scan's id, never
+  # the old 409), stop it via the cancel endpoint, and observe the terminal
+  # cancelled state (graceful: the item in flight completes first, so allow
+  # real polling time).
+  local full_resp full_id
+  full_resp=$(api_post "/api/scan")
+  sync_status
+  if [ "$HTTP_STATUS" = "202" ]; then
+    full_id=$(printf '%s' "$full_resp" | jq -r '.activity_id // empty')
+    [ -n "$full_id" ] && pass "Full scan trigger: 202 + activity_id=$full_id" \
+      || fail "Full scan 202 body carries no activity_id: $full_resp"
+    if [ -n "$full_id" ]; then
+      # Idempotent duplicate full-scan start: only probed while the first
+      # scan is still live (a completed scan legitimately mints a new id).
+      local dup_resp dup_id running
+      running=$(curl -sf --max-time 10 "${SUBFLUX_URL}/api/activity" 2>/dev/null \
+        | jq -r --arg id "$full_id" '[.[] | select(.id == $id and (.done | not))] | length')
+      if [ "$running" = "1" ]; then
+        dup_resp=$(api_post "/api/scan")
+        sync_status
+        dup_id=$(printf '%s' "$dup_resp" | jq -r '.activity_id // empty')
+        if [ "$HTTP_STATUS" = "202" ] && [ "$dup_id" = "$full_id" ]; then
+          pass "Duplicate full-scan start returns running id (202)"
+        else
+          # The scan may have finished between the probe and the POST; in
+          # that case the duplicate legitimately started a fresh scan.
+          running=$(curl -sf --max-time 10 "${SUBFLUX_URL}/api/activity" 2>/dev/null \
+            | jq -r --arg id "$full_id" '[.[] | select(.id == $id and (.done | not))] | length')
+          if [ "$running" = "1" ]; then
+            fail "Duplicate full-scan start: HTTP $HTTP_STATUS id=$dup_id, want 202 + running id $full_id"
+          else
+            log "Duplicate full-scan probe inconclusive (scan finished mid-probe)"
+            [ -n "$dup_id" ] && api_post "/api/activity/${dup_id}/cancel" >/dev/null
+          fi
+        fi
+      else
+        log "Duplicate full-scan probe skipped (scan already terminal)"
+      fi
+      api_post "/api/activity/${full_id}/cancel"
+      if [ "$HTTP_STATUS" = "204" ]; then
+        pass "Stop full scan: 204"
+        # Idempotent second stop.
+        api_post "/api/activity/${full_id}/cancel"
+        [ "$HTTP_STATUS" = "204" ] || [ "$HTTP_STATUS" = "409" ] \
+          && pass "Repeated stop idempotent (HTTP $HTTP_STATUS)" \
+          || fail "Repeated stop: HTTP $HTTP_STATUS"
+        if poll_scan_terminal "Stopped full scan" "$full_id" 300; then
+          [ "$SCAN_CANCELLED" = "true" ] \
+            && pass "Stopped full scan reports cancelled terminal state" \
+            || fail "Stopped full scan: cancelled=$SCAN_CANCELLED failed=$SCAN_FAILED, want cancelled=true"
+        fi
+      elif [ "$HTTP_STATUS" = "409" ]; then
+        # The scan finished before the stop landed (tiny library): not
+        # cancellable is the honest answer.
+        pass "Stop full scan raced completion (HTTP 409, acceptable)"
+      else
+        fail "Stop full scan: HTTP $HTTP_STATUS"
+      fi
+    fi
+  else
+    # 409 is no longer a duplicate-start answer (R1.5): a start while a
+    # scan runs must return 202 + the running scan's id.
+    fail "Full scan: HTTP $HTTP_STATUS, want 202"
+  fi
 
   # Edge cases
   api_post "/api/scan/series/0"
-  log "Scan series/0: HTTP $HTTP_STATUS"
+  assert_status 400 "Scan series/0 rejected"
   api_post "/api/scan/movie/0"
-  log "Scan movie/0: HTTP $HTTP_STATUS"
+  assert_status 400 "Scan movie/0 rejected"
+  api_post "/api/scan/series/99999999"
+  assert_status 404 "Scan unknown series: synchronous preflight 404"
   api_post "/api/scan/item" "{}"
-  log "Scan item empty: HTTP $HTTP_STATUS"
+  assert_status 400 "Scan item empty rejected"
   api_post "/api/scan/item" '{"media_type":"invalid","media_id":1}'
-  log "Scan item invalid: HTTP $HTTP_STATUS"
+  assert_status 400 "Scan item invalid rejected"
+  api_post "/api/activity/999999/cancel"
+  assert_status 404 "Cancel unknown activity"
 
   api_put "/api/config" "$ORIGINAL_CONFIG" >/dev/null
   sleep 2
@@ -1177,16 +1379,24 @@ test_manual_download() {
 # ===========================================================================
 test_hot_reload() {
   log "=== Config Hot Reload ==="
-  local modified parsed level
+  local modified parsed delay
 
-  modified=$(printf '%s' "$ORIGINAL_CONFIG" | sed 's/level: info/level: debug/' | sed 's/level: warn/level: debug/')
+  # Flip scan_delay and verify the parsed (live) config reflects it.
+  # (.logging is not exposed in /api/config/parsed, so a log-level flip
+  # could not be verified through the API.)
+  modified=$(printf '%s' "$ORIGINAL_CONFIG" | sed 's/scan_delay: .*/scan_delay: 7s/')
+  if [ "$modified" = "$ORIGINAL_CONFIG" ]; then
+    skip "Hot reload: config has no explicit scan_delay line"
+    return
+  fi
   api_put "/api/config" "$modified"
-  assert_status 200 "Hot reload: debug logging"
+  assert_status 200 "Hot reload: scan_delay change accepted"
 
   parsed=$(api_get "/api/config/parsed")
   sync_status
-  level=$(printf '%s' "$parsed" | jq -r '.logging.level // empty' 2>/dev/null)
-  [ "$level" = "debug" ] && pass "Hot reload: level=debug" || log "Hot reload: level=$level"
+  delay=$(printf '%s' "$parsed" | jq -r '.search.ScanDelay // empty' 2>/dev/null)
+  [ "$delay" = "7000000000" ] && pass "Hot reload: live scan_delay=7s" \
+    || fail "Hot reload: live scan_delay=$delay, want 7000000000 (7s)"
 
   api_put "/api/config" "$ORIGINAL_CONFIG" >/dev/null
   sleep 1
@@ -1209,7 +1419,7 @@ test_exclude_tags() {
 # SECTION: embedded_settings
 # ===========================================================================
 test_embedded_settings() {
-  log "=== Embedded Provider Settings ==="
+  log "=== Embedded Subtitle Settings ==="
   local combos=("true true false" "false false false" "true false true" "false true true" "true true true")
   for combo in "${combos[@]}"; do
     # shellcheck disable=SC2086
@@ -1228,12 +1438,11 @@ poll_interval: 999h
 languages:
   default:
     - code: en
+embedded_subtitles:
+  ignore_pgs: $1
+  ignore_vobsub: $2
+  ignore_ass: $3
 providers:
-  embedded:
-    settings:
-      ignore_pgs: $1
-      ignore_vobsub: $2
-      ignore_ass: $3
   mock:
     enabled: true
     priority: 1
@@ -1250,6 +1459,8 @@ scoring:
     video_codec: 10
     hdr: 8
     season_pack: 15
+auth:
+  disable_auth: true
 logging:
   level: debug
   format: json" >/dev/null
@@ -1258,6 +1469,37 @@ logging:
     [ "$HTTP_STATUS" = "200" ] && pass "Embedded: pgs=$1 vobsub=$2 ass=$3" \
       || fail "Embedded: pgs=$1 vobsub=$2 ass=$3 (HTTP $HTTP_STATUS)"
   done
+
+  # Legacy providers.embedded must be rejected with the targeted cutover
+  # error (alpha hard cutover, no migration path).
+  local r
+  r=$(api_put "/api/config" "sonarr:
+  enabled: true
+  url: \"http://sonarr:8989\"
+  api_key: \"$(_sonarr_key)\"
+media_roots:
+  - /media
+languages:
+  default:
+    - code: en
+providers:
+  embedded:
+    settings:
+      ignore_pgs: true
+  mock:
+    enabled: true
+    priority: 1
+auth:
+  disable_auth: true")
+  sync_status
+  if [ "$HTTP_STATUS" != "200" ]; then
+    printf '%s' "$r" | grep -q "embedded_subtitles" \
+      && pass "Rejects providers.embedded with targeted error (HTTP $HTTP_STATUS)" \
+      || fail "providers.embedded rejected but error lacks embedded_subtitles pointer: $r"
+  else
+    fail "Accepted legacy providers.embedded config"
+  fi
+
   api_put "/api/config" "$ORIGINAL_CONFIG" >/dev/null
   sleep 1
 }
@@ -1285,11 +1527,10 @@ poll_interval: 999h
 languages:
   default:
     - code: en
+embedded_subtitles:
+  ignore_pgs: true
+  ignore_vobsub: true
 providers:
-  embedded:
-    settings:
-      ignore_pgs: true
-      ignore_vobsub: true
   mock:
     enabled: true
     priority: 1
@@ -1311,6 +1552,8 @@ scoring:
     video_codec: 10
     hdr: 8
     season_pack: 15
+auth:
+  disable_auth: true
 logging:
   level: debug
   format: json" >/dev/null
@@ -1364,7 +1607,7 @@ test_real_providers() {
 # Main
 # ===========================================================================
 
-ALL_SECTIONS="health auth config providers media_browser coverage state files manual_search scoring backoff mock_provider provider_errors config_validation post_processing language_rules scans sync poster_proxy manual_download hot_reload exclude_tags embedded_settings adaptive_config real_providers"
+ALL_SECTIONS="health auth config providers media_browser coverage state files manual_search search_resolve scoring backoff mock_provider provider_errors config_validation post_processing language_rules scans sync poster_proxy manual_download hot_reload exclude_tags embedded_settings adaptive_config real_providers"
 
 if $DRY_RUN; then
   printf "Sections: %s\n" "$ALL_SECTIONS"
@@ -1392,6 +1635,7 @@ should_run "coverage" && test_coverage
 should_run "state" && test_state
 should_run "files" && test_files
 should_run "manual_search" && test_manual_search
+should_run "search_resolve" && test_search_resolve
 should_run "scoring" && test_scoring
 should_run "backoff" && test_backoff
 should_run "mock_provider" && test_mock_provider

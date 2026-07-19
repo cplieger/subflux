@@ -45,8 +45,8 @@ func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// Path should still be returned even when SaveDownload fails (it's a warning).
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1 (SaveDownload error is non-fatal)", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets() returned %d paths, want 1 (SaveDownload error is non-fatal)", len(result.Paths()))
 	}
 	if ms.saveCalled != true {
 		t.Error("SaveDownload not called")
@@ -85,8 +85,8 @@ func TestSearchTargets_atomic_write_error_returns_empty(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// AtomicWriteFile should fail, so no paths returned.
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty (write error)", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty (write error)", result.Paths())
 	}
 	// SaveDownload should NOT be called since write failed.
 	if ms.successCalled {
@@ -184,8 +184,8 @@ func TestSearchTargets_binary_data_rejected(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// Binary data should be rejected, no subtitle saved.
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty (binary data rejected)", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty (binary data rejected)", result.Paths())
 	}
 }
 
@@ -235,8 +235,8 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Errorf("SearchTargets(ForceUpgrade) returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Errorf("SearchTargets(ForceUpgrade) returned %d paths, want 1", len(result.Paths()))
 	}
 }
 
@@ -273,8 +273,8 @@ func TestSearchTargets_force_upgrade_skips_embedded_only(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Errorf("SearchTargets(ForceUpgrade, no existing) returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Errorf("SearchTargets(ForceUpgrade, no existing) returned %d paths, want 1", len(result.Paths()))
 	}
 }
 
@@ -314,11 +314,11 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets(hi variant) returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets(hi variant) returned %d paths, want 1", len(result.Paths()))
 	}
-	if !strings.Contains(result.Paths[0], ".hi.") {
-		t.Errorf("SearchTargets(hi variant) path = %q, want containing '.hi.'", result.Paths[0])
+	if !strings.Contains(result.Paths()[0], ".hi.") {
+		t.Errorf("SearchTargets(hi variant) path = %q, want containing '.hi.'", result.Paths()[0])
 	}
 }
 
@@ -356,11 +356,11 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets(forced variant) returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets(forced variant) returned %d paths, want 1", len(result.Paths()))
 	}
-	if !strings.Contains(result.Paths[0], ".forced.") {
-		t.Errorf("SearchTargets(forced variant) path = %q, want containing '.forced.'", result.Paths[0])
+	if !strings.Contains(result.Paths()[0], ".forced.") {
+		t.Errorf("SearchTargets(forced variant) path = %q, want containing '.forced.'", result.Paths()[0])
 	}
 }
 
@@ -396,12 +396,12 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets() returned %d paths, want 1", len(result.Paths()))
 	}
 	// With StripHI enabled and standard variant, the .hi. should be stripped.
-	if strings.Contains(result.Paths[0], ".hi.") {
-		t.Errorf("SearchTargets(strip_hi, standard) path = %q, want no '.hi.' suffix", result.Paths[0])
+	if strings.Contains(result.Paths()[0], ".hi.") {
+		t.Errorf("SearchTargets(strip_hi, standard) path = %q, want no '.hi.' suffix", result.Paths()[0])
 	}
 }
 
@@ -442,12 +442,12 @@ func TestSearchTargets_hash_match_skips_sync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 1 {
-		t.Fatalf("SearchTargets(hash match) returned %d paths, want 1", len(result.Paths))
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets(hash match) returned %d paths, want 1", len(result.Paths()))
 	}
 	// Verify the subtitle was saved (hash match bypasses sync).
-	if _, err := os.Stat(result.Paths[0]); err != nil {
-		t.Errorf("subtitle file not found at %q: %v", result.Paths[0], err)
+	if _, err := os.Stat(result.Paths()[0]); err != nil {
+		t.Errorf("subtitle file not found at %q: %v", result.Paths()[0], err)
 	}
 }
 
@@ -479,20 +479,20 @@ func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
-	if len(result.Paths) != 0 {
-		t.Errorf("SearchTargets() = %v, want empty", result.Paths)
+	if len(result.Paths()) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty", result.Paths())
 	}
-	// When all providers are backed off, the target counts in its OWN
-	// category: not searched (no provider query ran, so it must not feed the
+	// When all providers are backed off, the language counts in its OWN
+	// kind: not searched (no provider query ran, so it must not feed the
 	// season tracker or the searched stats) and not skipped-as-covered.
-	if result.Searched != 0 {
-		t.Errorf("SearchTargets().Searched = %d, want 0", result.Searched)
+	if got := result.TargetsSearched(); got != 0 {
+		t.Errorf("SearchTargets().TargetsSearched() = %d, want 0", got)
 	}
-	if result.BackedOff != 1 {
-		t.Errorf("SearchTargets().BackedOff = %d, want 1", result.BackedOff)
+	if got := result.TargetsBackedOff(); got != 1 {
+		t.Errorf("SearchTargets().TargetsBackedOff() = %d, want 1", got)
 	}
-	if len(result.SearchedLangs) != 0 {
-		t.Errorf("SearchTargets().SearchedLangs = %v, want empty", result.SearchedLangs)
+	if len(result.Langs) != 1 || result.Langs[0].Kind != api.LangBackedOff {
+		t.Errorf("SearchTargets().Langs = %+v, want one backed_off entry", result.Langs)
 	}
 	// Adaptive skip should be recorded for each backed-off provider.
 	if metrics.adaptiveSkips.Load() != 2 {
@@ -546,8 +546,8 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// Both variants should find a subtitle.
-	if len(result.Paths) != 2 {
-		t.Errorf("SearchTargets(multi-variant) returned %d paths, want 2", len(result.Paths))
+	if len(result.Paths()) != 2 {
+		t.Errorf("SearchTargets(multi-variant) returned %d paths, want 2", len(result.Paths()))
 	}
 	// Provider should only be queried once (grouped by language).
 	if metrics.searches.Load() != 1 {

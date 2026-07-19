@@ -40,6 +40,7 @@ func Schema(providerSchemas []api.ProviderSchema) []api.SchemaSection {
 		trustedProxiesSection(),
 		pollIntervalSection(),
 		languagesSection(),
+		embeddedSection(),
 		{
 			Key: sectionProviders, Title: "Providers", Type: sectionProviders,
 			Providers: providerSchemas,

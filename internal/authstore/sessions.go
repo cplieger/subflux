@@ -8,9 +8,7 @@ import (
 	"github.com/cplieger/auth/v2"
 )
 
-// This file holds the SessionPersister half of AuthStore plus the
-// BatchUpdateSessionActivity extension consumed by the server's session
-// batcher (sessionbatch.BatchUpdater, Requirement 16.7).
+// This file holds the SessionPersister half of AuthStore.
 //
 // Sessions are EPHEMERAL: they live only in the in-memory map Store.sessions,
 // guarded by Store.mu (an RWMutex — RLock for reads, Lock for writes), and are
@@ -66,10 +64,9 @@ func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 // through the returned pointer.
 func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, error) {
 	// cloneSession reads the stored struct's fields, so it must run while the
-	// read lock is held: a concurrent UpdateSessionActivity /
-	// BatchUpdateSessionActivity mutates LastActivity under the write lock, and
-	// cloning after RUnlock would race that write (caught by -race in
-	// TestSessions_concurrentAccess).
+	// read lock is held: a concurrent UpdateSessionActivity mutates
+	// LastActivity under the write lock, and cloning after RUnlock would race
+	// that write (caught by -race in TestSessions_concurrentAccess).
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	sess, ok := s.sessions[tokenHash]
@@ -86,25 +83,6 @@ func (s *Store) UpdateSessionActivity(_ context.Context, tokenHash string, now t
 	s.mu.Lock()
 	if sess, ok := s.sessions[tokenHash]; ok && sess != nil {
 		sess.LastActivity = now
-	}
-	s.mu.Unlock()
-	return nil
-}
-
-// BatchUpdateSessionActivity touches the last-activity time of many sessions in
-// one locked pass (memory only). Consumed by the server's session-activity
-// batcher via sessionbatch.BatchUpdater (Requirement 16.7). An empty slice is a
-// no-op, and absent hashes are skipped, matching the old store's per-hash
-// UPDATE semantics.
-func (s *Store) BatchUpdateSessionActivity(_ context.Context, tokenHashes []string, now time.Time) error {
-	if len(tokenHashes) == 0 {
-		return nil
-	}
-	s.mu.Lock()
-	for _, h := range tokenHashes {
-		if sess, ok := s.sessions[h]; ok && sess != nil {
-			sess.LastActivity = now
-		}
 	}
 	s.mu.Unlock()
 	return nil
@@ -157,8 +135,10 @@ func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time, idleTim
 
 	var total int64
 	s.mu.Lock()
+	// No nil-entry arm: CreateSession(nil) is a no-op and cloneSession never
+	// returns nil for a non-nil input, so the map never holds a nil session.
 	for hash, sess := range s.sessions {
-		if sess == nil || sess.LastActivity.Before(idleCutoff) || sess.CreatedAt.Before(absCutoff) {
+		if sess.LastActivity.Before(idleCutoff) || sess.CreatedAt.Before(absCutoff) {
 			delete(s.sessions, hash)
 			total++
 		}

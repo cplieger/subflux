@@ -17,9 +17,8 @@ func BuildProviderSchemas(reg ProviderRegistry, exclude ...string) []ProviderSch
 			label = nameStr
 		}
 		ps := ProviderSchema{
-			Name:          nameStr,
-			Label:         label,
-			AlwaysEnabled: name == ProviderNameEmbedded,
+			Name:  nameStr,
+			Label: label,
 		}
 		for _, f := range fields {
 			ps.Settings = append(ps.Settings, SchemaField{

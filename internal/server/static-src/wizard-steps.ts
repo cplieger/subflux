@@ -1,12 +1,17 @@
-// wizard-steps.ts — Extracted wizard step builders (Arr, Media Roots, Search, Post-Processing).
+// wizard-steps.ts — Extracted wizard step builders (Arr, Media Roots,
+// Search, Scoring, Post-Processing). Steps render prefilled from the
+// structured config (module bindings adopted by wizard.ts at boot); saved
+// secrets render a keep-placeholder instead of a value.
 
-import { apiPost } from "./api-client.js";
+import { validateConfigPath } from "./wire/client.gen.js";
 import { $ } from "./dom-core.js";
 import { el } from "./dom.js";
+import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import {
   type WizardStep,
   schemaByKey,
+  secretSaved,
   wizardValues,
   mediaRoots,
   infoIcon,
@@ -14,11 +19,15 @@ import {
   wizToggle,
 } from "./wizard.js";
 
+/** SECRET_SAVED_PLACEHOLDER marks a secret the config file already holds:
+ *  leaving the field blank keeps the stored value (server-side merge). */
+export const SECRET_SAVED_PLACEHOLDER = "\u2022\u2022\u2022\u2022 saved \u2014 leave blank to keep";
+
 // --- Step 1: Sonarr + Radarr ---
 
 export function buildArrStep(): WizardStep {
   return {
-    id: "arr",
+    stepId: "arr",
     title: "Sonarr & Radarr",
     render(container: HTMLElement): void {
       const sonarr = schemaByKey("sonarr");
@@ -37,6 +46,10 @@ export function buildArrStep(): WizardStep {
     validate(): string {
       const sv = wizardValues["sonarr"] ?? {};
       const rv = wizardValues["radarr"] ?? {};
+      // A saved API key (presence flag) satisfies the key requirement: the
+      // redacted-empty field means "keep the stored secret".
+      const sKey = (sv["api_key"] ?? "").trim() !== "" || secretSaved("sonarr.api_key");
+      const rKey = (rv["api_key"] ?? "").trim() !== "" || secretSaved("radarr.api_key");
       const sf = (sv["url"] ?? "").trim() !== "" || (sv["api_key"] ?? "").trim() !== "";
       const rf = (rv["url"] ?? "").trim() !== "" || (rv["api_key"] ?? "").trim() !== "";
       if (!sf && !rf) {
@@ -46,16 +59,16 @@ export function buildArrStep(): WizardStep {
         if (!(sv["url"] ?? "").trim()) {
           return "Sonarr URL is required";
         }
-        if (!(sv["api_key"] ?? "").trim()) {
-          return "Sonarr API Key is required";
+        if (!sKey) {
+          return "Sonarr API Key is required (or clear the Sonarr URL if you don't use Sonarr)";
         }
       }
       if (rf) {
         if (!(rv["url"] ?? "").trim()) {
           return "Radarr URL is required";
         }
-        if (!(rv["api_key"] ?? "").trim()) {
-          return "Radarr API Key is required";
+        if (!rKey) {
+          return "Radarr API Key is required (or clear the Radarr URL if you don't use Radarr)";
         }
       }
       return "";
@@ -73,13 +86,14 @@ function renderArrGroup(
   const group = el("div", { className: "wiz-arr-group" }, header);
   const saved = wizardValues[key] ?? {};
   for (const field of section.fields ?? []) {
+    const isSavedSecret = field.type === "secret" && secretSaved(key + "." + field.key);
     group.appendChild(
       wizField(
         "wiz-" + key + "-" + field.key,
         field.label,
         field.type === "secret" ? "secret" : "text",
         saved[field.key] ?? "",
-        field.placeholder ?? "",
+        isSavedSecret ? SECRET_SAVED_PLACEHOLDER : (field.placeholder ?? ""),
         field.help,
       ),
     );
@@ -106,7 +120,7 @@ function collectArrValues(key: string): void {
 
 export function buildMediaRootsStep(): WizardStep {
   return {
-    id: "media_roots",
+    stepId: "media_roots",
     title: "Media Roots",
     render(container: HTMLElement): void {
       container.appendChild(
@@ -165,11 +179,7 @@ export function buildMediaRootsStep(): WizardStep {
         if (signal.aborted) {
           return "";
         }
-        const data = await apiPost<{ valid: boolean; error?: string }>(
-          "/api/config/validate-path",
-          { path: p.trim() },
-          signal,
-        );
+        const data = await validateConfigPath({ path: p.trim() }, { signal });
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (signal.aborted) {
           return "";
@@ -238,7 +248,7 @@ function collectMediaRoots(): void {
 
 export function buildSearchStep(): WizardStep {
   return {
-    id: "search",
+    stepId: "search",
     title: "Search Settings",
     render(container: HTMLElement): void {
       const search = schemaByKey("search");
@@ -323,10 +333,9 @@ export function buildSearchStep(): WizardStep {
         const headerRow = el("div", { className: "wiz-adaptive-header" }, titleSpan, toggle);
         container.appendChild(headerRow);
 
+        // Region-only disclosure: the header checkbox is the visible control,
+        // the primitive drives the animated height + aria-hidden/inert.
         const fieldsDiv = el("div", { id: "wiz-adaptive-fields" });
-        if (!enabledChecked) {
-          fieldsDiv.hidden = true;
-        }
 
         for (const f of adaptive.fields) {
           if (f.type === "bool") {
@@ -345,9 +354,14 @@ export function buildSearchStep(): WizardStep {
           );
         }
         container.appendChild(fieldsDiv);
+        const fieldsCtl = createDisclosure(null, fieldsDiv, { open: enabledChecked });
 
         cb.addEventListener("change", () => {
-          fieldsDiv.hidden = !cb.checked;
+          if (cb.checked) {
+            fieldsCtl.open();
+          } else {
+            fieldsCtl.close();
+          }
         });
       }
     },
@@ -375,7 +389,10 @@ export function buildSearchStep(): WizardStep {
             vals[f.key] = (inp as HTMLInputElement).value;
           }
         }
-        wizardValues["search"] = vals;
+        // Preserve prefilled values for fields the wizard never renders
+        // (provider_timeout, scan_delay, ...): the save path merges over the
+        // boot section anyway, but the model should not lose them either.
+        wizardValues["search"] = { ...(wizardValues["search"] ?? {}), ...vals };
       }
       const adaptive = schemaByKey("adaptive");
       if (adaptive?.fields) {
@@ -393,7 +410,7 @@ export function buildSearchStep(): WizardStep {
             vals[f.key] = inp.value;
           }
         }
-        wizardValues["adaptive"] = vals;
+        wizardValues["adaptive"] = { ...(wizardValues["adaptive"] ?? {}), ...vals };
       }
     },
     validate(): string {
@@ -402,11 +419,71 @@ export function buildSearchStep(): WizardStep {
   };
 }
 
-// --- Step 6: Post-Processing ---
+// --- Step 6: Scoring ---
+
+export function buildScoringStep(): WizardStep {
+  return {
+    stepId: "scoring",
+    title: "Scoring",
+    render(container: HTMLElement): void {
+      const section = schemaByKey("scoring");
+      if (!section?.fields) {
+        return;
+      }
+      container.appendChild(
+        el(
+          "p",
+          {
+            style: "font-size:var(--text-sm);color:var(--text-2);margin-block-end:var(--sp-4)",
+          },
+          "Weights control how subtitle releases are ranked against your video. The defaults work well; tune only if you know your library.",
+        ),
+      );
+      const saved = wizardValues["scoring"] ?? {};
+      for (const field of section.fields ?? []) {
+        container.appendChild(
+          wizField(
+            "wiz-scoring-" + field.key,
+            field.label,
+            "number",
+            saved[field.key] ?? "",
+            field.placeholder ?? field.default ?? "",
+            field.help,
+          ),
+        );
+      }
+    },
+    collect(): void {
+      const section = schemaByKey("scoring");
+      if (!section?.fields) {
+        return;
+      }
+      const values: Record<string, string> = {};
+      for (const field of section.fields ?? []) {
+        const inp = $("wiz-scoring-" + field.key) as HTMLInputElement | null;
+        if (inp) {
+          values[field.key] = inp.value;
+        }
+      }
+      wizardValues["scoring"] = values;
+    },
+    validate(): string {
+      const vals = wizardValues["scoring"] ?? {};
+      for (const [k, v] of Object.entries(vals)) {
+        if (v.trim() !== "" && !/^\d+$/.test(v.trim())) {
+          return "Scoring weight " + k + " must be a whole number";
+        }
+      }
+      return "";
+    },
+  };
+}
+
+// --- Step 7: Post-Processing ---
 
 export function buildPostProcessStep(): WizardStep {
   return {
-    id: "post_processing",
+    stepId: "post_processing",
     title: "Post-Processing",
     render(container: HTMLElement): void {
       const section = schemaByKey("post_processing");

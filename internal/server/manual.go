@@ -21,8 +21,11 @@ func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {
 	return &manualops.LiveState{
 		Cfg:       ls.cfg,
 		Engine:    ls.engine,
+		Scorer:    ls.scorer,
 		Sonarr:    ls.sonarr,
 		Radarr:    ls.radarr,
+		SonarrLib: ls.sonarr,
+		RadarrLib: ls.radarr,
 		Providers: ls.providers,
 	}
 }

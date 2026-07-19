@@ -34,7 +34,7 @@ func FuzzScore(f *testing.F) {
 			SeasonPack:       sp,
 		}
 		sub := api.SubtitleInfo{HashVerifiable: verifiable}
-		score, scoreNoHash := e.Score(nil, sub, matches)
+		score, scoreNoHash := e.Score(sub, matches)
 
 		if score < 0 {
 			t.Fatalf("score = %d, want >= 0", score)
@@ -60,7 +60,7 @@ func FuzzScoreToTier(f *testing.F) {
 	e := New(&api.DefaultScores)
 
 	f.Fuzz(func(t *testing.T, score int) {
-		tier := e.ScoreToTier(score, api.MediaTypeMovie)
+		tier := e.ScoreToTier(score)
 		switch tier {
 		case api.TierExcellent, api.TierGood, api.TierAcceptable, api.TierMinimal, api.TierNone:
 		default:
@@ -85,8 +85,8 @@ func FuzzScoreToTierMonotonic(f *testing.F) {
 		if lo > hi {
 			lo, hi = hi, lo
 		}
-		tierLo := e.ScoreToTier(lo, api.MediaTypeMovie)
-		tierHi := e.ScoreToTier(hi, api.MediaTypeMovie)
+		tierLo := e.ScoreToTier(lo)
+		tierHi := e.ScoreToTier(hi)
 		if tierRank[tierLo] > tierRank[tierHi] {
 			t.Fatalf("monotonicity violated: score %d → %s (rank %d), score %d → %s (rank %d)",
 				lo, tierLo, tierRank[tierLo], hi, tierHi, tierRank[tierHi])

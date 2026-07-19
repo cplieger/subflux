@@ -11,7 +11,7 @@ import {
   confirm,
   closeDialog,
 } from "./dom.js";
-import { _resetForTest as resetConfirm } from "@cplieger/ui-primitives/confirm";
+import { _resetForTest as resetConfirm } from "@cplieger/ui-primitives/ask";
 
 describe("dom: el()", () => {
   it.todo("creates element with tag name");
@@ -29,8 +29,9 @@ describe("dom: el()", () => {
   it.todo("skips null/undefined children");
 });
 
-// confirm() now delegates to the @cplieger/ui-primitives confirm primitive,
-// which owns a reused <dialog class="uip-confirm"> appended to the body. These
+// confirm() now delegates to the @cplieger/ui-primitives ask primitive
+// (boolean shape), which owns a reused <dialog class="uip-ask"> appended to
+// the body. These
 // tests cover the subflux WRAPPER's contract: (title, message, label) maps onto
 // the primitive and the returned promise resolves true/false. resetConfirm()
 // clears the primitive's cached dialog between tests.
@@ -48,22 +49,22 @@ describe("dom: confirm()", () => {
   });
 
   function dlg(): HTMLDialogElement | null {
-    return document.querySelector<HTMLDialogElement>(".uip-confirm");
+    return document.querySelector<HTMLDialogElement>(".uip-ask");
   }
 
   function okBtn(): HTMLButtonElement | null {
-    return document.querySelector<HTMLButtonElement>(".uip-confirm-ok");
+    return document.querySelector<HTMLButtonElement>(".uip-ask-ok");
   }
 
   function cancelBtn(): HTMLButtonElement | null {
-    return document.querySelector<HTMLButtonElement>(".uip-confirm-cancel");
+    return document.querySelector<HTMLButtonElement>(".uip-ask-cancel");
   }
 
   it("opens a modal showing the title and message", () => {
     void confirm("Delete file", "This cannot be undone");
     expect(dlg()?.open).toBe(true);
-    expect(document.querySelector(".uip-confirm-title")?.textContent).toBe("Delete file");
-    expect(document.querySelector(".uip-confirm-msg")?.textContent).toBe("This cannot be undone");
+    expect(document.querySelector(".uip-ask-title")?.textContent).toBe("Delete file");
+    expect(document.querySelector(".uip-ask-msg")?.textContent).toBe("This cannot be undone");
   });
 
   it("uses a custom confirm-button label when provided", () => {

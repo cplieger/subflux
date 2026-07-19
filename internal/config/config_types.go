@@ -32,6 +32,13 @@ type Duration struct {
 
 // UnmarshalYAML parses a duration string, extending time.ParseDuration
 // with D (days), M (months), and Y (years) suffixes.
+//
+// The error deliberately withholds the offending value (and does not wrap
+// the parse error, whose message embeds it): the scalar may be an expanded
+// ${VAR} secret after yamlenv.Expand, and this error reaches the startup
+// log and the PUT /api/config response via sanitizeDecodeErr's app-owned
+// pass-through. The line number is the locator; the value stays out of
+// operator-facing text (field-name-only posture, as in seadex-scout).
 func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
 	if err := value.Decode(&s); err != nil {
@@ -39,7 +46,7 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	}
 	parsed, err := ParseDuration(s)
 	if err != nil {
-		return fmt.Errorf("line %d: invalid duration %q: %w", value.Line, s, err)
+		return fmt.Errorf("line %d: invalid duration (value withheld)", value.Line)
 	}
 	d.D = parsed
 	return nil
@@ -79,6 +86,7 @@ type Config struct {
 	SearchCfg            yamlSearchConfig      `yaml:"search"`
 	AdaptiveCfg          yamlAdaptiveConfig    `yaml:"adaptive"`
 	PostProcessing       yamlPostProcessConfig `yaml:"post_processing"`
+	EmbeddedSubtitles    yamlEmbeddedConfig    `yaml:"embedded_subtitles"`
 	PollIntervalCfg      Duration              `yaml:"poll_interval"`
 }
 
@@ -230,6 +238,16 @@ type LoggingConfig struct {
 	Format LogFormat `yaml:"format"`
 }
 
+// yamlEmbeddedConfig is the top-level embedded_subtitles section
+// (yaml-tagged): the typed codec policy for embedded subtitle tracks.
+// Defaults (true/true/false) come from newWithDefaults via the standard
+// pre-defaulted decode; an absent section or absent field keeps them.
+type yamlEmbeddedConfig struct {
+	IgnorePGS    bool `yaml:"ignore_pgs"`
+	IgnoreVobSub bool `yaml:"ignore_vobsub"`
+	IgnoreASS    bool `yaml:"ignore_ass"`
+}
+
 // yamlPostProcessConfig controls subtitle post-processing (yaml-tagged).
 type yamlPostProcessConfig struct {
 	StripHI           bool    `yaml:"strip_hi"`
@@ -251,7 +269,7 @@ type yamlOIDCConfig struct {
 	RedirectURI  string `yaml:"redirect_uri"`
 }
 
-// yamlBackupConfig controls scheduled SQLite backups (yaml-tagged).
+// yamlBackupConfig controls scheduled database backups (yaml-tagged).
 type yamlBackupConfig struct {
 	Path      string   `yaml:"path"`
 	Frequency Duration `yaml:"frequency"`

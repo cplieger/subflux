@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
 // maxZipEntries caps how many central-directory entries a zip may declare.
@@ -78,8 +80,7 @@ func matchEpisodeInZip(candidates []*zip.File, season, episode int) []byte {
 // IsValidSubtitleEntry checks if a zip entry is a valid subtitle file,
 // applying extension, hidden file, and zip bomb checks.
 func IsValidSubtitleEntry(f *zip.File) bool {
-	ext := strings.ToLower(filepath.Ext(f.Name))
-	if !SubtitleExts[ext] {
+	if !subtitleext.ArchiveInput(filepath.Ext(f.Name)) {
 		return false
 	}
 	if strings.HasPrefix(filepath.Base(f.Name), ".") {

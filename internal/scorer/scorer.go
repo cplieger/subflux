@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search/scoring"
 )
 
 // Compile-time interface assertion.
@@ -21,13 +22,13 @@ func New(scores *api.Scores) *Engine {
 	return &Engine{scores: *scores}
 }
 
-// Score calculates the score for a subtitle against a video.
+// Score calculates the score for a subtitle's match set.
 // The input matches struct is not modified.
 //
 // Verifiable hash match returns the hash weight directly (typically 100).
 // Otherwise, only release attribute keys contribute to the score.
 // Non-verifiable hash adds the hash weight on top of release attributes.
-func (e *Engine) Score(_ *api.VideoInfo, sub api.SubtitleInfo, matches api.MatchSet) (score, scoreNoHash int) {
+func (e *Engine) Score(sub api.SubtitleInfo, matches api.MatchSet) (score, scoreNoHash int) {
 	if matches.Hash && sub.HashVerifiable {
 		slog.Debug("computed score", "score", e.scores.Hash, "hash_match", true)
 		return e.scores.Hash, 0
@@ -63,7 +64,7 @@ var tierThresholds = []tierThreshold{
 }
 
 // ScoreToTier returns the named tier for a given score.
-func (e *Engine) ScoreToTier(score int, _ api.MediaType) api.ScoreTier {
+func (e *Engine) ScoreToTier(score int) api.ScoreTier {
 	for _, t := range tierThresholds {
 		if score >= t.Min {
 			return t.Tier
@@ -72,29 +73,13 @@ func (e *Engine) ScoreToTier(score int, _ api.MediaType) api.ScoreTier {
 	return api.TierNone
 }
 
-// scoreWeight pairs a match-field accessor with a score-field accessor.
-type scoreWeight struct {
-	weight func(*api.Scores) int
-	match  func(api.MatchSet) bool
-}
-
-// scoreWeights is the data-driven table mapping match fields to score fields.
-var scoreWeights = []scoreWeight{
-	{weight: func(s *api.Scores) int { return s.ReleaseGroup }, match: func(m api.MatchSet) bool { return m.ReleaseGroup }},
-	{weight: func(s *api.Scores) int { return s.Source }, match: func(m api.MatchSet) bool { return m.Source }},
-	{weight: func(s *api.Scores) int { return s.StreamingService }, match: func(m api.MatchSet) bool { return m.StreamingService }},
-	{weight: func(s *api.Scores) int { return s.Edition }, match: func(m api.MatchSet) bool { return m.Edition }},
-	{weight: func(s *api.Scores) int { return s.VideoCodec }, match: func(m api.MatchSet) bool { return m.VideoCodec }},
-	{weight: func(s *api.Scores) int { return s.HDR }, match: func(m api.MatchSet) bool { return m.HDR }},
-	{weight: func(s *api.Scores) int { return s.SeasonPack }, match: func(m api.MatchSet) bool { return m.SeasonPack }},
-}
-
-// sumScores totals the weights for matched release attributes.
+// sumScores totals the weights for matched release attributes, driven by the
+// shared category table in internal/search/scoring.
 func sumScores(s *api.Scores, matches api.MatchSet) int {
 	total := 0
-	for _, sw := range scoreWeights {
-		if sw.match(matches) {
-			total += sw.weight(s)
+	for _, c := range scoring.Categories {
+		if c.Match(matches) {
+			total += c.Weight(s)
 		}
 	}
 	return total

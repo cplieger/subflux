@@ -1,56 +1,52 @@
 // files.ts — subtitle file manager page with delete controls.
 //
 // Two-tier reactive model (mirrors coverage.ts/history.ts): external files
-// live in a `createCollection` keyed by their unique on-disk `path`; the table
-// is rendered once via `bindList` over a computed `sortedIds` view (episode
-// order for series, language for movies). Optimistic delete removes one entry
-// (rollback re-upserts it); bulk delete clears the collection; a refresh is
-// `setAll`. Keying on `path` is what fixes the multiple-files-per-language
-// collision the old `${media_id}-${language}-${source}` key silently dropped.
+// live in a `createCollection` keyed by their FileRef identity (media_id +
+// language + variant + ordinal; orphan rows key on their server-minted
+// handle); the table is rendered once via `bindList` over a computed
+// `sortedIds` view (episode order for series, language for movies).
+// Optimistic delete removes one entry (rollback re-upserts it); bulk delete
+// clears the collection; a refresh is `setAll`.
+//
+// S7 addressing: the wire carries no filesystem paths. Stored files are
+// addressed by FileRef; orphans (on disk, no store row) carry a single-use
+// `orphan_handle` and display their basename via `name`.
 
 import * as notify from "./notify.js";
 import * as store from "./store.js";
 import { $, el, icon, emptyDiv, errDiv, confirm } from "./dom.js";
-import { apiGet } from "./api-client.js";
+import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
+import { listFiles, PATH_BULK_DELETE_FILES, PATH_DELETE_FILE } from "./wire/client.gen.js";
+import type { DeleteFileRequest, FileEntry } from "./wire/types.gen.js";
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { fmtEpisode, langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
+import { subtitleRef } from "./file-ref.js";
 import type { MediaType } from "./api-types.js";
 import { computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 
 // --- API response shapes ---
 
-interface FileEntry {
-  source: string;
-  media_id: string;
-  language: string;
-  variant: string;
-  codec: string;
-  path: string;
-  offset_ms: number;
-  size: number;
-}
-
 interface BulkDeleteResponse {
   deleted: number;
 }
 
-// External files only — embedded tracks (no path) are never shown or deletable
-// here, so the table and the collection both deal exclusively with externals.
-// `path` is unique per external file, so it is a collision-free collection key.
-const fileKey = (f: FileEntry): string => f.path;
+// External files only — embedded tracks are never shown or deletable here,
+// so the table and the collection both deal exclusively with externals. The
+// FileRef tuple is unique per stored external file (ordinal separates manual
+// siblings); orphans key on their unique per-listing handle.
+const fileKey = (f: FileEntry): string =>
+  f.orphan_handle ?? `${f.media_id}|${f.language}|${f.variant}|${f.ordinal ?? 0}`;
 const files = createCollection<FileEntry>(fileKey);
 
 let currentMediaType: MediaType | "" = "";
 let currentMediaID = "";
 let currentTitle = "";
 let currentBackPath = "/";
-/** Sonarr/Radarr internal numeric ID for poster lookups. */
+/** Sonarr/Radarr internal numeric ID for poster + MediaRef lookups. */
 let currentArrId = 0;
-/** media_id or '' → video path */
-let videoPaths = new Map<string, string>();
 
 /** Parse season/episode from a series media_id (`...s01e02`). */
 function parseEp(mediaID: string): { season: number; episode: number } {
@@ -72,10 +68,10 @@ function compareFiles(a: FileEntry, b: FileEntry): number {
       ea.season - eb.season ||
       ea.episode - eb.episode ||
       a.language.localeCompare(b.language) ||
-      a.path.localeCompare(b.path)
+      fileKey(a).localeCompare(fileKey(b))
     );
   }
-  return a.language.localeCompare(b.language) || a.path.localeCompare(b.path);
+  return a.language.localeCompare(b.language) || fileKey(a).localeCompare(fileKey(b));
 }
 
 // Sorted id list — the structure tier `bindList` renders. Shallow-equal so a
@@ -93,7 +89,6 @@ export function openFileManager(
   mediaID: string,
   title: string,
   backPath: string,
-  paths?: Map<string, string>,
   arrId?: number,
 ): void {
   currentMediaType = mediaType;
@@ -101,7 +96,6 @@ export function openFileManager(
   currentTitle = title;
   currentBackPath = backPath || "/";
   currentArrId = arrId ?? 0;
-  videoPaths = paths ?? new Map<string, string>();
 
   const path =
     mediaType === "movie"
@@ -133,41 +127,76 @@ async function loadFiles(): Promise<void> {
   // Mark as files view so data:invalidate reloads files, not library.
   store.set("detailCtx", { files: true });
 
-  // Design-system skeleton (matching the library/history tables) instead of
-  // the one-off centered spinner — one loading pattern per concern.
-  const skel = document.createDocumentFragment();
-  for (let i = 0; i < 4; i++) {
-    skel.appendChild(
-      el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-    );
-  }
-  patch(out, skel);
+  // Design-system skeleton (matching the library/history tables) with the
+  // shared anti-flicker timing: 150ms show-delay so a fast listing never
+  // flashes it, 300ms min-visible so a painted one never blinks. Settled by
+  // refreshFileData (which also runs skeleton-less on data:invalidate).
+  filesSkeleton = skeletonTiming(
+    () => {
+      const skel = document.createDocumentFragment();
+      for (let i = 0; i < 4; i++) {
+        skel.appendChild(
+          el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+        );
+      }
+      patch(out, skel);
+    },
+    { minVisibleMs: 300 },
+  );
 
   await refreshFileData();
 }
 
+// Pending anti-flicker controller from openFileManager, settled by the next
+// refreshFileData. Null on the data:invalidate refresh path (no skeleton).
+let filesSkeleton: SkeletonTimingController | null = null;
+
 async function refreshFileData(): Promise<void> {
   const out = $.coverageContent;
-  const params = new URLSearchParams({
+  // Settle through the pending skeleton controller when one exists (honoring
+  // its show-delay/min-visible), else paint directly.
+  const settle = (render: () => void): void => {
+    if (filesSkeleton !== null) {
+      const s = filesSkeleton;
+      filesSkeleton = null;
+      s.commit(render);
+    } else {
+      render();
+    }
+  };
+  // arr_id lets the server derive orphan-walk roots for the all-orphan edge
+  // (a media item whose files all lack store rows).
+  const query: Record<string, string> = {
     media_type: currentMediaType,
     media_id: currentMediaID,
-  });
-  const data = await apiGet<FileEntry[] | null>(`/api/files?${params}`);
+  };
+  if (currentArrId > 0) {
+    query["arr_id"] = String(currentArrId);
+  }
+  const data = await listFiles(query);
   if (data === null) {
-    disposeBindings();
-    patch(out, errDiv("Failed to load files"));
+    settle(() => {
+      disposeBindings();
+      patch(out, errDiv("Failed to load files"));
+    });
     return;
   }
-  files.setAll(data.filter((f: FileEntry) => f.source === "external"));
-  ensureMounted();
+  settle(() => {
+    files.setAll(data.filter((f: FileEntry) => f.source === "external"));
+    ensureMounted();
+  });
 }
 
 function buildFileRow(f: FileEntry): HTMLElement {
   const isSeries = currentMediaType === "episode";
-  const lang = langName(f.language) + (f.variant !== DEFAULT_VARIANT ? ` (${f.variant})` : "");
-  let codec = f.codec || "";
-  if (!codec && f.path) {
-    const parts = f.path.split(".");
+  const isOrphan = Boolean(f.orphan_handle);
+  // Orphans have no language identity — display their basename instead.
+  const lang = isOrphan
+    ? (f.name ?? "unknown file")
+    : langName(f.language) + (f.variant !== DEFAULT_VARIANT ? ` (${f.variant})` : "");
+  let codec = f.codec ?? "";
+  if (!codec && f.name) {
+    const parts = f.name.split(".");
     const ext = (parts[parts.length - 1] ?? "").toLowerCase();
     const extMap: Record<string, string> = {
       srt: "srt",
@@ -178,7 +207,7 @@ function buildFileRow(f: FileEntry): HTMLElement {
     };
     codec = extMap[ext] ?? ext;
   }
-  const formatLabel = codec ? `${codec}: ext` : "ext";
+  const formatLabel = isOrphan ? `${codec || "ext"}: orphan` : codec ? `${codec}: ext` : "ext";
   const offset = f.offset_ms
     ? `${f.offset_ms > 0 ? "+" : ""}${(f.offset_ms / 1000).toFixed(1)}s`
     : "0.0s";
@@ -186,9 +215,10 @@ function buildFileRow(f: FileEntry): HTMLElement {
   const ep = parseEp(f.media_id);
 
   const actionGroup = el("div", { className: "action-group" });
-  if (f.source === "external" && f.path) {
-    const vp = videoPaths.get(f.media_id) ?? videoPaths.get("") ?? "";
-    if (vp) {
+  if (f.source === "external") {
+    // Sync needs both the FileRef (stored row) and the video MediaRef (arr
+    // id); orphans have neither a store row nor a quad, so no sync.
+    if (!isOrphan && currentArrId > 0) {
       actionGroup.appendChild(
         el(
           "button",
@@ -200,7 +230,6 @@ function buildFileRow(f: FileEntry): HTMLElement {
               e.stopPropagation();
               openSyncDialog(
                 [f],
-                vp,
                 isSeries ? "series" : (currentMediaType as MediaType),
                 currentArrId,
                 isSeries ? fmtEpisode(ep.season, ep.episode) : currentTitle,
@@ -331,12 +360,7 @@ function ensureMounted(): void {
 }
 
 async function deleteFile(f: FileEntry): Promise<void> {
-  if (!f.path || f.path.includes("..")) {
-    notify.error("Invalid file path");
-    return;
-  }
-  const parts = f.path.split("/");
-  const fileName = parts[parts.length - 1] ?? f.path;
+  const fileName = f.name ?? `${langName(f.language)} subtitle`;
   const ok = await confirm("Delete File", `Delete "${fileName}"? This cannot be undone.`, "Delete");
   if (!ok) {
     return;
@@ -349,26 +373,26 @@ interface DeleteFileOp {
   entry: FileEntry;
 }
 
+/** Build the typed DELETE /api/files body for a listed entry: the orphan
+ *  handle when present, else the entry's FileRef. */
+function deleteRequestFor(f: FileEntry): DeleteFileRequest {
+  if (f.orphan_handle) {
+    return { orphan_handle: f.orphan_handle };
+  }
+  return subtitleRef(currentMediaType as MediaType, f);
+}
+
 /** Single-file delete with optimistic remove + rollback restore on failure.
  *  The sorted view re-places a restored entry at its deterministic position,
  *  so no index bookkeeping is needed. dedupe protects against double-click. */
 const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
   name: "files.delete",
-  request: (f) => {
-    const params = new URLSearchParams({
-      path: f.path,
-      media_type: currentMediaType,
-      media_id: f.media_id,
-      language: f.language,
-      variant: f.variant,
-    });
-    return { method: "DELETE", path: `/api/files?${params.toString()}` };
-  },
+  request: (f) => ({ method: "DELETE", path: PATH_DELETE_FILE, body: deleteRequestFor(f) }),
   optimistic: (f): DeleteFileOp | undefined => {
-    if (!files.has(f.path)) {
+    if (!files.has(fileKey(f))) {
       return undefined;
     }
-    files.remove(f.path);
+    files.remove(fileKey(f));
     return { entry: f };
   },
   rollback: (_args, op) => {
@@ -377,7 +401,7 @@ const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
     }
     files.upsert(op.entry);
   },
-  dedupe: (f) => `files.delete:${f.path}:${f.variant}:${f.language}`,
+  dedupe: (f) => `files.delete:${fileKey(f)}`,
   success: "File deleted",
   error: "Delete failed",
   retryable: retryNetwork,
@@ -418,7 +442,7 @@ interface BulkDeleteOp {
  *  wrapper above can show the count from the response payload. */
 const bulkDeleteAction = apiAction<BulkDeleteArgs, BulkDeleteResponse, BulkDeleteOp>({
   name: "files.delete_bulk",
-  request: (args) => ({ method: "DELETE", path: "/api/files/bulk", body: args }),
+  request: (args) => ({ method: "DELETE", path: PATH_BULK_DELETE_FILES, body: args }),
   optimistic: (): BulkDeleteOp => {
     const externals = files.items();
     files.clear();

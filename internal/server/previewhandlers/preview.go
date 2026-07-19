@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
 // previewTimeout is the maximum duration for a single preview stream.
@@ -24,20 +25,24 @@ const bufferedMaxDuration = 30
 
 const displayGroupSeries = "series"
 
-// HandlePreviewVideo handles GET /api/preview/video?path=...&start=...&buffered=...
+// HandlePreviewVideo handles
+// GET /api/preview/video?media_type=...&media_id=...&season=...&episode=...&start=...&buffered=...
+// The video is addressed by MediaRef (arr identity); the server resolves the
+// arr-known video path — no client-supplied path exists on this verb.
 func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
-	videoPath := r.URL.Query().Get("path")
-	if videoPath == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "path parameter required")
+	ref, err := resolve.MediaRefFromQuery(r.URL.Query())
+	if err != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
-
-	if !h.deps.ValidatePath(w, r, videoPath, "path") {
+	videoPath, err := h.deps.Resolve.VideoPath(r.Context(), ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
 		return
 	}
 
@@ -61,7 +66,6 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("preview write deadline extension failed, 60s server timeout applies", "error", err)
 	}
 
-	var err error
 	if buffered {
 		err = h.serveBuffered(ctx, w, r, videoPath, startSec)
 	} else {
@@ -301,21 +305,24 @@ func resolveArrConfig(ls *LiveState, mediaType string) (arrURL, apiKey string, o
 	}
 }
 
-// HandlePreviewStart handles GET /api/preview/start?subtitle=...
-// Analyzes subtitle cue density and returns the best starting timestamp.
+// HandlePreviewStart handles GET /api/preview/start?media_type=...&media_id=...&language=...
+// (FileRef query parameters). Analyzes subtitle cue density and returns the
+// best starting timestamp. The subtitle is addressed by FileRef and resolved
+// from the store; no client-supplied path.
 func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
-	subPath := r.URL.Query().Get("subtitle")
-	if subPath == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "subtitle parameter required")
+	ref, err := resolve.FileRefFromQuery(r.URL.Query())
+	if err != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
-
-	if !h.deps.ValidatePath(w, r, subPath, "subtitle path") {
+	subPath, err := h.deps.Resolve.SubtitlePath(r.Context(), ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
 		return
 	}
 
@@ -334,33 +341,36 @@ func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 	secs := int(startSec) % 60
 	desc := fmt.Sprintf("%d:%02d — dialogue-dense section", mins, secs)
 
-	api.WriteJSON(w, previewStartResponse{
+	api.WriteJSON(w, PreviewStartResponse{
 		StartSeconds: startSec,
 		Description:  desc,
 	})
 }
 
-// previewStartResponse is the typed response for HandlePreviewStart.
-type previewStartResponse struct {
+// PreviewStartResponse is the typed response for HandlePreviewStart.
+type PreviewStartResponse struct {
 	Description  string  `json:"description"`
 	StartSeconds float64 `json:"start_seconds"`
 }
 
-// HandlePreviewSubtitle handles GET /api/preview/subtitle?path=...&start=...&shift=...
-// Returns the subtitle content as WebVTT for the video preview track.
+// HandlePreviewSubtitle handles GET /api/preview/subtitle?media_type=...&...&start=...&shift=...
+// (FileRef query parameters plus start/shift). Returns the subtitle content
+// as WebVTT for the video preview track. The subtitle is addressed by
+// FileRef and resolved from the store; no client-supplied path.
 func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
-	subPath := r.URL.Query().Get("path")
-	if subPath == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "path parameter required")
+	ref, err := resolve.FileRefFromQuery(r.URL.Query())
+	if err != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
-
-	if !h.deps.ValidatePath(w, r, subPath, "subtitle path") {
+	subPath, err := h.deps.Resolve.SubtitlePath(r.Context(), ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
 		return
 	}
 

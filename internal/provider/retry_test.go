@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/search/release"
 )
 
 // retryFakeProvider records calls and returns configured errors.
@@ -527,5 +528,45 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 	}
 	if v, ok := firstLogAttr(recs, msgDownloadRetrying, "attempt"); !ok || v != int64(1) {
 		t.Errorf("retrying-warn attempt = %v (present=%v), want 1", v, ok)
+	}
+}
+
+// searchResultProvider returns fixed search results (for the ReleaseName
+// clamp boundary test).
+type searchResultProvider struct {
+	retryFakeProvider
+
+	subs []api.Subtitle
+}
+
+func (f *searchResultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+	return f.subs, nil
+}
+
+// TestRetryProvider_search_clamps_release_names pins the provider-boundary
+// enforcement of the release-parsing layer's input bound (release package
+// doc "Input bound"): every wrapped provider's search results have
+// ReleaseName truncated to release.MaxNameLen bytes.
+func TestRetryProvider_search_clamps_release_names(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("a", release.MaxNameLen+200)
+	inner := &searchResultProvider{subs: []api.Subtitle{
+		{ReleaseName: "Movie.2024.1080p.BluRay.x264-GRP"},
+		{ReleaseName: long},
+	}}
+	p := WrapRetry(inner, 1, time.Millisecond)
+
+	subs, err := p.Search(context.Background(), &api.SearchRequest{})
+	if err != nil {
+		t.Fatalf("Search() error = %v, want nil", err)
+	}
+	if len(subs) != 2 {
+		t.Fatalf("Search() returned %d subs, want 2", len(subs))
+	}
+	if subs[0].ReleaseName != "Movie.2024.1080p.BluRay.x264-GRP" {
+		t.Errorf("short name changed: %q", subs[0].ReleaseName)
+	}
+	if len(subs[1].ReleaseName) != release.MaxNameLen {
+		t.Errorf("long name len = %d, want clamped to %d", len(subs[1].ReleaseName), release.MaxNameLen)
 	}
 }

@@ -2,23 +2,47 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
-	"time"
+	"slices"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
+// enabledProviders returns the sorted names of enabled providers in a config,
+// used by activation's drift detection.
+func enabledProviders(cfg interface {
+	ProviderConfigs() map[api.ProviderID]api.ProviderCfg
+},
+) []api.ProviderID {
+	var names []api.ProviderID
+	for name, pcfg := range cfg.ProviderConfigs() {
+		if pcfg.Enabled {
+			names = append(names, name)
+		}
+	}
+	slices.SortFunc(names, func(a, b api.ProviderID) int {
+		if a < b {
+			return -1
+		}
+		if a > b {
+			return 1
+		}
+		return 0
+	})
+	return names
+}
+
 // applyTrustedProxies pushes the live config's parsed trusted-proxy CIDR set
 // into the shared client-IP resolver (authhandlers.ClientIP), so every
 // client-IP site — audit log, login rate limiter, session IPAddress, admin
 // bootstrap, and the access log — resolves the real client behind a reverse
-// proxy. Called at serve start and on every hot reload so the set re-parses
-// and takes effect without a restart. A nil or non-*config.Config live config
-// yields an empty set: the trust-nothing default (socket peer, XFF ignored).
+// proxy. Called at serve start and by activation's finalize phase so the set
+// re-parses and takes effect without a restart. A nil or non-*config.Config
+// live config yields an empty set: the trust-nothing default (socket peer,
+// XFF ignored).
 func (s *Server) applyTrustedProxies() {
 	var nets []*net.IPNet
 	if cfg, ok := s.state().cfg.(*config.Config); ok {
@@ -27,123 +51,39 @@ func (s *Server) applyTrustedProxies() {
 	authhandlers.SetTrustedProxies(nets)
 }
 
-// hotReload swaps the live config and reinitializes providers and engine.
+// hotReload applies a candidate config at runtime: the config-save handlers
+// call it after parse/validate/arr-ping, before persisting. It is a thin
+// serialized wrapper over the single activation operation (activate.go), so
+// hot reload and cold boot cannot drift — the capability inventory lives in
+// one place. Failure contract: activation's prepare phase rejects the
+// candidate with no externally visible mutation, the previous snapshot keeps
+// serving, and the save handler surfaces config_reload_failed.
+//
+// Locking layers: reloadMu is the INNER guard — no two activations ever run
+// concurrently, whoever the caller is. The confighandlers save-transaction
+// lock (Handler.saveMu) is the OUTER guard serializing the complete save
+// (secret merge, canonicalization, arr pings, this call, and the file
+// write), so activation order always matches persist order. Both are needed:
+// reloadMu alone allowed two saves to interleave publish-A, publish-B,
+// write-B, write-A. Lock order is always saveMu → reloadMu.
 func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
 
-	slog.Debug("hotReload: starting",
+	slog.Debug("hot reload: activating candidate config",
 		"providers", len(newCfg.ProviderConfigs()),
 		"sonarr", newCfg.SonarrConfig().URL != "",
 		"radarr", newCfg.RadarrConfig().URL != "")
 
-	// Detect config drift before swapping.
-	// Skip when transitioning from unconfigured (no old config to compare).
-	oldCfg := s.state().cfg
-	var drift api.ConfigDrift
-	if oldCfg != nil {
-		drift = api.DetectDrift(
-			oldCfg.LanguageCodes(), newCfg.LanguageCodes(),
-			enabledProviders(oldCfg), enabledProviders(newCfg),
-			oldCfg.Adaptive().Enabled, newCfg.Adaptive().Enabled,
-		)
+	return s.activate(ctx, newCfg, activateHot)
+}
+
+// closeArrClient closes an outgoing arr client replaced by activation, when
+// the concrete type exposes Close (the api.SonarrClient / api.RadarrClient
+// interfaces deliberately don't; test doubles have no resources to release).
+// A nil interface value is a no-op.
+func closeArrClient(c any) {
+	if closer, ok := c.(interface{ Close() }); ok {
+		closer.Close()
 	}
-
-	engine, sc, providers, err := s.wire(ctx, newCfg, s.db, s.metrics)
-	if err != nil {
-		return fmt.Errorf("wire: %w", err)
-	}
-
-	// Apply drift cleanup after successful wire so that a wire failure
-	// doesn't leave the DB in an inconsistent state (attempts cleared
-	// but old config still active, causing unexpected re-searches).
-	if !drift.Empty() {
-		slog.Debug("config drift detected",
-			"removed_languages", drift.RemovedLanguages,
-			"removed_providers", drift.RemovedProviders,
-			"adaptive_disabled", drift.AdaptiveDisabled)
-		if err := s.db.CleanupDrift(ctx, drift); err != nil {
-			slog.Warn("config drift cleanup failed", "error", err)
-		}
-	}
-
-	var sonarrClient api.SonarrClient
-	if sonarrCfg := newCfg.SonarrConfig(); sonarrCfg.URL != "" {
-		c, err := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey)
-		if err != nil {
-			return fmt.Errorf("invalid sonarr config: %w", err)
-		}
-		sonarrClient = c
-	}
-	var radarrClient api.RadarrClient
-	if radarrCfg := newCfg.RadarrConfig(); radarrCfg.URL != "" {
-		c, err := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey)
-		if err != nil {
-			return fmt.Errorf("invalid radarr config: %w", err)
-		}
-		radarrClient = c
-	}
-
-	s.live.Store(&liveState{
-		cfg:       newCfg,
-		providers: providers,
-		scorer:    sc,
-		engine:    engine,
-		sonarr:    sonarrClient,
-		radarr:    radarrClient,
-	})
-
-	// Re-parse the trusted-proxy set from the new config so client-IP
-	// resolution reflects the hot-reloaded value without a restart.
-	s.applyTrustedProxies()
-
-	// Push the new session timeouts into the auth-store sweeper so eviction
-	// uses the same cutoffs the request-path validator now enforces (the
-	// validator reads live config; a stale sweeper would hard-logout
-	// sessions early). Same optional-capability pattern as backupStore.
-	if ts, ok := s.authStore.(interface {
-		SetSessionTimeouts(idle, absolute time.Duration)
-	}); ok {
-		ts.SetSessionTimeouts(newCfg.SessionIdleTimeout(), newCfg.SessionAbsoluteTimeout())
-	}
-
-	// Re-apply the SSE client cap on the running hub (admission-time enforced;
-	// existing streams above a lowered cap drain naturally).
-	s.events.SetMaxClients(sseClientCap(newCfg))
-
-	// Mark as configured. This is the transition point when the server
-	// starts in unconfigured mode and the user saves a valid config.
-	wasUnconfigured := !s.configured.Load()
-	s.configured.Store(true)
-	s.metrics.SetConfigured(true)
-
-	slog.Info("hot reload complete",
-		"providers", len(providers),
-		"languages", newCfg.LanguageCodes())
-
-	// Log config changes for debugging.
-	if oldCfg != nil {
-		slog.Info("hot reload: config changes",
-			"old_providers", len(enabledProviders(oldCfg)),
-			"new_providers", len(providers),
-			"old_languages", oldCfg.LanguageCodes(),
-			"new_languages", newCfg.LanguageCodes())
-	}
-
-	// Clear startup and config alerts on successful reload.
-	s.alerts.DismissBySource("startup")
-	s.alerts.DismissBySource("config")
-
-	// If transitioning from unconfigured to configured, start the
-	// scheduler and poller that were skipped during StartUnconfigured.
-	if wasUnconfigured {
-		slog.Info("configuration activated; starting scheduler, poller, and backup")
-		s.bgWg.Add(4)
-		go func() { defer s.bgWg.Done(); s.runScheduler(s.ctx) }()
-		go func() { defer s.bgWg.Done(); s.runPoller(s.ctx) }()
-		go func() { defer s.bgWg.Done(); s.runBackup(s.ctx) }()
-		go func() { defer s.bgWg.Done(); s.runStoreMetrics(s.ctx) }()
-	}
-
-	return nil
 }

@@ -28,6 +28,7 @@ type SearchCfg interface {
 	// ProviderPriority returns the priority of a provider by name.
 	// Returns 0 for unknown providers (lowest priority = tried last in tiebreakers).
 	ProviderPriority(name api.ProviderID) int
-	// ProviderConfigs returns per-provider configuration keyed by name.
-	ProviderConfigs() map[api.ProviderID]api.ProviderCfg
+	// EmbeddedPolicy returns the typed embedded subtitle codec policy
+	// (top-level embedded_subtitles config section).
+	EmbeddedPolicy() api.EmbeddedPolicy
 }

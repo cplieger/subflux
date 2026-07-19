@@ -11,10 +11,11 @@ import (
 // This file covers the task-4.3 manual-lock methods: locked/unlocked
 // detection (Requirement 4.2), non-destructive ClearManualLock (Requirement
 // 4.3), manual count (Requirement 15.6), manual paths (Requirement 15.6), and
-// NextManualNumber = max ordinal + 1 with a no-manual base case (Requirement
-// 4.4). IsManuallyLocked / ManualDownloadCount are asserted to answer from the
-// ix_state_quad projection without dereferencing primaries (Requirement
-// 18.3).
+// NextManualNumber = max ordinal + 1 over EVERY row's path (auto rows
+// included — a top pick records a numbered path on an auto row) with a
+// no-ordinal base case (Requirement 4.4). IsManuallyLocked /
+// ManualDownloadCount are asserted to answer from the ix_state_quad
+// projection without dereferencing primaries (Requirement 18.3).
 
 // saveManual appends a manual row for the default triple with the given path
 // and ordinal-bearing filename.
@@ -222,31 +223,42 @@ func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 	}
 }
 
-// TestNextManualNumber asserts the next ordinal is one greater than the highest
-// existing manual ordinal, the base case (no manual rows) is 1, and auto rows
-// do not influence the result (Requirement 4.4).
+// TestNextManualNumber asserts the next ordinal is one greater than the
+// highest ordinal encoded in ANY of the quad's row paths — auto rows
+// included, because a top pick records a numbered path on an auto row
+// (manual=false) — with 1 as the no-ordinal base case (Requirement 4.4). A
+// plain auto row (unnumbered path) contributes nothing.
 func TestNextManualNumber(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := context.Background()
 
-	// Base case: no manual rows -> 1.
+	// Base case: no rows -> 1.
 	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
 		t.Errorf("NextManualNumber (empty) = %d, want 1", got)
 	}
 
-	// An auto row must not bump the ordinal.
+	// A plain auto row (unnumbered auto path) must not bump the ordinal.
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
 	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
-		t.Errorf("NextManualNumber (auto only) = %d, want 1", got)
+		t.Errorf("NextManualNumber (plain auto only) = %d, want 1", got)
 	}
 
-	// Manual rows at ordinals 1 and 3 -> next is 4 (max + 1).
-	saveManual(t, db, testProv, "Manual.1", "/media/test.fr.1.srt", 70)
+	// A TOP PICK is an auto row (manual=false) on a NUMBERED path: it must
+	// reserve its ordinal, or the next download would reuse .1 and
+	// overwrite the top pick's file.
+	if err := db.SaveDownload(ctx, autoRec(testProv, "Top.Pick", "/media/test.fr.1.srt", 90)); err != nil {
+		t.Fatalf("top-pick SaveDownload: %v", err)
+	}
+	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 2 {
+		t.Errorf("NextManualNumber (top-pick auto at .1) = %d, want 2 (auto ordinal reserved)", got)
+	}
+
+	// A manual row at ordinal 3 continues the mixed sequence -> next is 4.
 	saveManual(t, db, testProv, "Manual.3", "/media/test.fr.3.srt", 72)
 	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 4 {
-		t.Errorf("NextManualNumber = %d, want 4 (max ordinal 3 + 1)", got)
+		t.Errorf("NextManualNumber (auto .1 + manual .3) = %d, want 4 (max ordinal 3 + 1)", got)
 	}
 }
 

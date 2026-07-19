@@ -1,4 +1,12 @@
 // Package filehandlers provides HTTP handlers for the /api/files/* endpoints.
+//
+// S7 addressing contract: the wire carries NO filesystem paths in either
+// direction. Listings expose the typed per-file identity (media_type,
+// media_id, language, variant, source, ordinal) plus display metadata;
+// deletion accepts that FileRef (or a server-minted orphan handle) and
+// resolves the path from the store. S16: every disk delete routes through
+// the subtitle-scoped gate (subtitlepath.RemoveUnderRoot), which refuses
+// non-subtitle extensions loudly with 409 subtitle_extension_not_allowed.
 package filehandlers
 
 import (
@@ -7,11 +15,17 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 
+	"github.com/cplieger/arrapi"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/server/subtitlepath"
+	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
 // FileStore is the narrow store interface used by file handlers.
@@ -29,13 +43,43 @@ var _ FileStore = api.Store(nil)
 // Deps holds the dependencies for file handlers.
 type Deps struct {
 	Store     FileStore
+	Resolve   *resolve.Resolver
 	StateFunc func() *LiveState
 	Events    EventPublisher
 }
 
-// LiveState holds the runtime state needed by file handlers.
+// FileSonarrClient is the Sonarr surface the bound orphan fallback needs:
+// the series identity for the media_id binding check plus the episodes'
+// file paths for the per-episode directory narrowing.
+type FileSonarrClient interface {
+	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+}
+
+// FileRadarrClient is the Radarr surface the bound orphan fallback needs:
+// the movie's identity for the media_id binding check plus its file path.
+type FileRadarrClient interface {
+	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+}
+
+// Compile-time assertions: the live arr client interfaces carry the orphan
+// fallback surface, so server_init's interface-to-interface assignment into
+// LiveState stays valid.
+var (
+	_ FileSonarrClient = api.SonarrClient(nil)
+	_ FileRadarrClient = api.RadarrClient(nil)
+)
+
+// LiveState holds the runtime state needed by file handlers. The arr
+// clients (nil when unconfigured) feed the orphan walk's all-orphan
+// fallback: a media item whose files are all orphans has no store-derivable
+// directory, so its directory is resolved via the arr item — but only after
+// the arr item's external identity is verified to match the requested
+// media_id (the client-supplied media_id/arr_id pairing is never trusted).
 type LiveState struct {
-	Cfg api.ConfigProvider
+	Cfg    api.ConfigProvider
+	Sonarr FileSonarrClient
+	Radarr FileRadarrClient
 }
 
 // EventPublisher is the narrow interface for publishing events.
@@ -45,30 +89,37 @@ type EventPublisher interface {
 
 // Handler provides HTTP handlers for the /api/files/* endpoints.
 type Handler struct {
-	deps Deps
+	deps    Deps
+	orphans *orphanTable
 }
 
 // NewHandler creates a file Handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{deps: deps}
+	return &Handler{deps: deps, orphans: newOrphanTable()}
 }
 
-// FileEntry is the JSON shape for the file manager API.
+// FileEntry is the JSON shape for the file manager API. It carries no
+// filesystem paths: (media_id, language, variant, source, ordinal) is the
+// FileRef identity a client echoes back to address the file; Name is the
+// display basename. Orphan rows (on disk, no store row) additionally carry
+// the single-use OrphanHandle and only Name/Size beside it.
 type FileEntry struct {
-	MediaID   string `json:"media_id"`
-	Language  string `json:"language"`
-	Variant   string `json:"variant"`
-	Source    string `json:"source"`
-	Codec     string `json:"codec,omitempty"`
-	Path      string `json:"path,omitempty"`
-	VideoPath string `json:"video_path,omitempty"`
-	Score     int    `json:"score,omitempty"`
-	OffsetMs  int64  `json:"offset_ms,omitempty"`
-	Size      int64  `json:"size,omitempty"`
+	MediaID      string `json:"media_id"`
+	Language     string `json:"language"`
+	Variant      string `json:"variant"`
+	Source       string `json:"source"`
+	Codec        string `json:"codec,omitempty"`
+	Name         string `json:"name,omitempty"`
+	OrphanHandle string `json:"orphan_handle,omitempty"`
+	Score        int    `json:"score,omitempty"`
+	Ordinal      int    `json:"ordinal,omitempty"`
+	OffsetMs     int64  `json:"offset_ms,omitempty"`
+	Size         int64  `json:"size,omitempty"`
 }
 
-// HandleListFiles returns subtitle files for a media item with file sizes.
-// GET /api/files?media_type=movie&media_id=tmdb-1271
+// HandleListFiles returns subtitle files for a media item with file sizes,
+// including orphans discovered by the server-side directory walk.
+// GET /api/files?media_type=movie&media_id=tmdb-1271[&arr_id=42]
 func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
@@ -86,6 +137,15 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
+	arrID := 0 // absent disables the arr fallback
+	if raw := r.URL.Query().Get("arr_id"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			api.BadRequestC(w, r, api.CodeBadRequest, "arr_id must be a positive integer")
+			return
+		}
+		arrID = n
+	}
 
 	rows, err := h.deps.Store.GetSubtitleFiles(ctx, api.MediaType(mediaType), mediaID)
 	if err != nil {
@@ -93,22 +153,35 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries := make([]FileEntry, 0, len(rows))
 	ls := h.deps.StateFunc()
+	entries := storeEntries(ctx, ls, rows)
+	entries, err = h.appendOrphans(ctx, ls, api.MediaType(mediaType), mediaID, arrID, rows, entries)
+	if err != nil {
+		writeArrBindingError(w, r, err)
+		return
+	}
+
+	api.WriteJSON(w, entries)
+}
+
+// storeEntries maps the store rows onto listing FileEntries, statting each
+// contained on-disk path for its size.
+func storeEntries(ctx context.Context, ls *LiveState, rows []api.SubtitleEntry) []FileEntry {
+	entries := make([]FileEntry, 0, len(rows))
 	for i := range rows {
 		row := &rows[i]
 		e := FileEntry{
-			MediaID:   row.MediaID,
-			Language:  row.Language,
-			Variant:   row.Variant,
-			Source:    row.Source,
-			Codec:     row.Codec,
-			Path:      row.Path,
-			VideoPath: row.VideoPath,
-			Score:     row.Score,
-			OffsetMs:  row.OffsetMs,
+			MediaID:  row.MediaID,
+			Language: row.Language,
+			Variant:  row.Variant,
+			Source:   row.Source,
+			Codec:    row.Codec,
+			Score:    row.Score,
+			Ordinal:  row.Ordinal,
+			OffsetMs: row.OffsetMs,
 		}
 		if row.Path != "" {
+			e.Name = filepath.Base(row.Path)
 			if err := ls.Cfg.ValidatePath(ctx, row.Path); err == nil {
 				if fi, statErr := os.Stat(row.Path); statErr == nil { //nolint:gosec // G703: path validated by ValidatePath above
 					e.Size = fi.Size()
@@ -117,12 +190,25 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, e)
 	}
-
-	api.WriteJSON(w, entries)
+	return entries
 }
 
-// HandleDeleteFile deletes a single external subtitle file.
-// DELETE /api/files?path=/media/...srt&media_type=movie&media_id=tmdb-1271&language=en&variant=standard
+// DeleteFileRequest is the typed body for DELETE /api/files: either the
+// FileRef fields addressing one stored subtitle file, or a server-minted
+// orphan handle from the listing (mutually exclusive; orphan_handle wins).
+type DeleteFileRequest struct {
+	MediaType    api.MediaType `json:"media_type,omitempty"`
+	MediaID      string        `json:"media_id,omitempty"`
+	Language     string        `json:"language,omitempty"`
+	Variant      string        `json:"variant,omitempty"`
+	Source       string        `json:"source,omitempty"`
+	OrphanHandle string        `json:"orphan_handle,omitempty"`
+	Ordinal      int           `json:"ordinal,omitempty"`
+}
+
+// HandleDeleteFile deletes a single external subtitle file addressed by
+// FileRef (store-resolved path) or orphan handle (TTL table).
+// DELETE /api/files
 func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodDelete {
@@ -130,55 +216,100 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := r.URL.Query().Get("path")
-	mediaType := r.URL.Query().Get("media_type")
-	mediaID := r.URL.Query().Get("media_id")
-	language := r.URL.Query().Get("language")
-	variant := r.URL.Query().Get("variant")
-
-	if path == "" || mediaType == "" || mediaID == "" || language == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "path, media_type, media_id, and language required")
+	var req DeleteFileRequest
+	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
-	if !api.MediaType(mediaType).Valid() {
+
+	if req.OrphanHandle != "" {
+		h.deleteOrphan(ctx, w, r, req.OrphanHandle)
+		return
+	}
+
+	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
+		api.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
+		return
+	}
+	if !req.MediaType.Valid() {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
-	if variant == "" {
-		variant = string(api.VariantStandard)
+	if req.Variant == "" {
+		req.Variant = string(api.VariantStandard)
+	}
+	if req.Source == "" {
+		req.Source = string(api.SourceExternal)
 	}
 
-	ls := h.deps.StateFunc()
+	ref := resolve.FileRef{
+		MediaType: req.MediaType,
+		MediaID:   req.MediaID,
+		Language:  req.Language,
+		Variant:   req.Variant,
+		Source:    req.Source,
+		Ordinal:   req.Ordinal,
+	}
+	path, err := h.deps.Resolve.SubtitlePath(ctx, &ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
+		return
+	}
 
-	if err := ls.Cfg.RemoveUnderRoot(ctx, path); err != nil {
-		if errors.Is(err, config.ErrPathNotAllowed) {
-			slog.Warn("delete file: path rejected", "path", path, "error", err)
-			api.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid path")
-			return
-		}
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "delete file", "path", path)
+	if !h.removeSubtitleFile(ctx, w, r, path) {
 		return
 	}
 
 	slog.Info("subtitle file deleted", "path", path)
 
 	if err := h.deps.Store.DeleteSubtitleFile(ctx,
-		api.MediaType(mediaType), mediaID, language, api.Variant(variant), api.SourceExternal, path); err != nil {
+		ref.MediaType, ref.MediaID, ref.Language, api.Variant(ref.Variant), api.SourceExternal, path); err != nil {
 		slog.Warn("delete file: db cleanup failed", "error", err)
 	}
 
-	h.maybeRevertManualLock(ctx, api.MediaType(mediaType), mediaID, language, api.Variant(variant))
+	h.maybeRevertManualLock(ctx, ref.MediaType, ref.MediaID, ref.Language, api.Variant(ref.Variant))
 
 	h.deps.Events.Publish(events.Event{
 		Type: events.CoverageUpdate,
 		Data: events.CoverageEvent{
-			MediaType: api.MediaType(mediaType),
-			MediaID:   mediaID,
-			Language:  language,
+			MediaType: ref.MediaType,
+			MediaID:   ref.MediaID,
+			Language:  ref.Language,
 		},
 	})
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// removeSubtitleFile deletes path through the S16 subtitle delete gate,
+// writing the response on failure. A refused extension answers 409
+// subtitle_extension_not_allowed + WARN (loud, never a silent skip); a
+// containment failure answers 403. Returns true when the file is gone.
+func (h *Handler) removeSubtitleFile(ctx context.Context, w http.ResponseWriter, r *http.Request, path string) bool {
+	ls := h.deps.StateFunc()
+	if err := subtitlepath.RemoveUnderRoot(ctx, ls.Cfg, path); err != nil {
+		switch {
+		case errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed):
+			slog.Warn("delete file: extension refused by subtitle delete gate", "path", path, "error", err)
+			api.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+				"stored path does not carry a deletable subtitle extension")
+		case errors.Is(err, config.ErrPathNotAllowed):
+			slog.Warn("delete file: path rejected", "path", path, "error", err)
+			api.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid path")
+		default:
+			api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "delete file", "path", path)
+		}
+		return false
+	}
+	return true
+}
+
+// BulkDeleteRequest is the typed body for DELETE /api/files/bulk: the media
+// item whose external subtitle files are all deleted. MediaID keeps the
+// store-ID semantics of the listing (exact ID, or a "tvdb-<id>-" series
+// prefix covering every episode).
+type BulkDeleteRequest struct {
+	MediaType api.MediaType `json:"media_type"`
+	MediaID   string        `json:"media_id"`
 }
 
 // HandleBulkDeleteFiles deletes all external subtitle files for a media item.
@@ -190,10 +321,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req struct {
-		MediaType api.MediaType `json:"media_type"`
-		MediaID   string        `json:"media_id"`
-	}
+	var req BulkDeleteRequest
 	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
@@ -211,6 +339,18 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	rows, err := h.deps.Store.GetSubtitleFiles(ctx, req.MediaType, req.MediaID)
 	if err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "bulk delete: db fetch")
+		return
+	}
+
+	// S16 preflight: every targeted external row must carry the delete
+	// capability BEFORE any mutation. One conflicting stored path refuses
+	// the whole bulk with the single-file path's 409 and deletes nothing —
+	// never a silent skip that answers 200 with the row left behind.
+	if path, refused := refusedBulkPath(rows); refused {
+		slog.Warn("bulk delete: extension refused by subtitle delete gate, refusing whole bulk",
+			"path", path)
+		api.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+			"a stored path does not carry a deletable subtitle extension")
 		return
 	}
 
@@ -243,6 +383,23 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	})
 
 	api.WriteJSON(w, map[string]int{"deleted": deleted})
+}
+
+// refusedBulkPath returns the first targeted external row path whose
+// extension lacks the delete capability in the subtitle-extension authority
+// (the S16 bulk preflight). Embedded rows and rows without a path are not
+// deletion targets and pass through.
+func refusedBulkPath(rows []api.SubtitleEntry) (string, bool) {
+	for i := range rows {
+		row := &rows[i]
+		if row.Source == string(api.SourceEmbedded) || row.Path == "" {
+			continue
+		}
+		if !subtitleext.Delete(row.Path) {
+			return row.Path, true
+		}
+	}
+	return "", false
 }
 
 // HandleHistoryIDs returns distinct media IDs that have download history.
@@ -283,14 +440,24 @@ func (h *Handler) DeleteExternalFile(ctx context.Context, cfg api.ConfigProvider
 	return h.deleteExternalFile(ctx, cfg, mediaType, row)
 }
 
-// deleteExternalFile removes a single external subtitle file from disk and DB.
+// deleteExternalFile removes a single external subtitle file from disk and
+// DB through the S16 subtitle delete gate. The bulk handler preflights every
+// targeted row's extension and answers 409 before any mutation, so the
+// in-sweep refusal branch here is defense-in-depth (it also guards the
+// exported DeleteExternalFile): a refused extension is still loud (WARN log
+// naming the gate) and the row is left untouched.
 func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
-	if row.Source == string(api.ProviderNameEmbedded) || row.Path == "" {
+	if row.Source == string(api.SourceEmbedded) || row.Path == "" {
 		return false
 	}
-	if err := cfg.RemoveUnderRoot(ctx, row.Path); err != nil {
-		slog.Warn("bulk delete: failed to remove file",
-			"path", row.Path, "error", err)
+	if err := subtitlepath.RemoveUnderRoot(ctx, cfg, row.Path); err != nil {
+		if errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed) {
+			slog.Warn("bulk delete: extension refused by subtitle delete gate",
+				"path", row.Path, "error", err)
+		} else {
+			slog.Warn("bulk delete: failed to remove file",
+				"path", row.Path, "error", err)
+		}
 		return false
 	}
 	slog.Info("subtitle file deleted (bulk)", "path", row.Path)
@@ -321,7 +488,7 @@ func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.Media
 		return
 	}
 	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil { //nolint:gosec // G703: paths from validated config
+		if _, err := os.Stat(p); err == nil {
 			return
 		}
 	}

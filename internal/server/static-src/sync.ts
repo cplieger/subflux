@@ -2,15 +2,17 @@
 
 import * as notify from "./notify.js";
 import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./dom.js";
+import { openDialog } from "@cplieger/ui-primitives/dialog";
 import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
+import { subtitleRef, type FileRefArgs } from "./file-ref.js";
 import {
-  apiAction,
-  bindLoadingState,
-  retryNetwork,
-  RETRY_STANDARD,
-  registerCleanup,
-} from "@cplieger/actions";
+  previewStart,
+  PATH_PREVIEW_POSTER,
+  PATH_PREVIEW_SUBTITLE,
+  PATH_PREVIEW_VIDEO,
+} from "./wire/client.gen.js";
+import { bindLoadingState, registerCleanup } from "@cplieger/actions";
 import { langName } from "./utils.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";
@@ -21,12 +23,21 @@ import type { SubtitleEntry, MediaType } from "./api-types.js";
 
 const syncDlg: HTMLDialogElement = dialog("syncDialog");
 
-// Common fields shared across all sync states.
+// Common fields shared across all sync states. Subtitles are addressed by
+// FileRef (built from the selected entry via subtitleRef) and the video by
+// MediaRef (arr id + season/episode) — the client never handles paths (S7).
 interface SyncStateBase {
-  subtitlePath: string;
-  videoPath: string;
+  /** Index of the selected subtitle in `entries`. */
+  selIdx: number;
+  /** Poster proxy type ("series"/"movie") — the arr the poster comes from. */
   mediaType: MediaType | "";
+  /** Store media type for FileRef/MediaRef ("episode" for series). */
+  fileMediaType: MediaType;
+  /** Arr internal ID (Sonarr series / Radarr movie) for the video MediaRef. */
   mediaId: number;
+  /** Aired season/episode for the video MediaRef (episodes only). */
+  season: number;
+  episode: number;
   entries: SubtitleEntry[];
   blobUrl: string;
 }
@@ -49,15 +60,40 @@ interface LabeledEntry {
 
 let syncState: SyncState = {
   status: "idle",
-  subtitlePath: "",
-  videoPath: "",
+  selIdx: 0,
   mediaType: "",
+  fileMediaType: "movie",
   mediaId: 0,
+  season: 0,
+  episode: 0,
   entries: [],
   previewStart: 0,
   previewBuffered: false,
   blobUrl: "",
 };
+
+/** The currently selected subtitle entry, or null when entries are empty. */
+function selectedEntry(): SubtitleEntry | null {
+  return syncState.entries[syncState.selIdx] ?? null;
+}
+
+/** FileRef for the currently selected subtitle. */
+function currentRef(): FileRefArgs | null {
+  const sub = selectedEntry();
+  if (!sub) {
+    return null;
+  }
+  return subtitleRef(syncState.fileMediaType, sub);
+}
+
+/** Parse aired season/episode from a series media_id (`...s01e05`). */
+function parseSeasonEpisode(mediaID: string): { season: number; episode: number } {
+  const m = /s(\d+)e(\d+)$/.exec(mediaID);
+  if (!m) {
+    return { season: 0, episode: 0 };
+  }
+  return { season: Number(m[1]), episode: Number(m[2]) };
+}
 
 // Single source of truth for the current manual offset (ms). Recreated per
 // openSyncDialog so each dialog instance gets a fresh signal; an effect
@@ -139,7 +175,6 @@ function buildSyncSubLabels(entries: SubtitleEntry[]): LabeledEntry[] {
 
 export function openSyncDialog(
   entries: SubtitleEntry[],
-  videoPath: string,
   mediaType: MediaType,
   mediaId: number,
   mediaLabel: string,
@@ -168,12 +203,17 @@ export function openSyncDialog(
     stopSaveBinding = null;
   }
   offset = signal(initialOffset);
+  // The video MediaRef: season/episode parse from the entry's media_id
+  // ("tvdb-...-s01e05"); movies parse to 0/0, which the server ignores.
+  const se = parseSeasonEpisode(entries[0]?.media_id ?? "");
   syncState = {
     status: "idle",
-    subtitlePath: "",
-    videoPath: videoPath,
+    selIdx: 0,
     mediaType: mediaType,
+    fileMediaType: mediaType === "movie" ? "movie" : "episode",
     mediaId: mediaId,
+    season: se.season,
+    episode: se.episode,
     entries: entries,
     previewStart: 0,
     previewBuffered: false,
@@ -198,7 +238,7 @@ export function openSyncDialog(
     if (!entry) {
       return;
     }
-    syncState.subtitlePath = entry.sub.path ?? "";
+    syncState.selIdx = idx;
     offset.value = entry.sub.offset_ms ?? 0;
     updateTimecodeDisplay(offset.peek());
     // Reload subtitle track on the video with the new language.
@@ -232,8 +272,6 @@ export function openSyncDialog(
       ),
     ),
   );
-
-  syncState.subtitlePath = labeled[0]?.sub.path ?? "";
 
   const body = el("div", { className: "dlg-body" });
 
@@ -321,11 +359,9 @@ export function openSyncDialog(
   if (dlg.open) {
     dlg.close();
   }
-  // closeDialog (@cplieger/ui-primitives) fades out via an `is-leaving` class,
-  // not inline styles; clear it so a reopen within the fade window renders
-  // visible and the pending close callback no-ops (it is guarded on the class).
-  dlg.classList.remove("is-leaving");
-  dlg.showModal();
+  // openDialog cancels a pending is-leaving fade before showing, so a reopen
+  // within the fade window renders visible and the stale close no-ops.
+  openDialog(dlg);
   // Keep keyboard focus INSIDE the modal (the dialog itself has
   // tabindex="-1"); the previous blur() dropped focus to <body>, leaving
   // keyboard/SR users with no position. The dialog-level arrow handler below
@@ -362,8 +398,10 @@ export function openSyncDialog(
 }
 
 // Build the video preview container with poster background and play overlay.
+// Requires the arr MediaRef (arr id) — without it the server cannot resolve
+// the video file, so the preview section is omitted.
 function buildVideoPreview(): HTMLElement | null {
-  if (!syncState.videoPath) {
+  if (!syncState.mediaId) {
     return null;
   }
   const previewContainer = el("div", {
@@ -371,12 +409,15 @@ function buildVideoPreview(): HTMLElement | null {
     id: "sync-preview-container",
   });
   if (syncState.mediaId) {
-    const fanartUrl = `/api/preview/poster?type=${encodeURIComponent(
-      syncState.mediaType,
-    )}&id=${syncState.mediaId}&style=fanart`;
-    const posterUrl = `/api/preview/poster?type=${encodeURIComponent(
-      syncState.mediaType,
-    )}&id=${syncState.mediaId}`;
+    const fanartUrl = `${PATH_PREVIEW_POSTER}?${new URLSearchParams({
+      type: syncState.mediaType,
+      id: String(syncState.mediaId),
+      style: "fanart",
+    }).toString()}`;
+    const posterUrl = `${PATH_PREVIEW_POSTER}?${new URLSearchParams({
+      type: syncState.mediaType,
+      id: String(syncState.mediaId),
+    }).toString()}`;
     previewContainer.style.backgroundImage = `url(${fanartUrl}), url(${posterUrl})`;
     previewContainer.style.backgroundSize = "cover";
     previewContainer.style.backgroundPosition = "center";
@@ -444,14 +485,16 @@ function closeSyncDialog(): void {
 }
 
 async function applyManualOffset(): Promise<void> {
-  if (!syncState.subtitlePath) {
+  const ref = currentRef();
+  const sub = selectedEntry();
+  if (!ref || !sub) {
     notify.error("No subtitle selected");
     return;
   }
   const currentOffset = offset.peek();
   const r = await saveManualOffsetAction.dispatch(
     {
-      subtitle_path: syncState.subtitlePath,
+      ...ref,
       offset_ms: currentOffset,
     },
     { silent: true },
@@ -459,19 +502,16 @@ async function applyManualOffset(): Promise<void> {
   if (r === null) {
     return;
   }
-  // Update cached entries so reopening the dialog shows the new offset.
-  for (const e of syncState.entries) {
-    if (e.path === syncState.subtitlePath) {
-      e.offset_ms = currentOffset;
-    }
-  }
+  // Update the cached entry so reopening the dialog shows the new offset.
+  sub.offset_ms = currentOffset;
   notify.success(`Offset saved: ${formatOffsetMs(currentOffset)}`);
   closeSyncDialog();
 }
 
 async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Promise<void> {
-  if (!syncState.subtitlePath || !syncState.videoPath) {
-    notify.error("Subtitle and video paths required");
+  const ref = currentRef();
+  if (!ref) {
+    notify.error("No subtitle selected");
     return;
   }
   btn.disabled = true;
@@ -480,8 +520,7 @@ async function runAudioSync(btn: HTMLButtonElement, resultDiv: HTMLElement): Pro
   resultDiv.hidden = true;
   try {
     const data = await audioSyncAction.dispatch({
-      subtitle_path: syncState.subtitlePath,
-      video_path: syncState.videoPath,
+      ...ref,
       dry_run: true,
     });
     if (data === null) {
@@ -519,25 +558,6 @@ function resetSync(): void {
   }
 }
 
-interface PreviewStartResponse {
-  start_seconds: number;
-}
-
-/** Find the dialogue-dense start point for the preview window. retryNetwork
- *  recovers from transient blips during the analyze step. error: false
- *  because the caller falls back to startSec=0 silently. */
-const previewStartAction = apiAction<string, PreviewStartResponse>({
-  name: "preview.start",
-  request: (subtitlePath) => ({
-    method: "GET",
-    path: `/api/preview/start?subtitle=${encodeURIComponent(subtitlePath)}`,
-  }),
-  dedupe: (subtitlePath) => `preview.start:${subtitlePath}`,
-  retryable: retryNetwork,
-  retry: RETRY_STANDARD,
-  error: false,
-});
-
 async function toggleVideoPreview(container: HTMLElement): Promise<void> {
   if (syncState.status === "preview") {
     if (syncState.ffmpegAbort) {
@@ -571,9 +591,10 @@ async function toggleVideoPreview(container: HTMLElement): Promise<void> {
     ),
   );
 
-  // Find dialogue-dense start point.
+  // Find dialogue-dense start point. Falls back to startSec=0 silently.
   let startSec = 0;
-  const r = await previewStartAction.dispatch(syncState.subtitlePath);
+  const ref = currentRef();
+  const r = ref ? await previewStart({ ...ref }) : null;
   if (r) {
     startSec = r.start_seconds || 0;
   }
@@ -582,6 +603,25 @@ async function toggleVideoPreview(container: HTMLElement): Promise<void> {
   syncState = { ...syncState, status: "preview", ffmpegAbort: null, previewStart: startSec };
 
   startPreviewStream(container, startSec);
+}
+
+/** Preview-video stream URL (raw media flow; the generated client only
+ *  supplies the path constant). The video is addressed by MediaRef (arr id
+ *  + season/episode); buffered=true selects the non-MSE fallback. */
+function previewVideoUrl(startSec: number, buffered?: boolean): string {
+  const params = new URLSearchParams({
+    media_type: syncState.fileMediaType,
+    media_id: String(syncState.mediaId),
+    start: String(startSec),
+  });
+  if (syncState.fileMediaType === "episode") {
+    params.set("season", String(syncState.season));
+    params.set("episode", String(syncState.episode));
+  }
+  if (buffered) {
+    params.set("buffered", "true");
+  }
+  return `${PATH_PREVIEW_VIDEO}?${params.toString()}`;
 }
 
 function startPreviewStream(container: HTMLElement, startSec: number): void {
@@ -601,9 +641,7 @@ function startPreviewStream(container: HTMLElement, startSec: number): void {
   if (canMSE) {
     startMSEStream(video, startSec);
   } else {
-    video.src = `/api/preview/video?path=${encodeURIComponent(
-      syncState.videoPath,
-    )}&start=${startSec}&buffered=true`;
+    video.src = previewVideoUrl(startSec, true);
   }
 
   reloadSubtitleTrack(video);
@@ -748,9 +786,7 @@ function startMSEStream(video: HTMLVideoElement, startSec: number): void {
       const mime = 'video/mp4; codecs="avc1.42E01E,mp4a.40.2"';
       const sb = ms.addSourceBuffer(mime);
 
-      const url = `/api/preview/video?path=${encodeURIComponent(
-        syncState.videoPath,
-      )}&start=${startSec}`;
+      const url = previewVideoUrl(startSec);
 
       try {
         const resp = await fetch(url, {
@@ -827,14 +863,25 @@ function reloadSubtitleTrack(video: HTMLVideoElement | null): void {
     t.remove();
   }
 
-  const trackUrl = `/api/preview/subtitle?path=${encodeURIComponent(
-    syncState.subtitlePath,
-  )}&start=${syncState.previewStart || 0}&shift=${offset.peek() || 0}`;
+  const ref = currentRef();
+  if (!ref) {
+    return;
+  }
+  const trackParams = new URLSearchParams({
+    media_type: ref.media_type,
+    media_id: ref.media_id,
+    language: ref.language,
+    variant: ref.variant ?? "standard",
+    source: ref.source ?? "external",
+    ordinal: String(ref.ordinal ?? 0),
+    start: String(syncState.previewStart || 0),
+    shift: String(offset.peek() || 0),
+  });
+  const trackUrl = `${PATH_PREVIEW_SUBTITLE}?${trackParams.toString()}`;
   // Declare the track's REAL language to the platform (caption menus, SR
   // announcements): a hardcoded srclang="en" mislabeled every non-English
   // subtitle.
-  const entry = syncState.entries.find((s) => s.path === syncState.subtitlePath);
-  const entryLang = entry?.language ?? "";
+  const entryLang = selectedEntry()?.language ?? "";
   const lang = entryLang === "" ? "en" : entryLang;
   const track = el("track", {
     kind: "subtitles",
@@ -873,9 +920,7 @@ function seekPreview(video: HTMLVideoElement, deltaSec: number): void {
     if (!syncState.previewBuffered) {
       startMSEStream(video, absTarget);
     } else {
-      video.src = `/api/preview/video?path=${encodeURIComponent(
-        syncState.videoPath,
-      )}&start=${absTarget}&buffered=true`;
+      video.src = previewVideoUrl(absTarget, true);
     }
     video.play().catch(() => {
       /* ignore */

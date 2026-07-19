@@ -93,7 +93,7 @@ func (m MatchSet) Keys() []string {
 }
 
 // VideoInfo describes the video file for scoring purposes.
-// Only MediaType and ReleaseGroup are used by the scorer and match builder.
+// Only MediaType and ReleaseGroup are used by the match builder.
 type VideoInfo struct {
 	ReleaseGroup string    // Full release name for parsing.
 	MediaType    MediaType // "episode" or "movie"

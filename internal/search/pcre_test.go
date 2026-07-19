@@ -2,7 +2,6 @@ package search
 
 import (
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/search/release"
@@ -11,21 +10,6 @@ import (
 
 // compilePCRE delegates to release.CompilePCRE for test compatibility.
 var compilePCRE = release.CompilePCRE
-
-// splitTopLevelAlternation delegates to release.SplitTopLevelAlternation.
-var splitTopLevelAlternation = release.SplitTopLevelAlternation
-
-// extractSubmatch converts a flat submatch index slice into strings.
-func extractSubmatch(s string, idx []int) []string {
-	result := make([]string, len(idx)/2)
-	for i := range result {
-		start, end := idx[i*2], idx[i*2+1]
-		if start >= 0 {
-			result[i] = s[start:end]
-		}
-	}
-	return result
-}
 
 func TestCompilePCRE_lookahead_positive(t *testing.T) {
 	t.Parallel()
@@ -164,11 +148,10 @@ func TestCompilePCRE_invalid_assertion_regex_returns_error(t *testing.T) {
 
 func TestCompilePCRE_unterminated_lookaround_ignored(t *testing.T) {
 	t.Parallel()
-	// An unterminated lookaround (?!... without closing ) is not parsed as
-	// an assertion; it falls through to the core regex. The core may or may
-	// not compile depending on the pattern.
+	// An unterminated lookaround (?!... without a closing ) is rejected by
+	// the marker-based compiler with a typed error (study: rejected-shape
+	// table; previously it fell through to the core and failed there).
 	_, err := compilePCRE(`(?!unclosed`)
-	// The unterminated lookaround is written to core as-is, which is invalid RE2.
 	if err == nil {
 		t.Error("compilePCRE(unterminated lookaround) expected error, got nil")
 	}
@@ -363,54 +346,6 @@ func TestFindStringSubmatch(t *testing.T) {
 			}
 		})
 	}
-}
-
-// --- extractSubmatch ---
-
-func TestExtractSubmatch_basic(t *testing.T) {
-	t.Parallel()
-	s := "hello world"
-	idx := []int{0, 5, 0, 5}
-	got := extractSubmatch(s, idx)
-	if len(got) != 2 || got[0] != "hello" || got[1] != "hello" {
-		t.Errorf("extractSubmatch(basic) = %v, want [hello, hello]", got)
-	}
-}
-
-func TestExtractSubmatch_unmatched_group(t *testing.T) {
-	t.Parallel()
-	s := "hello"
-	idx := []int{0, 5, -1, -1}
-	got := extractSubmatch(s, idx)
-	if len(got) != 2 || got[0] != "hello" || got[1] != "" {
-		t.Errorf("extractSubmatch(unmatched) = %v, want [hello, ]", got)
-	}
-}
-
-func TestExtractSubmatch_multiple_groups(t *testing.T) {
-	t.Parallel()
-	s := "abc123def"
-	idx := []int{0, 9, 3, 6, 6, 9}
-	got := extractSubmatch(s, idx)
-	if len(got) != 3 || got[0] != "abc123def" || got[1] != "123" || got[2] != "def" {
-		t.Errorf("extractSubmatch(multiple) = %v, want [abc123def, 123, def]", got)
-	}
-}
-
-// --- PBT: splitTopLevelAlternation round-trip ---
-
-func TestSplitTopLevelAlternation_roundtrip(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		// Generate patterns from safe alphabet (no unbalanced parens/brackets).
-		parts := rapid.SliceOfN(rapid.StringMatching(`[a-z0-9.+*?|\\]+`), 1, 5).Draw(t, "parts")
-		pattern := strings.Join(parts, "|")
-		got := splitTopLevelAlternation(pattern)
-		reconstructed := strings.Join(got, "|")
-		if reconstructed != pattern {
-			t.Errorf("splitTopLevelAlternation(%q) round-trip = %q, want %q", pattern, reconstructed, pattern)
-		}
-	})
 }
 
 // --- PBT: RE2-compatible pattern equivalence ---

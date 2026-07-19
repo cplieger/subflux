@@ -43,7 +43,7 @@ func scoreResults(sc api.Scorer, video *api.VideoInfo, subs []api.Subtitle, prov
 	scored := make([]scoredSub, len(subs))
 	for i := range subs {
 		matches := scoring.BuildMatches(video, &subs[i], defaultMatchDeps)
-		score, _ := sc.Score(video, api.SubtitleInfo{
+		score, _ := sc.Score(api.SubtitleInfo{
 			HashVerifiable: subs[i].MatchedBy == api.MatchByHash,
 		}, matches)
 		scored[i] = scoredSub{sub: subs[i], score: score, matches: matches}

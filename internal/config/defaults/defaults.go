@@ -15,6 +15,15 @@ const (
 	LogFormat  = "json"
 )
 
+// Embedded subtitle policy defaults (embedded_subtitles config section).
+// Declared once here; consumed by both the config pre-defaulted decode and
+// the schema section builder so the two can never drift.
+const (
+	EmbeddedIgnorePGS    = true
+	EmbeddedIgnoreVobSub = true
+	EmbeddedIgnoreASS    = false
+)
+
 // Default duration and numeric values used by both config loading and schema.
 const (
 	DefaultPollInterval      = 30 * time.Second

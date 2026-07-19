@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/cliparse"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -152,33 +156,36 @@ func TestServerURL_custom(t *testing.T) {
 
 // --- --format passthrough flag ---
 
-func TestRawJSONFormat_recognized_for_short_form(t *testing.T) {
-	prev := os.Args
-	t.Cleanup(func() { os.Args = prev })
+// statusParams parses args against the status spec (which carries the
+// shared formatFlag) for rawJSONFormat tests.
+func statusParams(t *testing.T, args ...string) cliparse.Params {
+	t.Helper()
+	spec := cliSpecs[cmdStatus]
+	p, err := cliparse.ParseAndValidate(args, &spec)
+	if err != nil {
+		t.Fatalf("ParseAndValidate(%v) error = %v, want nil", args, err)
+	}
+	return p
+}
 
-	os.Args = []string{"subflux", "status", "--format", "json"}
-	if !rawJSONFormat() {
-		t.Errorf("rawJSONFormat() = false for --format json, want true")
+func TestRawJSONFormat_recognized(t *testing.T) {
+	if !rawJSONFormat(statusParams(t, "--format", "json")) {
+		t.Errorf("rawJSONFormat(--format json) = false, want true")
+	}
+	if !rawJSONFormat(statusParams(t, "--format=JSON")) {
+		t.Errorf("rawJSONFormat(--format=JSON) = false, want true (case-insensitive)")
 	}
 }
 
 func TestRawJSONFormat_default_returns_false(t *testing.T) {
-	prev := os.Args
-	t.Cleanup(func() { os.Args = prev })
-
-	os.Args = []string{"subflux", "status"}
-	if rawJSONFormat() {
-		t.Errorf("rawJSONFormat() = true with no --format, want false")
+	if rawJSONFormat(statusParams(t)) {
+		t.Errorf("rawJSONFormat() = true with no --format, want false (default pretty)")
 	}
 }
 
 func TestRawJSONFormat_pretty_value_returns_false(t *testing.T) {
-	prev := os.Args
-	t.Cleanup(func() { os.Args = prev })
-
-	os.Args = []string{"subflux", "status", "--format", "pretty"}
-	if rawJSONFormat() {
-		t.Errorf("rawJSONFormat() = true for --format pretty, want false")
+	if rawJSONFormat(statusParams(t, "--format", "pretty")) {
+		t.Errorf("rawJSONFormat(--format pretty) = true, want false")
 	}
 }
 
@@ -276,5 +283,252 @@ func TestEnablePasswordLoginYAML_errors(t *testing.T) {
 					tt.input, err.Error(), tt.wantErrSub)
 			}
 		})
+	}
+}
+
+// --- P15 dispatch parity ---
+
+// Every declared subcommand must carry a Run function: dispatch has no
+// fallback table anymore (cliDispatch is gone), so a spec without Run
+// would nil-panic at invocation.
+func TestCLISpecs_every_entry_has_run(t *testing.T) {
+	for name, spec := range cliSpecs {
+		if spec.Run == nil {
+			t.Errorf("cliSpecs[%q].Run is nil; every subcommand must be dispatchable", name)
+		}
+		if spec.Name != name {
+			t.Errorf("cliSpecs[%q].Name = %q; map key and Name must agree", name, spec.Name)
+		}
+	}
+}
+
+// The sync-worker spec is hidden: dispatchable but absent from root help.
+func TestOrderedSpecs_excludes_hidden(t *testing.T) {
+	for _, s := range orderedSpecs() {
+		if s.Hidden {
+			t.Errorf("orderedSpecs() includes hidden spec %q", s.Name)
+		}
+		if s.Name == cmdSyncWorker {
+			t.Errorf("orderedSpecs() includes %q; the P13 vehicle must stay out of help", cmdSyncWorker)
+		}
+	}
+	if _, ok := cliSpecs[cmdSyncWorker]; !ok {
+		t.Error("cliSpecs is missing the hidden sync-worker entry (the P13 vehicle)")
+	}
+}
+
+// Parity: one invocation parses exactly once, and the runner receives the
+// same Params a direct ParseAndValidate of the argv produces — no runner
+// ever reparses os.Args (cliparse.ParseArgs no longer exists to reparse
+// with).
+func TestDispatchCLI_single_parse_parity(t *testing.T) {
+	spyCalls := 0
+	var got cliparse.Params
+	spec := cliparse.Spec{
+		Name: "spy",
+		Flags: []cliparse.Flag{
+			{Name: "lang", Default: "fr"},
+			{Name: "pick", Type: "int", Default: "1"},
+			{Name: "download", Type: "bool"},
+		},
+		Run: func(p cliparse.Params) int {
+			spyCalls++
+			got = p
+			return 42
+		},
+	}
+	cliSpecs["spy"] = spec
+	t.Cleanup(func() { delete(cliSpecs, "spy") })
+
+	args := []string{"--pick", "3", "--download"}
+	code, handled := dispatchCLI("spy", args)
+	if !handled || code != 42 {
+		t.Fatalf("dispatchCLI(spy) = (%d, %v), want (42, true)", code, handled)
+	}
+	if spyCalls != 1 {
+		t.Fatalf("runner invoked %d times, want exactly 1", spyCalls)
+	}
+
+	want, err := cliparse.ParseAndValidate(args, &spec)
+	if err != nil {
+		t.Fatalf("reference parse failed: %v", err)
+	}
+	if got.String("lang") != want.String("lang") ||
+		got.Int("pick") != want.Int("pick") ||
+		got.Bool("download") != want.Bool("download") {
+		t.Errorf("runner params = (lang=%q pick=%d download=%t), want (lang=%q pick=%d download=%t)",
+			got.String("lang"), got.Int("pick"), got.Bool("download"),
+			want.String("lang"), want.Int("pick"), want.Bool("download"))
+	}
+}
+
+// Positional tokens are rejected as usage errors by the single-pass parser.
+func TestDispatchCLI_rejects_positional(t *testing.T) {
+	code, handled := dispatchCLI(cmdStatus, []string{"stray"})
+	if !handled || code != 2 {
+		t.Errorf("dispatchCLI(status stray) = (%d, %v), want (2, true)", code, handled)
+	}
+}
+
+// --- S19: real bootstrap logging ---
+
+// captureStderrJSON swaps os.Stderr for a pipe, installs the bootstrap slog
+// default (setupLogging writes to the CURRENT os.Stderr), runs fn, and
+// returns the captured lines. Serial by nature: process-global stderr and
+// slog default (no t.Parallel).
+func captureStderrJSON(t *testing.T, fn func()) []string {
+	t.Helper()
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
+	t.Cleanup(func() {
+		os.Stderr = old
+		setupLogging("info", "json")
+	})
+
+	// Install the bootstrap default AFTER the swap so the handler binds to
+	// the pipe — exactly what runServer's top-of-function setup does.
+	setupLogging("info", "json")
+	fn()
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe writer: %v", err)
+	}
+	os.Stderr = old
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	var lines []string
+	for l := range strings.SplitSeq(string(data), "\n") {
+		if strings.TrimSpace(l) != "" {
+			lines = append(lines, l)
+		}
+	}
+	return lines
+}
+
+// TestBootstrapLogging_first_line_and_early_failure_are_json pins S19: the
+// very first line ("subflux starting") and a pre-config early-failure line
+// (config-dir creation failure) are BOTH valid JSON slog records in the
+// default format — not hand-rolled Fprintf fakes.
+func TestBootstrapLogging_first_line_and_early_failure_are_json(t *testing.T) {
+	// An unwritable parent directory makes MkdirAll fail with EACCES while
+	// os.Stat still reports the config path as not-existing: the genuine
+	// early-failure path. (Would not fail as root; tests run unprivileged.)
+	tmp := t.TempDir()
+	roDir := filepath.Join(tmp, "ro")
+	if err := os.Mkdir(roDir, 0o500); err != nil {
+		t.Fatalf("mkdir ro: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(roDir, 0o700) })
+	badPath := filepath.Join(roDir, "sub", "config.yaml")
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: directory permissions cannot force the failure path")
+	}
+
+	var ensureErr error
+	lines := captureStderrJSON(t, func() {
+		slog.Info("subflux starting")
+		ensureErr = ensureConfigFile(badPath, []byte("default: true\n"))
+	})
+
+	if ensureErr == nil {
+		t.Fatal("ensureConfigFile(unwritable path) error = nil, want error")
+	}
+	if len(lines) < 2 {
+		t.Fatalf("captured %d log lines, want at least 2 (start + failure): %v", len(lines), lines)
+	}
+
+	type record struct {
+		Time  string `json:"time"`
+		Level string `json:"level"`
+		Msg   string `json:"msg"`
+	}
+	var first, failure record
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatalf("first line is not valid JSON slog: %v\nline: %s", err, lines[0])
+	}
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &failure); err != nil {
+		t.Fatalf("failure line is not valid JSON slog: %v\nline: %s", err, lines[len(lines)-1])
+	}
+
+	if first.Msg != "subflux starting" || first.Level != "INFO" || first.Time == "" {
+		t.Errorf("first record = %+v, want msg=%q level=INFO with a timestamp", first, "subflux starting")
+	}
+	if failure.Msg != "failed to create config dir" || failure.Level != "ERROR" {
+		t.Errorf("failure record = %+v, want msg=%q level=ERROR", failure, "failed to create config dir")
+	}
+}
+
+// TestEnsureConfigFile_writes_default_and_logs_json covers the
+// created-config notice path: the default lands on disk 0600 and the notice
+// is a JSON slog line.
+func TestEnsureConfigFile_writes_default_and_logs_json(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cfgdir", "config.yaml")
+	def := []byte("sonarr:\n  enabled: true\n")
+
+	lines := captureStderrJSON(t, func() {
+		if err := ensureConfigFile(path, def); err != nil {
+			t.Errorf("ensureConfigFile() error = %v, want nil", err)
+		}
+	})
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("default config not written: %v", err)
+	}
+	if string(got) != string(def) {
+		t.Errorf("written config = %q, want %q", got, def)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("config mode = %v, want 0600", info.Mode().Perm())
+	}
+
+	if len(lines) != 1 {
+		t.Fatalf("captured %d lines, want exactly the created-config notice: %v", len(lines), lines)
+	}
+	var rec struct {
+		Msg  string `json:"msg"`
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatalf("notice line is not valid JSON slog: %v\nline: %s", err, lines[0])
+	}
+	if !strings.Contains(rec.Msg, "created default config") || rec.Path != path {
+		t.Errorf("notice record = %+v, want created-default-config msg carrying path=%q", rec, path)
+	}
+}
+
+// TestEnsureConfigFile_existing_file_untouched: a present config file is
+// never rewritten (and nothing is logged).
+func TestEnsureConfigFile_existing_file_untouched(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("mine: true\n"), 0o600); err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+
+	lines := captureStderrJSON(t, func() {
+		if err := ensureConfigFile(path, []byte("default: true\n")); err != nil {
+			t.Errorf("ensureConfigFile() error = %v, want nil", err)
+		}
+	})
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(got) != "mine: true\n" {
+		t.Errorf("existing config was rewritten to %q", got)
+	}
+	if len(lines) != 0 {
+		t.Errorf("existing-file path logged %v, want silence", lines)
 	}
 }

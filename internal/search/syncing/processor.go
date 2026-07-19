@@ -11,12 +11,22 @@ import (
 )
 
 // SubtitleProcessor implements api.SubtitleProcessor directly using subsync,
-// without an intermediate backend interface.
-type SubtitleProcessor struct{}
+// without an intermediate backend interface. The lightweight operations
+// (parse/write/shift/normalize) always run in-process; the heavy audio sync
+// routes through the configured SyncExec.
+type SubtitleProcessor struct {
+	exec SyncExec
+}
 
-// NewSubtitleProcessor creates a SubtitleProcessor.
+// NewSubtitleProcessor creates a SubtitleProcessor that syncs in-process.
 func NewSubtitleProcessor() SubtitleProcessor {
 	return SubtitleProcessor{}
+}
+
+// NewSubtitleProcessorWithExec creates a SubtitleProcessor whose audio sync
+// runs through the given executor (server mode: the syncworker client).
+func NewSubtitleProcessorWithExec(exec SyncExec) SubtitleProcessor {
+	return SubtitleProcessor{exec: exec}
 }
 
 // Compile-time check.
@@ -86,8 +96,12 @@ func (SubtitleProcessor) ShiftCues(cues []api.SubtitleCue, offset time.Duration)
 }
 
 // SyncFromAudio runs audio-based sync on subtitle data.
-func (SubtitleProcessor) SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) api.AudioSyncResult {
-	result := SyncFromAudio(ctx, data, videoPath, subtitlePath)
+func (p SubtitleProcessor) SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) api.AudioSyncResult {
+	exec := p.exec
+	if exec == nil {
+		exec = InProcessExec{}
+	}
+	result := exec.Audio(ctx, data, videoPath, subtitlePath)
 	return api.AudioSyncResult{
 		Method:     string(result.Method),
 		Cues:       apiCuesFromSubsync(result.Cues),

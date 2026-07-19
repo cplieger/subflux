@@ -11,14 +11,10 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// SubtitleExts lists file extensions recognized as subtitle formats.
-// Includes .vtt which is not in search/existing.go's list because VTT files
-// are only encountered inside archives, not as standalone files on disk from
-// Sonarr/Radarr media libraries.
-var SubtitleExts = map[string]bool{
-	".srt": true, ".ass": true, ".ssa": true, ".sub": true,
-	".vtt": true,
-}
+// Archive-member extension acceptance comes from the subtitle-extension
+// authority's archiveInput capability view (internal/subtitleext), which
+// includes .vtt: VTT files are only encountered inside archives, not as
+// standalone files on disk from Sonarr/Radarr media libraries.
 
 // MaxExtractSize is the maximum size of a single extracted subtitle file (5 MB).
 const MaxExtractSize = 5 << 20

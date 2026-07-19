@@ -1,24 +1,34 @@
 // login.ts — Standalone login page logic. Only imports leaf modules.
 
-import { apiGetTyped, apiPost, apiPostRaw } from "./api-client.js";
 import type { ApiResult } from "./api-client.js";
-import { decodeSetupStatus } from "./wire/decoders.gen.js";
+import {
+  authSetupCreateRaw,
+  authSetupStatus,
+  loginRaw,
+  oidcLinkRaw,
+  webauthnLoginBegin,
+  PATH_OIDC_REDIRECT,
+  PATH_WEBAUTHN_LOGIN_FINISH,
+} from "./wire/client.gen.js";
+import type { LoginSuccess } from "./wire/types.gen.js";
 import { registerCleanup } from "@cplieger/actions";
+import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
 import { startConfigWizard } from "./wizard.js";
-import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./webauthn-utils.js";
+import { postLoginDestination } from "./wizard-state.js";
+import {
+  bufferToBase64url,
+  requestOptionsFromJSON,
+  sendWebAuthnSignals,
+} from "./webauthn-utils.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
 
 // --- Inline interfaces for API response shapes ---
 
-interface LoginResponse {
+/** Shape of the raw WebAuthn login-finish / OIDC-link JSON bodies (both flows
+ *  answer with the login-success envelope; only `redirect` is consumed). */
+interface LoginRedirect {
   redirect?: string;
-  error?: string;
-}
-
-interface WebAuthnOptions {
-  publicKey: PublicKeyCredentialRequestOptions;
-  session_token?: string;
 }
 
 // --- State ---
@@ -43,6 +53,11 @@ registerCleanup(() => {
 // --- Initialization ---
 
 async function init(): Promise<void> {
+  // Delegated tooltips over the wizard's data-tip info icons — the same
+  // primitive + attribute + delays as the app page (app.ts), replacing the
+  // old CSS-only ::before tooltip.
+  initTooltips({ attribute: "data-tip", delayCold: 300, delayWarm: 300 });
+
   // Link-on-login: an OIDC login that collided with an existing local account
   // redirects here with ?oidc_link=<token>; prove the password to link it.
   const linkToken = new URLSearchParams(window.location.search).get("oidc_link");
@@ -52,7 +67,7 @@ async function init(): Promise<void> {
     return;
   }
 
-  const data = await apiGetTyped("/api/auth/setup", decodeSetupStatus);
+  const data = await authSetupStatus();
   if (!data) {
     showError("loginError", "Failed to initialize");
     showPage("loginPage");
@@ -61,7 +76,7 @@ async function init(): Promise<void> {
 
   if (data.setup_required) {
     showPage("setupPage");
-    wireSetupForm();
+    wireSetupForm(data.config_valid);
     return;
   }
 
@@ -81,7 +96,7 @@ async function init(): Promise<void> {
 
 async function detectAuthMethods(): Promise<void> {
   try {
-    const res = await fetch("/api/auth/oidc", {
+    const res = await fetch(PATH_OIDC_REDIRECT, {
       method: "HEAD",
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
@@ -101,7 +116,7 @@ async function detectAuthMethods(): Promise<void> {
   }
 
   $("oidcBtn")?.addEventListener("click", () => {
-    window.location.href = "/api/auth/oidc";
+    window.location.href = PATH_OIDC_REDIRECT;
   });
   $("passkeyBtn")?.addEventListener("click", () => {
     void passkeyLogin();
@@ -125,20 +140,14 @@ async function startConditionalUI(): Promise<void> {
   }
 
   try {
-    const options = await apiPost<WebAuthnOptions>(
-      "/api/auth/webauthn/login/begin?mediation=conditional",
-    );
-    if (!options) {
+    const options = await webauthnLoginBegin({ mediation: "conditional" });
+    if (!options?.publicKey) {
       return;
     }
-    webauthnSessionToken = options.session_token ?? "";
-    const pk = options.publicKey;
-    pk.challenge = base64urlToBuffer(pk.challenge as unknown as string);
-    if (pk.allowCredentials) {
-      for (const cred of pk.allowCredentials) {
-        cred.id = base64urlToBuffer(cred.id as unknown as string);
-      }
-    }
+    webauthnSessionToken = options.session_token;
+    // The wire envelope nests the options under a second publicKey key
+    // (go-webauthn's CredentialAssertion shape).
+    const pk = requestOptionsFromJSON(options.publicKey.publicKey);
     conditionalAbort = new AbortController();
     const credential = (await navigator.credentials.get({
       publicKey: pk,
@@ -171,21 +180,16 @@ async function passkeyLogin(): Promise<void> {
     conditionalAbort = null;
   }
   try {
-    const options = await apiPost<WebAuthnOptions>("/api/auth/webauthn/login/begin");
-    if (!options) {
+    const options = await webauthnLoginBegin();
+    if (!options?.publicKey) {
       showError("loginError", "Failed to start passkey login");
       return;
     }
-    webauthnSessionToken = options.session_token ?? "";
-    const pk = options.publicKey;
-    pk.challenge = base64urlToBuffer(pk.challenge as unknown as string);
-    if (pk.allowCredentials) {
-      for (const cred of pk.allowCredentials) {
-        cred.id = base64urlToBuffer(cred.id as unknown as string);
-      }
-    }
+    webauthnSessionToken = options.session_token;
+    // The wire envelope nests the options under a second publicKey key
+    // (go-webauthn's CredentialAssertion shape).
     const credential = (await navigator.credentials.get({
-      publicKey: pk,
+      publicKey: requestOptionsFromJSON(options.publicKey.publicKey),
     })) as PublicKeyCredential | null;
     if (!credential) {
       return;
@@ -216,7 +220,7 @@ async function finishWebAuthnLogin(
       userHandle: response.userHandle ? bufferToBase64url(response.userHandle) : "",
     },
   };
-  const res = await fetch("/api/auth/webauthn/login/finish", {
+  const res = await fetch(PATH_WEBAUTHN_LOGIN_FINISH, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-WebAuthn-Session": sessionToken },
     body: JSON.stringify(body),
@@ -245,7 +249,7 @@ async function finishWebAuthnLogin(
     showError("loginError", data.error ?? "Passkey authentication failed");
     return;
   }
-  const data = (await res.json()) as LoginResponse;
+  const data = (await res.json()) as LoginRedirect;
   void sendWebAuthnSignals();
   window.location.href = data.redirect ?? "/";
 }
@@ -254,7 +258,7 @@ async function finishWebAuthnLogin(
 
 const LOGIN_ERROR_MAP: readonly {
   code: ErrorCode;
-  msg: string | ((res: ApiResult<LoginResponse>) => string);
+  msg: string | ((res: ApiResult<LoginSuccess>) => string);
 }[] = [
   {
     code: ErrorCode.RateLimited,
@@ -273,7 +277,7 @@ const LOGIN_ERROR_MAP: readonly {
   },
 ];
 
-function loginErrorMessage(res: ApiResult<LoginResponse>): string {
+function loginErrorMessage(res: ApiResult<LoginSuccess>): string {
   const entry = LOGIN_ERROR_MAP.find((e) => hasCode(res, e.code));
   if (entry) {
     return typeof entry.msg === "function" ? entry.msg(res) : entry.msg;
@@ -305,7 +309,7 @@ function wireLoginForm(resumeSetup: boolean): void {
       btn.setAttribute("aria-busy", "true");
     }
     try {
-      const res = await apiPostRaw<LoginResponse>("/api/auth/login", { username, password });
+      const res = await loginRaw({ username, password });
       if (!res.ok) {
         const errEl = $("loginError");
         if (errEl && hasCode(res, ErrorCode.RateLimited)) {
@@ -316,12 +320,19 @@ function wireLoginForm(resumeSetup: boolean): void {
         showError("loginError", loginErrorMessage(res));
         return;
       }
-      const data = res.data ?? {};
       if (resumeSetup) {
-        await startConfigWizard();
+        // Setup is unfinished (config invalid). Route by role: the wizard's
+        // endpoints are admin-gated, so a non-admin gets the "an admin needs
+        // to finish setup" notice instead of a wizard of 403s (R3.8).
+        const dest = postLoginDestination(res.data?.user.role ?? "", false);
+        if (dest === "wizard") {
+          await startConfigWizard({ configValid: false, password });
+        } else {
+          showPage("setupNoticePage");
+        }
         return;
       }
-      window.location.href = data.redirect ?? "/";
+      window.location.href = res.data?.redirect ?? "/";
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -357,21 +368,23 @@ function wireOIDCLinkForm(linkToken: string): void {
     e.preventDefault();
     hideError("loginError");
     const password = (new FormData(form).get("password") as string) || "";
-    const res = await apiPostRaw<LoginResponse>("/api/auth/oidc/link", {
+    const res = await oidcLinkRaw({
       link_token: linkToken,
       password,
     });
     if (!res.ok) {
-      showError("loginError", res.data?.error ?? res.error ?? "Failed to link account");
+      // The error envelope never carries a data payload; res.error holds the
+      // server's message.
+      showError("loginError", res.error ?? "Failed to link account");
       return;
     }
-    window.location.href = res.data?.redirect ?? "/";
+    window.location.href = (res.data as LoginRedirect | undefined)?.redirect ?? "/";
   });
 }
 
 // --- Setup form ---
 
-function wireSetupForm(): void {
+function wireSetupForm(configValid: boolean): void {
   const form = $("setupForm") as HTMLFormElement | null;
   if (!form) {
     return;
@@ -384,12 +397,18 @@ function wireSetupForm(): void {
     const formData = new FormData(form);
     const username = (formData.get("username") as string) || "";
     const password = (formData.get("password") as string) || "";
-    const res = await apiPostRaw<{ error?: string }>("/api/auth/setup", { username, password });
+    const res = await authSetupCreateRaw({ username, password });
     if (!res.ok) {
-      showError("setupError", res.data?.error ?? res.error ?? "Setup failed");
+      // The error envelope never carries a data payload; res.error holds the
+      // server's message.
+      showError("setupError", res.error ?? "Setup failed");
       return;
     }
-    await startConfigWizard();
+    // ONE flow for every first boot: admin creation flows straight into the
+    // config wizard, prefilled and accelerated by whatever the config file
+    // already answers; the password (memory-only) funds the post-activation
+    // passkey offer.
+    await startConfigWizard({ configValid, password });
   });
 }
 

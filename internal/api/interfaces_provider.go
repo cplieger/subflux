@@ -21,14 +21,6 @@ import (
 
 // --- Provider ---
 
-// Transient is implemented by errors that can classify themselves as
-// retryable (transient server/network failures) vs permanent. Used by
-// retry logic to decide whether to retry without importing concrete
-// error packages.
-type Transient interface {
-	IsTransient() bool
-}
-
 // Provider is the interface all subtitle providers must implement.
 type Provider interface {
 	// Name returns the provider identifier (e.g. "opensubtitles", "yifysubtitles").
@@ -75,14 +67,17 @@ type ProviderRegistry interface {
 
 // --- Scoring ---
 
-// Scorer evaluates subtitle matches against video metadata.
+// Scorer turns a subtitle's release-attribute match set into a quality score.
 type Scorer interface {
-	// Score computes a quality score for a subtitle match. Returns the full
-	// score (including hash bonus) and the release-attribute-only score.
-	Score(video *VideoInfo, sub SubtitleInfo, matches MatchSet) (score, scoreNoHash int)
-	// ScoreToTier maps a numeric score to a human-readable tier label
-	// (excellent/good/acceptable/minimal/none) based on media type thresholds.
-	ScoreToTier(score int, mediaType MediaType) ScoreTier
+	// Score computes a quality score for a subtitle match set. Returns the
+	// full score (including the hash bonus) and the release-attribute-only
+	// score. A verifiable hash match short-circuits to the hash weight alone.
+	Score(sub SubtitleInfo, matches MatchSet) (score, scoreNoHash int)
+	// ScoreToTier maps a numeric score to a human-readable tier label via
+	// one global threshold table: excellent >= 80, good >= 50,
+	// acceptable >= 20, minimal >= 1, else none. Thresholds do not vary by
+	// media type.
+	ScoreToTier(score int) ScoreTier
 }
 
 // --- Arr clients ---

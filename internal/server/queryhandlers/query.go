@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
@@ -101,6 +102,14 @@ func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, entries)
 }
 
+// ProviderInfo is one entry of the GET /api/providers response: a registered
+// provider's config-enabled flag and whether it is currently loaded.
+type ProviderInfo struct {
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+	Loaded  bool   `json:"loaded"`
+}
+
 // HandleProviders returns registered providers with enabled status.
 // GET /api/providers
 func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
@@ -109,17 +118,12 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	}
 	ls := h.state()
 	cfgProviders := ls.Cfg.ProviderConfigs()
-	type providerInfo struct {
-		Name    string `json:"name"`
-		Enabled bool   `json:"enabled"`
-		Loaded  bool   `json:"loaded"`
-	}
-	out := make([]providerInfo, 0, len(cfgProviders))
+	out := make([]ProviderInfo, 0, len(cfgProviders))
 	for name, cfg := range cfgProviders {
 		if name == api.ProviderNameMock {
 			continue
 		}
-		out = append(out, providerInfo{
+		out = append(out, ProviderInfo{
 			Name:    string(name),
 			Enabled: cfg.Enabled,
 			Loaded: slices.ContainsFunc(ls.Providers, func(p api.Provider) bool {
@@ -127,10 +131,31 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 			}),
 		})
 	}
-	slices.SortFunc(out, func(a, b providerInfo) int {
+	slices.SortFunc(out, func(a, b ProviderInfo) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 	api.WriteJSON(w, out)
+}
+
+// ParsedConfig is the GET /api/config/parsed response: the live parsed
+// configuration in UI-consumable form. Adaptive and Search carry the
+// config package's structs verbatim (their Go field names are the wire
+// keys); they are typed loosely here to keep this package decoupled from
+// the config internals.
+type ParsedConfig struct {
+	Adaptive       any                   `json:"adaptive"`
+	Search         any                   `json:"search"`
+	Providers      map[string]bool       `json:"providers"`
+	SonarrURL      string                `json:"sonarr_url,omitempty"`
+	RadarrURL      string                `json:"radarr_url,omitempty"`
+	LanguageRules  api.LanguageRulesJSON `json:"language_rules"`
+	IgnoredCodecs  []string              `json:"ignored_codecs,omitempty"`
+	Languages      []string              `json:"languages"`
+	Scores         api.Scores            `json:"scores"`
+	PostProcessing api.PostProcessConfig `json:"post_processing"`
+	Configured     bool                  `json:"configured"`
+	Sonarr         bool                  `json:"sonarr_configured"`
+	Radarr         bool                  `json:"radarr_configured"`
 }
 
 // HandleConfigParsed returns the config as structured JSON.
@@ -139,23 +164,8 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 	if !httphelpers.RequireGET(w, r) {
 		return
 	}
-	type parsedConfig struct {
-		Adaptive       any                   `json:"adaptive"`
-		Search         any                   `json:"search"`
-		Providers      map[string]bool       `json:"providers"`
-		SonarrURL      string                `json:"sonarr_url,omitempty"`
-		RadarrURL      string                `json:"radarr_url,omitempty"`
-		LanguageRules  api.LanguageRulesJSON `json:"language_rules"`
-		IgnoredCodecs  []string              `json:"ignored_codecs,omitempty"`
-		Languages      []string              `json:"languages"`
-		Scores         api.Scores            `json:"scores"`
-		PostProcessing api.PostProcessConfig `json:"post_processing"`
-		Configured     bool                  `json:"configured"`
-		Sonarr         bool                  `json:"sonarr_configured"`
-		Radarr         bool                  `json:"radarr_configured"`
-	}
 	if !h.configured() {
-		api.WriteJSON(w, parsedConfig{
+		api.WriteJSON(w, ParsedConfig{
 			Configured: false,
 			Languages:  []string{},
 			Providers:  map[string]bool{},
@@ -176,7 +186,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	api.WriteJSON(w, parsedConfig{
+	api.WriteJSON(w, ParsedConfig{
 		Configured:     true,
 		Languages:      ls.Cfg.LanguageCodes(),
 		LanguageRules:  ls.Cfg.LanguageRulesForUI(),
@@ -208,6 +218,20 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 	}
 	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
+	}
+	// Both names are direct user input into the release parser. The parser
+	// clamps internally (defense in depth), but a diagnostic request must
+	// never be silently truncated: reject oversized names loudly at the
+	// HTTP boundary instead.
+	for _, f := range []struct{ name, value string }{
+		{"release_name", req.ReleaseName},
+		{"sub_release", req.SubRelease},
+	} {
+		if len(f.value) > release.MaxNameLen {
+			api.BadRequestC(w, r, api.CodeBadRequest,
+				f.name+" exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
+			return
+		}
 	}
 	if req.MediaType == "" {
 		req.MediaType = api.MediaTypeEpisode

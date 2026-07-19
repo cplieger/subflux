@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/jsonx"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httputil"
@@ -101,7 +104,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		g.Go(func() error {
 			subs, queryErr := p.querySubtitles(gctx, titleID, le.ss, le.iso, req)
 			if queryErr != nil {
-				slog.Warn("subsource query failed", "lang", le.iso, "error", httputil.RedactSecret(queryErr, p.apiKey))
+				slog.Warn("subsource query failed", "lang", le.iso, "error", httpx.RedactSecret(queryErr, p.apiKey))
 				perLang[i] = langResult{err: queryErr}
 			} else {
 				perLang[i] = langResult{subs: subs}
@@ -175,12 +178,12 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dlURL, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "subsource download", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource download", p.apiKey)
 	}
 	defer resp.Body.Close()
 
@@ -188,12 +191,12 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	// Retry-After header on 429 (via httputil.ParseRetryAfter) and returns
 	// *api.AuthError for 401/403 just like the search path.
 	if statusErr := httputil.CheckHTTPStatus(resp); statusErr != nil {
-		return nil, httputil.RedactSecret(statusErr, p.apiKey)
+		return nil, httpx.RedactSecret(statusErr, p.apiKey)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
 	if err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 	if len(data) == 0 {
 		return nil, fmt.Errorf("subsource: empty response body for subtitle %s", sub.ID)
@@ -358,22 +361,22 @@ func (p *Provider) doSearch(ctx context.Context, params url.Values) ([]searchRes
 	u := baseURL + "/movies/search?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("subsource title search: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("subsource title search: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "subsource title search", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource title search", p.apiKey)
 	}
 	defer resp.Body.Close()
 
 	if err := httputil.CheckHTTPStatus(resp); err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result searchResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxSearchResponseBytes)).Decode(&result); err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
 	}
 	return result.Data, nil
 }
@@ -407,22 +410,22 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 	u := baseURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("subsource subtitles: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("subsource subtitles: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "subsource subtitles", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource subtitles", p.apiKey)
 	}
 	defer resp.Body.Close()
 
 	if err := httputil.CheckHTTPStatus(resp); err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result subtitleResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
 	}
 
 	if !result.Success {
@@ -478,11 +481,30 @@ func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) [
 // Uses lenient semantics: errors default to zero (year=0 means "unknown").
 type FlexInt int
 
+// yearPolicy is the lenient decode policy for releaseYear: every gate is
+// jsonx.Zero over the full int64 range, so any odd shape or invalid value
+// decodes to 0 instead of failing the record.
+var yearPolicy = jsonx.Policy{
+	MinValue:         math.MinInt64,
+	MaxValue:         math.MaxInt64,
+	Null:             jsonx.Zero,
+	EmptyInput:       jsonx.Zero,
+	EmptyString:      jsonx.Zero,
+	MalformedString:  jsonx.Zero,
+	NonNumericString: jsonx.Zero,
+	OtherShape:       jsonx.Zero,
+	PaddedString:     jsonx.Zero,
+	FloatForm:        jsonx.Zero,
+	Fractional:       jsonx.Zero,
+	OutOfRange:       jsonx.Zero,
+}
+
 // UnmarshalJSON implements json.Unmarshaler for FlexInt.
 func (f *FlexInt) UnmarshalJSON(data []byte) error {
-	n, err := provider.ParseFlexInt(data)
+	n, err := jsonx.ParseInt64(data, yearPolicy)
 	if err != nil {
-		// Lenient: default to zero on parse errors.
+		// Unreachable under the all-Zero policy; keep the lenient
+		// default anyway so a future policy tweak cannot fail records.
 		*f = 0
 		return nil
 	}

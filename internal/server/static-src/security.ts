@@ -2,38 +2,31 @@
 
 import * as bus from "./bus.js";
 import * as notify from "./notify.js";
-import { el, icon, dialog, closeDialog, dialogHead, onBackdropClose, confirm } from "./dom.js";
+import { el, icon, dialog, dialogHead, confirm } from "./dom.js";
 import { createDialog } from "@cplieger/ui-primitives/dialog";
+import { ask, type AskInput } from "@cplieger/ui-primitives/ask";
 import { reconcile, patch } from "@cplieger/reactive";
 import {
-  apiGet,
-  apiGetTyped,
-  apiPost,
-  apiPostRaw,
-  apiPut,
-  apiPutRaw,
-  apiDelete,
-  apiDeleteRaw,
-} from "./api-client.js";
-import { base64urlToBuffer, bufferToBase64url, sendWebAuthnSignals } from "./webauthn-utils.js";
-import type { MeResponse, KeyGenerated } from "./api-types.js";
-import { decodeMeResponse } from "./wire/decoders.gen.js";
-
-// --- Inline interfaces for API response shapes ---
-
-interface PasskeyItem {
-  id: number;
-  name: string;
-  created_at: string;
-}
-
-interface APIKeyItem {
-  id: number;
-  key_prefix: string;
-  key_suffix: string;
-  label: string;
-  created_at: string;
-}
+  changePasswordRaw,
+  deletePasskeyRaw,
+  generateAPIKeyRaw,
+  listAPIKeys,
+  listPasskeys,
+  me,
+  oidcUnlinkRaw,
+  renamePasskey as renamePasskeyRequest,
+  revokeAPIKey,
+  webauthnRegisterBegin,
+  PATH_OIDC_REDIRECT,
+  PATH_WEBAUTHN_REGISTER_FINISH,
+} from "./wire/client.gen.js";
+import type { APIKeyInfo, PasskeyInfo } from "./wire/types.gen.js";
+import {
+  bufferToBase64url,
+  creationOptionsFromJSON,
+  sendWebAuthnSignals,
+} from "./webauthn-utils.js";
+import type { MeResponse } from "./api-types.js";
 
 /** Wrap an async click handler with disabled + aria-busy lifecycle. The
  *  button is disabled and announced as busy while the handler runs;
@@ -99,26 +92,22 @@ async function openSecurity(): Promise<void> {
 }
 
 async function renderSections(body: HTMLElement): Promise<void> {
-  const [me, passkeys, oidcAvailable] = await Promise.all([
-    apiGetTyped("/api/auth/me", decodeMeResponse),
-    apiGet<PasskeyItem[]>("/api/auth/passkeys"),
-    detectOIDC(),
-  ]);
+  const [user, passkeys, oidcAvailable] = await Promise.all([me(), listPasskeys(), detectOIDC()]);
 
   const frag = document.createDocumentFragment();
 
   // Local-credential management is only for accounts that have a password.
   // SSO-governed (password-less) accounts are managed at the identity provider.
-  if (me?.has_password) {
+  if (user?.has_password) {
     frag.appendChild(buildPasswordSection());
     frag.appendChild(buildPasskeysSection(passkeys));
   }
   // API keys are admin-only (bearer credentials carrying the owner's role).
-  if (me?.role === "admin") {
-    const apikeys = await apiGet<APIKeyItem[]>("/api/auth/apikeys");
+  if (user?.role === "admin") {
+    const apikeys = await listAPIKeys();
     frag.appendChild(buildAPIKeysSection(apikeys));
   }
-  const oidcSection = buildOIDCSection(me, oidcAvailable);
+  const oidcSection = buildOIDCSection(user, oidcAvailable);
   if (oidcSection) {
     frag.appendChild(oidcSection);
   }
@@ -166,7 +155,7 @@ function buildPasswordSection(): HTMLElement {
           showFeedback(feedback, "Password must be at least 8 characters", true);
           return;
         }
-        const r = await apiPutRaw<unknown>("/api/auth/password", {
+        const r = await changePasswordRaw({
           current_password: cur,
           new_password: nw,
         });
@@ -199,7 +188,7 @@ function buildPasswordSection(): HTMLElement {
 
 // --- Passkeys ---
 
-function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
+function buildPasskeysSection(passkeys: PasskeyInfo[] | null): HTMLElement {
   const sec = el("div", { className: "sec-section" });
   sec.appendChild(el("h3", null, "Passkeys"));
 
@@ -221,7 +210,7 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
     {
       type: "button",
       onclick: busyClick(async () => {
-        const password = await showInputDialog("Enter your password to add a passkey:", {
+        const password = await promptTrimmed("Enter your password to add a passkey:", {
           type: "password",
           autocomplete: "current-password",
         });
@@ -238,7 +227,7 @@ function buildPasskeysSection(passkeys: PasskeyItem[] | null): HTMLElement {
   return sec;
 }
 
-function passkeyRow(pk: PasskeyItem): HTMLElement {
+function passkeyRow(pk: PasskeyInfo): HTMLElement {
   const date = new Date(pk.created_at).toLocaleDateString();
   // A real button (was a click-only <span>): rename must be reachable by
   // keyboard and announced as an action, not as plain text.
@@ -269,7 +258,7 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
         ) {
           return;
         }
-        const r = await apiDeleteRaw<unknown>(`/api/auth/passkeys/${pk.id}`);
+        const r = await deletePasskeyRaw(pk.id);
         if (r.ok) {
           notify.success("Passkey deleted");
           void sendWebAuthnSignals();
@@ -291,16 +280,16 @@ function passkeyRow(pk: PasskeyItem): HTMLElement {
   );
 }
 
-async function renamePasskey(pk: PasskeyItem, nameEl: HTMLElement): Promise<void> {
-  const newName = await showInputDialog("Rename passkey:", {
-    value: pk.name,
-    maxlength: "64",
+async function renamePasskey(pk: PasskeyInfo, nameEl: HTMLElement): Promise<void> {
+  const newName = await promptTrimmed("Rename passkey:", {
+    initialValue: pk.name,
+    maxLength: 64,
   });
   if (!newName || newName === pk.name) {
     return;
   }
-  const ok = await apiPut<unknown>(`/api/auth/passkeys/${pk.id}`, { name: newName });
-  if (ok !== null) {
+  const ok = await renamePasskeyRequest(pk.id, { name: newName });
+  if (ok) {
     nameEl.textContent = newName;
     pk.name = newName;
   } else {
@@ -308,39 +297,20 @@ async function renamePasskey(pk: PasskeyItem, nameEl: HTMLElement): Promise<void
   }
 }
 
-/** Decode base64url fields in WebAuthn creation options for the browser API. */
-function prepareCreationOptions(pk: PublicKeyCredentialCreationOptions): void {
-  if (typeof pk.challenge === "string") {
-    pk.challenge = base64urlToBuffer(pk.challenge);
-  }
-  if (typeof pk.user.id === "string") {
-    pk.user.id = base64urlToBuffer(pk.user.id);
-  }
-  if (pk.excludeCredentials) {
-    for (const cred of pk.excludeCredentials) {
-      if (typeof cred.id === "string") {
-        cred.id = base64urlToBuffer(cred.id);
-      }
-    }
-  }
-}
-
 async function registerPasskey(password: string): Promise<void> {
   try {
-    const begin = await apiPost<{
-      publicKey: PublicKeyCredentialCreationOptions;
-      session_token?: string;
-    }>("/api/auth/webauthn/register/begin", { password });
-    if (!begin) {
+    const begin = await webauthnRegisterBegin({ password });
+    if (!begin?.publicKey) {
       notify.error("Failed to start passkey registration");
       return;
     }
 
-    const sessionToken = begin.session_token ?? "";
+    const sessionToken = begin.session_token;
+    // The wire envelope nests the options under a second publicKey key
+    // (go-webauthn's CredentialCreation shape).
+    const publicKey = creationOptionsFromJSON(begin.publicKey.publicKey);
 
-    prepareCreationOptions(begin.publicKey);
-
-    const credential = await navigator.credentials.create({ publicKey: begin.publicKey });
+    const credential = await navigator.credentials.create({ publicKey });
     if (!credential) {
       notify.error("Passkey creation cancelled");
       return;
@@ -357,8 +327,10 @@ async function registerPasskey(password: string): Promise<void> {
       );
     }
 
-    // Custom header required (X-WebAuthn-Session); can't go through apiPost.
-    const finishRes = await fetch("/api/auth/webauthn/register/finish", {
+    // Custom header required (X-WebAuthn-Session); can't go through the
+    // generated client (its transport carries no per-call headers), so this
+    // stays a documented raw-fetch flow sourcing only the path constant.
+    const finishRes = await fetch(PATH_WEBAUTHN_REGISTER_FINISH, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -394,7 +366,7 @@ async function registerPasskey(password: string): Promise<void> {
 
 // --- API Keys ---
 
-function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
+function buildAPIKeysSection(apikeys: APIKeyInfo[] | null): HTMLElement {
   const sec = el("div", { className: "sec-section" });
   sec.appendChild(el("h3", null, "API Keys"));
 
@@ -416,13 +388,13 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
     {
       type: "button",
       onclick: busyClick(async () => {
-        const label = await showInputDialog("Label for the new API key:", {
-          maxlength: "64",
+        const label = await promptTrimmed("Label for the new API key:", {
+          maxLength: 64,
         });
         if (label === null) {
           return;
         }
-        const r = await apiPostRaw<KeyGenerated>("/api/auth/apikeys", { label });
+        const r = await generateAPIKeyRaw({ label });
         if (r.ok && r.data) {
           showNewAPIKey(sec, r.data.key);
         } else {
@@ -437,7 +409,7 @@ function buildAPIKeysSection(apikeys: APIKeyItem[] | null): HTMLElement {
   return sec;
 }
 
-function apiKeyRow(key: APIKeyItem): HTMLElement {
+function apiKeyRow(key: APIKeyInfo): HTMLElement {
   const display = `${key.key_prefix}\u2026${key.key_suffix}`;
   const date = new Date(key.created_at).toLocaleDateString();
 
@@ -457,7 +429,7 @@ function apiKeyRow(key: APIKeyItem): HTMLElement {
         ) {
           return;
         }
-        const deleted = await apiDelete(`/api/auth/apikeys/${key.id}`);
+        const deleted = await revokeAPIKey(key.id);
         if (deleted) {
           notify.success("API key revoked");
           await renderSections(secDlgBody());
@@ -547,7 +519,7 @@ function showNewAPIKey(container: HTMLElement, key: string): void {
 /** Probe whether an OIDC provider is configured (mirrors the login page). */
 async function detectOIDC(): Promise<boolean> {
   try {
-    const res = await fetch("/api/auth/oidc", {
+    const res = await fetch(PATH_OIDC_REDIRECT, {
       method: "HEAD",
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
@@ -596,7 +568,7 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
           ) {
             return;
           }
-          const r = await apiDeleteRaw<unknown>("/api/auth/oidc/link");
+          const r = await oidcUnlinkRaw();
           if (r.ok) {
             notify.success("Single sign-on disconnected");
             await renderSections(secDlgBody());
@@ -614,7 +586,7 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
       {
         type: "button",
         onclick: () => {
-          window.location.href = "/api/auth/oidc";
+          window.location.href = PATH_OIDC_REDIRECT;
         },
       },
       "Connect",
@@ -635,77 +607,19 @@ function buildOIDCSection(me: MeResponse | null, available: boolean): HTMLElemen
 
 // --- Utilities ---
 
-/** Show a custom input dialog (replaces native prompt() for styled, validated input). */
-function showInputDialog(message: string, attrs?: Record<string, string>): Promise<string | null> {
-  return new Promise((resolve) => {
-    const dlg = dialog("confirmDialog");
-    if (dlg.open) {
-      dlg.close();
-    }
-    let resolved = false;
-    const settle = (val: string | null): void => {
-      if (resolved) {
-        return;
-      }
-      resolved = true;
-      closeDialog(dlg);
-      resolve(val);
-    };
-
-    const header = dialogHead("Input", () => {
-      settle(null);
-    });
-
-    const inp = el("input", {
-      type: "text",
-      autocomplete: "off",
-      "aria-label": message,
-      ...attrs,
-    }) as HTMLInputElement;
-
-    const body = el("div", { className: "dlg-body" }, el("p", null, message), inp);
-
-    const footer = el(
-      "div",
-      { className: "dlg-foot" },
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: () => {
-            const val = inp.value.trim();
-            settle(val || null);
-          },
-        },
-        "OK",
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          className: "ghost",
-          onclick: () => {
-            settle(null);
-          },
-        },
-        "Cancel",
-      ),
-    );
-
-    dlg.replaceChildren(header, body, footer);
-    dlg.showModal();
-    onBackdropClose(dlg, () => {
-      settle(null);
-    });
-    dlg.addEventListener(
-      "close",
-      () => {
-        settle(null);
-      },
-      { once: true },
-    );
-    inp.focus();
-  });
+/** Styled input prompt over @cplieger/ui-primitives' prompt primitive (its own
+ *  reused <dialog class="uip-ask uip-ask--input">, Enter submits,
+ *  Escape/backdrop/Cancel settle null), preserving subflux's input semantics:
+ *  the value is trimmed and an empty submission resolves null, exactly like
+ *  the old hand-rolled showInputDialog. The "Input" title matches the old
+ *  dialog head. */
+async function promptTrimmed(message: string, input?: AskInput): Promise<string | null> {
+  const raw = await ask(message, { title: "Input", input: input ?? {} });
+  if (raw === null) {
+    return null;
+  }
+  const val = raw.trim();
+  return val === "" ? null : val;
 }
 
 function showFeedback(feedbackEl: HTMLElement, msg: string, isError: boolean): void {

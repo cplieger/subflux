@@ -132,32 +132,6 @@ func TestUpdateSessionActivity_single(t *testing.T) {
 	}
 }
 
-func TestBatchUpdateSessionActivity(t *testing.T) {
-	s := newSessionStore(t)
-	ctx := context.Background()
-	t0 := time.Now().UTC()
-	for _, h := range []string{"h1", "h2", "h3"} {
-		if err := s.CreateSession(ctx, mkSession(h, 1, t0, t0)); err != nil {
-			t.Fatalf("CreateSession(%s): %v", h, err)
-		}
-	}
-	t1 := t0.Add(time.Hour)
-	// Includes an absent hash, which must be skipped without error.
-	if err := s.BatchUpdateSessionActivity(ctx, []string{"h1", "h3", "missing"}, t1); err != nil {
-		t.Fatalf("BatchUpdateSessionActivity: %v", err)
-	}
-	for h, want := range map[string]time.Time{"h1": t1, "h2": t0, "h3": t1} {
-		got, _ := s.GetSessionByHash(ctx, h)
-		if !got.LastActivity.Equal(want) {
-			t.Errorf("%s LastActivity = %v, want %v", h, got.LastActivity, want)
-		}
-	}
-	// Empty slice is a no-op.
-	if err := s.BatchUpdateSessionActivity(ctx, nil, t1); err != nil {
-		t.Errorf("BatchUpdateSessionActivity(nil) = %v, want nil", err)
-	}
-}
-
 func TestDeleteSession(t *testing.T) {
 	s := newSessionStore(t)
 	ctx := context.Background()
@@ -296,13 +270,13 @@ func TestSessions_concurrentAccess(t *testing.T) {
 			}
 		})
 	}
-	// Batch updaters and per-user deleters.
+	// Per-user deleters.
 	for w := range workers {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
 			for i := range iters {
-				_ = s.BatchUpdateSessionActivity(ctx, []string{fmt.Sprintf("w%d-%d", w, i)}, now)
+				_ = s.UpdateSessionActivity(ctx, fmt.Sprintf("w%d-%d", w, i), now)
 				_ = s.DeleteUserSessions(ctx, int64(w), fmt.Sprintf("w%d-0", w))
 			}
 		}(w)

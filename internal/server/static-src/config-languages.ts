@@ -5,26 +5,9 @@ import { el, option, icon } from "./dom.js";
 import { langSelect } from "./utils.js";
 import { SUBTITLE_VARIANTS, DEFAULT_VARIANT } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
-
-// --- Inline interfaces for language config shapes ---
-
-interface SubTarget {
-  code: string;
-  variant?: string;
-  min_score?: number | null;
-  providers?: string[];
-  exclude?: string[];
-}
-
-interface LanguageRule {
-  audio: string;
-  subtitles?: SubTarget[];
-}
-
-interface LanguageRules {
-  rules?: LanguageRule[];
-  default?: SubTarget[];
-}
+// Language config shapes come from the generated wire types (registered in
+// internal/wirespec); the former hand-mirrored interfaces are gone.
+import type { AudioRule, LanguageRules, SubtitleTarget } from "./wire/types.gen.js";
 
 // --- Shared helper (duplicated from config.ts to avoid circular import) ---
 
@@ -54,9 +37,9 @@ export function buildLanguagesSection(): HTMLElement {
 
   // Use parsed config if available, otherwise empty defaults.
   const cfgVal = store.get("config");
-  const lr: LanguageRules = (cfgVal && (cfgVal.language_rules as LanguageRules)) ?? {};
-  const rules: LanguageRule[] = lr.rules ?? [];
-  const defaults: SubTarget[] = lr.default ?? [{ code: "en" }];
+  const lr: LanguageRules = cfgVal?.language_rules ?? {};
+  const rules: AudioRule[] = lr.rules ?? [];
+  const defaults: SubtitleTarget[] = lr.default ?? [{ code: "en" }];
 
   // --- Defaults ---
   sec.appendChild(el("div", { className: "cfg-title" }, "Language Defaults"));
@@ -116,7 +99,7 @@ export function buildLanguagesSection(): HTMLElement {
   return sec;
 }
 
-function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
+function buildSubTarget(sub: SubtitleTarget, isDefault: boolean): HTMLElement {
   // Block wrapper: the flex controls row and the collapsible advanced region are
   // siblings inside it (not the region nested in the flex row), so the region
   // collapses to zero height with no flex row-gap residual. This wrapper is the
@@ -211,7 +194,7 @@ function buildSubTarget(sub: SubTarget, isDefault: boolean): HTMLElement {
   return wrapper;
 }
 
-function buildRuleBlock(rule: LanguageRule): HTMLElement {
+function buildRuleBlock(rule: AudioRule): HTMLElement {
   const block = el("div", { className: "lang-rule" });
 
   block.appendChild(el("span", { className: "lang-label" }, "Audio:"));
@@ -235,7 +218,7 @@ function buildRuleBlock(rule: LanguageRule): HTMLElement {
 
   block.appendChild(el("span", { className: "lang-label" }, "Subtitles:"));
   const subsContainer = el("div", { className: "lang-subs" });
-  for (const sub of rule.subtitles ?? []) {
+  for (const sub of rule.subtitles) {
     subsContainer.appendChild(buildSubTarget(sub, false));
   }
   block.appendChild(subsContainer);
@@ -254,80 +237,84 @@ function buildRuleBlock(rule: LanguageRule): HTMLElement {
   return block;
 }
 
-export function serializeLanguagesFromForm(): string {
-  const lines: string[] = ["languages:"];
+// serializeLanguagesFromForm reads the language builder DOM back into the
+// languages section value for the structured save. Shape mirrors what the
+// old YAML emitter produced: rules (each audio + subtitles, [] when a rule
+// has no targets) and default, both omitted entirely when their container
+// is empty.
+export function serializeLanguagesFromForm(): LanguageRules {
+  const languages: LanguageRules = {};
 
   // Rules.
   const rulesEl = document.getElementById("lang-rules");
   if (rulesEl && rulesEl.children.length > 0) {
-    lines.push("  rules:");
+    const rules: AudioRule[] = [];
     for (const block of Array.from(rulesEl.children)) {
       const audioSel = block.querySelector<HTMLSelectElement>(".lang-row .lang-select");
       if (!audioSel) {
         continue;
       }
-      lines.push(`    - audio: ${audioSel.value}`);
-      lines.push("      subtitles:");
-      const subs = block.querySelectorAll(".lang-subs > .lang-sub");
-      if (subs.length === 0) {
-        lines[lines.length - 1] = "      subtitles: []";
-      } else {
-        for (const row of Array.from(subs)) {
-          serializeSubTarget(lines, row as HTMLElement, 8, false);
+      const subtitles: SubtitleTarget[] = [];
+      for (const row of Array.from(block.querySelectorAll(".lang-subs > .lang-sub"))) {
+        const st = subTargetFromForm(row as HTMLElement, false);
+        if (st) {
+          subtitles.push(st);
         }
       }
+      rules.push({ audio: audioSel.value, subtitles });
     }
+    languages.rules = rules;
   }
 
   // Defaults.
   const defaultsEl = document.getElementById("lang-defaults");
   if (defaultsEl && defaultsEl.children.length > 0) {
-    lines.push("  default:");
+    const defaults: SubtitleTarget[] = [];
     for (const row of Array.from(defaultsEl.children)) {
-      serializeSubTarget(lines, row as HTMLElement, 4, true);
+      const st = subTargetFromForm(row as HTMLElement, true);
+      if (st) {
+        defaults.push(st);
+      }
     }
+    languages.default = defaults;
   }
 
-  return lines.join("\n");
+  return languages;
 }
 
-function serializeSubTarget(
-  lines: string[],
-  row: HTMLElement,
-  indent: number,
-  isDefault: boolean,
-): void {
+function subTargetFromForm(row: HTMLElement, isDefault: boolean): SubtitleTarget | null {
   const langSel = row.querySelector<HTMLSelectElement>(".lang-select");
   if (!langSel) {
-    return;
+    return null;
   }
-  const indentStr = " ".repeat(indent);
-  lines.push(`${indentStr}- code: ${langSel.value}`);
+  const st: SubtitleTarget = { code: langSel.value };
   if (!isDefault) {
     const varSel = row.querySelector<HTMLSelectElement>(".variant-select");
     const v = varSel ? varSel.value : DEFAULT_VARIANT;
     if (v !== DEFAULT_VARIANT) {
-      lines.push(`${indentStr}  variant: ${v}`);
+      st.variant = v;
     }
     const msEl = row.querySelector<HTMLInputElement>(".lang-min-score");
     if (msEl?.value) {
-      lines.push(`${indentStr}  min_score: ${msEl.value}`);
+      const ms = Number(msEl.value);
+      if (Number.isFinite(ms)) {
+        st.min_score = ms;
+      }
     }
   }
   const provEl = row.querySelector<HTMLInputElement>(".lang-providers");
   if (provEl?.value.trim()) {
-    const provs = provEl.value
+    st.providers = provEl.value
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean);
-    lines.push(`${indentStr}  providers: [${provs.join(", ")}]`);
   }
   const exclEl = row.querySelector<HTMLInputElement>(".lang-exclude");
   if (exclEl?.value.trim()) {
-    const excls = exclEl.value
+    st.exclude = exclEl.value
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean);
-    lines.push(`${indentStr}  exclude: [${excls.join(", ")}]`);
   }
+  return st;
 }

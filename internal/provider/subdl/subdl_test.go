@@ -39,6 +39,7 @@ func TestIso2ToSubDL(t *testing.T) {
 		{name: "English", input: "en", want: "EN"},
 		{name: "French", input: "fr", want: "FR"},
 		{name: "Persian", input: "fa", want: "FA"},
+		{name: "Brazilian Portuguese override", input: "pb", want: "BR_PT"},
 		{name: "alpha3 English", input: "eng", want: "EN"},
 		{name: "alpha3 French", input: "fre", want: "FR"},
 		{name: "unknown", input: "xx", want: ""},
@@ -62,6 +63,7 @@ func TestSubdlToISO2(t *testing.T) {
 		{name: "english", input: "EN", want: "en"},
 		{name: "french", input: "FR", want: "fr"},
 		{name: "persian", input: "FA", want: "fa"},
+		{name: "brazilian portuguese override", input: "BR_PT", want: "pb"},
 		{name: "lowercase input", input: "en", want: "en"},
 		{name: "unknown", input: "XX", want: ""},
 	}

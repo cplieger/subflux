@@ -16,6 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
 // SyncStore documents the api.Store methods used by sync handlers.
@@ -27,12 +28,15 @@ type SyncStore interface {
 // Compile-time assertion: api.Store satisfies SyncStore.
 var _ SyncStore = api.Store(nil)
 
-// Deps holds all dependencies for the sync handler family.
+// Deps holds all dependencies for the sync handler family. Resolve is the
+// S7 typed-reference resolver: sync verbs address the subtitle by FileRef
+// and the server resolves both the subtitle path (store row) and the video
+// path (same media) — no client-supplied paths.
 type Deps struct {
 	Store        SyncStore
 	SubtitleProc api.SubtitleProcessor
 	Activity     *activity.Log
-	ValidatePath func(w http.ResponseWriter, r *http.Request, p, label string) bool
+	Resolve      *resolve.Resolver
 }
 
 // Handler holds all dependencies for the sync handler family.
@@ -40,7 +44,7 @@ type Handler struct {
 	store        SyncStore
 	subtitleProc api.SubtitleProcessor
 	activity     *activity.Log
-	validatePath func(w http.ResponseWriter, r *http.Request, p, label string) bool
+	resolve      *resolve.Resolver
 }
 
 // New creates a Handler with the given dependencies.
@@ -49,7 +53,7 @@ func New(d Deps) *Handler {
 		store:        d.Store,
 		subtitleProc: d.SubtitleProc,
 		activity:     d.Activity,
-		validatePath: d.ValidatePath,
+		resolve:      d.Resolve,
 	}
 }
 
@@ -61,73 +65,118 @@ const maxBodySize = httphelpers.MaxDefaultBodySize
 
 // --- Request/Response types ---
 
-type syncAudioRequest struct {
-	SubtitlePath string `json:"subtitle_path"`
-	VideoPath    string `json:"video_path"`
-	DryRun       bool   `json:"dry_run,omitempty"`
+// SyncAudioRequest is the typed body for POST /api/sync/audio: the FileRef
+// of the subtitle to align (the server resolves the subtitle path from the
+// store row and the video path from the same media) plus the dry-run flag.
+type SyncAudioRequest struct {
+	MediaType api.MediaType `json:"media_type"`
+	MediaID   string        `json:"media_id"`
+	Language  string        `json:"language"`
+	Variant   string        `json:"variant,omitempty"`
+	Source    string        `json:"source,omitempty"`
+	Ordinal   int           `json:"ordinal,omitempty"`
+	DryRun    bool          `json:"dry_run,omitempty"`
 }
 
-type syncAudioResponse struct {
+// SyncAudioResponse is the typed response for POST /api/sync/audio.
+type SyncAudioResponse struct {
 	Method     string  `json:"method"`
 	OffsetMs   int64   `json:"offset_ms"`
 	Confidence float64 `json:"confidence"`
 	Applied    bool    `json:"applied"`
 }
 
-type syncOffsetRequest struct {
-	SubtitlePath string `json:"subtitle_path"`
-	OffsetMs     int64  `json:"offset_ms"`
+// SyncOffsetRequest is the typed body for POST /api/sync/offset: the FileRef
+// of the subtitle plus the absolute cumulative offset to apply.
+type SyncOffsetRequest struct {
+	MediaType api.MediaType `json:"media_type"`
+	MediaID   string        `json:"media_id"`
+	Language  string        `json:"language"`
+	Variant   string        `json:"variant,omitempty"`
+	Source    string        `json:"source,omitempty"`
+	Ordinal   int           `json:"ordinal,omitempty"`
+	OffsetMs  int64         `json:"offset_ms"`
+}
+
+// fileRef converts the request's flat wire fields into a resolve.FileRef,
+// applying the variant/source defaults.
+func fileRef(mediaType api.MediaType, mediaID, language, variant, source string, ordinal int) *resolve.FileRef {
+	if variant == "" {
+		variant = string(api.VariantStandard)
+	}
+	if source == "" {
+		source = string(api.SourceExternal)
+	}
+	return &resolve.FileRef{
+		MediaType: mediaType,
+		MediaID:   mediaID,
+		Language:  language,
+		Variant:   variant,
+		Source:    source,
+		Ordinal:   ordinal,
+	}
 }
 
 // --- Handlers ---
 
+// syncAudioPaths holds the server-resolved paths for one sync-audio request.
+type syncAudioPaths struct {
+	subtitle string
+	video    string
+}
+
 // decodeSyncAudioRequest decodes and gates a sync-audio request: POST only,
-// JSON body, both paths present and library-validated, and the ASS/SSA apply
-// refusal. ok=false means the response has already been written.
+// JSON body, FileRef resolving to a stored subtitle whose media has a known
+// video path, and the ASS/SSA apply refusal. ok=false means the response has
+// already been written.
 //
 // The ASS/SSA gate exists because the writeback path serializes cues as SRT
 // dialogue only, which would silently destroy styling, signs, and karaoke
 // and leave SRT content under an .ass name. Dry-run is still allowed so the
 // computed offset can be inspected. Lift the gate only when a
-// format-preserving ASS writer exists.
-func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (syncAudioRequest, bool) {
-	var req syncAudioRequest
+// format-preserving ASS writer exists. The gate runs on the RESOLVED path.
+func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (req SyncAudioRequest, paths syncAudioPaths, ok bool) {
 	if !httphelpers.RequirePOST(w, r) {
-		return req, false
+		return req, paths, false
 	}
 	if !httphelpers.DecodeJSONBody(w, r, &req, maxBodySize) {
-		return req, false
+		return req, paths, false
 	}
-	if req.SubtitlePath == "" || req.VideoPath == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "subtitle_path and video_path required")
-		return req, false
+	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
+	if err := ref.Validate(); err != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		return req, paths, false
 	}
-	if !h.validatePath(w, r, req.VideoPath, "video path") {
-		return req, false
+	subPath, err := h.resolve.SubtitlePath(r.Context(), ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
+		return req, paths, false
 	}
-	if !h.validatePath(w, r, req.SubtitlePath, "subtitle path") {
-		return req, false
+	videoPath, err := h.resolve.VideoPathForFile(r.Context(), ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
+		return req, paths, false
 	}
-	if !req.DryRun && isASSSubtitlePath(req.SubtitlePath) {
+	if !req.DryRun && isASSSubtitlePath(subPath) {
 		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat,
 			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
-		return req, false
+		return req, paths, false
 	}
-	return req, true
+	return req, syncAudioPaths{subtitle: subPath, video: videoPath}, true
 }
 
 // HandleSyncAudio handles POST /api/sync/audio.
 func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	req, ok := h.decodeSyncAudioRequest(w, r)
+	req, paths, ok := h.decodeSyncAudioRequest(w, r)
 	if !ok {
 		return
 	}
 
-	data, err := atomicfile.ReadBounded(ctx, req.SubtitlePath, MaxSyncSubSize)
+	data, err := atomicfile.ReadBounded(ctx, paths.subtitle, MaxSyncSubSize)
 	if err != nil {
 		slog.Warn("sync audio: read subtitle failed",
-			"path", req.SubtitlePath, "error", err)
+			"path", paths.subtitle, "error", err)
 		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to read subtitle")
 		return
 	}
@@ -135,16 +184,16 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 	data = h.subtitleProc.NormalizeEncoding(data)
 
 	actID := h.activity.Start("Audio Sync",
-		filepath.Base(req.SubtitlePath), activity.SourceManual)
+		filepath.Base(paths.subtitle), activity.SourceManual)
 	defer h.activity.End(actID)
 
 	slog.Info("audio sync requested",
-		"subtitle", filepath.Base(req.SubtitlePath),
-		"video", filepath.Base(req.VideoPath))
+		"subtitle", filepath.Base(paths.subtitle),
+		"video", filepath.Base(paths.video))
 
-	result := h.subtitleProc.SyncFromAudio(ctx, data, req.VideoPath, req.SubtitlePath)
+	result := h.subtitleProc.SyncFromAudio(ctx, data, paths.video, paths.subtitle)
 
-	resp := syncAudioResponse{
+	resp := SyncAudioResponse{
 		OffsetMs:   result.Offset,
 		Confidence: result.Confidence,
 		Method:     result.Method,
@@ -158,20 +207,20 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 			"offset_ms", resp.OffsetMs,
 			"confidence", resp.Confidence,
 			"method", resp.Method,
-			"path", filepath.Base(req.SubtitlePath))
+			"path", filepath.Base(paths.subtitle))
 	}
 
 	if resp.Applied && result.Cues != nil && !req.DryRun {
-		cumOffset, err := h.applySyncResult(ctx, req.SubtitlePath, result.Cues, result.Offset, result.Confidence)
+		cumOffset, err := h.applySyncResult(ctx, paths.subtitle, result.Cues, result.Offset, result.Confidence)
 		if err != nil {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "path", req.SubtitlePath)
+			api.InternalErrorC(w, r, err, api.CodeInternalError, "path", paths.subtitle)
 			return
 		}
 		resp.OffsetMs = cumOffset
 	}
 
 	slog.Info("audio sync completed",
-		"subtitle", filepath.Base(req.SubtitlePath),
+		"subtitle", filepath.Base(paths.subtitle),
 		"offset_ms", resp.OffsetMs,
 		"confidence", resp.Confidence,
 		"method", resp.Method,
@@ -188,35 +237,37 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req syncOffsetRequest
+	var req SyncOffsetRequest
 	if !httphelpers.DecodeJSONBody(w, r, &req, maxBodySize) {
 		return
 	}
-	if req.SubtitlePath == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "subtitle_path required")
+	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
+	if err := ref.Validate(); err != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
-
-	if !h.validatePath(w, r, req.SubtitlePath, "subtitle path") {
+	subtitlePath, err := h.resolve.SubtitlePath(ctx, ref)
+	if err != nil {
+		resolve.WriteError(w, r, err)
 		return
 	}
 
 	slog.Info("manual offset requested",
-		"subtitle", filepath.Base(req.SubtitlePath),
+		"subtitle", filepath.Base(subtitlePath),
 		"offset_ms", req.OffsetMs)
 
-	currentOffset, err := h.store.GetSyncOffset(ctx, req.SubtitlePath)
+	currentOffset, err := h.store.GetSyncOffset(ctx, subtitlePath)
 	if err != nil {
 		slog.Debug("sync offset: no previous offset, treating as zero",
-			"path", req.SubtitlePath, "error", err)
+			"path", subtitlePath, "error", err)
 		currentOffset = 0
 	}
 	delta := req.OffsetMs - currentOffset
 
-	_, cues, parseErr := h.readAndParseSRT(req.SubtitlePath)
+	_, cues, parseErr := h.readAndParseSRT(subtitlePath)
 	if parseErr != nil || len(cues) == 0 {
 		slog.Debug("sync offset: read/parse failed",
-			"path", req.SubtitlePath, "error", parseErr, "cues", len(cues))
+			"path", subtitlePath, "error", parseErr, "cues", len(cues))
 		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to parse subtitle")
 		return
 	}
@@ -236,19 +287,19 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := atomicfile.WriteFile(ctx, req.SubtitlePath, srtData); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", req.SubtitlePath)
+	if _, err := atomicfile.WriteFile(ctx, subtitlePath, srtData); err != nil {
+		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", subtitlePath)
 		return
 	}
 
 	slog.Info("manual offset applied",
 		"offset_ms", req.OffsetMs,
 		"delta_ms", delta,
-		"path", filepath.Base(req.SubtitlePath))
+		"path", filepath.Base(subtitlePath))
 
-	if err := h.store.SetSyncOffset(ctx, req.SubtitlePath, req.OffsetMs); err != nil {
+	if err := h.store.SetSyncOffset(ctx, subtitlePath, req.OffsetMs); err != nil {
 		slog.Error("sync offset: file saved but DB offset update failed",
-			"path", filepath.Base(req.SubtitlePath),
+			"path", filepath.Base(subtitlePath),
 			"offset_ms", req.OffsetMs,
 			"error", err)
 		api.JSONErrorWithCode(w, r, http.StatusInternalServerError, api.CodeInternalError,

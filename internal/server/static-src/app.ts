@@ -2,7 +2,6 @@
 
 import { initActions } from "./actions-boot.js";
 import * as store from "./store.js";
-import * as notify from "./notify.js";
 import { on, BusEvent } from "./bus.js";
 
 // Wire @cplieger/actions notifier + API layer before any action is created.
@@ -10,6 +9,7 @@ initActions();
 import * as events from "./events.js";
 import * as theme from "./theme.js";
 import { initStatusPopover, pollStatusAction, updateLiveTimers } from "./status.js";
+import { initScanButtons } from "./detail-scan.js";
 import { loadCoverage, filterCoverage } from "./coverage.js";
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import { closeSearchPopup } from "./search.js";
@@ -21,12 +21,11 @@ import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
-import { apiGet, apiGetArray } from "./api-client.js";
+import { configParsed, coverageMovies, coverageSeriesDetail, stateIDs } from "./wire/client.gen.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 import { STATUS_POLL_MS } from "./constants.js";
 import type { MovieItem } from "./api-types.js";
-import { decodeSubtitleEntry, decodeMovieItem } from "./wire/decoders.gen.js";
 
 // Initialize store.
 store.batch(() => {
@@ -35,8 +34,7 @@ store.batch(() => {
   store.set("ignoredCodecs", new Set<string>());
   store.set("detailCtx", null);
   store.set("currentPage", "library");
-  store.set("scanInFlight", false);
-  store.set("refreshPending", false);
+  store.set("runningScansByScope", new Map());
 });
 
 // Derived state: eliminates repeated guard checks across all modules.
@@ -67,14 +65,14 @@ function refreshCurrentPage(): void {
   // refreshCurrentPage re-fetches data and passes it to detail renderers.
   if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
     void Promise.all([
-      apiGetArray(`/api/coverage/series/${ctx.tvdbId}`, decodeSubtitleEntry),
-      apiGet<string[]>(`/api/state/ids?type=episode&prefix=tvdb-${ctx.tvdbId}-`),
+      coverageSeriesDetail(ctx.tvdbId),
+      stateIDs({ type: "episode", prefix: `tvdb-${ctx.tvdbId}-` }),
     ]).then(([subFiles, historyIDs]) => {
       renderSeriesDetail(ctx.series, ctx.seasons, subFiles ?? [], new Set(historyIDs ?? []));
     });
   } else if (ctx && "movie" in ctx && ctx.movie) {
     // Movie detail: re-fetch coverage and re-render.
-    void apiGetArray("/api/coverage/movies", decodeMovieItem).then((movies) => {
+    void coverageMovies().then((movies) => {
       if (!movies) {
         return;
       }
@@ -91,14 +89,10 @@ function refreshCurrentPage(): void {
 }
 
 // Any module can trigger a refresh by emitting BusEvent.DataInvalidate.
-// Defer refresh while a scan button is active (prevents DOM replacement
-// from detaching the button reference mid-animation).
+// Scan starts are instant 202s now, so there is no long-lived button
+// animation to protect; refreshes apply immediately.
 on(BusEvent.DataInvalidate, () => {
-  if (store.get("scanInFlight")) {
-    store.set("refreshPending", true);
-  } else {
-    refreshCurrentPage();
-  }
+  refreshCurrentPage();
 });
 
 events.connect();
@@ -113,6 +107,9 @@ void initLanguages();
 initUserMenu();
 initStatusPopover();
 initSecurity();
+// Scan buttons key off the shared runningScansByScope store: install the
+// effect that repaints every annotated button when the map changes.
+initScanButtons();
 
 // Action-framework global: live-log every action error to the browser
 // console so failures are visible in DevTools regardless of toast policy
@@ -146,15 +143,15 @@ if (footerYear) {
 }
 
 // Check if the server is configured; auto-open settings if not.
-void apiGet<Record<string, unknown>>("/api/config/parsed").then((pc) => {
+void configParsed().then((pc) => {
   store.batch(() => {
     store.set("configChecked", true);
     if (pc) {
       store.set("config", pc);
-      store.set("ignoredCodecs", new Set((pc["ignored_codecs"] as string[] | undefined) ?? []));
+      store.set("ignoredCodecs", new Set(pc.ignored_codecs ?? []));
     }
   });
-  if (pc?.["configured"] === false) {
+  if (pc?.configured === false) {
     openConfig(true);
   }
 });
@@ -230,38 +227,9 @@ if (configBtn) {
 }
 $.configClose.addEventListener("click", closeConfig);
 
-// Config dialog backdrop click.
-configDlg.addEventListener("click", (e: MouseEvent) => {
-  if (e.target === e.currentTarget) {
-    if (isUnconfigured()) {
-      notify.error("Save a valid configuration before closing settings");
-      return;
-    }
-    closeConfig();
-  }
-});
-
-// Config dialog native Escape (cancel event fires before close).
-configDlg.addEventListener("cancel", (e: Event) => {
-  if (isUnconfigured()) {
-    e.preventDefault();
-    return;
-  }
-  if (location.pathname === "/settings") {
-    navigate("/");
-  }
-});
-
-// Intercept Escape at keydown level to show toast and fully prevent
-// the dialog from closing when unconfigured. The cancel event alone
-// is not reliable across all browsers.
-configDlg.addEventListener("keydown", (e: KeyboardEvent) => {
-  if (e.key === "Escape" && isUnconfigured()) {
-    e.preventDefault();
-    e.stopPropagation();
-    notify.error("Save a valid configuration before closing settings");
-  }
-});
+// Config dialog dismissal (drag-safe backdrop + Escape, with the
+// unconfigured-mode refusal) is wired by config.ts via the dialog
+// primitive's createDialog + canDismiss — no hand-rolled listeners here.
 
 // Coverage controls — filter changes update both the view and the URL.
 // Text input is debounced at 150ms to avoid janking on large libraries.

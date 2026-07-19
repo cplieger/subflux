@@ -14,9 +14,34 @@ import (
 	"github.com/cplieger/subflux/internal/server/polling"
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 )
+
+// newResolver builds the S7 typed-reference resolver over the store and the
+// live (hot-reloadable) config + arr clients. One resolver instance is
+// shared by every reference-taking handler family so resolution semantics
+// cannot drift between endpoints.
+func (s *Server) newResolver() *resolve.Resolver {
+	return &resolve.Resolver{
+		Store: s.db,
+		State: func() *resolve.State {
+			ls := s.state()
+			st := &resolve.State{}
+			if ls.cfg != nil {
+				st.Cfg = ls.cfg
+			}
+			if ls.sonarr != nil {
+				st.Sonarr = ls.sonarr
+			}
+			if ls.radarr != nil {
+				st.Radarr = ls.radarr
+			}
+			return st
+		},
+	}
+}
 
 // initHandlers constructs all handler families on the server.
 // Called from New() after options are applied and live state is initialized.
@@ -37,6 +62,9 @@ func (s *Server) initHandlers() {
 			return err
 		},
 	)
+	if s.metrics != nil {
+		s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
+	}
 	s.queryH = queryhandlers.New(queryhandlers.Deps{
 		QueryDB:      s.stores.query,
 		CovDB:        s.db,
@@ -70,12 +98,14 @@ func (s *Server) initHandlers() {
 		StatsCache: s.queryH.StatsInvalidator(),
 	}, s.pollerLiveState)
 	s.scanH = s.initScanHandler()
-	s.manualH = s.initManualHandler()
+	resolver := s.newResolver()
+	s.manualH = s.initManualHandler(resolver)
 
 	s.previewH = previewhandlers.NewHandler(previewhandlers.Deps{
 		SubtitleProc: s.subtitleProc,
 		FFmpegSem:    s.ffmpegSem,
 		PosterClient: s.posterClient,
+		Resolve:      resolver,
 		StateFunc: func() *previewhandlers.LiveState {
 			ls := s.state()
 			pls := &previewhandlers.LiveState{}
@@ -93,13 +123,12 @@ func (s *Server) initHandlers() {
 			}
 			return pls
 		},
-		ValidatePath: s.validateFSPath,
-		ReadBounded:  atomicfile.ReadBounded,
-		ServerCtx:    func() context.Context { return s.ctx },
+		ReadBounded: atomicfile.ReadBounded,
+		ServerCtx:   func() context.Context { return s.ctx },
 	})
 
 	s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
-		Store: &covStoreProxy{s: s},
+		Store: s.db,
 		StateFunc: func() *coveragehandlers.LiveState {
 			ls := s.state()
 			return &coveragehandlers.LiveState{
@@ -110,10 +139,18 @@ func (s *Server) initHandlers() {
 		},
 	})
 	s.fileH = filehandlers.NewHandler(filehandlers.Deps{
-		Store: s.db,
+		Store:   s.db,
+		Resolve: resolver,
 		StateFunc: func() *filehandlers.LiveState {
 			ls := s.state()
-			return &filehandlers.LiveState{Cfg: ls.cfg}
+			fls := &filehandlers.LiveState{Cfg: ls.cfg}
+			if ls.sonarr != nil {
+				fls.Sonarr = ls.sonarr
+			}
+			if ls.radarr != nil {
+				fls.Radarr = ls.radarr
+			}
+			return fls
 		},
 		Events: s.events,
 	})
@@ -133,28 +170,31 @@ func (s *Server) initHandlers() {
 		Store:        s.stores.sync,
 		SubtitleProc: s.subtitleProc,
 		Activity:     s.activity,
-		ValidatePath: s.validateFSPath,
+		Resolve:      resolver,
 	})
 }
 
 // initManualHandler constructs the manualops.Handler with the server's dependencies.
-func (s *Server) initManualHandler() *manualops.Handler {
+func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handler {
 	return manualops.NewHandler(manualops.HandlerDeps{
-		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) }, //nolint:errcheck // compile-time interface guarantee
+		// api.Store is a compile-checked superset of manualops.DownloadStore,
+		// so the implicit interface conversion needs no assertion.
+		DBFunc:   func() manualops.DownloadStore { return s.db },
 		Activity: &serveradapter.ActivityAdapter{A: s.activity},
 		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
 		Events:   &serveradapter.ManualEventAdapter{E: s.events},
 		StateFunc: func() *manualops.LiveState {
 			ls := s.state()
 			return &manualops.LiveState{
-				Cfg: ls.cfg, Engine: ls.engine,
+				Cfg: ls.cfg, Engine: ls.engine, Scorer: ls.scorer,
 				Sonarr: ls.sonarr, Radarr: ls.radarr,
+				SonarrLib: ls.sonarr, RadarrLib: ls.radarr,
 				Providers: ls.providers,
 			}
 		},
-		BGTracker:    &s.bgWg,
-		ServerCtx:    func() context.Context { return s.ctx },
-		ValidatePath: s.validateFSPath,
-		DecodeJSON:   decodeJSONBodyAny,
+		BGTracker:  &s.bgWg,
+		ServerCtx:  func() context.Context { return s.ctx },
+		Resolve:    resolver,
+		DecodeJSON: decodeJSONBodyAny,
 	})
 }

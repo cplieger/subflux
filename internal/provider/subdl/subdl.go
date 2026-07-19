@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/runesafe"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
@@ -170,12 +173,15 @@ func checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
 	if result.Status {
 		return result.Subtitles, nil
 	}
-	if isNotFoundError(result.Error) {
+	if isNotFoundError(result.Error.Raw()) {
 		slog.Debug("subdl: no results", "media", label)
 		return nil, nil
 	}
 	if result.Error != "" {
-		return nil, fmt.Errorf("subdl API: %w: %s", errSubDLNotFound, result.Error)
+		// The upstream error string is untrusted text that callers pass to
+		// slog; neutralize control/bidi runes at construction (single-line,
+		// since error strings are one-line by convention).
+		return nil, fmt.Errorf("subdl API: %w: %s", errSubDLNotFound, result.Error.SingleLine())
 	}
 	slog.Warn("subdl: API returned status=false with no error message", "media", label)
 	return nil, nil
@@ -236,12 +242,12 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "subdl download", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl download", p.apiKey)
 	}
 	defer resp.Body.Close()
 
@@ -251,7 +257,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 		if errors.As(err, &rateErr) {
 			slog.Warn("subdl: download rate limited", "url", fullURL)
 		}
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 	slog.Debug("subdl download complete", "id", sub.ID, "bytes", len(data))
 	return data, nil
@@ -266,22 +272,22 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 	u := apiURL + "/subtitles?" + params.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("subdl search: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("subdl search: %w", err), p.apiKey)
 	}
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httputil.RedactTransportError(err, "subdl search", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl search", p.apiKey)
 	}
 	defer resp.Body.Close()
 
 	if err := httputil.CheckHTTPStatus(resp); err != nil {
-		return nil, httputil.RedactSecret(err, p.apiKey)
+		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result apiResponse
 	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)).Decode(&result); err != nil {
-		return nil, httputil.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
+		return nil, httpx.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
 	}
 	return &result, nil
 }
@@ -323,9 +329,11 @@ func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, e
 // --- API types ---
 
 type apiResponse struct {
-	Error     string         `json:"error"`
-	Subtitles []subtitleItem `json:"subtitles"`
-	Status    bool           `json:"status"`
+	// Error is upstream-controlled text, tagged at the decode boundary; the
+	// error construction applies the strict single-line form explicitly.
+	Error     runesafe.Untrusted `json:"error"`
+	Subtitles []subtitleItem     `json:"subtitles"`
+	Status    bool               `json:"status"`
 }
 
 type subtitleItem struct {
@@ -344,22 +352,39 @@ type subtitleItem struct {
 // --- Language mapping ---
 // SubDL uses uppercase ISO 639-1 codes (EN, FR, AR, etc.)
 
-var iso2ToSubDLMap = map[string]string{
-	"en": "EN", "fr": "FR", "es": "ES", "de": "DE",
-	"it": "IT", "pt": "PT", "pb": "BR_PT", "nl": "NL", "ru": "RU",
-	"ar": "AR", "ja": "JA", "zh": "ZH", "ko": "KO",
-	"sv": "SV", "no": "NO", "da": "DA", "fi": "FI",
-	"pl": "PL", "cs": "CS", "hu": "HU", "ro": "RO",
-	"tr": "TR", "el": "EL", "he": "HE", "th": "TH",
-	"vi": "VI", "id": "ID", "bg": "BG",
-	"hr": "HR", "sr": "SR", "sl": "SL",
-	"sk": "SK", "uk": "UK", "fa": "FA",
-	"ms": "MS", "hi": "HI", "bn": "BN",
-	"ta": "TA", "te": "TE", "ur": "UR",
-	"is": "IS", "lt": "LT", "lv": "LV",
-	"et": "ET", "sq": "SQ", "bs": "BS",
-	"mk": "MK", "ca": "CA",
+// subdlLangCodes lists the ISO 639-1 codes SubDL supports. The SubDL API
+// code is strings.ToUpper(code) for every entry except the overrides below.
+var subdlLangCodes = []string{
+	"en", "fr", "es", "de",
+	"it", "pt", "pb", "nl", "ru",
+	"ar", "ja", "zh", "ko",
+	"sv", "no", "da", "fi",
+	"pl", "cs", "hu", "ro",
+	"tr", "el", "he", "th",
+	"vi", "id", "bg",
+	"hr", "sr", "sl",
+	"sk", "uk", "fa",
+	"ms", "hi", "bn",
+	"ta", "te", "ur",
+	"is", "lt", "lv",
+	"et", "sq", "bs",
+	"mk", "ca",
 }
+
+// subdlLangOverrides maps ISO codes whose SubDL name is not the plain
+// uppercase of the code (mirrors hdbits' hdbLangOverrides pattern).
+var subdlLangOverrides = map[string]string{
+	"pb": "BR_PT",
+}
+
+var iso2ToSubDLMap = func() map[string]string {
+	m := make(map[string]string, len(subdlLangCodes))
+	for _, c := range subdlLangCodes {
+		m[c] = strings.ToUpper(c)
+	}
+	maps.Copy(m, subdlLangOverrides)
+	return m
+}()
 
 var subdlToISO2Map = func() map[string]string {
 	m := make(map[string]string, len(iso2ToSubDLMap))

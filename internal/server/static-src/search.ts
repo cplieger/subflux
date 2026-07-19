@@ -5,16 +5,13 @@ import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
 import { el, option, icon, dialog, closeDialog, emptyDiv, errDiv } from "./dom.js";
+import { openDialog } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
-import { apiGetArray, apiGetRaw } from "./api-client.js";
-import { decodeActivityEntry } from "./wire/decoders.gen.js";
-import {
-  apiAction,
-  type ActionError,
-  retryNetwork,
-  registerCleanup,
-  pollUntil,
-} from "@cplieger/actions";
+import { listActivity, manualSearchRaw, PATH_DOWNLOAD_SUBTITLE } from "./wire/client.gen.js";
+import type { QueryValue } from "./wire/client.gen.js";
+import { decodeDownloadAccepted } from "./wire/decoders.gen.js";
+import type { DownloadAccepted, SearchResult } from "./wire/types.gen.js";
+import { apiAction, retryNetwork, registerCleanup, pollUntil } from "@cplieger/actions";
 import { hasCode, ErrorCode } from "./error_codes.js";
 import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from "./constants.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
@@ -39,10 +36,11 @@ interface CoverageEpisode {
   absolute_episode?: number;
   title?: string;
   scene_name?: string;
-  path?: string;
 }
 
 interface CoverageMedia {
+  /** Arr internal ID (Radarr movie / Sonarr series) — the MediaRef the
+   *  server resolves video paths from. */
   id: number;
   tvdb_id?: number;
   tmdb_id?: number;
@@ -50,28 +48,6 @@ interface CoverageMedia {
   title: string;
   year?: number;
   scene_name?: string;
-  path?: string;
-}
-
-interface SearchResult {
-  provider: string;
-  language: string;
-  release_name: string;
-  score: number;
-  matches: Record<string, number>;
-  matched_by: string;
-  hearing_impaired: boolean;
-  forced: boolean;
-  subtitle_id: string;
-  on_disk: boolean;
-}
-
-interface SearchResponse {
-  results?: SearchResult[];
-}
-
-interface DownloadResponse {
-  activity_id: string;
 }
 
 interface DownloadOpts {
@@ -88,11 +64,12 @@ interface DownloadArgs {
   provider: string;
   subtitle_id: string;
   release_name: string;
-  file_path: string;
   language: string;
   season: number;
   episode: number;
   media_type: MediaType;
+  /** Arr internal ID: with media_type + season/episode this is the MediaRef
+   *  the server resolves the video file path from (no path on the wire). */
   media_id: number;
   top_pick: boolean;
   score: number;
@@ -114,9 +91,10 @@ interface DownloadPollState {
  *  to recover from transient blips, but app-level "download_failed"
  *  errors (provider 4xx, IO errors) are NOT retried — the user re-clicks
  *  via the manually-re-enabled button. */
-const downloadAction = apiAction<DownloadArgs, DownloadResponse>({
+const downloadAction = apiAction<DownloadArgs, DownloadAccepted>({
   name: "search.download",
-  request: (args) => ({ method: "POST", path: "/api/search/download", body: args }),
+  request: (args) => ({ method: "POST", path: PATH_DOWNLOAD_SUBTITLE, body: args }),
+  decode: (data) => decodeDownloadAccepted(data),
   retryable: (err) => err.code !== ErrorCode.DownloadFailed && retryNetwork(err),
   error: false, // callsite drives icon + tooltip + per-error re-enable logic
 });
@@ -216,11 +194,9 @@ export function openSearchPopup(
   if (searchDlg.open) {
     searchDlg.close();
   }
-  // closeDialog (@cplieger/ui-primitives) fades out via an `is-leaving` class,
-  // not inline styles; clear it so a reopen within the fade window renders
-  // visible and the pending close callback no-ops (it is guarded on the class).
-  searchDlg.classList.remove("is-leaving");
-  searchDlg.showModal();
+  // openDialog cancels a pending is-leaving fade before showing, so a reopen
+  // within the fade window renders visible and the stale close no-ops.
+  openDialog(searchDlg);
   searchDlg.focus();
 
   // Auto-run search.
@@ -273,64 +249,60 @@ async function runPopupSearch(
     ),
   );
 
-  const params: URLSearchParams = new URLSearchParams();
-  params.set("type", mediaType);
-  params.set("lang", lang);
-
+  // Same params (and the same conditions) as the previous hand-built
+  // URLSearchParams; the generated client serializes the object in insertion
+  // order and skips undefined values.
+  const query: Record<string, QueryValue> = { type: mediaType, lang };
   if (mediaType === "episode") {
-    params.set("tvdb", String(media.tvdb_id));
+    query["tvdb"] = String(media.tvdb_id);
     if (media.imdb_id) {
-      params.set("imdb", media.imdb_id);
+      query["imdb"] = media.imdb_id;
     }
     if (season != null) {
-      params.set("season", String(season));
+      query["season"] = season;
     }
     if (episode) {
-      params.set("episode", String(episode.episode));
+      query["episode"] = episode.episode;
       if (episode.scene_season) {
-        params.set("scene_season", String(episode.scene_season));
+        query["scene_season"] = episode.scene_season;
       }
       if (episode.scene_episode) {
-        params.set("scene_episode", String(episode.scene_episode));
+        query["scene_episode"] = episode.scene_episode;
       }
       if (episode.absolute_episode) {
-        params.set("absolute_episode", String(episode.absolute_episode));
+        query["absolute_episode"] = episode.absolute_episode;
       }
       if (episode.title) {
-        params.set("episode_title", episode.title);
+        query["episode_title"] = episode.title;
       }
       if (episode.scene_name) {
-        params.set("release", episode.scene_name);
-      }
-      if (episode.path) {
-        params.set("file", episode.path);
+        query["release"] = episode.scene_name;
       }
     }
-    params.set("title", media.title);
+    query["title"] = media.title;
     if (media.year) {
-      params.set("year", String(media.year));
+      query["year"] = media.year;
     }
   } else {
-    params.set("tmdb", String(media.tmdb_id));
+    query["tmdb"] = String(media.tmdb_id);
     if (media.imdb_id) {
-      params.set("imdb", media.imdb_id);
+      query["imdb"] = media.imdb_id;
     }
-    params.set("title", media.title);
+    query["title"] = media.title;
     if (media.year) {
-      params.set("year", String(media.year));
+      query["year"] = media.year;
     }
     if (media.scene_name) {
-      params.set("release", media.scene_name);
-    }
-    if (media.path) {
-      params.set("file", media.path);
+      query["release"] = media.scene_name;
     }
   }
+  // MediaRef for server-side video resolution (hash computation): the arr
+  // internal ID; season/episode ride the episode params above.
+  if (media.id > 0) {
+    query["media_id"] = media.id;
+  }
 
-  const r = await apiGetRaw<SearchResponse | SearchResult[]>(
-    `/api/search?${params.toString()}`,
-    signal,
-  );
+  const r = await manualSearchRaw(query, { signal });
   if (!r.ok) {
     if (r.status === 0 && signal.aborted) {
       return;
@@ -348,9 +320,7 @@ async function runPopupSearch(
     patch(out, errDiv("Empty response"));
     return;
   }
-  const resp = payload as SearchResponse;
-  const results: SearchResult[] = resp.results ?? (payload as SearchResult[]);
-  renderPopupResults(out, results, lang, mediaType, media, season, episode);
+  renderPopupResults(out, payload.results, lang, mediaType, media, season, episode);
 }
 
 function renderPopupResults(
@@ -420,7 +390,7 @@ function renderPopupResults(
     ) as HTMLButtonElement;
 
     // Build score tooltip from match breakdown.
-    const matches: Record<string, number> = s.matches;
+    const matches: Record<string, number> = s.matches ?? {};
     const keys: string[] = Object.keys(matches);
     const scoreTip: string =
       keys.length > 0
@@ -463,50 +433,32 @@ function renderPopupResults(
 
 async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<void> {
   const { sub, lang, mediaType, media, season, episode, isTop } = opts;
-  let filePath = "";
-  if (mediaType === "episode" && episode?.path) {
-    filePath = episode.path;
-  } else if (mediaType === "movie" && media.path) {
-    filePath = media.path;
-  }
-  if (!filePath) {
-    notify.error(
-      "File path not available for download. " +
-        "Use the detailed search panel for file-based downloads.",
-    );
+  if (!media.id) {
+    notify.error("Media reference not available for download.");
     return;
   }
 
   (btn as HTMLButtonElement).disabled = true;
   patch(btn, icon("hourglass"));
 
-  let downloadErr: ActionError | undefined;
-  const data = await downloadAction.dispatch(
-    {
-      provider: sub.provider,
-      subtitle_id: sub.subtitle_id,
-      release_name: sub.release_name || "",
-      file_path: filePath,
-      language: lang,
-      season: season ?? 0,
-      episode: episode ? episode.episode : 0,
-      media_type: mediaType,
-      media_id: media.id,
-      top_pick: isTop,
-      score: sub.score,
-      hearing_impaired: sub.hearing_impaired,
-      forced: sub.forced,
-    },
-    {
-      // Capture the error so we can decide whether to re-enable the button.
-      onError: (err) => {
-        // ActionError shape; we only need the code here for retry-eligible
-        // re-enable. The framework already toasted the message.
-        downloadErr = err as ActionError;
-      },
-    },
-  );
-  if (data === null) {
+  const o = await downloadAction.dispatch({
+    provider: sub.provider,
+    subtitle_id: sub.subtitle_id,
+    release_name: sub.release_name || "",
+    language: lang,
+    season: season ?? 0,
+    episode: episode ? episode.episode : 0,
+    media_type: mediaType,
+    media_id: media.id,
+    top_pick: isTop,
+    score: sub.score,
+    hearing_impaired: sub.hearing_impaired,
+    forced: sub.forced,
+  }).outcome;
+  if (o.status !== "success") {
+    // The framework already toasted the message; the typed outcome carries
+    // the error (cancelled dispatches carry none) for the retry decision.
+    const downloadErr = o.status === "error" ? o.error : undefined;
     btn.dataset["status"] = "err";
     patch(btn, icon("close"));
     btn.setAttribute("data-tip", downloadErr?.message ?? "Download failed");
@@ -517,6 +469,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     }
     return;
   }
+  const data = o.value;
   // 202 Accepted: download running in background.
   const actID: string = data.activity_id;
   patch(btn, el("span", { className: "spinner" }));
@@ -536,7 +489,7 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
   // /api/activity fetch on deadline or teardown (cleanup aborts via activePolls).
   const outcome = await pollUntil<DownloadPollState>(
     async (sig: AbortSignal): Promise<DownloadPollState | null> => {
-      const acts = await apiGetArray("/api/activity", decodeActivityEntry, sig);
+      const acts = await listActivity({ signal: sig });
       if (!acts) {
         return null;
       }

@@ -1,20 +1,15 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"slices"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/server/confighandlers"
 )
 
 // --- enabledProviders ---
@@ -119,120 +114,9 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 	}
 }
 
-// --- handleResetConfig ---
-
-func TestHandleResetConfig_rejects_when_configured(t *testing.T) {
-	t.Parallel()
-	s := &Server{
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
-	}
-	s.configured.Store(true)
-	s.configH = confighandlers.New(&confighandlers.Deps{
-		Configured: func() bool { return true },
-		ConfigPath: func() string { return "" },
-	})
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/config/reset", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleResetConfig(rec, req)
-
-	if rec.Code != http.StatusConflict {
-		t.Errorf("handleResetConfig(configured) status = %d, want %d",
-			rec.Code, http.StatusConflict)
-	}
-}
-
-func TestHandleResetConfig_no_default_config(t *testing.T) {
-	t.Parallel()
-	s := &Server{
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
-	}
-	s.configH = confighandlers.New(&confighandlers.Deps{
-		Configured: func() bool { return false },
-		ConfigPath: func() string { return "" },
-	})
-	// configured is false, defaultConfig is nil.
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/config/reset", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleResetConfig(rec, req)
-
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("handleResetConfig(no default) status = %d, want %d",
-			rec.Code, http.StatusInternalServerError)
-	}
-}
-
-func TestHandleResetConfig_writes_default(t *testing.T) {
-	dir := t.TempDir()
-	configPath := dir + "/config.yaml"
-	cfgFilePath = configPath
-
-	defaultCfg := []byte("# default config\nlanguages: [en]\n")
-	s := &Server{
-		activity:      activity.New(50),
-		alerts:        activity.NewAlertLog(100),
-		defaultConfig: defaultCfg,
-	}
-	s.configH = confighandlers.New(&confighandlers.Deps{
-		DefaultConfig: defaultCfg,
-		Configured:    func() bool { return false },
-		ConfigPath:    func() string { return cfgFilePath },
-	})
-	// configured is false (unconfigured mode).
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/config/reset", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleResetConfig(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("handleResetConfig() status = %d, want %d", rec.Code, http.StatusOK)
-	}
-
-	// Verify the file was written.
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("read config after reset: %v", err)
-	}
-	if !bytes.Equal(data, defaultCfg) {
-		t.Errorf("config content = %q, want %q", string(data), string(defaultCfg))
-	}
-}
-
-// --- handleConfigParsed unconfigured mode ---
-
-func TestHandleConfigParsed_unconfigured_returns_defaults(t *testing.T) {
-	t.Parallel()
-	s := &Server{
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
-	}
-	s.live.Store(&liveState{})
-	// configured is false.
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodGet, "/api/config/parsed", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleConfigParsed(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("handleConfigParsed(unconfigured) status = %d, want %d",
-			rec.Code, http.StatusOK)
-	}
-
-	var result map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if result["configured"] != false {
-		t.Errorf("configured = %v, want false", result["configured"])
-	}
-}
+// The handleResetConfig and handleConfigSchema tests formerly in this file
+// moved to internal/server/confighandlers/handler_test.go with the rest of
+// the config HTTP surface.
 
 // --- buildProviderSchemas ---
 
@@ -248,8 +132,8 @@ func TestBuildProviderSchemas_empty_registry(t *testing.T) {
 func TestBuildProviderSchemas_with_providers(t *testing.T) {
 	t.Parallel()
 	reg := provider.NewRegistry()
-	reg.Register("embedded", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "embedded"}, nil
+	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+		return &stubProvider{name: "gestdown"}, nil
 	})
 	reg.Register("opensubtitles", func(_ context.Context, _ map[string]any) (api.Provider, error) {
 		return &stubProvider{name: "opensubtitles"}, nil
@@ -258,7 +142,7 @@ func TestBuildProviderSchemas_with_providers(t *testing.T) {
 		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
 		{Key: "username", Label: "Username", Type: "text"},
 	})
-	// embedded has no schema registered; label should fall back to name.
+	// gestdown has no schema registered; label should fall back to name.
 
 	schemas := api.BuildProviderSchemas(reg)
 
@@ -267,25 +151,18 @@ func TestBuildProviderSchemas_with_providers(t *testing.T) {
 	}
 
 	// Schemas should be in sorted order (from ProviderNames).
-	if schemas[0].Name != "embedded" {
-		t.Errorf("schemas[0].Name = %q, want %q", schemas[0].Name, "embedded")
+	if schemas[0].Name != "gestdown" {
+		t.Errorf("schemas[0].Name = %q, want %q", schemas[0].Name, "gestdown")
 	}
 	if schemas[1].Name != "opensubtitles" {
 		t.Errorf("schemas[1].Name = %q, want %q", schemas[1].Name, "opensubtitles")
 	}
 
-	// embedded: AlwaysEnabled=true, label falls back to name.
-	if !schemas[0].AlwaysEnabled {
-		t.Error("embedded.AlwaysEnabled = false, want true")
-	}
-	if schemas[0].Label != "embedded" {
-		t.Errorf("embedded.Label = %q, want %q (fallback to name)", schemas[0].Label, "embedded")
+	// gestdown: label falls back to name.
+	if schemas[0].Label != "gestdown" {
+		t.Errorf("gestdown.Label = %q, want %q (fallback to name)", schemas[0].Label, "gestdown")
 	}
 
-	// opensubtitles: AlwaysEnabled=false, has schema fields.
-	if schemas[1].AlwaysEnabled {
-		t.Error("opensubtitles.AlwaysEnabled = true, want false")
-	}
 	if schemas[1].Label != "OpenSubtitles" {
 		t.Errorf("opensubtitles.Label = %q, want %q", schemas[1].Label, "OpenSubtitles")
 	}
@@ -297,74 +174,6 @@ func TestBuildProviderSchemas_with_providers(t *testing.T) {
 	}
 	if !schemas[1].Settings[0].Secret {
 		t.Error("settings[0].Secret = false, want true")
-	}
-}
-
-// --- handleConfigSchema ---
-
-func TestHandleConfigSchema_returns_json(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	reg.Register("embedded", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "embedded"}, nil
-	})
-
-	s := &Server{
-		registry:   reg,
-		schemaFunc: schema.Schema,
-		activity:   activity.New(50),
-		alerts:     activity.NewAlertLog(100),
-	}
-	s.configH = confighandlers.New(&confighandlers.Deps{
-		SchemaFunc: schema.Schema,
-		Registry:   reg,
-	})
-	s.live.Store(&liveState{})
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodGet, "/api/config/schema", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleConfigSchema(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("handleConfigSchema() status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	ct := rec.Header().Get("Content-Type")
-	if ct != "application/json" {
-		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
-	}
-
-	var sections []api.SchemaSection
-	if err := json.NewDecoder(rec.Body).Decode(&sections); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(sections) == 0 {
-		t.Error("handleConfigSchema() returned 0 sections, want > 0")
-	}
-}
-
-func TestHandleConfigSchema_rejects_non_get(t *testing.T) {
-	t.Parallel()
-	s := &Server{
-		registry:   provider.NewRegistry(),
-		schemaFunc: schema.Schema,
-		activity:   activity.New(50),
-		alerts:     activity.NewAlertLog(100),
-	}
-	s.configH = confighandlers.New(&confighandlers.Deps{
-		SchemaFunc: schema.Schema,
-		Registry:   provider.NewRegistry(),
-	})
-	s.live.Store(&liveState{})
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/config/schema", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleConfigSchema(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("handleConfigSchema(POST) status = %d, want %d",
-			rec.Code, http.StatusMethodNotAllowed)
 	}
 }
 

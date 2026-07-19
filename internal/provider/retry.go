@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cplieger/httpx/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/search/release"
 )
 
 // DownloadRetryAttempts is the maximum number of download attempts per provider.
@@ -52,8 +54,17 @@ func WrapRetry(p api.Provider, maxAttempts int, initBackoff time.Duration) api.P
 
 func (r *retryProvider) Name() api.ProviderID { return r.inner.Name() }
 
+// Search delegates to the inner provider and clamps each result's
+// ReleaseName to release.MaxNameLen. Both composition roots wrap every
+// provider with WrapRetryAll, making this the provider boundary where the
+// release-parsing layer's documented input bound is enforced on untrusted
+// provider responses (release package doc, "Input bound").
 func (r *retryProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
-	return r.inner.Search(ctx, req)
+	subs, err := r.inner.Search(ctx, req)
+	for i := range subs {
+		subs[i].ReleaseName = release.ClampName(subs[i].ReleaseName)
+	}
+	return subs, err
 }
 
 func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
@@ -83,14 +94,14 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 		if attempt == r.maxAttempts-1 {
 			break
 		}
-		delay := httputil.JitteredBackoff(backoff)
+		delay := httpx.JitteredBackoff(backoff)
 		slog.Warn("download failed with transient error, retrying",
 			"provider", r.inner.Name(), "attempt", attempt+1,
 			"backoff_ms", delay.Milliseconds(), "error", err)
-		if err := httputil.SleepCtx(ctx, delay); err != nil {
+		if err := httpx.SleepCtx(ctx, delay); err != nil {
 			return nil, err
 		}
-		backoff = httputil.SafeDouble(backoff)
+		backoff = httpx.SafeDouble(backoff)
 		backoff = min(backoff, maxRetryBackoff)
 	}
 	slog.Error("download failed after all attempts",

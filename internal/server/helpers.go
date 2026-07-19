@@ -5,9 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
@@ -26,11 +24,6 @@ import (
 // maxDefaultBodySize references the canonical constant from httphelpers.
 const maxDefaultBodySize = httphelpers.MaxDefaultBodySize
 
-// requireGET delegates to httphelpers.RequireGET.
-func requireGET(w http.ResponseWriter, r *http.Request) bool {
-	return httphelpers.RequireGET(w, r)
-}
-
 // decodeJSONBodyAny is a package-level function matching the signature
 // required by manualops.HandlerDeps.DecodeJSON. Uses maxDefaultBodySize
 // when maxSize is 0.
@@ -39,17 +32,6 @@ func decodeJSONBodyAny(w http.ResponseWriter, r *http.Request, dst any, maxSize 
 		maxSize = maxDefaultBodySize
 	}
 	return httphelpers.DecodeJSONBody(w, r, dst, maxSize)
-}
-
-// validateFSPath runs the configured filesystem path allowlist against
-// p. Writes 403 and returns false if the path is invalid. The label is
-// used in the error message ("invalid <label>").
-func (s *Server) validateFSPath(w http.ResponseWriter, r *http.Request, p, label string) bool {
-	if err := s.state().cfg.ValidatePath(r.Context(), p); err != nil {
-		api.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid "+label)
-		return false
-	}
-	return true
 }
 
 // deleteSubtitleFiles validates and removes subtitle files from disk.
@@ -70,21 +52,4 @@ func (s *Server) deleteSubtitleFiles(paths []string, logCtx string) {
 			slog.Info(logCtx+": deleted subtitle", "path", p)
 		}
 	}
-}
-
-// extractPathSegment extracts the segment between prefix and suffix in a URL path.
-// Returns empty string if the path doesn't match the expected pattern.
-func extractPathSegment(path, prefix, suffix string) string {
-	if !strings.HasPrefix(path, prefix) {
-		return ""
-	}
-	rest := path[len(prefix):]
-	if suffix != "" {
-		idx := strings.Index(rest, suffix)
-		if idx < 0 {
-			return ""
-		}
-		rest = rest[:idx]
-	}
-	return rest
 }

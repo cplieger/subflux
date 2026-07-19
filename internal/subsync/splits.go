@@ -50,6 +50,7 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 			Cues:       incorrect,
 			Confidence: ConfidenceNone,
 			Method:     MethodSplit,
+			Source:     SourceSplit,
 		}
 	}
 
@@ -66,13 +67,17 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 	splits := detectSplits(offsets, splitPenalty)
 
 	if len(splits) <= 1 {
-		// No splits detected; fall back to constant offset.
-		cues, offset := syncCues(ctx, reference, incorrect)
+		// No split detected: the constant-offset hypothesis is already
+		// represented in arbitration by the offset generator. Re-emitting
+		// it here (as this branch once did, with a flat moderate
+		// confidence) granted the hypothesis a structural self-agreement
+		// bonus. Emit no candidate: the zero-confidence filter in
+		// referenceSync drops this result.
 		return SyncResult{
-			Cues:       cues,
-			Offset:     offset.Milliseconds(),
-			Confidence: ConfidenceModerate,
+			Cues:       incorrect,
+			Confidence: ConfidenceNone,
 			Method:     MethodSplit,
+			Source:     SourceSplit,
 		}
 	}
 
@@ -96,7 +101,23 @@ func alignWithSplits(ctx context.Context, reference, incorrect []Cue, splitPenal
 		Cues:       corrected,
 		Confidence: confidence,
 		Method:     MethodSplit,
+		Source:     SourceSplit,
+		Transform:  Transform{Kind: TransformSegments, Segments: transformSegments(segments)},
 	}
+}
+
+// transformSegments converts the internal segment representation into the
+// exported per-segment shift descriptor carried on SyncResult.Transform.
+func transformSegments(segs []segment) []Segment {
+	out := make([]Segment, len(segs))
+	for i, s := range segs {
+		out[i] = Segment{
+			StartIdx: s.startIdx,
+			EndIdx:   s.endIdx,
+			ShiftMs:  s.offset.Milliseconds(),
+		}
+	}
+	return out
 }
 
 // perCueOffset holds the best offset for a single cue.
@@ -238,17 +259,32 @@ func alignSegments(incorrect []Cue, segments []segment) []Cue {
 }
 
 // overlapTotal computes the total overlap between corrected and reference
-// spans. Both slices must be sorted by start time.
+// spans, plus the total reference span time. For each reference span it
+// accumulates the UNION of ALL corrected spans overlapping it — a
+// covered-up-to watermark keeps corrected spans that overlap each other
+// from double-counting — so a reference span fully covered by several
+// adjacent corrected spans counts as fully overlapped. Per reference span
+// the contribution is capped at the span's own length, preserving
+// totalOverlap <= totalRef and the callers' normalization to [0,1]. Both
+// slices must be sorted by start time.
 func overlapTotal(corrSpans, refSpans []TimeSpan) (totalOverlap, totalRef float64) {
 	var j int
 	for _, r := range refSpans {
 		totalRef += float64(r.End - r.Start)
+		// Corrected spans ending at or before r start cannot overlap r or
+		// any later reference span (refSpans is sorted by start).
 		for j < len(corrSpans) && corrSpans[j].End <= r.Start {
 			j++
 		}
-		if j < len(corrSpans) {
-			if o := overlapMs(r, corrSpans[j]); o > 0 {
-				totalOverlap += o
+		// Union sweep: covered marks how far into r overlap has already
+		// been counted; each span contributes only its uncovered part.
+		covered := r.Start
+		for k := j; k < len(corrSpans) && corrSpans[k].Start < r.End; k++ {
+			start := max(corrSpans[k].Start, covered)
+			end := min(corrSpans[k].End, r.End)
+			if end > start {
+				totalOverlap += float64(end - start)
+				covered = end
 			}
 		}
 	}

@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/webhttp"
 )
 
@@ -129,11 +131,11 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 		}
 	}
 
-	// Content-Security-Policy is computed from the embedded importmap at
+	// Content-Security-Policy is computed from the embedded HTML at
 	// startup (buildCSPPolicy), so assert its directives rather than a
-	// brittle exact string. The inline importmap must be allowed via a
-	// script-src sha256 hash, or the login/first-boot wizard's
-	// bare-specifier imports (@cplieger/actions) fail to resolve.
+	// brittle exact string. The inline anti-FOUC theme-init script must be
+	// allowed via a script-src sha256 hash, or the browser blocks it and
+	// the page flashes the wrong theme.
 	csp := rec.Header().Get("Content-Security-Policy")
 	for _, want := range []string{
 		"default-src 'self'",
@@ -188,10 +190,12 @@ func TestWriteJSON_sets_content_type(t *testing.T) {
 	}
 }
 
-func TestHandleScan_post_returns_accepted(t *testing.T) {
+func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 	t.Parallel()
-	// handleScan launches runFullScan in a goroutine which needs sonarr/radarr clients.
-	// We only test the synchronous response (202 Accepted).
+	// handleScan launches the scan in a goroutine which needs sonarr/radarr
+	// clients; we only test the synchronous accept sequence: 202 with the
+	// activity id present AT accept time, entry created with the full-scan
+	// scope, stop registered before the response.
 	s := &Server{
 		db:       &qhMockStore{},
 		metrics:  metrics.New(),
@@ -211,16 +215,116 @@ func TestHandleScan_post_returns_accepted(t *testing.T) {
 		t.Errorf("handleScan(POST) status = %d, want %d",
 			rec.Code, http.StatusAccepted)
 	}
-	var resp map[string]string
+	var resp scanning.ScanAccepted
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp["status"] != "scan started" {
-		t.Errorf("handleScan(POST) status = %q, want %q", resp["status"], "scan started")
+	if resp.Status != "scan started" {
+		t.Errorf("handleScan(POST) status = %q, want %q", resp.Status, "scan started")
+	}
+	if resp.ActivityID == "" {
+		t.Fatal("handleScan(POST) returned no activity_id at accept time")
+	}
+	entry, ok := s.activity.Get(resp.ActivityID)
+	if !ok {
+		t.Fatalf("activity entry %q not found after accept", resp.ActivityID)
+	}
+	if entry.Kind != activity.ScanKindFull {
+		t.Errorf("entry.Kind = %q, want %q", entry.Kind, activity.ScanKindFull)
+	}
+	if entry.RequiredRole != auth.RoleAdmin {
+		t.Errorf("entry.RequiredRole = %q, want admin (full scans are admin-cancellable only)", entry.RequiredRole)
+	}
+	if entry.Source != activity.SourceManual {
+		t.Errorf("entry.Source = %q, want manual (POST /api/scan is a manual trigger)", entry.Source)
 	}
 }
 
-func TestHandleScan_conflict_when_already_running(t *testing.T) {
+func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
+	t.Parallel()
+	// R1.5: a start while a full scan is already running answers 202 with
+	// the RUNNING scan's activity id and starts no second scan. Scheduled
+	// and manual full scans both run through scheduler.PrepareFullScan, so
+	// a scheduled-scan entry answers a manual duplicate too — pinned here
+	// with a SourceScheduled entry.
+	s := &Server{
+		db:       &qhMockStore{},
+		metrics:  metrics.New(),
+		activity: activity.New(50),
+		alerts:   activity.NewAlertLog(100),
+		ctx:      context.Background(),
+	}
+	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+
+	// Simulate a running full scan: the guard flag plus the active
+	// full-scan entry PrepareFullScan leaves while a scan runs.
+	runningID, existing := s.activity.StartScan(scheduler.FullScanAction, scheduler.FullScanDetail,
+		activity.SourceScheduled, activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
+	if existing {
+		t.Fatal("test setup: full-scan entry unexpectedly existed")
+	}
+	s.scanning.Store(true)
+
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodPost, "/api/scan", http.NoBody)
+	rec := httptest.NewRecorder()
+	s.handleScan(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("handleScan(duplicate start) status = %d, want %d (idempotent 202 per R1.5)",
+			rec.Code, http.StatusAccepted)
+	}
+	var resp scanning.ScanAccepted
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.ActivityID != runningID {
+		t.Errorf("duplicate start activity_id = %q, want the running scan's id %q",
+			resp.ActivityID, runningID)
+	}
+	if resp.Status != "scan already running" {
+		t.Errorf("duplicate start status = %q, want %q", resp.Status, "scan already running")
+	}
+	if n := len(s.activity.Entries()); n != 1 {
+		t.Errorf("activity entries = %d after duplicate start, want 1 (no second scan)", n)
+	}
+	if !s.scanning.Load() {
+		t.Error("duplicate start cleared the running scan's guard flag")
+	}
+}
+
+func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
+	t.Parallel()
+	// Degenerate fallback: the guard flag is held but no active full-scan
+	// entry exists (the owner's sub-microsecond accept instant). Conflict
+	// is the honest answer, and the handler must not steal the flag.
+	s := &Server{
+		db:       &qhMockStore{},
+		metrics:  metrics.New(),
+		activity: activity.New(50),
+		alerts:   activity.NewAlertLog(100),
+		ctx:      context.Background(),
+	}
+	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.scanning.Store(true)
+
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodPost, "/api/scan", http.NoBody)
+	rec := httptest.NewRecorder()
+	s.handleScan(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("handleScan(flag held, no entry) status = %d, want %d",
+			rec.Code, http.StatusConflict)
+	}
+	if !s.scanning.Load() {
+		t.Error("handleScan stole the guard flag in the fallback window")
+	}
+}
+
+// --- handleScan method guard (fork of the former generic asyncAction) ---
+
+func TestHandleScan_non_post_returns_405(t *testing.T) {
 	t.Parallel()
 	s := &Server{
 		db:       &qhMockStore{},
@@ -231,83 +335,16 @@ func TestHandleScan_conflict_when_already_running(t *testing.T) {
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
-	// Simulate a scan already in progress.
-	s.scanning.Store(true)
-
 	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/scan", http.NoBody)
+		http.MethodGet, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)
 
-	if rec.Code != http.StatusConflict {
-		t.Errorf("handleScan(already running) status = %d, want %d",
-			rec.Code, http.StatusConflict)
-	}
-}
-
-// --- asyncAction direct tests ---
-
-func TestAsyncAction_non_post_returns_405(t *testing.T) {
-	t.Parallel()
-	var flag atomic.Bool
-	called := false
-	s := &Server{}
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodGet, "/test", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.asyncAction(context.Background(), rec, req, &flag, "busy", "started", func(context.Context) { called = true })
-
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("asyncAction(GET) status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		t.Errorf("handleScan(GET) status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
-	if called {
-		t.Error("asyncAction(GET) should not invoke fn")
-	}
-}
-
-func TestAsyncAction_conflict_when_flag_set(t *testing.T) {
-	t.Parallel()
-	var flag atomic.Bool
-	flag.Store(true)
-	s := &Server{}
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/test", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.asyncAction(context.Background(), rec, req, &flag, "custom busy msg", "started", func(context.Context) {})
-
-	if rec.Code != http.StatusConflict {
-		t.Errorf("asyncAction(conflict) status = %d, want %d", rec.Code, http.StatusConflict)
-	}
-	var resp map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if resp["error"] != "custom busy msg" {
-		t.Errorf("asyncAction(conflict) error = %q, want %q", resp["error"], "custom busy msg")
-	}
-}
-
-func TestAsyncAction_post_returns_accepted(t *testing.T) {
-	t.Parallel()
-	var flag atomic.Bool
-	s := &Server{}
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/test", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.asyncAction(context.Background(), rec, req, &flag, "busy", "custom started", func(context.Context) {})
-
-	if rec.Code != http.StatusAccepted {
-		t.Errorf("asyncAction(POST) status = %d, want %d", rec.Code, http.StatusAccepted)
-	}
-	var resp map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if resp["status"] != "custom started" {
-		t.Errorf("asyncAction(POST) status = %q, want %q", resp["status"], "custom started")
+	if s.scanning.Load() {
+		t.Error("handleScan(GET) must not flip the scanning flag")
 	}
 }
 

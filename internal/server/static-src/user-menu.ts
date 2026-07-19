@@ -4,12 +4,12 @@ import { apiAction } from "@cplieger/actions";
 import * as bus from "./bus.js";
 import * as theme from "./theme.js";
 import { el, icon } from "./dom.js";
-import { apiGetTyped } from "./api-client.js";
-import { decodeMeResponse } from "./wire/decoders.gen.js";
+import { me, PATH_LOGOUT } from "./wire/client.gen.js";
 import { openConfig } from "./config.js";
 import * as store from "./store.js";
 import type { MeResponse } from "./api-types.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
+import { rovingFocus, type RovingFocusController } from "@cplieger/ui-primitives/roving-focus";
 
 // --- Inline interfaces for API response shapes ---
 
@@ -20,13 +20,19 @@ let userInfo: MeResponse | null = null;
 // the open-rebuild hook can drive it.
 let menuPopover: MenuPopover | null = null;
 
+// The WAI-ARIA menu keyboard contract (roving focus over the role="menuitem"
+// entries, Home/End, Enter/Space activation) is the library's roving-focus
+// primitive — wired once on the panel; items are queried live, so the
+// per-open rebuild needs only refresh() + focusFirst().
+let menuNav: RovingFocusController | null = null;
+
 export function initUserMenu(): void {
   void fetchMe();
   wireUserButton();
 }
 
 async function fetchMe(): Promise<void> {
-  const data = await apiGetTyped("/api/auth/me", decodeMeResponse);
+  const data = await me();
   if (data) {
     userInfo = data;
     store.set("isAdmin", data.role === "admin");
@@ -56,6 +62,7 @@ function wireUserButton(): void {
     haspopup: "menu",
     onOpen: buildMenuContent,
   });
+  menuNav = rovingFocus(popup, ".um-item");
   btn.addEventListener("click", () => menuPopover?.toggle());
 }
 
@@ -132,41 +139,12 @@ function buildMenuContent(): void {
   popup.replaceChildren(...items);
 
   // The panel announces itself as role="menu", so it must honor the menu
-  // interaction contract: arrow keys move a roving focus over the items
-  // (Home/End jump), and the first item receives focus on open. createPopover
-  // only handles Escape; without this the announced role lied to AT users.
-  popup.onkeydown = menuKeydown;
-  const first = popup.querySelector<HTMLElement>(".um-item");
-  first?.focus();
-}
-
-// Roving focus over the .um-item entries of the user menu.
-function menuKeydown(e: KeyboardEvent): void {
-  const popup = e.currentTarget as HTMLElement;
-  const items = Array.from(popup.querySelectorAll<HTMLElement>(".um-item"));
-  if (items.length === 0) {
-    return;
-  }
-  const current = items.indexOf(document.activeElement as HTMLElement);
-  let next: number;
-  switch (e.key) {
-    case "ArrowDown":
-      next = current < 0 ? 0 : (current + 1) % items.length;
-      break;
-    case "ArrowUp":
-      next = current <= 0 ? items.length - 1 : current - 1;
-      break;
-    case "Home":
-      next = 0;
-      break;
-    case "End":
-      next = items.length - 1;
-      break;
-    default:
-      return;
-  }
-  e.preventDefault();
-  items[next]?.focus();
+  // interaction contract — the roving-focus primitive owns it (wired once in
+  // wireUserButton). After the rebuild, restore the single-Tab-stop invariant
+  // on the fresh items and focus the first one (a no-op while the popover is
+  // still hidden, e.g. the initial fetchMe build).
+  menuNav?.refresh();
+  menuNav?.focusFirst();
 }
 
 function menuItem(
@@ -227,7 +205,7 @@ function themeIcon(): string {
  *  mid-redirect (no args ⇒ constant key). */
 const logoutAction = apiAction<undefined>({
   name: "auth.logout",
-  request: () => ({ method: "POST", path: "/api/auth/logout" }),
+  request: () => ({ method: "POST", path: PATH_LOGOUT }),
   dedupe: true, // double-click protection
   error: false, // best-effort; redirect happens regardless of outcome
 });

@@ -18,6 +18,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"pgregory.net/rapid"
@@ -82,16 +83,13 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	// Add 25 entries manually with distinct IDs.
-	s.activity.Lock()
-	for i := range 25 {
-		s.activity.AppendEntry(activity.Entry{
-			ID:     time.Now().Format("20060102150405.000") + string(rune('A'+i)),
-			Action: "Scan",
-			Detail: "scan",
-		})
+	// Add 25 COMPLETED entries (the page cap applies to completed rows;
+	// running rows always survive it). The log's capacity is 50, so none
+	// are ring-evicted.
+	for range 25 {
+		id := s.activity.Start("Scan", "scan", "scheduled")
+		s.activity.End(id)
 	}
-	s.activity.Unlock()
 
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/api/activity", http.NoBody)
@@ -108,6 +106,52 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 	}
 	if len(entries) != 20 {
 		t.Errorf("handleGetActivity() returned %d entries, want 20 (capped)", len(entries))
+	}
+}
+
+func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+
+	// One RUNNING entry older than the 20-entry page window, buried under
+	// 25 completed rows: it must still be included (restoration and the
+	// stop control depend on seeing it), with its cancellable flag merged
+	// from the stop registry.
+	runningID := s.activity.Start("Series Search", "old running scan", "manual")
+	for range 25 {
+		id := s.activity.Start("Scan", "scan", "scheduled")
+		s.activity.End(id)
+	}
+	unregister := s.stops.RegisterStop(runningID, func() {})
+	defer unregister()
+
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodGet, "/api/activity", http.NoBody)
+	rec := httptest.NewRecorder()
+	s.handleGetActivity(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var entries []activity.Entry
+	if err := json.NewDecoder(rec.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(entries) != 21 {
+		t.Errorf("handleGetActivity() returned %d entries, want 21 (20-page + surviving running row)", len(entries))
+	}
+	var running *activity.Entry
+	for i := range entries {
+		if entries[i].ID == runningID {
+			running = &entries[i]
+			break
+		}
+	}
+	if running == nil {
+		t.Fatal("running entry was dropped by the page cap")
+	}
+	if !running.Cancellable {
+		t.Error("running entry should carry cancellable=true while its stop is registered")
 	}
 }
 
@@ -136,10 +180,10 @@ func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 	}
 }
 
-func TestHandleManualDownload_path_validation_failure(t *testing.T) {
-	t.Parallel()
-
-	cfg := &pathValidationErrorConfig{}
+// newManualDownloadServer builds a Server whose manual handler resolves
+// MediaRefs against cfg (containment validator) and radarr, with one stub
+// provider "os" so the provider check passes and requests reach resolution.
+func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie) *Server {
 	s := &Server{
 		db:       &qhMockStore{},
 		activity: activity.New(50),
@@ -147,27 +191,72 @@ func TestHandleManualDownload_path_validation_failure(t *testing.T) {
 		events:   events.New(0),
 	}
 	s.live.Store(&liveState{cfg: cfg})
+	resolver := &resolve.Resolver{
+		Store: s.db,
+		State: func() *resolve.State { return &resolve.State{Cfg: cfg, Radarr: radarr} },
+	}
 	s.manualH = manualops.NewHandler(manualops.HandlerDeps{
-		DBFunc:       func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) },
-		Activity:     &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:       &serveradapter.AlertAdapter{A: s.alerts},
-		Events:       &serveradapter.ManualEventAdapter{E: s.events},
-		StateFunc:    func() *manualops.LiveState { return &manualops.LiveState{} },
-		BGTracker:    &s.bgWg,
-		ServerCtx:    func() context.Context { return context.Background() },
-		ValidatePath: s.validateFSPath,
-		DecodeJSON:   decodeJSONBodyAny,
+		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) },
+		Activity: &serveradapter.ActivityAdapter{A: s.activity},
+		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
+		Events:   &serveradapter.ManualEventAdapter{E: s.events},
+		StateFunc: func() *manualops.LiveState {
+			return &manualops.LiveState{Providers: []api.Provider{&stubProvider{name: "os"}}}
+		},
+		BGTracker:  &s.bgWg,
+		ServerCtx:  func() context.Context { return context.Background() },
+		Resolve:    resolver,
+		DecodeJSON: decodeJSONBodyAny,
 	})
+	return s
+}
 
-	body := `{"provider":"os","subtitle_id":"1","file_path":"/evil/path","language":"en"}`
+// statusFakeRadarr resolves movie 42 to a fixed file; anything else is
+// unknown.
+type statusFakeRadarr struct{ path string }
+
+func (f statusFakeRadarr) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
+	if id != 42 {
+		return arrapi.Movie{}, errors.New("movie not found")
+	}
+	return arrapi.Movie{ID: 42, MovieFile: &arrapi.MovieFile{Path: f.path}}, nil
+}
+
+func TestHandleManualDownload_unknown_media_returns_404(t *testing.T) {
+	t.Parallel()
+	s := newManualDownloadServer(&qhMockConfig{}, statusFakeRadarr{path: "/media/movie.mkv"})
+
+	body := `{"provider":"os","subtitle_id":"1","media_id":9999,"language":"en"}`
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	s.handleManualDownload(rec, req)
+	s.manualH.HandleManualDownload(rec, req)
 
-	if rec.Code != http.StatusForbidden {
-		t.Errorf("handleManualDownload(invalid path) status = %d, want %d",
-			rec.Code, http.StatusForbidden)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("HandleManualDownload(unknown media) status = %d, want %d",
+			rec.Code, http.StatusNotFound)
+	}
+	if !strings.Contains(rec.Body.String(), "media_not_found") {
+		t.Errorf("body = %q, want machine code media_not_found", rec.Body.String())
+	}
+}
+
+func TestHandleManualDownload_containment_invariant_returns_500(t *testing.T) {
+	t.Parallel()
+	// The arr resolves the movie, but the resolved path fails the
+	// containment check: a server-derived-path invariant breach -> 500,
+	// never a 4xx (there is no client path to blame).
+	s := newManualDownloadServer(&pathValidationErrorConfig{}, statusFakeRadarr{path: "/evil/path.mkv"})
+
+	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodPost, "/api/search/download", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.manualH.HandleManualDownload(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("HandleManualDownload(containment breach) status = %d, want %d",
+			rec.Code, http.StatusInternalServerError)
 	}
 }
 
@@ -182,93 +271,13 @@ func (m *pathValidationErrorConfig) RemoveUnderRoot(_ context.Context, _ string)
 	return config.ErrPathNotAllowed
 }
 
-func TestHandleManualDownload_provider_not_found(t *testing.T) {
-	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
-
-	body := `{"provider":"nonexistent","subtitle_id":"1","file_path":"/media/movie.mkv","language":"en"}`
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPost, "/api/search/download", strings.NewReader(body))
-	rec := httptest.NewRecorder()
-	s.handleManualDownload(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("handleManualDownload(unknown provider) status = %d, want %d",
-			rec.Code, http.StatusBadRequest)
-	}
-	if !strings.Contains(rec.Body.String(), "provider not found") {
-		t.Errorf("handleManualDownload() body = %q, want to contain %q",
-			rec.Body.String(), "provider not found")
-	}
-}
-
-func TestHandleState_filters_passed_through(t *testing.T) {
-	t.Parallel()
-
-	db := &filterTrackingStore{}
-	s := &Server{
-		db:       db,
-		stores:   storeFacade{query: db},
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
-	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodGet, "/api/state?type=episode&lang=fr&provider=os", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleState(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("handleState() status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	if db.mediaType != "episode" {
-		t.Errorf("GetState mediaType = %q, want %q", db.mediaType, "episode")
-	}
-	if db.language != "fr" {
-		t.Errorf("GetState language = %q, want %q", db.language, "fr")
-	}
-	if db.provider != "os" {
-		t.Errorf("GetState provider = %q, want %q", db.provider, "os")
-	}
-}
-
-// filterTrackingStore tracks the filter params passed to GetState.
-type filterTrackingStore struct {
-	mediaType api.MediaType
-	language  string
-	provider  string
-	search    string
-	qhMockStore
-}
-
-func (m *filterTrackingStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
-	m.mediaType = q.MediaType
-	m.language = q.Language
-	m.provider = string(q.Provider)
-	m.search = q.Search
-	m.stateLimit = q.Limit
-	return nil, nil
-}
+// The provider-not-found download test formerly here moved to
+// internal/server/manualops/handler_http_test.go with the rest of the
+// manual download HTTP surface.
 
 // --- handleGetAlerts persistent alert filtering ---
 
-func TestHandleGetAlerts_rejects_unsupported_method(t *testing.T) {
-	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
-
-	req := httptest.NewRequestWithContext(context.Background(),
-		http.MethodPut, "/api/alerts", http.NoBody)
-	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("handleGetAlerts(PUT) status = %d, want %d",
-			rec.Code, http.StatusMethodNotAllowed)
-	}
-}
-
-func TestHandleGetAlerts_delete_dispatches_to_dismiss(t *testing.T) {
+func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
@@ -278,14 +287,15 @@ func TestHandleGetAlerts_delete_dispatches_to_dismiss(t *testing.T) {
 	id := s.alerts.AlertsUnsafe()[0].ID
 	s.alerts.RUnlock()
 
-	// DELETE via handleGetAlerts should dispatch to handleDismissAlert.
+	// Method dispatch lives in routes.go ("DELETE /api/alerts" binds
+	// handleDismissAlert directly); the handler owns only the dismissal.
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodDelete, "/api/alerts?id="+strconv.Itoa(id), http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
+	s.handleDismissAlert(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("handleGetAlerts(DELETE) status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify the alert was dismissed.
@@ -294,7 +304,7 @@ func TestHandleGetAlerts_delete_dispatches_to_dismiss(t *testing.T) {
 	s.alerts.RUnlock()
 
 	if !dismissed {
-		t.Error("alert should be dismissed after DELETE dispatch")
+		t.Error("alert should be dismissed after DELETE")
 	}
 }
 

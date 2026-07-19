@@ -1,137 +1,261 @@
 package subsync
 
-import "log/slog"
+import (
+	"cmp"
+	"log/slog"
+	"slices"
+)
 
-// --- Voting system ---
+// --- Arbitration (voting) ---
 //
-// The voting system selects the best sync result from multiple strategy
-// candidates using weighted clustering and validation heuristics.
+// The arbitration layer selects the best sync result from the reference
+// strategies' candidates. Candidates are validated by their corrected cues,
+// clustered order-canonically with complete linkage, and compared on one
+// normalized alignment rating. The winner's calibrated Confidence is
+// returned untouched — the two-value contract: the rating selects, the
+// calibrated confidence gates (sync_min_confidence, audio fallback).
+//
+// Audio-based sync never passes through here; it runs OUTSIDE the vote as a
+// fallback after the reference winner misses the caller's gate.
 
-// voteCluster groups sync results with similar offsets.
+// CorrectedCueAgreementMs is the maximum per-cue timing difference, over ALL
+// corrected cue starts and ends in milliseconds, for two candidates to count
+// as agreeing. 1500ms is the package's crosslang anchor-agreement scale; the
+// value is validated against the golden corpus (see corpusbench_test.go).
+const CorrectedCueAgreementMs = 1500
+
+// voteCluster groups candidates whose corrected cues agree.
 type voteCluster struct {
 	members []SyncResult
-	weight  float64
-	offset  int64 // representative offset (from first member)
 }
 
-// buildClusters groups candidates by offset similarity (within clusterMs).
-func buildClusters(candidates []SyncResult, clusterMs int64) []voteCluster {
+// isValidCandidate reports whether a candidate is safe to arbitrate:
+// corrected cues present, index-parallel with the incorrect input, and
+// monotonic (non-decreasing starts). Every voted generator corrects the
+// same incorrect slice cue-for-cue; the guard protects the pairwise
+// corrected-cue comparison from a future generator that drops, merges, or
+// reorders cues.
+func isValidCandidate(c *SyncResult, wantLen int) bool {
+	if c.Cues == nil || len(c.Cues) != wantLen {
+		return false
+	}
+	for i := 1; i < len(c.Cues); i++ {
+		if c.Cues[i].Start < c.Cues[i-1].Start {
+			return false
+		}
+	}
+	return true
+}
+
+// filterValidCandidates drops malformed candidates before arbitration,
+// logging each reject. Filters in place; the returned slice aliases
+// candidates. See isValidCandidate for the invariant.
+func filterValidCandidates(candidates []SyncResult, incorrect []Cue) []SyncResult {
+	valid := candidates[:0]
+	for i := range candidates {
+		if isValidCandidate(&candidates[i], len(incorrect)) {
+			valid = append(valid, candidates[i])
+			continue
+		}
+		slog.Warn("sync vote: dropping malformed candidate",
+			"source", candidates[i].Source.String(),
+			"method", candidates[i].Method,
+			"cues", len(candidates[i].Cues),
+			"want_cues", len(incorrect))
+	}
+	return valid
+}
+
+// correctedCuesAgree reports whether two corrected cue slices agree within
+// CorrectedCueAgreementMs at EVERY cue start and end. Full comparison, not
+// a sample: a sampled scheme can miss a short mis-corrected segment, and
+// the cost is bounded (at most 6 candidate pairs x cue count).
+func correctedCuesAgree(a, b []Cue) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if absMsDelta(a[i].Start.Milliseconds(), b[i].Start.Milliseconds()) > CorrectedCueAgreementMs ||
+			absMsDelta(a[i].End.Milliseconds(), b[i].End.Milliseconds()) > CorrectedCueAgreementMs {
+			return false
+		}
+	}
+	return true
+}
+
+// absMsDelta returns |a-b| for two millisecond values.
+func absMsDelta(a, b int64) int64 { return abs64(a - b) }
+
+// candidatesAgree is the cluster-membership predicate: agreement is always
+// decided by the corrected-cue predicate (R2.1). For two pure-shift
+// candidates the retained ClusterMs pre-grouping acts first as a cheap
+// early REJECTION — for constant shifts of the same input the per-cue
+// delta is the declared shift delta (modulo zero-clamping), so a pair
+// beyond ClusterMs is a different hypothesis family. Passing the prefilter
+// never grants membership: every pair still needs correctedCuesAgree.
+func candidatesAgree(a, b *SyncResult) bool {
+	if a.Transform.Kind == TransformShift && b.Transform.Kind == TransformShift &&
+		abs64(a.Transform.Shift-b.Transform.Shift) > defaultVoteConfig.ClusterMs {
+		return false
+	}
+	return correctedCuesAgree(a.Cues, b.Cues)
+}
+
+// clusterCandidates groups candidates by corrected-cue agreement. The input
+// is first copied and sorted into canonical CandidateSource order, making
+// clustering order-canonical regardless of strategy completion order. It
+// then applies complete linkage: a candidate joins a cluster only if it
+// agrees with EVERY existing member (threshold agreement is non-transitive;
+// single linkage would chain disagreeing members through an intermediate).
+// Tie-break: the first eligible cluster in canonical order.
+func clusterCandidates(candidates []SyncResult) []voteCluster {
+	sorted := make([]SyncResult, len(candidates))
+	copy(sorted, candidates)
+	slices.SortStableFunc(sorted, func(a, b SyncResult) int {
+		return cmp.Compare(a.Source, b.Source)
+	})
+
 	var clusters []voteCluster
-	for _, c := range candidates {
+	for i := range sorted {
 		placed := false
-		for i := range clusters {
-			if abs64(c.Offset-clusters[i].offset) <= clusterMs {
-				clusters[i].members = append(clusters[i].members, c)
-				clusters[i].weight += float64(c.Confidence)
+		for j := range clusters {
+			if clusterAccepts(&clusters[j], &sorted[i]) {
+				clusters[j].members = append(clusters[j].members, sorted[i])
 				placed = true
 				break
 			}
 		}
 		if !placed {
-			clusters = append(clusters, voteCluster{
-				members: []SyncResult{c},
-				weight:  float64(c.Confidence),
-				offset:  c.Offset,
-			})
+			clusters = append(clusters, voteCluster{members: []SyncResult{sorted[i]}})
 		}
 	}
 	return clusters
 }
 
-// applyAgreementBonus boosts clusters with multiple agreeing strategies.
-func applyAgreementBonus(clusters []voteCluster) {
-	for i := range clusters {
-		n := len(clusters[i].members)
-		if n >= 3 {
-			clusters[i].weight *= defaultVoteConfig.AgreementBonus3Plus
-		} else if n >= 2 {
-			clusters[i].weight *= defaultVoteConfig.AgreementBonus2
+// clusterAccepts reports whether candidate c agrees with every member of
+// the cluster (complete linkage).
+func clusterAccepts(cl *voteCluster, c *SyncResult) bool {
+	for i := range cl.members {
+		if !candidatesAgree(&cl.members[i], c) {
+			return false
 		}
 	}
+	return true
 }
 
-// penalizeLargeOffsets reduces weight for clusters with unreasonably large
-// offsets when reference and incorrect have similar total duration.
-func penalizeLargeOffsets(clusters []voteCluster, similarDuration bool, durationDiff int64) {
-	for i := range clusters {
-		if similarDuration && abs64(clusters[i].offset) > defaultVoteConfig.LargeOffsetMs {
-			clusters[i].weight *= defaultVoteConfig.LargeOffsetPenalty
-			slog.Debug("sync vote: penalizing large offset",
-				"cluster_offset_ms", clusters[i].offset,
-				"duration_diff_ms", durationDiff,
-				"members", len(clusters[i].members))
+// alignmentRating scores how well ALREADY-APPLIED corrected cues overlap
+// the reference: overlapped reference time over total reference time,
+// normalized to [0,1]. Unlike the generators' internal scores, no hidden
+// offset is fitted — the cues are compared exactly as the candidate
+// corrected them. The rating orders candidates; it is never written into
+// SyncResult.Confidence.
+func alignmentRating(reference, corrected []Cue) float64 {
+	corrSpans := cuesToSpans(corrected)
+	refSpans := cuesToSpans(reference)
+	totalOverlap, totalRef := overlapTotal(corrSpans, refSpans)
+	if totalRef == 0 {
+		return 0
+	}
+	return min(totalOverlap/totalRef, 1.0)
+}
+
+// plausibleCandidate reports whether a candidate passes the large-offset
+// plausibility prior: on similar-duration content, a pure shift beyond
+// LargeOffsetMs is implausible. Non-shift transforms are always plausible
+// (framerate and split corrections carry no single headline shift). The
+// guard is rating-independent and cluster-internal: it restricts which
+// member may represent a cluster (R3.3's retained plausibility prior on
+// shift winners), never the cross-cluster order, the rating, or the
+// calibrated confidence.
+func plausibleCandidate(c *SyncResult, similarDuration bool) bool {
+	if !similarDuration || c.Transform.Kind != TransformShift {
+		return true
+	}
+	return abs64(c.Transform.Shift) <= defaultVoteConfig.LargeOffsetMs
+}
+
+// clusterScore is the ordinal ranking key for one cluster: the validated
+// cluster size and the best member with its alignment rating.
+type clusterScore struct {
+	best   *SyncResult
+	rating float64
+	size   int
+}
+
+// scoreCluster evaluates one cluster: its size and its best member —
+// highest alignment rating, restricted to members passing the plausibility
+// guard when the cluster has any (the guard's only seat: it filters which
+// member may represent the cluster, never the cross-cluster order), with
+// ties resolving to the earliest member in canonical source order.
+func scoreCluster(cl *voteCluster, reference []Cue, similarDuration bool) clusterScore {
+	s := clusterScore{size: len(cl.members)}
+	anyPlausible := false
+	for i := range cl.members {
+		if plausibleCandidate(&cl.members[i], similarDuration) {
+			anyPlausible = true
+			break
 		}
 	}
-}
-
-// applyAlignmentCheck boosts or penalizes clusters based on how well the
-// offset aligns the first and last (90th percentile) cues.
-func applyAlignmentCheck(clusters []voteCluster, reference, incorrect []Cue) {
-	for i := range clusters {
-		off := clusters[i].offset
-		// Check first cue alignment.
-		shiftedFirstMs := incorrect[0].Start.Milliseconds() + off
-		firstDiff := abs64(shiftedFirstMs - reference[0].Start.Milliseconds())
-		// Check last cue alignment (ignoring credits: use 90th percentile).
-		incLast := incorrect[len(incorrect)*9/10].Start.Milliseconds() + off
-		refLast := reference[len(reference)*9/10].Start.Milliseconds()
-		lastDiff := abs64(incLast - refLast)
-
-		if firstDiff < defaultVoteConfig.AlignFirstGood && lastDiff < defaultVoteConfig.AlignLastGood {
-			clusters[i].weight *= defaultVoteConfig.AlignGoodBoost
-		} else if firstDiff > defaultVoteConfig.AlignFirstBad || lastDiff > defaultVoteConfig.AlignLastBad {
-			clusters[i].weight *= defaultVoteConfig.AlignBadPenalty
+	for i := range cl.members {
+		m := &cl.members[i]
+		if anyPlausible && !plausibleCandidate(m, similarDuration) {
+			continue
+		}
+		r := alignmentRating(reference, m.Cues)
+		if s.best == nil || r > s.rating {
+			s.best = m
+			s.rating = r
 		}
 	}
+	return s
 }
 
-// pickWinner selects the highest-weighted cluster, then the best member
-// within it by confidence.
-func pickWinner(clusters []voteCluster) SyncResult {
-	bestCluster := 0
+// outranks reports whether s beats o in the settled ordinal winner ladder
+// (R3.2): validated-cluster size first (genuine corrected-cue consensus),
+// then best member rating. Equal keys keep the incumbent, so the first
+// cluster in canonical order wins ties (the source-order tie-break).
+func (s clusterScore) outranks(o clusterScore) bool {
+	if s.size != o.size {
+		return s.size > o.size
+	}
+	return s.rating > o.rating
+}
+
+// pickWinner selects the winning candidate ordinally across clusters. The
+// returned member is unchanged: its Confidence is exactly the calibrated
+// value its generator produced (two-value contract).
+func pickWinner(clusters []voteCluster, reference []Cue, similarDuration bool) SyncResult {
+	best := scoreCluster(&clusters[0], reference, similarDuration)
 	for i := 1; i < len(clusters); i++ {
-		if clusters[i].weight > clusters[bestCluster].weight {
-			bestCluster = i
+		if s := scoreCluster(&clusters[i], reference, similarDuration); s.outranks(best) {
+			best = s
 		}
 	}
-
-	best := clusters[bestCluster].members[0]
-	for _, m := range clusters[bestCluster].members[1:] {
-		if m.Confidence > best.Confidence {
-			best = m
-		}
-	}
-	return best
+	return *best.best
 }
 
-// voteOnCandidates selects the best sync result using weighted voting.
+// voteOnCandidates selects the best sync result from validated candidates:
 //
-// The voting system:
-//  1. Group candidates by offset similarity (within 3s = same cluster)
-//  2. Each cluster's weight = sum of member confidences + agreement bonus
-//  3. Apply hard validation: reject clusters with unreasonable offsets
-//  4. Return the highest-weighted cluster's best member
-func voteOnCandidates(candidates []SyncResult,
-	reference, incorrect []Cue,
-) SyncResult {
+//  1. Copy and sort the candidates into canonical source order
+//  2. Cluster by corrected-cue agreement with complete linkage
+//  3. Rank clusters ordinally: validated size, then best member rating
+//     (the plausibility guard restricts member selection within a cluster)
+//  4. Return the winning member with its calibrated Confidence untouched
+//
+// Callers must pre-filter candidates with filterValidCandidates.
+func voteOnCandidates(candidates []SyncResult, reference, incorrect []Cue) SyncResult {
 	if len(candidates) == 1 {
 		return candidates[0]
 	}
-
-	clusterMs := defaultVoteConfig.ClusterMs
 
 	// Invariant: reference and incorrect are non-empty (checked by
 	// SyncWithOptions and referenceSync before reaching here).
 	refEndMs := reference[len(reference)-1].End.Milliseconds()
 	incEndMs := incorrect[len(incorrect)-1].End.Milliseconds()
-	durationDiff := abs64(refEndMs - incEndMs)
-	similarDuration := durationDiff < defaultVoteConfig.SimilarDurationMs
+	similarDuration := abs64(refEndMs-incEndMs) < defaultVoteConfig.SimilarDurationMs
 
-	clusters := buildClusters(candidates, clusterMs)
-	applyAgreementBonus(clusters)
-	penalizeLargeOffsets(clusters, similarDuration, durationDiff)
-	applyAlignmentCheck(clusters, reference, incorrect)
-	return pickWinner(clusters)
+	clusters := clusterCandidates(candidates)
+	return pickWinner(clusters, reference, similarDuration)
 }
 
 // abs64 returns the absolute value of an int64.
@@ -142,40 +266,22 @@ func abs64(v int64) int64 {
 	return v
 }
 
-// voteConfig holds all tuning parameters for the voting system.
-// Centralizes the multipliers and thresholds so the rule set is inspectable
-// and independently tunable.
+// voteConfig holds the tuning parameters for the arbitration layer.
 type voteConfig struct {
-	ClusterMs           int64
-	AgreementBonus2     float64 // 2 strategies agree
-	AgreementBonus3Plus float64 // 3+ strategies agree
-	LargeOffsetPenalty  float64
-	AlignGoodBoost      float64
-	AlignBadPenalty     float64
-	LargeOffsetMs       int64 // penalize clusters with offsets exceeding this
-	AlignFirstGood      int64 // first-cue alignment "good" threshold
-	AlignLastGood       int64 // last-cue alignment "good" threshold
-	AlignFirstBad       int64 // first-cue alignment "bad" threshold
-	AlignLastBad        int64 // last-cue alignment "bad" threshold
-	SimilarDurationMs   int64 // threshold for "similar duration" classification
+	// ClusterMs is the scalar pre-grouping shortcut threshold for the
+	// pure-shift candidate family (see candidatesAgree).
+	ClusterMs int64
+	// LargeOffsetMs is the shift plausibility guard threshold: on
+	// similar-duration content a shift beyond this is implausible.
+	LargeOffsetMs int64
+	// SimilarDurationMs classifies reference/incorrect as similar-duration
+	// content, arming the plausibility guard.
+	SimilarDurationMs int64
 }
 
-// defaultVoteConfig contains the production tuning values for the
-// voting system. Each multiplier reflects empirical tuning:
-// - Agreement bonuses reward convergence across independent strategies
-// - Large offset penalty discourages implausible shifts
-// - Alignment boost/penalty validates structural consistency
+// defaultVoteConfig contains the production tuning values for arbitration.
 var defaultVoteConfig = voteConfig{
-	ClusterMs:           3000,
-	AgreementBonus2:     1.25,
-	AgreementBonus3Plus: 1.5,
-	LargeOffsetPenalty:  0.3,
-	AlignGoodBoost:      1.2,
-	AlignBadPenalty:     0.5,
-	LargeOffsetMs:       30_000,
-	AlignFirstGood:      5_000,
-	AlignLastGood:       10_000,
-	AlignFirstBad:       30_000,
-	AlignLastBad:        60_000,
-	SimilarDurationMs:   60_000,
+	ClusterMs:         3000,
+	LargeOffsetMs:     30_000,
+	SimilarDurationMs: 60_000,
 }

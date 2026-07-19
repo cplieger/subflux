@@ -17,8 +17,9 @@ import (
 )
 
 // Retry policy preserving subflux's prior arr-client behavior: 3 total attempts
-// with a 5s base delay (5s, 10s, 20s). arrapi keeps its 120s per-request
-// timeout (when the caller's context has none) and its short ping timeout.
+// with a 5s base delay (two between-attempt waits: 5s, 10s). arrapi keeps its
+// 120s per-request timeout (when the caller's context has none) and its short
+// ping timeout.
 const (
 	maxAttempts = 3
 	baseDelay   = 5 * time.Second

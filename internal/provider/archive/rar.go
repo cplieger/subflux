@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/subtitleext"
 	"github.com/nwaples/rardecode/v2"
 )
 
@@ -86,8 +87,7 @@ func IsValidRAREntry(hdr *rardecode.FileHeader) bool {
 	if hdr.PackedSize > 0 && hdr.UnPackedSize/hdr.PackedSize > 50 {
 		return false
 	}
-	ext := strings.ToLower(filepath.Ext(hdr.Name))
-	if !SubtitleExts[ext] {
+	if !subtitleext.ArchiveInput(filepath.Ext(hdr.Name)) {
 		return false
 	}
 	if strings.HasPrefix(filepath.Base(hdr.Name), ".") {

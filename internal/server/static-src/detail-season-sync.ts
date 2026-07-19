@@ -4,11 +4,12 @@ import { el, dialog, closeDialog, dialogHead, pad } from "./dom.js";
 import { createDialog } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
 import { audioSyncAction } from "./sync-actions.js";
+import type { FileRefArgs } from "./file-ref.js";
 import { SEASON_SYNC_CONCURRENCY } from "./constants.js";
 
 export interface SeasonSyncEpisode {
-  subPath: string;
-  videoPath: string;
+  /** FileRef of the subtitle to align; the server resolves both paths. */
+  ref: FileRefArgs;
   label: string;
 }
 
@@ -129,13 +130,7 @@ async function runSeasonAudioSync(
       if (status) {
         status.textContent = `Syncing ${done}/${episodes.length}: ${ep.label}\u2026`;
       }
-      const r = await audioSyncAction.dispatch(
-        {
-          subtitle_path: ep.subPath,
-          video_path: ep.videoPath,
-        },
-        { silent: true },
-      );
+      const r = await audioSyncAction.dispatch({ ...ep.ref }, { silent: true });
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- may change during await
       if (signal.aborted) {
         return;

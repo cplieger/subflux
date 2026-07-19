@@ -45,22 +45,13 @@ func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.M
 	videoRelease := deps.ParseRelease(video.ReleaseGroup)
 	subRelease := deps.ParseRelease(sub.ReleaseName)
 
-	// matchRule pairs a field setter with the video and subtitle field values.
-	type matchRule struct {
-		set      func(*api.MatchSet)
-		videoVal string
-		subVal   string
-	}
-	rules := []matchRule{
-		{func(m *api.MatchSet) { m.ReleaseGroup = true }, videoRelease.ReleaseGroup, subRelease.ReleaseGroup},
-		{func(m *api.MatchSet) { m.VideoCodec = true }, videoRelease.VideoCodec, subRelease.VideoCodec},
-		{func(m *api.MatchSet) { m.StreamingService = true }, videoRelease.StreamingService, subRelease.StreamingService},
-		{func(m *api.MatchSet) { m.Edition = true }, videoRelease.Edition, subRelease.Edition},
-		{func(m *api.MatchSet) { m.HDR = true }, videoRelease.HDR, subRelease.HDR},
-	}
-	for _, r := range rules {
-		if r.videoVal != "" && r.subVal != "" && strings.EqualFold(r.videoVal, r.subVal) {
-			r.set(&matches)
+	for _, c := range Categories {
+		if c.Extract == nil {
+			continue // bespoke matching below (source, season_pack)
+		}
+		videoVal, subVal := c.Extract(videoRelease), c.Extract(subRelease)
+		if videoVal != "" && subVal != "" && strings.EqualFold(videoVal, subVal) {
+			c.SetMatch(&matches)
 		}
 	}
 	deps.CompareSource(&matches, videoRelease.Source, subRelease.Source)
@@ -83,22 +74,79 @@ func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.M
 	return matches
 }
 
-// matchKeyWeight pairs a match-field accessor with a score-field accessor and key name.
-type matchKeyWeight struct {
-	weight func(*api.Scores) int
-	match  func(api.MatchSet) bool
-	key    string
+// Category is one row of the canonical scoring-category table: the
+// breakdown key, the weight accessor into api.Scores, the match-bit getter
+// and setter on api.MatchSet, and — for categories matched by simple
+// case-insensitive equality of parsed release attributes — the ReleaseInfo
+// extractor that drives BuildMatches. Categories with bespoke match logic
+// (source-family comparison, season-pack detection) leave Extract nil and
+// are handled explicitly in BuildMatches.
+type Category struct {
+	Key      string                   // breakdown/log key, e.g. "release_group"
+	Weight   func(*api.Scores) int    // weight accessor
+	Match    func(api.MatchSet) bool  // match-bit getter
+	SetMatch func(*api.MatchSet)      // match-bit setter
+	Extract  func(ReleaseInfo) string // release attribute; nil = bespoke matching
 }
 
-// matchKeyWeights is the data-driven table mapping match fields to score fields.
-var matchKeyWeights = []matchKeyWeight{
-	{weight: func(s *api.Scores) int { return s.Source }, match: func(m api.MatchSet) bool { return m.Source }, key: "source"},
-	{weight: func(s *api.Scores) int { return s.ReleaseGroup }, match: func(m api.MatchSet) bool { return m.ReleaseGroup }, key: "release_group"},
-	{weight: func(s *api.Scores) int { return s.StreamingService }, match: func(m api.MatchSet) bool { return m.StreamingService }, key: "streaming_service"},
-	{weight: func(s *api.Scores) int { return s.VideoCodec }, match: func(m api.MatchSet) bool { return m.VideoCodec }, key: "video_codec"},
-	{weight: func(s *api.Scores) int { return s.HDR }, match: func(m api.MatchSet) bool { return m.HDR }, key: "hdr"},
-	{weight: func(s *api.Scores) int { return s.Edition }, match: func(m api.MatchSet) bool { return m.Edition }, key: "edition"},
-	{weight: func(s *api.Scores) int { return s.SeasonPack }, match: func(m api.MatchSet) bool { return m.SeasonPack }, key: "season_pack"},
+// Categories is the canonical table of scored release-attribute categories,
+// shared by the match builder (BuildMatches), the score breakdown
+// (MatchBreakdown), and the scorer (internal/scorer). Hash and identity
+// (IMDB) matching are handled separately by each consumer. Adding a scoring
+// category is a one-entry change here, plus the api.Scores/api.MatchSet
+// fields it references.
+var Categories = []Category{
+	{
+		Key:      "source",
+		Weight:   func(s *api.Scores) int { return s.Source },
+		Match:    func(m api.MatchSet) bool { return m.Source },
+		SetMatch: func(m *api.MatchSet) { m.Source = true },
+		// Matched by MatchDeps.CompareSource (source-family logic), not by
+		// generic attribute equality; Extract stays nil.
+	},
+	{
+		Key:      "release_group",
+		Weight:   func(s *api.Scores) int { return s.ReleaseGroup },
+		Match:    func(m api.MatchSet) bool { return m.ReleaseGroup },
+		SetMatch: func(m *api.MatchSet) { m.ReleaseGroup = true },
+		Extract:  func(r ReleaseInfo) string { return r.ReleaseGroup },
+	},
+	{
+		Key:      "streaming_service",
+		Weight:   func(s *api.Scores) int { return s.StreamingService },
+		Match:    func(m api.MatchSet) bool { return m.StreamingService },
+		SetMatch: func(m *api.MatchSet) { m.StreamingService = true },
+		Extract:  func(r ReleaseInfo) string { return r.StreamingService },
+	},
+	{
+		Key:      "video_codec",
+		Weight:   func(s *api.Scores) int { return s.VideoCodec },
+		Match:    func(m api.MatchSet) bool { return m.VideoCodec },
+		SetMatch: func(m *api.MatchSet) { m.VideoCodec = true },
+		Extract:  func(r ReleaseInfo) string { return r.VideoCodec },
+	},
+	{
+		Key:      "hdr",
+		Weight:   func(s *api.Scores) int { return s.HDR },
+		Match:    func(m api.MatchSet) bool { return m.HDR },
+		SetMatch: func(m *api.MatchSet) { m.HDR = true },
+		Extract:  func(r ReleaseInfo) string { return r.HDR },
+	},
+	{
+		Key:      "edition",
+		Weight:   func(s *api.Scores) int { return s.Edition },
+		Match:    func(m api.MatchSet) bool { return m.Edition },
+		SetMatch: func(m *api.MatchSet) { m.Edition = true },
+		Extract:  func(r ReleaseInfo) string { return r.Edition },
+	},
+	{
+		Key:      "season_pack",
+		Weight:   func(s *api.Scores) int { return s.SeasonPack },
+		Match:    func(m api.MatchSet) bool { return m.SeasonPack },
+		SetMatch: func(m *api.MatchSet) { m.SeasonPack = true },
+		// Matched by MatchDeps.IsSeasonPack on episodes, not by generic
+		// attribute equality; Extract stays nil.
+	},
 }
 
 // MatchBreakdown returns the per-category score contributions for a match set.
@@ -107,9 +155,9 @@ func MatchBreakdown(scores *api.Scores, matches api.MatchSet) map[string]int {
 	if matches.Hash {
 		out["hash"] = scores.Hash
 	}
-	for _, sw := range matchKeyWeights {
-		if w := sw.weight(scores); sw.match(matches) && w > 0 {
-			out[sw.key] = w
+	for _, c := range Categories {
+		if w := c.Weight(scores); c.Match(matches) && w > 0 {
+			out[c.Key] = w
 		}
 	}
 	return out

@@ -13,7 +13,7 @@ package server
 // chains (e.g. a middleware that secretly calls another middleware
 // inside its body). What you see in newRouteGroup is what runs.
 //
-// Six groups cover every endpoint:
+// Five groups cover every TCP endpoint:
 //
 //	public           — no auth at all (health, metrics, static assets,
 //	                   credential-establishing flows: /api/auth/login,
@@ -25,6 +25,12 @@ package server
 //	userConfigured   — requireAuth + requireConfigured. 503 if no valid
 //	                   config yet.
 //	adminConfigured  — requireAuth + requireRole(admin) + requireConfigured.
+//
+// The admin bootstrap endpoint is NOT on this mux: it is served exclusively
+// on the Unix-socket admin plane (AdminHandler in admin_bootstrap.go), where
+// the 0700 socket directory is the security boundary. The TCP mux never
+// registers /api/admin/bootstrap, so that path falls through to the SPA
+// catch-all like any unknown route.
 //
 // Group membership rules (enforced at read time, not compile time):
 //
@@ -52,15 +58,27 @@ type middleware func(http.HandlerFunc) http.HandlerFunc
 // Routes registered via Add are wrapped with every middleware in the
 // chain at registration time; no caller can forget a wrapper.
 type routeGroup struct {
-	mux   *http.ServeMux
-	chain []middleware
+	mux    *http.ServeMux
+	record func(reg routeReg)
+	name   string
+	chain  []middleware
 }
 
-// newRouteGroup creates a group bound to `mux` with the given middleware
-// chain. Applied outside-in: the first middleware wraps the second, which
-// wraps the third, etc. A zero-length chain produces a pass-through group.
-func newRouteGroup(mux *http.ServeMux, chain ...middleware) *routeGroup {
-	return &routeGroup{mux: mux, chain: chain}
+// routeReg is one recorded route registration: the ServeMux pattern and the
+// route group it was declared in. The wirespec consistency test compares
+// these against the endpoint table (internal/wirespec), so the generated
+// client and the permission table cannot drift silently.
+type routeReg struct {
+	Group   string
+	Pattern string
+}
+
+// newRouteGroup creates a named group bound to `mux` with the given
+// middleware chain. Applied outside-in: the first middleware wraps the
+// second, which wraps the third, etc. A zero-length chain produces a
+// pass-through group. record receives every Add for the registration log.
+func newRouteGroup(mux *http.ServeMux, name string, record func(routeReg), chain ...middleware) *routeGroup {
+	return &routeGroup{mux: mux, name: name, record: record, chain: chain}
 }
 
 // Add registers a handler on the group's mux under the given pattern,
@@ -73,6 +91,7 @@ func (g *routeGroup) Add(pattern string, handler http.HandlerFunc) {
 		wrapped = mw(wrapped)
 	}
 	g.mux.HandleFunc(pattern, wrapped)
+	g.record(routeReg{Group: g.name, Pattern: pattern})
 }
 
 // registerRoutes registers all HTTP routes on the given mux. Routes are
@@ -80,11 +99,13 @@ func (g *routeGroup) Add(pattern string, handler http.HandlerFunc) {
 // endpoint policy is declared; handlers never re-check auth, roles, or
 // reauth.
 func (s *Server) registerRoutes(mux *http.ServeMux) {
-	public := newRouteGroup(mux)
-	user := newRouteGroup(mux, s.requireAuth)
-	admin := newRouteGroup(mux, s.requireAuth, s.requireRole(auth.RoleAdmin))
-	userConfigured := newRouteGroup(mux, s.requireAuth, s.requireConfigured)
-	adminConfigured := newRouteGroup(mux, s.requireAuth, s.requireRole(auth.RoleAdmin), s.requireConfigured)
+	s.routeRegs = nil
+	record := func(reg routeReg) { s.routeRegs = append(s.routeRegs, reg) }
+	public := newRouteGroup(mux, "public", record)
+	user := newRouteGroup(mux, "user", record, s.requireAuth)
+	admin := newRouteGroup(mux, "admin", record, s.requireAuth, s.requireRole(auth.RoleAdmin))
+	userConfigured := newRouteGroup(mux, "userConfigured", record, s.requireAuth, s.requireConfigured)
+	adminConfigured := newRouteGroup(mux, "adminConfigured", record, s.requireAuth, s.requireRole(auth.RoleAdmin), s.requireConfigured)
 
 	// --- public: no auth ---
 
@@ -128,10 +149,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 
 	// Config schema (read-only; available even when unconfigured).
 	user.Add("GET /api/config/schema", s.configH.HandleConfigSchema)
-	user.Add("POST /api/config/validate-path", s.configH.HandleValidatePath)
 
 	// Alerts (read + dismiss).
-	user.Add("/api/alerts", s.handleGetAlerts)
+	user.Add("GET /api/alerts", s.handleGetAlerts)
+	user.Add("DELETE /api/alerts", s.handleDismissAlert)
 
 	// Activity feed (user-visible history; config-independent).
 	user.Add("GET /api/activity", s.handleGetActivity)
@@ -161,13 +182,24 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	admin.Add("GET /api/config", s.configH.HandleGetConfig)
 	admin.Add("PUT /api/config", s.configH.HandleSaveConfig)
 	admin.Add("POST /api/config", s.configH.HandleSaveConfig)
+	// Structured (typed JSON) config surface: the settings UI's read/write
+	// path; the raw YAML endpoints above remain for hand editing and the API.
+	admin.Add("GET /api/config/structured", s.configH.HandleGetConfigStructured)
+	admin.Add("PUT /api/config/structured", s.configH.HandleSaveConfigStructured)
 	admin.Add("POST /api/config/reset", s.configH.HandleResetConfig)
 	admin.Add("GET /api/config/parsed", s.queryH.HandleConfigParsed)
+	// Config-time directory probe. The one deliberate path-accepting
+	// endpoint (S7 survivor): it probes candidate media_roots while EDITING
+	// config, so it cannot be store-resolved by construction. Admin-only —
+	// it reveals filesystem structure and belongs to the config-editing
+	// role that consumes it.
+	admin.Add("POST /api/config/validate-path", s.configH.HandleValidatePath)
 
 	// --- userConfigured: requires session + valid config ---
 
 	// Read-only query endpoints.
 	userConfigured.Add("GET /api/search", s.manualH.HandleManualSearch)
+	userConfigured.Add("GET /api/search/resolve", s.manualH.HandleSearchResolve)
 	userConfigured.Add("GET /api/search/targets", s.queryH.HandleSearchTargets)
 	userConfigured.Add("GET /api/state", s.queryH.HandleState)
 	userConfigured.Add("GET /api/state/stats", s.queryH.HandleStateStats)
@@ -214,23 +246,21 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Full-library scan is an admin/maintenance operation.
 	adminConfigured.Add("POST /api/scan", s.handleScan)
 	// Per-item subtitle search/download is a normal user action.
-	userConfigured.Add("POST /api/scan/series/", s.handleScanSeries)
-	userConfigured.Add("POST /api/scan/season/", s.handleScanSeason)
-	userConfigured.Add("POST /api/scan/movie/", s.handleScanMovie)
-	userConfigured.Add("POST /api/scan/item", s.handleScanItem)
+	userConfigured.Add("POST /api/scan/series/", s.scanH.HandleScanSeries)
+	userConfigured.Add("POST /api/scan/season/", s.scanH.HandleScanSeason)
+	userConfigured.Add("POST /api/scan/movie/", s.scanH.HandleScanMovie)
+	userConfigured.Add("POST /api/scan/item", s.scanH.HandleScanItem)
+
+	// Explicit graceful stop for running background scans — the repo's first
+	// {id} wildcard route (deliberate; Go 1.22 ServeMux). The group is the
+	// per-item scan START group; the handler enforces the object-level role
+	// (full scans: admin) against the entry's required_role. Distinct from
+	// the dismiss idiom (DELETE /api/activity?id=), which never stops
+	// running work.
+	userConfigured.Add("POST /api/activity/{id}/cancel", s.handleCancelActivity)
 
 	// Provider timeout reset.
 	adminConfigured.Add("POST /api/providers/timeout/reset", s.queryH.HandleProviderTimeoutReset)
-
-	// --- Admin bootstrap (localhost-only, no auth) ---
-	//
-	// CLI auth commands (reset-password, generate-api-key) route through this
-	// endpoint instead of opening the bbolt file directly. bbolt's exclusive
-	// OS lock prevents multi-process access (a regression from SQLite WAL).
-	// Guarded by requireLocalhost: only loopback (127.0.0.1/::1) is accepted,
-	// so docker exec and same-host CLI can reach it without credentials.
-	localhost := newRouteGroup(mux, s.requireLocalhost)
-	localhost.Add("POST /api/admin/bootstrap", s.handleAdminBootstrap)
 
 	// --- Web UI ---
 	//

@@ -40,19 +40,28 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	rl := ratelimit.NewRateLimiter(context.Background(), ratelimit.DefaultConfig())
 	t.Cleanup(func() { rl.Stop() })
 
+	// The production authenticator shape (library authenticator + subflux's
+	// cookie and 401 policies), minus the live-config timeout source: tests
+	// pin static 24h/7d timeouts.
+	authn, err := auth.NewAuthenticator(authDB,
+		auth.WithCookie(authhandlers.SessionCookie),
+		auth.WithUnauthorizedResponse(authhandlers.UnauthorizedResponse),
+		auth.WithIdleTimeout(24*time.Hour),
+		auth.WithAbsTimeout(7*24*time.Hour),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	s := &Server{
 		authDeps: authDeps{
-			authStore:   authDB,
-			adminDB:     authDB,
-			secDB:       authDB,
-			oidcDB:      authDB,
-			rateLimiter: rl,
-			authenticator: &authhandlers.Authenticator{
-				Store:       authDB,
-				IdleTimeout: 24 * time.Hour,
-				AbsTimeout:  7 * 24 * time.Hour,
-			},
-			ceremonies: authhandlers.NewCeremonyStore(),
+			authStore:     authDB,
+			adminDB:       authDB,
+			secDB:         authDB,
+			oidcDB:        authDB,
+			rateLimiter:   rl,
+			authenticator: authn,
+			ceremonies:    authhandlers.NewCeremonyStore(),
 		},
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),

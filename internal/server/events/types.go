@@ -10,6 +10,13 @@ type EventType string
 
 // EventData is a sealed interface restricting Event.Data to known payload types.
 // Implementors: CoverageEvent, NotifyEvent, ScanEvent.
+//
+// The wiregen directive below emits the TS union
+// (export type EventData = CoverageEvent | NotifyEvent | ScanEvent) plus its
+// runtime decoders; the discriminator is the SSE envelope's "type" key
+// (Event.Type), which is also the named SSE event the browser dispatches on.
+//
+//wiregen:union discriminator=type variants=CoverageEvent,NotifyEvent,ScanEvent
 type EventData interface{ eventData() }
 
 // Event is a server-sent event pushed to connected browsers.
@@ -26,14 +33,15 @@ const (
 	ScanDone       EventType = "scan:done"  // scan activity finished (succeeded or failed)
 )
 
-// CoverageEvent is the data payload for coverage updates.
+// CoverageEvent is the data payload for coverage updates. It deliberately
+// carries no file path (S7: no filesystem paths on the wire; the UI keys
+// refreshes on media identity alone).
 type CoverageEvent struct {
 	MediaType api.MediaType `json:"media_type"`
 	MediaID   string        `json:"media_id"`
 	Language  string        `json:"language"`
 	Variant   string        `json:"variant"`
 	Source    string        `json:"source"`
-	Path      string        `json:"path,omitempty"`
 }
 
 func (CoverageEvent) eventData() {}
@@ -59,13 +67,16 @@ func (NotifyEvent) eventData() {}
 // ScanEvent is the data payload for scan:start and scan:done. Action and
 // Detail mirror the activity log entry (e.g. "Full Scan" / "Searching
 // library for missing subtitles"). Source is "scheduled" or "manual".
-// Succeeded is meaningful only on scan:done; false indicates the scan
-// ended via activity.fail rather than activity.end.
+// ActivityID correlates the event with its activity entry. Outcome is
+// meaningful only on scan:done and carries the four-valued terminal outcome
+// (completed | failed | cancelled | shutdown) — a cancelled scan is neither
+// a success nor a failure.
 type ScanEvent struct {
-	Action    string                  `json:"action"`
-	Detail    string                  `json:"detail"`
-	Source    activity.ActivitySource `json:"source"`
-	Succeeded bool                    `json:"succeeded,omitempty"`
+	Action     string                  `json:"action"`
+	Detail     string                  `json:"detail"`
+	Source     activity.ActivitySource `json:"source"`
+	ActivityID string                  `json:"activity_id,omitempty"`
+	Outcome    activity.Outcome        `json:"outcome,omitempty"`
 }
 
 func (ScanEvent) eventData() {}

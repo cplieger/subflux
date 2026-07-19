@@ -1,0 +1,372 @@
+{
+ "patterns": [
+  {
+   "id": "sources/Remux",
+   "regex": "(?:[_. ]|\\d{4}p-|\\bHybrid-)(?:(BD|UHD)[-_. ]?)?Remux\\b|(?:(BD|UHD)[-_. ]?)?Remux[_. ]\\d{4}p"
+  },
+  {
+   "id": "sources/BluRay",
+   "regex": "\\b(?:BluRay|Blu-Ray|HD-?DVD|BDMux|BD(?!$))\\b"
+  },
+  {
+   "id": "sources/WEB-DL",
+   "regex": "WEB[-_. ]DL(?:mux)?|WEBDL|AmazonHD|AmazonSD|iTunesHD|MaxdomeHD|NetflixU?HD|WebHD|HBOMaxHD|DisneyHD|[. ]WEB[. ](?:[xh][ .]?26[45]|AVC|HEVC|DDP?5[. ]1)|[. ](?-i:WEB)$|(?:720|1080|2160)p[-. ]WEB[-. ]|[-. ]WEB[-. ](?:720|1080|2160)p|\\b\\s/\\sWEB\\s/\\s\\b|(?:AMZN|NF|DP)[. -]WEB[. -](?!Rip)"
+  },
+  {
+   "id": "sources/WEBRip",
+   "regex": "\\b(?:WebRip|Web-Rip|WEBMux)\\b"
+  },
+  {
+   "id": "sources/HDTV",
+   "regex": "\\b(?:HDTV)\\b"
+  },
+  {
+   "id": "sources/BDRip",
+   "regex": "\\b(?:BDRip|BDLight)\\b"
+  },
+  {
+   "id": "sources/BRRip",
+   "regex": "\\b(?:BRRip)\\b"
+  },
+  {
+   "id": "sources/DVD",
+   "regex": "\\b(?:DVD|DVDRip|NTSC|PAL|xvidvd)\\b"
+  },
+  {
+   "id": "sources/DSR",
+   "regex": "\\b(?:WS[-_. ]DSR|DSR)\\b"
+  },
+  {
+   "id": "sources/PDTV",
+   "regex": "\\b(?:PDTV)\\b"
+  },
+  {
+   "id": "sources/SDTV",
+   "regex": "\\b(?:SDTV)\\b"
+  },
+  {
+   "id": "sources/TVRip",
+   "regex": "\\b(?:TVRip)\\b"
+  },
+  {
+   "id": "sources/HD-TV",
+   "regex": "HD[-_. ]TV"
+  },
+  {
+   "id": "sources/SD-TV",
+   "regex": "SD[-_. ]TV"
+  },
+  {
+   "id": "sources/Anime BD",
+   "regex": "bd(?:720|1080|2160)|(?\u003c=[-_. (\\[])bd(?=[-_. )\\]])"
+  },
+  {
+   "id": "sources/Anime WEB",
+   "regex": "\\[WEB\\]|[\\[\\(]WEB[ .]"
+  },
+  {
+   "id": "sources/CAM",
+   "regex": "\\b(?:CAM|HDCAM)\\b"
+  },
+  {
+   "id": "sources/Telesync",
+   "regex": "\\b(?:Telesync|TS|PDVD)\\b"
+  },
+  {
+   "id": "sources/Telecine",
+   "regex": "\\b(?:Telecine|TC)\\b"
+  },
+  {
+   "id": "sources/HDRip",
+   "regex": "\\b(?:HDRip)\\b"
+  },
+  {
+   "id": "codecs/x264",
+   "regex": "[xh][ ._-]?264|\\bAVC(\\b|\\d)"
+  },
+  {
+   "id": "codecs/x265",
+   "regex": "[xh][ ._-]?265|\\bHEVC(\\b|\\d)"
+  },
+  {
+   "id": "codecs/x266",
+   "regex": "[xh][ ._-]?266|\\bVVC(\\b|\\d)"
+  },
+  {
+   "id": "codecs/AV1",
+   "regex": "\\bAV1\\b"
+  },
+  {
+   "id": "codecs/VC-1",
+   "regex": "\\bVC[-_. ]?1\\b"
+  },
+  {
+   "id": "codecs/MPEG2",
+   "regex": "MPEG[-.]?2"
+  },
+  {
+   "id": "codecs/VP9",
+   "regex": "\\bVP9\\b"
+  },
+  {
+   "id": "codecs/XviD",
+   "regex": "\\b[Xx][Vv][Ii][Dd]\\b"
+  },
+  {
+   "id": "codecs/DivX",
+   "regex": "\\b[Dd][Ii][Vv][Xx]\\b"
+  },
+  {
+   "id": "hdr/HDR10+",
+   "regex": "\\b(HDR10(?=[+]|P(lus)?))"
+  },
+  {
+   "id": "hdr/HDR10",
+   "regex": "\\b(HDR10(?![+]|P(lus)?))"
+  },
+  {
+   "id": "hdr/HDR",
+   "regex": "\\b(HDR)\\b"
+  },
+  {
+   "id": "hdr/DV",
+   "regex": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+  },
+  {
+   "id": "hdr/HLG",
+   "regex": "\\b(HLG)\\b"
+  },
+  {
+   "id": "hdr/PQ",
+   "regex": "\\b(PQ)\\b"
+  },
+  {
+   "id": "hdr/WCG",
+   "regex": "\\b(WCG)\\b"
+  },
+  {
+   "id": "streaming/AMZN",
+   "regex": "\\b(amzn|amazon(hd)?)\\b"
+  },
+  {
+   "id": "streaming/NF",
+   "regex": "\\b(nf|netflix(u?hd)?)\\b"
+  },
+  {
+   "id": "streaming/DSNP",
+   "regex": "\\b(dsnp|dsny|disney|Disney\\+)\\b"
+  },
+  {
+   "id": "streaming/ATVP",
+   "regex": "\\b(atvp|aptv|Apple TV\\+)\\b"
+  },
+  {
+   "id": "streaming/ATV",
+   "regex": "\\b(ATV)\\b"
+  },
+  {
+   "id": "streaming/HMAX",
+   "regex": "\\b(hmax|hbom|hbo[ ._-]?max)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/HBO",
+   "regex": "\\b(hbo)(?![ ._-]max)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/MAX",
+   "regex": "\\b((?\u003c!hbo[ ._-])max)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/HULU",
+   "regex": "\\b(hulu)\\b"
+  },
+  {
+   "id": "streaming/PCOK",
+   "regex": "\\b(pcok|peacock)\\b"
+  },
+  {
+   "id": "streaming/PMTP",
+   "regex": "\\b(pmtp|Paramount Plus)\\b"
+  },
+  {
+   "id": "streaming/BCORE",
+   "regex": "\\b(BCORE)\\b|\\b(\\d{3,4}(p|i))\\b.*\\b(CORE)\\b"
+  },
+  {
+   "id": "streaming/CRAV",
+   "regex": "\\b(crav(e)?)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/CRiT",
+   "regex": "\\b(CRiT)\\b"
+  },
+  {
+   "id": "streaming/ROKU",
+   "regex": "\\b(ROKU)\\b"
+  },
+  {
+   "id": "streaming/STAN",
+   "regex": "\\b(stan)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/MA",
+   "regex": "(?\u003c!dts[ .-]?hd[ .-]?)\\b(ma|ykw)\\b(?=.*\\bweb[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/iT",
+   "regex": "\\b(it|itunes)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/STRP",
+   "regex": "\\b(STRP)\\b"
+  },
+  {
+   "id": "streaming/SHO",
+   "regex": "\\b(sho|showtime)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/PLAY",
+   "regex": "\\b(Play)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+  },
+  {
+   "id": "streaming/NOW",
+   "regex": "\\b(now)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/IP",
+   "regex": "\\b(ip|iplayer)\\b"
+  },
+  {
+   "id": "streaming/ITVX",
+   "regex": "\\b(ITVX?)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/MY5",
+   "regex": "\\b(MY5)\\b"
+  },
+  {
+   "id": "streaming/ALL4",
+   "regex": "\\b(ALL4)\\b"
+  },
+  {
+   "id": "streaming/4OD",
+   "regex": "\\b(4OD)\\b"
+  },
+  {
+   "id": "streaming/Pathe",
+   "regex": "\\b(Pathe)\\b"
+  },
+  {
+   "id": "streaming/OViD",
+   "regex": "\\b(ovid)\\b"
+  },
+  {
+   "id": "streaming/NLZ",
+   "regex": "\\b(nlz|NLZiet)\\b"
+  },
+  {
+   "id": "streaming/VDL",
+   "regex": "\\b(vdl)\\b"
+  },
+  {
+   "id": "streaming/CC",
+   "regex": "\\b(CC)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/RED",
+   "regex": "\\b(red|youtube red)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/SYFY",
+   "regex": "\\b(SYFY)\\b"
+  },
+  {
+   "id": "streaming/CBC",
+   "regex": "\\b(CBC)\\b"
+  },
+  {
+   "id": "streaming/AUBC",
+   "regex": "\\b(AUBC)\\b"
+  },
+  {
+   "id": "streaming/HTSR",
+   "regex": "\\b(HTSR|DSNPHS|HS)\\b"
+  },
+  {
+   "id": "streaming/VIU",
+   "regex": "\\b(viu)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/TVING",
+   "regex": "\\b(tving)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/TVer",
+   "regex": "\\b(tver)\\b"
+  },
+  {
+   "id": "streaming/FOD",
+   "regex": "\\b(fod)\\b"
+  },
+  {
+   "id": "streaming/U-NEXT",
+   "regex": "\\b(u-next)\\b"
+  },
+  {
+   "id": "streaming/ABEMA",
+   "regex": "\\b(ABEMA[ ._-]?(TV)?)\\b"
+  },
+  {
+   "id": "streaming/B-Global",
+   "regex": "\\b(B[ .-]?Global)\\b"
+  },
+  {
+   "id": "streaming/CR",
+   "regex": "\\b(C(runchy)?[ .-]?R(oll)?)\\b"
+  },
+  {
+   "id": "streaming/HIDIVE",
+   "regex": "\\b(HIDI(VE)?)\\b"
+  },
+  {
+   "id": "streaming/FUNi",
+   "regex": "\\b(FUNi(mation)?)\\b"
+  },
+  {
+   "id": "streaming/Bilibili",
+   "regex": "\\b(Bili(bili)?)\\b"
+  },
+  {
+   "id": "streaming/VRV",
+   "regex": "\\b(vrv)\\b"
+  },
+  {
+   "id": "streaming/DSCP",
+   "regex": "\\b((dscp|dcp|disc)\\b|dscv\\+?)[ ._-]web[ ._-]?(dl|rip)?\\b"
+  },
+  {
+   "id": "streaming/DCU",
+   "regex": "\\b(dcu|DC Universe)\\b"
+  },
+  {
+   "id": "streaming/QIBI",
+   "regex": "\\b(qibi|quibi)\\b"
+  },
+  {
+   "id": "streaming/NICK",
+   "regex": "\\b(nick)\\b"
+  },
+  {
+   "id": "streaming/VDMO",
+   "regex": "\\b(vdmo)\\b"
+  },
+  {
+   "id": "streaming/MUBI",
+   "regex": "\\b(mubi)\\b"
+  },
+  {
+   "id": "releasegroup",
+   "regex": "-([a-z0-9]+(-[a-z0-9]+)?(?!.+?(?:480p|576p|720p|1080p|2160p)))(?\u003c!(?:WEB-DL|Blu-Ray|DTS-HD|DTS-X|DTS-MA|DTS-ES|-ES|-EN|-CAT|[ ._]\\d{4}-\\d{2}|-\\d{2}))(?:\\b|[-._ ]|$)|[-._ ]\\[([a-z0-9]+)\\]$"
+  }
+ ]
+}

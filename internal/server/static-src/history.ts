@@ -7,27 +7,14 @@
 // (history is append-only display), so only the structure tier does work.
 
 import { el, input, select, option, errDiv } from "./dom.js";
-import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
+import { listState } from "./wire/client.gen.js";
+import type { QueryValue } from "./wire/client.gen.js";
+import type { StateEntry } from "./wire/types.gen.js";
 import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
 import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
-import { skeletonTiming } from "./skeleton-timing.js";
+import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
 import * as store from "./store.js";
-
-interface HistoryEntry {
-  id: number; // unique subtitle_state row id (stable collection key)
-  media_id: string;
-  media_type: string;
-  language: string;
-  variant: string; // standard | hi | forced (state rows are keyed per variant)
-  provider: string;
-  release_name: string;
-  title: string;
-  season: number;
-  episode: number;
-  manual: boolean;
-  media_imported: string;
-}
 
 const PAGE_SIZE = 50;
 
@@ -35,8 +22,8 @@ const PAGE_SIZE = 50;
 // (one row per language + a new row per manual download, and media_imported is
 // a second-precision timestamp), so it collided — the collection dropped rows
 // and reconcile mounted duplicates.
-const historyKey = (e: HistoryEntry): string => String(e.id);
-const history = createCollection<HistoryEntry>(historyKey);
+const historyKey = (e: StateEntry): string => String(e.id);
+const history = createCollection<StateEntry>(historyKey);
 
 // Whether the server has more pages beyond what's loaded (drives "show more").
 const hasMore = signal(false);
@@ -49,52 +36,35 @@ const renderTick = signal(0);
 // on return, so the two never interleave into the collection.
 let gen = 0;
 
-function buildApiUrl(offset: number, limit: number): string {
-  const params = new URLSearchParams();
-  params.set("limit", String(limit));
-  if (offset > 0) {
-    params.set("offset", String(offset));
-  }
+/** Query for a history page: limit always, offset only past page 0, and the
+ *  filter params only when non-empty (undefined entries are skipped at
+ *  serialization — exactly the params the hand-built URLSearchParams sent). */
+function buildQuery(offset: number, limit: number): Record<string, QueryValue> {
   const type = select("h-type").value;
   const lang = select("h-lang").value;
   const prov = select("h-provider").value;
   const search = input("h-filter").value.trim();
-  if (type) {
-    params.set("type", type);
-  }
-  if (lang) {
-    params.set("lang", lang);
-  }
-  if (prov) {
-    params.set("provider", prov);
-  }
-  if (search) {
-    params.set("search", search);
-  }
-  return `/api/state?${params.toString()}`;
+  return {
+    limit,
+    offset: offset > 0 ? offset : undefined,
+    type: type || undefined,
+    lang: lang || undefined,
+    provider: prov || undefined,
+    search: search || undefined,
+  };
 }
 
-/** Fetch a page of history entries. Pure GET; failures show as empty
- *  page (caller renders empty-state) but retryNetwork handles transient
- *  blips so a single network hiccup doesn't leave the user staring at
- *  "no downloads". error: false because the empty-state IS the error UI. */
-const loadHistoryAction = apiAction<string, HistoryEntry[]>({
-  name: "history.load",
-  request: (path) => ({ method: "GET", path }),
-  retryable: retryNetwork,
-  retry: RETRY_STANDARD,
-  error: false,
-});
-
+/** Fetch a page of history entries via the generated typed client. Failures
+ *  collapse to an empty page (the empty-state IS the error UI). */
 async function fetchPage(
   offset: number,
   limit: number,
-): Promise<{ items: HistoryEntry[]; hasMore: boolean }> {
-  const items = (await loadHistoryAction.dispatch(buildApiUrl(offset, limit))) ?? [];
+): Promise<{ items: StateEntry[]; hasMore: boolean }> {
+  const items = (await listState(buildQuery(offset, limit))) ?? [];
   return { items, hasMore: items.length >= limit };
 }
 
-function historyMediaHref(entry: HistoryEntry): string {
+function historyMediaHref(entry: StateEntry): string {
   const mid = entry.media_id || "";
   const tm = /^tmdb-(\d+)$/.exec(mid);
   if (tm) {
@@ -107,19 +77,18 @@ function historyMediaHref(entry: HistoryEntry): string {
   return "";
 }
 
-function buildHistoryRow(entry: HistoryEntry): HTMLElement {
+function buildHistoryRow(entry: StateEntry): HTMLElement {
   const time = fmtDateTime(new Date(entry.media_imported));
   let label = entry.title || "";
-  if (entry.season > 0 || entry.episode > 0) {
-    label += ` \u00B7 ${fmtEpisode(entry.season, entry.episode)}`;
+  const season = entry.season ?? 0;
+  const episode = entry.episode ?? 0;
+  if (season > 0 || episode > 0) {
+    label += ` \u00B7 ${fmtEpisode(season, episode)}`;
   }
   const href = historyMediaHref(entry);
   // Non-standard variants (forced/hi) qualify the language cell; standard
   // stays bare so the common case reads clean.
-  const lang =
-    entry.variant && entry.variant !== "standard"
-      ? `${entry.language} ${entry.variant}`
-      : entry.language;
+  const lang = entry.variant !== "standard" ? `${entry.language} ${entry.variant}` : entry.language;
   const cells = [
     el("td", { "data-col": "meta" }, time),
     el("td", { "data-col": "title" }, label),
@@ -144,7 +113,7 @@ function buildHistoryRow(entry: HistoryEntry): HTMLElement {
  *  languages). Deriving from loaded pages alone made options depend on how
  *  many "Show more" pages happened to be loaded: filtering is server-side, so
  *  a provider present only in older history was unselectable. */
-function updateHistoryFilters(data: HistoryEntry[]): void {
+function updateHistoryFilters(data: StateEntry[]): void {
   const cfg = store.get("config");
   const langs = new Set<string>(cfg?.languages ?? []);
   const provs = new Set<string>(Object.keys(cfg?.providers ?? {}));
@@ -270,18 +239,23 @@ async function reload(): Promise<void> {
   const out = document.getElementById("historyContent");
   const firstMount = out !== null && out.querySelector("table.history") === null;
   const timing = firstMount
-    ? skeletonTiming(() => {
-        if (g !== gen) {
-          return;
-        }
-        const skel = document.createDocumentFragment();
-        for (let i = 0; i < 6; i++) {
-          skel.appendChild(
-            el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-          );
-        }
-        patch(out, skel);
-      })
+    ? skeletonTiming(
+        () => {
+          if (g !== gen) {
+            return;
+          }
+          const skel = document.createDocumentFragment();
+          for (let i = 0; i < 6; i++) {
+            skel.appendChild(
+              el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+            );
+          }
+          patch(out, skel);
+        },
+        // The library default is min-visible 0; subflux keeps its 300ms
+        // never-blink window explicitly.
+        { minVisibleMs: 300 },
+      )
     : null;
   try {
     const page = await fetchPage(0, PAGE_SIZE);
@@ -304,6 +278,9 @@ async function reload(): Promise<void> {
       mount();
     }
   } catch (e: unknown) {
+    // Settle the anti-flicker controller on the failure path too: a pending
+    // (not yet painted) skeleton must never land OVER the error panel.
+    timing?.cancel();
     if (g === gen) {
       showError(e);
     }

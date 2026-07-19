@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/subflux/internal/store/buckets"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -18,7 +19,7 @@ var _ AuthStore = (*Store)(nil)
 // persisted: an in-progress login that does not survive a restart simply
 // retries.
 type oidcRec struct {
-	expiresAt    time.Time
+	createdAt    time.Time // creation instant; expiry derives from sweep maxAge
 	nonce        string
 	codeVerifier string
 	redirectURI  string
@@ -92,27 +93,23 @@ func New(db *bbolt.DB) *Store {
 // below — alongside the core buckets — in one Update (spec task 2.3). The auth
 // store only ever SHARES the already-bootstrapped handle, so it never creates a
 // bucket here. These constants MUST hold the same string values as the auth
-// bucket names in internal/boltstore/keys.go; the foundation test cross-checks
-// that by asserting every name here exists in a boltstore-opened file.
+// bucket names in internal/store/buckets — the single shared owner both this
+// package and the core store alias, so the names can never drift (S15); the
+// foundation test still asserts every bucket exists in a boltstore-opened file.
 const (
-	bucketAuthUsers    = "auth_users"    // be64(id) -> userRec
-	bucketAuthPasskeys = "auth_passkeys" //nolint:gosec // G101: bbolt bucket name, not a credential
-	bucketAuthAPIKeys  = "auth_api_keys" //nolint:gosec // G101: bbolt bucket name, not a credential
+	bucketAuthUsers    = buckets.AuthUsers
+	bucketAuthPasskeys = buckets.AuthPasskeys
+	bucketAuthAPIKeys  = buckets.AuthAPIKeys
 
-	bucketIxUserName    = "ix_user_name"    // lower(username) -> be64(user_id)
-	bucketIxUserOIDC    = "ix_user_oidc"    // issuer 0x00 sub -> be64(user_id)
-	bucketIxPasskeyUser = "ix_passkey_user" // be64(user_id) 0x00 credential_id -> (empty)
-	bucketIxAPIKeyUser  = "ix_apikey_user"  //nolint:gosec // G101: bbolt bucket name, not a credential
+	bucketIxUserName    = buckets.IxUserName
+	bucketIxUserOIDC    = buckets.IxUserOIDC
+	bucketIxPasskeyUser = buckets.IxPasskeyUser
+	bucketIxAPIKeyUser  = buckets.IxAPIKeyUser
 )
 
 // authBuckets lists every auth primary and index bucket the core store
-// bootstraps and the auth store uses. Kept adjacent to the name constants so a
-// drift between this list and the owner's schema is caught by the foundation
-// test.
-var authBuckets = []string{
-	bucketAuthUsers, bucketAuthPasskeys, bucketAuthAPIKeys,
-	bucketIxUserName, bucketIxUserOIDC, bucketIxPasskeyUser, bucketIxAPIKeyUser,
-}
+// bootstraps and the auth store uses, sourced from the shared owner.
+var authBuckets = buckets.Auth()
 
 // errConflict is returned by uniqueCheck when a uniqueness index already holds
 // the candidate key (duplicate username, (issuer, sub), credential id, or

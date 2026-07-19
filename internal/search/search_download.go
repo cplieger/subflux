@@ -57,9 +57,11 @@ func (e *Engine) syncSubtitle(ctx context.Context, data []byte, videoPath, lang 
 	return data, 0
 }
 
-// syncSubtitleAudio runs audio-based sync on subtitle data.
+// syncSubtitleAudio runs audio-based sync on subtitle data through the
+// configured executor (in-process by default; the sync-worker client in
+// server mode, so the memory-heavy PCM/alignment work is process-isolated).
 func (e *Engine) syncSubtitleAudio(ctx context.Context, data []byte, videoPath string) (synced []byte, offsetMs int64) {
-	result := syncing.SyncFromAudio(ctx, data, videoPath, "")
+	result := e.syncExec.Audio(ctx, data, videoPath, "")
 	if !result.ShouldApply() || result.Cues == nil {
 		return data, 0
 	}

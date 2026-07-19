@@ -47,6 +47,9 @@ in the container logs.
    EXISTING user (it answers 404 for an unknown username); it does not
    create accounts, so it cannot bootstrap a fresh store.
 
+   If the store is so corrupt the server cannot start, restoring the
+   database from a backup snapshot is the recovery path.
+
 6. Re-apply any manual locks if needed (manual locks and sync offsets
    are not recoverable from the filesystem).
 

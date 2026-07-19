@@ -1,0 +1,14 @@
+[
+ {
+  "pattern_id": "sources/BluRay",
+  "name": "Movie.2020.BD\n",
+  "class": "i",
+  "reason": "RE2 '$' matches only at end of text; .NET '$' also matches before a final newline, so .NET sees BD(?!$) fail on a name ending in '\\n' while the layer matches. Accepted RE2 core-syntax contract (R3.4): release names never carry newlines, and the provider-boundary clamp keeps the layer's documented semantics byte-oriented."
+ },
+ {
+  "pattern_id": "releasegroup/captures",
+  "name": "7s-Series-s02e01-720p.mkv",
+  "class": "d",
+  "reason": "Overlapping-candidate handling: the leading '-Series-s02e01' candidate is rejected (its lookahead sees 720p ahead at every legal shrink width), and RE2's non-overlapping scan resumes after the rejected span, so the layer's next candidate is '-720p' where .NET rescans from the failed start+1 and finds '-s02e01-720p'. Rescanning inside rejected spans would make per-call work quadratic on adversarial input, violating the R3.7 measured linear-time gate; accepted as a documented contract."
+ }
+]

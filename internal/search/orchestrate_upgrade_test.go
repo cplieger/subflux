@@ -129,8 +129,8 @@ func TestSearchTargets_upgrade(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SearchTargets() unexpected error: %v", err)
 			}
-			if len(result.Paths) != tc.wantPaths {
-				t.Errorf("SearchTargets() returned %d paths, want %d", len(result.Paths), tc.wantPaths)
+			if len(result.Paths()) != tc.wantPaths {
+				t.Errorf("SearchTargets() returned %d paths, want %d", len(result.Paths()), tc.wantPaths)
 			}
 			if tc.wantSuccess && !ms.successCalled {
 				t.Error("SaveDownload not called, want called")

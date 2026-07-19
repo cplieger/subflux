@@ -1,8 +1,6 @@
 package authhandlers
 
 import (
-	"context"
-	"encoding/binary"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -21,7 +19,8 @@ import (
 // issues a WebAuthn assertion challenge. Supports both standard and
 // conditional (passkey autofill) mediation modes.
 func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Request) {
-	if !h.requireWebAuthn(w) {
+	wa, ok := h.requireWebAuthn(w)
+	if !ok {
 		return
 	}
 
@@ -31,9 +30,9 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 		err         error
 	)
 	if r.URL.Query().Get("mediation") == "conditional" {
-		assertion, sessionData, err = authwebauthn.BeginConditionalLogin(h.WebAuthn)
+		assertion, sessionData, err = authwebauthn.BeginConditionalLogin(wa)
 	} else {
-		assertion, sessionData, err = authwebauthn.BeginLogin(h.WebAuthn)
+		assertion, sessionData, err = authwebauthn.BeginLogin(wa)
 	}
 	if err != nil {
 		slog.Error("webauthn: begin login", "error", err)
@@ -69,7 +68,8 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 // verifies the assertion response, updates the credential sign count, and
 // creates a session for the authenticated user.
 func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
-	if !h.requireWebAuthn(w) {
+	wa, ok := h.requireWebAuthn(w)
+	if !ok {
 		return
 	}
 
@@ -78,9 +78,11 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ctx := r.Context()
-
-	resolvedUser, cred, err := authwebauthn.FinishLogin(h.WebAuthn, sessData, r, h.webAuthnUserFinder(ctx))
+	// The library completes the ceremony against the store: user + credential
+	// resolution from the user handle, assertion verification, and the
+	// post-login custody write (sign count + flags, including CloneWarning).
+	// Account-status policy stays here.
+	user, _, err := authwebauthn.CompleteLogin(r.Context(), wa, h.Store, sessData, r)
 	if err != nil {
 		slog.Warn("webauthn: finish login failed", "error", err)
 
@@ -97,23 +99,6 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if errSC := h.Store.UpdatePasskeyAfterLogin(ctx, cred.ID, cred.Authenticator.SignCount, auth.PasskeyFlags{
-		UserPresent:    cred.Flags.UserPresent,
-		UserVerified:   cred.Flags.UserVerified,
-		BackupEligible: cred.Flags.BackupEligible,
-		BackupState:    cred.Flags.BackupState,
-	}); errSC != nil {
-		slog.Warn("webauthn: update credential after login", "error", errSC)
-	}
-
-	webauthnUser, ok := resolvedUser.(*authwebauthn.User)
-	if !ok || webauthnUser.AuthUser == nil {
-		slog.Error("webauthn: unexpected user type from passkey login")
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
-	user := webauthnUser.AuthUser
-
 	if !user.Enabled {
 		api.ForbiddenC(w, r, api.CodeAuthAccountDisabled, "account disabled")
 		return
@@ -126,31 +111,6 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
 		slog.String("method", string(auth.MethodPasskey)))
-}
-
-// webAuthnUserFinder returns the credential-lookup callback FinishLogin uses to
-// resolve the asserting user and their registered passkeys from the store. The
-// returned errors are deliberately generic so the assertion response never
-// reveals whether a particular user handle exists.
-func (h *Handler) webAuthnUserFinder(ctx context.Context) func(rawID, userHandle []byte) (webauthn.User, error) {
-	return func(_, userHandle []byte) (webauthn.User, error) {
-		userID, _ := binary.Varint(userHandle)
-		if userID == 0 {
-			return nil, errors.New("invalid user handle")
-		}
-
-		user, err := h.Store.GetUserByID(ctx, userID)
-		if err != nil || user == nil {
-			return nil, errors.New("user not found")
-		}
-
-		creds, err := h.Store.GetPasskeysByUserID(ctx, user.ID)
-		if err != nil {
-			return nil, errors.New("get passkeys failed")
-		}
-
-		return authwebauthn.NewWebAuthnUser(user, creds)
-	}
 }
 
 // --- passkey reauth handlers removed (reauth step-up dropped) ---

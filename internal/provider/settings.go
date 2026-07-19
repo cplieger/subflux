@@ -24,9 +24,6 @@ const (
 	KeyToken           SettingKey = "token"
 	KeyUseHash         SettingKey = "use_hash"
 	KeyIncludeAI       SettingKey = "include_ai_translated"
-	KeyIgnorePGS       SettingKey = SettingKey(api.EmbeddedSettingIgnorePGS)
-	KeyIgnoreVobSub    SettingKey = SettingKey(api.EmbeddedSettingIgnoreVobSub)
-	KeyIgnoreASS       SettingKey = SettingKey(api.EmbeddedSettingIgnoreASS)
 	KeyAniDBClientKey  SettingKey = "anidb_client_key"
 	KeyMode            SettingKey = "mode"
 	KeyErrorMessage    SettingKey = "error_message"
@@ -147,8 +144,8 @@ func SettingFloat(settings map[string]any, key SettingKey, def float64) float64 
 }
 
 // Settings provides typed access to common provider configuration fields.
-// This is a phased migration: providers can use FromMap to get compile-time safety
-// for common fields while provider-specific settings remain in Custom.
+// Every common field has migrated here (FromMap gives compile-time safety);
+// Custom carries only genuinely provider-specific extras.
 type Settings struct {
 	Custom   map[string]any // provider-specific extras
 	APIKey   string
@@ -185,4 +182,50 @@ func FromMap(settings map[string]any) Settings {
 		}
 	}
 	return ps
+}
+
+// NormalizeSettings returns a copy of the raw settings map with every
+// declared-but-absent field filled from its schema Default, coerced per the
+// declared Type (P14). The registry applies this before invoking a factory,
+// which makes the providerEntries declaration the SINGLE source of a
+// setting's default: factories read the normalized map through FromMap /
+// the typed accessors and never re-encode a default of their own (the
+// use_hash dual-encoding this replaces drifted exactly once already).
+// Undeclared keys pass through untouched, and a declared field the user DID
+// set is never rewritten.
+func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map[string]any {
+	if len(fields) == 0 {
+		return raw
+	}
+	out := make(map[string]any, len(raw)+len(fields))
+	for k, v := range raw {
+		out[k] = v
+	}
+	for _, f := range fields {
+		if f.Default == "" {
+			continue
+		}
+		if _, present := out[f.Key]; present {
+			continue
+		}
+		out[f.Key] = coerceDefault(f)
+	}
+	return out
+}
+
+// coerceDefault converts a schema field's string Default into the native
+// type its declared Type implies, so normalized maps carry the same value
+// shapes YAML parsing produces.
+func coerceDefault(f api.ProviderSchemaField) any {
+	switch f.Type {
+	case "bool":
+		return f.Default == valTrue
+	case "number":
+		if n, err := strconv.Atoi(f.Default); err == nil {
+			return n
+		}
+		return f.Default
+	default: // text, secret, select
+		return f.Default
+	}
 }

@@ -2,8 +2,9 @@
 // All cross-component calls go through these interfaces, enabling
 // testability (mock any component) and swappability (e.g. SQLite → PostgreSQL).
 //
-// This package imports only stdlib. Implementation packages import api,
-// never the reverse.
+// This package imports no subflux implementation packages — only stdlib
+// and shared external libraries (cplieger/arrapi, cplieger/auth,
+// cplieger/webhttp). Implementation packages import api, never the reverse.
 //
 // This file contains consumer contracts: interfaces that consuming code
 // depends on (Store, AuthStore, ConfigProvider, SearchEngine).
@@ -62,6 +63,12 @@ type ConfigProvider interface {
 // SubtitleSearcher orchestrates subtitle search across providers.
 type SubtitleSearcher interface {
 	SearchTargets(ctx context.Context, req *SearchRequest, videoPath string, targets []SubtitleTarget) (SearchResult, error)
+	// InventoryCoverage records the on-disk/embedded subtitle inventory for a
+	// media item WITHOUT any provider work, stamping its scan state as
+	// inventoried-not-searched. Used by scan skip paths (season early stop,
+	// show-level skip) so coverage stays truthful for items the scanner
+	// deliberately does not search.
+	InventoryCoverage(ctx context.Context, req *SearchRequest, videoPath string) (coverageChanged bool)
 }
 
 // ScoreSimulator provides subtitle scoring capabilities.

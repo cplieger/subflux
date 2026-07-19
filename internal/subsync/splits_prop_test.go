@@ -97,9 +97,11 @@ func TestAlignWithSplits_output_length(t *testing.T) {
 	})
 }
 
-// TestAlignWithSplits_identity verifies that when reference == incorrect
-// (identity case), the result has zero or near-zero offset and moderate+
-// confidence.
+// TestAlignWithSplits_identity verifies the no-candidate contract on
+// identity input: the cue count is preserved, and when the generator emits
+// no candidate (zero confidence — the no-split branch, since the
+// constant-offset hypothesis belongs to the offset generator) the input
+// cues are returned verbatim, never half-corrected.
 func TestAlignWithSplits_identity(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
@@ -110,9 +112,12 @@ func TestAlignWithSplits_identity(t *testing.T) {
 		if len(result.Cues) != len(cues) {
 			t.Fatalf("identity: returned %d cues, want %d", len(result.Cues), len(cues))
 		}
-		// For identity input, confidence should be non-zero.
-		if result.Confidence <= 0 {
-			t.Fatalf("identity: confidence = %v, want > 0", result.Confidence)
+		if result.Confidence == ConfidenceNone {
+			for i := range cues {
+				if result.Cues[i] != cues[i] {
+					t.Fatalf("identity: zero-confidence result altered cue %d: %+v", i, result.Cues[i])
+				}
+			}
 		}
 	})
 }

@@ -233,7 +233,14 @@
   opacity: 0.45;
 }
 
+/* Now a uip-disclosure-region (animated height collapse): vertical spacing
+ * lives on the first child's margin — inside the animated height — so the
+ * collapsed region is truly zero-height (region padding would still render
+ * at height: 0). */
 .provider-body {
   padding-inline-start: var(--sp-2);
-  padding-block-start: var(--sp-3);
+}
+
+.provider-body > :first-child {
+  margin-block-start: var(--sp-3);
 }

@@ -1,12 +1,13 @@
-// Package cliparse adds help generation, unknown-flag detection (with
-// typo suggestions), and required/type validation on top of subflux's
-// existing flag-parsing helpers. It does not replace the parser; it
-// validates after the fact, so existing call sites remain backward
-// compatible.
+// Package cliparse implements subflux's flat CLI grammar: a single
+// ParseAndValidate pass that splits "--key value" / "--key=value" tokens,
+// rejects unknown flags (with typo suggestions) and stray positionals,
+// parses bool flags from the spec table, validates typed values, enforces
+// required flags, and applies spec defaults. It also renders per-command
+// and root help.
 //
 // The design choice is deliberate: the CLI surface is auxiliary to
 // subflux's HTTP/JSON API and web UI, so a heavyweight CLI framework
-// (kong, cobra) would be over-engineered for ~13 flat subcommands. This
+// (kong, cobra) would be over-engineered for ~15 flat subcommands. This
 // package closes the user-visible gaps (missing --help, silent typos,
 // silent type errors) in roughly one file.
 package cliparse
@@ -20,20 +21,62 @@ import (
 	"time"
 )
 
-// Spec describes one subcommand. Used by PrintHelp and Validate.
+// Spec describes one subcommand: help metadata, the declared flag surface,
+// and the runner dispatch invokes with the single parse's result.
 type Spec struct {
+	// Run executes the subcommand with the parsed, validated params and
+	// returns the process exit code. Receiving Params keeps parsing to
+	// exactly one pass per invocation (a bare func() int would force
+	// runners to reparse os.Args).
+	Run      func(Params) int
 	Name     string // e.g. "search"
 	Synopsis string // one-line purpose, shown in root help
 	Help     string // multi-line description for `<command> --help`
 	Args     string // optional usage suffix, e.g. "<imdb-id>"
 	Flags    []Flag
+	// Hidden excludes the spec from root help. Internal vehicles (the
+	// sync-worker child process) stay dispatchable without being
+	// advertised as user commands.
+	Hidden bool
 }
+
+// Params is the validated result of one ParseAndValidate pass: typed access
+// to flag values with spec defaults applied. Bool flags live in their own
+// set; every other flag is stored in its string form (typed flags were
+// already validated as parseable).
+type Params struct {
+	strs  map[string]string
+	bools map[string]bool
+}
+
+// String returns the value of a string-ish flag, or "" when the flag is
+// absent and its spec declares no default.
+func (p Params) String(name string) string { return p.strs[name] }
+
+// Int returns the value of an int-typed flag, or 0 when the flag is absent
+// and its spec declares no default. Explicit values were validated during
+// the parse, so a malformed value cannot reach this accessor.
+func (p Params) Int(name string) int {
+	n, _ := strconv.Atoi(p.strs[name])
+	return n
+}
+
+// Bool reports whether a bool-typed flag was set.
+func (p Params) Bool(name string) bool { return p.bools[name] }
+
+// Flag type vocabulary for Flag.Type. An empty Type means TypeString.
+const (
+	TypeString   = "string"
+	TypeInt      = "int"
+	TypeBool     = "bool"
+	TypeDuration = "duration"
+)
 
 // Flag describes one CLI flag for a subcommand.
 type Flag struct {
 	Name     string
 	Help     string
-	Type     string // "string" (default), "int", "bool", "duration"
+	Type     string // TypeString (default), TypeInt, TypeBool, TypeDuration
 	Default  string
 	Required bool
 }
@@ -82,7 +125,7 @@ func PrintHelp(w io.Writer, s *Spec) {
 }
 
 func flagSignature(f Flag) string {
-	if f.Type == "" || f.Type == "bool" {
+	if f.Type == "" || f.Type == TypeBool {
 		return "--" + f.Name
 	}
 	return fmt.Sprintf("--%s <%s>", f.Name, f.Type)
@@ -116,19 +159,124 @@ func PrintRootHelp(w io.Writer, specs []Spec) {
 	fmt.Fprintln(w, "Use 'subflux <command> --help' for command-specific flags.")
 }
 
-// Validate checks that args contains only flags declared in spec, that
-// all required flags are present, and that typed flags (int, duration)
-// parse cleanly. Returns nil on success; any error is human-readable
-// and includes a "did you mean" suggestion for unknown flags whose
-// edit distance to a known flag is at most 2.
+// ParseAndValidate parses args (the argv slice after the subcommand name,
+// e.g. os.Args[2:]) against spec in a single pass: "--key value" and
+// "--key=value" forms are split (the "=" form on the FIRST "=", so values
+// may themselves contain "="), unknown flags are rejected with a "did you
+// mean" suggestion, stray positional tokens are rejected, bool flags are
+// parsed from the spec table (bare "--flag", or "--flag=true|false"),
+// typed values (int, duration) are validated, required flags are enforced,
+// and spec defaults are applied for absent flags.
 //
-// args is the raw argv slice (after the subcommand name, e.g.
-// os.Args[2:]); params is the result of clisearch.ParseArgs.
-func Validate(args []string, params map[string]string, spec *Spec) error {
-	if err := checkUnknownFlags(args, spec); err != nil {
-		return err
+// Preserved edge semantics (pinned by tests): a trailing non-bool flag
+// without a value is treated as unset (a required flag then errors), a
+// non-bool flag whose next token starts with "--" is a missing-value error
+// (the "--name=--literal" form is the escape hatch for intentional
+// flag-like values), a duplicated flag keeps the last value, and "--help" /
+// "-h" / bare "--" / empty-name "--=v" tokens are skipped (help
+// short-circuits in the dispatch preamble before this parse runs).
+func ParseAndValidate(args []string, spec *Spec) (Params, error) {
+	p := Params{strs: make(map[string]string), bools: make(map[string]bool)}
+	known := knownFlags(spec)
+	for i := 0; i < len(args); i++ {
+		next, err := p.consumeToken(args, i, known, spec)
+		if err != nil {
+			return Params{}, err
+		}
+		i = next
 	}
-	return checkRequiredAndTypes(params, spec)
+	if err := finishParams(&p, spec); err != nil {
+		return Params{}, err
+	}
+	return p, nil
+}
+
+// consumeToken processes args[i] and returns the index of the last token
+// it consumed: i, or i+1 when a space-separated value was taken. Skipped
+// tokens (help, bare "--", empty flag names) consume themselves.
+func (p Params) consumeToken(args []string, i int, known map[string]Flag, spec *Spec) (int, error) {
+	arg := args[i]
+	if arg == "--help" || arg == "-h" {
+		return i, nil
+	}
+	name, isFlag := strings.CutPrefix(arg, "--")
+	if !isFlag {
+		return i, fmt.Errorf("unexpected argument %q (subcommands take --flag arguments only)", arg)
+	}
+	if name == "" {
+		return i, nil // bare "--"
+	}
+	value, hasValue := "", false
+	if k, v, found := strings.Cut(name, "="); found {
+		if k == "" {
+			return i, nil // "--=value": empty flag name, dropped
+		}
+		name, value, hasValue = k, v, true
+	}
+	f, ok := known[name]
+	if !ok {
+		return i, fmt.Errorf("unknown flag --%s%s", name, suggestion(name, spec.Flags))
+	}
+	if f.Type == TypeBool {
+		return i, p.setBool(name, value, hasValue)
+	}
+	if !hasValue {
+		if i+1 >= len(args) {
+			// Trailing flag without a value: treated as unset, matching
+			// the pre-consolidation parser. Required flags error below.
+			return i, nil
+		}
+		if strings.HasPrefix(args[i+1], "--") {
+			// The next token is another flag: report the missing value
+			// instead of silently consuming the flag as the value
+			// ("--lang --download" must not set lang to "--download" and
+			// suppress the download flag).
+			return i, fmt.Errorf("--%s requires a value (to pass a value beginning with --, use --%s=<value>)", name, name)
+		}
+		p.strs[name] = args[i+1]
+		return i + 1, nil
+	}
+	p.strs[name] = value
+	return i, nil
+}
+
+// setBool parses a spec-table bool flag: the bare form sets true; the
+// "=value" form goes through strconv.ParseBool.
+func (p Params) setBool(name, value string, hasValue bool) error {
+	if !hasValue {
+		p.bools[name] = true
+		return nil
+	}
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("--%s: %q is not a valid boolean", name, value)
+	}
+	p.bools[name] = b
+	return nil
+}
+
+// finishParams enforces required flags, validates explicit typed values,
+// and applies spec defaults for absent non-bool flags.
+func finishParams(p *Params, spec *Spec) error {
+	for _, f := range spec.Flags {
+		if f.Type == TypeBool {
+			continue
+		}
+		value, present := p.strs[f.Name]
+		if !present {
+			if f.Required {
+				return fmt.Errorf("--%s is required", f.Name)
+			}
+			if f.Default != "" {
+				p.strs[f.Name] = f.Default
+			}
+			continue
+		}
+		if err := checkType(f, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // knownFlags indexes a spec's flags by name for O(1) lookup.
@@ -140,76 +288,13 @@ func knownFlags(spec *Spec) map[string]Flag {
 	return known
 }
 
-// unknownFlagName reports whether arg is an unknown --flag and, if so, returns
-// its bare name (with any =value suffix stripped). It returns ok=false for
-// non-flag tokens, help tokens, the bare "--", and known flags.
-//
-// Only "--"-prefixed tokens are considered: ParseArgs pairs "--flag value"
-// greedily, so a value following a known flag is a bare token here and is
-// correctly treated as not-a-flag rather than an unknown flag.
-func unknownFlagName(arg string, known map[string]Flag) (string, bool) {
-	if arg == "--help" || arg == "-h" {
-		return "", false
-	}
-	name, ok := strings.CutPrefix(arg, "--")
-	if !ok {
-		return "", false
-	}
-	// Strip the --flag=value form down to the flag name.
-	if eq := strings.IndexByte(name, '='); eq >= 0 {
-		name = name[:eq]
-	}
-	if name == "" {
-		return "", false
-	}
-	if _, found := known[name]; found {
-		return "", false
-	}
-	return name, true
-}
-
-// checkUnknownFlags returns an error for the first --flag in args that is not
-// declared in spec, with a "did you mean" suggestion when a close match exists.
-func checkUnknownFlags(args []string, spec *Spec) error {
-	known := knownFlags(spec)
-	for _, a := range args {
-		name, ok := unknownFlagName(a, known)
-		if !ok {
-			continue
-		}
-		if msg := suggestion(name, spec.Flags); msg != "" {
-			return fmt.Errorf("unknown flag --%s%s", name, msg)
-		}
-		return fmt.Errorf("unknown flag --%s", name)
-	}
-	return nil
-}
-
-// checkRequiredAndTypes verifies that every required flag is present and that
-// each present typed flag parses cleanly.
-func checkRequiredAndTypes(params map[string]string, spec *Spec) error {
-	for _, f := range spec.Flags {
-		_, present := params[f.Name]
-		if f.Required && !present {
-			return fmt.Errorf("--%s is required", f.Name)
-		}
-		if !present {
-			continue
-		}
-		if err := checkType(f, params[f.Name]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func checkType(f Flag, value string) error {
 	switch f.Type {
-	case "int":
+	case TypeInt:
 		if _, err := strconv.Atoi(value); err != nil {
 			return fmt.Errorf("--%s: %q is not a valid integer", f.Name, value)
 		}
-	case "duration":
+	case TypeDuration:
 		if _, err := time.ParseDuration(value); err != nil {
 			return fmt.Errorf("--%s: %q is not a valid duration (e.g. 30s, 5m, 1h): %w", f.Name, value, err)
 		}
@@ -310,21 +395,4 @@ func SuggestName(input string, candidates []string) (string, bool) {
 		}
 	}
 	return bestName, bestDist != -1
-}
-
-// ParseArgs parses --key value pairs from the given argument slice.
-// Returns the params map and whether --download was specified.
-func ParseArgs(args []string) (params map[string]string, download bool) {
-	params = make(map[string]string)
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--download" {
-			download = true
-			continue
-		}
-		if name, ok := strings.CutPrefix(args[i], "--"); ok && name != "" && i+1 < len(args) {
-			params[name] = args[i+1]
-			i++
-		}
-	}
-	return params, download
 }

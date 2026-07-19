@@ -21,16 +21,24 @@ type SubtitleFile struct {
 	Path     string         // file path for external; empty for embedded
 }
 
-// SubtitleEntry is the JSON shape returned by coverage queries.
+// SubtitleEntry is a subtitle-file row from coverage queries. On the wire it
+// carries NO filesystem paths (S7: clients address files by typed reference,
+// never by path); Path and VideoPath stay populated for in-process consumers
+// (file listing size stat, deletion, reconciliation) but are json-omitted.
+// Ordinal is the manual-sibling number parsed from the row's filename
+// (api.ManualOrdinal) — together with (media_type, media_id, language,
+// variant, source) it forms the wire FileRef the client echoes back to
+// address this exact file.
 type SubtitleEntry struct {
 	MediaID   string `json:"media_id"`
 	Language  string `json:"language"`
 	Variant   string `json:"variant"`
 	Source    string `json:"source"`
 	Codec     string `json:"codec,omitempty"`
-	Path      string `json:"path,omitempty"`
-	VideoPath string `json:"video_path,omitempty"`
+	Path      string `json:"-"`
+	VideoPath string `json:"-"`
 	Score     int    `json:"score,omitempty"`
+	Ordinal   int    `json:"ordinal,omitempty"`
 	OffsetMs  int64  `json:"offset_ms,omitempty"`
 }
 
@@ -42,4 +50,7 @@ type ScanStateRow struct {
 	AudioLang string `json:"audio_lang"`
 	Season    int    `json:"season,omitempty"`
 	Episode   int    `json:"episode,omitempty"`
+	// Searched is false for inventory-only stamps (scan skip paths that
+	// recorded coverage without provider work).
+	Searched bool `json:"searched"`
 }

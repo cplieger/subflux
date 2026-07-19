@@ -6,6 +6,7 @@ package serveradapter
 import (
 	"log/slog"
 
+	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -34,11 +35,24 @@ func (a *ActivityAdapter) Start(action, detail string, source activity.ActivityS
 	return a.A.Start(action, detail, source)
 }
 
+// StartScan begins a new scan activity carrying its structured scope and
+// cancel role; an active same-scope entry is returned instead of creating a
+// duplicate (existing=true).
+func (a *ActivityAdapter) StartScan(action, detail string, source activity.ActivitySource,
+	scope activity.ScanScope, role auth.Role,
+) (id string, existing bool) {
+	return a.A.StartScan(action, detail, source, scope, role)
+}
+
 // End marks the activity with the given ID as successfully completed.
 func (a *ActivityAdapter) End(id string) { a.A.End(id) }
 
 // Fail marks the activity with the given ID as failed.
 func (a *ActivityAdapter) Fail(id string) { a.A.Fail(id) }
+
+// FinishCancelled marks the activity with the given ID as terminally
+// cancelled (Done + Cancelled + EndedAt).
+func (a *ActivityAdapter) FinishCancelled(id string) { a.A.FinishCancelled(id) }
 
 // Progress updates the progress counters and message for an activity.
 func (a *ActivityAdapter) Progress(id string, current, total int, msg string) {
@@ -95,19 +109,22 @@ func (a *ScanEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaI
 	})
 }
 
-// PublishScanStart publishes a scan-start SSE event.
-func (a *ScanEventAdapter) PublishScanStart(action, detail string, source activity.ActivitySource) {
+// PublishScanStart publishes a scan-start SSE event carrying the activity id.
+func (a *ScanEventAdapter) PublishScanStart(action, detail string, source activity.ActivitySource, actID string) {
 	a.E.Publish(events.Event{
 		Type: events.ScanStart,
-		Data: events.ScanEvent{Action: action, Detail: detail, Source: source},
+		Data: events.ScanEvent{Action: action, Detail: detail, Source: source, ActivityID: actID},
 	})
 }
 
-// PublishScanDone publishes a scan-done SSE event with success or failure status.
-func (a *ScanEventAdapter) PublishScanDone(action, detail string, source activity.ActivitySource, ok bool) {
+// PublishScanDone publishes a scan-done SSE event with the activity id and
+// the four-valued terminal outcome.
+func (a *ScanEventAdapter) PublishScanDone(action, detail string, source activity.ActivitySource,
+	actID string, outcome activity.Outcome,
+) {
 	a.E.Publish(events.Event{
 		Type: events.ScanDone,
-		Data: events.ScanEvent{Action: action, Detail: detail, Source: source, Succeeded: ok},
+		Data: events.ScanEvent{Action: action, Detail: detail, Source: source, ActivityID: actID, Outcome: outcome},
 	})
 }
 
@@ -119,9 +136,9 @@ func (a *ManualEventAdapter) PublishNotify(level events.NotifyLevel, text string
 	a.E.Publish(events.Event{Type: events.Notify, Data: events.NotifyEvent{Level: level, Text: text}})
 }
 
-// PublishCoverageUpdate publishes a coverage-update SSE event carrying the full
-// subtitle file path for the manual download case.
-func (a *ManualEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source, path string) {
+// PublishCoverageUpdate publishes a coverage-update SSE event for the manual
+// download/clear-lock case (no path on the wire; see events.CoverageEvent).
+func (a *ManualEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source string) {
 	a.E.Publish(events.Event{
 		Type: events.CoverageUpdate,
 		Data: events.CoverageEvent{
@@ -129,7 +146,6 @@ func (a *ManualEventAdapter) PublishCoverageUpdate(mediaType api.MediaType, medi
 			MediaID:   mediaID,
 			Language:  language,
 			Source:    source,
-			Path:      path,
 		},
 	})
 }

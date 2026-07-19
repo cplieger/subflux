@@ -117,11 +117,12 @@
   translate: 0 2px;
 }
 
-/* --- Confirm (was the hand-rolled .dlg-confirm flow) --- */
-/* .uip-confirm is a native <dialog>, so it inherits subflux's base dialog
-   chrome (surface/border/radius/shadow, backdrop, @starting-style enter). Only
-   the transition + inner parts need skinning here. */
-.uip-confirm {
+/* --- Ask (the Promise question dialog: boolean = the old confirm flow,
+   input = the old prompt/showInputDialog flow) --- */
+/* .uip-ask is a native <dialog>, so it inherits subflux's base dialog chrome
+   (surface/border/radius/shadow, backdrop, @starting-style enter). Only the
+   transition + inner parts need skinning here. */
+.uip-ask {
   max-width: 28rem;
   width: auto;
   transition:
@@ -129,8 +130,14 @@
     translate var(--dur-standard) var(--ease-standard);
 }
 
+/* The input shape spans the full width (the old prompt sizing). */
+/* stylelint-disable-next-line selector-class-pattern -- @cplieger/ui-primitives BEM shape modifier (uip-ask--input) */
+.uip-ask--input {
+  width: 100%;
+}
+
 @supports (transition-behavior: allow-discrete) {
-  .uip-confirm {
+  .uip-ask {
     transition:
       opacity var(--dur-standard) var(--ease-standard),
       translate var(--dur-standard) var(--ease-standard),
@@ -139,19 +146,37 @@
   }
 }
 
-.uip-confirm-title {
+.uip-ask-title {
   font-size: var(--text-base);
   font-weight: 600;
   padding: var(--sp-5) var(--sp-6);
   border-block-end: 1px solid var(--border);
 }
 
-.uip-confirm-msg {
+/* Boolean shape: the message is a padded <p>. In the input shape the message
+   is the input's <label> inside the padded form, so it drops its own padding
+   (the form owns spacing). */
+.uip-ask-msg {
   margin: 0;
   padding: var(--sp-5) var(--sp-6);
 }
 
-.uip-confirm-actions {
+.uip-ask-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6);
+}
+
+.uip-ask-form .uip-ask-msg {
+  padding: 0;
+}
+
+.uip-ask-input {
+  width: 100%;
+}
+
+.uip-ask-actions {
   /* DOM order is [Cancel, OK]; row-reverse + flex-end renders [OK(primary),
      Cancel] left-packed, matching subflux's [Confirm, Cancel] footer. */
   display: flex;
@@ -163,17 +188,24 @@
   border-block-start: 1px solid var(--border);
 }
 
-.uip-confirm-cancel {
+/* Inside the form the row inherits the form's padding; keep only the gap. */
+.uip-ask-form .uip-ask-actions {
+  padding: 0;
+  border-block-start: none;
+  margin-block-start: var(--sp-2);
+}
+
+.uip-ask-cancel {
   background: var(--ghost);
   color: var(--text-2);
 }
 
-.uip-confirm-cancel:hover {
+.uip-ask-cancel:hover {
   background: var(--ghost-hover);
   color: var(--text);
 }
 
-.uip-confirm-ok.is-destructive {
+.uip-ask-ok.is-destructive {
   background: var(--err);
 }
 

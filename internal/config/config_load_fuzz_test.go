@@ -4,19 +4,19 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"github.com/cplieger/subflux/internal/api"
 )
 
 // FuzzLoadFromBytes feeds arbitrary (untrusted) config text through the full
 // load pipeline. Beyond "never panics", a config that loads successfully must
-// be self-consistent: the embedded provider is always force-enabled and the
-// returned config re-validates cleanly.
+// be self-consistent: the legacy providers.embedded shape can never survive
+// validation (alpha hard cutover) and the returned config re-validates
+// cleanly.
 func FuzzLoadFromBytes(f *testing.F) {
 	f.Add([]byte(""))
 	f.Add([]byte("sonarr:\n  url: http://localhost:8989\n  api_key: abc123\n"))
 	f.Add([]byte("poll_interval: 5m\n"))
-	f.Add([]byte(minimalValidYAML())) // a config that actually loads
+	f.Add([]byte("providers:\n  embedded:\n    enabled: true\n")) // legacy shape: must be rejected
+	f.Add([]byte(minimalValidYAML()))                             // a config that actually loads
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cfg, err := LoadFromBytes(context.Background(), data)
@@ -28,10 +28,10 @@ func FuzzLoadFromBytes(f *testing.F) {
 		}
 		defer func() { _ = cfg.Close() }()
 
-		// forceEmbeddedProvider runs on every successful load, so the embedded
-		// provider can never end up disabled.
-		if p, ok := cfg.Providers[api.ProviderNameEmbedded]; !ok || !p.Enabled {
-			t.Errorf("embedded provider present=%v enabled=%v, want always enabled", ok, p.Enabled)
+		// The legacy providers.embedded section fails validation with the
+		// targeted cutover error, so it can never appear in a loaded config.
+		if _, ok := cfg.Providers[legacyEmbeddedProvider]; ok {
+			t.Error("providers.embedded survived a successful load, want targeted rejection")
 		}
 
 		// A successful load means validation passed; re-validating must agree.

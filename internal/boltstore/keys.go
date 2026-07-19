@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/store/buckets"
 	"github.com/cplieger/subflux/internal/store/kv"
 )
 
@@ -21,10 +22,13 @@ const (
 	bucketScanState      = "scan_state"      // scanStateKey -> scanRec
 	bucketSyncOffsets    = "sync_offsets"    // syncOffsetKey(path) -> be64(offset_ms)
 	bucketPollState      = "poll_state"      // pollStateKey -> RFC3339 timestamp
-	bucketAuthUsers      = "auth_users"      // be64(id) -> userRec
-	bucketAuthPasskeys   = "auth_passkeys"   //nolint:gosec // G101: bbolt bucket name, not a credential
-	bucketAuthAPIKeys    = "auth_api_keys"   //nolint:gosec // G101: bbolt bucket name, not a credential
 	bucketMeta           = "meta"            // schema versions + O(1) counters
+
+	// Auth-domain primaries: names owned by the shared internal/store/buckets
+	// package (aliased, not copied — see that package's doc).
+	bucketAuthUsers    = buckets.AuthUsers
+	bucketAuthPasskeys = buckets.AuthPasskeys
+	bucketAuthAPIKeys  = buckets.AuthAPIKeys
 )
 
 // Index (secondary) bucket names. Each is a sibling bucket maintained inside
@@ -37,11 +41,12 @@ const (
 	bucketIxStateVideo    = "ix_state_video"    // stateVideoKey -> (empty)
 	bucketIxScanAt        = "ix_scan_at"        // scanAtKey -> (empty)
 
-	// Auth-domain indexes (builders in internal/authstore; names owned here).
-	bucketIxUserName    = "ix_user_name"    // lower(username) -> be64(user_id)
-	bucketIxUserOIDC    = "ix_user_oidc"    // issuer 0x00 sub -> be64(user_id)
-	bucketIxPasskeyUser = "ix_passkey_user" // be64(user_id) 0x00 credential_id
-	bucketIxAPIKeyUser  = "ix_apikey_user"  //nolint:gosec // G101: bbolt bucket name, not a credential
+	// Auth-domain indexes (builders in internal/authstore; names owned by
+	// the shared internal/store/buckets package).
+	bucketIxUserName    = buckets.IxUserName
+	bucketIxUserOIDC    = buckets.IxUserOIDC
+	bucketIxPasskeyUser = buckets.IxPasskeyUser
+	bucketIxAPIKeyUser  = buckets.IxAPIKeyUser
 )
 
 // coreBuckets and authBuckets list every bucket the core store bootstraps. Kept

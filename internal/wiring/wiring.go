@@ -12,7 +12,7 @@
 //
 // wiring/ is also a convenient home for cross-package compile-time
 // assertions where neither side can hold the assertion without creating
-// a cycle (e.g. embedded.ProviderDirect satisfies search.TrackDetector,
+// a cycle (e.g. embedded.Detector satisfies search.TrackDetector,
 // but search/ can't import embedded/ and embedded/ shouldn't import search/).
 package wiring
 
@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/provider/embedded"
+	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 )
@@ -35,10 +35,10 @@ type Func func(
 	m search.SearchMetrics,
 ) (api.SearchEngine, api.Scorer, []api.Provider, error)
 
-// Compile-time assertion: embedded.ProviderDirect satisfies
+// Compile-time assertion: embedded.Detector satisfies
 // search.TrackDetector. This lives here (rather than in embedded/ or
 // search/) to keep both of those packages decoupled from each other.
-var _ search.TrackDetector = embedded.ProviderDirect{}
+var _ search.TrackDetector = embedded.Detector{}
 
 // Compile-time assertion: syncing.Syncer satisfies search.SubtitleSyncer.
 // Moved here from search/ to decouple search from the syncing→subsync→ffmpeg chain.

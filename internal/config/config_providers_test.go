@@ -2,7 +2,9 @@ package config
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -78,129 +80,123 @@ func TestProvidersForTarget(t *testing.T) {
 	}
 }
 
-// --- forceEmbeddedProvider ---
+// --- embedded_subtitles section (typed policy) ---
 
-func TestLoadFromBytes_embedded_provider_always_enabled(t *testing.T) {
+func TestLoadFromBytes_embedded_subtitles_defaults(t *testing.T) {
 	t.Parallel()
-	data := `
-sonarr:
-  url: "http://sonarr:8989"
-  api_key: "test"
-languages:
-  rules:
-    - audio: en
-      subtitles:
-        - code: fr
-  default:
-    - code: en
-providers:
-  embedded:
-    enabled: false
-  opensubtitles:
-    enabled: true
-    settings:
-      api_key: "test"
-`
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
-	}
-	p, ok := cfg.Providers[api.ProviderID("embedded")]
-	if !ok {
-		t.Fatal("embedded provider missing from config")
-	}
-	if !p.Enabled {
-		t.Error("embedded provider should be force-enabled, got disabled")
-	}
-}
-
-func TestLoadFromBytes_embedded_provider_default_settings(t *testing.T) {
-	t.Parallel()
+	// Absent section: defaults (true/true/false) via the pre-defaulted decode.
 	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	p, ok := cfg.Providers[api.ProviderID("embedded")]
-	if !ok {
-		t.Fatal("embedded provider missing from config")
-	}
-	if !p.Enabled {
-		t.Error("embedded provider should be enabled")
-	}
-	if p.Settings["ignore_pgs"] != true {
-		t.Errorf("embedded.ignore_pgs = %v, want true", p.Settings["ignore_pgs"])
-	}
-	if p.Settings["ignore_vobsub"] != true {
-		t.Errorf("embedded.ignore_vobsub = %v, want true", p.Settings["ignore_vobsub"])
-	}
-	if p.Settings["ignore_ass"] != false {
-		t.Errorf("embedded.ignore_ass = %v, want false", p.Settings["ignore_ass"])
+	defer func() { _ = cfg.Close() }()
+	want := api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: false}
+	if got := cfg.EmbeddedPolicy(); got != want {
+		t.Errorf("EmbeddedPolicy() = %+v, want %+v (defaults)", got, want)
 	}
 }
 
-func TestLoadFromBytes_embedded_provider_explicit_bool_settings(t *testing.T) {
+func TestLoadFromBytes_embedded_subtitles_full_section(t *testing.T) {
 	t.Parallel()
-	yaml := `
+	yaml := minimalValidYAML() + `
+embedded_subtitles:
+  ignore_pgs: false
+  ignore_vobsub: false
+  ignore_ass: true
+`
+	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+	}
+	defer func() { _ = cfg.Close() }()
+	want := api.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: false, IgnoreASS: true}
+	if got := cfg.EmbeddedPolicy(); got != want {
+		t.Errorf("EmbeddedPolicy() = %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadFromBytes_embedded_subtitles_partial_section(t *testing.T) {
+	t.Parallel()
+	// One field set: the absent fields keep their defaults (vobsub=true,
+	// ass=false) through the standard pre-defaulted decode — no
+	// presence-detection machinery.
+	yaml := minimalValidYAML() + `
+embedded_subtitles:
+  ignore_pgs: false
+`
+	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+	}
+	defer func() { _ = cfg.Close() }()
+	want := api.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: true, IgnoreASS: false}
+	if got := cfg.EmbeddedPolicy(); got != want {
+		t.Errorf("EmbeddedPolicy() = %+v, want %+v (partial overlay)", got, want)
+	}
+}
+
+// --- Hard cutover: legacy embedded shapes fail validation (R3.2/R3.3) ---
+
+func TestLoadFromBytes_rejects_providers_embedded(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		block string
+	}{
+		{name: "with_settings", block: `
+  embedded:
+    settings:
+      ignore_pgs: true
+`},
+		{name: "enabled_only", block: `
+  embedded:
+    enabled: true
+`},
+		{name: "empty_block", block: `
+  embedded: {}
+`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// A standalone document (minimalValidYAML already carries a
+			// providers: key; appending another would be a duplicate map key).
+			yaml := `
 sonarr:
   url: "http://sonarr:8989"
   api_key: "test"
 languages:
-  rules:
-    - audio: en
-      subtitles:
-        - code: fr
   default:
     - code: en
-providers:
-  embedded:
-    settings:
-      ignore_pgs: true
-      ignore_vobsub: false
-      ignore_ass: true
+providers:` + tt.block + `
   opensubtitles:
     enabled: true
     settings:
       api_key: "test"
-      use_hash: false
-      include_ai_translated: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
-	}
-
-	emb := cfg.Providers[api.ProviderID("embedded")]
-	if emb.Settings["ignore_pgs"] != true {
-		t.Errorf("embedded.ignore_pgs = %v (%T), want bool true",
-			emb.Settings["ignore_pgs"], emb.Settings["ignore_pgs"])
-	}
-	if emb.Settings["ignore_vobsub"] != false {
-		t.Errorf("embedded.ignore_vobsub = %v (%T), want bool false",
-			emb.Settings["ignore_vobsub"], emb.Settings["ignore_vobsub"])
-	}
-	if emb.Settings["ignore_ass"] != true {
-		t.Errorf("embedded.ignore_ass = %v (%T), want bool true",
-			emb.Settings["ignore_ass"], emb.Settings["ignore_ass"])
-	}
-
-	osCfg := cfg.Providers[api.ProviderID("opensubtitles")]
-	if osCfg.Settings["use_hash"] != false {
-		t.Errorf("opensubtitles.use_hash = %v (%T), want bool false",
-			osCfg.Settings["use_hash"], osCfg.Settings["use_hash"])
-	}
-	if osCfg.Settings["include_ai_translated"] != true {
-		t.Errorf("opensubtitles.include_ai_translated = %v (%T), want bool true",
-			osCfg.Settings["include_ai_translated"], osCfg.Settings["include_ai_translated"])
-	}
-	if osCfg.Settings["api_key"] != "test" {
-		t.Errorf("opensubtitles.api_key = %v (%T), want string \"test\"",
-			osCfg.Settings["api_key"], osCfg.Settings["api_key"])
+			_, err := LoadFromBytes(context.Background(), []byte(yaml))
+			if err == nil {
+				t.Fatal("LoadFromBytes() = nil error, want targeted providers.embedded rejection")
+			}
+			if !errors.Is(err, ErrEmbeddedProviderRemoved) {
+				t.Errorf("error = %v, want errors.Is(ErrEmbeddedProviderRemoved)", err)
+			}
+			if !strings.Contains(err.Error(), "providers.embedded has been replaced by the top-level embedded_subtitles section") {
+				t.Errorf("error text = %q, want the targeted guidance message", err)
+			}
+		})
 	}
 }
 
-func TestLoadFromBytes_embedded_provider_preserves_user_settings(t *testing.T) {
+func TestLoadFromBytes_rejects_embedded_in_provider_filters(t *testing.T) {
 	t.Parallel()
-	yaml := `
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "include_list_in_rule",
+			yaml: `
 sonarr:
   url: "http://sonarr:8989"
   api_key: "test"
@@ -209,69 +205,70 @@ languages:
     - audio: en
       subtitles:
         - code: fr
+          providers: [opensubtitles, embedded]
   default:
     - code: en
 providers:
-  embedded:
-    settings:
-      ignore_pgs: false
-      ignore_vobsub: false
-      ignore_ass: true
-  yifysubtitles:
+  opensubtitles:
     enabled: true
-`
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+    settings:
+      api_key: "test"
+`,
+		},
+		{
+			name: "exclude_list_in_default",
+			yaml: `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "test"
+languages:
+  default:
+    - code: en
+      exclude: [embedded]
+providers:
+  opensubtitles:
+    enabled: true
+    settings:
+      api_key: "test"
+`,
+		},
 	}
-	emb := cfg.Providers[api.ProviderID("embedded")]
-	if emb.Settings["ignore_pgs"] != false {
-		t.Errorf("embedded.ignore_pgs = %v (%T), want bool false (user override preserved)",
-			emb.Settings["ignore_pgs"], emb.Settings["ignore_pgs"])
-	}
-	if emb.Settings["ignore_vobsub"] != false {
-		t.Errorf("embedded.ignore_vobsub = %v (%T), want bool false (user override preserved)",
-			emb.Settings["ignore_vobsub"], emb.Settings["ignore_vobsub"])
-	}
-	if emb.Settings["ignore_ass"] != true {
-		t.Errorf("embedded.ignore_ass = %v (%T), want bool true (user override preserved)",
-			emb.Settings["ignore_ass"], emb.Settings["ignore_ass"])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadFromBytes(context.Background(), []byte(tt.yaml))
+			if err == nil {
+				t.Fatal("LoadFromBytes() = nil error, want targeted filter-list rejection")
+			}
+			if !errors.Is(err, ErrEmbeddedProviderRemoved) {
+				t.Errorf("error = %v, want errors.Is(ErrEmbeddedProviderRemoved)", err)
+			}
+		})
 	}
 }
 
-func TestLoadFromBytes_yaml_quoted_bools_parsed_as_strings(t *testing.T) {
-	t.Parallel()
+// --- Zero acquisition providers: valid config, startup WARN (R3.5) ---
+
+func TestLoadFromBytes_zero_providers_loads_with_warn(t *testing.T) {
+	// captureLogs swaps the process-global logger: no t.Parallel().
 	yaml := `
 sonarr:
   url: "http://sonarr:8989"
   api_key: "test"
 languages:
-  rules:
-    - audio: en
-      subtitles:
-        - code: fr
   default:
     - code: en
-providers:
-  embedded:
-    settings:
-      ignore_pgs: "true"
-      ignore_vobsub: "false"
-  yifysubtitles:
-    enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	var cfg *Config
+	var err error
+	logs := captureLogs(t, func() {
+		cfg, err = LoadFromBytes(context.Background(), []byte(yaml))
+	})
 	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+		t.Fatalf("LoadFromBytes(zero providers) unexpected error: %v", err)
 	}
-	emb := cfg.Providers[api.ProviderID("embedded")]
-	if _, ok := emb.Settings["ignore_pgs"].(string); !ok {
-		t.Errorf("embedded.ignore_pgs type = %T, want string (YAML quoted bool)", emb.Settings["ignore_pgs"])
-	}
-	if emb.Settings["ignore_pgs"] != "true" {
-		t.Errorf("embedded.ignore_pgs = %v, want string \"true\"", emb.Settings["ignore_pgs"])
-	}
-	if emb.Settings["ignore_vobsub"] != "false" {
-		t.Errorf("embedded.ignore_vobsub = %v, want string \"false\"", emb.Settings["ignore_vobsub"])
+	defer func() { _ = cfg.Close() }()
+	if !strings.Contains(logs, "no acquisition providers enabled") {
+		t.Errorf("startup WARN missing from logs:\n%s", logs)
 	}
 }

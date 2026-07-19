@@ -1,29 +1,28 @@
 // ---------------------------------------------------------------------------
-// Thin API client: subflux's REST-style surface layered over @cplieger/fetch.
+// Thin API client: subflux's transport layer over @cplieger/fetch.
 //
 // The request/response core — JSON body encoding, the non-throwing ApiResult
-// envelope, timeout composition, credentials, and decoder validation — is now
+// envelope, timeout composition, credentials, and decoder validation — is
 // @cplieger/fetch. This module keeps the pieces fetch deliberately leaves to
 // each consumer:
 //
 //   - subflux's ApiResult shape: a loose interface (`ok` is a plain boolean
 //     with optional data/error), NOT fetch's discriminated ApiOk|ApiErr union,
 //     so existing call sites that read r.data / r.error without narrowing keep
-//     compiling. It also carries `headers` on the error envelope — fetch omits
-//     response headers by design (they're on its "unsupported by design"
-//     list), but subflux's login rate-limit UI reads `Retry-After` off a 429
-//     (see login.ts), so we capture the response headers via an injected
-//     fetchFn and attach them here.
-//   - the null-collapsing (`apiGet` → T|null) + boolean (`apiDelete`) sugar and
-//     the console diagnostics (silent on caller abort; one warn per failed
-//     call; one error at a decode boundary).
-//   - the exact helper signatures every module already imports.
+//     compiling. It also carries `headers` on the error envelope — sourced
+//     from fetch's ApiErr.headers (present whenever a real HTTP response was
+//     received); subflux's login rate-limit UI reads `Retry-After` off a 429
+//     (see login.ts).
+//   - the null-collapsing (T|null) + OK-flag sugar and the console diagnostics
+//     (silent on caller abort; one warn per failed call; one error at a decode
+//     boundary).
+//   - the session-expiry redirect chokepoint every call routes through.
 //
-// Two shapes, as before:
-//
-//   apiX<T>(path, body?)     → Promise<T | null>       (2xx body or null)
-//   apiXRaw<T>(path, body?)  → Promise<ApiResult<T>>   (full envelope: status,
-//                                                        error, code, headers)
+// Modules do not call this transport directly: they use the CODE-GENERATED
+// typed functions in wire/client.gen.ts (one per JSON endpoint, decoder-bound,
+// in T|null / OK-flag / ApiResult<T> Raw flavors), which dispatch through the
+// clientRequest* trio below. Declarative apiAction sites keep the actions
+// framework's own transport and source only PATH_ constants (+ fillPath).
 //
 // Raw platform fetch() stays reserved for the documented non-JSON / streaming /
 // custom-header flows (config YAML PUT, WebAuthn finish, OIDC HEAD, video
@@ -32,7 +31,6 @@
 
 import { createFetch } from "@cplieger/fetch";
 import type { ApiResult as FetchApiResult, HttpMethod, RequestOptions } from "@cplieger/fetch";
-import { decodeArray } from "./validators.js";
 
 /** Decoder<T> is owned by validators.ts (single source of truth); re-exported
  *  here so callers can import it from api-client as well as validators. */
@@ -54,33 +52,23 @@ export interface ApiResult<T> {
   headers?: Headers;
 }
 
-// The shared non-throwing core. Delegates the request lifecycle to
-// @cplieger/fetch and maps its envelope onto subflux's ApiResult.
-//
-// A fresh fetch instance is built per call so the header-capturing fetchFn
-// writes into a per-call closure variable — there is no shared slot for
-// concurrent requests to clobber. createFetch is cheap (a few closures); the
-// per-request cost is negligible for a UI. credentials mirror actions-boot's
+// subflux's single fetch instance. Config is frozen at construction (fetch v2
+// is instances-only / immutable); credentials mirror actions-boot's
 // configureApi("same-origin"), which also matches the browser default the
 // former hand-rolled core relied on.
+const client = createFetch({ credentials: "same-origin" });
+
+// The shared non-throwing core. Delegates the request lifecycle to
+// @cplieger/fetch and maps its envelope onto subflux's ApiResult. Error
+// response headers ride fetch's ApiErr.headers — no header-capturing fetchFn
+// or per-call instance needed.
 async function requestRaw<T>(
-  method: string,
+  method: HttpMethod,
   path: string,
   body?: unknown,
   signal?: AbortSignal,
   decoder?: Decoder<T>,
-  extraHeaders?: Record<string, string>,
 ): Promise<ApiResult<T>> {
-  let responseHeaders: Headers | undefined;
-  const client = createFetch({
-    credentials: "same-origin",
-    fetchFn: (input, init) =>
-      fetch(input, init).then((res) => {
-        responseHeaders = res.headers;
-        return res;
-      }),
-  });
-
   const opts: RequestOptions<T> = {};
   if (body !== undefined) {
     opts.body = body;
@@ -91,19 +79,16 @@ async function requestRaw<T>(
   if (decoder !== undefined) {
     opts.decoder = decoder;
   }
-  if (extraHeaders !== undefined) {
-    opts.headers = extraHeaders;
-  }
 
   // Drive @cplieger/fetch's per-verb raw helpers (apiGetRaw / apiPostRaw / …)
   // rather than the generic requestRaw, so the library's verb helpers are what
   // subflux actually consumes. Each is a thin wrapper over requestRaw with the
   // method baked in (GET/DELETE thread the body through opts, POST/PUT/PATCH via
-  // the body param), so the envelope mapping, header capture, decode/warn
-  // diagnostics, and empty-body contract below are all unchanged. The raw
-  // (not null-collapsing) family is the right fit: subflux layers its own
-  // null-collapse + loose envelope + response-header capture on top, which the
-  // T|null helpers would hide.
+  // the body param), so the envelope mapping, decode/warn diagnostics, and
+  // empty-body contract below are all unchanged. The raw (not null-collapsing)
+  // family is the right fit: subflux layers its own null-collapse + loose
+  // envelope on top, which the T|null helpers would hide. The switch is
+  // exhaustive over HttpMethod — no default arm, no string cast.
   let r: FetchApiResult<T>;
   switch (method) {
     case "GET":
@@ -120,9 +105,6 @@ async function requestRaw<T>(
       break;
     case "DELETE":
       r = await client.apiDeleteRaw<T>(path, opts);
-      break;
-    default:
-      r = await client.requestRaw<T>(method as HttpMethod, path, opts);
       break;
   }
 
@@ -149,8 +131,8 @@ async function requestRaw<T>(
   if (r.requestId !== undefined) {
     result.requestId = r.requestId;
   }
-  if (responseHeaders !== undefined) {
-    result.headers = responseHeaders;
+  if (r.headers !== undefined) {
+    result.headers = r.headers;
   }
   return result;
 }
@@ -176,7 +158,7 @@ function handleSessionExpiry(status: number): void {
 }
 
 async function request<T>(
-  method: string,
+  method: HttpMethod,
   path: string,
   body?: unknown,
   signal?: AbortSignal,
@@ -194,112 +176,63 @@ async function request<T>(
   return r.data ?? null;
 }
 
-// --- Typed 2xx-or-null helpers (use these by default) ---
-
-export function apiGet<T>(path: string, signal?: AbortSignal): Promise<T | null> {
-  return request<T>("GET", path, undefined, signal);
-}
-
-export function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T | null> {
-  return request<T>("POST", path, body, signal);
-}
-
-export function apiPut<T>(path: string, body?: unknown): Promise<T | null> {
-  return request<T>("PUT", path, body);
-}
-
-export function apiPatch<T>(path: string, body?: unknown): Promise<T | null> {
-  return request<T>("PATCH", path, body);
-}
-
-export async function apiDelete(path: string, body?: unknown): Promise<boolean> {
-  const r = await requestRaw<unknown>("DELETE", path, body);
-  if (!r.ok) {
-    console.warn("api: DELETE", path, r.status, r.error);
-  }
-  return r.ok;
-}
-
-// --- Validating helpers (opt-in runtime shape check via decoder) ---
+// --- Generated-client transport contract ---
 //
-// Use these for high-value endpoints that drive UI rendering. If the
-// server changes a field name without updating the frontend, the
-// decoder throws at the boundary and the caller sees null (apiGetTyped)
-// or an error envelope (apiGetTypedRaw) rather than a silent undefined.
-// See validators.ts for the available decoders.
+// wire/client.gen.ts (emitted by cmd/wire-codegen from the wirespec endpoint
+// table) calls exactly these three functions. They are thin aliases over the
+// same request/requestRaw core as the hand helpers below, so the envelope
+// mapping, session-expiry redirect, and console diagnostics stay uniform.
 
-export function apiGetTyped<T>(
-  path: string,
-  decoder: Decoder<T>,
-  signal?: AbortSignal,
-): Promise<T | null> {
-  return request<T>("GET", path, undefined, signal, decoder);
-}
-
-export function apiPostTyped<T>(
+/** Typed transport for generated functions with a bound decoder. */
+export function clientRequest<T>(
+  method: HttpMethod,
   path: string,
   body: unknown,
   decoder: Decoder<T>,
   signal?: AbortSignal,
 ): Promise<T | null> {
-  return request<T>("POST", path, body, signal, decoder);
+  return request<T>(method, path, body, signal, decoder);
 }
 
-export function apiGetTypedRaw<T>(
-  path: string,
-  decoder: Decoder<T>,
-  signal?: AbortSignal,
-): Promise<ApiResult<T>> {
-  return requestRaw<T>("GET", path, undefined, signal, decoder);
-}
-
-// apiGetArray<T>(path, elem) → Promise<T[] | null>
-// Like apiGetTyped, but for endpoints that return a JSON array: validates
-// the array and every element via the generated element decoder.
-export function apiGetArray<T>(
-  path: string,
-  elem: Decoder<T>,
-  signal?: AbortSignal,
-): Promise<T[] | null> {
-  return request<T[]>("GET", path, undefined, signal, (v) => decodeArray(v, elem, "$"));
-}
-
-// --- Raw helpers that expose status + error envelope ---
-
-export function apiGetRaw<T>(path: string, signal?: AbortSignal): Promise<ApiResult<T>> {
-  return requestRaw<T>("GET", path, undefined, signal);
-}
-
-export function apiPostRaw<T>(
+/** OK-flag transport for generated functions without a decoded response. */
+export async function clientRequestOK(
+  method: HttpMethod,
   path: string,
   body?: unknown,
   signal?: AbortSignal,
-): Promise<ApiResult<T>> {
-  return requestRaw<T>("POST", path, body, signal);
+): Promise<boolean> {
+  const r = await requestRaw<unknown>(method, path, body, signal);
+  if (!r.ok && !(r.status === 0 && signal?.aborted)) {
+    console.warn("api:", method, path, r.status, r.error);
+  }
+  return r.ok;
 }
 
-export function apiPutRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>("PUT", path, body);
-}
-
-export function apiPatchRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>("PATCH", path, body);
-}
-
-export function apiDeleteRaw<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
-  return requestRaw<T>("DELETE", path, body);
-}
-
-/** Uniform raw-request helper with optional extra headers. Used by layered
- *  code that already knows the method as a string and needs to thread
- *  per-request headers (e.g. an Idempotency-Key) through the client. The
- *  per-method shorthands above stay clean for direct callers. */
-export function apiRequestRaw<T>(
-  method: string,
+/** Raw-envelope transport for generated *Raw functions. */
+export function clientRequestRaw<T>(
+  method: HttpMethod,
   path: string,
   body?: unknown,
+  decoder?: Decoder<T>,
   signal?: AbortSignal,
-  headers?: Record<string, string>,
 ): Promise<ApiResult<T>> {
-  return requestRaw<T>(method, path, body, signal, undefined, headers);
+  return requestRaw<T>(method, path, body, signal, decoder);
 }
+
+/** Fill a generated PATH_ template's `{name}` placeholders with encoded
+ *  values. For declarative apiAction sites that can't call the generated
+ *  functions directly (the action framework owns the request lifecycle) but
+ *  should still source their paths from the generated constants. Unknown
+ *  placeholders are left verbatim. */
+export function fillPath(template: string, params: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    const v = params[name];
+    return v === undefined ? match : encodeURIComponent(String(v));
+  });
+}
+
+// (The former hand-rolled apiGet/apiPost/… helper families were removed once
+// every JSON call site moved onto the generated wire/client.gen.ts functions;
+// the clientRequest* trio above is the only surface the generated code needs.
+// requestRaw is fully typed; add a typed wrapper here if layered code ever
+// needs extra headers again.)

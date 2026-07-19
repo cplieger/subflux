@@ -333,7 +333,7 @@ func TestBadRequestC_emits_typed_envelope(t *testing.T) {
 	if envelope.Error != "bad input" {
 		t.Errorf("error = %q, want %q", envelope.Error, "bad input")
 	}
-	if envelope.Code != CodeBadRequest {
+	if envelope.Code != string(CodeBadRequest) {
 		t.Errorf("code = %q, want %q", envelope.Code, CodeBadRequest)
 	}
 	if envelope.RequestID != "abc123" {

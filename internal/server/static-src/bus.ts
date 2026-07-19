@@ -26,8 +26,8 @@ interface EventMap {
   "nav:route": string;
   "nav:history": string | undefined;
   "load:history": undefined;
-  "scan:series": { item: CoverageItem | SeriesItem; btn: HTMLButtonElement | null };
-  "scan:movie": { item: CoverageItem | MovieDetail; btn: HTMLButtonElement | null };
+  "scan:series": { item: CoverageItem | SeriesItem };
+  "scan:movie": { item: CoverageItem | MovieDetail };
   "open:security": undefined;
   // Request a refresh of the current view (replaces the old needsRefresh
   // store pulse — this is an event, not state).

@@ -1,138 +1,101 @@
 package authhandlers
 
 import (
-	"context"
-	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/cplieger/auth/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 )
 
-// SessionStore is the narrow store interface the Authenticator needs to
-// resolve a request to a user via session cookie or API key.
-type SessionStore interface {
-	GetSessionByHash(ctx context.Context, tokenHash string) (*auth.Session, error)
-	GetUserByID(ctx context.Context, id int64) (*auth.User, error)
-	GetAPIKeyByHash(ctx context.Context, hash string) (*auth.Key, error)
+// Request authentication is the library's auth.Authenticator, assembled in the
+// server package with subflux's three policies from this file: the session
+// cookie (SessionCookie), the unauthorized response (UnauthorizedResponse),
+// and live session timeouts (auth.WithTimeoutSource wired to the hot-reloaded
+// config). This file is the whole subflux-specific auth glue; the chain
+// runner, session verifier, API-key verifier, bypass, and activity throttling
+// all come from the library.
+
+// Compile-time assertion: the composite authstore satisfies the library's
+// Authenticator store contract (session, activity, user, and API-key lookup).
+var _ auth.AuthStore = authstore.AuthStore(nil)
+
+// Session cookie names as they appear on the wire: the bare base name over
+// plain HTTP (LAN, ip:port) and the __Host--prefixed Secure form over HTTPS.
+// These are the two names SessionCookie's per-request posture alternates
+// between; tests assert against them as subflux's observable cookie contract.
+const (
+	CookieNameHTTP   = "sfx_session"
+	CookieNameSecure = "__Host-" + CookieNameHTTP
+)
+
+// SessionCookie is subflux's session-cookie configuration. Subflux serves both
+// HTTP (LAN, ip:port) and HTTPS (behind a reverse proxy) from a single
+// instance, so PosturePerRequest selects CookieNameSecure with the Secure flag
+// over HTTPS and CookieNameHTTP without it over plain HTTP, per request.
+// TrustForwardedHeaders honors X-Forwarded-Proto for the HTTPS decision; it is
+// safe only because SanitizeForwardedProto strips that header from any request
+// whose direct peer is not a configured trusted proxy.
+var SessionCookie = auth.CookieConfig{
+	Posture:               auth.PosturePerRequest,
+	Name:                  CookieNameHTTP,
+	TrustForwardedHeaders: true,
 }
 
-// Compile-time assertion: the composite authstore satisfies SessionStore.
-var _ SessionStore = authstore.AuthStore(nil)
-
-// Authenticator resolves an HTTP request to an authenticated user. It chains a
-// subflux session-cookie verifier with the library's API-key verifier.
-type Authenticator struct {
-	Store SessionStore
-	// Bypass reports whether all authentication is disabled (nil means never).
-	Bypass func() bool
-	// Timeouts, when non-nil, resolves the session idle/absolute timeouts per
-	// request (the server wires it to the live, hot-reloadable config so a
-	// settings change takes effect without a restart). When nil, the static
-	// IdleTimeout/AbsTimeout fields below are used.
-	Timeouts    func() (idle, absolute time.Duration)
-	IdleTimeout time.Duration
-	AbsTimeout  time.Duration
-}
-
-// syntheticAdminUser is injected when Bypass returns true (auth.disable_auth).
-var syntheticAdminUser = &auth.User{
-	ID:       0,
-	Username: "admin",
-	Role:     auth.RoleAdmin,
-	Enabled:  true,
-}
-
-// Authenticate checks session cookie first, then API key. Returns the user and
-// session hash, or [auth.ErrUnauthenticated].
-func (a *Authenticator) Authenticate(r *http.Request) (user *auth.User, sessHash string, err error) {
-	if a.Bypass != nil && a.Bypass() {
-		return syntheticAdminUser, "", nil
+// UnauthorizedResponse writes subflux's unauthorized response: a 302 to /login
+// for browsers and subflux's typed 401 JSON envelope otherwise. Installed on
+// the library Authenticator via auth.WithUnauthorizedResponse so RequireAuth
+// speaks subflux's error vocabulary.
+func UnauthorizedResponse(w http.ResponseWriter, r *http.Request) {
+	if auth.IsBrowserRequest(r) {
+		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
+		return
 	}
-	ctx := r.Context()
-	for _, v := range a.verifiers() {
-		user, hash, err := v.Verify(ctx, r)
-		if err != nil {
-			return nil, "", err
-		}
-		if user != nil {
-			return user, hash, nil
-		}
-	}
-	return nil, "", auth.ErrUnauthenticated
+	api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
 }
 
-// RequireAuth checks authentication and returns the user. If not authenticated
-// it writes the appropriate response (401 JSON for API clients, 302 to /login
-// for browsers) and returns ok=false.
-func (a *Authenticator) RequireAuth(w http.ResponseWriter, r *http.Request) (user *auth.User, sessHash string, ok bool) {
-	user, sessHash, err := a.Authenticate(r)
+// SanitizeForwardedProto strips the X-Forwarded-Proto header from any request
+// whose direct peer is not in the configured trusted-proxy set (the same
+// hot-reloadable set ClientIP consults). A trusted reverse proxy always
+// overwrites the header for the requests it forwards, so the only surviving
+// spoofing path is a direct connection — and for those the header must not
+// influence the per-request cookie posture (a forged "https" over plain LAN
+// HTTP would flip the session cookie to the __Host-/Secure form the browser
+// then refuses to store or send). With no trusted proxies configured the
+// header is stripped from every request: scheme detection falls back to the
+// unspoofable r.TLS, and HTTPS-terminating deployments declare their proxy via
+// trusted_proxies exactly as they already must for client-IP resolution.
+func SanitizeForwardedProto(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !peerIsTrustedProxy(r) {
+			r.Header.Del("X-Forwarded-Proto")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// peerIsTrustedProxy reports whether the request's direct socket peer is
+// inside the configured trusted-proxy CIDR set. The zero configuration (no
+// trusted proxies) trusts nothing.
+func peerIsTrustedProxy(r *http.Request) bool {
+	p := trustedProxies.Load()
+	if p == nil || len(*p) == 0 {
+		return false
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		if auth.IsBrowserRequest(r) {
-			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
-		} else {
-			api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
+		host = r.RemoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, n := range *p {
+		if n.Contains(ip) {
+			return true
 		}
-		return nil, "", false
 	}
-	return user, sessHash, true
-}
-
-// verifiers returns the ordered credential verifiers: subflux session cookie,
-// then the library's API-key verifier. Session timeouts come from the Timeouts
-// provider when set (live config), falling back to the static fields.
-func (a *Authenticator) verifiers() []auth.CredentialVerifier {
-	idle, absolute := a.IdleTimeout, a.AbsTimeout
-	if a.Timeouts != nil {
-		idle, absolute = a.Timeouts()
-	}
-	return []auth.CredentialVerifier{
-		&sessionVerifier{store: a.Store, idleTimeout: idle, absTimeout: absolute},
-		auth.NewAPIKeyVerifier(a.Store),
-	}
-}
-
-// sessionVerifier authenticates via subflux's session cookie. It differs from
-// the library's session verifier in two ways: it reads subflux's per-request
-// HTTP/HTTPS dual-name cookie, and it does not update session activity inline
-// (the server batches activity writes via sessionActivityBatcher).
-type sessionVerifier struct {
-	store       SessionStore
-	idleTimeout time.Duration
-	absTimeout  time.Duration
-}
-
-// Verify checks the session cookie and returns the user if valid.
-func (v *sessionVerifier) Verify(ctx context.Context, r *http.Request) (user *auth.User, sessHash string, err error) {
-	token := ReadSessionCookie(r)
-	if token == "" {
-		return nil, "", nil
-	}
-	hash := auth.SessionHash(token)
-	sess, err := v.store.GetSessionByHash(ctx, hash)
-	if err != nil {
-		slog.Debug("auth: session lookup failed", "error", err)
-		return nil, "", nil
-	}
-	if sess == nil {
-		return nil, "", nil
-	}
-	if auth.ValidateSession(sess, v.idleTimeout, v.absTimeout, time.Now()) != nil {
-		return nil, "", nil
-	}
-	user, err = v.store.GetUserByID(ctx, sess.UserID)
-	if err != nil {
-		slog.Debug("auth: user lookup failed", "user_id", sess.UserID, "error", err)
-		return nil, "", nil
-	}
-	if user == nil || !user.Enabled {
-		if user != nil {
-			slog.Debug("auth: disabled user attempted session auth", "user_id", sess.UserID)
-		}
-		return nil, "", nil
-	}
-	return user, hash, nil
+	return false
 }

@@ -20,18 +20,9 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type userInfo struct {
-		CreatedAt time.Time `json:"created_at"`
-		Username  string    `json:"username"`
-		Email     string    `json:"email"`
-		Role      auth.Role `json:"role"`
-		ID        int64     `json:"id"`
-		Enabled   bool      `json:"enabled"`
-	}
-
-	out := make([]userInfo, 0, len(users))
+	out := make([]UserInfo, 0, len(users))
 	for i := range users {
-		out = append(out, userInfo{
+		out = append(out, UserInfo{
 			ID:        users[i].ID,
 			Username:  users[i].Username,
 			Email:     users[i].Email,

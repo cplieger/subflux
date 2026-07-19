@@ -1,5 +1,7 @@
 package opensubtitles
 
+import "github.com/cplieger/runesafe"
+
 // --- Language Mapping ---
 
 // Language mapping between ISO 639-1 and OpenSubtitles.com codes.
@@ -26,9 +28,11 @@ func fromOSLang(lang string) string {
 
 // API response types.
 type loginResponse struct {
-	Token   string    `json:"token"`
-	BaseURL string    `json:"base_url"`
-	User    loginUser `json:"user"`
+	Token string `json:"token"`
+	// BaseURL is an upstream-controlled redirect host, tagged at the decode
+	// boundary: validation and use read Raw(); any emit sanitizes itself.
+	BaseURL runesafe.Untrusted `json:"base_url"`
+	User    loginUser          `json:"user"`
 }
 
 type loginUser struct {

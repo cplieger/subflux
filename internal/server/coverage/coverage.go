@@ -43,7 +43,7 @@ func IndexSubStatus(files []api.SubtitleEntry, ignoredCodecs map[string]bool) ma
 			st = &Status{}
 			idx[f.MediaID][k] = st
 		}
-		if f.Source == string(api.ProviderNameEmbedded) && ignoredCodecs[f.Codec] {
+		if f.Source == string(api.SourceEmbedded) && ignoredCodecs[f.Codec] {
 			if !st.Usable {
 				st.IgnoredOnly = true
 			}

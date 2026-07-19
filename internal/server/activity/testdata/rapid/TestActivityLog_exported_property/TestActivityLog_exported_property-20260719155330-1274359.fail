@@ -1,0 +1,31 @@
+# 2026/07/19 15:53:30.422388 [TestActivityLog_exported_property] [rapid] draw ops: 6
+# 2026/07/19 15:53:30.422392 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422394 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422396 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422398 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422400 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422402 [TestActivityLog_exported_property] [rapid] draw op: 0
+# 2026/07/19 15:53:30.422403 [TestActivityLog_exported_property] Entries() len = 6, exceeds maxItems=5
+# 
+v0.4.8#13875739647616691522
+0x0
+0x6b74f03291620
+0x5
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

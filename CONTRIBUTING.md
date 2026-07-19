@@ -17,9 +17,12 @@ locally.
 - The **server** (`internal/server/`) exposes the JSON API and the embedded
   web UI, streams live updates over SSE, and hot-reloads config saves into a
   running engine.
-- The **CLI is the same binary**: `subflux search` runs a local search;
-  `subflux status`, `scan`, `locks`, and friends are remote commands against a
-  running instance over HTTP.
+- The **CLI is the same binary**, and every subcommand is a remote command
+  against a running instance over HTTP: `subflux search` resolves media and
+  drives providers through the server (`/api/search/resolve` +
+  `/api/search`), and `subflux status`, `scan`, `locks`, and friends read or
+  trigger server state. The CLI never opens the database or constructs the
+  search engine itself.
 - State is a single bbolt file (`/config/subflux.bolt`); subtitle files are
   written alongside the media.
 
@@ -59,6 +62,10 @@ The only files that import concrete implementations:
   SSRF-hardened HTTP client) plus one subdirectory per provider
   implementation, and support packages `archive`, `classify`, `dlcache`,
   `anidb`.
+- `embedded/` — the ffprobe-backed embedded subtitle track detector (local
+  media inspection, deliberately not a provider); the search engine owns the
+  codec-usability policy via the top-level `embedded_subtitles` config
+  section.
 - `scorer/` — release scoring with configurable weights.
 - `boltstore/` — the bbolt store (implements `api.Store`); `store/kv` holds
   the engine-agnostic key/codec helpers and `store/storetest` the contract
@@ -69,22 +76,23 @@ The only files that import concrete implementations:
 - `server/` — HTTP routing, SSE, middleware, and the embedded UI, split into
   focused subpackages (`authhandlers`, `confighandlers`, `synchandlers`,
   `manualops`, `scanning`, `scheduler`, `polling`, `events`, `coverage`, …).
-- `arrsvc/`, `metrics/`, `cache/`, `httputil/`, `cliparse/`, `clisearch/`,
+- `arrsvc/`, `metrics/`, `cache/`, `httputil/`, `cliparse/`,
   `testsupport/` — focused helpers and thin wrappers over the shared
-  `cplieger/*` libraries.
+  `cplieger/*` libraries (`cliparse/` is the CLI grammar: one
+  `ParseAndValidate` pass plus help rendering).
 
 Dependencies flow one way: composition roots → `internal/server/` → domain
 packages → `internal/api/`. There are no reverse imports.
 
 ### Frontend (`internal/server/static-src/`)
 
-TypeScript compiled by tsc, served as native ES modules with an importmap.
-There is no bundler and no framework; reactivity comes from
-`@cplieger/reactive`, user-initiated mutations go through
-`@cplieger/actions`, HTTP through `@cplieger/fetch`, and toasts/dialogs/
-tooltips from `@cplieger/ui-primitives`. Generated wire types live under
-`static-src/wire/` (see below). CSS is split per feature and concatenated
-via `MANIFEST` files at image build.
+TypeScript typechecked by tsc (`--noEmit`) and bundled by esbuild via its Go
+API (`go run ./cmd/bundle` — no Node in the build). There is no framework;
+reactivity comes from `@cplieger/reactive`, user-initiated mutations go
+through `@cplieger/actions`, HTTP through `@cplieger/fetch`, and
+toasts/dialogs/tooltips from `@cplieger/ui-primitives`. Generated wire types
+live under `static-src/wire/` (see below). CSS is split per feature and
+concatenated via `MANIFEST` files by the same bundle command.
 
 ## Invariants (do not break)
 
@@ -118,6 +126,15 @@ CI when they drift.
 - **Manual locks gate automation.** Every automated search checks
   `IsManuallyLocked` first and fails closed on a store error. Don't add an
   automated download path that skips it.
+- **Schema bumps ship a migration step, never a "delete your database"
+  release note.** A breaking store change bumps its domain's version constant
+  and appends one step to the matching ladder in
+  `internal/boltstore/migrations.go`; the store migrates itself at startup
+  after writing a safety snapshot next to the database file. Auth-domain
+  rewrites are implemented in `internal/authstore` (its record types are
+  unexported by design) and registered as a plain step callback. The
+  irreplaceable set — users, passkeys, API keys, manual locks/history, sync
+  offsets — must survive every migration path by construction.
 - **HTTP responses go through the `api` helpers.** Don't hand-craft JSON
   error strings.
 - **Logs are UTC.** The `slogx` library forces every record's timestamp to
@@ -144,19 +161,24 @@ to exercise those paths locally, put `ffmpeg` and `ffprobe` on your `PATH`.
 Run the server with no arguments; on first start it comes up in unconfigured
 mode (only the web UI and config endpoints respond) until a valid config is
 saved. `config.example.yaml` is the documented template. The CLI is the same
-binary:
+binary, and its subcommands talk to a running server:
 
 ```sh
-subflux --help            # full command list
-subflux search ...        # local search against configured providers
-subflux status            # remote command, talks to a running server
+subflux --help                      # full command list
+subflux status                      # remote command, talks to a running server
+subflux search --title "The Wire"   # remote search through the server's providers
 ```
 
-Remote subcommands (`status`, `scan`, `state`, `locks`, `providers`, …)
-reach a running instance over HTTP via `SUBFLUX_URL` (default
-`http://127.0.0.1:8374`). When the instance has auth enabled, set
-`SUBFLUX_API_KEY` to an API key (created via `subflux generate-api-key` or
-the web UI's Security dialog); the CLI sends it as `X-API-Key`.
+CLI development workflow: run a server locally (`go run .` or the container),
+then point the CLI at it. All subcommands — including `search` — reach the
+instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`). When
+the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key (created
+via `subflux generate-api-key` or the web UI's Security dialog); the CLI
+sends it as `X-API-Key`. There is no local-execution search mode: the search
+subcommand resolves media via `GET /api/search/resolve`, searches via
+`GET /api/search`, and downloads via the async `POST /api/search/download` +
+activity polling, so results, locks, and history are always coherent with
+the server's state.
 
 A `go.work` file may exist locally to develop against unreleased sibling
 libraries (for example `../webhttp`); it is gitignored, and the image build
@@ -175,25 +197,32 @@ go generate ./...         # runs ./cmd/wire-codegen
 
 ### Frontend assets
 
-The browser bundle is produced during the Docker build, not committed. The
-builder stage compiles `static-src/*.ts` with tsc (the TypeScript native
-compiler), fetches the `@cplieger/*` runtime packages from npm for the
-importmap-based vendor directory, and concatenates the per-feature CSS
-splits listed in the `MANIFEST` files (`MANIFEST` → `style.css`,
-`login.MANIFEST` → `login.css`). The compiled output under
-`internal/server/static/` is gitignored and embedded at build time. Go-only
-changes need none of this; rebuild the image to pick up frontend edits.
+The browser bundle is produced at build time, not committed. `cmd/bundle`
+(esbuild via its Go API — a Go library, no Node, no npm) bundles the two
+page entries (`app.ts` → `/app.js`, `login.ts` → `/login.js`) as ES modules
+with code splitting (shared modules become hashed chunks under `/chunks/`),
+concatenates the per-feature CSS splits listed in the `MANIFEST` files
+(`MANIFEST` → `style.css`, `login.MANIFEST` → `login.css`), copies
+`ui-primitives.css`, and writes precompressed `.gz` siblings the server
+hands to gzip-accepting clients. tsc runs `--noEmit` as the type gate
+(esbuild does not typecheck). In the Docker build the ts-builder stage
+typechecks and fetches the pinned `@cplieger/*` packages; the Go builder
+stage then runs `go run ./cmd/bundle` and embeds the output. Everything
+generated under `internal/server/static/` is gitignored (only the HTML
+entrypoints, favicon, and icons are committed). Go-only changes need none
+of this; rebuild the image to pick up frontend edits.
 
 To iterate on `static-src/` locally, install the dev toolchain and use the
-package scripts:
+package scripts (plus the bundle command from the repo root):
 
 ```sh
 cd internal/server/static-src
 npm install
-npm run typecheck          # tsc -project tsconfig.json (source)
+npm run typecheck          # tsc -project tsconfig.json (--noEmit type gate)
 npm run typecheck:tests    # tsc -project tsconfig.test.json (tests)
 npm test                   # vitest --run (single pass)
 npm run test:watch         # vitest watch mode
+cd ../../.. && go run ./cmd/bundle   # build the served assets into static/
 ```
 
 ## Running checks
@@ -264,9 +293,10 @@ checks above pass before opening a PR.
 
 ## Functional tests
 
-`tests/functional/run.sh` drives a live instance over the HTTP API: 27
-sections covering config, providers, coverage, scoring, scans, sync,
-manual downloads, hot reload, and the mock provider's failure modes. It
+`tests/functional/run.sh` drives a live instance over the HTTP API: 26
+sections covering config, providers, coverage, search resolution, scoring,
+scans, sync, manual downloads, hot reload, and the mock provider's failure
+modes. It
 needs `jq`, a reachable subflux with auth disabled or an API key configured,
 and reachable Sonarr/Radarr. It saves and restores the config around the
 run.

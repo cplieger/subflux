@@ -2,8 +2,8 @@
 
 import * as store from "./store.js";
 import { $, el, icon, errDiv, pad, insertNavButton } from "./dom.js";
-import { apiGet, apiGetArray } from "./api-client.js";
-import { decodeSubtitleEntry } from "./wire/decoders.gen.js";
+import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
+import { coverageSeriesDetail, mediaEpisodes, stateIDs } from "./wire/client.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   fmtEpisode,
@@ -19,10 +19,23 @@ import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openSyncDialog } from "./sync.js";
 import { openFileManager } from "./files.js";
-import { triggerSeriesScan, triggerSeasonScan, triggerMovieScan } from "./detail-scan.js";
+import {
+  triggerSeriesScan,
+  triggerSeasonScan,
+  triggerMovieScan,
+  applyScanButtonState,
+} from "./detail-scan.js";
+import { seasonScopeKey } from "./scan-scope.js";
 import { confirmSeasonSync } from "./detail-season-sync.js";
 import type { SeasonSyncEpisode } from "./detail-season-sync.js";
-import type { SubtitleEntry, MovieDetail, Episode, SeasonGroup, SeriesItem } from "./api-types.js";
+import { subtitleRef } from "./file-ref.js";
+import type {
+  SubtitleEntry,
+  MovieDetail,
+  EpisodeItem,
+  SeasonGroup,
+  SeriesItem,
+} from "./api-types.js";
 import { patch, createCollection, bindList, type ListSpec } from "@cplieger/reactive";
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
@@ -204,34 +217,50 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
     },
   });
   const out = $.coverageContent;
-  const skel = document.createDocumentFragment();
-  for (let i = 0; i < 6; i++) {
-    skel.appendChild(
-      el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
-    );
-  }
-  // The skeleton patch detaches any live detail <tbody>, so the fetch's
-  // renderSeriesDetail always REBUILDS — initial navigation never reuses a
-  // stale binding. (A coverage SSE refresh paints no skeleton, so it reuses.)
-  patch(out, skel);
+  // Anti-flicker loading skeleton (150ms show-delay + 300ms min-visible,
+  // abort-aware): a cached/fast load never paints it, a slow one keeps it up
+  // long enough not to blink. The commit ALWAYS detaches the current content
+  // (fresh-fragment patch) before rendering — preserving the always-REBUILD
+  // guarantee the old eager skeleton patch provided, so renderSeriesDetail
+  // never reuses a stale live-table binding from a previous detail view. (A
+  // coverage SSE refresh paints no skeleton, so it reuses — unchanged.)
+  const timing = skeletonTiming(
+    () => {
+      const skel = document.createDocumentFragment();
+      for (let i = 0; i < 6; i++) {
+        skel.appendChild(
+          el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+        );
+      }
+      patch(out, skel);
+    },
+    { minVisibleMs: 300, signal },
+  );
 
   Promise.all([
-    apiGet<SeasonGroup[]>(`/api/media/series/${s.id}/episodes`, signal),
-    apiGetArray(`/api/coverage/series/${s.tvdb_id}`, decodeSubtitleEntry, signal),
-    apiGet<string[]>(`/api/state/ids?type=episode&prefix=tvdb-${s.tvdb_id}-`, signal),
+    mediaEpisodes(s.id, { signal }),
+    coverageSeriesDetail(s.tvdb_id, { signal }),
+    stateIDs({ type: "episode", prefix: `tvdb-${s.tvdb_id}-` }, { signal }),
   ])
     .then(([seasons, subFiles, historyIDs]) => {
       if (signal.aborted) {
+        timing.cancel();
         return;
       }
-      renderSeriesDetail(s, seasons ?? [], subFiles ?? [], new Set(historyIDs ?? []));
+      timing.commit(() => {
+        patch(out, document.createDocumentFragment()); // detach: rebuild guarantee
+        renderSeriesDetail(s, seasons ?? [], subFiles ?? [], new Set(historyIDs ?? []));
+      });
     })
     .catch((e: unknown) => {
       if (signal.aborted) {
+        timing.cancel();
         return;
       }
       const msg = e instanceof Error ? e.message : String(e);
-      patch(out, errDiv(msg));
+      timing.commit(() => {
+        patch(out, errDiv(msg));
+      });
     });
 }
 
@@ -243,8 +272,8 @@ function collectSeasonSyncEps(
   targetLangs: { lang: string; variant: string }[],
 ): SeasonSyncEpisode[] {
   const result: SeasonSyncEpisode[] = [];
-  for (const ep of sg.episodes ?? []) {
-    if (!ep.has_file || !ep.path) {
+  for (const ep of sg.episodes) {
+    if (!ep.has_file) {
       continue;
     }
     const mediaId = tvdbMediaId(series.tvdb_id, sg.season, ep.episode);
@@ -254,10 +283,9 @@ function collectSeasonSyncEps(
       const entries = subs[key];
       if (entries) {
         for (const sub of entries) {
-          if (sub.source !== EMBEDDED_PROVIDER && sub.path) {
+          if (sub.source !== EMBEDDED_PROVIDER) {
             result.push({
-              subPath: sub.path,
-              videoPath: ep.path,
+              ref: subtitleRef("episode", sub),
               label: fmtEpisode(sg.season, ep.episode),
             });
           }
@@ -292,7 +320,7 @@ type DetailRow =
   | {
       kind: "ep";
       season: number;
-      ep: Episode;
+      ep: EpisodeItem;
       series: SeriesItem;
       subs: Partial<Record<string, SubtitleEntry[]>>;
       targetLangs: { lang: string; variant: string }[];
@@ -331,7 +359,7 @@ function epSig(
       .map((t) => {
         const entries = subs[`${t.lang}|${t.variant}`] ?? [];
         return entries
-          .map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}:${e.path ?? ""}`)
+          .map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}:${e.ordinal ?? 0}`)
           .join(",");
       })
       .join("|");
@@ -397,7 +425,7 @@ function episodeActionChildren(row: DetailEpRow): (HTMLElement | null)[] {
     const entries = subs[key];
     if (entries) {
       for (const sub of entries) {
-        if (sub.source !== EMBEDDED_PROVIDER && sub.path) {
+        if (sub.source !== EMBEDDED_PROVIDER) {
           extEpSubs.push(sub);
         }
       }
@@ -423,7 +451,7 @@ function episodeActionChildren(row: DetailEpRow): (HTMLElement | null)[] {
 
   const firstExtSub = extEpSubs[0];
   const syncBtn =
-    extEpSubs.length > 0 && firstExtSub
+    extEpSubs.length > 0 && firstExtSub && ep.has_file
       ? el(
           "button",
           {
@@ -431,13 +459,7 @@ function episodeActionChildren(row: DetailEpRow): (HTMLElement | null)[] {
             className: "ghost",
             "data-tip": "Adjust subtitle timing",
             onclick: () => {
-              openSyncDialog(
-                extEpSubs,
-                ep.path ?? "",
-                "series",
-                series.id,
-                fmtEpisode(season, ep.episode),
-              );
+              openSyncDialog(extEpSubs, "series", series.id, fmtEpisode(season, ep.episode));
             },
           },
           icon("sync"),
@@ -477,7 +499,7 @@ function buildEpisodeRow(row: DetailEpRow): HTMLElement {
     "tr",
     null,
     epNumCell,
-    el("td", { className: "ep-title", "data-ep": epLabel }, ep.title ?? ""),
+    el("td", { className: "ep-title", "data-ep": epLabel }, ep.title),
     covCell,
     el(
       "td",
@@ -513,12 +535,14 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
       type: "button",
       className: "ghost",
       "data-tip": "Auto: scan and download missing subtitles for this season",
-      onclick: (e: MouseEvent) =>
-        triggerSeasonScan(series, season, e.currentTarget as HTMLButtonElement),
+      "data-scan-scope": seasonScopeKey(series.id, season),
+      onclick: () => triggerSeasonScan(series, season),
     },
     icon("search"),
     el("span", { className: "btn-text" }, " Search"),
-  );
+  ) as HTMLButtonElement;
+  // Rows painted while a scan runs restore the disabled+spinner state.
+  applyScanButtonState(searchBtn);
   const histBtn = hasHistory
     ? el(
         "button",
@@ -631,7 +655,7 @@ function buildSeriesRows(
   const rows: DetailRow[] = [];
   let first = true;
   for (const sg of sortedSeasons) {
-    if (!(sg.episodes ?? []).some((ep) => ep.has_file)) {
+    if (!sg.episodes.some((ep) => ep.has_file)) {
       continue;
     }
     if (!first) {
@@ -652,7 +676,7 @@ function buildSeriesRows(
       sig: `${syncEps.length}:${hasHist}`,
     });
     rows.push({ kind: "cols", season: sg.season });
-    for (const ep of sg.episodes ?? []) {
+    for (const ep of sg.episodes) {
       if (!ep.has_file) {
         continue;
       }
@@ -693,16 +717,6 @@ export function renderSeriesDetail(
       oldFiles.remove();
     }
     if (hasExtSubs && store.get("isAdmin")) {
-      // Build media_id → video path map from episode data.
-      const epPaths = new Map<string, string>();
-      for (const sg of seasons) {
-        for (const ep of sg.episodes ?? []) {
-          if (ep.has_file && ep.path) {
-            const mid = tvdbMediaId(series.tvdb_id, sg.season, ep.episode);
-            epPaths.set(mid, ep.path);
-          }
-        }
-      }
       const filesBtn = el(
         "button",
         {
@@ -715,7 +729,6 @@ export function renderSeriesDetail(
               `tvdb-${series.tvdb_id}-`,
               series.title,
               `/series/${series.tvdb_id}`,
-              epPaths,
               series.id,
             );
           },
@@ -777,7 +790,7 @@ export function renderSeriesDetail(
       if (sg.season === 0) {
         continue;
       }
-      const eps = sg.episodes ?? [];
+      const eps = sg.episodes;
       for (const ep of eps) {
         if (ep.absolute_episode && ep.absolute_episode !== prior + ep.episode) {
           return true;
@@ -939,7 +952,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
     m.rule,
   )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
   const subs = m.subs;
-  const hasExtSubs = subs.some((s) => s.source !== EMBEDDED_PROVIDER && s.path);
+  const hasExtSubs = subs.some((s) => s.source !== EMBEDDED_PROVIDER);
   emit(BusEvent.PanelConfigure, {
     visible: false,
     detail: {
@@ -950,21 +963,14 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
       arrName: "Radarr",
       filesAction: hasExtSubs
         ? () => {
-            openFileManager(
-              "movie",
-              `tmdb-${m.tmdb_id}`,
-              m.title,
-              `/movie/${m.tmdb_id}`,
-              new Map([["", m.path ?? ""]]),
-              m.id,
-            );
+            openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
           }
         : null,
     },
   });
 
   // Check history async and add button if found.
-  apiGet<string[]>(`/api/state/ids?type=movie&prefix=tmdb-${m.tmdb_id}`, signal)
+  stateIDs({ type: "movie", prefix: `tmdb-${m.tmdb_id}` }, { signal })
     .then((ids: string[] | null) => {
       if (signal.aborted) {
         return;
@@ -997,7 +1003,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   const out = $.coverageContent;
 
   // Collect all external subtitles for the sync button.
-  const extSubs = subs.filter((s) => s.source !== EMBEDDED_PROVIDER && s.path);
+  const extSubs = subs.filter((s) => s.source !== EMBEDDED_PROVIDER);
 
   // Add sync button to header if external subs exist.
   const firstExtSub = extSubs[0];
@@ -1010,7 +1016,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
         "data-nav": "sync",
         "data-tip": "Adjust subtitle timing",
         onclick: () => {
-          openSyncDialog(extSubs, m.path ?? "", "movie", m.id, m.title);
+          openSyncDialog(extSubs, "movie", m.id, m.title);
         },
       },
       icon("sync"),
@@ -1092,9 +1098,9 @@ on(BusEvent.OpenSeries, ({ item, skipPush }) => {
 on(BusEvent.OpenMovie, ({ item, skipPush }) => {
   openMovieDetail(item as MovieDetail, skipPush);
 });
-on(BusEvent.ScanSeries, ({ item, btn }) => {
-  void triggerSeriesScan(item as SeriesItem, btn);
+on(BusEvent.ScanSeries, ({ item }) => {
+  void triggerSeriesScan(item as SeriesItem);
 });
-on(BusEvent.ScanMovie, ({ item, btn }) => {
-  void triggerMovieScan(item as MovieDetail, btn);
+on(BusEvent.ScanMovie, ({ item }) => {
+  void triggerMovieScan(item as MovieDetail);
 });

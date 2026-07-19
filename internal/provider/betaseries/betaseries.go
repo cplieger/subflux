@@ -14,7 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/ssrf/v2"
+	"github.com/cplieger/runesafe"
+	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
@@ -89,7 +90,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 	if len(resp.Errors) > 0 {
 		slog.Warn("betaseries: API returned errors",
-			"errors", resp.Errors,
+			"errors", runesafe.Sanitize(fmt.Sprint(resp.Errors)),
 			"tvdb_id", req.TvdbID,
 			"season", req.Season,
 			"episode", req.Episode)
@@ -168,7 +169,7 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	// (code 1001). Parse the error body to distinguish them.
 	if resp.StatusCode == http.StatusBadRequest {
 		defer resp.Body.Close()
-		data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB error response limit
+		data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxErrorBodyBytes))
 		if err != nil {
 			return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 		}

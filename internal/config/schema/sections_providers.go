@@ -23,7 +23,7 @@ func searchSection() api.SchemaSection {
 				Default:     defaults.FormatDuration(defaults.DefaultScanDelay),
 				Placeholder: defaults.FormatDuration(defaults.DefaultScanDelay),
 				Min:         defaults.FormatDuration(defaults.MinScanDelay),
-				Help:        "Delay between items during scans to avoid hammering providers (minimum 5s)",
+				Help:        "Delay after items that queried providers during scans, to avoid hammering them (minimum 5s; items needing no provider work skip it)",
 			},
 			{
 				Key: "provider_timeout", Label: "Provider Timeout", Type: fieldDuration,

@@ -5,7 +5,6 @@
 package server
 
 import (
-	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/serveradapter"
@@ -19,12 +18,12 @@ func (s *Server) scanDeps() *scanning.Deps {
 	}
 	return &scanning.Deps{
 		DB:            s.db,
+		Backoff:       s.db,
 		Metrics:       s.metrics,
 		Events:        &serveradapter.ScanEventAdapter{E: s.events},
 		Activity:      &serveradapter.ActivityAdapter{A: s.activity},
 		Alerts:        &serveradapter.AlertAdapter{A: s.alerts},
 		ShowSkipCache: s.showSkipCache,
-		SleepCtx:      httputil.SleepCtx,
 		ClearCaches:   provider.ClearProviderCaches,
 	}
 }

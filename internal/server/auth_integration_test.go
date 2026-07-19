@@ -166,6 +166,7 @@ func (noopMetrics) RecordHTTP(_, _ string, _ int, _ time.Duration)          {}
 func (noopMetrics) RecordPanic()                                            {}
 func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
 func (noopMetrics) AdaptiveSkip()                                           {}
+func (noopMetrics) RecordEmbeddedDetectorError()                            {}
 func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
 func (noopMetrics) RecordImport(_ api.PollKey)                              {}
 func (noopMetrics) TotalSearches() int64                                    { return 0 }
@@ -180,6 +181,7 @@ func (noopMetrics) RecordStoreFreelistBytes(_ int64)                {}
 func (noopMetrics) RecordReconcile(_ int, _ int64, _ time.Duration) {}
 func (noopMetrics) RecordBackupSuccess(_ time.Duration)             {}
 func (noopMetrics) SetConfigured(_ bool)                            {}
+func (noopMetrics) SetPollCursorsDirty(_ int)                       {}
 
 func TestIntegration_MiddlewareChain(t *testing.T) {
 	t.Parallel()
@@ -600,14 +602,14 @@ func TestSecurity_CookieFallback(t *testing.T) {
 
 	// Request over HTTP → cookie name is sfx_session (no __Host- prefix).
 	httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", http.NoBody)
-	httpName := authhandlers.SessionCookieName(httpReq)
+	httpName := authhandlers.SessionCookie.CookieName(httpReq)
 	if httpName != authhandlers.CookieNameHTTP {
 		t.Errorf("HTTP cookie name = %q, want %q", httpName, authhandlers.CookieNameHTTP)
 	}
 
-	// Verify SetSessionCookie over HTTP produces the right cookie.
+	// Verify SetCookie over HTTP produces the right cookie.
 	rec := httptest.NewRecorder()
-	authhandlers.SetSessionCookie(rec, httpReq, "test-token", 0)
+	authhandlers.SessionCookie.SetCookie(rec, httpReq, "test-token", 0)
 	httpCookies := rec.Result().Cookies()
 	for _, c := range httpCookies {
 		if c.Name == authhandlers.CookieNameHTTP {
@@ -620,13 +622,13 @@ func TestSecurity_CookieFallback(t *testing.T) {
 	// Request with TLS → cookie name is __Host-sfx_session.
 	tlsReq := httptest.NewRequest(http.MethodGet, "https://localhost/", http.NoBody)
 	tlsReq.Header.Set("X-Forwarded-Proto", "https")
-	tlsName := authhandlers.SessionCookieName(tlsReq)
+	tlsName := authhandlers.SessionCookie.CookieName(tlsReq)
 	if tlsName != authhandlers.CookieNameSecure {
 		t.Errorf("TLS cookie name = %q, want %q", tlsName, authhandlers.CookieNameSecure)
 	}
 
 	rec = httptest.NewRecorder()
-	authhandlers.SetSessionCookie(rec, tlsReq, "test-token", 0)
+	authhandlers.SessionCookie.SetCookie(rec, tlsReq, "test-token", 0)
 	tlsCookies := rec.Result().Cookies()
 	foundSecure := false
 	for _, c := range tlsCookies {

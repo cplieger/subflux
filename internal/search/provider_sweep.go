@@ -54,8 +54,7 @@ func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
 }
 
 // searchProvidersFiltered searches all eligible providers concurrently.
-// Embedded runs outside the main pool (local ffprobe, no rate limits).
-// Network providers in timeout are skipped.
+// Providers in timeout are skipped.
 // Returns results and per-provider success/error lists.
 //
 // Concurrent calls with identical request inputs (media id, language list,
@@ -144,16 +143,6 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 	g.SetLimit(e.providerConcurrency())
 
 	for _, p := range providers {
-		// Embedded is local (ffprobe); skip timeout check but still use errgroup.
-		if p.Name() == api.ProviderNameEmbedded {
-			g.Go(func() error {
-				subs, name, err := e.searchProvider(ctx, p, req, false)
-				collect(subs, name, err)
-				return nil
-			})
-			continue
-		}
-
 		if e.timeout.IsTimedOut(p.Name()) {
 			mu.Lock()
 			provResults = append(provResults, providerResult{

@@ -29,10 +29,14 @@ type SearchResult struct {
 	ReleaseName string         `json:"release_name"`
 	MatchedBy   string         `json:"matched_by"`
 	SubtitleID  string         `json:"subtitle_id"`
-	Score       int            `json:"score"`
-	HearingImp  bool           `json:"hearing_impaired"`
-	Forced      bool           `json:"forced"`
-	OnDisk      bool           `json:"on_disk"`
+	// Tier is the score's quality-tier label, computed server-side by the
+	// scorer (same table as /api/score): the remote CLI renders it and has
+	// no scorer of its own.
+	Tier       api.ScoreTier `json:"tier"`
+	Score      int           `json:"score"`
+	HearingImp bool          `json:"hearing_impaired"`
+	Forced     bool          `json:"forced"`
+	OnDisk     bool          `json:"on_disk"`
 }
 
 // SearchDeps holds the narrow dependencies for manual search execution.
@@ -51,11 +55,15 @@ type SearchStore interface {
 	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
 }
 
-// ActivityTracker manages activity lifecycle.
+// ActivityTracker manages activity lifecycle. Progress doubles as the
+// detail mutator: download completion writes the saved subtitle path into
+// the entry detail so activity consumers (the remote CLI's poll loop)
+// can report it.
 type ActivityTracker interface {
 	Start(action, detail string, source activity.ActivitySource) string
 	End(id string)
 	Fail(id string)
+	Progress(id string, current, total int, detail string)
 }
 
 // ManualSonarrClient is the Sonarr surface manual downloads use: series lookup
@@ -81,15 +89,21 @@ var (
 // EventPublisher publishes events to SSE clients.
 type EventPublisher interface {
 	PublishNotify(level events.NotifyLevel, text string)
-	PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source, path string)
+	PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source string)
 }
 
 // LiveState holds the runtime state needed for a manual search pass.
+// Sonarr/Radarr are the narrow by-ID surfaces manual downloads use;
+// SonarrLib/RadarrLib are the library-listing surfaces the resolve
+// endpoint uses (all nil when the corresponding arr is not configured).
 type LiveState struct {
 	Cfg       api.ConfigProvider
 	Engine    api.SearchEngine
+	Scorer    api.Scorer
 	Sonarr    ManualSonarrClient
 	Radarr    ManualRadarrClient
+	SonarrLib ResolveSonarrClient
+	RadarrLib ResolveRadarrClient
 	Providers []api.Provider
 }
 

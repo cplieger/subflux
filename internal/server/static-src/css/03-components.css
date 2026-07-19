@@ -90,6 +90,10 @@
   mask-image: url("icons/pause.svg");
 }
 
+.icon-stop {
+  mask-image: url("icons/stop.svg");
+}
+
 .icon-file {
   mask-image: url("icons/file.svg");
 }

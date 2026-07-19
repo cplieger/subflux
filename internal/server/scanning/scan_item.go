@@ -11,11 +11,13 @@ import (
 )
 
 // ScanEpisode searches for subtitles for a single episode.
-// Returns the scan outcome, the language codes whose group actually ran
-// (searchedLangs — the only langs the season tracker may record), and the
-// language codes that had at least one subtitle downloaded (foundLangs, a
-// subset of searchedLangs).
-func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (outcome ScanOutcome, searchedLangs, foundLangs []string) {
+// Returns the scan outcome, the typed per-language outcomes from the
+// engine — the season tracker records evidence only for entries whose Kind
+// is api.LangSearched (a skipped or backed-off language must never accrue a
+// false no-result streak) — and whether the search actually queried any
+// provider (the inter-item pacing signal: callers skip the scan delay for
+// items that generated no provider traffic).
+func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.Series, ep *arrapi.Episode, forceUpgrade ...bool) (ScanOutcome, []api.LangOutcome, bool) {
 	label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 	slog.Debug("scan: processing episode",
 		"media", label, "imdb", series.ImdbID,
@@ -33,32 +35,45 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	if err != nil {
 		slog.Warn("episode search failed", "media", label, "error", err)
 	}
-	if len(result.Paths) > 0 || result.CoverageChanged {
+	queried := result.ProviderQueried()
+	paths := result.Paths()
+	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := api.BuildMediaID(&req)
 		deps.Events.PublishCoverageUpdate(api.MediaTypeEpisode, mediaID)
-		if len(result.Paths) > 0 && ls.Sonarr != nil {
+		if len(paths) > 0 && ls.Sonarr != nil {
 			if err := ls.Sonarr.RescanSeries(ctx, series.ID); err != nil {
 				slog.Warn("failed to refresh series", "series_id", series.ID, "error", err)
 			}
 		}
-		if len(result.Paths) > 0 {
-			return ScanFound, result.SearchedLangs, result.FoundLangs
+		if len(paths) > 0 {
+			return ScanFound, result.Langs, queried
 		}
 	}
-	if result.Searched == 0 {
-		if result.BackedOff > 0 {
+	if result.TargetsSearched() == 0 {
+		if result.TargetsBackedOff() > 0 {
 			// Every language needing a search had all providers in adaptive
 			// backoff: no query ran, so this is neither skipped-as-covered
 			// nor searched-with-no-result.
-			return ScanBackedOff, nil, nil
+			return ScanBackedOff, result.Langs, queried
 		}
-		return ScanSkipped, nil, nil
+		return ScanSkipped, result.Langs, queried
 	}
-	return ScanNoResult, result.SearchedLangs, nil
+	return ScanNoResult, result.Langs, queried
 }
 
-// ScanMovie searches for subtitles for a single movie.
-func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) ScanOutcome {
+// ScanMovie searches for subtitles for a single movie. The second return
+// reports whether any provider was actually queried (the inter-item pacing
+// signal; see ScanEpisode).
+func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) (ScanOutcome, bool) {
+	outcome, _, queried := scanMovieDetail(ctx, deps, ls, m, forceUpgrade...)
+	return outcome, queried
+}
+
+// scanMovieDetail is ScanMovie plus the number of targets that got a
+// subtitle downloaded (the engine saves one file per successful target), for
+// callers that report per-target found counts rather than a single outcome.
+// queried is the inter-item pacing signal (see ScanEpisode).
+func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, forceUpgrade ...bool) (outcome ScanOutcome, found int, queried bool) {
 	label := fmt.Sprintf("%s (%d)", m.Title, m.Year)
 	slog.Debug("scan: processing movie",
 		"media", label, "imdb", m.ImdbID, "tmdb", m.TmdbID,
@@ -76,25 +91,27 @@ func ScanMovie(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.Movie, 
 	if err != nil {
 		slog.Warn("movie search failed", "media", label, "error", err)
 	}
-	if len(result.Paths) > 0 || result.CoverageChanged {
+	queried = result.ProviderQueried()
+	paths := result.Paths()
+	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := api.BuildMediaID(&req)
 		deps.Events.PublishCoverageUpdate(api.MediaTypeMovie, mediaID)
-		if len(result.Paths) > 0 && ls.Radarr != nil {
+		if len(paths) > 0 && ls.Radarr != nil {
 			if err := ls.Radarr.RescanMovie(ctx, m.ID); err != nil {
 				slog.Warn("failed to refresh movie", "movie_id", m.ID, "error", err)
 			}
 		}
-		if len(result.Paths) > 0 {
-			return ScanFound
+		if len(paths) > 0 {
+			return ScanFound, len(paths), queried
 		}
 	}
-	if result.Searched == 0 {
-		if result.BackedOff > 0 {
-			return ScanBackedOff
+	if result.TargetsSearched() == 0 {
+		if result.TargetsBackedOff() > 0 {
+			return ScanBackedOff, 0, queried
 		}
-		return ScanSkipped
+		return ScanSkipped, 0, queried
 	}
-	return ScanNoResult
+	return ScanNoResult, 0, queried
 }
 
 // SceneOrPath returns sceneName if non-empty, otherwise filePath.

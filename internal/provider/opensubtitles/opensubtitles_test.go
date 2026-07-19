@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
 func TestFactory_requires_credentials(t *testing.T) {
@@ -84,16 +85,28 @@ func TestFactory_options(t *testing.T) {
 		wantHash bool
 		wantAI   bool
 	}{
-		{name: "defaults", extra: nil, wantHash: true, wantAI: false},
+		// P14: use_hash's product default (true) lives ONLY in the
+		// providerEntries schema declaration; the registry normalizes it in
+		// before the factory runs. A bare map here bypasses normalization,
+		// so absent means the accessor zero (false) — the factory must NOT
+		// re-encode the default (the dual-encoding drift this prevents).
+		{name: "defaults (bare map, no normalization)", extra: nil, wantHash: false, wantAI: false},
 		{name: "use_hash explicit true", extra: map[string]any{"use_hash": true}, wantHash: true, wantAI: false},
 		{name: "use_hash false", extra: map[string]any{"use_hash": false}, wantHash: false, wantAI: false},
-		{name: "include_ai_translated true", extra: map[string]any{"include_ai_translated": true}, wantHash: true, wantAI: true},
-		{name: "include_ai_translated false", extra: map[string]any{"include_ai_translated": false}, wantHash: true, wantAI: false},
+		{name: "include_ai_translated true", extra: map[string]any{"include_ai_translated": true}, wantHash: false, wantAI: true},
+		{name: "include_ai_translated false", extra: map[string]any{"include_ai_translated": false}, wantHash: false, wantAI: false},
 		{name: "both overridden", extra: map[string]any{
 			"use_hash": false, "include_ai_translated": true,
 		}, wantHash: false, wantAI: true},
 		{name: "string true accepted", extra: map[string]any{"use_hash": "true"}, wantHash: true, wantAI: false},
 		{name: "string false accepted", extra: map[string]any{"use_hash": "false"}, wantHash: false, wantAI: false},
+		// The registry path: a schema-normalized map carries the declared
+		// default. The field literal here mirrors the declaration's Type and
+		// Default (the real declaration is asserted by the main package's
+		// registry tests; this pins that normalization reaches the factory).
+		{name: "normalized map carries declared default", extra: provider.NormalizeSettings(
+			[]api.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}},
+			nil), wantHash: true, wantAI: false},
 	}
 
 	for _, tt := range tests {

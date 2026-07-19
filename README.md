@@ -31,11 +31,11 @@ Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-epi
 
 ### Search and scoring
 
-- **Eight online providers** (OpenSubtitles, Gestdown, SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits) plus embedded-track extraction, behind one interface.
+- **Eight online providers** (OpenSubtitles, Gestdown, SubSource, SubDL, BetaSeries, AnimeTosho, YIFY Subtitles, HDBits) behind one interface, plus always-on embedded-track detection (local ffprobe inspection, not a provider).
 - **Two-phase scoring:** a hard identity gate (IMDB/TVDB/TMDB id, season/episode, title validation) before a 0-100 release-quality score used for ranking and upgrades. Upgrades replace an existing subtitle only when a strictly better release shows up.
 - **Language rules keyed on the audio track:** map detected audio languages to subtitle targets (Japanese audio can want different subs than English audio), with `standard`/`forced`/`hi` variants and per-target provider or min-score overrides.
 - **Anime-aware numbering:** searches run with aired, scene (TheXEM), and absolute (TVDB) numbering and merge the results, so long-running shows with weird episode orders still match.
-- **Embedded-subtitle awareness:** coverage counts text and bitmap tracks already in the container (SRT/ASS, PGS, VobSub, DVB), with per-codec ignore settings so an unwanted PGS track doesn't stop the search for a text alternative.
+- **Embedded-subtitle awareness:** coverage counts text and bitmap tracks already in the container (SRT/ASS, PGS, VobSub, DVB), with per-codec ignore settings (top-level `embedded_subtitles` config section) so an unwanted PGS track doesn't stop the search for a text alternative.
 - **Adaptive backoff:** per-provider exponential backoff for no-result media, season-level early termination, and per-provider timeouts, so failing or empty providers don't get hammered.
 - **Manual override with locks:** manual downloads are saved as numbered siblings (`movie.fr.1.srt`) and lock the item from automation; locks clear automatically when the files are deleted or the video is replaced.
 
@@ -51,7 +51,7 @@ Downloaded subtitles rarely match your exact file, so subflux syncs every downlo
 - **Knowing when not to sync:** hash-matched subtitles and same-release matches skip sync (their timing is already right); forced subtitles skip it (too few cues to align reliably).
 - **Post-processing:** encoding normalization to UTF-8 (UTF-16, Windows-1252), hearing-impaired annotation removal, tag stripping, and whitespace cleanup, each step logged.
 
-Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in). Audio sync and external-file references are always available manually from the sync dialog.
+Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in). Audio sync and manual offset adjustment are always available from the sync dialog.
 
 ### The web UI
 
@@ -68,7 +68,7 @@ First run lands in unconfigured mode: the settings dialog auto-opens and the ins
 ### Auth, API, and operations
 
 - **Multi-user auth (optional):** local passwords (Argon2id), passkeys/WebAuthn, OIDC with PKCE, per-user API keys, and login rate limiting.
-- **API and CLI:** the UI drives a JSON API you can use too; a CLI runs searches and remote commands against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...).
+- **API and CLI:** the UI drives a JSON API you can use too; every CLI subcommand is a remote command against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`.
 - **Operations:** Prometheus metrics at `/metrics`, structured `slog` logging (UTC), a distroless file-marker healthcheck, graceful shutdown, scheduled bbolt hot backups with a staleness metric, database reconciliation before each scan, and scan resume after a restart.
 
 ## Run it
@@ -90,11 +90,18 @@ services:
       - "/path/to/media:/media"         # must NOT be read-only; subflux writes subtitle files
 ```
 
-Open `http://localhost:8374`; the settings dialog opens on first run. Point it at your Sonarr/Radarr instances and configure providers and language rules.
+### First run
+
+Open `http://localhost:8374`. Every first boot runs ONE guided flow: create the admin account, then walk the setup wizard (Sonarr/Radarr, media roots, providers, languages, and tunable defaults), then an optional passkey enrollment. The wizard adapts to what it finds:
+
+- **From scratch** — subflux wrote a placeholder config on first boot, so the wizard walks every step with sensible defaults prefilled.
+- **Pre-authored `config.yaml`** — every step the file already answers is prefilled and collapsed (saved secrets show as present without exposing values); a fully valid config fast-forwards straight to a review screen with a "Finish" button. Collapsed steps stay reviewable and editable before finishing.
+
+Finishing saves the config and activates everything in place — providers, arr clients, background scans, and auth capabilities — with no restart. The same holds for later edits in the settings dialog: saving a valid config hot-activates it, including WebAuthn/OIDC and logging changes.
 
 ## Configuration
 
-All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI also supports manual search and remote commands against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
+All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands — including manual search — run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
 
 ### Running behind a reverse proxy
 
