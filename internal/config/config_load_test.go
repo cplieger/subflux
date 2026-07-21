@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cplieger/envx/yamlenv"
 )
 
 // --- LoadFromBytes ---
@@ -545,6 +547,90 @@ func TestLoadFromBytes_syntax_error_withholds_document_text(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "pasted-literal-secret") {
 		t.Errorf("LoadFromBytes() error leaks document text: %q", err)
+	}
+}
+
+// --- Strict pre-decode checks (yamlenv.CheckSingleDocument / checkUnknownKeys) ---
+
+// TestLoadFromBytes_unknown_key_rejected pins the fail-loud unknown-key
+// contract: a misspelled top-level key errors instead of being silently
+// ignored while the intended setting stays at its default. The error keeps
+// the redact-everything stance of the file's sanitize path: the key name is
+// withheld (a misindented paste can put a secret in key position), only the
+// structural unknown-key vocabulary and locator survive.
+func TestLoadFromBytes_unknown_key_rejected(t *testing.T) {
+	t.Parallel()
+	data := minimalValidYAML() + "poll_intervall: 30s\n"
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes(misspelled key) expected error")
+	}
+	if !strings.Contains(err.Error(), "unknown configuration key") {
+		t.Errorf("LoadFromBytes() error = %q, want the unknown-key vocabulary", err)
+	}
+	if strings.Contains(err.Error(), "poll_intervall") {
+		t.Errorf("LoadFromBytes() error = %q, must withhold the key name (sanitize path)", err)
+	}
+}
+
+// TestLoadFromBytes_env_var_in_duration_field_passes_probe pins the probe
+// filter's abort branch: the strict unknown-key probe runs on the RAW
+// pre-expansion bytes, where a literal ${VAR} in a Duration field makes
+// Duration.UnmarshalYAML abort the probe decode with its own non-TypeError
+// error. That is a pre-expansion artifact — the value is legal once
+// expanded (Duration decodes the scalar as a string, so the kept !!str tag
+// is no obstacle) — and must not reject the load.
+func TestLoadFromBytes_env_var_in_duration_field_passes_probe(t *testing.T) {
+	// Not parallel: t.Setenv modifies process environment.
+	t.Setenv("SUBFLUX_TEST_SCAN_DELAY", "6s")
+	data := minimalValidYAML() + `search:
+  scan_delay: ${SUBFLUX_TEST_SCAN_DELAY}
+`
+	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	if err != nil {
+		t.Fatalf("LoadFromBytes(${VAR} in Duration field) unexpected error: %v", err)
+	}
+	if cfg.SearchCfg.ScanDelay.D != 6*time.Second {
+		t.Errorf("ScanDelay = %v, want 6s (expanded from ${VAR})", cfg.SearchCfg.ScanDelay.D)
+	}
+}
+
+// TestLoadFromBytes_unknown_key_detected_beside_var_int pins the probe
+// filter's entry discrimination: a ${VAR} in an int field raises a
+// wrong-type entry in the same probe TypeError as a genuine unknown-key
+// finding. The filter must drop the wrong-type noise (the post-expansion
+// decode owns value diagnostics) and still report the unknown key.
+func TestLoadFromBytes_unknown_key_detected_beside_var_int(t *testing.T) {
+	t.Parallel()
+	data := minimalValidYAML() + `search:
+  min_score: ${SUBFLUX_TEST_UNSET_MIN_SCORE}
+  scan_intervall: 24h
+`
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes(unknown key beside ${VAR} int) expected error")
+	}
+	if !strings.Contains(err.Error(), "unknown configuration key") {
+		t.Errorf("LoadFromBytes() error = %q, want the unknown-key finding kept", err)
+	}
+	if strings.Contains(err.Error(), "cannot unmarshal") {
+		t.Errorf("LoadFromBytes() error = %q, want the wrong-type probe entry dropped", err)
+	}
+}
+
+// TestLoadFromBytes_multi_document_rejected pins the document-multiplicity
+// guard: the single-document decode pipeline reads only the first document,
+// so everything under a stray "---" separator would be silently ignored —
+// rejected loudly instead, with the static (content-free) sentinel.
+func TestLoadFromBytes_multi_document_rejected(t *testing.T) {
+	t.Parallel()
+	data := minimalValidYAML() + "---\nproviders:\n  opensubtitles:\n    enabled: false\n"
+	_, err := LoadFromBytes(context.Background(), []byte(data))
+	if err == nil {
+		t.Fatal("LoadFromBytes(multi-document) expected error")
+	}
+	if !errors.Is(err, yamlenv.ErrMultipleDocuments) {
+		t.Errorf("LoadFromBytes() error = %q, want yamlenv.ErrMultipleDocuments", err)
 	}
 }
 
