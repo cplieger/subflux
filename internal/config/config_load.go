@@ -229,32 +229,29 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 		return nil, fmt.Errorf("config data %w: %d bytes (max %d)", ErrConfigTooLarge, len(data), maxConfigSize)
 	}
 
-	// Parse FIRST, then expand ${VAR} references inside string scalar VALUES
-	// only (yamlenv.Expand). The former pre-parse text expansion (os.Expand
-	// over the raw bytes) let an environment value containing YAML syntax — a
-	// quote, a newline, a '#' — change the document structure or truncate the
-	// value; the post-parse walk makes that impossible. Only the braced ${VAR}
-	// form expands now: unbraced $VAR, mapping keys, and non-string scalars
-	// stay byte-for-byte literal.
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		// Syntax errors from yaml.v3 are structural today, but the raw
-		// document can hold pasted literal secrets; sanitize for the same
-		// redact-everything stance as the post-expansion decode below.
-		return nil, fmt.Errorf("parse YAML: %w", yamlenv.SanitizeDecodeError(err))
-	}
-
+	// The whole strict loading pipeline is yamlenv.Load: the single-document
+	// check and the filtered unknown-key probe on the RAW pre-expansion bytes
+	// (a stray "---" or a misspelled key fails loudly instead of being
+	// silently ignored; a literal ${VAR} in a typed field cannot false-fail
+	// the probe — the post-expansion decode owns value diagnostics), then
+	// post-parse ${VAR} expansion of string scalar VALUES only (the braced
+	// form, allowlisted via isAllowedEnvVar — the former pre-parse os.Expand
+	// let an environment value carrying YAML syntax rewrite the document
+	// structure), the decode onto the defaults (an empty document keeps
+	// them), and fail-closed sanitization of every yaml.v3 error so an
+	// expanded secret never reaches the two operator surfaces (the startup
+	// log and the PUT /api/config response body). Errors from this package's
+	// own UnmarshalYAML implementations pass through unchanged
+	// (appOwnedDecodeErr).
 	cfg := newWithDefaults()
-	// An empty document (zero node) keeps the defaults, matching the former
-	// yaml.Unmarshal(empty, cfg) no-op.
-	if doc.Kind != 0 {
-		if unresolved := yamlenv.Expand(&doc, isAllowedEnvVar); len(unresolved) > 0 {
-			slog.Warn("config references environment variables that are not set; the literal ${VAR} is kept",
-				"vars", strings.Join(unresolved, ","))
-		}
-		if err := doc.Decode(cfg); err != nil {
-			return nil, fmt.Errorf("parse YAML: %w", sanitizeDecodeErr(err))
-		}
+	unresolved, err := yamlenv.Load(data, cfg, isAllowedEnvVar,
+		yamlenv.WithErrorPassthrough(appOwnedDecodeErr))
+	if len(unresolved) > 0 {
+		slog.Warn("config references environment variables that are not set; the literal ${VAR} is kept",
+			"vars", strings.Join(unresolved, ","))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("parse YAML: %w", err)
 	}
 
 	if err := expandVariants(cfg); err != nil {
@@ -271,18 +268,19 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	return cfg, nil
 }
 
-// sanitizeDecodeErr redacts yaml.v3's own decode errors before they reach
-// the two operator-facing surfaces (the startup log and the PUT /api/config
-// response body): a *yaml.TypeError entry embeds a backtick-quoted excerpt
-// of the offending scalar, which after yamlenv.Expand may be an expanded
-// ${VAR} secret. Errors raised by this package's own UnmarshalYAML
-// implementations (Duration's "invalid duration ...") pass through
-// unchanged: their vocabulary is app-owned and pinned by tests.
-func sanitizeDecodeErr(err error) error {
-	if _, ok := errors.AsType[*yaml.TypeError](err); ok || strings.HasPrefix(err.Error(), "yaml:") {
-		return yamlenv.SanitizeDecodeError(err)
+// appOwnedDecodeErr reports whether a decode error came from this package's
+// own UnmarshalYAML implementations (Duration's "invalid duration ..."):
+// neither a *yaml.TypeError nor "yaml:"-prefixed. yamlenv.Load returns such
+// errors unchanged onto the two operator surfaces (the startup log and the
+// PUT /api/config response body): their vocabulary is app-owned, value-safe
+// by construction (Duration deliberately withholds the offending scalar),
+// and pinned by tests. Everything yaml.v3 itself produces stays sanitized
+// by the library.
+func appOwnedDecodeErr(err error) bool {
+	if _, ok := errors.AsType[*yaml.TypeError](err); ok {
+		return false
 	}
-	return err
+	return !strings.HasPrefix(err.Error(), "yaml:")
 }
 
 // buildCaches pre-computes lookup structures after config is fully loaded.
