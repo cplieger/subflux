@@ -36,9 +36,10 @@ type Duration struct {
 // The error deliberately withholds the offending value (and does not wrap
 // the parse error, whose message embeds it): the scalar may be an expanded
 // ${VAR} secret after yamlenv.Expand, and this error reaches the startup
-// log and the PUT /api/config response via sanitizeDecodeErr's app-owned
-// pass-through. The line number is the locator; the value stays out of
-// operator-facing text (field-name-only posture, as in seadex-scout).
+// log and the PUT /api/config response via the app-owned error passthrough
+// (appOwnedDecodeErr, handed to yamlenv.Load). The line number is the
+// locator; the value stays out of operator-facing text (field-name-only
+// posture, as in seadex-scout).
 func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
 	if err := value.Decode(&s); err != nil {
