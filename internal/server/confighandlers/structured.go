@@ -367,6 +367,14 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 		slog.Error("config applied but not persisted", "error", err)
 		h.alerts.RecordPersistent("config",
 			"Config applied but NOT saved to disk (a restart will revert it): "+err.Error())
+		// A merged payload over the write cap (secret merge can grow a body
+		// past the request pre-check) is the client's to fix: report it as
+		// the same 413/code the oversized-body pre-checks use, not a 500.
+		if errors.Is(err, atomicfile.ErrFileTooLarge) {
+			api.PayloadTooLargeC(w, r, api.CodeConfigTooLarge,
+				"merged config exceeds the maximum size; applied but not saved to disk (a restart will revert it)")
+			return
+		}
 		api.InternalErrorC(w, r, fmt.Errorf("config applied but not persisted: %w", err),
 			api.CodeInternalError, "stage", "write config")
 		return

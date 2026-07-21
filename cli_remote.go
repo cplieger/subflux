@@ -14,9 +14,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/cplieger/envx"
+	"github.com/cplieger/runesafe"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/apipaths"
 	"github.com/cplieger/subflux/internal/cliparse"
@@ -568,8 +568,9 @@ func searchOneItem(rc *searchRunConfig, item *cliResolvedItem, lang string, down
 // renderSearchResults writes the scored result table. The line format is
 // pinned by a golden test and must stay byte-identical to the pre-remote
 // CLI's rendering: index, [score tier], provider, matched-by, release name
-// truncated at 45 bytes (rune-boundary safe), and the [HI] suffix. Tier
-// arrives on the wire (computed by the server's scorer).
+// sanitized and truncated to a 42-byte budget (rune-boundary safe, "..."
+// marker), and the [HI] suffix. Tier arrives on the wire (computed by the
+// server's scorer).
 func renderSearchResults(w io.Writer, results []cliSearchResult) {
 	fmt.Fprintf(w, "  %d result(s) ranked by release quality:\n", len(results))
 	for i := range results {
@@ -583,21 +584,16 @@ func renderSearchResults(w io.Writer, results []cliSearchResult) {
 	}
 }
 
-// truncateRelease shortens a release name for the fixed-width result
-// table: names over 45 bytes keep their largest prefix within 42 bytes
-// that ends on a rune boundary, then the "..." marker. Cutting at the raw
-// byte index could split a multibyte rune and emit invalid UTF-8 into the
-// rendered row; for pure-ASCII names the output is byte-identical to the
-// historical [:42] cut (pinned by the golden test).
+// truncateRelease bounds a release name for the fixed-width result table:
+// runesafe's single-line preset replaces control/bidi runes (an
+// upstream-controlled name must not forge table rows or reorder terminal
+// output) and names over 42 bytes are cut on a rune boundary with the "..."
+// marker appended (at most 45 bytes total). For pure-ASCII names within the
+// budget the output is byte-identical to the historical rendering (pinned
+// by the golden test); names of 43-45 bytes, which the historical cut
+// passed through marker-free, now truncate like everything over budget.
 func truncateRelease(name string) string {
-	if len(name) <= 45 {
-		return name
-	}
-	cut := 42
-	for cut > 0 && !utf8.RuneStart(name[cut]) {
-		cut--
-	}
-	return name[:cut] + "..."
+	return runesafe.SanitizeSingleLineBounded(name, 42)
 }
 
 // downloadPick posts the picked result to the download endpoint and polls

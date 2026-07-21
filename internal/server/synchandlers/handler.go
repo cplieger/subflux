@@ -287,7 +287,11 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := atomicfile.WriteFile(ctx, subtitlePath, srtData); err != nil {
+	// WithMaxBytes mirrors the read bound above: this handler refuses to
+	// persist a subtitle its own ReadBounded(MaxSyncSubSize) path would
+	// refuse to load on the next request.
+	if _, err := atomicfile.WriteFile(ctx, subtitlePath, srtData,
+		atomicfile.WithMaxBytes(MaxSyncSubSize)); err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", subtitlePath)
 		return
 	}
@@ -424,7 +428,9 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []api.S
 		return 0, fmt.Errorf("write SRT: %w", err)
 	}
 
-	pf, err := atomicfile.NewPendingFile(ctx, path)
+	// WithMaxBytes mirrors the read bound: readAndParseSRT and the sync-audio
+	// read cap at MaxSyncSubSize, so the staged write must refuse to cross it.
+	pf, err := atomicfile.NewPendingFile(ctx, path, atomicfile.WithMaxBytes(MaxSyncSubSize))
 	if err != nil {
 		return 0, fmt.Errorf("save (prepare): %w", err)
 	}

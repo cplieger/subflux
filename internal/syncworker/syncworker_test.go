@@ -160,7 +160,7 @@ func TestClient_spawn_error_degrades_to_no_change(t *testing.T) {
 	if result.Applied() || result.Method != subsync.MethodNone {
 		t.Errorf("result = %+v, want no-change on worker death", result)
 	}
-	if !hasWarn(sink, "sync worker failed; subtitle kept unsynced") {
+	if sink.CountLevel(slog.LevelWarn, "sync worker failed; subtitle kept unsynced") == 0 {
 		t.Errorf("want degradation WARN on worker death")
 	}
 }
@@ -174,7 +174,7 @@ func TestClient_response_error_degrades_to_no_change(t *testing.T) {
 	if result.Applied() {
 		t.Errorf("result applied despite job error")
 	}
-	if !hasWarn(sink, "sync worker job errored; subtitle kept unsynced") {
+	if sink.CountLevel(slog.LevelWarn, "sync worker job errored; subtitle kept unsynced") == 0 {
 		t.Errorf("want degradation WARN on job error")
 	}
 }
@@ -197,15 +197,6 @@ func TestClient_cancelled_while_queued_returns_no_change(t *testing.T) {
 	if result.Method != subsync.MethodNone {
 		t.Errorf("cancelled-while-queued result = %+v, want no-change", result)
 	}
-}
-
-func hasWarn(rec *capture.Recorder, msg string) bool {
-	for _, r := range rec.Records() {
-		if r.Level == slog.LevelWarn && r.Message == msg {
-			return true
-		}
-	}
-	return false
 }
 
 // --- real child-process integration (helper re-exec pattern) ---

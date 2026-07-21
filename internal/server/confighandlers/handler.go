@@ -280,7 +280,13 @@ func (h *Handler) newArrPinger(name, baseURL, apiKey string) (interface {
 }
 
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.
+// WithMaxBytes mirrors the read bound: every config read in this package
+// (HandleGetConfig, the structured GET, the secret-merge baseline) caps at
+// maxBodySize, and MergeSecrets can grow a payload past the request-body
+// pre-check, so a file the package's own reads would refuse to load must
+// fail the write (ErrFileTooLarge) instead of landing on disk.
 func atomicWriteConfig(ctx context.Context, path string, data []byte) error {
-	_, err := atomicfile.WriteFile(ctx, path, data, atomicfile.WithMode(0o600))
+	_, err := atomicfile.WriteFile(ctx, path, data,
+		atomicfile.WithMode(0o600), atomicfile.WithMaxBytes(maxBodySize))
 	return err
 }

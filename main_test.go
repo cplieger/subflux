@@ -270,6 +270,14 @@ func TestEnablePasswordLoginYAML_errors(t *testing.T) {
 		{name: "empty config", input: "", wantErrSub: "config is empty"},
 		{name: "comment-only config", input: "# just a comment\n", wantErrSub: "config is empty"},
 		{name: "malformed yaml", input: "auth:\n\tbasic_enabled: true\n", wantErrSub: "parse config"},
+		// The rewrite parses and re-marshals only the FIRST document; a
+		// multi-document file must be refused rather than silently truncated
+		// at the "---" separator.
+		{
+			name:       "multi-document config",
+			input:      "auth:\n  basic_enabled: false\n---\nauth:\n  basic_enabled: true\n",
+			wantErrSub: "more than one YAML document",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

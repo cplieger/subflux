@@ -92,6 +92,62 @@ func doStructuredSave(t *testing.T, h *Handler, payload string) *httptest.Respon
 	return rec
 }
 
+// recordingAlerts captures RecordPersistent calls, so a test can assert the
+// write-failure branch alerted the operator before responding.
+type recordingAlerts struct{ msgs []string }
+
+func (a *recordingAlerts) RecordPersistent(_, msg string) { a.msgs = append(a.msgs, msg) }
+
+// TestApplyConfig_over_cap_payload_maps_to_413 pins the write-cap error
+// mapping: atomicWriteConfig caps at maxBodySize (the package's own read
+// bound), and a payload crossing it — possible when the secret merge grows
+// a body past the request pre-check — must surface as the same 413/code the
+// oversized-body pre-checks use rather than a 500, must not land on disk,
+// and must still record the loud operator alert. applyConfig is driven
+// directly (under saveMu, per its contract) because the HTTP entry points
+// pre-check the raw body size; only merge growth can reach the write over
+// cap, and simulating the merge here would test MergeSecrets, not the map.
+func TestApplyConfig_over_cap_payload_maps_to_413(t *testing.T) {
+	t.Parallel()
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	alerts := &recordingAlerts{}
+	h := newStructuredHandlerAt(t, cfgPath, nil)
+	h.alerts = alerts
+
+	// A VALID config over the write cap: the padding comment survives
+	// parsing (loadConfig sees a normal document) but pushes the byte size
+	// past maxBodySize, so only the atomic write can reject it.
+	data := `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "k"
+languages:
+  default:
+    - code: en
+# ` + strings.Repeat("x", int(maxBodySize)) + "\n"
+
+	req := httptest.NewRequestWithContext(context.Background(),
+		http.MethodPut, "/api/config", strings.NewReader(""))
+	rec := httptest.NewRecorder()
+	h.saveMu.Lock()
+	h.applyConfig(rec, req, []byte(data))
+	h.saveMu.Unlock()
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(rec.Body.String(), string(api.CodeConfigTooLarge)) {
+		t.Errorf("applyConfig(over-cap payload) body = %q, want error code %q",
+			rec.Body, api.CodeConfigTooLarge)
+	}
+	if _, err := os.Stat(cfgPath); err == nil {
+		t.Error("over-cap payload landed on disk, want no file")
+	}
+	if len(alerts.msgs) == 0 {
+		t.Error("write failure recorded no persistent alert")
+	}
+}
+
 // --- secret coverage protection (the coverage-test pattern) ---
 
 // TestSecretPaths_cover_every_schema_secret walks the REAL schema (app

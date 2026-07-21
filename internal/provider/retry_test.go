@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -462,26 +461,10 @@ const (
 	msgDownloadRetrying  = "download failed with transient error, retrying"
 )
 
-// firstLogAttr returns the named attr of the first captured record whose
-// message is msg.
-func firstLogAttr(rec *capture.Recorder, msg, key string) (any, bool) {
-	for _, r := range rec.Records() {
-		if r.Message != msg {
-			continue
-		}
-		var v any
-		found := false
-		r.Attrs(func(a slog.Attr) bool {
-			if a.Key == key {
-				v, found = a.Value.Any(), true
-				return false
-			}
-			return true
-		})
-		return v, found
-	}
-	return nil, false
-}
+// Attempt-count attrs are asserted through capture.Recorder.AttrValue (the
+// former in-package firstLogAttr walk is gone): first match in capture
+// order, rendered form, so an Int64 2 asserts as "2". Each assertion sits
+// behind a CountExact(msg) == 1 check, so first-match equals only-match.
 
 // A first-attempt success must not emit the "recovered" log, which is gated on
 // having already failed at least once.
@@ -520,14 +503,14 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 	if got := recs.CountExact(msgDownloadRecovered); got != 1 {
 		t.Fatalf("recovered-log count = %d, want 1", got)
 	}
-	if v, ok := firstLogAttr(recs, msgDownloadRecovered, "attempts"); !ok || v != int64(2) {
-		t.Errorf("recovered-log attempts = %v (present=%v), want 2", v, ok)
+	if v, ok := recs.AttrValue(msgDownloadRecovered, "attempts"); !ok || v != "2" {
+		t.Errorf("recovered-log attempts = %q (present=%v), want \"2\"", v, ok)
 	}
 	if got := recs.CountExact(msgDownloadRetrying); got != 1 {
 		t.Fatalf("retrying-warn count = %d, want 1", got)
 	}
-	if v, ok := firstLogAttr(recs, msgDownloadRetrying, "attempt"); !ok || v != int64(1) {
-		t.Errorf("retrying-warn attempt = %v (present=%v), want 1", v, ok)
+	if v, ok := recs.AttrValue(msgDownloadRetrying, "attempt"); !ok || v != "1" {
+		t.Errorf("retrying-warn attempt = %q (present=%v), want \"1\"", v, ok)
 	}
 }
 

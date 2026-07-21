@@ -90,7 +90,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 	if len(resp.Errors) > 0 {
 		slog.Warn("betaseries: API returned errors",
-			"errors", runesafe.Sanitize(fmt.Sprint(resp.Errors)),
+			"errors", runesafe.SanitizeSingleLineBounded(fmt.Sprint(resp.Errors), 256),
 			"tvdb_id", req.TvdbID,
 			"season", req.Season,
 			"episode", req.Episode)
