@@ -13,7 +13,7 @@ require (
 	// runesafe v1.1.0 is published (Untrusted provenance type +
 	// IsUnsafeNonASCII); resolved from the proxy, no go.work rider.
 	github.com/cplieger/runesafe v1.1.1
-	github.com/cplieger/slogx v1.3.0
+	github.com/cplieger/slogx v1.3.1
 	github.com/cplieger/ssrf/v3 v3.0.0
 	github.com/cplieger/webhttp v1.10.0
 	github.com/cplieger/wiregen/v2 v2.0.0
@@ -32,7 +32,7 @@ require github.com/cplieger/metrics/v3 v3.0.0
 
 require github.com/cplieger/httpx/v3 v3.1.1
 
-require github.com/cplieger/jsonx v1.1.0
+require github.com/cplieger/jsonx v1.1.1
 
 require github.com/evanw/esbuild v0.28.1
 
