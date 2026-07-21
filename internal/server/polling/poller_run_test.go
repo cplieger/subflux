@@ -346,10 +346,10 @@ func TestPollOnce_no_spurious_warns_within_interval(t *testing.T) {
 	ls := &LiveState{Cfg: cfg} // nil arrs: g.Wait() returns nil, cycle is fast
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	p.PollOnce(context.Background())
-	if hasRecord(sink, slog.LevelWarn, "poll cycle error") {
+	if sink.CountLevel(slog.LevelWarn, "poll cycle error") > 0 {
 		t.Errorf("unexpected WARN 'poll cycle error' for a clean cycle")
 	}
-	if hasRecord(sink, slog.LevelWarn, "poll cycle exceeded interval") {
+	if sink.CountLevel(slog.LevelWarn, "poll cycle exceeded interval") > 0 {
 		t.Errorf("unexpected WARN 'poll cycle exceeded interval' within the interval")
 	}
 }
@@ -361,7 +361,7 @@ func TestPollOnce_warns_when_exceeds_interval(t *testing.T) {
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
 	p.PollOnce(context.Background())
-	if !hasRecord(sink, slog.LevelWarn, "poll cycle exceeded interval") {
+	if sink.CountLevel(slog.LevelWarn, "poll cycle exceeded interval") == 0 {
 		t.Errorf("want WARN 'poll cycle exceeded interval' with a 0 interval")
 	}
 }

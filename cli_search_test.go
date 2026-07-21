@@ -597,12 +597,30 @@ func TestRenderSearchResults_golden(t *testing.T) {
 // cut emitted invalid UTF-8 into the rendered row). The truncation keeps
 // the largest prefix within the byte budget that ends on a rune boundary,
 // then the "..." marker; pure-ASCII truncation stays byte-identical.
+// truncateRelease is runesafe.SanitizeSingleLineBounded(name, 42), so the
+// cap applies to every name over 42 bytes (the historical cut passed
+// 43-45-byte names through marker-free) and unsafe runes become spaces.
 func TestRenderSearchResults_unicode_boundary(t *testing.T) {
 	cases := []struct {
 		name        string
 		release     string
 		wantRelease string
 	}{
+		{
+			// Historical pass-through window: 43-45-byte names used to render
+			// unmarked; the bounded form truncates everything over the 42-byte
+			// budget.
+			name:        "43-byte name truncates under the bounded form",
+			release:     strings.Repeat("a", 43),
+			wantRelease: strings.Repeat("a", 42) + "...",
+		},
+		{
+			// Single-line sanitization: an upstream-controlled name must not
+			// forge a second table row; the raw newline renders as a space.
+			name:        "newline in name is sanitized to a space",
+			release:     "Movie.\n2024",
+			wantRelease: "Movie. 2024",
+		},
 		{
 			name: "3-byte rune split at the cut",
 			// Bytes 41..43 are 日: the naive [:42] kept one of its 3 bytes.

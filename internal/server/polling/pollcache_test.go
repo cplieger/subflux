@@ -106,7 +106,7 @@ func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return errors.New("db boom") },
 	)
 	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
-	if !hasRecord(sink, slog.LevelWarn, dirtyWarnMsg) {
+	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) == 0 {
 		t.Errorf("Set with failing setFn: want the dirty-cursor WARN")
 	}
 	if got := pc.DirtyCount(); got != 1 {
@@ -122,7 +122,7 @@ func TestPollCacheSet_silent_when_setFn_ok(t *testing.T) {
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
 	)
 	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
-	if hasRecord(sink, slog.LevelWarn, dirtyWarnMsg) {
+	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) > 0 {
 		t.Errorf("Set with ok setFn: unexpected dirty-cursor WARN")
 	}
 	if got := pc.DirtyCount(); got != 0 {
@@ -170,7 +170,7 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 	if len(persisted) != 1 || !persisted[0].Equal(second) {
 		t.Errorf("persisted = %v, want exactly the LATEST in-memory position %v", persisted, second)
 	}
-	if !hasRecord(sink, slog.LevelInfo, "PollCache: dirty cursor persisted; memory and disk agree again") {
+	if sink.CountLevel(slog.LevelInfo, "PollCache: dirty cursor persisted; memory and disk agree again") == 0 {
 		t.Errorf("want recovery INFO after heal")
 	}
 	if len(gaugeVals) == 0 || gaugeVals[len(gaugeVals)-1] != 0 {

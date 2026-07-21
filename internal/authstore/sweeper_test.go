@@ -215,32 +215,27 @@ func TestSweeper_zeroIntervalUsesDefault(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
-	var found bool
+	// Record presence + rendered value in one assertion: a Duration attr
+	// renders as its String() form, so the default must appear verbatim.
+	if !logs.HasAttr("auth sweeper started", "interval", defaultSweepInterval.String()) {
+		t.Fatalf(`no "auth sweeper started" log carrying interval=%v captured`, defaultSweepInterval)
+	}
+
+	// The rendered form cannot distinguish a Duration attr from a string
+	// attr carrying the same text; value-kind is the point of this log's
+	// contract, so the KindDuration assertion stays a Records() walk.
 	for _, r := range logs.Records() {
 		if r.Message != "auth sweeper started" {
 			continue
 		}
-		found = true
-		var iv slog.Value
-		var ok bool
 		r.Attrs(func(a slog.Attr) bool {
-			if a.Key == "interval" {
-				iv, ok = a.Value, true
-				return false
+			if a.Key != "interval" {
+				return true
 			}
-			return true
+			if a.Value.Kind() != slog.KindDuration {
+				t.Errorf(`"interval" attribute kind = %v, want Duration`, a.Value.Kind())
+			}
+			return false
 		})
-		if !ok {
-			t.Fatal(`"auth sweeper started" log has no "interval" attribute`)
-		}
-		if iv.Kind() != slog.KindDuration {
-			t.Fatalf(`"interval" attribute kind = %v, want Duration`, iv.Kind())
-		}
-		if iv.Duration() != defaultSweepInterval {
-			t.Errorf("sweeper started with interval %v, want default %v", iv.Duration(), defaultSweepInterval)
-		}
-	}
-	if !found {
-		t.Fatal(`no "auth sweeper started" log captured`)
 	}
 }

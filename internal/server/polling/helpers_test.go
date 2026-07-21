@@ -1,22 +1,9 @@
 package polling
 
-import (
-	"log/slog"
-
-	"github.com/cplieger/slogx/capture"
-)
-
-// hasRecord reports whether a record with the given level and message was
-// captured, used to assert which of the poller's WARN/ERROR observable log
-// branches fired.
-func hasRecord(rec *capture.Recorder, level slog.Level, msg string) bool {
-	for _, r := range rec.Records() {
-		if r.Level == level && r.Message == msg {
-			return true
-		}
-	}
-	return false
-}
+// Level-scoped log assertions go through capture.Recorder.CountLevel
+// directly (the former in-package hasRecord walk is gone): the poller's
+// WARN/ERROR branch messages are package-unique prefixes, so
+// CountLevel(level, msg) > 0 asserts exactly "this branch fired".
 
 // fullDeps builds a Deps wired to the standard mock collaborators and the given
 // store, used by the poll-import and poll-cycle tests.

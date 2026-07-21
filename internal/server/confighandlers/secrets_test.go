@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/atomicfile/v2"
 )
 
 // byteLines converts string rows into the [][]byte shape the YAML scanners
@@ -619,5 +621,33 @@ func TestAtomicWriteConfig_empty_data(t *testing.T) {
 	got, _ := os.ReadFile(path)
 	if len(got) != 0 {
 		t.Errorf("atomicWriteConfig(empty) content len = %d, want 0", len(got))
+	}
+}
+
+// TestAtomicWriteConfig_cap_boundary pins the write-side mirror of the
+// package's read bound: exactly maxBodySize is accepted (the read paths
+// load it back), one byte over is rejected with ErrFileTooLarge, and the
+// rejected write leaves the previous file intact.
+func TestAtomicWriteConfig_cap_boundary(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	if err := atomicWriteConfig(context.Background(), path, make([]byte, int(maxBodySize))); err != nil {
+		t.Fatalf("atomicWriteConfig(exactly maxBodySize) error = %v, want nil", err)
+	}
+
+	err := atomicWriteConfig(context.Background(), path, make([]byte, int(maxBodySize)+1))
+	if !errors.Is(err, atomicfile.ErrFileTooLarge) {
+		t.Errorf("atomicWriteConfig(maxBodySize+1) error = %v, want atomicfile.ErrFileTooLarge", err)
+	}
+
+	fi, statErr := os.Stat(path)
+	if statErr != nil {
+		t.Fatalf("Stat after rejected write: %v", statErr)
+	}
+	if fi.Size() != maxBodySize {
+		t.Errorf("previous file size after rejected write = %d, want %d (must stay intact)",
+			fi.Size(), maxBodySize)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/envx/yamlenv"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
 	"go.yaml.in/yaml/v3"
@@ -230,10 +231,15 @@ func doEnablePasswordLogin() error {
 // keys and sections are preserved. This is the pure transform extracted
 // from doEnablePasswordLogin so the YAML rewrite is testable without
 // touching the on-disk config at the fixed container path. Returns an
-// error for malformed or empty YAML.
+// error for malformed, empty, or multi-document YAML — the parse below
+// reads only the first document, so re-marshalling a multi-document file
+// would silently truncate everything under the "---" separator.
 func enablePasswordLoginYAML(data []byte) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	if err := yamlenv.CheckSingleDocument(data); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	if len(doc.Content) == 0 {

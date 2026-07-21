@@ -110,7 +110,8 @@ func (p *Provider) invalidateTokenOn401(err error) {
 	p.tokenMu.Lock()
 	p.token = ""
 	p.tokenMu.Unlock()
-	slog.Warn("opensubtitles: token invalidated after 401", "reason", runesafe.Sanitize(authErr.Error()))
+	slog.Warn("opensubtitles: token invalidated after 401",
+		"reason", runesafe.SanitizeSingleLineBounded(authErr.Error(), 256))
 }
 
 // doPostUnauthed performs a rate-limited POST request to the default

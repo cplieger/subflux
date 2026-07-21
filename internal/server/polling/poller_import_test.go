@@ -95,7 +95,7 @@ func TestProcessPollImport_warns_when_cleanup_errors(t *testing.T) {
 	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-err.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
-	if !hasRecord(sink, slog.LevelWarn, "poll: cleanup failed") {
+	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") == 0 {
 		t.Errorf("cleanup error: want WARN 'poll: cleanup failed'")
 	}
 }
@@ -109,7 +109,7 @@ func TestProcessPollImport_silent_when_cleanup_ok(t *testing.T) {
 	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-ok.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
-	if hasRecord(sink, slog.LevelWarn, "poll: cleanup failed") {
+	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") > 0 {
 		t.Errorf("cleanup ok: unexpected WARN 'poll: cleanup failed'")
 	}
 }
@@ -204,7 +204,7 @@ func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return errors.New("notify boom") })
-	if !hasRecord(sink, slog.LevelWarn, "failed to notify arr") {
+	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") == 0 {
 		t.Errorf("refreshFn error: want WARN 'failed to notify arr'")
 	}
 }
@@ -218,7 +218,7 @@ func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 	p.processPollImport(context.Background(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return nil })
-	if hasRecord(sink, slog.LevelWarn, "failed to notify arr") {
+	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") > 0 {
 		t.Errorf("refreshFn ok: unexpected WARN 'failed to notify arr'")
 	}
 }
