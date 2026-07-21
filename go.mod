@@ -28,7 +28,7 @@ require (
 
 require github.com/cplieger/envx/yamlenv v1.2.0
 
-require github.com/cplieger/metrics/v3 v3.0.0
+require github.com/cplieger/metrics/v3 v3.0.1
 
 require github.com/cplieger/httpx/v3 v3.2.0
 
