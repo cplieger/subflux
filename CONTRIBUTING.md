@@ -293,21 +293,39 @@ checks above pass before opening a PR.
 
 ## Functional tests
 
-`tests/functional/run.sh` drives a live instance over the HTTP API: 26
-sections covering config, providers, coverage, search resolution, scoring,
-scans, sync, manual downloads, hot reload, and the mock provider's failure
-modes. It
-needs `jq`, a reachable subflux with auth disabled or an API key configured,
-and reachable Sonarr/Radarr. It saves and restores the config around the
+The Go suite under `tests/functional/` (package `functional`, build tag
+`functional`, so regular `./...` runs skip it) drives a live instance over
+the HTTP API: 26 sections covering config, providers, coverage, search
+resolution, scoring, scans, sync, manual downloads, hot reload, and the
+mock provider's failure modes. It needs a reachable subflux with auth
+disabled (the suite sends no credentials), and reachable Sonarr/Radarr for
+the arr-dependent sections. It saves and restores the config around the
 run.
 
 ```sh
-bash tests/functional/run.sh                  # all sections
-bash tests/functional/run.sh --section config # one section
-bash tests/functional/run.sh --dry-run        # list sections
+# all sections (the scans/sync polling ceilings can exceed go test's
+# default 10m binary timeout, hence -timeout 30m)
+go test -tags functional -count=1 -timeout 30m -run 'TestFunctional$' ./tests/functional/
+# one section (equivalently: -run 'TestFunctional/config')
+SECTION=config go test -tags functional -count=1 -run 'TestFunctional$' ./tests/functional/
+# list sections
+go test -tags functional -count=1 -run TestFunctionalSectionList -v ./tests/functional/
+# offline oracle for the suite's JSON helpers (no server needed)
+go test -tags functional -count=1 -run TestJSONHelpersOracle ./tests/functional/
 ```
 
-Override the target with `--url <url>` or `SUBFLUX_URL`.
+The target instance comes from the `SUBFLUX_URL` environment variable
+(there is no URL flag). `-count=1` keeps the run live instead of replaying
+a cached result; add `-v` to see per-assertion output on success.
+
+The suite inspects responses through the typed helpers in
+`tests/functional/json_helpers_test.go`; each mirrors one exact jq program
+the retired bash suite ran, byte-for-byte (raw/JSON/compact rendering,
+errors collapse to an empty string). Their contract is pinned by the
+offline `TestJSONHelpersOracle` above against
+`tests/functional/testdata/jq-oracle.json` (761 synthetic cases,
+cross-checked against real jq); when a helper's behavior must change,
+update the affected cases' `want` alongside the change.
 
 ## Conventions and gotchas
 
