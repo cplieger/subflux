@@ -103,6 +103,16 @@ Finishing saves the config and activates everything in place — providers, arr 
 
 All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands — including manual search — run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
 
+### Environment variables in config.yaml
+
+String values in `config.yaml` can reference environment variables with the braced `${VAR}` form, so secrets stay in the container environment while the file holds the structure:
+
+```yaml
+some_api_key: ${SUBFLUX_SOME_KEY}
+```
+
+Expansion is allowlisted: `SUBFLUX_*` names plus the common deployment vars `CONFIG_ROOT`, `MEDIA_FOLDER`, `PUID`, `PGID`, `TZ`, `LAN_IP`, and `HOSTNAME`. Any other name, and the unbraced `$VAR` form, stays literal. Referencing an allowlisted var that is unset logs a startup warning naming the variable and keeps the literal `${VAR}` text (a set-but-empty var substitutes the empty string). Expansion runs after YAML parsing, on string values only, so an environment value can never alter the document structure.
+
 ### Running behind a reverse proxy
 
 When subflux runs behind a reverse proxy (nginx, Caddy, Traefik, HAProxy, ...), the network peer subflux sees is the proxy, not the browser. Set `trusted_proxies` to the proxy's IP or CIDR so the real client IP, resolved from a trusted `X-Forwarded-For` header, is used for the audit log, the login rate limiter, the session `IPAddress`, and the request access log, instead of the proxy's address:
