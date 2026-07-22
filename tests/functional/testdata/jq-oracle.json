@@ -1,0 +1,9134 @@
+{
+ "_comment": [
+  "Oracle for the functional suite's typed JSON helpers (json_helpers_test.go).",
+  "Synthetic corpus x expected output. Expectations were generated from the",
+  "retired in-suite jq emulator (proven byte-equivalent to the bash suite's",
+  "real-jq output on the live CI sections) and cross-checked against real",
+  "jq 1.8.1; deliberate divergences are documented in the generator's",
+  "divergences.md. Regenerate with _rewrite/simplify/gen-oracle.py (corpus,",
+  "realjq, merge) or hand-edit a case when a helper's contract changes."
+ ],
+ "cases": [
+  {
+   "id": "P01a/realistic",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":true,\"items\":[{\"media_type\":\"movie\",\"media_id\":123,\"title\":\"Inception\",\"year\":2010,\"season\":0,\"episode\":0}]}",
+   "want": "true"
+  },
+  {
+   "id": "P01a/field-missing",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01a/field-null",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01a/field-false",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01a/field-zero",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01a/field-empty-string",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01a/field-string",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01a/field-number",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01a/field-array",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01a/field-object",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01a/body-empty-object",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01a/body-empty-array",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-array",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "[{\"resolved\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-string",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-number",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-null",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01a/body-empty",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-whitespace",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-malformed",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01a/body-not-json",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01a/multi-doc",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":\"first\"}\n{\"resolved\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01a/trailing-garbage",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01a/realistic-false",
+   "prog": ".resolved",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".resolved"
+   ],
+   "body": "{\"resolved\":false,\"items\":[]}",
+   "want": "false"
+  },
+  {
+   "id": "P01b/realistic",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"done\":false,\"cancellable\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P01b/field-missing",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01b/field-null",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01b/field-false",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01b/field-zero",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01b/field-empty-string",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01b/field-string",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01b/field-number",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01b/field-array",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01b/field-object",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01b/body-empty-object",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01b/body-empty-array",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-array",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "[{\"done\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-string",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-number",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-null",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01b/body-empty",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-whitespace",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-malformed",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01b/body-not-json",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01b/multi-doc",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":\"first\"}\n{\"done\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01b/trailing-garbage",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"done\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01b/realistic-done",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P01b/compact-row-reparse",
+   "prog": ".done",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".done"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P01c/realistic",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"admin\",\"role\":\"admin\"}",
+   "want": "admin"
+  },
+  {
+   "id": "P01c/field-missing",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01c/field-null",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01c/field-false",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01c/field-zero",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01c/field-empty-string",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01c/field-string",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01c/field-number",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01c/field-array",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01c/field-object",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01c/body-empty-object",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01c/body-empty-array",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-array",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "[{\"username\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-string",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-number",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-null",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01c/body-empty",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-whitespace",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-malformed",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01c/body-not-json",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01c/multi-doc",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"first\"}\n{\"username\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01c/trailing-garbage",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01c/unicode",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"ädmïn\"}",
+   "want": "ädmïn"
+  },
+  {
+   "id": "P01c/embedded-newline",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"line1\\nline2\"}",
+   "want": "line1\nline2"
+  },
+  {
+   "id": "P01c/trailing-newline-in-value",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"x\\n\"}",
+   "want": "x\n"
+  },
+  {
+   "id": "P01c/quotes-and-html",
+   "prog": ".username",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".username"
+   ],
+   "body": "{\"username\":\"a\\\"b<c>&d\"}",
+   "want": "a\"b<c>&d"
+  },
+  {
+   "id": "P01d/realistic",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"username\":\"admin\",\"role\":\"admin\"}",
+   "want": "admin"
+  },
+  {
+   "id": "P01d/field-missing",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01d/field-null",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01d/field-false",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01d/field-zero",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01d/field-empty-string",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01d/field-string",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01d/field-number",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01d/field-array",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01d/field-object",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01d/body-empty-object",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01d/body-empty-array",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-array",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "[{\"role\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-string",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-number",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-null",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01d/body-empty",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-whitespace",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-malformed",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01d/body-not-json",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01d/multi-doc",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":\"first\"}\n{\"role\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01d/trailing-garbage",
+   "prog": ".role",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".role"
+   ],
+   "body": "{\"role\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01e/realistic",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": "{\n  \"ExcludeArrTags\": [\n    \"skip-subs\",\n    \"no-subs\"\n  ],\n  \"ScanDelay\": 7000000000,\n  \"ScanInterval\": 3600000000000,\n  \"UpgradeEnabled\": false\n}"
+  },
+  {
+   "id": "P01e/field-missing",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01e/field-null",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01e/field-false",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01e/field-zero",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01e/field-empty-string",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01e/field-string",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01e/field-number",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01e/field-array",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01e/field-object",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01e/body-empty-object",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01e/body-empty-array",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-array",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "[{\"search\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-string",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-number",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-null",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01e/body-empty",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-whitespace",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-malformed",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01e/body-not-json",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01e/multi-doc",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":\"first\"}\n{\"search\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01e/trailing-garbage",
+   "prog": ".search",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".search"
+   ],
+   "body": "{\"search\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01f/realistic",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": "{\n  \"mock\": {\n    \"enabled\": true,\n    \"priority\": 1\n  }\n}"
+  },
+  {
+   "id": "P01f/field-missing",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01f/field-null",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01f/field-false",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01f/field-zero",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01f/field-empty-string",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01f/field-string",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01f/field-number",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01f/field-array",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01f/field-object",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01f/body-empty-object",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01f/body-empty-array",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-array",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "[{\"providers\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-string",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-number",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-null",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01f/body-empty",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-whitespace",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-malformed",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01f/body-not-json",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01f/multi-doc",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":\"first\"}\n{\"providers\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01f/trailing-garbage",
+   "prog": ".providers",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".providers"
+   ],
+   "body": "{\"providers\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01g/realistic",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":[{\"provider\":\"opensubtitles\",\"id\":\"os-1\",\"score\":87,\"release\":\"Inception.2010.1080p.BluRay.x264-SPARKS\",\"language\":\"en\"},{\"provider\":\"subdl\",\"id\":\"sd-2\",\"score\":74,\"release\":\"Inception.2010.720p.WEB-DL\",\"language\":\"en\"},{\"provider\":\"opensubtitles\",\"id\":\"os-3\",\"score\":60,\"release\":\"Inception.2010.HDTV\",\"language\":\"en\"}],\"total\":3}",
+   "want": "[\n  {\n    \"id\": \"os-1\",\n    \"language\": \"en\",\n    \"provider\": \"opensubtitles\",\n    \"release\": \"Inception.2010.1080p.BluRay.x264-SPARKS\",\n    \"score\": 87\n  },\n  {\n    \"id\": \"sd-2\",\n    \"language\": \"en\",\n    \"provider\": \"subdl\",\n    \"release\": \"Inception.2010.720p.WEB-DL\",\n    \"score\": 74\n  },\n  {\n    \"id\": \"os-3\",\n    \"language\": \"en\",\n    \"provider\": \"opensubtitles\",\n    \"release\": \"Inception.2010.HDTV\",\n    \"score\": 60\n  }\n]"
+  },
+  {
+   "id": "P01g/field-missing",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01g/field-null",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01g/field-false",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01g/field-zero",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01g/field-empty-string",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01g/field-string",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01g/field-number",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01g/field-array",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01g/field-object",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01g/body-empty-object",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01g/body-empty-array",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-array",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "[{\"results\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-string",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-number",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-null",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01g/body-empty",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-whitespace",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-malformed",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01g/body-not-json",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01g/multi-doc",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":\"first\"}\n{\"results\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01g/trailing-garbage",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01g/realistic-empty",
+   "prog": ".results",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".results"
+   ],
+   "body": "{\"results\":[],\"total\":0}",
+   "want": "[]"
+  },
+  {
+   "id": "P01h/realistic",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":115,\"tier\":\"perfect\",\"breakdown\":{\"hash\":100,\"source\":15}}",
+   "want": "115"
+  },
+  {
+   "id": "P01h/field-missing",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01h/field-null",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01h/field-false",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01h/field-zero",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01h/field-empty-string",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01h/field-string",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01h/field-number",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01h/field-array",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01h/field-object",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01h/body-empty-object",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01h/body-empty-array",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-array",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "[{\"score\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-string",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-number",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-null",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01h/body-empty",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-whitespace",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-malformed",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01h/body-not-json",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01h/multi-doc",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"first\"}\n{\"score\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01h/trailing-garbage",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01h/big-int-literal",
+   "prog": ".score",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":9999999999999999999}",
+   "want": "9999999999999999999"
+  },
+  {
+   "id": "P01i/realistic",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"score\":115,\"tier\":\"perfect\",\"breakdown\":{\"hash\":100,\"source\":15}}",
+   "want": "perfect"
+  },
+  {
+   "id": "P01i/field-missing",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01i/field-null",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01i/field-false",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01i/field-zero",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01i/field-empty-string",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01i/field-string",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01i/field-number",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01i/field-array",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01i/field-object",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01i/body-empty-object",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01i/body-empty-array",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-array",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "[{\"tier\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-string",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-number",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-null",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01i/body-empty",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-whitespace",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-malformed",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01i/body-not-json",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01i/multi-doc",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":\"first\"}\n{\"tier\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01i/trailing-garbage",
+   "prog": ".tier",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".tier"
+   ],
+   "body": "{\"tier\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01j/realistic",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":42,\"total_movies\":360,\"total_subtitles\":1234,\"downloads_today\":7,\"last_scan\":\"2026-02-01T03:00:00Z\"}",
+   "want": "42"
+  },
+  {
+   "id": "P01j/field-missing",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01j/field-null",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01j/field-false",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01j/field-zero",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01j/field-empty-string",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01j/field-string",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01j/field-number",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01j/field-array",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01j/field-object",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01j/body-empty-object",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01j/body-empty-array",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-array",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "[{\"total_series\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-string",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-number",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-null",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01j/body-empty",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-whitespace",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-malformed",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01j/body-not-json",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01j/multi-doc",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":\"first\"}\n{\"total_series\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01j/trailing-garbage",
+   "prog": ".total_series",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_series"
+   ],
+   "body": "{\"total_series\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01k/realistic",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_series\":42,\"total_movies\":360,\"total_subtitles\":1234,\"downloads_today\":7,\"last_scan\":\"2026-02-01T03:00:00Z\"}",
+   "want": "360"
+  },
+  {
+   "id": "P01k/field-missing",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01k/field-null",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01k/field-false",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01k/field-zero",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01k/field-empty-string",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01k/field-string",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01k/field-number",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01k/field-array",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01k/field-object",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01k/body-empty-object",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01k/body-empty-array",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-array",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "[{\"total_movies\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-string",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-number",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-null",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01k/body-empty",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-whitespace",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-malformed",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01k/body-not-json",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01k/multi-doc",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":\"first\"}\n{\"total_movies\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01k/trailing-garbage",
+   "prog": ".total_movies",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".total_movies"
+   ],
+   "body": "{\"total_movies\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01l/realistic",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":false,\"config_valid\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P01l/field-missing",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01l/field-null",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01l/field-false",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01l/field-zero",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01l/field-empty-string",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01l/field-string",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01l/field-number",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01l/field-array",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01l/field-object",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01l/body-empty-object",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01l/body-empty-array",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-array",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "[{\"setup_required\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-string",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-number",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-null",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01l/body-empty",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-whitespace",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-malformed",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01l/body-not-json",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01l/multi-doc",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":\"first\"}\n{\"setup_required\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01l/trailing-garbage",
+   "prog": ".setup_required",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".setup_required"
+   ],
+   "body": "{\"setup_required\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P01m/realistic",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"setup_required\":false,\"config_valid\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P01m/field-missing",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"other\":1}",
+   "want": "null"
+  },
+  {
+   "id": "P01m/field-null",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P01m/field-false",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P01m/field-zero",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P01m/field-empty-string",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P01m/field-string",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P01m/field-number",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P01m/field-array",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P01m/field-object",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P01m/body-empty-object",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{}",
+   "want": "null"
+  },
+  {
+   "id": "P01m/body-empty-array",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-array",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "[{\"config_valid\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-string",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-number",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-null",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "null",
+   "want": "null"
+  },
+  {
+   "id": "P01m/body-empty",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-whitespace",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-malformed",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P01m/body-not-json",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P01m/multi-doc",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":\"first\"}\n{\"config_valid\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P01m/trailing-garbage",
+   "prog": ".config_valid",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".config_valid"
+   ],
+   "body": "{\"config_valid\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P02a/realistic-movie",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"resolved\":true,\"items\":[{\"media_type\":\"movie\",\"media_id\":123,\"title\":\"Inception\",\"year\":2010,\"season\":0,\"episode\":0}]}",
+   "want": "movie"
+  },
+  {
+   "id": "P02a/realistic-episode",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"resolved\":true,\"items\":[{\"media_type\":\"episode\",\"media_id\":5,\"title\":\"Breaking Bad\",\"year\":2008,\"season\":1,\"episode\":1}]}",
+   "want": "episode"
+  },
+  {
+   "id": "P02a/no-items",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"resolved\":false,\"items\":[]}",
+   "want": "null"
+  },
+  {
+   "id": "P02a/items-missing",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"resolved\":false}",
+   "want": "null"
+  },
+  {
+   "id": "P02a/items-null",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":null}",
+   "want": "null"
+  },
+  {
+   "id": "P02a/items-string",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":\"none\"}",
+   "want": ""
+  },
+  {
+   "id": "P02a/items-number",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":3}",
+   "want": ""
+  },
+  {
+   "id": "P02a/item-scalar",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":[7]}",
+   "want": ""
+  },
+  {
+   "id": "P02a/item-null",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":[null]}",
+   "want": "null"
+  },
+  {
+   "id": "P02a/item-missing-field",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":[{\"media_id\":1}]}",
+   "want": "null"
+  },
+  {
+   "id": "P02a/field-number",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"items\":[{\"media_type\":1}]}",
+   "want": "1"
+  },
+  {
+   "id": "P02a/body-array",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P02a/body-empty",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P02a/body-malformed",
+   "prog": ".items[0].media_type",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_type"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P02b/realistic",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"resolved\":true,\"items\":[{\"media_type\":\"movie\",\"media_id\":123,\"title\":\"Inception\",\"year\":2010,\"season\":0,\"episode\":0}]}",
+   "want": "123"
+  },
+  {
+   "id": "P02b/no-items",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"resolved\":false,\"items\":[]}",
+   "want": "null"
+  },
+  {
+   "id": "P02b/id-zero",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"items\":[{\"media_id\":0}]}",
+   "want": "0"
+  },
+  {
+   "id": "P02b/id-string",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"items\":[{\"media_id\":\"tt123\"}]}",
+   "want": "tt123"
+  },
+  {
+   "id": "P02b/id-null",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"items\":[{\"media_id\":null}]}",
+   "want": "null"
+  },
+  {
+   "id": "P02b/item-scalar",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"items\":[\"x\"]}",
+   "want": ""
+  },
+  {
+   "id": "P02b/items-object",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"items\":{\"0\":{\"media_id\":1}}}",
+   "want": ""
+  },
+  {
+   "id": "P02b/body-empty",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P02b/body-malformed",
+   "prog": ".items[0].media_id",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRaw",
+   "args": [
+    ".items[0].media_id"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P03/realistic",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]",
+   "want": "5"
+  },
+  {
+   "id": "P03/empty-list",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P03/elem-missing-field",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"other\":1}]",
+   "want": ""
+  },
+  {
+   "id": "P03/elem-field-null",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":null}]",
+   "want": ""
+  },
+  {
+   "id": "P03/elem-field-false",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":false}]",
+   "want": ""
+  },
+  {
+   "id": "P03/elem-field-zero",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":0}]",
+   "want": "0"
+  },
+  {
+   "id": "P03/elem-field-string",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"str-id\"}]",
+   "want": "str-id"
+  },
+  {
+   "id": "P03/elem-null",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[null]",
+   "want": ""
+  },
+  {
+   "id": "P03/elem-scalar",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P03/body-object",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"id\":\"x\"}",
+   "want": ""
+  },
+  {
+   "id": "P03/body-string",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "\"nope\"",
+   "want": ""
+  },
+  {
+   "id": "P03/body-empty",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P03/body-malformed",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P03/multi-doc",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"a\"}]\n[{\"id\":\"b\"}]",
+   "want": "a"
+  },
+  {
+   "id": "P03/realistic-movies",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Inception\",\"id\":7,\"year\":2010,\"tmdb_id\":27205,\"has_file\":true},{\"title\":\"Tenet\",\"id\":8,\"year\":2020,\"tmdb_id\":577922,\"has_file\":false}]",
+   "want": "7"
+  },
+  {
+   "id": "P03/realistic-trailing-newline",
+   "prog": ".[0].id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Inception\",\"id\":7,\"year\":2010,\"tmdb_id\":27205,\"has_file\":true},{\"title\":\"Tenet\",\"id\":8,\"year\":2020,\"tmdb_id\":577922,\"has_file\":false}]\n",
+   "want": "7"
+  },
+  {
+   "id": "P24/realistic",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]",
+   "want": "5"
+  },
+  {
+   "id": "P24/empty-list",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P24/elem-missing-field",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"other\":1}]",
+   "want": ""
+  },
+  {
+   "id": "P24/elem-field-null",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":null}]",
+   "want": ""
+  },
+  {
+   "id": "P24/elem-field-false",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":false}]",
+   "want": ""
+  },
+  {
+   "id": "P24/elem-field-zero",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":0}]",
+   "want": "0"
+  },
+  {
+   "id": "P24/elem-field-string",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"str-id\"}]",
+   "want": "\"str-id\""
+  },
+  {
+   "id": "P24/elem-null",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[null]",
+   "want": ""
+  },
+  {
+   "id": "P24/elem-scalar",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P24/body-object",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"id\":\"x\"}",
+   "want": ""
+  },
+  {
+   "id": "P24/body-string",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "\"nope\"",
+   "want": ""
+  },
+  {
+   "id": "P24/body-empty",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P24/body-malformed",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P24/multi-doc",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"a\"}]\n[{\"id\":\"b\"}]",
+   "want": "\"a\""
+  },
+  {
+   "id": "P24/realistic-movies",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Inception\",\"id\":7,\"year\":2010,\"tmdb_id\":27205,\"has_file\":true},{\"title\":\"Tenet\",\"id\":8,\"year\":2020,\"tmdb_id\":577922,\"has_file\":false}]",
+   "want": "7"
+  },
+  {
+   "id": "P24/realistic-episode-groups",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"episodes\":[{\"title\":\"Pilot\",\"id\":101,\"season\":1,\"episode\":1,\"has_file\":true}],\"season\":1}]",
+   "want": ""
+  },
+  {
+   "id": "P24/realistic-trailing-newline",
+   "prog": ".[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]\n",
+   "want": "5"
+  },
+  {
+   "id": "P04/realistic",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": "7000000000"
+  },
+  {
+   "id": "P04/outer-missing",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"other\":{}}",
+   "want": ""
+  },
+  {
+   "id": "P04/outer-null",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":null}",
+   "want": ""
+  },
+  {
+   "id": "P04/outer-string",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":\"not-an-object\"}",
+   "want": ""
+  },
+  {
+   "id": "P04/outer-array",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":[{\"ScanDelay\":1}]}",
+   "want": ""
+  },
+  {
+   "id": "P04/inner-missing",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"other\":1}}",
+   "want": ""
+  },
+  {
+   "id": "P04/inner-null",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":null}}",
+   "want": ""
+  },
+  {
+   "id": "P04/inner-false",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":false}}",
+   "want": ""
+  },
+  {
+   "id": "P04/inner-zero",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":0}}",
+   "want": "0"
+  },
+  {
+   "id": "P04/inner-string",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":\"strval\"}}",
+   "want": "strval"
+  },
+  {
+   "id": "P04/inner-object",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":{\"k\":1}}}",
+   "want": "{\n  \"k\": 1\n}"
+  },
+  {
+   "id": "P04/body-array",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "[1,2]",
+   "want": ""
+  },
+  {
+   "id": "P04/body-null",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "null",
+   "want": ""
+  },
+  {
+   "id": "P04/body-empty",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P04/body-malformed",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P04/delay-string",
+   "prog": ".search.ScanDelay // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".search.ScanDelay"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":\"7s\"}}",
+   "want": "7s"
+  },
+  {
+   "id": "P05/realistic",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":\"7\"}",
+   "want": "7"
+  },
+  {
+   "id": "P05/field-missing",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"other\":1}",
+   "want": ""
+  },
+  {
+   "id": "P05/field-null",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":null}",
+   "want": ""
+  },
+  {
+   "id": "P05/field-false",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":false}",
+   "want": ""
+  },
+  {
+   "id": "P05/field-zero",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P05/field-empty-string",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P05/field-string",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P05/field-number",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P05/field-array",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P05/field-object",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P05/body-empty-object",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{}",
+   "want": ""
+  },
+  {
+   "id": "P05/body-empty-array",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P05/body-array",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "[{\"activity_id\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P05/body-string",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P05/body-number",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P05/body-null",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "null",
+   "want": ""
+  },
+  {
+   "id": "P05/body-empty",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P05/body-whitespace",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P05/body-malformed",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P05/body-not-json",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P05/multi-doc",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":\"first\"}\n{\"activity_id\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P05/trailing-garbage",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P05/id-numeric",
+   "prog": ".activity_id // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".activity_id"
+   ],
+   "body": "{\"activity_id\":7}",
+   "want": "7"
+  },
+  {
+   "id": "P06/realistic",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P06/field-missing",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"other\":1}",
+   "want": "false"
+  },
+  {
+   "id": "P06/field-null",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":null}",
+   "want": "false"
+  },
+  {
+   "id": "P06/field-false",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P06/field-zero",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P06/field-empty-string",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P06/field-string",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P06/field-number",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P06/field-array",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P06/field-object",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P06/body-empty-object",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{}",
+   "want": "false"
+  },
+  {
+   "id": "P06/body-empty-array",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P06/body-array",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "[{\"cancelled\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P06/body-string",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P06/body-number",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P06/body-null",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "null",
+   "want": "false"
+  },
+  {
+   "id": "P06/body-empty",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P06/body-whitespace",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P06/body-malformed",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P06/body-not-json",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P06/multi-doc",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":\"first\"}\n{\"cancelled\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P06/trailing-garbage",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"cancelled\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P06/realistic-live-row",
+   "prog": ".cancelled // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".cancelled"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"done\":false,\"cancellable\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P07/realistic",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P07/field-missing",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"other\":1}",
+   "want": "false"
+  },
+  {
+   "id": "P07/field-null",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":null}",
+   "want": "false"
+  },
+  {
+   "id": "P07/field-false",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":false}",
+   "want": "false"
+  },
+  {
+   "id": "P07/field-zero",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P07/field-empty-string",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":\"\"}",
+   "want": ""
+  },
+  {
+   "id": "P07/field-string",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":\"strval\"}",
+   "want": "strval"
+  },
+  {
+   "id": "P07/field-number",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P07/field-array",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P07/field-object",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P07/body-empty-object",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{}",
+   "want": "false"
+  },
+  {
+   "id": "P07/body-empty-array",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P07/body-array",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "[{\"failed\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P07/body-string",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P07/body-number",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P07/body-null",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "null",
+   "want": "false"
+  },
+  {
+   "id": "P07/body-empty",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P07/body-whitespace",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P07/body-malformed",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P07/body-not-json",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P07/multi-doc",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":\"first\"}\n{\"failed\":\"second\"}",
+   "want": "first"
+  },
+  {
+   "id": "P07/trailing-garbage",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"failed\":\"kept\"} trailing junk",
+   "want": "kept"
+  },
+  {
+   "id": "P07/failed-true",
+   "prog": ".failed // false",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrFalse",
+   "args": [
+    ".failed"
+   ],
+   "body": "{\"id\":\"1\",\"done\":true,\"failed\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P08/realistic",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":\"/media/movies/Inception (2010)/Inception.2010.en.srt\",\"media_type\":\"movie\",\"media_id\":\"tmdb-27205\",\"language\":\"en\",\"score\":87,\"provider\":\"opensubtitles\",\"manual\":false}]",
+   "want": "/media/movies/Inception (2010)/Inception.2010.en.srt"
+  },
+  {
+   "id": "P08/empty-list",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P08/elem-missing-field",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"other\":1}]",
+   "want": ""
+  },
+  {
+   "id": "P08/elem-field-null",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":null}]",
+   "want": ""
+  },
+  {
+   "id": "P08/elem-field-false",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":false}]",
+   "want": ""
+  },
+  {
+   "id": "P08/elem-field-zero",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":0}]",
+   "want": "0"
+  },
+  {
+   "id": "P08/elem-field-string",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":\"str-id\"}]",
+   "want": "str-id"
+  },
+  {
+   "id": "P08/elem-null",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[null]",
+   "want": ""
+  },
+  {
+   "id": "P08/elem-scalar",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P08/body-object",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "{\"path\":\"x\"}",
+   "want": ""
+  },
+  {
+   "id": "P08/body-string",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "\"nope\"",
+   "want": ""
+  },
+  {
+   "id": "P08/body-empty",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P08/body-malformed",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P08/multi-doc",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":\"a\"}]\n[{\"path\":\"b\"}]",
+   "want": "a"
+  },
+  {
+   "id": "P08/path-with-spaces",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":\"/media/tv/The Wire (2002)/s01e01.en.srt\"}]",
+   "want": "/media/tv/The Wire (2002)/s01e01.en.srt"
+  },
+  {
+   "id": "P08/path-unicode",
+   "prog": ".[0].path // empty",
+   "mode": "raw",
+   "vars": {},
+   "helper": "fieldRawOrEmpty",
+   "args": [
+    ".[0].path"
+   ],
+   "body": "[{\"path\":\"/media/animé/幸運星.srt\"}]",
+   "want": "/media/animé/幸運星.srt"
+  },
+  {
+   "id": "P09/realistic",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"opensubtitles\",\"id\":\"os-1\",\"score\":87,\"release\":\"Inception.2010.1080p.BluRay.x264-SPARKS\",\"language\":\"en\"},{\"provider\":\"subdl\",\"id\":\"sd-2\",\"score\":74,\"release\":\"Inception.2010.720p.WEB-DL\",\"language\":\"en\"},{\"provider\":\"opensubtitles\",\"id\":\"os-3\",\"score\":60,\"release\":\"Inception.2010.HDTV\",\"language\":\"en\"}],\"total\":3}",
+   "want": "{\n  \"opensubtitles\": 2,\n  \"subdl\": 1\n}"
+  },
+  {
+   "id": "P09/empty-results",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[],\"total\":0}",
+   "want": "{}"
+  },
+  {
+   "id": "P09/single-provider",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"subdl\",\"id\":\"1\"}]}",
+   "want": "{\n  \"subdl\": 1\n}"
+  },
+  {
+   "id": "P09/many-same-provider",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"os\"},{\"provider\":\"os\"},{\"provider\":\"os\"}]}",
+   "want": "{\n  \"os\": 3\n}"
+  },
+  {
+   "id": "P09/unicode-provider",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"sübtitles\"}]}",
+   "want": "{\n  \"sübtitles\": 1\n}"
+  },
+  {
+   "id": "P09/empty-string-provider",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"\"}]}",
+   "want": "{\n  \"\": 1\n}"
+  },
+  {
+   "id": "P09/results-missing",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{}",
+   "want": ""
+  },
+  {
+   "id": "P09/results-null",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":null}",
+   "want": ""
+  },
+  {
+   "id": "P09/results-object",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":{\"a\":{\"provider\":\"os\"}}}",
+   "want": ""
+  },
+  {
+   "id": "P09/results-string",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":\"nope\"}",
+   "want": ""
+  },
+  {
+   "id": "P09/entry-scalar",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[5]}",
+   "want": ""
+  },
+  {
+   "id": "P09/entry-missing-provider",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"id\":\"x\"}]}",
+   "want": ""
+  },
+  {
+   "id": "P09/provider-number",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":5}]}",
+   "want": ""
+  },
+  {
+   "id": "P09/body-array",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P09/body-empty",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P09/body-malformed",
+   "prog": "[.results[].provider] | group_by(.) | map({(.[0]): length}) | add // {}",
+   "mode": "raw",
+   "vars": {},
+   "helper": "providerBreakdown",
+   "args": [],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P10/realistic",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"key\":\"sonarr\",\"label\":\"Sonarr\",\"fields\":[{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"api_key\",\"type\":\"string\"}]},{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"opensubtitles\",\"label\":\"OpenSubtitles\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]},{\"key\":\"embedded_subtitles\",\"label\":\"Embedded Subtitles\",\"fields\":[{\"name\":\"ignore_pgs\",\"type\":\"bool\"}]}]",
+   "want": "3"
+  },
+  {
+   "id": "P10/empty-array",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P10/target-null",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "null",
+   "want": "0"
+  },
+  {
+   "id": "P10/target-missing",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "null",
+   "want": "0"
+  },
+  {
+   "id": "P10/string",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "\"héllo\"",
+   "want": "5"
+  },
+  {
+   "id": "P10/object",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "{\"a\":1,\"b\":2}",
+   "want": "2"
+  },
+  {
+   "id": "P10/number-negative",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "-3",
+   "want": "3"
+  },
+  {
+   "id": "P10/number-decimal-literal",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "2.50",
+   "want": "2.50"
+  },
+  {
+   "id": "P10/number-exponent-literal",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "1e3",
+   "want": "1e3"
+  },
+  {
+   "id": "P10/bool",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "true",
+   "want": ""
+  },
+  {
+   "id": "P10/hetero-array",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"a\":1},5,\"x\",null]",
+   "want": "4"
+  },
+  {
+   "id": "P10/body-empty",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P10/body-malformed",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P10/multi-doc",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[1]\n[]",
+   "want": "1"
+  },
+  {
+   "id": "P10/realistic-providers",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]",
+   "want": "1"
+  },
+  {
+   "id": "P10/realistic-series",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]",
+   "want": "3"
+  },
+  {
+   "id": "P10/realistic-episode-groups",
+   "prog": ". | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"episodes\":[{\"title\":\"Pilot\",\"id\":101,\"season\":1,\"episode\":1,\"has_file\":true}],\"season\":1}]",
+   "want": "1"
+  },
+  {
+   "id": "P21/realistic",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"code\":\"fr\",\"variant\":\"standard\",\"min_score\":0},{\"code\":\"de\",\"variant\":\"standard\"}]",
+   "want": "2"
+  },
+  {
+   "id": "P21/empty-array",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P21/target-null",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "null",
+   "want": "0"
+  },
+  {
+   "id": "P21/target-missing",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "null",
+   "want": "0"
+  },
+  {
+   "id": "P21/string",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "\"héllo\"",
+   "want": "5"
+  },
+  {
+   "id": "P21/object",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "{\"a\":1,\"b\":2}",
+   "want": "2"
+  },
+  {
+   "id": "P21/number-negative",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "-3",
+   "want": "3"
+  },
+  {
+   "id": "P21/number-decimal-literal",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "2.50",
+   "want": "2.50"
+  },
+  {
+   "id": "P21/number-exponent-literal",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "1e3",
+   "want": "1e3"
+  },
+  {
+   "id": "P21/bool",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "true",
+   "want": ""
+  },
+  {
+   "id": "P21/hetero-array",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[{\"a\":1},5,\"x\",null]",
+   "want": "4"
+  },
+  {
+   "id": "P21/body-empty",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P21/body-malformed",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P21/multi-doc",
+   "prog": "length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    "."
+   ],
+   "body": "[1]\n[]",
+   "want": "1"
+  },
+  {
+   "id": "P11/realistic",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"resolved\":true,\"items\":[{\"media_type\":\"movie\",\"media_id\":123,\"title\":\"Inception\",\"year\":2010,\"season\":0,\"episode\":0}]}",
+   "want": "1"
+  },
+  {
+   "id": "P11/empty-array",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":[]}",
+   "want": "0"
+  },
+  {
+   "id": "P11/target-null",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":null}",
+   "want": "0"
+  },
+  {
+   "id": "P11/target-missing",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{}",
+   "want": "0"
+  },
+  {
+   "id": "P11/string",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":\"héllo\"}",
+   "want": "5"
+  },
+  {
+   "id": "P11/object",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":{\"a\":1,\"b\":2}}",
+   "want": "2"
+  },
+  {
+   "id": "P11/number-negative",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":-3}",
+   "want": "3"
+  },
+  {
+   "id": "P11/number-decimal-literal",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":2.50}",
+   "want": "2.50"
+  },
+  {
+   "id": "P11/number-exponent-literal",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":1e3}",
+   "want": "1e3"
+  },
+  {
+   "id": "P11/bool",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":true}",
+   "want": ""
+  },
+  {
+   "id": "P11/hetero-array",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":[{\"a\":1},5,\"x\",null]}",
+   "want": "4"
+  },
+  {
+   "id": "P11/body-empty",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P11/body-malformed",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P11/multi-doc",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"items\":[1]}\n{\"items\":[]}",
+   "want": "1"
+  },
+  {
+   "id": "P11/realistic-empty",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "{\"resolved\":false,\"items\":[]}",
+   "want": "0"
+  },
+  {
+   "id": "P11/body-array",
+   "prog": ".items | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".items"
+   ],
+   "body": "[1,2]",
+   "want": ""
+  },
+  {
+   "id": "P12/realistic",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": ""
+  },
+  {
+   "id": "P12/outer-missing",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"other\":{}}",
+   "want": ""
+  },
+  {
+   "id": "P12/outer-null",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":null}",
+   "want": ""
+  },
+  {
+   "id": "P12/outer-string",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":\"not-an-object\"}",
+   "want": ""
+  },
+  {
+   "id": "P12/outer-array",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":[{\"enabled\":1}]}",
+   "want": ""
+  },
+  {
+   "id": "P12/inner-missing",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"other\":1}}",
+   "want": ""
+  },
+  {
+   "id": "P12/inner-null",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":null}}",
+   "want": ""
+  },
+  {
+   "id": "P12/inner-false",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":false}}",
+   "want": ""
+  },
+  {
+   "id": "P12/inner-zero",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":0}}",
+   "want": "0"
+  },
+  {
+   "id": "P12/inner-string",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":\"strval\"}}",
+   "want": "\"strval\""
+  },
+  {
+   "id": "P12/inner-object",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":{\"k\":1}}}",
+   "want": "{\n  \"k\": 1\n}"
+  },
+  {
+   "id": "P12/body-array",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "[1,2]",
+   "want": ""
+  },
+  {
+   "id": "P12/body-null",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "null",
+   "want": ""
+  },
+  {
+   "id": "P12/body-empty",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P12/body-malformed",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P12/enabled-true",
+   "prog": ".auth.enabled // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrEmpty",
+   "args": [
+    ".auth.enabled"
+   ],
+   "body": "{\"auth\":{\"enabled\":true}}",
+   "want": "true"
+  },
+  {
+   "id": "P13/realistic",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]",
+   "want": "1"
+  },
+  {
+   "id": "P13/realistic-multi",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":\"opensubtitles\",\"enabled\":true,\"priority\":1,\"loaded\":true},{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true},{\"name\":\"subdl\",\"enabled\":false,\"priority\":3,\"loaded\":false}]",
+   "want": "1"
+  },
+  {
+   "id": "P13/duplicates",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":\"gestdown\"},{\"name\":\"gestdown\"}]",
+   "want": "2"
+  },
+  {
+   "id": "P13/absent",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":\"subdl\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P13/empty-list",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P13/name-missing",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"enabled\":true}]",
+   "want": "0"
+  },
+  {
+   "id": "P13/name-null",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":null}]",
+   "want": "0"
+  },
+  {
+   "id": "P13/name-number",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":5}]",
+   "want": "0"
+  },
+  {
+   "id": "P13/elem-null",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[null]",
+   "want": "0"
+  },
+  {
+   "id": "P13/elem-scalar",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[\"gestdown\"]",
+   "want": ""
+  },
+  {
+   "id": "P13/body-object",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "{\"a\":{\"name\":\"gestdown\"},\"b\":{\"name\":\"x\"}}",
+   "want": "1"
+  },
+  {
+   "id": "P13/body-string",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "\"gestdown\"",
+   "want": ""
+  },
+  {
+   "id": "P13/body-empty",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P13/body-malformed",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P13/trailing-newline",
+   "prog": "[.[] | select(.name==\"gestdown\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "gestdown"
+   ],
+   "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]\n",
+   "want": "1"
+  },
+  {
+   "id": "P15/realistic-hidden",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]",
+   "want": "0"
+  },
+  {
+   "id": "P15/leaked",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "[{\"name\":\"mock\",\"enabled\":true}]",
+   "want": "1"
+  },
+  {
+   "id": "P15/empty-list",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P15/elem-scalar",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "[1]",
+   "want": ""
+  },
+  {
+   "id": "P15/name-missing",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "[{\"enabled\":true}]",
+   "want": "0"
+  },
+  {
+   "id": "P15/body-object",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "{\"m\":{\"name\":\"mock\"}}",
+   "want": "1"
+  },
+  {
+   "id": "P15/body-empty",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P15/body-malformed",
+   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "mock"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P16/realistic-absent",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]",
+   "want": "0"
+  },
+  {
+   "id": "P16/leaked",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "[{\"name\":\"embedded\"}]",
+   "want": "1"
+  },
+  {
+   "id": "P16/empty-list",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P16/elem-null",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "[null]",
+   "want": "0"
+  },
+  {
+   "id": "P16/name-false",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "[{\"name\":false}]",
+   "want": "0"
+  },
+  {
+   "id": "P16/body-number",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "7",
+   "want": ""
+  },
+  {
+   "id": "P16/body-empty",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P16/body-malformed",
+   "prog": "[.[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "name",
+    "embedded"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P18/realistic",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[{\"key\":\"sonarr\",\"label\":\"Sonarr\",\"fields\":[{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"api_key\",\"type\":\"string\"}]},{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"opensubtitles\",\"label\":\"OpenSubtitles\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]},{\"key\":\"embedded_subtitles\",\"label\":\"Embedded Subtitles\",\"fields\":[{\"name\":\"ignore_pgs\",\"type\":\"bool\"}]}]",
+   "want": "1"
+  },
+  {
+   "id": "P18/absent",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[{\"key\":\"sonarr\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P18/duplicates",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[{\"key\":\"embedded_subtitles\"},{\"key\":\"embedded_subtitles\"}]",
+   "want": "2"
+  },
+  {
+   "id": "P18/empty-list",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P18/key-missing",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[{\"label\":\"x\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P18/key-number",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[{\"key\":3}]",
+   "want": "0"
+  },
+  {
+   "id": "P18/elem-scalar",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "[\"embedded_subtitles\"]",
+   "want": ""
+  },
+  {
+   "id": "P18/body-object",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "{\"s\":{\"key\":\"embedded_subtitles\"}}",
+   "want": "1"
+  },
+  {
+   "id": "P18/body-empty",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P18/body-malformed",
+   "prog": "[.[] | select(.key==\"embedded_subtitles\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "countFieldEq",
+   "args": [
+    "key",
+    "embedded_subtitles"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P14/realistic-hidden",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"sonarr\",\"label\":\"Sonarr\",\"fields\":[{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"api_key\",\"type\":\"string\"}]},{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"opensubtitles\",\"label\":\"OpenSubtitles\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]},{\"key\":\"embedded_subtitles\",\"label\":\"Embedded Subtitles\",\"fields\":[{\"name\":\"ignore_pgs\",\"type\":\"bool\"}]}]",
+   "want": "0"
+  },
+  {
+   "id": "P14/leaked",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"mock\",\"label\":\"Mock\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]}]",
+   "want": "1"
+  },
+  {
+   "id": "P14/no-providers-section",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"sonarr\",\"fields\":[]}]",
+   "want": "0"
+  },
+  {
+   "id": "P14/providers-field-missing",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\"}]",
+   "want": ""
+  },
+  {
+   "id": "P14/providers-null",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":null}]",
+   "want": ""
+  },
+  {
+   "id": "P14/providers-empty",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":[]}]",
+   "want": "0"
+  },
+  {
+   "id": "P14/providers-object",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":{\"a\":{\"name\":\"mock\"}}}]",
+   "want": "1"
+  },
+  {
+   "id": "P14/providers-string",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":\"mock\"}]",
+   "want": ""
+  },
+  {
+   "id": "P14/two-provider-sections",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":[{\"name\":\"mock\"}]},{\"key\":\"providers\",\"providers\":[{\"name\":\"mock\"}]}]",
+   "want": "2"
+  },
+  {
+   "id": "P14/provider-entry-scalar",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":[\"mock\"]}]",
+   "want": ""
+  },
+  {
+   "id": "P14/provider-name-missing",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":[{\"label\":\"M\"}]}]",
+   "want": "0"
+  },
+  {
+   "id": "P14/section-null",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[null]",
+   "want": "0"
+  },
+  {
+   "id": "P14/section-scalar",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P14/key-number",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[{\"key\":1,\"providers\":[{\"name\":\"mock\"}]}]",
+   "want": "0"
+  },
+  {
+   "id": "P14/empty-list",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P14/body-empty",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P14/body-malformed",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "mock"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P17/realistic-absent",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "[{\"key\":\"sonarr\",\"label\":\"Sonarr\",\"fields\":[{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"api_key\",\"type\":\"string\"}]},{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"opensubtitles\",\"label\":\"OpenSubtitles\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]},{\"key\":\"embedded_subtitles\",\"label\":\"Embedded Subtitles\",\"fields\":[{\"name\":\"ignore_pgs\",\"type\":\"bool\"}]}]",
+   "want": "0"
+  },
+  {
+   "id": "P17/leaked",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "[{\"key\":\"providers\",\"providers\":[{\"name\":\"embedded\"}]}]",
+   "want": "1"
+  },
+  {
+   "id": "P17/empty-list",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P17/no-providers-section",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "[{\"key\":\"scoring\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P17/providers-missing",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "[{\"key\":\"providers\"}]",
+   "want": ""
+  },
+  {
+   "id": "P17/body-object",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "{\"x\":{\"key\":\"providers\",\"providers\":[{\"name\":\"embedded\"}]}}",
+   "want": "1"
+  },
+  {
+   "id": "P17/body-empty",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P17/body-malformed",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"embedded\")] | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "schemaProviderCount",
+   "args": [
+    "embedded"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P19/realistic-absent",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{\"mock\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P19/realistic-empty-providers",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{},\"enabled\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P19/leaked",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{\"embedded\":{\"recent_failures\":0,\"threshold\":5,\"timed_out\":false}},\"enabled\":true}",
+   "want": "true"
+  },
+  {
+   "id": "P19/embedded-null",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{\"embedded\":null}}",
+   "want": "false"
+  },
+  {
+   "id": "P19/embedded-false",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{\"embedded\":false}}",
+   "want": "true"
+  },
+  {
+   "id": "P19/embedded-zero",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":{\"embedded\":0}}",
+   "want": "true"
+  },
+  {
+   "id": "P19/providers-missing",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{}",
+   "want": "false"
+  },
+  {
+   "id": "P19/providers-null",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":null}",
+   "want": "false"
+  },
+  {
+   "id": "P19/providers-string",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"providers\":\"none\"}",
+   "want": ""
+  },
+  {
+   "id": "P19/body-null",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "null",
+   "want": "false"
+  },
+  {
+   "id": "P19/body-array",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P19/body-empty",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P19/body-malformed",
+   "prog": ".providers.embedded != null",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldNotNull",
+   "args": [
+    ".providers.embedded"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P20/realistic",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]",
+   "want": "5"
+  },
+  {
+   "id": "P20/empty-list",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[]",
+   "want": "null"
+  },
+  {
+   "id": "P20/elem-missing-field",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"other\":1}]",
+   "want": "null"
+  },
+  {
+   "id": "P20/elem-field-null",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":null}]",
+   "want": "null"
+  },
+  {
+   "id": "P20/elem-field-false",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":false}]",
+   "want": "false"
+  },
+  {
+   "id": "P20/elem-field-zero",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":0}]",
+   "want": "0"
+  },
+  {
+   "id": "P20/elem-field-string",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"str-id\"}]",
+   "want": "\"str-id\""
+  },
+  {
+   "id": "P20/elem-null",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[null]",
+   "want": "null"
+  },
+  {
+   "id": "P20/elem-scalar",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P20/body-object",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"id\":\"x\"}",
+   "want": ""
+  },
+  {
+   "id": "P20/body-string",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "\"nope\"",
+   "want": ""
+  },
+  {
+   "id": "P20/body-empty",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P20/body-malformed",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P20/multi-doc",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"a\"}]\n[{\"id\":\"b\"}]",
+   "want": "\"a\""
+  },
+  {
+   "id": "P20/id-string-quoted",
+   "prog": ".[0].id",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSON",
+   "args": [
+    ".[0].id"
+   ],
+   "body": "[{\"id\":\"sonarr-5\"}]",
+   "want": "\"sonarr-5\""
+  },
+  {
+   "id": "P22/realistic",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": "2"
+  },
+  {
+   "id": "P22/empty-tags",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":[]}}",
+   "want": "0"
+  },
+  {
+   "id": "P22/tags-missing",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":1}}",
+   "want": "0"
+  },
+  {
+   "id": "P22/tags-null",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":null}}",
+   "want": "0"
+  },
+  {
+   "id": "P22/tags-string",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":\"solo\"}}",
+   "want": "4"
+  },
+  {
+   "id": "P22/tags-object",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":{\"a\":1}}}",
+   "want": "1"
+  },
+  {
+   "id": "P22/tags-number",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":-2}}",
+   "want": "2"
+  },
+  {
+   "id": "P22/tags-bool",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ExcludeArrTags\":true}}",
+   "want": ""
+  },
+  {
+   "id": "P22/search-missing",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{}",
+   "want": "0"
+  },
+  {
+   "id": "P22/search-null",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":null}",
+   "want": "0"
+  },
+  {
+   "id": "P22/search-string",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":\"x\"}",
+   "want": ""
+  },
+  {
+   "id": "P22/body-array",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P22/body-empty",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P22/body-malformed",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P22/trailing-newline",
+   "prog": ".search.ExcludeArrTags | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "lengthAt",
+   "args": [
+    ".search.ExcludeArrTags"
+   ],
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}\n",
+   "want": "2"
+  },
+  {
+   "id": "P23/realistic",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]",
+   "want": "12"
+  },
+  {
+   "id": "P23/none-in-range",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":1,\"episodes\":62},{\"id\":2,\"episodes\":0}]",
+   "want": ""
+  },
+  {
+   "id": "P23/first-matches",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":3,\"episodes\":1},{\"id\":4,\"episodes\":5}]",
+   "want": "3"
+  },
+  {
+   "id": "P23/boundary-10",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":5,\"episodes\":10}]",
+   "want": "5"
+  },
+  {
+   "id": "P23/boundary-0",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":6,\"episodes\":0}]",
+   "want": ""
+  },
+  {
+   "id": "P23/boundary-float",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":7,\"episodes\":9.5}]",
+   "want": "7"
+  },
+  {
+   "id": "P23/boundary-above-float",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":8,\"episodes\":10.5}]",
+   "want": ""
+  },
+  {
+   "id": "P23/negative",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":9,\"episodes\":-2}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-missing",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":10}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-null",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":11,\"episodes\":null}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-string",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":12,\"episodes\":\"5\"}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-bool",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":13,\"episodes\":true}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-array",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":14,\"episodes\":[1]}]",
+   "want": ""
+  },
+  {
+   "id": "P23/episodes-object",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":15,\"episodes\":{\"n\":1}}]",
+   "want": ""
+  },
+  {
+   "id": "P23/match-then-error",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":16,\"episodes\":5},7]",
+   "want": ""
+  },
+  {
+   "id": "P23/matched-id-missing",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"episodes\":5}]",
+   "want": ""
+  },
+  {
+   "id": "P23/matched-id-null",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":null,\"episodes\":5}]",
+   "want": ""
+  },
+  {
+   "id": "P23/matched-id-false",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":false,\"episodes\":5}]",
+   "want": ""
+  },
+  {
+   "id": "P23/matched-id-zero",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":0,\"episodes\":5}]",
+   "want": "0"
+  },
+  {
+   "id": "P23/matched-id-string",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"id\":\"s-1\",\"episodes\":5}]",
+   "want": "\"s-1\""
+  },
+  {
+   "id": "P23/elem-null",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[null]",
+   "want": ""
+  },
+  {
+   "id": "P23/empty-list",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P23/body-object",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "{\"z\":{\"id\":1,\"episodes\":5},\"a\":{\"id\":2,\"episodes\":7}}",
+   "want": "2"
+  },
+  {
+   "id": "P23/body-string",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "\"x\"",
+   "want": ""
+  },
+  {
+   "id": "P23/body-empty",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P23/body-malformed",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P23/trailing-newline",
+   "prog": "[.[] | select(.episodes > 0 and .episodes <= 10)] | .[0].id // empty",
+   "mode": "json",
+   "vars": {},
+   "helper": "seriesPick",
+   "args": [],
+   "body": "[{\"title\":\"Breaking Bad\",\"imdb_id\":\"tt0903747\",\"id\":5,\"year\":2008,\"tvdb_id\":81189,\"seasons\":5,\"episodes\":62},{\"title\":\"Firefly\",\"id\":9,\"year\":2002,\"tvdb_id\":78874,\"seasons\":1,\"episodes\":14},{\"title\":\"Short Show\",\"id\":12,\"year\":2020,\"tvdb_id\":111,\"seasons\":1,\"episodes\":8}]\n",
+   "want": "12"
+  },
+  {
+   "id": "P25/realistic",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"opensubtitles\",\"id\":\"os-1\",\"score\":87,\"release\":\"Inception.2010.1080p.BluRay.x264-SPARKS\",\"language\":\"en\"},{\"provider\":\"subdl\",\"id\":\"sd-2\",\"score\":74,\"release\":\"Inception.2010.720p.WEB-DL\",\"language\":\"en\"},{\"provider\":\"opensubtitles\",\"id\":\"os-3\",\"score\":60,\"release\":\"Inception.2010.HDTV\",\"language\":\"en\"}],\"total\":3}",
+   "want": "3"
+  },
+  {
+   "id": "P25/empty-array",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[]}",
+   "want": "0"
+  },
+  {
+   "id": "P25/target-null",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":null}",
+   "want": "0"
+  },
+  {
+   "id": "P25/target-missing",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{}",
+   "want": "0"
+  },
+  {
+   "id": "P25/string",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":\"héllo\"}",
+   "want": "5"
+  },
+  {
+   "id": "P25/object",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":{\"a\":1,\"b\":2}}",
+   "want": "2"
+  },
+  {
+   "id": "P25/number-negative",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":-3}",
+   "want": "3"
+  },
+  {
+   "id": "P25/number-decimal-literal",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":2.50}",
+   "want": "2.50"
+  },
+  {
+   "id": "P25/number-exponent-literal",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":1e3}",
+   "want": "1e3"
+  },
+  {
+   "id": "P25/bool",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":true}",
+   "want": ""
+  },
+  {
+   "id": "P25/hetero-array",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[{\"a\":1},5,\"x\",null]}",
+   "want": "4"
+  },
+  {
+   "id": "P25/body-empty",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P25/body-malformed",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P25/multi-doc",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[1]}\n{\"results\":[]}",
+   "want": "1"
+  },
+  {
+   "id": "P25/realistic-empty",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[],\"total\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P25/body-array",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P25/realistic-trailing-newline",
+   "prog": ".results | length",
+   "mode": "json",
+   "vars": {},
+   "helper": "resultsLen",
+   "args": [],
+   "body": "{\"results\":[{\"provider\":\"opensubtitles\",\"id\":\"os-1\",\"score\":87,\"release\":\"Inception.2010.1080p.BluRay.x264-SPARKS\",\"language\":\"en\"},{\"provider\":\"subdl\",\"id\":\"sd-2\",\"score\":74,\"release\":\"Inception.2010.720p.WEB-DL\",\"language\":\"en\"},{\"provider\":\"opensubtitles\",\"id\":\"os-3\",\"score\":60,\"release\":\"Inception.2010.HDTV\",\"language\":\"en\"}],\"total\":3}\n",
+   "want": "3"
+  },
+  {
+   "id": "P26/realistic",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":115,\"tier\":\"perfect\",\"breakdown\":{\"hash\":100,\"source\":15}}",
+   "want": "115"
+  },
+  {
+   "id": "P26/field-missing",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"other\":1}",
+   "want": "0"
+  },
+  {
+   "id": "P26/field-null",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":null}",
+   "want": "0"
+  },
+  {
+   "id": "P26/field-false",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":false}",
+   "want": "0"
+  },
+  {
+   "id": "P26/field-zero",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":0}",
+   "want": "0"
+  },
+  {
+   "id": "P26/field-empty-string",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"\"}",
+   "want": "\"\""
+  },
+  {
+   "id": "P26/field-string",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"strval\"}",
+   "want": "\"strval\""
+  },
+  {
+   "id": "P26/field-number",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P26/field-array",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":[1,\"two\"]}",
+   "want": "[\n  1,\n  \"two\"\n]"
+  },
+  {
+   "id": "P26/field-object",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":{\"zk\":1,\"ak\":[true,null]}}",
+   "want": "{\n  \"ak\": [\n    true,\n    null\n  ],\n  \"zk\": 1\n}"
+  },
+  {
+   "id": "P26/body-empty-object",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{}",
+   "want": "0"
+  },
+  {
+   "id": "P26/body-empty-array",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P26/body-array",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "[{\"score\":\"x\"}]",
+   "want": ""
+  },
+  {
+   "id": "P26/body-string",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "\"just a string\"",
+   "want": ""
+  },
+  {
+   "id": "P26/body-number",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "42",
+   "want": ""
+  },
+  {
+   "id": "P26/body-null",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "null",
+   "want": "0"
+  },
+  {
+   "id": "P26/body-empty",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P26/body-whitespace",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "  \n\t ",
+   "want": ""
+  },
+  {
+   "id": "P26/body-malformed",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P26/body-not-json",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "<html>502 Bad Gateway</html>",
+   "want": ""
+  },
+  {
+   "id": "P26/multi-doc",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"first\"}\n{\"score\":\"second\"}",
+   "want": "\"first\""
+  },
+  {
+   "id": "P26/trailing-garbage",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":\"kept\"} trailing junk",
+   "want": "\"kept\""
+  },
+  {
+   "id": "P26/score-float",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":87.5}",
+   "want": "87.5"
+  },
+  {
+   "id": "P26/score-exponent-literal",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":1e2}",
+   "want": "1e2"
+  },
+  {
+   "id": "P26/score-big-int-literal",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":9999999999999999999}",
+   "want": "9999999999999999999"
+  },
+  {
+   "id": "P26/score-negative",
+   "prog": ".score // 0",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrZero",
+   "args": [
+    ".score"
+   ],
+   "body": "{\"score\":-5}",
+   "want": "-5"
+  },
+  {
+   "id": "P27/realistic",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}}",
+   "want": "true"
+  },
+  {
+   "id": "P27/outer-missing",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"other\":{}}",
+   "want": "false"
+  },
+  {
+   "id": "P27/outer-null",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":null}",
+   "want": "false"
+  },
+  {
+   "id": "P27/outer-string",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":\"not-an-object\"}",
+   "want": ""
+  },
+  {
+   "id": "P27/outer-array",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":[{\"timed_out\":1}]}",
+   "want": ""
+  },
+  {
+   "id": "P27/inner-missing",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"other\":1}}",
+   "want": "false"
+  },
+  {
+   "id": "P27/inner-null",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"timed_out\":null}}",
+   "want": "false"
+  },
+  {
+   "id": "P27/inner-false",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"timed_out\":false}}",
+   "want": "false"
+  },
+  {
+   "id": "P27/inner-zero",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"timed_out\":0}}",
+   "want": "0"
+  },
+  {
+   "id": "P27/inner-string",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"timed_out\":\"strval\"}}",
+   "want": "\"strval\""
+  },
+  {
+   "id": "P27/inner-object",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"mock\":{\"timed_out\":{\"k\":1}}}",
+   "want": "{\n  \"k\": 1\n}"
+  },
+  {
+   "id": "P27/body-array",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "[1,2]",
+   "want": ""
+  },
+  {
+   "id": "P27/body-null",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "null",
+   "want": "false"
+  },
+  {
+   "id": "P27/body-empty",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P27/body-malformed",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P27/realistic-nested-wire-shape",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"providers\":{\"mock\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P27/realistic-quiet",
+   "prog": ".mock.timed_out // false",
+   "mode": "json",
+   "vars": {},
+   "helper": "fieldJSONOrFalse",
+   "args": [
+    ".mock.timed_out"
+   ],
+   "body": "{\"providers\":{},\"enabled\":true}",
+   "want": "false"
+  },
+  {
+   "id": "P28/realistic-live",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"current\":4,\"total\":62,\"done\":false,\"cancellable\":true},{\"started_at\":\"2026-02-01T09:00:00Z\",\"ended_at\":\"2026-02-01T09:05:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan: Breaking Bad\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"started_at\":\"2026-02-01T08:00:00Z\",\"ended_at\":\"2026-02-01T08:01:00Z\",\"id\":\"1\",\"action\":\"download\",\"detail\":\"movie.fr.srt\",\"source\":\"scheduled\",\"done\":true,\"failed\":true}]",
+   "want": "1"
+  },
+  {
+   "id": "P28/realistic-done",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"id\":\"3\",\"done\":true,\"action\":\"scan\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P28/done-missing",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"action\":\"scan\"}]",
+   "want": "1"
+  },
+  {
+   "id": "P28/done-null",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"done\":null}]",
+   "want": "1"
+  },
+  {
+   "id": "P28/done-string",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"done\":\"yes\"}]",
+   "want": "0"
+  },
+  {
+   "id": "P28/done-zero",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"done\":0}]",
+   "want": "0"
+  },
+  {
+   "id": "P28/duplicate-live",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"done\":false},{\"id\":\"3\"}]",
+   "want": "2"
+  },
+  {
+   "id": "P28/id-numeric-no-match",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":3,\"done\":false}]",
+   "want": "0"
+  },
+  {
+   "id": "P28/no-match",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"9\",\"done\":false}]",
+   "want": "0"
+  },
+  {
+   "id": "P28/elem-scalar",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[5]",
+   "want": ""
+  },
+  {
+   "id": "P28/elem-null",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[null]",
+   "want": "0"
+  },
+  {
+   "id": "P28/empty-list",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[]",
+   "want": "0"
+  },
+  {
+   "id": "P28/body-object",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "{\"a\":{\"id\":\"3\",\"done\":false}}",
+   "want": "1"
+  },
+  {
+   "id": "P28/body-string",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "\"3\"",
+   "want": ""
+  },
+  {
+   "id": "P28/body-empty",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P28/body-malformed",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P28/trailing-newline",
+   "prog": "[.[] | select(.id == $id and (.done | not))] | length",
+   "mode": "rawvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "runningLen",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"current\":4,\"total\":62,\"done\":false,\"cancellable\":true},{\"started_at\":\"2026-02-01T09:00:00Z\",\"ended_at\":\"2026-02-01T09:05:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan: Breaking Bad\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"started_at\":\"2026-02-01T08:00:00Z\",\"ended_at\":\"2026-02-01T08:01:00Z\",\"id\":\"1\",\"action\":\"download\",\"detail\":\"movie.fr.srt\",\"source\":\"scheduled\",\"done\":true,\"failed\":true}]\n",
+   "want": "1"
+  },
+  {
+   "id": "P29/realistic",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"current\":4,\"total\":62,\"done\":false,\"cancellable\":true},{\"started_at\":\"2026-02-01T09:00:00Z\",\"ended_at\":\"2026-02-01T09:05:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan: Breaking Bad\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"started_at\":\"2026-02-01T08:00:00Z\",\"ended_at\":\"2026-02-01T08:01:00Z\",\"id\":\"1\",\"action\":\"download\",\"detail\":\"movie.fr.srt\",\"source\":\"scheduled\",\"done\":true,\"failed\":true}]",
+   "want": "{\"action\":\"scan\",\"cancellable\":true,\"current\":4,\"detail\":\"Full library scan\",\"done\":false,\"id\":\"3\",\"source\":\"manual\",\"started_at\":\"2026-02-01T10:00:00Z\",\"total\":62}"
+  },
+  {
+   "id": "P29/match-last",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"done\":false,\"cancellable\":true}]",
+   "want": "{\"action\":\"scan\",\"cancellable\":true,\"detail\":\"Full library scan\",\"done\":false,\"id\":\"3\",\"source\":\"manual\",\"started_at\":\"2026-02-01T10:00:00Z\"}"
+  },
+  {
+   "id": "P29/duplicate-first-wins",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"seq\":1},{\"id\":\"3\",\"seq\":2}]",
+   "want": "{\"id\":\"3\",\"seq\":1}"
+  },
+  {
+   "id": "P29/no-match",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T09:00:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan\",\"source\":\"manual\",\"done\":true,\"cancelled\":true}]",
+   "want": ""
+  },
+  {
+   "id": "P29/id-numeric-no-match",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":3,\"done\":true}]",
+   "want": ""
+  },
+  {
+   "id": "P29/unsorted-keys",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"t\",\"id\":\"3\",\"done\":false,\"action\":\"scan\"}]",
+   "want": "{\"action\":\"scan\",\"done\":false,\"id\":\"3\",\"started_at\":\"t\"}"
+  },
+  {
+   "id": "P29/nested-values",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"detail\":\"sub \\\"q\\\" <&>\",\"steps\":[1,{\"k\":null}],\"meta\":{\"z\":1,\"a\":2}}]",
+   "want": "{\"detail\":\"sub \\\"q\\\" <&>\",\"id\":\"3\",\"meta\":{\"a\":2,\"z\":1},\"steps\":[1,{\"k\":null}]}"
+  },
+  {
+   "id": "P29/unicode-detail",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"detail\":\"animé: 幸運星\\nline2\"}]",
+   "want": "{\"detail\":\"animé: 幸運星\\nline2\",\"id\":\"3\"}"
+  },
+  {
+   "id": "P29/row-false-fields",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"done\":false,\"cancelled\":false,\"failed\":false}]",
+   "want": "{\"cancelled\":false,\"done\":false,\"failed\":false,\"id\":\"3\"}"
+  },
+  {
+   "id": "P29/elem-null",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[null]",
+   "want": ""
+  },
+  {
+   "id": "P29/elem-scalar",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[7]",
+   "want": ""
+  },
+  {
+   "id": "P29/empty-list",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[]",
+   "want": ""
+  },
+  {
+   "id": "P29/body-object",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "{\"a\":{\"id\":\"3\",\"done\":false}}",
+   "want": "{\"done\":false,\"id\":\"3\"}"
+  },
+  {
+   "id": "P29/body-empty",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "",
+   "want": ""
+  },
+  {
+   "id": "P29/body-malformed",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "{\"results\": [{\"provider\":",
+   "want": ""
+  },
+  {
+   "id": "P29/multi-doc",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"id\":\"3\",\"v\":1}]\n[{\"id\":\"3\",\"v\":2}]",
+   "want": "{\"id\":\"3\",\"v\":1}"
+  },
+  {
+   "id": "P29/trailing-newline",
+   "prog": "[.[] | select(.id == $id)] | .[0] // empty",
+   "mode": "compactvars",
+   "vars": {
+    "id": "3"
+   },
+   "helper": "activityRow",
+   "args": [
+    "3"
+   ],
+   "body": "[{\"started_at\":\"2026-02-01T10:00:00Z\",\"id\":\"3\",\"action\":\"scan\",\"detail\":\"Full library scan\",\"source\":\"manual\",\"current\":4,\"total\":62,\"done\":false,\"cancellable\":true},{\"started_at\":\"2026-02-01T09:00:00Z\",\"ended_at\":\"2026-02-01T09:05:00Z\",\"id\":\"2\",\"action\":\"scan\",\"detail\":\"Series scan: Breaking Bad\",\"source\":\"manual\",\"done\":true,\"cancelled\":true},{\"started_at\":\"2026-02-01T08:00:00Z\",\"ended_at\":\"2026-02-01T08:01:00Z\",\"id\":\"1\",\"action\":\"download\",\"detail\":\"movie.fr.srt\",\"source\":\"scheduled\",\"done\":true,\"failed\":true}]\n",
+   "want": "{\"action\":\"scan\",\"cancellable\":true,\"current\":4,\"detail\":\"Full library scan\",\"done\":false,\"id\":\"3\",\"source\":\"manual\",\"started_at\":\"2026-02-01T10:00:00Z\",\"total\":62}"
+  }
+ ]
+}

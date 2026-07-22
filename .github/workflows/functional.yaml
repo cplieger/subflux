@@ -2,10 +2,11 @@
 #
 # Boots the real subflux binary with a mock-provider config (no Sonarr/Radarr,
 # no media fixtures, auth disabled) and runs the arr-free subset of the
-# functional HTTP suite (tests/functional/run.sh) against it. Sections that
-# need a live arr or media files (media_browser, coverage, scans, sync,
-# poster_proxy, real_providers, state, files, manual_search, post_processing,
-# embedded_settings, exclude_tags, manual_download) stay dev-box-only.
+# functional HTTP suite (the Go package under tests/functional/, build tag
+# `functional`) against it. Sections that need a live arr or media files
+# (media_browser, coverage, scans, sync, poster_proxy, real_providers, state,
+# files, manual_search, search_resolve, post_processing, embedded_settings,
+# exclude_tags, manual_download) stay dev-box-only.
 #
 # Not a required check: docs-only PRs may skip it via the paths filter without
 # blocking merge (the required `validate` gate lives in ci.yaml, which must
@@ -54,6 +55,15 @@ jobs:
 
       - name: Build subflux
         run: go build -o /tmp/subflux .
+
+      # Cheap offline gate first: the suite's JSON helpers against their
+      # committed oracle (tests/functional/testdata/jq-oracle.json). No
+      # server involved; a helper regression fails here in seconds instead
+      # of as a confusing assertion mismatch mid-section.
+      - name: JSON helper oracle
+        run: |
+          go test -tags functional -count=1 -run TestJSONHelpersOracle \
+            ./tests/functional/
 
       # Container-internal fixed paths: the binary reads /config/config.yaml
       # and writes /config/subflux.bolt. media_roots is only stat'd (warn on
@@ -121,16 +131,19 @@ jobs:
           /tmp/subflux > /tmp/subflux.log 2>&1 &
           echo $! > /tmp/subflux.pid
 
-      # run.sh's wait_ready polls /api/health for up to 30s before the first
-      # section, so no separate readiness step is needed.
+      # The suite's waitReady polls /api/health for up to 30s before the
+      # first section, so no separate readiness step is needed. -count=1
+      # forces a real run against the live instance (never the test cache);
+      # -v surfaces the per-assertion output go test buffers on success.
       - name: Run arr-free functional sections
         run: |
           for section in health auth config providers scoring backoff \
             mock_provider provider_errors config_validation language_rules \
             adaptive_config hot_reload; do
             echo "::group::section: $section"
-            if ! bash tests/functional/run.sh --section "$section" \
-              --url http://127.0.0.1:8374; then
+            if ! SUBFLUX_URL=http://127.0.0.1:8374 SECTION="$section" \
+              go test -tags functional -count=1 -run 'TestFunctional$' -v \
+              ./tests/functional/; then
               echo "::endgroup::"
               exit 1
             fi
