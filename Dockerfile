@@ -29,6 +29,52 @@ RUN echo "FFMPEG_VERSION=${FFMPEG_VERSION}" \
     && mv /tmp/FFmpeg-n${FFMPEG_VERSION} /tmp/ffmpeg \
     && rm /tmp/ffmpeg.tar.gz
 
+# ---------------------------------------------------------------------------
+# Embedded SBOM fragment. The final image is distroless with no package DB,
+# so the source-built ffmpeg/ffprobe and the statically linked libx264 are
+# invisible to the signed release SBOM and to vulnerability scanners.
+# Generate a CycloneDX fragment from the same version ARGs the fetches above
+# use — a version bump keeps the SBOM correct with zero extra maintenance —
+# and ship it in the runtime image where Syft's sbom-cataloger picks it up.
+# The cataloger is enabled centrally by the release pipeline (cplieger/ci);
+# no per-repo .syft.yaml is needed.
+# ffmpeg purl: pkg:github mirroring the tag-tarball fetch above (namespace/
+# name lowercased per the purl spec; the version keeps the tag exactly as in
+# the URL, n<ver>). CPE vendor:product is ffmpeg:ffmpeg per the NVD CPE
+# dictionary, e.g.
+# https://nvd.nist.gov/products/cpe/detail/512EDDC9-8B04-444F-BA0C-D3BA698AEAC7/
+# libx264 purl: pkg:generic with a vcs_url qualifier carrying the commit pin
+# — honest provenance for a commit-pinned git build (no release tarball
+# exists to point at). CPE: omitted — the NVD dictionary has no
+# videolan:x264 product (the only x264 CPEs are Lexmark printers), and a
+# commit-pinned version string can never match NVD's version-based CPE
+# criteria anyway; scanners get the purl + commit for triage instead of a
+# never-matching CPE.
+RUN cat > /tmp/subflux-ffmpeg.cdx.json <<EOF
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "bom-ref": "pkg:github/ffmpeg/ffmpeg@n${FFMPEG_VERSION}",
+      "type": "application",
+      "name": "ffmpeg",
+      "version": "${FFMPEG_VERSION}",
+      "purl": "pkg:github/ffmpeg/ffmpeg@n${FFMPEG_VERSION}",
+      "cpe": "cpe:2.3:a:ffmpeg:ffmpeg:${FFMPEG_VERSION}:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:generic/x264?vcs_url=https://code.videolan.org/videolan/x264.git@${X264_COMMIT}",
+      "type": "library",
+      "name": "libx264",
+      "version": "${X264_COMMIT}",
+      "purl": "pkg:generic/x264?vcs_url=https://code.videolan.org/videolan/x264.git@${X264_COMMIT}"
+    }
+  ]
+}
+EOF
+
 # --- Minimal ffmpeg build (audio/video decode, subtitle, 360p preview encode) ---
 # Audio decode + subtitle decode for sync pipeline.
 # Video decode + x264 encode + scale filter for 360p preview transcode.
@@ -221,6 +267,12 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae
 
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-builder --chmod=755 /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
+# CycloneDX SBOM fragment for the source-built ffmpeg + statically linked
+# libx264 (generated in the sources stage from the same version ARGs the
+# fetches use). Placed where the release pipeline's Syft sbom-cataloger
+# inventories it, so SBOMs and scanners see both components alongside the
+# Go module inventory.
+COPY --from=sources /tmp/subflux-ffmpeg.cdx.json /usr/share/sbom/subflux-ffmpeg.cdx.json
 COPY --from=builder --chmod=755 /subflux /subflux
 # Ship an empty, nonroot-owned /config so the image starts standalone (e.g. the
 # CI image smoke test) with no mount; subflux writes its default config + DB
