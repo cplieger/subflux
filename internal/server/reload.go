@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/webhttp"
 )
 
 // enabledProviders returns the sorted names of enabled providers in a config,
@@ -33,6 +34,32 @@ func enabledProviders(cfg interface {
 		return 0
 	})
 	return names
+}
+
+// applyHostAllowlist re-wraps the middleware chain with the live config's
+// exact-match Host allowlist (webhttp.HostPolicy) and swaps it in atomically,
+// so an allowed_hosts edit takes effect on the next request without a
+// restart. Called by buildHandler once the inner chain exists and by
+// activation's finalize phase on every reload; before buildHandler has
+// assembled the chain it is a no-op (activation at cold boot runs first).
+// A nil or non-*config.Config live config yields a nil policy: the inactive
+// pass-through default (any Host accepted).
+func (s *Server) applyHostAllowlist() {
+	if s.hostGateInner == nil {
+		return // cold-boot activation before buildHandler; it re-applies
+	}
+	var policy *webhttp.HostPolicy
+	if ls := s.state(); ls != nil {
+		if cfg, ok := ls.cfg.(*config.Config); ok {
+			policy = cfg.HostAllowlist()
+		}
+	}
+	if !policy.Active() {
+		slog.Warn("allowed_hosts not configured: any Host header is accepted, leaving DNS rebinding open; " +
+			"set allowed_hosts in the server settings to engage the gate")
+	}
+	h := policy.Middleware()(s.hostGateInner)
+	s.hostGated.Store(&h)
 }
 
 // applyTrustedProxies pushes the live config's parsed trusted-proxy CIDR set

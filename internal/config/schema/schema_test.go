@@ -13,9 +13,10 @@ func TestSchema_returns_all_sections(t *testing.T) {
 	sections := Schema(nil)
 
 	wantKeys := []string{
-		"sonarr", "radarr", "media_roots", "trusted_proxies", "poll_interval",
-		"languages", "embedded_subtitles", "providers", "search", "adaptive",
-		"post_processing", "auth", "scoring", "backup", "logging",
+		"sonarr", "radarr", "media_roots", "trusted_proxies", "allowed_hosts",
+		"poll_interval", "languages", "embedded_subtitles", "providers",
+		"search", "adaptive", "post_processing", "auth", "scoring", "backup",
+		"logging",
 	}
 	if len(sections) != len(wantKeys) {
 		t.Fatalf("Schema() returned %d sections, want %d", len(sections), len(wantKeys))

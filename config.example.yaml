@@ -33,6 +33,20 @@ trusted_proxies: []
 #  - 10.0.0.0/8
 #  - 192.168.0.0/16
 
+# Exact hostnames or IPs subflux answers for (the DNS-rebinding gate).
+# When set, a request whose Host header is not listed is rejected with 403.
+# This blocks DNS rebinding against the browser session: a malicious page
+# re-resolves its own hostname to subflux's address, and the victim's browser
+# then sends same-origin requests that carry the attacker's name in Host —
+# the cross-origin (CSRF) check cannot reject them because Origin and Host
+# agree, so the exact-Host check is what breaks the chain.
+# Entries are bare hostnames or IPs (no scheme, path, or port). Requests from
+# localhost (e.g. the container healthcheck) always pass. Leave empty (the
+# default) to accept any Host.
+allowed_hosts: []
+#  - subflux.example.com
+#  - 192.168.1.5
+
 # How often to check Sonarr/Radarr for new imports (minimum 10s).
 poll_interval: 30s
 

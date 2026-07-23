@@ -194,6 +194,23 @@ func trustedProxiesSection() api.SchemaSection {
 	}
 }
 
+func allowedHostsSection() api.SchemaSection {
+	return api.SchemaSection{
+		Key: "allowed_hosts", Title: "Allowed Hosts", Type: fieldList,
+		Help: "Exact hostnames or IPs subflux answers for. When set, a request whose Host header is " +
+			"not listed is rejected with 403, blocking DNS-rebinding attacks against the browser " +
+			"session. Requests from localhost (e.g. the container healthcheck) always pass. Leave " +
+			"empty to accept any Host.",
+		Fields: []api.SchemaField{
+			{
+				Key: "host", Label: "Hostname or IP", Type: fieldText,
+				Placeholder: "subflux.example.com",
+				Help:        "Bare hostname or IP, no scheme, path, or port (e.g. subflux.example.com or 192.168.1.5)",
+			},
+		},
+	}
+}
+
 func languagesSection() api.SchemaSection {
 	return api.SchemaSection{
 		Key: keyLanguages, Title: "Languages", Type: fieldLanguages,

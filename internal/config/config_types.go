@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/webhttp"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -74,6 +75,11 @@ type Config struct {
 	// whose X-Forwarded-For may be trusted for client-IP resolution. Empty
 	// (the default) trusts nothing: the socket peer is used and XFF ignored.
 	TrustedProxies []string `yaml:"trusted_proxies"`
+	// AllowedHosts lists the exact hostnames/IPs subflux answers for; a
+	// request whose Host header is not listed is rejected with 403, breaking
+	// DNS rebinding (loopback requests are exempt so the container
+	// healthcheck keeps working). Empty (the default) accepts any Host.
+	AllowedHosts []string `yaml:"allowed_hosts"`
 	// cachedDefaultTargets is the pre-computed default targets.
 	cachedDefaultTargets []api.SubtitleTarget
 	// cachedRoots holds pre-opened *os.Root handles for media_roots,
@@ -82,13 +88,16 @@ type Config struct {
 	// cachedTrustedProxies is the parsed form of TrustedProxies, built at
 	// load/hot-reload and consumed by the client-IP resolver.
 	cachedTrustedProxies []*net.IPNet
-	Auth                 yamlAuthConfig        `yaml:"auth"`
-	Backup               yamlBackupConfig      `yaml:"backup"`
-	SearchCfg            yamlSearchConfig      `yaml:"search"`
-	AdaptiveCfg          yamlAdaptiveConfig    `yaml:"adaptive"`
-	PostProcessing       yamlPostProcessConfig `yaml:"post_processing"`
-	EmbeddedSubtitles    yamlEmbeddedConfig    `yaml:"embedded_subtitles"`
-	PollIntervalCfg      Duration              `yaml:"poll_interval"`
+	// cachedHostPolicy is the parsed form of AllowedHosts, built at
+	// load/hot-reload and consumed by the server's Host allowlist gate.
+	cachedHostPolicy  *webhttp.HostPolicy
+	Auth              yamlAuthConfig        `yaml:"auth"`
+	Backup            yamlBackupConfig      `yaml:"backup"`
+	SearchCfg         yamlSearchConfig      `yaml:"search"`
+	AdaptiveCfg       yamlAdaptiveConfig    `yaml:"adaptive"`
+	PostProcessing    yamlPostProcessConfig `yaml:"post_processing"`
+	EmbeddedSubtitles yamlEmbeddedConfig    `yaml:"embedded_subtitles"`
+	PollIntervalCfg   Duration              `yaml:"poll_interval"`
 }
 
 // LanguageRules maps detected audio languages to desired subtitle downloads.

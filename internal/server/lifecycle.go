@@ -84,11 +84,13 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // (first entry outermost). Extracted from serveAndWait so the chain has one
 // definition that the streaming smoke tests can exercise end-to-end.
 //
-// http.NewCrossOriginProtection (Go 1.25+) stays OUTERMOST and is app-owned, not
-// a webhttp feature: cross-origin state-changing requests are rejected before
-// anything else runs (Sec-Fetch-Site, else Origin vs Host). GET/HEAD/OPTIONS and
-// clients that send no Origin/Sec-Fetch-Site (arr webhooks, the subflux CLI) are
-// permitted by default; their auth is the API key.
+// The outermost layer is the allowed_hosts exact-match Host allowlist (see the
+// tail of this function); http.NewCrossOriginProtection (Go 1.25+) comes next
+// and is app-owned, not a webhttp feature: cross-origin state-changing requests
+// are rejected before anything else runs (Sec-Fetch-Site, else Origin vs Host).
+// GET/HEAD/OPTIONS and clients that send no Origin/Sec-Fetch-Site (arr
+// webhooks, the subflux CLI) are permitted by default; their auth is the API
+// key.
 //
 // The access logger comes next so it observes the final status and threads a
 // request id into the context (the typed-code error helpers read it back via
@@ -108,7 +110,7 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // including 4xx/5xx envelopes — carries them.
 func (s *Server) buildHandler(mux http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
-	return webhttp.Chain(mux,
+	inner := webhttp.Chain(mux,
 		cop.Handler,
 		// Strip X-Forwarded-Proto from requests not arriving via a configured
 		// trusted proxy, BEFORE anything consults it (the per-request session
@@ -129,6 +131,19 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 		securityHeadersMW(),
 		cacheControlMW,
 	)
+
+	// The allowed_hosts gate (webhttp.HostPolicy) wraps the chain OUTERMOST,
+	// above even the cross-origin check, per webhttp's placement contract: a
+	// DNS-rebinding request makes Origin and Host AGREE, so COP admits it —
+	// only the exact-Host check breaks that chain (CWE-346). Because a
+	// HostPolicy is immutable, hot reload swaps the whole wrapped chain
+	// (applyHostAllowlist); the returned handler dereferences the current one
+	// per request instead of capturing one policy forever.
+	s.hostGateInner = inner
+	s.applyHostAllowlist()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		(*s.hostGated.Load()).ServeHTTP(w, r)
+	})
 }
 
 // newHTTPServer creates the app's http.Server. webhttp.NewServer supplies the

@@ -313,6 +313,12 @@ func (c *Config) buildCaches(ctx context.Context) {
 	// here; discard it defensively and fall back to an empty (trust-nothing) set.
 	c.cachedTrustedProxies, _ = parseTrustedProxies(c.TrustedProxies)
 
+	// Parse the Host allowlist. validate() already rejected malformed entries,
+	// so the error is unreachable here; the policy is kept even when it is
+	// returned with an error because ParseHostList's fail-closed contract makes
+	// an active-but-diminished allowlist gate (deny-all) rather than deactivate.
+	c.cachedHostPolicy, _ = parseAllowedHosts(c.AllowedHosts)
+
 	// Check context before the expensive media-root syscall loop.
 	if ctx.Err() != nil {
 		return
