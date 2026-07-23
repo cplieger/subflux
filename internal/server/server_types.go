@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"sync/atomic"
 
@@ -127,6 +128,15 @@ type Server struct {
 	// tests inject a counter to assert launch cardinality.
 	launchWorkers func()
 	defaultConfig []byte
+	// hostGateInner is the middleware chain INSIDE the Host allowlist gate,
+	// assembled once by buildHandler before the listener opens;
+	// applyHostAllowlist re-wraps it with the live config's HostPolicy.
+	hostGateInner http.Handler
+	// hostGated is the current HostPolicy-wrapped handler chain, swapped
+	// atomically by applyHostAllowlist on every activation (an immutable
+	// webhttp.HostPolicy cannot be mutated in place, so hot reload re-wraps)
+	// and read locklessly per request by the handler buildHandler returns.
+	hostGated atomic.Pointer[http.Handler]
 	// routeRegs records every route registration (group + pattern) made by
 	// registerRoutes; the wirespec consistency test compares it against the
 	// endpoint table.

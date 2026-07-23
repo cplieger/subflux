@@ -149,6 +149,9 @@ func validate(ctx context.Context, cfg *Config) error {
 	if _, err := parseTrustedProxies(cfg.TrustedProxies); err != nil {
 		ve.Add(err)
 	}
+	if _, err := parseAllowedHosts(cfg.AllowedHosts); err != nil {
+		ve.Add(err)
+	}
 	if cfg.Auth.DisableAuth {
 		slog.Warn("auth.disable_auth is enabled: ALL authentication is bypassed")
 	}

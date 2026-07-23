@@ -125,6 +125,18 @@ trusted_proxies:
 
 Entries are CIDR ranges; write a single proxy as a `/32` (IPv4) or `/128` (IPv6). Only when the direct peer is one of these ranges is `X-Forwarded-For` consulted (walked right-to-left, spoof-safe); invalid CIDRs are rejected at config load. Leave `trusted_proxies` empty (the default) when subflux is directly exposed: the socket peer is used and `X-Forwarded-For` is ignored.
 
+### Blocking DNS rebinding
+
+`allowed_hosts` lists the exact hostnames or IPs subflux answers for. A request whose `Host` header is not on the list is rejected with 403 before it reaches any route:
+
+```yaml
+allowed_hosts:
+  - subflux.example.com
+  - 192.168.1.5
+```
+
+This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebinding attack makes a malicious page's hostname resolve to subflux's address, so the browser's same-origin request carries the attacker's name in both `Origin` and `Host` — they agree, so the CSRF check admits it. Only an exact-match `Host` check breaks that chain. Requests from localhost (the container healthcheck) always pass regardless of the list. Leave `allowed_hosts` empty (the default) to accept any `Host`, matching prior behavior.
+
 ## Alerting
 
 subflux exposes Prometheus metrics on `/metrics`. Scrape it and evaluate these

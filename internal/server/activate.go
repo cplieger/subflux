@@ -214,6 +214,11 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.C
 	// resolution reflects the activated value without a restart.
 	s.applyTrustedProxies()
 
+	// Re-wrap the middleware chain with the new config's Host allowlist so an
+	// allowed_hosts edit engages (or relaxes) the DNS-rebinding gate without a
+	// restart. No-op before buildHandler assembles the chain at serve start.
+	s.applyHostAllowlist()
+
 	// Push the new session timeouts into the auth-store sweeper so eviction
 	// uses the same cutoffs the request-path validator now enforces (the
 	// validator reads live config; a stale sweeper would hard-logout
