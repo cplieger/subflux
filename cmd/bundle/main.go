@@ -2,8 +2,9 @@
 // entrypoints (app.ts, login.ts) with esbuild (a Go library — no Node, no
 // npm, per the fleet's no-Node-in-the-builder doctrine), assembles the CSS
 // bundles from the manifest files, copies @cplieger/ui-primitives' base
-// stylesheet, and writes precompressed .gz siblings for every emitted text
-// asset.
+// stylesheet. (Precompressed .gz siblings are no longer emitted: the server's
+// webhttp.StaticHandler gzips the embedded originals at construction, at the
+// same BestCompression level.)
 //
 // It replaces the previous tsc-emit pipeline (per-module JS served over the
 // pages' importmaps: dozens of uncached module fetches per page load) with
@@ -21,7 +22,6 @@
 package main
 
 import (
-	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,10 +52,7 @@ func run() error {
 	if err := bundleEntries(); err != nil {
 		return err
 	}
-	if err := buildCSS(); err != nil {
-		return err
-	}
-	return gzipOutputs()
+	return buildCSS()
 }
 
 // cleanOutputs removes previous build artifacts from static/ so stale
@@ -168,48 +165,4 @@ func concatCSS(manifestPath, baseDir, outName string) error {
 		out.Write(part)
 	}
 	return os.WriteFile(filepath.Join(outDir, outName), []byte(out.String()), 0o600)
-}
-
-// gzipOutputs writes a maximum-compression .gz sibling for every emitted
-// .js/.css/.map file (recursively, so chunks/ is covered). The server
-// serves the sibling to Accept-Encoding: gzip clients; a bundle this size
-// compresses ~3-4x, and precompressing at build beats per-request
-// compression on every axis (CPU, latency, simplicity).
-func gzipOutputs() error {
-	return filepath.WalkDir(outDir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		if !strings.HasSuffix(p, ".js") && !strings.HasSuffix(p, ".css") && !strings.HasSuffix(p, ".map") {
-			return nil
-		}
-		return gzipFile(p)
-	})
-}
-
-// gzipFile writes a BestCompression .gz sibling next to p.
-func gzipFile(p string) error {
-	data, err := os.ReadFile(p)
-	if err != nil {
-		return err
-	}
-	f, err := os.Create(p + ".gz")
-	if err != nil {
-		return err
-	}
-	zw, err := gzip.NewWriterLevel(f, gzip.BestCompression)
-	if err != nil {
-		f.Close()
-		return err
-	}
-	if _, err := zw.Write(data); err != nil {
-		zw.Close()
-		f.Close()
-		return err
-	}
-	if err := zw.Close(); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
 }
