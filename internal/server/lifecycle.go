@@ -125,6 +125,13 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 		webhttp.Logging(
 			webhttp.WithLogger(slog.Default()),
 			webhttp.WithSkipPaths("/api/events"),
+			// /api/health (Docker HEALTHCHECK CLI is file-marker, but Gatus
+			// HTTP-probes it every 30s) and /metrics (Prometheus/Alloy
+			// scrapes) ride the fleet-standard ProbeLogLevel: healthy probes
+			// at Debug instead of an Info line per probe, failures surfaced
+			// at Warn/Error. The SSE stream above stays fully skipped (one
+			// open-to-close line would be misleading by shape).
+			webhttp.ProbeLogLevel("/api/health", "/metrics"),
 			webhttp.WithClientIPFunc(authhandlers.ClientIP),
 			webhttp.WithRecordMetricRequest(s.recordHTTPMetric),
 		),
