@@ -180,10 +180,11 @@ func securityHeadersMW() webhttp.Middleware {
 // per-user data (API responses, HTML entrypoints, SPA fallback) is never
 // cached (`no-store`), while the embedded static assets carry a
 // startup-computed ETag with `no-cache` so browsers revalidate with cheap
-// 304s instead of re-downloading the whole frontend every page load. webhttp
-// ships no cache-control feature, so this stays app-owned, applied innermost
-// in the global chain (every response carries one of the two directives).
-var cacheControlMW = cacheControlFor(staticETags)
+// 304s instead of re-downloading the whole frontend every page load. The
+// ETag/gzip mechanics are webhttp.StaticHandler's; this middleware owns only
+// the no-store default the asset handler overrides, applied innermost in the
+// global chain (every response carries one of the two directives).
+var cacheControlMW = cacheControlFor()
 
 // --- Top-level handlers ---
 
@@ -254,9 +255,10 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUI serves the embedded web UI with SPA fallback. Real static files
-// go through serveAsset (ETag revalidation + precompressed .gz variant
-// selection; see staticcache.go); the .gz sibling paths themselves are not
-// addressable and fall through to the fallbacks like any unknown path.
+// go through the shared webhttp.StaticHandler (ETag revalidation +
+// construction-time gzip variants; see staticcache.go); any stale
+// pre-migration .gz sibling in a dev tree is not addressable and falls
+// through to the fallbacks like any unknown path.
 func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(pathpkg.Clean(r.URL.Path), "/")
 	if p == "" {
@@ -267,7 +269,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	// Static assets are public: serve them directly if present.
 	if servable {
 		if info, err := fs.Stat(staticSub, p); err == nil && !info.IsDir() {
-			serveAsset(w, r, staticSub, staticETags, p)
+			staticAssets.ServeHTTP(w, r)
 			return
 		}
 	}

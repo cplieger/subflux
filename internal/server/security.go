@@ -13,12 +13,11 @@
 package server
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"io/fs"
-	"regexp"
 	"strings"
+
+	"github.com/cplieger/webhttp"
 )
 
 // cspTemplate is the policy applied to every response, with a single %s
@@ -34,26 +33,24 @@ const cspTemplate = "default-src 'self'; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"media-src 'self' blob:"
 
-// themeInitRe captures the content of the inline anti-FOUC theme-init script
-// (marked with the data-theme-init attribute). Its body is the verbatim output
-// of @cplieger/ui-primitives' themeInitSnippet("subflux-theme"); hashing it lets
-// script-src stay 'self' + specific hashes without 'unsafe-inline'. The
-// theme-snippet drift-guard test pins the inline bytes to the library output, so
-// an upstream snippet change fails the test rather than silently breaking the CSP.
-var themeInitRe = regexp.MustCompile(`(?s)<script data-theme-init>(.*?)</script>`)
-
 // cspInlineScriptFiles are the embedded HTML entrypoints whose inline <head>
 // scripts the CSP must allow. Both currently ship the identical theme-init
 // snippet; hashing each independently keeps the policy correct if they
 // diverge.
 var cspInlineScriptFiles = []string{indexHTML, loginHTML}
 
-// inlineScriptHashes returns the unique CSP-quoted sha256 tokens for the inline
-// <script> blocks matched by re (capturing the script body in group 1) across
-// the named files, in first-seen order. It errors if any file is missing the
-// block (an authoring/build bug), so startup fails loudly rather than serving a
-// CSP that would silently block a required inline script.
-func inlineScriptHashes(staticFS fs.FS, files []string, re *regexp.Regexp, what string) (string, error) {
+// inlineScriptHashes returns the unique CSP-quoted sha256 tokens for the
+// inline <script> blocks across the named files, in first-seen order, hashed
+// via webhttp.InlineScriptHashes (byte-precise, quote-aware — the exact bytes
+// a browser hashes for a script-src token). Each entrypoint carries exactly
+// ONE inline script (the anti-FOUC theme-init, pinned to the
+// @cplieger/ui-primitives snippet by the drift-guard test); the exactly-one
+// assertion preserves the old targeted extraction's strictness — zero means
+// the required block is missing (an authoring/build bug: fail startup rather
+// than serve a CSP that would block it), and more than one means an
+// unreviewed inline script was added (update this check consciously instead
+// of silently granting it CSP allowance).
+func inlineScriptHashes(staticFS fs.FS, files []string) (string, error) {
 	seen := make(map[string]struct{}, len(files))
 	tokens := make([]string, 0, len(files))
 	for _, name := range files {
@@ -61,12 +58,11 @@ func inlineScriptHashes(staticFS fs.FS, files []string, re *regexp.Regexp, what 
 		if err != nil {
 			return "", fmt.Errorf("read %s: %w", name, err)
 		}
-		m := re.FindSubmatch(html)
-		if m == nil {
-			return "", fmt.Errorf("no inline %s script in %s", what, name)
+		hashes := webhttp.InlineScriptHashes(html)
+		if len(hashes) != 1 {
+			return "", fmt.Errorf("expected exactly one inline script in %s, found %d (a new inline script must be reviewed and this check updated)", name, len(hashes))
 		}
-		sum := sha256.Sum256(m[1])
-		token := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
+		token := hashes[0]
 		if _, dup := seen[token]; dup {
 			continue
 		}
@@ -79,7 +75,7 @@ func inlineScriptHashes(staticFS fs.FS, files []string, re *regexp.Regexp, what 
 // buildCSPPolicy assembles the full CSP from the embedded HTML entrypoints'
 // inline anti-FOUC theme-init scripts. Called once at startup.
 func buildCSPPolicy(staticFS fs.FS) (string, error) {
-	themeInit, err := inlineScriptHashes(staticFS, cspInlineScriptFiles, themeInitRe, "theme-init")
+	themeInit, err := inlineScriptHashes(staticFS, cspInlineScriptFiles)
 	if err != nil {
 		return "", err
 	}
