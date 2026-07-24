@@ -41,21 +41,13 @@ Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-epi
 
 ### The sync engine
 
-Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions:
+Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions: split-aware and framerate-aware alignment, audio sync via a re-tuned voice-activity detector cross-correlated with the subtitle's dialogue signal, and cross-language anchor matching (a French subtitle can sync against the English track embedded in the file). The strategies run concurrently and vote; the winner is applied only above a confidence threshold, so a sync that isn't confident doesn't happen. On the audio benchmark this passes 91.4% of 326 files with ~120 ms residual error.
 
-- **Constant-offset and split-aware alignment** (the alass algorithms): a piecewise-linear overlap rating finds the global shift, and a dynamic-programming pass finds split points where the offset changes abruptly (commercial breaks, different cuts) and aligns each segment independently.
-- **Framerate correction:** drift detection via linear regression, snapping to known ratio pairs (23.976, 24, 25, 29.97, ...) with a golden-section search for non-standard ratios.
-- **Cross-language anchor alignment** (subflux's own): aligns subtitles across languages by matching language-independent anchors (numbers, proper nouns, cognates by edit distance) through a monotonic DP pass. This is what lets a French subtitle sync against the English track embedded in the file.
-- **Audio sync with a re-tuned VAD:** a pure-Go port of WebRTC's GMM voice-activity detector, reconfigured for film audio. The stock threshold under-detects movie dialogue; subflux runs a two-pass classification (a safe pass and a precise pass that must agree within 500 ms), which raised the benchmark pass rate from 82.5% to 91.4% across 326 files with ~120 ms residual error. Neural VADs (Silero, FunASR) were benchmarked and brought no improvement; the tuning is what matters. Voice activity is FFT-cross-correlated with the subtitle's dialogue signal, and ASS inputs are filtered for karaoke/signs/SDH first.
-- **Confidence-weighted voting:** the strategies run concurrently, results cluster by offset, agreeing clusters get boosted, and the winner is applied only above a confidence threshold. A sync that isn't confident is a sync that doesn't happen.
-- **Knowing when not to sync:** hash-matched subtitles and same-release matches skip sync (their timing is already right); forced subtitles skip it (too few cues to align reliably).
-- **Post-processing:** encoding normalization to UTF-8 (UTF-16, Windows-1252), hearing-impaired annotation removal, tag stripping, and whitespace cleanup, each step logged.
-
-Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in). Audio sync and manual offset adjustment are always available from the sync dialog.
+Hash-matched and same-release downloads skip sync (their timing is already right), and forced subtitles skip it (too few cues to align reliably). Every saved file is post-processed: encoding normalization to UTF-8, hearing-impaired annotation removal, tag stripping, and whitespace cleanup. Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in); audio sync and manual offset adjustment are always available from the sync dialog.
 
 ### The web UI
 
-A single-page app served by the same binary: framework-free TypeScript compiled to ~380 KB of first-party JS, loaded as native ES modules (no bundler), updating live over SSE.
+A single-page app served by the same binary: framework-free TypeScript compiled to ~380 KB of first-party JS, loaded as native ES modules, updating live over SSE.
 
 - **Coverage table:** every series and movie against your language rules, with per-target have/total badges, embedded-track counts, a missing-only filter, and text search.
 - **Visual sync editor:** subflux transcodes the actual video to a 360p stream on the fly (fMP4 over MSE, using the bundled ffmpeg) and renders the subtitle as a live caption track. Scrub the offset with a timecode control and the captions reload in place, so you verify timing with your own eyes; or run any sync strategy (embedded reference, external file, audio VAD) and preview its computed result before a byte is written.
@@ -94,14 +86,14 @@ services:
 
 Open `http://localhost:8374`. Every first boot runs ONE guided flow: create the admin account, then walk the setup wizard (Sonarr/Radarr, media roots, providers, languages, and tunable defaults), then an optional passkey enrollment. The wizard adapts to what it finds:
 
-- **From scratch** — subflux wrote a placeholder config on first boot, so the wizard walks every step with sensible defaults prefilled.
-- **Pre-authored `config.yaml`** — every step the file already answers is prefilled and collapsed (saved secrets show as present without exposing values); a fully valid config fast-forwards straight to a review screen with a "Finish" button. Collapsed steps stay reviewable and editable before finishing.
+- **From scratch:** subflux wrote a placeholder config on first boot, so the wizard walks every step with sensible defaults prefilled.
+- **Pre-authored `config.yaml`:** every step the file already answers is prefilled and collapsed (saved secrets show as present without exposing values); a fully valid config fast-forwards straight to a review screen with a "Finish" button. Collapsed steps stay reviewable and editable before finishing.
 
-Finishing saves the config and activates everything in place — providers, arr clients, background scans, and auth capabilities — with no restart. The same holds for later edits in the settings dialog: saving a valid config hot-activates it, including WebAuthn/OIDC and logging changes.
+Finishing saves the config and activates everything in place (providers, arr clients, background scans, and auth capabilities) with no restart. The same holds for later edits in the settings dialog: saving a valid config hot-activates it, including WebAuthn/OIDC and logging changes.
 
-## Configuration
+## Configuration reference
 
-All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands — including manual search — run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
+All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
 
 ### Environment variables in config.yaml
 
@@ -132,10 +124,10 @@ Entries are CIDR ranges; write a single proxy as a `/32` (IPv4) or `/128` (IPv6)
 ```yaml
 allowed_hosts:
   - subflux.example.com
-  - 192.168.1.5
+  - 192.0.2.5
 ```
 
-This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebinding attack makes a malicious page's hostname resolve to subflux's address, so the browser's same-origin request carries the attacker's name in both `Origin` and `Host` — they agree, so the CSRF check admits it. Only an exact-match `Host` check breaks that chain. Requests from localhost (the container healthcheck) always pass regardless of the list. Leave `allowed_hosts` empty (the default) to accept any `Host`, matching prior behavior.
+This closes a gap the cross-origin (CSRF) check alone leaves open: a DNS-rebinding attack makes a malicious page's hostname resolve to subflux's address, so the browser's same-origin request carries the attacker's name in both `Origin` and `Host`; they agree, so the CSRF check admits it. Only an exact-match `Host` check breaks that chain. Requests from localhost (the container healthcheck) always pass regardless of the list. Leave `allowed_hosts` empty (the default) to accept any `Host`, matching prior behavior.
 
 ## Alerting
 

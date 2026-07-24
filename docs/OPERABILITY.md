@@ -199,7 +199,7 @@ No `invalid database` or `checksum` errors in the first few lines of output.
 ## 4. Leftover SQLite-era files
 
 Installs upgraded across the SQLite-to-bbolt cutover still hold the old
-SQLite files. Nothing in the bbolt engine reads, prunes, or deletes them —
+SQLite files. Nothing in the bbolt engine reads, prunes, or deletes them;
 they are frozen dead weight (bounded at roughly the old database size plus
 `backup.retention` snapshot copies of it). Up to four patterns exist:
 

@@ -35,49 +35,49 @@ tree with `go list ./...` or by browsing `internal/`.
 
 The only files that import concrete implementations:
 
-- `main.go` — server mode (and the `go:generate` directive for wire codegen).
-- `cli.go`, `cli_remote.go`, `cli_specs.go` — the flat CLI.
-- `providers.go` — table-driven provider registration (`providerEntries`
+- `main.go`: server mode (and the `go:generate` directive for wire codegen).
+- `cli.go`, `cli_remote.go`, `cli_specs.go`: the flat CLI.
+- `providers.go`: table-driven provider registration (`providerEntries`
   drives both `Register` and `RegisterSchema`).
-- `internal/wiring/` — composition-root types connecting concrete
+- `internal/wiring/`: composition-root types connecting concrete
   implementations across api/metrics/search/provider.
-- `cmd/wire-codegen/` — build-time-only driver over the
+- `cmd/wire-codegen/`: build-time-only driver over the
   [`wiregen`](https://github.com/cplieger/wiregen) library; not a server
   runtime dependency.
 
 ### Domain packages (`internal/`)
 
-- `api/` — interface contracts and pure utility types. Every other package
+- `api/`: interface contracts and pure utility types. Every other package
   depends only on this one. Auth domain types come directly from
   `github.com/cplieger/auth/v2` and arr DTOs from
   `github.com/cplieger/arrapi` (no local aliases or adapter package).
-- `search/` — the scan engine: provider orchestration, retry policy, history
-  polling, and the download pipeline. Subpackages: `scoring`, `syncing`
+- `search/`: the scan engine (provider orchestration, retry policy, history
+  polling, and the download pipeline). Subpackages: `scoring`, `syncing`
   (sync + post-process glue), `timeout`, `release`.
-- `subsync/` — the subtitle sync library (alass port, cross-language anchors,
+- `subsync/`: the subtitle sync library (alass port, cross-language anchors,
   framerate correction, split-aware DP, audio sync). Subpackages: `ffmpeg`
   (subprocess wrappers), `fft`, `framerate`, `crosslang`, `vad` (the WebRTC
   GMM port).
-- `provider/` — shared provider primitives (registry, retry wrapper, the
+- `provider/`: shared provider primitives (registry, retry wrapper, the
   SSRF-hardened HTTP client) plus one subdirectory per provider
   implementation, and support packages `archive`, `classify`, `dlcache`,
   `anidb`.
-- `embedded/` — the ffprobe-backed embedded subtitle track detector (local
+- `embedded/`: the ffprobe-backed embedded subtitle track detector (local
   media inspection, deliberately not a provider); the search engine owns the
   codec-usability policy via the top-level `embedded_subtitles` config
   section.
-- `scorer/` — release scoring with configurable weights.
-- `boltstore/` — the bbolt store (implements `api.Store`); `store/kv` holds
+- `scorer/`: release scoring with configurable weights.
+- `boltstore/`: the bbolt store (implements `api.Store`); `store/kv` holds
   the engine-agnostic key/codec helpers and `store/storetest` the contract
   suite. `authstore/` implements the auth store (durable bbolt + ephemeral
   in-memory).
-- `config/` — YAML loader, env expansion, validation, hot reload;
+- `config/`: YAML loader, env expansion, validation, hot reload;
   `config/schema/` generates the settings-UI schema.
-- `server/` — HTTP routing, SSE, middleware, and the embedded UI, split into
+- `server/`: HTTP routing, SSE, middleware, and the embedded UI, split into
   focused subpackages (`authhandlers`, `confighandlers`, `synchandlers`,
   `manualops`, `scanning`, `scheduler`, `polling`, `events`, `coverage`, …).
 - `arrsvc/`, `metrics/`, `cache/`, `httputil/`, `cliparse/`,
-  `testsupport/` — focused helpers and thin wrappers over the shared
+  `testsupport/`: focused helpers and thin wrappers over the shared
   `cplieger/*` libraries (`cliparse/` is the CLI grammar: one
   `ParseAndValidate` pass plus help rendering).
 
@@ -87,7 +87,7 @@ packages → `internal/api/`. There are no reverse imports.
 ### Frontend (`internal/server/static-src/`)
 
 TypeScript typechecked by tsc (`--noEmit`) and bundled by esbuild via its Go
-API (`go run ./cmd/bundle` — no Node in the build). There is no framework;
+API (`go run ./cmd/bundle`; no Node in the build). There is no framework;
 reactivity comes from `@cplieger/reactive`, user-initiated mutations go
 through `@cplieger/actions`, HTTP through `@cplieger/fetch`, and
 toasts/dialogs/tooltips from `@cplieger/ui-primitives`. Generated wire types
@@ -133,8 +133,8 @@ CI when they drift.
   after writing a safety snapshot next to the database file. Auth-domain
   rewrites are implemented in `internal/authstore` (its record types are
   unexported by design) and registered as a plain step callback. The
-  irreplaceable set — users, passkeys, API keys, manual locks/history, sync
-  offsets — must survive every migration path by construction.
+  irreplaceable set (users, passkeys, API keys, manual locks/history, sync
+  offsets) must survive every migration path by construction.
 - **HTTP responses go through the `api` helpers.** Don't hand-craft JSON
   error strings.
 - **Logs are UTC.** The `slogx` library forces every record's timestamp to
@@ -170,7 +170,7 @@ subflux search --title "The Wire"   # remote search through the server's provide
 ```
 
 CLI development workflow: run a server locally (`go run .` or the container),
-then point the CLI at it. All subcommands — including `search` — reach the
+then point the CLI at it. All subcommands, including `search`, reach the
 instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`). When
 the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key (created
 via `subflux generate-api-key` or the web UI's Security dialog); the CLI
@@ -198,13 +198,14 @@ go generate ./...         # runs ./cmd/wire-codegen
 ### Frontend assets
 
 The browser bundle is produced at build time, not committed. `cmd/bundle`
-(esbuild via its Go API — a Go library, no Node, no npm) bundles the two
+(esbuild via its Go API: a Go library, no Node, no npm) bundles the two
 page entries (`app.ts` → `/app.js`, `login.ts` → `/login.js`) as ES modules
 with code splitting (shared modules become hashed chunks under `/chunks/`),
 concatenates the per-feature CSS splits listed in the `MANIFEST` files
-(`MANIFEST` → `style.css`, `login.MANIFEST` → `login.css`), copies
-`ui-primitives.css`, and writes precompressed `.gz` siblings the server
-hands to gzip-accepting clients. tsc runs `--noEmit` as the type gate
+(`MANIFEST` → `style.css`, `login.MANIFEST` → `login.css`), and copies
+`ui-primitives.css`. It emits no precompressed `.gz` siblings; the server
+gzip-compresses the embedded assets itself at startup and serves those to
+gzip-accepting clients. tsc runs `--noEmit` as the type gate
 (esbuild does not typecheck). In the Docker build the ts-builder stage
 typechecks and fetches the pinned `@cplieger/*` packages; the Go builder
 stage then runs `go run ./cmd/bundle` and embeds the output. Everything
