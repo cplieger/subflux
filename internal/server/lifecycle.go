@@ -98,7 +98,11 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // access line exactly: WithClientIPFunc(authhandlers.ClientIP) adds the
 // client_ip field resolved through the hot-reloadable trusted-proxy set (a
 // field the fixed-shape line does not carry on its own), and
-// WithRecordMetric(s.metrics.RecordHTTP) fires the per-request metric hook.
+// WithRecordMetricRequest(s.recordHTTPMetric) fires the per-request metric
+// hook with the request itself, so the http_requests_total labels key on the
+// matched route TEMPLATE (r.Pattern) with unmatched requests collapsed to one
+// series — an unauthenticated client probing arbitrary paths (or varying an
+// {id} wildcard) can no longer mint unbounded label series from r.URL.Path.
 // /api/events is skipped via WithSkipPaths: its open-to-close SSE lifetime would
 // emit one misleading high-latency access line and RecordHTTP sample, and the
 // skip leaves the SSE writer un-recorded — webhttp.Recoverer then wraps it in
@@ -122,7 +126,7 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 			webhttp.WithLogger(slog.Default()),
 			webhttp.WithSkipPaths("/api/events"),
 			webhttp.WithClientIPFunc(authhandlers.ClientIP),
-			webhttp.WithRecordMetric(s.metrics.RecordHTTP),
+			webhttp.WithRecordMetricRequest(s.recordHTTPMetric),
 		),
 		webhttp.Recoverer(
 			webhttp.WithRecoverLogger(slog.Default()),
@@ -174,6 +178,26 @@ func securityHeadersMW() webhttp.Middleware {
 		webhttp.WithPermissionsPolicy("camera=(), microphone=(), geolocation=()"),
 		webhttp.WithCOOP("same-origin"),
 	)
+}
+
+// recordHTTPMetric feeds the http_requests_total metric from the access
+// logger's request-aware hook, keying the method/path labels on the matched
+// route TEMPLATE (r.Pattern) and collapsing any unmatched request — probes,
+// 404s, path-cleaning variants like /api//status — to a single
+// method="unmatched",path="unmatched" series, so a client cannot mint
+// unbounded label series from attacker-controlled tokens. When a route
+// matched, the pattern's method prefix is cut so the path label carries only
+// the path template (e.g. "/api/activity/{id}/cancel", never the raw id).
+func (s *Server) recordHTTPMetric(r *http.Request, status int, d time.Duration) {
+	method, path := "unmatched", "unmatched"
+	if r.Pattern != "" {
+		method = r.Method
+		path = r.Pattern
+		if _, p, ok := strings.Cut(r.Pattern, " "); ok {
+			path = p
+		}
+	}
+	s.metrics.RecordHTTP(method, path, status, d)
 }
 
 // cacheControlMW applies the scoped cache policy (see staticcache.go):
