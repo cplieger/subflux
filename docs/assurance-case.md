@@ -1,4 +1,4 @@
-# Security assurance case — subflux
+# Security assurance case for subflux
 
 This extends the shared
 [default assurance case](https://github.com/cplieger/.github/blob/main/assurance-case.md)

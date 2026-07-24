@@ -16,7 +16,7 @@ for this repository.
   first thing a new user touches and the highest-leverage place to remove
   friction.
 - **Authentication stack hardening.** Focused testing and refinement of the
-  auth stack — sessions, API keys, passkeys/WebAuthn, and **especially the
+  auth stack: sessions, API keys, passkeys/WebAuthn, and **especially the
   OIDC + PKCE flow** (provider compatibility, token handling, edge cases).
 
 ## Ongoing
