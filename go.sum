@@ -8,8 +8,8 @@ github.com/cplieger/auth/v2 v2.1.1 h1:rViNEhZbyAtAG9T8iNEnozacK+dPEbJn02bLWvKjVF
 github.com/cplieger/auth/v2 v2.1.1/go.mod h1:0AE1741V65LpzNlQdqaj9DkQ5Bpz2rtug3d6z0fAnoY=
 github.com/cplieger/envx v1.3.0 h1:XiEk7RJFuh1YO20RJXDr9v0/S+8XsZLUnTOwkxQdtfk=
 github.com/cplieger/envx v1.3.0/go.mod h1:OA7MSc3ChDXYZgIlHkABJZWt5FqUtr66yWBISLUvq20=
-github.com/cplieger/envx/yamlenv v1.2.0 h1:K/z6EGyMH/nYm5RoKvH9Gs53QCol+WhbFrQkAOFG0/Y=
-github.com/cplieger/envx/yamlenv v1.2.0/go.mod h1:SqWyN5bqVe82N+QTchfKzg7YREQNCsi9SWvCHnxCbb8=
+github.com/cplieger/envx/yamlenv v1.2.1 h1:EzLTghpO16rFdf9RImru1t2wMR2QNGpRIvQw7M4jSZA=
+github.com/cplieger/envx/yamlenv v1.2.1/go.mod h1:Ur9/Rynk/DCB6QkqPpg/DEHCr5GhiAXpTGqinBqGNlI=
 github.com/cplieger/health v1.4.0 h1:MnLfSZNRnq7wYSMVi1s8Ox0kowk5iPzmqVKQ5JHHsoM=
 github.com/cplieger/health v1.4.0/go.mod h1:15Lm3XhPMU3nCEDfIH2hVAz6TXH06Wwiz9tgBi71vEE=
 github.com/cplieger/httpx/v4 v4.1.0 h1:G91soof0rZlKKEDmPFm/TzNmOtaEgwkTUCTrTf1jqMs=
