@@ -30,7 +30,7 @@ require github.com/cplieger/envx/yamlenv v1.2.0
 
 require github.com/cplieger/metrics/v3 v3.0.1
 
-require github.com/cplieger/httpx/v3 v3.2.0
+require github.com/cplieger/httpx/v4 v4.1.0
 
 require github.com/cplieger/jsonx v1.3.0
 
@@ -39,8 +39,6 @@ require github.com/evanw/esbuild v0.28.1
 require golang.org/x/term v0.45.0
 
 require github.com/cplieger/xmlx v1.0.0
-
-require github.com/cplieger/httpx/v4 v4.1.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
