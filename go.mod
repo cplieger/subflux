@@ -6,7 +6,7 @@ require (
 	// arrapi v1.7.0 is UNPUBLISHED (latest tag: v1.6.0): it ships the
 	// capture-side StatusError body sanitization via runesafe. See go.work
 	// for the local dev resolution until the tag lands.
-	github.com/cplieger/arrapi v1.8.0
+	github.com/cplieger/arrapi v1.8.1
 	github.com/cplieger/atomicfile/v2 v2.4.0
 	github.com/cplieger/auth/v2 v2.1.1
 	github.com/cplieger/health v1.4.0
@@ -39,6 +39,8 @@ require github.com/evanw/esbuild v0.28.1
 require golang.org/x/term v0.45.0
 
 require github.com/cplieger/xmlx v1.0.0
+
+require github.com/cplieger/httpx/v4 v4.1.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
