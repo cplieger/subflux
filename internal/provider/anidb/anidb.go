@@ -15,6 +15,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/xmlx"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -203,6 +204,17 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	data, err = decompressIfGzipped(data, httputil.MaxDownloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("anidb: mapping decompress: %w", err)
+	}
+
+	// The byte caps above bound the WIRE and the inflate, not the decode.
+	// encoding/xml materializes each token before this code sees it, and the
+	// mapping arrives GZIPPED, so a small download can inflate to the full
+	// ceiling and only then amplify: one cap-sized text node, or a tree nested
+	// past any real depth growing the decoder's element stack one heap entry at
+	// a time. The preflight runs over the inflated bytes we already hold and
+	// rejects a document outside the anime-list contract in one scan.
+	if err := xmlx.Preflight(data, mappingLimits); err != nil {
+		return nil, fmt.Errorf("anidb: mapping outside decode bounds: %w", err)
 	}
 
 	var list animeList

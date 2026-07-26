@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/xmlx"
 )
 
 // --- AniDB HTTP API ---
@@ -154,6 +155,15 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	data, err = decompressIfGzipped(data, httputil.MaxJSONResponseBytes)
 	if err != nil {
 		return fmt.Errorf("anidb: episodes decompress: %w", err)
+	}
+
+	// The byte cap and the inflate ceiling above bound the WIRE, not the decode:
+	// encoding/xml materializes each token first, so a body inside the cap can
+	// still force one cap-sized token allocation or grow the decoder's element
+	// stack one heap entry per tiny tag. Gate the inflated bytes ONCE here,
+	// before either unmarshal below re-tokenizes them.
+	if err := xmlx.Preflight(data, episodeLimits); err != nil {
+		return fmt.Errorf("anidb: episodes outside decode bounds: %w", err)
 	}
 
 	// AniDB signals errors with HTTP 200 + <error>...</error>. Check for
