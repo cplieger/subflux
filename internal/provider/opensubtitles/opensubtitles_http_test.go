@@ -56,6 +56,10 @@ func TestSetHeaders(t *testing.T) {
 func TestCheckStatus(t *testing.T) {
 	t.Parallel()
 
+	// Success is EXACTLY 2xx (httpx v4). A 3xx here means the redirect chain
+	// was refused or exhausted, not that the body is a payload — the shared
+	// provider client follows redirects, so this path only sees a 3xx when
+	// something went wrong.
 	tests := []struct {
 		name       string
 		body       string
@@ -67,7 +71,7 @@ func TestCheckStatus(t *testing.T) {
 		{name: "200 OK returns nil", statusCode: 200, body: "", wantErr: false, wantMsg: "", wantType: ""},
 		{name: "201 Created returns nil", statusCode: 201, body: "", wantErr: false, wantMsg: "", wantType: ""},
 		{name: "204 No Content returns nil", statusCode: 204, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "301 redirect returns nil", statusCode: 301, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "301 redirect is an error", statusCode: 301, body: "", wantErr: true, wantMsg: "HTTP 301", wantType: ""},
 		{name: "401 unauthorized", statusCode: 401, body: "", wantErr: true, wantMsg: "invalid API key (401)", wantType: "auth"},
 		{name: "429 rate limited", statusCode: 429, body: "", wantErr: true, wantMsg: "rate limited (429)", wantType: "ratelimit"},
 		{name: "406 download limit", statusCode: 406, body: "", wantErr: true, wantMsg: "download limit exceeded (406)", wantType: "ratelimit"},
@@ -75,8 +79,8 @@ func TestCheckStatus(t *testing.T) {
 		{name: "400 bad request ignores body", statusCode: 400, body: "bad request", wantErr: true, wantMsg: "HTTP 400", wantType: ""},
 		{name: "403 forbidden is auth error", statusCode: 403, body: "", wantErr: true, wantMsg: "access denied (403)", wantType: "auth"},
 		{name: "202 Accepted returns nil", statusCode: 202, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "304 Not Modified returns nil", statusCode: 304, body: "", wantErr: false, wantMsg: "", wantType: ""},
-		{name: "399 returns nil", statusCode: 399, body: "", wantErr: false, wantMsg: "", wantType: ""},
+		{name: "304 Not Modified is an error", statusCode: 304, body: "", wantErr: true, wantMsg: "HTTP 304", wantType: ""},
+		{name: "399 is an error", statusCode: 399, body: "", wantErr: true, wantMsg: "HTTP 399", wantType: ""},
 		{name: "503 service unavailable", statusCode: 503, body: "service down", wantErr: true, wantMsg: "HTTP 503", wantType: ""},
 		{name: "404 not found no body", statusCode: 404, body: "", wantErr: true, wantMsg: "HTTP 404", wantType: ""},
 	}

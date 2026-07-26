@@ -12,8 +12,6 @@ github.com/cplieger/envx/yamlenv v1.2.0 h1:K/z6EGyMH/nYm5RoKvH9Gs53QCol+WhbFrQkA
 github.com/cplieger/envx/yamlenv v1.2.0/go.mod h1:SqWyN5bqVe82N+QTchfKzg7YREQNCsi9SWvCHnxCbb8=
 github.com/cplieger/health v1.4.0 h1:MnLfSZNRnq7wYSMVi1s8Ox0kowk5iPzmqVKQ5JHHsoM=
 github.com/cplieger/health v1.4.0/go.mod h1:15Lm3XhPMU3nCEDfIH2hVAz6TXH06Wwiz9tgBi71vEE=
-github.com/cplieger/httpx/v3 v3.2.0 h1:vMqF0Bf06gkfJJMfZQNHnHyEnbtLo8DdnqZNLL0D+yE=
-github.com/cplieger/httpx/v3 v3.2.0/go.mod h1:aITrLHd0nPnJ5+Gu76xhRyOChC0KZEBCwslCELPHk+s=
 github.com/cplieger/httpx/v4 v4.1.0 h1:G91soof0rZlKKEDmPFm/TzNmOtaEgwkTUCTrTf1jqMs=
 github.com/cplieger/httpx/v4 v4.1.0/go.mod h1:bfJDGEQRWEwLu6mlwk49PfDIAETABwhlp+DAWFXo8XE=
 github.com/cplieger/jsonx v1.3.0 h1:m6rpdqXD2nZ74CguFaFXHmaS+V9Em9YVwsPN/X8FPWo=

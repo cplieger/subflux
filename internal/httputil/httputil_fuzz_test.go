@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/httpx/v4"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -64,7 +64,13 @@ func FuzzIsTransient(f *testing.F) {
 }
 
 // FuzzCheckHTTPStatus exercises CheckHTTPStatus across status codes,
-// verifying that 2xx/3xx return nil and error types are correctly bridged.
+// verifying that 2xx returns nil and error types are correctly bridged.
+//
+// The success window is EXACTLY 2xx as of httpx v4. v3 returned nil for
+// anything under 400, which meant a client with a non-following redirect
+// policy saw a 3xx as success and treated the redirect body as the payload.
+// subflux's provider clients follow redirects, so a 3xx arriving here means
+// the redirect chain was refused or exhausted — a failure, not a payload.
 func FuzzCheckHTTPStatus(f *testing.F) {
 	f.Add(200)
 	f.Add(201)
@@ -86,15 +92,16 @@ func FuzzCheckHTTPStatus(f *testing.F) {
 		resp := &http.Response{StatusCode: code, Header: http.Header{}}
 		err := CheckHTTPStatus(resp)
 
-		// Invariant 1: 1xx/2xx/3xx return nil.
-		if code >= 100 && code < 400 {
+		// Invariant 1: 2xx returns nil. Nothing else does — a 1xx or 3xx here
+		// is an unfinished exchange, not a payload (httpx v4).
+		if code >= 200 && code < 300 {
 			if err != nil {
 				t.Fatalf("CheckHTTPStatus(%d) = %v, want nil", code, err)
 			}
 			return
 		}
 
-		// Invariant 2: 4xx/5xx return non-nil.
+		// Invariant 2: every non-2xx returns non-nil.
 		if err == nil {
 			t.Fatalf("CheckHTTPStatus(%d) = nil, want error", code)
 		}

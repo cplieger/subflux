@@ -1,5 +1,5 @@
 // Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx/v3; this package
+// Behavioral logic is delegated to github.com/cplieger/httpx/v4; this package
 // retains application-specific constants and thin adapters that bridge httpx
 // error types to the internal api.* error types used across the codebase.
 package httputil
@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/httpx/v4"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -99,7 +99,7 @@ func LimitedBody(resp *http.Response) io.ReadCloser {
 
 // RetryOnRateLimit retries fn up to maxAttempts times when it returns a
 // *api.RateLimitError. Bridges the api.RateLimitError type to
-// httpx.RateLimitError and runs httpx's rate-limit-only retry mode (v3's
+// httpx.RateLimitError and runs httpx's rate-limit-only retry mode (httpx's
 // Do + WithRateLimitOnly, which absorbed the v2 RetryOnRateLimit helper):
 // only rate limits are retried — waiting min(hint, maxWait) — and every
 // other error, transient included, returns immediately (transient retry is

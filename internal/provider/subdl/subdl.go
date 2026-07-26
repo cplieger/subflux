@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/httpx/v4"
 	"github.com/cplieger/runesafe"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"

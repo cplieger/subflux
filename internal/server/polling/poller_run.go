@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi"
-	"github.com/cplieger/httpx/v3"
+	"github.com/cplieger/httpx/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/server/activity"
