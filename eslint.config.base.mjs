@@ -43,7 +43,19 @@ export default [
       sourceType: "module",
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.test.ts", "*.property.test.ts", "fc-strict-setup.ts"],
+          // "*.mjs" covers THIS file: it is vendored into each consumer under
+          // the bare name `eslint.config.base.mjs`, which does NOT match the
+          // "*.config.mjs" glob below, so without this the lint run fails with
+          // "was not found by the project service" on the config it is reading.
+          // Handled here rather than in each consumer --
+          // actions/fetch/ui-primitives/web-terminal-ui each carried an
+          // identical local .map() transform to patch this in.
+          //
+          // This only reaches a consumer that IMPORTS the vendored base. One
+          // carrying its own copy reads its own allowDefaultProject (often with
+          // repo-specific entries), so a fix here cannot help it — see the
+          // dest-relocation revert in scripts/classify-repos.py.
+          allowDefaultProject: ["*.mjs", "*.test.ts", "*.property.test.ts", "fc-strict-setup.ts"],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
@@ -175,6 +187,9 @@ export default [
       "vitest.config.ts",
       "*.config.ts",
       "*.config.mjs",
+      // The vendored base itself (bare `eslint.config.base.mjs`); see the
+      // allowDefaultProject note above.
+      "*.mjs",
       "*.config.js",
       "**/*.test.ts",
       "**/*.fuzz.test.ts",
