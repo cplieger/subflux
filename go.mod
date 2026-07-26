@@ -38,6 +38,8 @@ require github.com/evanw/esbuild v0.28.1
 
 require golang.org/x/term v0.45.0
 
+require github.com/cplieger/xmlx v1.0.0
+
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/cplieger/envx v1.3.0

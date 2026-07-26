@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/cplieger/xmlx"
 )
 
 // decompressIfGzipped returns data unchanged if it is not gzip-compressed.
@@ -40,6 +42,31 @@ func decompressIfGzipped(data []byte, maxBytes int64) ([]byte, error) {
 // XML types for anime-list.xml.
 type animeList struct {
 	Animes []animeEntry `xml:"anime"`
+}
+
+// mappingLimits bounds the anime-list mapping dump before encoding/xml
+// tokenizes it. This is the catalogue-scale document in this provider: tens of
+// thousands of <anime> records, each with a handful of attribute-only children,
+// so MaxElements is sized well above the real catalogue while still refusing a
+// body orders of magnitude larger. The shape is otherwise shallow and its text
+// values are short titles, which is what keeps the per-token bounds tight.
+var mappingLimits = xmlx.Limits{
+	MaxTextRunBytes: 16 << 10,
+	MaxTokenBytes:   32 << 10,
+	MaxTagAttrs:     32,
+	MaxDepth:        16,
+	MaxElements:     2_000_000,
+}
+
+// episodeLimits bounds one AniDB HTTP-API response: a single <anime> with its
+// episode list, or the <error> envelope AniDB returns with HTTP 200. Far smaller
+// than the mapping dump, so the element bound is correspondingly tighter.
+var episodeLimits = xmlx.Limits{
+	MaxTextRunBytes: 16 << 10,
+	MaxTokenBytes:   32 << 10,
+	MaxTagAttrs:     32,
+	MaxDepth:        16,
+	MaxElements:     200_000,
 }
 
 type animeEntry struct {

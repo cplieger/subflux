@@ -2,11 +2,13 @@ package anidb
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/cplieger/xmlx"
 	"pgregory.net/rapid"
 )
 
@@ -358,5 +360,59 @@ func TestDecompressIfGzipped_passesThroughNonGzip(t *testing.T) {
 				t.Errorf("decompressIfGzipped(% x) = % x, want unchanged % x", tt.in, out, tt.in)
 			}
 		})
+	}
+}
+
+// TestPreflightLimitsFitTheRealDocuments is the cross-library acceptance test for
+// the xmlx bounds this provider gates its two XML paths on. Both halves matter:
+// a real document must pass (a bound that rejects live upstream data is an outage
+// with no operator action), and an amplifying document must be refused BEFORE
+// encoding/xml tokenizes it. The mapping path is the one that matters most here
+// because its body arrives gzipped, so a small download inflates to the full
+// ceiling and only then amplifies.
+func TestPreflightLimitsFitTheRealDocuments(t *testing.T) {
+	realMapping := []byte(`<?xml version="1.0" encoding="utf-8"?>
+<anime-list>
+  <anime anidbid="1" tvdbid="72025" defaulttvdbseason="1" tmdbtv="26209" tmdbseason="1">
+    <name>Seikai no Monshou</name>
+    <supplemental-info>
+      <studio>Sunrise</studio>
+    </supplemental-info>
+  </anime>
+  <anime anidbid="2" tvdbid="70973" defaulttvdbseason="1">
+    <name>3x3 Eyes</name>
+  </anime>
+</anime-list>`)
+	if err := xmlx.Preflight(realMapping, mappingLimits); err != nil {
+		t.Errorf("mappingLimits rejected a real anime-list document: %v", err)
+	}
+
+	realEpisodes := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<anime id="1" restricted="false">
+  <episodes>
+    <episode id="1" update="2013-01-01"><epno type="1">1</epno></episode>
+    <episode id="2" update="2013-01-01"><epno type="1">2</epno></episode>
+  </episodes>
+</anime>`)
+	if err := xmlx.Preflight(realEpisodes, episodeLimits); err != nil {
+		t.Errorf("episodeLimits rejected a real episodes document: %v", err)
+	}
+	realError := []byte(`<error code="500">banned</error>`)
+	if err := xmlx.Preflight(realError, episodeLimits); err != nil {
+		t.Errorf("episodeLimits rejected the AniDB error envelope: %v", err)
+	}
+
+	// Amplification the byte cap alone admits: each 3 bytes of wire would cost
+	// the decoder one live open-element stack entry.
+	for name, lim := range map[string]xmlx.Limits{"mapping": mappingLimits, "episodes": episodeLimits} {
+		deep := []byte(strings.Repeat("<a>", lim.MaxDepth+2))
+		if err := xmlx.Preflight(deep, lim); !errors.Is(err, xmlx.ErrLimit) {
+			t.Errorf("%s limits accepted a document nested past MaxDepth: %v", name, err)
+		}
+		// A DTD is refused as a class: AniDB sends none, and a body carrying one
+		// is far more likely an error page than a feed.
+		if err := xmlx.Preflight([]byte(`<!DOCTYPE anime><anime/>`), lim); !errors.Is(err, xmlx.ErrLimit) {
+			t.Errorf("%s limits accepted an XML directive: %v", name, err)
+		}
 	}
 }
