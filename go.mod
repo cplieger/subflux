@@ -21,7 +21,7 @@ require (
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.16
 	go.etcd.io/bbolt v1.5.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sync v0.22.0
 	pgregory.net/rapid v1.3.0
 )
