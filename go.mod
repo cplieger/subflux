@@ -15,7 +15,7 @@ require (
 	github.com/cplieger/runesafe v1.2.1
 	github.com/cplieger/slogx v1.4.0
 	github.com/cplieger/ssrf/v3 v3.0.0
-	github.com/cplieger/webhttp v1.16.0
+	github.com/cplieger/webhttp v1.18.0
 	github.com/cplieger/wiregen/v2 v2.0.0
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
@@ -38,11 +38,11 @@ require golang.org/x/term v0.45.0
 
 require github.com/cplieger/xmlx v1.0.0
 
-require github.com/cplieger/httpx/v4 v4.1.0
+require github.com/cplieger/httpx/v4 v4.2.0
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
-	github.com/cplieger/envx v1.3.0
+	github.com/cplieger/envx v1.4.0
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
