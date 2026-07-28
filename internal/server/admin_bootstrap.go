@@ -144,9 +144,14 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 // AdminHandler returns the admin-plane handler: a one-route mux serving
 // POST /api/admin/bootstrap, wrapped in the same access-log/request-ID and
 // panic-recovery middleware the TCP mux uses (the body limit is inside the
-// handler via webhttp.DecodeBody, exactly as on the TCP plane). main.go
-// serves it on a second http.Server bound to the Unix socket in the 0700
-// directory config.AdminSocketDir — kernel socket custody replaces the
+// handler via webhttp.DecodeBody, exactly as on the TCP plane). It installs no
+// metric hook, deliberately: http_requests_total describes the public HTTP
+// surface, and this plane is one route reachable only by a same-container
+// process, so a series for it would carry no signal. Every http_requests_total
+// sample therefore comes from buildHandler's chain.
+//
+// main.go serves it on a second http.Server bound to the Unix socket in the
+// 0700 directory config.AdminSocketDir — kernel socket custody replaces the
 // former requireLocalhost peer-address check, so the zero-credential
 // bootstrap channel is unreachable over every TCP path (netns-sharing peers
 // and proxied clients included). Both configured and unconfigured server

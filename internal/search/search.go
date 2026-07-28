@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
@@ -293,11 +294,28 @@ const maxLogPathLen = 256
 
 // boundLogPath caps a path for use as a log attribute, keeping the tail
 // (the identifying filename end) when truncation is needed.
+//
+// The cut is advanced to the next UTF-8 rune start instead of being taken at
+// the raw byte offset. A media path routinely carries multi-byte runes
+// (accented titles, CJK), and a cut landing inside one would emit that rune's
+// bare continuation bytes into a slog attribute and from there into Loki as
+// invalid UTF-8. Advancing FORWARD rather than backing off is what keeps the
+// 256-byte cap a cap: backing off to the previous boundary would let the kept
+// tail exceed it. runesafe.CapBytes is the fleet's canonical rune-safe cut,
+// but it keeps the HEAD — the wrong end here, since the filename at the end
+// is what identifies the video — and runesafe exports no tail variant, so the
+// boundary walk is local. Bytes before the cut are unaffected: this bounds
+// the length, it does not sanitize a path that was already invalid UTF-8 on
+// disk.
 func boundLogPath(p string) string {
 	if len(p) <= maxLogPathLen {
 		return p
 	}
-	return "..." + p[len(p)-maxLogPathLen:]
+	cut := len(p) - maxLogPathLen
+	for cut < len(p) && !utf8.RuneStart(p[cut]) {
+		cut++
+	}
+	return "..." + p[cut:]
 }
 
 // recordCoverageInventory records the subtitle files discovered on disk for
