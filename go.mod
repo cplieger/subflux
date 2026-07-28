@@ -38,7 +38,7 @@ require golang.org/x/term v0.45.0
 
 require github.com/cplieger/xmlx v1.0.0
 
-require github.com/cplieger/httpx/v4 v4.2.0
+require github.com/cplieger/httpx/v4 v4.2.1
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
