@@ -98,11 +98,10 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // access line exactly: WithClientIPFunc(authhandlers.ClientIP) adds the
 // client_ip field resolved through the hot-reloadable trusted-proxy set (a
 // field the fixed-shape line does not carry on its own), and
-// WithRecordMetricRequest(s.recordHTTPMetric) fires the per-request metric
-// hook with the request itself, so the http_requests_total labels key on the
-// matched route TEMPLATE (r.Pattern) with unmatched requests collapsed to one
-// series — an unauthenticated client probing arbitrary paths (or varying an
-// {id} wildcard) can no longer mint unbounded label series from r.URL.Path.
+// WithRecordRouteMetric(s.metrics.RecordHTTP) feeds http_requests_total with
+// the (method, path) pair WEBHTTP derives, so no label value comes from the
+// caller: neither an arbitrary r.URL.Path nor a varied {id} wildcard nor a
+// made-up request-line method can mint a label series.
 // /api/events is skipped via WithSkipPaths: its open-to-close SSE lifetime would
 // emit one misleading high-latency access line and RecordHTTP sample, and the
 // skip leaves the SSE writer un-recorded — webhttp.Recoverer then wraps it in
@@ -133,7 +132,31 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 			// open-to-close line would be misleading by shape).
 			webhttp.ProbeLogLevel("/api/health", "/metrics"),
 			webhttp.WithClientIPFunc(authhandlers.ClientIP),
-			webhttp.WithRecordMetricRequest(s.recordHTTPMetric),
+			// http_requests_total is subflux's one unauthenticated
+			// unbounded-cardinality surface: this hook fires from the
+			// access-log defer, OUTSIDE every auth gate, and a series once
+			// minted is permanent for the process lifetime here and in every
+			// scraper storing it. WithRecordRouteMetric is the option whose
+			// labels the LIBRARY derives, which is the point — the bound is a
+			// property of this wiring, not of a local derivation somebody has
+			// to remember to keep correct. subflux is the cautionary tale in
+			// webhttp's own godoc: it hand-rolled the derivation, asserted in
+			// a comment that its labels were bounded, and shipped an
+			// attacker-controllable method label anyway, because the SPA
+			// catch-all (public.Add("/", s.handleUI)) matches every
+			// origin-form path, so the unmatched collapse it leaned on could
+			// not fire for the shape that mattered — a hostile method on any
+			// normal URL — and the method reached the label verbatim.
+			//
+			// The library's method label is the real r.Method narrowed to the
+			// nine standard verbs plus a fixed "other" bucket, and its path
+			// label is a pattern this server registered, or the fixed
+			// "unmatched" for a request carrying no path to match (CONNECT's
+			// authority form, OPTIONS *). Ceiling 10 x (routes+1), whatever a
+			// caller sends. RecordHTTP already takes exactly the hook's
+			// (method, path, status, duration), so there is no adapter left to
+			// hold a derivation.
+			webhttp.WithRecordRouteMetric(s.metrics.RecordHTTP),
 		),
 		webhttp.Recoverer(
 			webhttp.WithRecoverLogger(slog.Default()),
@@ -185,26 +208,6 @@ func securityHeadersMW() webhttp.Middleware {
 		webhttp.WithPermissionsPolicy("camera=(), microphone=(), geolocation=()"),
 		webhttp.WithCOOP("same-origin"),
 	)
-}
-
-// recordHTTPMetric feeds the http_requests_total metric from the access
-// logger's request-aware hook, keying the method/path labels on the matched
-// route TEMPLATE (r.Pattern) and collapsing any unmatched request — probes,
-// 404s, path-cleaning variants like /api//status — to a single
-// method="unmatched",path="unmatched" series, so a client cannot mint
-// unbounded label series from attacker-controlled tokens. When a route
-// matched, the pattern's method prefix is cut so the path label carries only
-// the path template (e.g. "/api/activity/{id}/cancel", never the raw id).
-func (s *Server) recordHTTPMetric(r *http.Request, status int, d time.Duration) {
-	method, path := "unmatched", "unmatched"
-	if r.Pattern != "" {
-		method = r.Method
-		path = r.Pattern
-		if _, p, ok := strings.Cut(r.Pattern, " "); ok {
-			path = p
-		}
-	}
-	s.metrics.RecordHTTP(method, path, status, d)
 }
 
 // cacheControlMW applies the scoped cache policy (see staticcache.go):
