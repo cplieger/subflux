@@ -347,65 +347,6 @@ func ShiftAndFilterCues(cues []api.SubtitleCue, totalShift time.Duration) []api.
 	return filtered
 }
 
-// FindDialogueDenseStart finds the timestamp (ms) of the densest 60-second
-// dialogue window in the subtitle.
-func FindDialogueDenseStart(cues []api.SubtitleCue) int64 {
-	if len(cues) == 0 {
-		return 0
-	}
-
-	const windowMs int64 = 60_000
-	const leadInMs int64 = 10_000
-
-	var bestStart int64
-	var bestChars int
-
-	for i, anchor := range cues {
-		anchorMs := anchor.Start.Milliseconds()
-		windowEnd := anchorMs + windowMs
-		chars := 0
-		for j := i; j < len(cues) && cues[j].Start.Milliseconds() < windowEnd; j++ {
-			chars += len(strings.TrimSpace(cues[j].Text))
-		}
-		if chars > bestChars {
-			bestChars = chars
-			bestStart = anchorMs
-		}
-	}
-
-	start := max(bestStart-leadInMs, 0)
-	return start
-}
-
-// SrtToWebVTT converts parsed SRT cues to WebVTT format string.
-func SrtToWebVTT(cues []api.SubtitleCue) string {
-	var b strings.Builder
-	b.WriteString("WEBVTT\n\n")
-	for i, c := range cues {
-		fmt.Fprintf(&b, "%d\n", i+1)
-		fmt.Fprintf(&b, "%s --> %s\n",
-			MsToVTT(c.Start.Milliseconds()),
-			MsToVTT(c.End.Milliseconds()))
-		b.WriteString(c.Text)
-		b.WriteString("\n\n")
-	}
-	return b.String()
-}
-
-// MsToVTT formats milliseconds as VTT timestamp (HH:MM:SS.mmm).
-func MsToVTT(ms int64) string {
-	if ms < 0 {
-		ms = 0
-	}
-	h := ms / 3_600_000
-	ms %= 3_600_000
-	m := ms / 60_000
-	ms %= 60_000
-	sec := ms / 1000
-	frac := ms % 1000
-	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, sec, frac)
-}
-
 // readAndParseSRT reads a subtitle file, normalizes encoding, and parses SRT.
 func (h *Handler) readAndParseSRT(path string) ([]byte, []api.SubtitleCue, error) {
 	data, err := atomicfile.ReadBounded(context.Background(), path, MaxSyncSubSize)

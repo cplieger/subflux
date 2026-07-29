@@ -146,17 +146,13 @@ type Resolver struct {
 	State func() *State
 }
 
-// SubtitleRow resolves a FileRef to its single store row. It filters the
-// media item's rows by the full reference identity; zero matches answer
-// ErrSubtitleNotFound, more than one ErrAmbiguous (see package doc).
-func (r *Resolver) SubtitleRow(ctx context.Context, ref *FileRef) (*api.SubtitleEntry, error) {
-	return r.subtitleRow(ctx, r.State(), ref)
-}
-
-// subtitleRow is SubtitleRow against one already-captured State snapshot.
-// Every public resolution call captures State exactly once and threads the
-// snapshot through, so a hot reload between lookup and validation can never
-// validate an old-generation path against new-generation media roots.
+// subtitleRow resolves a FileRef to its single store row against one
+// already-captured State snapshot. It filters the media item's rows by the
+// full reference identity; zero matches answer ErrSubtitleNotFound, more than
+// one ErrAmbiguous (see package doc). Every public resolution call captures
+// State exactly once and threads the snapshot through, so a hot reload between
+// lookup and validation can never validate an old-generation path against
+// new-generation media roots.
 func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*api.SubtitleEntry, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSubtitleNotFound, err)

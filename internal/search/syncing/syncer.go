@@ -16,9 +16,6 @@ const (
 	ExtSSA = ".ssa"
 )
 
-// SyncResult is re-exported from subsync for consumer convenience.
-type SyncResult = subsync.SyncResult
-
 // Syncer implements SubtitleSyncer using the subsync library.
 type Syncer struct {
 	// Exec runs the heavy alignment computation. Nil means in-process

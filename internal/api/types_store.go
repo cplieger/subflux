@@ -162,12 +162,6 @@ type ReconcileResult struct {
 
 // ScanStats tracks scan progress and outcomes for logging.
 type ScanStats struct {
-	// Pre-scan totals (from API).
-	TotalSeries       int
-	TotalEpisodeFiles int // Sum of episodeFileCount across all series.
-	TotalMovies       int
-	TotalMovieFiles   int // Movies with hasFile=true.
-
 	// Post-scan outcomes for episodes. EpisodesSearched counts every episode
 	// the scan loop processed (it drives progress reporting); the other
 	// fields are its per-outcome buckets.

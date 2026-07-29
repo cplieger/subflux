@@ -435,17 +435,11 @@ func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, ids)
 }
 
-// DeleteExternalFile removes a single external subtitle file from disk and DB.
-func (h *Handler) DeleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
-	return h.deleteExternalFile(ctx, cfg, mediaType, row)
-}
-
 // deleteExternalFile removes a single external subtitle file from disk and
 // DB through the S16 subtitle delete gate. The bulk handler preflights every
 // targeted row's extension and answers 409 before any mutation, so the
-// in-sweep refusal branch here is defense-in-depth (it also guards the
-// exported DeleteExternalFile): a refused extension is still loud (WARN log
-// naming the gate) and the row is left untouched.
+// in-sweep refusal branch here is defense-in-depth: a refused extension is
+// still loud (WARN log naming the gate) and the row is left untouched.
 func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
 	if row.Source == string(api.SourceEmbedded) || row.Path == "" {
 		return false

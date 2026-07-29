@@ -87,9 +87,9 @@ func TestDPAlign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := DPAlign(tt.pairs)
+			got := dpAlign(tt.pairs)
 			if tt.wantLen >= 0 && len(got) != tt.wantLen {
-				t.Errorf("DPAlign() returned %d pairs, want %d", len(got), tt.wantLen)
+				t.Errorf("dpAlign() returned %d pairs, want %d", len(got), tt.wantLen)
 			}
 			if tt.checkMono {
 				for i := 1; i < len(got); i++ {
@@ -119,12 +119,12 @@ func TestDPAlign_tieBreakKeepsNearerPredecessor(t *testing.T) {
 		{IncIdx: 1, RefIdx: 2, Score: 1.0},
 		{IncIdx: 2, RefIdx: 3, Score: 2.0},
 	}
-	got := DPAlign(pairs)
+	got := dpAlign(pairs)
 	if len(got) != 3 {
-		t.Fatalf("DPAlign() len = %d, want 3 (path %+v)", len(got), got)
+		t.Fatalf("dpAlign() len = %d, want 3 (path %+v)", len(got), got)
 	}
 	if got[1].IncIdx != 1 || got[1].RefIdx != 2 {
-		t.Errorf("DPAlign() middle = (Inc %d, Ref %d), want (1, 2)",
+		t.Errorf("dpAlign() middle = (Inc %d, Ref %d), want (1, 2)",
 			got[1].IncIdx, got[1].RefIdx)
 	}
 }
@@ -137,12 +137,12 @@ func TestDPAlign_tieBreakKeepsEarliestEndNode(t *testing.T) {
 		{IncIdx: 0, RefIdx: 0, Score: 3.0},
 		{IncIdx: 0, RefIdx: 1, Score: 3.0},
 	}
-	got := DPAlign(pairs)
+	got := dpAlign(pairs)
 	if len(got) != 1 {
-		t.Fatalf("DPAlign() len = %d, want 1 (path %+v)", len(got), got)
+		t.Fatalf("dpAlign() len = %d, want 1 (path %+v)", len(got), got)
 	}
 	if got[0].RefIdx != 0 {
-		t.Errorf("DPAlign() best RefIdx = %d, want 0", got[0].RefIdx)
+		t.Errorf("dpAlign() best RefIdx = %d, want 0", got[0].RefIdx)
 	}
 }
 
@@ -202,9 +202,9 @@ func TestWeightedMedianOffset(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := WeightedMedianOffset(tt.pairs)
+			got := weightedMedianOffset(tt.pairs)
 			if got != tt.want {
-				t.Errorf("WeightedMedianOffset() = %d, want %d", got, tt.want)
+				t.Errorf("weightedMedianOffset() = %d, want %d", got, tt.want)
 			}
 		})
 	}

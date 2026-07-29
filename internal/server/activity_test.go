@@ -324,9 +324,7 @@ func TestAlertLog_record_exact_max(t *testing.T) {
 	al.Record("a", "first")
 	al.Record("b", "second")
 
-	al.RLock()
-	count := len(al.AlertsUnsafe())
-	al.RUnlock()
+	count := len(al.VisibleAlerts())
 
 	// At exactly max, should NOT trim.
 	if count != 2 {
@@ -336,10 +334,9 @@ func TestAlertLog_record_exact_max(t *testing.T) {
 	// One more should trigger trim.
 	al.Record("c", "third")
 
-	al.RLock()
-	count = len(al.AlertsUnsafe())
-	first := al.AlertsUnsafe()[0].Source
-	al.RUnlock()
+	visible := al.VisibleAlerts()
+	count = len(visible)
+	first := visible[0].Source
 
 	if count != 2 {
 		t.Errorf("alerts count = %d after 3 inserts with max=2, want 2", count)
@@ -357,17 +354,16 @@ func TestAlertLog_recordWarn_sets_warn_level(t *testing.T) {
 
 	al.RecordWarn("sonarr", "warning message")
 
-	al.RLock()
-	defer al.RUnlock()
+	alerts := al.VisibleAlerts()
 
-	if len(al.AlertsUnsafe()) != 1 {
-		t.Fatalf("alerts count = %d, want 1", len(al.AlertsUnsafe()))
+	if len(alerts) != 1 {
+		t.Fatalf("alerts count = %d, want 1", len(alerts))
 	}
-	if al.AlertsUnsafe()[0].Level != "warn" {
-		t.Errorf("alert.Level = %q, want %q", al.AlertsUnsafe()[0].Level, "warn")
+	if alerts[0].Level != "warn" {
+		t.Errorf("alert.Level = %q, want %q", alerts[0].Level, "warn")
 	}
-	if al.AlertsUnsafe()[0].Kind != activity.AlertTransient {
-		t.Errorf("alert.Kind = %q, want %q", al.AlertsUnsafe()[0].Kind, activity.AlertTransient)
+	if alerts[0].Kind != activity.AlertTransient {
+		t.Errorf("alert.Kind = %q, want %q", alerts[0].Kind, activity.AlertTransient)
 	}
 }
 
@@ -377,36 +373,17 @@ func TestAlertLog_recordInfo_sets_info_level_with_short_ttl(t *testing.T) {
 
 	al.RecordInfo("scan complete")
 
-	al.RLock()
-	defer al.RUnlock()
+	alerts := al.VisibleAlerts()
 
-	if len(al.AlertsUnsafe()) != 1 {
-		t.Fatalf("alerts count = %d, want 1", len(al.AlertsUnsafe()))
+	if len(alerts) != 1 {
+		t.Fatalf("alerts count = %d, want 1", len(alerts))
 	}
-	if al.AlertsUnsafe()[0].Level != "info" {
-		t.Errorf("alert.Level = %q, want %q", al.AlertsUnsafe()[0].Level, "info")
+	if alerts[0].Level != "info" {
+		t.Errorf("alert.Level = %q, want %q", alerts[0].Level, "info")
 	}
-	if al.AlertsUnsafe()[0].TTL == 0 {
+	if alerts[0].TTL == 0 {
 		t.Error("alert.TTL should be non-zero for info alerts")
 	}
 }
 
 // --- visibleAlerts respects per-alert TTL ---
-
-func TestVisibleAlerts_respects_custom_ttl(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	// Add an info alert with a very short TTL that has already expired.
-	al.RecordInfo("old info")
-	al.Lock()
-	// Backdate the alert so its 10-minute TTL has expired.
-	al.AlertsUnsafe()[0].Time = al.AlertsUnsafe()[0].Time.Add(-15 * time.Minute)
-	al.Unlock()
-
-	visible := al.VisibleAlerts()
-	if len(visible) != 0 {
-		t.Errorf("visibleAlerts() returned %d alerts, want 0 (info TTL expired)",
-			len(visible))
-	}
-}

@@ -31,11 +31,7 @@ func stripSubTags(text string) string {
 	return subTagRe.ReplaceAllString(text, "")
 }
 
-// ExtractAnchors extracts language-independent features from cue text.
-func ExtractAnchors(text string) Anchor {
-	return extractAnchors(text)
-}
-
+// extractAnchors extracts language-independent features from cue text.
 func extractAnchors(text string) anchor {
 	cleaned := stripSubTags(text)
 	trimmed := strings.TrimSpace(cleaned)
@@ -124,6 +120,7 @@ func endsWithSentence(w string) bool {
 	return last == '.' || last == '?' || last == '!'
 }
 
+// isLatinWord reports whether the string contains only Latin letters.
 func isLatinWord(s string) bool {
 	if s == "" {
 		return false
@@ -214,18 +211,7 @@ func featureScore(a, b []string, matchWeight, penaltyWeight float64, matcher fun
 	return 0, 0
 }
 
-// IsCognate returns true if two words are likely cognates.
-func IsCognate(a, b string) bool { return isCognate(a, b) }
-
-// EditDistance computes the Levenshtein distance between two strings.
-func EditDistance(a, b string) int { return editDistance(a, b) }
-
-// CountShared counts exact string matches between two slices.
-func CountShared(a, b []string) int { return countShared(a, b) }
-
-// CountCognates counts cognate pairs between two word lists.
-func CountCognates(a, b []string) int { return countCognates(a, b) }
-
+// editDistance computes the Levenshtein distance between two strings.
 func editDistance(a, b string) int {
 	ra := []rune(a)
 	rb := []rune(b)
@@ -260,6 +246,7 @@ func editDistance(a, b string) int {
 	return prev[lb]
 }
 
+// isCognate reports whether two words are likely cognates.
 func isCognate(a, b string) bool {
 	la := utf8.RuneCountInString(a)
 	lb := utf8.RuneCountInString(b)
@@ -275,6 +262,7 @@ func isCognate(a, b string) bool {
 	return dist <= threshold
 }
 
+// countCognates counts cognate pairs between two word lists.
 func countCognates(a, b []string) int {
 	if len(a) == 0 || len(b) == 0 {
 		return 0
@@ -296,6 +284,7 @@ func countCognates(a, b []string) int {
 	return count
 }
 
+// countShared counts exact string matches between two slices.
 func countShared(a, b []string) int {
 	freq := make(map[string]int, len(b))
 	for _, s := range b {
@@ -311,12 +300,7 @@ func countShared(a, b []string) int {
 	return count
 }
 
-// CountSharedFold counts case-insensitive matches between two slices.
-func CountSharedFold(a, b []string) int { return countSharedFold(a, b) }
-
-// IsLatinWord returns true if the string contains only Latin letters.
-func IsLatinWord(s string) bool { return isLatinWord(s) }
-
+// countSharedFold counts case-insensitive matches between two slices.
 func countSharedFold(a, b []string) int {
 	freq := make(map[string]int, len(b))
 	for _, s := range b {

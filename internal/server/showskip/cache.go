@@ -48,13 +48,6 @@ func (c *Cache) Set(key string, skip bool) {
 	c.mu.Unlock()
 }
 
-// Clear removes all cached entries.
-func (c *Cache) Clear() {
-	c.mu.Lock()
-	c.entries = make(map[string]result)
-	c.mu.Unlock()
-}
-
 // Prune removes expired entries from the cache, reclaiming memory.
 func (c *Cache) Prune() {
 	c.mu.Lock()

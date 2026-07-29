@@ -2,7 +2,6 @@ package syncing
 
 import (
 	"testing"
-	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 )
@@ -37,7 +36,7 @@ func FuzzParseSRTRoundtrip(f *testing.F) {
 	f.Add([]byte("1\n00:01:00,500 --> 00:01:03,200\nLine 1\nLine 2\n\n2\n00:02:00,000 --> 00:02:05,000\nSecond cue\n\n"))
 	f.Add([]byte(""))
 
-	p := NewSubtitleProcessor()
+	p := SubtitleProcessor{}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cues, err := p.ParseSRT(data)
@@ -51,32 +50,6 @@ func FuzzParseSRTRoundtrip(f *testing.F) {
 		}
 		if len(cues) > 0 && len(out) == 0 {
 			t.Fatal("WriteSRT produced empty output from non-empty cues")
-		}
-	})
-}
-
-func FuzzShiftCues(f *testing.F) {
-	f.Add(int64(1000), int64(2000), "hello", int64(500))
-	f.Add(int64(0), int64(1000), "", int64(-500))
-	f.Add(int64(60000), int64(62000), "text", int64(0))
-
-	p := NewSubtitleProcessor()
-
-	f.Fuzz(func(t *testing.T, startMs, endMs int64, text string, offsetMs int64) {
-		if startMs < 0 || endMs < startMs || endMs > 360000000 {
-			return
-		}
-		if offsetMs < -360000000 || offsetMs > 360000000 {
-			return
-		}
-		cues := []api.SubtitleCue{
-			{Start: time.Duration(startMs) * time.Millisecond, End: time.Duration(endMs) * time.Millisecond, Text: text},
-		}
-		offset := time.Duration(offsetMs) * time.Millisecond
-		// Must not panic.
-		shifted := p.ShiftCues(cues, offset)
-		if len(shifted) != 1 {
-			t.Fatalf("ShiftCues changed length: got %d want 1", len(shifted))
 		}
 	})
 }

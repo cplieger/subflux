@@ -83,24 +83,15 @@ func FuzzEpisodeNumberMatch(f *testing.F) {
 	})
 }
 
-func FuzzReleaseNameMatchesTitle(f *testing.F) {
-	f.Add("Breaking Bad", "Breaking.Bad.S01E01.720p.WEB-DL")
-	f.Add("The Office", "The.Office.US.S02E03.HDTV")
-	f.Add("Inception", "Inception.2010.1080p.BluRay")
-	f.Add("", "")
-	f.Add("Show", "Show.II.S01E01")
-
-	f.Fuzz(func(t *testing.T, title, release string) {
-		// Manual index arithmetic over the release name must never panic.
-		_ = ReleaseNameMatchesTitle(title, release)
-	})
-}
-
 func FuzzAnyReleaseNameMatches(f *testing.F) {
 	f.Add("Breaking Bad", "Breaking.Bad.S01E01.720p.WEB-DL", "")
 	f.Add("The Office", "The.Office.US.S02E03.HDTV", "Office US")
 	f.Add("", "", "")
 	f.Add("Show", "Totally.Different.Release", "Alt Title")
+	f.Add("Inception", "Inception.2010.1080p.BluRay", "")
+	// Promoted from the deleted FuzzReleaseNameMatchesTitle: a roman-numeral
+	// sequel token directly after the title.
+	f.Add("Show", "Show.II.S01E01", "")
 
 	f.Fuzz(func(t *testing.T, title, releaseName, altTitle string) {
 		req := &api.SearchRequest{

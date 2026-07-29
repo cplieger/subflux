@@ -54,8 +54,9 @@ func TestCache_Get_expired_entry(t *testing.T) {
 	}
 }
 
-// TestCache_Get_is_read_only verifies Get does not remove expired entries.
-// Cache memory reclamation is the caller's responsibility via Reap or Clear.
+// TestCache_Get_is_read_only verifies Get does not remove expired entries: it
+// reports the miss but leaves the map untouched. Cache memory reclamation is
+// the caller's responsibility via Clear.
 func TestCache_Get_is_read_only(t *testing.T) {
 	t.Parallel()
 	c := New[string](50 * time.Millisecond)
@@ -68,31 +69,11 @@ func TestCache_Get_is_read_only(t *testing.T) {
 		t.Error("Get() returned ok=true for expired entry")
 	}
 
-	// Set a fresh entry, reap, and confirm only the expired one is gone.
-	c.Set("key2", "value2")
-	c.Reap()
-	if _, ok := c.Get("key2"); !ok {
-		t.Error("Reap() removed fresh entry")
-	}
-}
-
-// TestCache_Reap_removes_expired confirms Reap removes expired entries
-// and leaves fresh ones alone.
-func TestCache_Reap_removes_expired(t *testing.T) {
-	t.Parallel()
-	c := New[string](10 * time.Millisecond)
-
-	c.Set("old", "old-value")
-	time.Sleep(20 * time.Millisecond) // old expires
-	c.Set("fresh", "fresh-value")
-
-	c.Reap()
-
-	if _, ok := c.Get("old"); ok {
-		t.Error("Reap() did not remove expired entry")
-	}
-	if got, ok := c.Get("fresh"); !ok || got != "fresh-value" {
-		t.Errorf("Reap() removed fresh entry: got %v, ok=%v", got, ok)
+	c.mu.RLock()
+	_, present := c.entries["key1"]
+	c.mu.RUnlock()
+	if !present {
+		t.Error("Get() evicted the expired entry; it must be read-only")
 	}
 }
 
@@ -259,9 +240,9 @@ func TestCache_property_set_then_get_value_correctness(t *testing.T) {
 		// gap between Set and Get can exceed 1ms (GC pauses, scheduler
 		// jitter), causing spurious "expired" Get results that rapid
 		// reported as un-reproducible flakes. TTL handling is exercised
-		// deterministically by TestCache_Get_expired_entry and
-		// TestCache_Reap_removes_expired (which use time.Sleep with margins
-		// well above scheduling jitter); this test is now purely about the
+		// deterministically by TestCache_Get_expired_entry (which uses
+		// time.Sleep with margins well above scheduling jitter); this test
+		// is now purely about the
 		// data-flow invariant — TTL is fixed at time.Hour to remove the
 		// time dependency.
 		c := New[int](time.Hour)
@@ -330,32 +311,6 @@ func TestCache_property_clear_invalidates_all(t *testing.T) {
 		for _, k := range keys {
 			if _, ok := c.Get(k); ok {
 				rt.Fatalf("Get(%q) returned ok=true after Clear", k)
-			}
-		}
-	})
-}
-
-func TestCache_property_reap_preserves_fresh(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(rt *rapid.T) {
-		// Invariant 4: Reap removes only expired entries (non-expired survive).
-		c := New[int](time.Hour)
-		n := rapid.IntRange(1, 20).Draw(rt, "n")
-		keys := make([]string, n)
-		vals := make(map[string]int)
-		for i := range n {
-			keys[i] = fmt.Sprintf("key-%d", i)
-			c.Set(keys[i], i)
-			vals[keys[i]] = i
-		}
-		c.Reap()
-		for _, k := range keys {
-			got, ok := c.Get(k)
-			if !ok {
-				rt.Fatalf("Get(%q) returned ok=false after Reap (entry should be fresh)", k)
-			}
-			if got != vals[k] {
-				rt.Fatalf("Get(%q) = %v, want %v after Reap", k, got, vals[k])
 			}
 		}
 	})

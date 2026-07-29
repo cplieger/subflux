@@ -363,7 +363,7 @@ func TestConsumeWebAuthnSession_expired(t *testing.T) {
 		t.Error("consumeWebAuthnSession(expired) should return nil")
 	}
 
-	_, exists := cs.WebAuthn.Load(token)
+	_, exists := cs.WebAuthn.LoadAndDelete(token)
 	if exists {
 		t.Error("expired session not removed from map")
 	}

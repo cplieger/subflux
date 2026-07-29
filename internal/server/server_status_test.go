@@ -28,14 +28,11 @@ func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	// Add a recent alert and an old alert.
+	// Add a recent alert and an already-expired one (a negative TTL override
+	// is elapsed the moment it is recorded, so no backdating is needed).
 	s.alerts.Record("sonarr", "recent error")
-	s.alerts.Lock()
-	s.alerts.AppendAlert(activity.Alert{
-		ID: -1, Level: "error", Source: "old", Message: "old error",
-		Kind: activity.AlertTransient, Time: time.Now().Add(-48 * time.Hour),
-	})
-	s.alerts.Unlock()
+	s.alerts.AddAlert("old", "old error",
+		activity.AlertTransient, activity.LevelError, -time.Second)
 
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet, "/api/alerts", http.NoBody)
@@ -283,9 +280,7 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 
 	s.alerts.Record("sonarr", "test error")
 
-	s.alerts.RLock()
-	id := s.alerts.AlertsUnsafe()[0].ID
-	s.alerts.RUnlock()
+	id := s.alerts.VisibleAlerts()[0].ID
 
 	// Method dispatch lives in routes.go ("DELETE /api/alerts" binds
 	// handleDismissAlert directly); the handler owns only the dismissal.
@@ -298,13 +293,9 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 		t.Fatalf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	// Verify the alert was dismissed.
-	s.alerts.RLock()
-	dismissed := s.alerts.AlertsUnsafe()[0].Dismissed
-	s.alerts.RUnlock()
-
-	if !dismissed {
-		t.Error("alert should be dismissed after DELETE")
+	// Verify the alert was dismissed: a dismissed alert leaves the visible set.
+	if n := len(s.alerts.VisibleAlerts()); n != 0 {
+		t.Errorf("visible alerts after DELETE = %d, want 0 (the alert was dismissed)", n)
 	}
 }
 

@@ -95,9 +95,6 @@ func (n *NopConfig) LoggingLevel() api.LogLevel { return "info" }
 // LoggingFormat returns the json log format.
 func (n *NopConfig) LoggingFormat() api.LogFormat { return "json" }
 
-// MediaRoots returns no media roots.
-func (n *NopConfig) MediaRoots() []string { return nil }
-
 // ValidatePath returns PathErr (nil by default, accepting every path).
 func (n *NopConfig) ValidatePath(_ context.Context, _ string) error { return n.PathErr }
 
@@ -117,9 +114,6 @@ func (n *NopConfig) RemoveUnderRoot(_ context.Context, path string) error {
 
 // LanguageRulesForUI returns the configured language rules.
 func (n *NopConfig) LanguageRulesForUI() api.LanguageRulesJSON { return n.LangRules }
-
-// AuthEnabled reports auth as disabled.
-func (n *NopConfig) AuthEnabled() bool { return false }
 
 // BasicAuthEnabled reports basic auth as enabled.
 func (n *NopConfig) BasicAuthEnabled() bool { return true }

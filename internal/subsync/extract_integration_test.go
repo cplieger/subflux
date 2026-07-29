@@ -100,58 +100,6 @@ func TestIntegration_MKV_AudioSync(t *testing.T) {
 	// combinations. Just verify it didn't panic.
 }
 
-// --- SyncFile end-to-end (requires test5.mkv) ---
-
-func TestIntegration_SyncFile_WithExternalRef(t *testing.T) {
-	t.Parallel()
-	mkvPath := filepath.Join(testdataDir(t), "test5.mkv")
-	if _, err := os.Stat(mkvPath); os.IsNotExist(err) {
-		t.Skip("test5.mkv not found")
-	}
-
-	ref, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
-	if err != nil || len(ref) < 5 {
-		t.Skipf("insufficient embedded cues: %d", len(ref))
-	}
-
-	dir := t.TempDir()
-
-	// Write reference as "English" SRT.
-	var refBuf bytes.Buffer
-	if err := WriteSRT(&refBuf, ref); err != nil {
-		t.Fatalf("write ref: %v", err)
-	}
-	refPath := filepath.Join(dir, "test5.en.srt")
-	if err := os.WriteFile(refPath, refBuf.Bytes(), 0o644); err != nil {
-		t.Fatalf("save ref: %v", err)
-	}
-
-	// Create a shifted "French" subtitle.
-	shifted := ShiftCues(ref, 3*time.Second)
-	var shiftedBuf bytes.Buffer
-	if err := WriteSRT(&shiftedBuf, shifted); err != nil {
-		t.Fatalf("write shifted: %v", err)
-	}
-	shiftedPath := filepath.Join(dir, "test5.fr.srt")
-	if err := os.WriteFile(shiftedPath, shiftedBuf.Bytes(), 0o644); err != nil {
-		t.Fatalf("save shifted: %v", err)
-	}
-
-	result, syncErr := SyncFile(context.Background(), mkvPath, shiftedPath, &Options{
-		Reference: refPath,
-	})
-	if syncErr != nil {
-		t.Fatalf("SyncFile: %v", syncErr)
-	}
-
-	t.Logf("SyncFile: method=%s, offset=%dms, conf=%.2f, applied=%v",
-		result.Method, result.OffsetMs, result.Confidence, result.Applied)
-
-	if !result.Applied {
-		t.Error("SyncFile did not apply correction")
-	}
-}
-
 // --- MP4 embedded subtitle extraction (requires test_subtitled.mp4) ---
 
 func TestIntegration_MP4_EmbeddedExtraction(t *testing.T) {

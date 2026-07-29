@@ -22,9 +22,9 @@ import (
 //     (internal/server/scheduler.AuthCleanupInterval = 15m).
 //   - The session idle/absolute DURATIONS match subflux's config defaults
 //     (internal/config/defaults.DefaultSession{Idle,Absolute}Timeout = 24h / 7d),
-//     and the OIDC TTL matches scheduler.OIDCStateTTL = 10m. A self-hosted
-//     instance that never tunes them therefore behaves exactly like the SQLite
-//     cleanup it replaces.
+//     and this package owns the 10m OIDC pending-login TTL outright. A
+//     self-hosted instance that never tunes them therefore behaves exactly
+//     like the SQLite cleanup it replaces.
 //
 // The durations live on the Store (not as Open arguments) so the composition
 // root (main.go, task 10.2) MAY override them with configured values without
@@ -36,7 +36,8 @@ const (
 	defaultSessionIdleTimeout = 24 * time.Hour
 	// defaultSessionAbsoluteTimeout is the max session lifetime (cf. config defaults).
 	defaultSessionAbsoluteTimeout = 7 * 24 * time.Hour
-	// defaultOIDCStateTTL is the pending-login TTL (cf. scheduler.OIDCStateTTL).
+	// defaultOIDCStateTTL is the pending-login TTL: how long an OIDC
+	// authorization flow can remain pending before it is swept.
 	defaultOIDCStateTTL = 10 * time.Minute
 )
 

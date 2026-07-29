@@ -17,8 +17,11 @@ func normalizeTitle(s string) string {
 	return scoring.NormalizeTitle(s)
 }
 
+// releaseNameMatchesTitle observes the single-title release-name match through
+// the production entry point: with no alternative titles,
+// scoring.AnyReleaseNameMatches is exactly that comparison.
 func releaseNameMatchesTitle(reqTitle, releaseName string) bool {
-	return scoring.ReleaseNameMatchesTitle(reqTitle, releaseName)
+	return scoring.AnyReleaseNameMatches(&api.SearchRequest{Title: reqTitle}, releaseName)
 }
 
 func titlesMatch(a, b string) bool {

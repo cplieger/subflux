@@ -1,3 +1,20 @@
+// Package subsync provides subtitle timing synchronization.
+//
+// It supports multiple sync strategies:
+//   - Constant-offset alignment (alass algorithm port)
+//   - Framerate correction (known ratios + golden-section search)
+//   - Split-aware DP alignment (handles commercial breaks, different cuts)
+//   - Audio-based sync (energy VAD + FFT cross-correlation, no reference needed)
+//   - Encoding normalization (UTF-16, Windows-1252 → UTF-8)
+//
+// The entry point is SyncWithOptions, which takes already-parsed cues and
+// returns the winning SyncResult. Callers own file I/O: read the subtitle,
+// NormalizeEncoding it, ParseSRT it, sync, then WriteSRT the corrected cues.
+// internal/search/syncing is the in-repo consumer and shows the full shape
+// (parse -> SyncWithOptions -> WriteSRT -> PostProcess).
+//
+// Audio-only sync (no reference subtitle) is the same call with a nil
+// reference, EnableAudio, and SyncOptions.VideoPath set.
 package subsync
 
 import (

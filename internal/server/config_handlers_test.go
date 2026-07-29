@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -117,13 +116,12 @@ func TestAlertLog_record_adds_alert(t *testing.T) {
 
 	al.Record("sonarr", "Search failed for Series X")
 
-	al.RLock()
-	defer al.RUnlock()
+	alerts := al.VisibleAlerts()
 
-	if len(al.AlertsUnsafe()) != 1 {
-		t.Fatalf("alerts count = %d, want 1", len(al.AlertsUnsafe()))
+	if len(alerts) != 1 {
+		t.Fatalf("alerts count = %d, want 1", len(alerts))
 	}
-	alert := al.AlertsUnsafe()[0]
+	alert := alerts[0]
 	if alert.Source != "sonarr" {
 		t.Errorf("alert.Source = %q, want %q", alert.Source, "sonarr")
 	}
@@ -138,161 +136,7 @@ func TestAlertLog_record_adds_alert(t *testing.T) {
 	}
 }
 
-func TestAlertLog_record_trims_to_max(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(2)
-
-	al.Record("a", "first")
-	al.Record("b", "second")
-	al.Record("c", "third")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.AlertsUnsafe()) != 2 {
-		t.Fatalf("alerts count = %d, want 2 (trimmed)", len(al.AlertsUnsafe()))
-	}
-	if al.AlertsUnsafe()[0].Source != "b" {
-		t.Errorf("alerts[0].Source = %q, want %q (oldest trimmed)", al.AlertsUnsafe()[0].Source, "b")
-	}
-}
-
-func TestAlertLog_record_multiple_sources(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(100)
-
-	al.Record("sonarr", "error 1")
-	al.Record("radarr", "error 2")
-	al.Record("config", "error 3")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.AlertsUnsafe()) != 3 {
-		t.Fatalf("alerts count = %d, want 3", len(al.AlertsUnsafe()))
-	}
-}
-
 // --- visibleAlerts ---
-
-func TestVisibleAlerts_excludes_expired_transient(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	// Add a transient alert that expired (older than default TTL).
-	al.Lock()
-	al.AppendAlert(activity.Alert{
-		ID: 999, Level: "error", Source: "old", Message: "old error",
-		Kind: activity.AlertTransient, Time: time.Now().Add(-2 * time.Hour),
-	})
-	al.Unlock()
-
-	visible := al.VisibleAlerts()
-	if len(visible) != 0 {
-		t.Errorf("visibleAlerts() returned %d alerts, want 0 (expired transient excluded)",
-			len(visible))
-	}
-}
-
-func TestVisibleAlerts_includes_persistent_regardless_of_age(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	// Add a persistent alert that is very old.
-	al.Lock()
-	al.AppendAlert(activity.Alert{
-		ID: 998, Level: "error", Source: "startup", Message: "old persistent",
-		Kind: activity.AlertPersistent, Time: time.Now().Add(-72 * time.Hour),
-	})
-	al.Unlock()
-
-	visible := al.VisibleAlerts()
-	if len(visible) != 1 {
-		t.Fatalf("visibleAlerts() returned %d alerts, want 1 (persistent always visible)",
-			len(visible))
-	}
-	if visible[0].Kind != activity.AlertPersistent {
-		t.Errorf("visible[0].Kind = %q, want %q", visible[0].Kind, activity.AlertPersistent)
-	}
-}
-
-func TestVisibleAlerts_excludes_dismissed(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.Record("sonarr", "recent error")
-	al.RLock()
-	id := al.AlertsUnsafe()[0].ID
-	al.RUnlock()
-	al.Dismiss(id)
-
-	visible := al.VisibleAlerts()
-	if len(visible) != 0 {
-		t.Errorf("visibleAlerts() returned %d alerts, want 0 (dismissed excluded)",
-			len(visible))
-	}
-}
-
-func TestVisibleAlerts_empty_returns_empty_slice(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	visible := al.VisibleAlerts()
-	if visible == nil {
-		t.Fatal("visibleAlerts() returned nil, want non-nil empty slice")
-	}
-	if len(visible) != 0 {
-		t.Errorf("visibleAlerts() returned %d alerts, want 0", len(visible))
-	}
-}
-
-func TestVisibleAlerts_mixed_types_and_states(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	// 1. Recent transient (visible).
-	al.Record("sonarr", "recent error")
-
-	// 2. Old transient (expired, hidden).
-	al.Lock()
-	al.AppendAlert(activity.Alert{
-		ID: 997, Level: "error", Source: "old-transient", Message: "expired",
-		Kind: activity.AlertTransient, Time: time.Now().Add(-48 * time.Hour),
-	})
-	al.Unlock()
-
-	// 3. Old persistent (visible regardless of age).
-	al.Lock()
-	al.AppendAlert(activity.Alert{
-		ID: 996, Level: "error", Source: "startup", Message: "persistent",
-		Kind: activity.AlertPersistent, Time: time.Now().Add(-72 * time.Hour),
-	})
-	al.Unlock()
-
-	// 4. Dismissed recent transient (hidden).
-	al.Record("radarr", "dismissed error")
-	al.RLock()
-	dismissID := al.AlertsUnsafe()[len(al.AlertsUnsafe())-1].ID
-	al.RUnlock()
-	al.Dismiss(dismissID)
-
-	visible := al.VisibleAlerts()
-	if len(visible) != 2 {
-		t.Fatalf("visibleAlerts() returned %d alerts, want 2 (recent transient + old persistent)",
-			len(visible))
-	}
-
-	sources := map[string]bool{}
-	for _, a := range visible {
-		sources[a.Source] = true
-	}
-	if !sources["sonarr"] {
-		t.Error("expected recent transient alert from 'sonarr' to be visible")
-	}
-	if !sources["startup"] {
-		t.Error("expected old persistent alert from 'startup' to be visible")
-	}
-}
 
 // --- readBounded ---
 

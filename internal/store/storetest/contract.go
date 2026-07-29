@@ -1,16 +1,13 @@
 // Package storetest provides a shared, engine-agnostic behavioral contract
 // suite for api.Store implementations. It depends ONLY on internal/api, so it
-// can be run against any concrete engine (the legacy SQLite store.DB and the
-// bbolt boltstore.DB) without importing either, proving behavioral parity at
-// the api.Store seam (Requirement 14.1).
+// pins behaviour at the api.Store seam rather than at one engine's internals
+// (Requirement 14.1). boltstore.DB is the only engine today.
 //
 // # What this suite is
 //
-// Suite asserts EXACT observable values, not merely "does not error". The
-// substantive behavioural expectations were promoted here from the formerly
-// SQLite-coupled store_contract_test.go and store_maint_reconcile_test.go so a
-// single suite pins every resolved finding from the bbolt-store-rewrite design
-// review (Requirement 14.2):
+// Suite asserts EXACT observable values, not merely "does not error". A single
+// suite pins every resolved finding from the bbolt-store-rewrite design review
+// (Requirement 14.2):
 //
 //   - the three ReconcileState branches (video gone; subtitle gone with a
 //     sibling still present; all subtitles gone),
@@ -29,8 +26,8 @@
 //
 // # Filesystem dependency
 //
-// ReconcileState classifies each row against the real filesystem (both engines
-// default their stat oracle to os.Stat), so the reconcile cases create real
+// ReconcileState classifies each row against the real filesystem (an engine
+// defaults its stat oracle to os.Stat), so the reconcile cases create real
 // video/subtitle files under t.TempDir() and reference those paths. This keeps
 // the suite engine-agnostic: it drives reconcile entirely through SaveDownload
 // + RecordNoResult + RecordScanState and real files, with no engine-specific
@@ -174,7 +171,7 @@ func defaultBackoff() api.BackoffParams {
 
 // writeFile creates a real file so ReconcileState's os.Stat oracle classifies
 // the path as present. Used by the reconcile cases to stand up the on-disk
-// state both engines inspect.
+// state the engine under test inspects.
 func writeFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
@@ -468,7 +465,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 	// The next ordinal is one greater than the highest stored ordinal (parsed
 	// from the path), so a second manual download lands at .2. The manual
 	// filename embeds the triple's language token (movie.<lang>.N.srt), which
-	// both engines rely on to locate the ordinal.
+	// the engine relies on to locate the ordinal.
 	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); n != 2 {
 		t.Fatalf("NextManualNumber (after .1) = %d, want 2", n)
 	}
@@ -643,12 +640,10 @@ func testPollTimestamp(t *testing.T, s api.Store) {
 
 // testSyncOffset asserts a sync offset round-trips by path (Requirement 6.1).
 //
-// The offset is associated with a known subtitle file: the legacy SQLite store
-// carries offset_ms ON the subtitle_files row (a SetSyncOffset for an unknown
-// path is a no-op there), whereas the bbolt store keeps an independent
-// sync_offsets bucket keyed by path. Recording the subtitle file first is the
-// behaviour-preserving common precondition both engines satisfy; the bbolt
-// engine's standalone bucket is a (lenient) superset of the old behaviour.
+// The offset is associated with a known subtitle file: the bbolt store keeps an
+// independent sync_offsets bucket keyed by path, so the suite states that
+// precondition instead of assuming it — an engine that hangs offset_ms off the
+// subtitle_files row would no-op a SetSyncOffset for an unknown path.
 func testSyncOffset(t *testing.T, s api.Store) {
 	t.Helper()
 	ctx := context.Background()

@@ -109,8 +109,8 @@ func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) == 0 {
 		t.Errorf("Set with failing setFn: want the dirty-cursor WARN")
 	}
-	if got := pc.DirtyCount(); got != 1 {
-		t.Errorf("DirtyCount after failed persist = %d, want 1", got)
+	if pc.dirtySince(api.PollKeySonarr).IsZero() {
+		t.Errorf("cursor not marked dirty after a failed persist")
 	}
 }
 
@@ -125,8 +125,8 @@ func TestPollCacheSet_silent_when_setFn_ok(t *testing.T) {
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) > 0 {
 		t.Errorf("Set with ok setFn: unexpected dirty-cursor WARN")
 	}
-	if got := pc.DirtyCount(); got != 0 {
-		t.Errorf("DirtyCount after clean persist = %d, want 0", got)
+	if !pc.dirtySince(api.PollKeySonarr).IsZero() {
+		t.Errorf("cursor marked dirty after a successful persist")
 	}
 }
 
@@ -158,14 +158,14 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 
 	// While dirty, retries against a still-failing store keep it dirty.
 	pc.RetryDirty(context.Background())
-	if got := pc.DirtyCount(); got != 1 {
-		t.Fatalf("DirtyCount while store failing = %d, want 1", got)
+	if pc.dirtySince(api.PollKeySonarr).IsZero() {
+		t.Fatalf("cursor cleared while the store is still failing")
 	}
 
 	failing.Store(false)
 	pc.RetryDirty(context.Background())
-	if got := pc.DirtyCount(); got != 0 {
-		t.Errorf("DirtyCount after heal = %d, want 0", got)
+	if !pc.dirtySince(api.PollKeySonarr).IsZero() {
+		t.Errorf("cursor still dirty after the store healed")
 	}
 	if len(persisted) != 1 || !persisted[0].Equal(second) {
 		t.Errorf("persisted = %v, want exactly the LATEST in-memory position %v", persisted, second)

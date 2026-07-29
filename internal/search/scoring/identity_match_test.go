@@ -151,7 +151,7 @@ func TestExtractReleaseSeason(t *testing.T) {
 	}
 }
 
-// --- ReleaseNameMatchesTitle (word-boundary + sequel-indicator logic) ---
+// --- release-name title matching (word-boundary + sequel-indicator logic) ---
 
 func TestReleaseNameMatchesTitle(t *testing.T) {
 	t.Parallel()
@@ -176,8 +176,12 @@ func TestReleaseNameMatchesTitle(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ReleaseNameMatchesTitle(tc.reqTitle, tc.release); got != tc.want {
-				t.Errorf("ReleaseNameMatchesTitle(%q, %q) = %v, want %v",
+			// Observed through the production entry point: with no
+			// alternative titles, AnyReleaseNameMatches is exactly the
+			// single-title match this table pins.
+			req := &api.SearchRequest{Title: tc.reqTitle}
+			if got := AnyReleaseNameMatches(req, tc.release); got != tc.want {
+				t.Errorf("AnyReleaseNameMatches({Title: %q}, %q) = %v, want %v",
 					tc.reqTitle, tc.release, got, tc.want)
 			}
 		})

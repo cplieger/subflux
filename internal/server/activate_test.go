@@ -499,11 +499,8 @@ func (fakeOIDCStore) GetUserByOIDCSub(context.Context, string, string) (*auth.Us
 	return nil, nil
 }
 
-func (fakeOIDCStore) GetUserByEmail(context.Context, string) (*auth.User, error) { return nil, nil }
-
 func (fakeOIDCStore) GetUserByUsername(context.Context, string) (*auth.User, error) { return nil, nil }
 func (fakeOIDCStore) CreateUser(context.Context, *auth.User) error                  { return nil }
-func (fakeOIDCStore) UpdateUser(context.Context, *auth.User) error                  { return nil }
 
 // oidcRedirectLocation drives GET /api/auth/oidc through the handler and
 // returns the Location header of the 302.

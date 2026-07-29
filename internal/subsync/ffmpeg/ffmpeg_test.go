@@ -2,47 +2,12 @@ package ffmpeg
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
 var testLangMapper LangMapper = classify.Alpha2FromAlpha3
-
-// mockRunner implements CommandRunner for testing without real ffmpeg binaries.
-type mockRunner struct {
-	err    error
-	output []byte
-}
-
-func (m mockRunner) Run(_ context.Context, _ string, _ ...string) ([]byte, error) {
-	return m.output, m.err
-}
-
-// Compile-time assertion: mockRunner satisfies CommandRunner.
-var _ CommandRunner = mockRunner{}
-
-func TestFFprobeStreams_with_mock(t *testing.T) {
-	t.Parallel()
-	orig := DefaultRunner
-	defer func() { DefaultRunner = orig }()
-
-	DefaultRunner = mockRunner{
-		output: []byte(`{"streams":[{"index":0,"codec_name":"subrip","codec_type":"subtitle","r_frame_rate":"0/0","tags":{"language":"eng"},"disposition":{"forced":0}}]}`),
-	}
-
-	tracks, err := ParseProbeOutput(DefaultRunner.(mockRunner).output)
-	if err != nil {
-		t.Fatalf("ParseProbeOutput with mock data: %v", err)
-	}
-	if len(tracks) != 1 {
-		t.Fatalf("expected 1 track, got %d", len(tracks))
-	}
-	if tracks[0].CodecName != "subrip" {
-		t.Errorf("CodecName = %q, want subrip", tracks[0].CodecName)
-	}
-}
 
 func TestNormalizeFFprobeLang(t *testing.T) {
 	t.Parallel()

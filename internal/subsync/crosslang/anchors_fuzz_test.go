@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// FuzzIsCognateSymmetric asserts the IsCognate relation is symmetric:
-// IsCognate(a,b) == IsCognate(b,a).
+// FuzzIsCognateSymmetric asserts the isCognate relation is symmetric:
+// isCognate(a,b) == isCognate(b,a).
 //
 // Bug class: asymmetric cognate detection would cause non-deterministic
 // alignment scores depending on which subtitle track was passed first
@@ -20,15 +20,15 @@ func FuzzIsCognateSymmetric(f *testing.F) {
 	f.Add("\xff\xfe", "ascii")
 
 	f.Fuzz(func(t *testing.T, a, b string) {
-		ab := IsCognate(a, b)
-		ba := IsCognate(b, a)
+		ab := isCognate(a, b)
+		ba := isCognate(b, a)
 		if ab != ba {
-			t.Fatalf("not symmetric: IsCognate(%q,%q)=%v, IsCognate(%q,%q)=%v", a, b, ab, b, a, ba)
+			t.Fatalf("not symmetric: isCognate(%q,%q)=%v, isCognate(%q,%q)=%v", a, b, ab, b, a, ba)
 		}
 	})
 }
 
-// FuzzCountSharedFoldBounded asserts CountSharedFold's count never
+// FuzzCountSharedFoldBounded asserts countSharedFold's count never
 // exceeds the size of the smaller slice.
 //
 // Bug class: counter overflow / off-by-one — if shared count exceeded
@@ -43,15 +43,15 @@ func FuzzCountSharedFoldBounded(f *testing.F) {
 	f.Fuzz(func(t *testing.T, csvA, csvB string) {
 		a := splitCSV(csvA)
 		b := splitCSV(csvB)
-		got := CountSharedFold(a, b)
+		got := countSharedFold(a, b)
 		smaller := min(len(a), len(b))
 		if got < 0 || got > smaller {
-			t.Fatalf("CountSharedFold(%v,%v)=%d; want in [0,%d]", a, b, got, smaller)
+			t.Fatalf("countSharedFold(%v,%v)=%d; want in [0,%d]", a, b, got, smaller)
 		}
 	})
 }
 
-// FuzzIsLatinWordPureASCII asserts IsLatinWord agrees with a reference
+// FuzzIsLatinWordPureASCII asserts isLatinWord agrees with a reference
 // predicate for pure-ASCII letter inputs (where the answer is unambiguous).
 //
 // Bug class: incorrect Unicode classification would let non-Latin scripts
@@ -66,7 +66,7 @@ func FuzzIsLatinWordPureASCII(f *testing.F) {
 	f.Add("a b")
 
 	f.Fuzz(func(t *testing.T, s string) {
-		got := IsLatinWord(s)
+		got := isLatinWord(s)
 		// Reference for pure ASCII letters: at least one rune, all in [a-zA-Z].
 		ref := s != ""
 		if ref {
@@ -77,14 +77,14 @@ func FuzzIsLatinWordPureASCII(f *testing.F) {
 				}
 			}
 		}
-		// Implication: pure-ASCII-letters → IsLatinWord.
+		// Implication: pure-ASCII-letters → isLatinWord.
 		if ref && !got {
-			t.Fatalf("IsLatinWord(%q) = false; pure ASCII letters must qualify", s)
+			t.Fatalf("isLatinWord(%q) = false; pure ASCII letters must qualify", s)
 		}
 	})
 }
 
-// FuzzCountCognatesBounded asserts CountCognates' count is always within
+// FuzzCountCognatesBounded asserts countCognates' count is always within
 // [0, min(len(a), len(b))]: a greedy-matching or index-overflow bug could
 // produce a count exceeding the smaller list, pushing the downstream
 // cognates/total confidence ratio above 1.0 and corrupting alignment scoring.
@@ -99,10 +99,10 @@ func FuzzCountCognatesBounded(f *testing.F) {
 	f.Fuzz(func(t *testing.T, csvA, csvB string) {
 		a := splitCSV(csvA)
 		b := splitCSV(csvB)
-		got := CountCognates(a, b)
+		got := countCognates(a, b)
 		smaller := min(len(a), len(b))
 		if got < 0 || got > smaller {
-			t.Fatalf("CountCognates(%v, %v) = %d; want in [0, %d]", a, b, got, smaller)
+			t.Fatalf("countCognates(%v, %v) = %d; want in [0, %d]", a, b, got, smaller)
 		}
 	})
 }

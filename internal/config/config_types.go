@@ -220,14 +220,10 @@ func ValidLogLevel(l LogLevel) bool {
 	return false
 }
 
-// LogFormat is a typed string for log output formats.
+// LogFormat is a typed string for log output formats. The recognized values
+// are owned by slogx.ParseFormat (see ValidLogFormat), not by a local
+// vocabulary.
 type LogFormat = api.LogFormat
-
-// LogFormat constants for the supported log output formats.
-const (
-	LogFormatJSON LogFormat = "json"
-	LogFormatText LogFormat = "text"
-)
 
 // ValidLogFormat returns true if the format is a recognized value, judged by
 // slogx.ParseFormat — the same case-insensitive, trimming normalization
