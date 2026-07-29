@@ -20,7 +20,7 @@ func TestDPAlign_monotonicity(t *testing.T) {
 				Score:  rapid.Float64Range(0.01, 1.0).Draw(t, "score"),
 			}
 		}
-		result := DPAlign(pairs)
+		result := dpAlign(pairs)
 		for i := 1; i < len(result); i++ {
 			if result[i].IncIdx <= result[i-1].IncIdx {
 				t.Fatalf("IncIdx not strictly increasing: [%d]=%d, [%d]=%d",
@@ -54,15 +54,15 @@ func TestWeightedMedianOffset_selectsInputOffset(t *testing.T) {
 			}
 			offsets[off] = true
 		}
-		got := WeightedMedianOffset(pairs)
+		got := weightedMedianOffset(pairs)
 		if n == 0 {
 			if got != 0 {
-				t.Fatalf("WeightedMedianOffset(empty) = %d, want 0", got)
+				t.Fatalf("weightedMedianOffset(empty) = %d, want 0", got)
 			}
 			return
 		}
 		if !offsets[got] {
-			t.Fatalf("WeightedMedianOffset returned %d, which is not one of the input offsets", got)
+			t.Fatalf("weightedMedianOffset returned %d, which is not one of the input offsets", got)
 		}
 	})
 }

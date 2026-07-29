@@ -4,7 +4,6 @@
 package ffmpeg
 
 import (
-	"context"
 	"os/exec"
 )
 
@@ -14,27 +13,6 @@ const MaxExtractBytes = 50 * 1024 * 1024
 
 // LangMapper maps ISO 639-3 language codes to ISO 639-1.
 type LangMapper func(string) string
-
-// CommandRunner abstracts subprocess execution for testability. The default
-// implementation uses exec.CommandContext. Test code can inject a mock runner
-// to exercise parsing/selection logic without real ffmpeg binaries.
-type CommandRunner interface {
-	// Run executes a command and returns its combined stdout output.
-	Run(ctx context.Context, name string, args ...string) ([]byte, error)
-}
-
-// execRunner is the default CommandRunner using os/exec.
-type execRunner struct{}
-
-// Run implements CommandRunner by running the command and capturing stdout.
-func (execRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	return cmd.Output()
-}
-
-// DefaultRunner is the package-level CommandRunner used by exported functions.
-// Override in tests to inject a mock.
-var DefaultRunner CommandRunner = execRunner{}
 
 // Available checks if ffmpeg is on PATH.
 func Available() bool {

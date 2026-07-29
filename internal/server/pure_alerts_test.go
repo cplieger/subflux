@@ -12,103 +12,6 @@ import (
 
 // --- activity.AlertLog ---
 
-func TestAlertLog_recordPersistent_deduplicates(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.RecordPersistent("startup", "First error")
-	al.RecordPersistent("startup", "Updated error")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.AlertsUnsafe()) != 1 {
-		t.Fatalf("alerts count = %d, want 1 (deduplicated)", len(al.AlertsUnsafe()))
-	}
-	if al.AlertsUnsafe()[0].Message != "Updated error" {
-		t.Errorf("alert message = %q, want %q",
-			al.AlertsUnsafe()[0].Message, "Updated error")
-	}
-	if al.AlertsUnsafe()[0].Kind != activity.AlertPersistent {
-		t.Errorf("alert kind = %q, want %q",
-			al.AlertsUnsafe()[0].Kind, activity.AlertPersistent)
-	}
-}
-
-func TestAlertLog_recordPersistent_different_sources_not_deduplicated(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.RecordPersistent("startup", "Error A")
-	al.RecordPersistent("config", "Error B")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.AlertsUnsafe()) != 2 {
-		t.Fatalf("alerts count = %d, want 2", len(al.AlertsUnsafe()))
-	}
-}
-
-func TestAlertLog_dismiss(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.Record("sonarr", "test error")
-
-	al.RLock()
-	id := al.AlertsUnsafe()[0].ID
-	al.RUnlock()
-
-	if !al.Dismiss(id) {
-		t.Error("dismiss() returned false for existing alert")
-	}
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if !al.AlertsUnsafe()[0].Dismissed {
-		t.Error("alert should be dismissed after dismiss()")
-	}
-}
-
-func TestAlertLog_dismiss_nonexistent_returns_false(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	if al.Dismiss(999) {
-		t.Error("dismiss(999) should return false for nonexistent alert")
-	}
-}
-
-func TestAlertLog_recordPersistent_dismissed_allows_new(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.RecordPersistent("startup", "First error")
-
-	al.RLock()
-	id := al.AlertsUnsafe()[0].ID
-	al.RUnlock()
-
-	al.Dismiss(id)
-
-	// After dismissing, a new persistent alert with the same source
-	// should create a new entry (not update the dismissed one).
-	al.RecordPersistent("startup", "Second error")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if len(al.AlertsUnsafe()) != 2 {
-		t.Fatalf("alerts count = %d, want 2 (dismissed + new)", len(al.AlertsUnsafe()))
-	}
-	if al.AlertsUnsafe()[1].Message != "Second error" {
-		t.Errorf("second alert message = %q, want %q",
-			al.AlertsUnsafe()[1].Message, "Second error")
-	}
-}
-
 // --- handleDismissAlert ---
 
 func TestHandleDismissAlert(t *testing.T) {
@@ -139,9 +42,7 @@ func TestHandleDismissAlert(t *testing.T) {
 			if tt.setupAlert {
 				s.alerts.Record("test", "test error")
 
-				s.alerts.RLock()
-				id := s.alerts.AlertsUnsafe()[0].ID
-				s.alerts.RUnlock()
+				id := s.alerts.VisibleAlerts()[0].ID
 
 				query = "?id=" + strconv.Itoa(id)
 			}
@@ -214,47 +115,3 @@ func TestActivityLog_progress_nonexistent_id_is_noop(t *testing.T) {
 }
 
 // --- dismissBySource ---
-
-func TestAlertLog_dismissBySource(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.RecordPersistent("startup", "Error A")
-	al.RecordPersistent("config", "Error B")
-	al.Record("startup", "Transient C") // transient, same source
-
-	al.DismissBySource("startup")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	for _, a := range al.AlertsUnsafe() {
-		if a.Source == "startup" && a.Kind == activity.AlertPersistent && !a.Dismissed {
-			t.Error("persistent startup alert should be dismissed")
-		}
-		if a.Source == "config" && a.Dismissed {
-			t.Error("config alert should not be dismissed")
-		}
-		// Transient alerts from the same source should not be dismissed.
-		if a.Source == "startup" && a.Kind == activity.AlertTransient && a.Dismissed {
-			t.Error("transient startup alert should not be dismissed by dismissBySource")
-		}
-	}
-}
-
-func TestAlertLog_dismissBySource_no_matching_source(t *testing.T) {
-	t.Parallel()
-	al := activity.NewAlertLog(10)
-
-	al.RecordPersistent("startup", "Error A")
-
-	// Should not panic or modify anything.
-	al.DismissBySource("nonexistent")
-
-	al.RLock()
-	defer al.RUnlock()
-
-	if al.AlertsUnsafe()[0].Dismissed {
-		t.Error("alert should not be dismissed by non-matching source")
-	}
-}

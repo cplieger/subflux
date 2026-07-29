@@ -243,8 +243,8 @@ func TestReferenceSync_framerate_strong_returns_early(t *testing.T) {
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
-	if result.Confidence < ConfidenceStrong {
-		t.Errorf("expected strong confidence, got %f", float64(result.Confidence))
+	if result.Confidence < 0.8 {
+		t.Errorf("expected strong confidence (>= 0.8), got %f", float64(result.Confidence))
 	}
 }
 

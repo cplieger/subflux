@@ -31,9 +31,9 @@ func TestAlertLog_RecordInfo_ttlExpiresAfter10m(t *testing.T) {
 	al := NewAlertLog(10)
 	al.RecordInfo("scan complete")
 
-	al.Lock()
-	al.AlertsUnsafe()[0].Time = time.Now().Add(-30 * time.Minute)
-	al.Unlock()
+	al.mu.Lock()
+	al.alerts[0].Time = time.Now().Add(-30 * time.Minute)
+	al.mu.Unlock()
 
 	if vis := al.VisibleAlerts(); len(vis) != 0 {
 		t.Errorf("VisibleAlerts() len = %d, want 0 (30m-old info alert is past its 10m TTL)", len(vis))
@@ -94,9 +94,9 @@ func TestAlertLog_VisibleAlerts_persistentIgnoresTTL(t *testing.T) {
 	al := NewAlertLog(10)
 	al.RecordPersistent("poller", "down")
 
-	al.Lock()
-	al.AlertsUnsafe()[0].Time = time.Now().Add(-2 * time.Hour)
-	al.Unlock()
+	al.mu.Lock()
+	al.alerts[0].Time = time.Now().Add(-2 * time.Hour)
+	al.mu.Unlock()
 
 	found := false
 	for _, a := range al.VisibleAlerts() {
@@ -121,9 +121,9 @@ func TestAlertLog_Dismiss_matchesByID(t *testing.T) {
 		t.Fatalf("Dismiss(2) = false, want true")
 	}
 
-	al.RLock()
-	defer al.RUnlock()
-	for _, a := range al.AlertsUnsafe() {
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+	for _, a := range al.alerts {
 		switch a.ID {
 		case 2:
 			if !a.Dismissed {
@@ -168,5 +168,213 @@ func TestAlertLog_DismissBySource_dismissesPersistentFromSource(t *testing.T) {
 	}
 	if !sawScanner {
 		t.Errorf("DismissBySource(poller) wrongly dismissed the scanner alert")
+	}
+}
+
+// ---- Moved from package server ----
+//
+// These AlertLog unit tests lived in internal/server and reached into the log
+// through six exported mutex/raw-slice helpers (Lock/Unlock/RLock/RUnlock/
+// AlertsUnsafe/AppendAlert) that existed only for them. They belong next to
+// the type, where the same assertions need no exported escape hatch.
+
+func TestAlertLog_Record_trimsToMax(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(2)
+
+	al.Record("a", "first")
+	al.Record("b", "second")
+	al.Record("c", "third")
+
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	if len(al.alerts) != 2 {
+		t.Fatalf("alerts count = %d, want 2 (trimmed)", len(al.alerts))
+	}
+	if al.alerts[0].Source != "b" {
+		t.Errorf("alerts[0].Source = %q, want %q (oldest trimmed)", al.alerts[0].Source, "b")
+	}
+}
+
+func TestAlertLog_Record_keepsEverySource(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(100)
+
+	al.Record("sonarr", "error 1")
+	al.Record("radarr", "error 2")
+	al.Record("config", "error 3")
+
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	if len(al.alerts) != 3 {
+		t.Fatalf("alerts count = %d, want 3", len(al.alerts))
+	}
+}
+
+func TestAlertLog_RecordPersistent_differentSourcesNotDeduplicated(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	al.RecordPersistent("startup", "Error A")
+	al.RecordPersistent("config", "Error B")
+
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	if len(al.alerts) != 2 {
+		t.Fatalf("alerts count = %d, want 2", len(al.alerts))
+	}
+}
+
+func TestAlertLog_RecordPersistent_dismissedAllowsNew(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	al.RecordPersistent("startup", "First error")
+
+	al.mu.RLock()
+	id := al.alerts[0].ID
+	al.mu.RUnlock()
+
+	al.Dismiss(id)
+
+	// After dismissing, a new persistent alert with the same source
+	// should create a new entry (not update the dismissed one).
+	al.RecordPersistent("startup", "Second error")
+
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	if len(al.alerts) != 2 {
+		t.Fatalf("alerts count = %d, want 2 (dismissed + new)", len(al.alerts))
+	}
+	if al.alerts[1].Message != "Second error" {
+		t.Errorf("second alert message = %q, want %q",
+			al.alerts[1].Message, "Second error")
+	}
+}
+
+func TestAlertLog_Dismiss_nonexistentReturnsFalse(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	if al.Dismiss(999) {
+		t.Error("dismiss(999) should return false for nonexistent alert")
+	}
+}
+
+func TestAlertLog_DismissBySource_noMatchingSource(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	al.RecordPersistent("startup", "Error A")
+
+	// Should not panic or modify anything.
+	al.DismissBySource("nonexistent")
+
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	if al.alerts[0].Dismissed {
+		t.Error("alert should not be dismissed by non-matching source")
+	}
+}
+
+func TestAlertLog_VisibleAlerts_excludesExpiredTransient(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	// Add a transient alert that expired (older than default TTL).
+	al.mu.Lock()
+	al.alerts = append(al.alerts, Alert{
+		ID: 999, Level: "error", Source: "old", Message: "old error",
+		Kind: AlertTransient, Time: time.Now().Add(-2 * time.Hour),
+	})
+	al.mu.Unlock()
+
+	visible := al.VisibleAlerts()
+	if len(visible) != 0 {
+		t.Errorf("visibleAlerts() returned %d alerts, want 0 (expired transient excluded)",
+			len(visible))
+	}
+}
+
+func TestAlertLog_VisibleAlerts_excludesDismissed(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	al.Record("sonarr", "recent error")
+	al.mu.RLock()
+	id := al.alerts[0].ID
+	al.mu.RUnlock()
+	al.Dismiss(id)
+
+	visible := al.VisibleAlerts()
+	if len(visible) != 0 {
+		t.Errorf("visibleAlerts() returned %d alerts, want 0 (dismissed excluded)",
+			len(visible))
+	}
+}
+
+func TestAlertLog_VisibleAlerts_emptyReturnsEmptySlice(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	visible := al.VisibleAlerts()
+	if visible == nil {
+		t.Fatal("visibleAlerts() returned nil, want non-nil empty slice")
+	}
+	if len(visible) != 0 {
+		t.Errorf("visibleAlerts() returned %d alerts, want 0", len(visible))
+	}
+}
+
+func TestAlertLog_VisibleAlerts_mixedTypesAndStates(t *testing.T) {
+	t.Parallel()
+	al := NewAlertLog(10)
+
+	// 1. Recent transient (visible).
+	al.Record("sonarr", "recent error")
+
+	// 2. Old transient (expired, hidden).
+	al.mu.Lock()
+	al.alerts = append(al.alerts, Alert{
+		ID: 997, Level: "error", Source: "old-transient", Message: "expired",
+		Kind: AlertTransient, Time: time.Now().Add(-48 * time.Hour),
+	})
+	al.mu.Unlock()
+
+	// 3. Old persistent (visible regardless of age).
+	al.mu.Lock()
+	al.alerts = append(al.alerts, Alert{
+		ID: 996, Level: "error", Source: "startup", Message: "persistent",
+		Kind: AlertPersistent, Time: time.Now().Add(-72 * time.Hour),
+	})
+	al.mu.Unlock()
+
+	// 4. Dismissed recent transient (hidden).
+	al.Record("radarr", "dismissed error")
+	al.mu.RLock()
+	dismissID := al.alerts[len(al.alerts)-1].ID
+	al.mu.RUnlock()
+	al.Dismiss(dismissID)
+
+	visible := al.VisibleAlerts()
+	if len(visible) != 2 {
+		t.Fatalf("visibleAlerts() returned %d alerts, want 2 (recent transient + old persistent)",
+			len(visible))
+	}
+
+	sources := map[string]bool{}
+	for _, a := range visible {
+		sources[a.Source] = true
+	}
+	if !sources["sonarr"] {
+		t.Error("expected recent transient alert from 'sonarr' to be visible")
+	}
+	if !sources["startup"] {
+		t.Error("expected old persistent alert from 'startup' to be visible")
 	}
 }

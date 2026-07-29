@@ -9,26 +9,6 @@ import (
 	"testing"
 )
 
-// --- MediaRoots ---
-
-func TestMediaRoots_returns_configured(t *testing.T) {
-	t.Parallel()
-	cfg := &Config{MediaRootDirs: []string{"/media", "/data"}}
-	got := cfg.MediaRoots()
-	if len(got) != 2 || got[0] != "/media" || got[1] != "/data" {
-		t.Errorf("MediaRoots() = %v, want [/media /data]", got)
-	}
-}
-
-func TestMediaRoots_empty(t *testing.T) {
-	t.Parallel()
-	cfg := &Config{}
-	got := cfg.MediaRoots()
-	if len(got) != 0 {
-		t.Errorf("MediaRoots() = %v, want empty", got)
-	}
-}
-
 // --- ValidatePath ---
 
 func TestValidatePath(t *testing.T) {

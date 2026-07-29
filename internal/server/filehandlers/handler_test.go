@@ -885,7 +885,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 	})
 }
 
-// --- DeleteExternalFile ---
+// --- deleteExternalFile ---
 
 func TestDeleteExternalFile(t *testing.T) {
 	t.Parallel()
@@ -897,9 +897,9 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "embedded",
 			Path:   "/media/movie.srt",
 		}
-		got := h.DeleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if got {
-			t.Error("DeleteExternalFile(embedded) = true, want false")
+			t.Error("deleteExternalFile(embedded) = true, want false")
 		}
 	})
 
@@ -910,9 +910,9 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "external",
 			Path:   "",
 		}
-		got := h.DeleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if got {
-			t.Error("DeleteExternalFile(empty path) = true, want false")
+			t.Error("deleteExternalFile(empty path) = true, want false")
 		}
 	})
 
@@ -923,10 +923,10 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "external",
 			Path:   "/etc/passwd",
 		}
-		got := h.DeleteExternalFile(context.Background(),
+		got := h.deleteExternalFile(context.Background(),
 			&testsupport.NopConfig{PathErr: config.ErrPathNotAllowed}, api.MediaTypeMovie, row)
 		if got {
-			t.Error("DeleteExternalFile(invalid path) = true, want false")
+			t.Error("deleteExternalFile(invalid path) = true, want false")
 		}
 	})
 
@@ -941,9 +941,9 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/nonexistent/movie.en.srt",
 		}
-		got := h.DeleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if !got {
-			t.Error("DeleteExternalFile(nonexistent file) = false, want true")
+			t.Error("deleteExternalFile(nonexistent file) = false, want true")
 		}
 		if store.deletedPath != "/nonexistent/movie.en.srt" {
 			t.Errorf("DeleteSubtitleFile path = %q, want %q",

@@ -43,9 +43,6 @@ const (
 // ErrPathNotAllowed is returned when a path is not under any configured media_roots.
 var ErrPathNotAllowed = errors.New("path not under any configured media_roots")
 
-// MediaRoots returns the configured media root directories.
-func (c *Config) MediaRoots() []string { return c.MediaRootDirs }
-
 // ValidatePath checks that a file path is under one of the configured
 // media roots using pre-opened os.Root handles for symlink-safe containment.
 // Returns an error if the path escapes all roots.

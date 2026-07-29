@@ -24,23 +24,12 @@ func (m SyncMethod) String() string { return string(m) }
 // Compile-time assertion: SyncMethod satisfies fmt.Stringer.
 var _ fmt.Stringer = SyncMethod("")
 
-const (
-	// ConfidenceNone means no sync was performed or the result is unusable.
-	ConfidenceNone Confidence = 0
-
-	// ConfidenceWeak means the sync may be wrong; caller should consider
-	// keeping the original timing.
-	ConfidenceWeak Confidence = 0.3
-
-	// ConfidenceModerate means the sync is likely correct but may have issues.
-	ConfidenceModerate Confidence = 0.6
-
-	// ConfidenceStrong means high confidence in the sync result.
-	ConfidenceStrong Confidence = 0.8
-
-	// ConfidencePerfect means hash match or perfect correlation.
-	ConfidencePerfect Confidence = 1.0
-)
+// ConfidenceNone means no sync was performed or the result is unusable.
+// It is the only named point on the 0.0-1.0 Confidence scale: every other
+// threshold that production reads is a purpose-specific constant
+// (ShouldApplyThreshold here, api.DefaultSyncMinConfidence at the API layer)
+// or a per-strategy ceiling in DefaultConfidenceCaps.
+const ConfidenceNone Confidence = 0
 
 // ConfidenceCaps holds per-strategy confidence ceilings. Each strategy has a
 // different cap reflecting its inherent reliability. The relative ordering is
@@ -93,16 +82,11 @@ func (c ConfidenceCaps) ForMethod(m SyncMethod) Confidence {
 // ShouldApplyThreshold is the exported minimum confidence for a sync result
 // to be considered applicable. Consumers comparing Result.Confidence against
 // a threshold should use this constant instead of a magic 0.5 literal.
-// This is the audio/fallback threshold; reference-based sync uses
-// DefaultMinConfidence (0.5) as the engine default, while the API layer
-// may apply a stricter threshold (e.g. 0.6) for user-facing auto-sync.
+// It is also the sync engine's own default when no explicit threshold is
+// provided (see DefaultSyncOptions and SyncWithOptions). The API layer's
+// DefaultSyncMinConfidence (0.6) is intentionally stricter for user-facing
+// auto-apply decisions.
 const ShouldApplyThreshold Confidence = 0.5
-
-// DefaultMinConfidence is the default minimum confidence used by the sync
-// engine when no explicit threshold is provided. This is the single source
-// of truth for the engine's default; the API layer's DefaultSyncMinConfidence
-// (0.6) is intentionally stricter for user-facing auto-apply decisions.
-const DefaultMinConfidence Confidence = 0.5
 
 // MinCuesForSync is the minimum number of subtitle cues required for any
 // timing-based sync strategy to produce meaningful results. Fewer than this

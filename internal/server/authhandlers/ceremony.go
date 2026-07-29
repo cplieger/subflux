@@ -103,15 +103,6 @@ func (sm *ShardedCeremonyMap[V]) LoadAndDelete(key string) (V, bool) {
 	return val, ok
 }
 
-// Load retrieves a value from the sharded ceremony map by key without removing it.
-func (sm *ShardedCeremonyMap[V]) Load(key string) (V, bool) {
-	s := sm.shard(key)
-	s.mu.Lock()
-	val, ok := s.m[key]
-	s.mu.Unlock()
-	return val, ok
-}
-
 // Cleanup removes entries matching the isExpired predicate.
 func (sm *ShardedCeremonyMap[V]) Cleanup(isExpired func(V) bool) {
 	for i := range sm.shards {

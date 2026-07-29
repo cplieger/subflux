@@ -13,15 +13,14 @@ import "sync"
 // StopResult is the outcome of a stop request against the registry.
 type StopResult int
 
-// Stop request outcomes. StopNotCancellable is never returned by the
-// registry itself (every registration is stoppable); it exists as shared
-// vocabulary for the composing endpoint, which maps StopNotFound plus an
-// existing terminal entry onto "not cancellable" (409).
+// Stop request outcomes. The registry reports only these three: every
+// registration is stoppable, so "not cancellable" is not a registry state —
+// the composing endpoint derives it by mapping StopNotFound plus an existing
+// entry onto 409 (see the default branch of handleCancelActivity).
 const (
 	StopRequested StopResult = iota
 	StopAlreadyStopping
 	StopNotFound
-	StopNotCancellable
 )
 
 // stopEntry pairs a registered stop callback with its requested flag, which

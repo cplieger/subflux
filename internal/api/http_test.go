@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/webhttp"
 )
 
 // --- Helpers ---
@@ -97,23 +99,6 @@ func TestWriteJSONStatus_encode_error_does_not_panic(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-}
-
-// --- JSONError ---
-
-func TestJSONError_wraps_error_text(t *testing.T) {
-	t.Parallel()
-
-	rec := httptest.NewRecorder()
-	JSONError(rec, errors.New("boom"), http.StatusBadRequest)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-	assertJSONHeaders(t, rec)
-	if got := decodeErrorBody(t, rec.Body); got != "boom" {
-		t.Errorf("error body = %q, want %q", got, "boom")
 	}
 }
 
@@ -278,7 +263,6 @@ func TestAllHelpers_set_nosniff_header(t *testing.T) {
 	}{
 		{func(w http.ResponseWriter) { WriteJSON(w, 1) }, "WriteJSON"},
 		{func(w http.ResponseWriter) { WriteJSONStatus(w, 201, 1) }, "WriteJSONStatus"},
-		{func(w http.ResponseWriter) { JSONError(w, errors.New("x"), 400) }, "JSONError"},
 		{Ok, "Ok"},
 		{func(w http.ResponseWriter) { BadRequestC(w, req, "", "x") }, "BadRequestC"},
 		{func(w http.ResponseWriter) { UnauthorizedC(w, req, "", "x") }, "UnauthorizedC"},
@@ -319,7 +303,7 @@ func TestBadRequestC_emits_typed_envelope(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/x", http.NoBody)
-	req = req.WithContext(WithRequestID(req.Context(), "abc123"))
+	req = req.WithContext(webhttp.WithRequestID(req.Context(), "abc123"))
 
 	BadRequestC(rec, req, CodeBadRequest, "bad input")
 

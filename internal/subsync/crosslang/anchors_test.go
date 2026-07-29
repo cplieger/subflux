@@ -116,7 +116,7 @@ func TestExtractAnchors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			a := ExtractAnchors(tt.input)
+			a := extractAnchors(tt.input)
 			if tt.wantWords > 0 && a.WordCount != tt.wantWords {
 				t.Errorf("WordCount = %d, want %d", a.WordCount, tt.wantWords)
 			}
@@ -168,9 +168,9 @@ func TestExtractAnchors_sentenceStartIsNotProperNoun(t *testing.T) {
 	t.Parallel()
 	// "World" follows a sentence-terminating word, so it begins a new sentence
 	// and must not be classified as a proper noun.
-	a := ExtractAnchors("Hello. World")
+	a := extractAnchors("Hello. World")
 	if len(a.ProperNouns) != 0 {
-		t.Errorf("ExtractAnchors(%q).ProperNouns = %v, want []", "Hello. World", a.ProperNouns)
+		t.Errorf("extractAnchors(%q).ProperNouns = %v, want []", "Hello. World", a.ProperNouns)
 	}
 }
 
@@ -178,9 +178,9 @@ func TestExtractAnchors_twoCharProperNoun(t *testing.T) {
 	t.Parallel()
 	// A capitalized two-rune word mid-sentence is the shortest accepted proper
 	// noun; the classifier ignores words under two runes.
-	a := ExtractAnchors("go Bo")
+	a := extractAnchors("go Bo")
 	if len(a.ProperNouns) != 1 || a.ProperNouns[0] != "Bo" {
-		t.Errorf("ExtractAnchors(%q).ProperNouns = %v, want [Bo]", "go Bo", a.ProperNouns)
+		t.Errorf("extractAnchors(%q).ProperNouns = %v, want [Bo]", "go Bo", a.ProperNouns)
 	}
 }
 
@@ -215,12 +215,22 @@ func TestIsLatinWord(t *testing.T) {
 	}{
 		{"ascii_word", "cafe", true},
 		{"greek_rejected", "\u03b1\u03b2\u03b3\u03b4", false}, // αβγδ: codepoints above Latin-Extended-B
+		{"empty", "", false},
+		{"latin_simple", "hello", true},
+		{"latin_accented", "télévision", true},
+		{"latin_extended", "naïve", true},
+		{"cyrillic", "Москва", false},
+		{"cjk", "東京", false},
+		{"mixed_latin_cyrillic", "helloМир", false},
+		{"digits_only", "1234", false},
+		{"latin_with_digit", "abc1", false},
+		{"single_latin", "a", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := IsLatinWord(tt.in); got != tt.want {
-				t.Errorf("IsLatinWord(%q) = %v, want %v", tt.in, got, tt.want)
+			if got := isLatinWord(tt.in); got != tt.want {
+				t.Errorf("isLatinWord(%q) = %v, want %v", tt.in, got, tt.want)
 			}
 		})
 	}
@@ -237,12 +247,28 @@ func TestIsCognate(t *testing.T) {
 		{"equal_len3_too_short", "abc", "abc", false},
 		{"distance_equals_threshold", "abcdefghij", "abcdefg000", true},
 		{"distance_above_threshold", "abcdefghij", "abcde00000", false},
+		{"identical", "television", "television", true},
+		{"accent_difference", "television", "télévision", true},
+		{"accent_short", "president", "président", true},
+		{"identical_medium", "ridicule", "ridicule", true},
+		{"identical_costume", "costume", "costume", true},
+		{"suffix_cognate", "feministe", "feminist", true},
+		{"longer_suffix", "charismatique", "charismatic", true},
+		{"hyphenated", "hot-dog", "hot-dog", true},
+		{"proper_noun_4", "Pete", "Pete", true},
+		{"proper_noun_5", "Lemon", "Lemon", true},
+		{"short_cognate", "cat", "chat", true},
+		{"too_short", "cat", "bat", false},
+		{"too_short_different", "the", "le", false},
+		{"acronym_too_short", "NBC", "NBC", false},
+		{"completely_different", "house", "maison", false},
+		{"length_ratio_below_half", "ab", "abcdef", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := IsCognate(tt.a, tt.b); got != tt.want {
-				t.Errorf("IsCognate(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
+			if got := isCognate(tt.a, tt.b); got != tt.want {
+				t.Errorf("isCognate(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
 			}
 		})
 	}
@@ -257,12 +283,20 @@ func TestCountCognates(t *testing.T) {
 	}{
 		{"exact_match_counts_one", []string{"test"}, []string{"test"}, 1},
 		{"distinct_short_words_no_match", []string{"ab"}, []string{"cd"}, 0},
+		{"both_empty", nil, nil, 0},
+		{"a_empty", nil, []string{"hello"}, 0},
+		{"b_empty", []string{"hello"}, nil, 0},
+		{"exact_match_real_word", []string{"police"}, []string{"police"}, 1},
+		{"cognate_pair", []string{"television"}, []string{"télévision"}, 1},
+		{"no_match", []string{"house"}, []string{"maison"}, 0},
+		{"one_to_one_consumption", []string{"police", "police"}, []string{"police"}, 1},
+		{"multiple_matches", []string{"television", "president"}, []string{"télévision", "président"}, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := CountCognates(tt.a, tt.b); got != tt.want {
-				t.Errorf("CountCognates(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
+			if got := countCognates(tt.a, tt.b); got != tt.want {
+				t.Errorf("countCognates(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
 			}
 		})
 	}
@@ -281,12 +315,88 @@ func TestCountSharedFold(t *testing.T) {
 		// one of a's duplicates can pair.
 		{"budget_consumed_per_b_element", []string{"x", "x"}, []string{"x"}, 1},
 		{"no_overlap", []string{"a"}, []string{"b"}, 0},
+		{"both_empty", nil, nil, 0},
+		{"a_empty", nil, []string{"X"}, 0},
+		{"b_empty", []string{"X"}, nil, 0},
+		{"exact_case_match", []string{"John"}, []string{"John"}, 1},
+		{"multiple_matches", []string{"Paris", "John"}, []string{"paris", "john"}, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := CountSharedFold(tt.a, tt.b); got != tt.want {
-				t.Errorf("CountSharedFold(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
+			if got := countSharedFold(tt.a, tt.b); got != tt.want {
+				t.Errorf("countSharedFold(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+// The tests below were promoted from internal/subsync/anchors_test.go, which
+// reached these functions through exported one-line wrappers
+// (crosslang.ExtractAnchors, .EditDistance, .CountShared, ...) that had no
+// production caller. The wrappers are gone; the assertions live here, against
+// the same functions the production Align path calls.
+
+// TestExtractAnchors_commaIsNotTerminalPunctuation pins that a trailing comma
+// is not a sentence terminator: the anchor's Punctuation feature only carries
+// . ? ! and the ellipsis, so a comma-ended cue contributes no punctuation
+// signal to the cross-language match score.
+func TestExtractAnchors_commaIsNotTerminalPunctuation(t *testing.T) {
+	t.Parallel()
+	if a := extractAnchors("Hello,"); a.Punctuation != "" {
+		t.Errorf("extractAnchors(%q).Punctuation = %q, want empty", "Hello,", a.Punctuation)
+	}
+}
+
+func TestEditDistance(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b string
+		want int
+	}{
+		{"identical", "hello", "hello", 0},
+		{"empty_vs_nonempty", "", "abc", 3},
+		{"nonempty_vs_empty", "abc", "", 3},
+		{"both_empty", "", "", 0},
+		{"single_substitution", "cat", "bat", 1},
+		{"single_insertion", "cat", "cart", 1},
+		{"single_deletion", "cart", "cat", 1},
+		{"completely_different", "abc", "xyz", 3},
+		{"unicode_accents", "television", "télévision", 2},
+		{"different_lengths", "short", "shorter", 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := editDistance(tt.a, tt.b); got != tt.want {
+				t.Errorf("editDistance(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCountShared(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b []string
+		want int
+	}{
+		{"both_empty", nil, nil, 0},
+		{"a_empty", nil, []string{"x"}, 0},
+		{"b_empty", []string{"x"}, nil, 0},
+		{"exact_match_single", []string{"x"}, []string{"x"}, 1},
+		{"no_match", []string{"x"}, []string{"y"}, 0},
+		{"duplicate_in_a_single_in_b", []string{"x", "x"}, []string{"x"}, 1},
+		{"duplicate_in_both", []string{"x", "x"}, []string{"x", "x"}, 2},
+		{"partial_overlap", []string{"a", "b", "c"}, []string{"b", "c", "d"}, 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := countShared(tt.a, tt.b); got != tt.want {
+				t.Errorf("countShared(%v, %v) = %d, want %d", tt.a, tt.b, got, tt.want)
 			}
 		})
 	}

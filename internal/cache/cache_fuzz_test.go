@@ -12,6 +12,7 @@ import (
 func FuzzCacheSetGet_roundtrip(f *testing.F) {
 	f.Add("k1", "v1")
 	f.Add("", "")
+	f.Add("", "x") // promoted from the deleted Reap target: empty key, non-empty value
 	f.Add("key", "value with spaces")
 
 	f.Fuzz(func(t *testing.T, key, value string) {
@@ -107,40 +108,6 @@ func FuzzGetOrFetchCtx_cancellation(f *testing.F) {
 			if result != "value-"+key {
 				t.Errorf("got %q, want %q", result, "value-"+key)
 			}
-		}
-	})
-}
-
-// FuzzCacheReap_preservesValue checks that Reap never corrupts a surviving
-// entry's value and never panics on arbitrary keys/timings.
-func FuzzCacheReap_preservesValue(f *testing.F) {
-	f.Add("k1", "v1", int64(1), int64(100))
-	f.Add("", "x", int64(0), int64(0))
-
-	f.Fuzz(func(t *testing.T, key, value string, ttlMs, sleepMs int64) {
-		if ttlMs < 1 {
-			ttlMs = 1
-		}
-		if ttlMs > 1000 {
-			ttlMs = 1000
-		}
-		if sleepMs < 0 {
-			sleepMs = 0
-		}
-		if sleepMs > 50 {
-			sleepMs = 50
-		}
-
-		c := New[string](time.Duration(ttlMs) * time.Millisecond)
-		c.Set(key, value)
-
-		time.Sleep(time.Duration(sleepMs) * time.Millisecond)
-		c.Reap()
-
-		// Whether the entry survived depends on timing; if it did, its value
-		// must be intact.
-		if got, ok := c.Get(key); ok && got != value {
-			t.Errorf("Get after Reap returned wrong value: got %q, want %q", got, value)
 		}
 	})
 }

@@ -14,13 +14,12 @@ import (
 // AudioSyncHints provides content characteristics for adaptive strategy
 // selection. Zero values use the default strategy.
 type AudioSyncHints struct {
-	// DialogueCues and MaskCues are pre-classified ASS cues from the native
+	// DialogueCues are pre-classified ASS dialogue cues from the native
 	// parser. When set, audioSyncFromPCM uses these directly instead of
 	// applying text-based heuristics (karaoke pair detection, SDH filtering)
 	// to the flat cue list. This produces better results for ASS files
 	// because style-based classification is more accurate than text patterns.
 	DialogueCues []Cue
-	MaskCues     []Cue
 
 	// DurationSec is the total media duration in seconds.
 	DurationSec int

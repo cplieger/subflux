@@ -99,19 +99,6 @@ func TestShardedCeremonyMap_LoadAndDelete_frees_capacity(t *testing.T) {
 	}
 }
 
-func TestShardedCeremonyMap_Load_does_not_remove(t *testing.T) {
-	t.Parallel()
-	sm := NewShardedCeremonyMap[string]()
-	sm.Store("k", "v")
-	if got, ok := sm.Load("k"); !ok || got != "v" {
-		t.Fatalf("Load(k) = %q, %v; want \"v\", true", got, ok)
-	}
-	// Load is a peek: a second Load still finds the value.
-	if got, ok := sm.Load("k"); !ok || got != "v" {
-		t.Errorf("second Load(k) = %q, %v; want \"v\", true (Load must not remove)", got, ok)
-	}
-}
-
 func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 	t.Parallel()
 	sm := NewShardedCeremonyMap[*WebAuthnSession]()
@@ -122,10 +109,10 @@ func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 		return time.Since(v.CreatedAt) > time.Minute
 	})
 
-	if _, ok := sm.Load("fresh"); !ok {
+	if _, ok := sm.LoadAndDelete("fresh"); !ok {
 		t.Error("Cleanup removed a fresh entry it should have kept")
 	}
-	if _, ok := sm.Load("stale"); ok {
+	if _, ok := sm.LoadAndDelete("stale"); ok {
 		t.Error("Cleanup kept a stale entry it should have removed")
 	}
 }
@@ -213,16 +200,16 @@ func TestCeremonyStore_Cleanup_expires_both_maps(t *testing.T) {
 
 	cs.Cleanup()
 
-	if _, ok := cs.WebAuthn.Load("wa-fresh"); !ok {
+	if _, ok := cs.WebAuthn.LoadAndDelete("wa-fresh"); !ok {
 		t.Error("Cleanup expired a fresh WebAuthn session it should have kept")
 	}
-	if _, ok := cs.WebAuthn.Load("wa-stale"); ok {
+	if _, ok := cs.WebAuthn.LoadAndDelete("wa-stale"); ok {
 		t.Error("Cleanup kept a stale WebAuthn session past the TTL")
 	}
-	if _, ok := cs.Link.Load("ln-fresh"); !ok {
+	if _, ok := cs.Link.LoadAndDelete("ln-fresh"); !ok {
 		t.Error("Cleanup expired a fresh pending link it should have kept")
 	}
-	if _, ok := cs.Link.Load("ln-stale"); ok {
+	if _, ok := cs.Link.LoadAndDelete("ln-stale"); ok {
 		t.Error("Cleanup kept a stale pending link past the TTL")
 	}
 }

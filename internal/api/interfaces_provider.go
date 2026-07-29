@@ -155,8 +155,6 @@ type SubtitleProcessor interface {
 	ParseSRT(data []byte) ([]SubtitleCue, error)
 	// WriteSRT serializes cues back to SRT format.
 	WriteSRT(cues []SubtitleCue) ([]byte, error)
-	// ShiftCues applies a timing offset to all cues.
-	ShiftCues(cues []SubtitleCue, offset time.Duration) []SubtitleCue
 	// SyncFromAudio runs audio-based sync on subtitle data against the video.
 	SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) AudioSyncResult
 }

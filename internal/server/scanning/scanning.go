@@ -51,7 +51,6 @@ type ScanStore interface {
 // ScanMetrics records scan-level metrics.
 type ScanMetrics interface {
 	RecordScan(items, found int, dur time.Duration)
-	AdaptiveSkip()
 }
 
 // EventPublisher publishes events to SSE clients. Scan events carry the

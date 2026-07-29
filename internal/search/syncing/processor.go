@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"time"
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/subsync"
@@ -18,13 +17,9 @@ type SubtitleProcessor struct {
 	exec SyncExec
 }
 
-// NewSubtitleProcessor creates a SubtitleProcessor that syncs in-process.
-func NewSubtitleProcessor() SubtitleProcessor {
-	return SubtitleProcessor{}
-}
-
 // NewSubtitleProcessorWithExec creates a SubtitleProcessor whose audio sync
-// runs through the given executor (server mode: the syncworker client).
+// runs through the given executor (server mode: the syncworker client). The
+// zero SubtitleProcessor runs audio sync in-process.
 func NewSubtitleProcessorWithExec(exec SyncExec) SubtitleProcessor {
 	return SubtitleProcessor{exec: exec}
 }
@@ -87,12 +82,6 @@ func (SubtitleProcessor) WriteSRT(cues []api.SubtitleCue) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// ShiftCues applies a timing offset to all cues.
-func (SubtitleProcessor) ShiftCues(cues []api.SubtitleCue, offset time.Duration) []api.SubtitleCue {
-	shifted := subsync.ShiftCues(subsyncCuesFromAPI(cues), offset)
-	return apiCuesFromSubsync(shifted)
 }
 
 // SyncFromAudio runs audio-based sync on subtitle data.

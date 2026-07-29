@@ -52,7 +52,6 @@ type ServerConfig interface {
 
 // PathValidator provides media path validation.
 type PathValidator interface {
-	MediaRoots() []string
 	ValidatePath(ctx context.Context, path string) error
 	RemoveUnderRoot(ctx context.Context, path string) error
 }
@@ -70,7 +69,6 @@ type SearchConfigProvider interface {
 
 // AuthConfigProvider provides authentication configuration.
 type AuthConfigProvider interface {
-	AuthEnabled() bool
 	BasicAuthEnabled() bool
 	OIDCEnabled() bool
 	OIDCConfig() auth.OIDCConfig

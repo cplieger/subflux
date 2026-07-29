@@ -9,10 +9,6 @@ import (
 
 // --- AuthConfigProvider methods ---
 
-// AuthEnabled returns true once setup is complete (any user exists).
-// The actual check is done at the middleware level; config always returns true.
-func (c *Config) AuthEnabled() bool { return true }
-
 // BasicAuthEnabled returns whether password login is enabled.
 // Defaults to true if not explicitly set.
 func (c *Config) BasicAuthEnabled() bool {

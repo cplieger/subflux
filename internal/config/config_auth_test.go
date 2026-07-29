@@ -59,17 +59,6 @@ auth:
 
 // --- Auth accessor coverage ---
 
-func TestAuthEnabled_always_true(t *testing.T) {
-	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
-	if err != nil {
-		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
-	}
-	if !cfg.AuthEnabled() {
-		t.Error("AuthEnabled() = false, want true")
-	}
-}
-
 func TestWebAuthnRPID_empty_default(t *testing.T) {
 	t.Parallel()
 	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))

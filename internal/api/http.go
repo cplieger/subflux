@@ -58,19 +58,16 @@ const (
 
 	// ErrMsgRadarrNotConfigured is the canonical error message when Radarr is nil.
 	ErrMsgRadarrNotConfigured = "radarr not configured"
-
-	// HeaderXAPIKey is the canonical HTTP header name for API key authentication.
-	// Used by both inbound (subflux API key verification) and outbound (Sonarr/Radarr) requests.
-	HeaderXAPIKey = "X-Api-Key" //nolint:gosec // G101 false positive: header name, not a credential
 )
 
-// errorResponse is the canonical JSON error envelope for all HTTP error helpers.
-// It aliases webhttp.ErrorResponse so the wire format ({"error": msg, "code":
-// ..., "request_id": ...}) is defined once, in the library, and stays
-// byte-identical across every consumer. `error` is always populated; `code` and
-// `request_id` are emitted only when set (omitempty), preserving the legacy
-// error-only shape for callers that pass no code and run without the request-id
-// middleware.
+// errorResponse is the canonical JSON error envelope every helper in this file
+// puts on the wire (via webhttp.WriteError) and the named shape the package's
+// tests decode into. It aliases webhttp.ErrorResponse so the wire format
+// ({"error": msg, "code": ..., "request_id": ...}) is defined once, in the
+// library, and stays byte-identical across every consumer. `error` is always
+// populated; `code` and `request_id` are emitted only when set (omitempty),
+// preserving the legacy error-only shape for callers that pass no code and run
+// without the request-id middleware.
 type errorResponse = webhttp.ErrorResponse
 
 // jsonHeaders sets the standard JSON response headers (application/json +
@@ -97,22 +94,15 @@ func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
 	}
 }
 
-// JSONError writes {"error": err.Error()} at the given status code.
-//
-// SECURITY: err.Error() is echoed verbatim to the client. Only use
-// when the error text is author-controlled or explicitly user-safe
-// (e.g. errors.New("short, static message")). For wrapped internal
-// errors, use InternalError(w, err, ...) which logs the raw error and
-// returns a generic message. For user-facing validation failures,
-// prefer BadRequest(w, r, code, msg) with an author-controlled message.
-func JSONError(w http.ResponseWriter, err error, code int) {
-	WriteJSONStatus(w, code, errorResponse{Error: err.Error()})
-}
-
-// JSONErrorWithCode is JSONError + an error-code envelope. Use when the
-// error string is safe to surface verbatim AND a stable machine-
+// JSONErrorWithCode writes the error envelope with a machine-readable code.
+// Use when the error string is safe to surface verbatim AND a stable machine-
 // readable code is meaningful for the client. Delegates to webhttp.WriteError
 // so the envelope and its request-id population match writeError.
+//
+// SECURITY: msg is echoed verbatim to the client. Only pass an
+// author-controlled or explicitly user-safe message. For wrapped internal
+// errors, use InternalErrorC(w, r, err, code), which logs the raw error and
+// returns a generic message.
 func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, string(code), msg)
 }

@@ -19,6 +19,11 @@ func FuzzFlexIntUnmarshalJSON(f *testing.F) {
 	f.Add([]byte(`"not_a_number"`))
 	f.Add([]byte(`""`))
 	f.Add([]byte(`99999999`))
+	// Promoted from the deleted FuzzParseFlexInt (internal/provider/flexint.go,
+	// the caller-less shared shim): a quoted zero must still be refused, and
+	// empty input must not panic.
+	f.Add([]byte(`"0"`))
+	f.Add([]byte{})
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var fi flexInt
 		if err := fi.UnmarshalJSON(data); err == nil && fi <= 0 {

@@ -57,7 +57,7 @@ func BenchmarkDPAlign(b *testing.B) {
 		b.Run(sizeLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				_ = DPAlign(pairs)
+				_ = dpAlign(pairs)
 			}
 		})
 	}
@@ -67,7 +67,7 @@ func BenchmarkWeightedMedianOffset(b *testing.B) {
 	pairs := makeBenchPairs(200)
 	b.ReportAllocs()
 	for range b.N {
-		_ = WeightedMedianOffset(pairs)
+		_ = weightedMedianOffset(pairs)
 	}
 }
 

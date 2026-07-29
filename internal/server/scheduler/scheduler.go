@@ -24,10 +24,6 @@ const StartupDelay = 30 * time.Second
 // are purged from the database.
 const AuthCleanupInterval = 15 * time.Minute
 
-// OIDCStateTTL is how long an OIDC authorization flow can remain pending
-// before garbage collection.
-const OIDCStateTTL = 10 * time.Minute
-
 // Store is the narrow store interface used by RunDBMaintenance.
 type Store interface {
 	ReconcileState(ctx context.Context) (api.ReconcileResult, error)

@@ -134,6 +134,8 @@ func (al *AlertLog) DismissBySource(source string) {
 }
 
 // VisibleAlerts returns a copy of non-dismissed, non-expired alerts.
+// It is the only read path: the log never hands out its internal slice, and
+// its mutex stays private (tests that need the raw state live in this package).
 func (al *AlertLog) VisibleAlerts() []Alert {
 	al.mu.RLock()
 	defer al.mu.RUnlock()
@@ -158,22 +160,3 @@ func (al *AlertLog) VisibleAlerts() []Alert {
 	}
 	return visible
 }
-
-// Lock acquires a write lock (for test manipulation).
-func (al *AlertLog) Lock() { al.mu.Lock() }
-
-// Unlock releases a write lock.
-func (al *AlertLog) Unlock() { al.mu.Unlock() }
-
-// RLock acquires a read lock (for test inspection).
-func (al *AlertLog) RLock() { al.mu.RLock() }
-
-// RUnlock releases a read lock.
-func (al *AlertLog) RUnlock() { al.mu.RUnlock() }
-
-// AlertsUnsafe returns the internal alerts slice without copying.
-// Caller must hold the lock.
-func (al *AlertLog) AlertsUnsafe() []Alert { return al.alerts }
-
-// AppendAlert appends an alert directly (for test setup). Caller must hold the lock.
-func (al *AlertLog) AppendAlert(a Alert) { al.alerts = append(al.alerts, a) } //nolint:gocritic // hugeParam: exported test helper

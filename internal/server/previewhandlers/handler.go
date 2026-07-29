@@ -29,16 +29,10 @@ type StateFunc func() *LiveState
 
 // LiveState holds the runtime state needed by preview handlers.
 type LiveState struct {
-	Cfg          ConfigProvider
 	SonarrConfig ArrConfig
 	RadarrConfig ArrConfig
 	HasSonarr    bool
 	HasRadarr    bool
-}
-
-// ConfigProvider is the narrow config interface for path validation.
-type ConfigProvider interface {
-	ValidatePath(ctx context.Context, path string) error
 }
 
 // PosterFetcher performs the poster request. The server implementation owns

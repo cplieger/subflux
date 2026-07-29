@@ -115,7 +115,6 @@ func (m *qhMockConfig) ServerPort() int                                         
 func (m *qhMockConfig) PollInterval() time.Duration                                  { return 30 * time.Second }
 func (m *qhMockConfig) LoggingLevel() api.LogLevel                                   { return "info" }
 func (m *qhMockConfig) LoggingFormat() api.LogFormat                                 { return "json" }
-func (m *qhMockConfig) MediaRoots() []string                                         { return nil }
 func (m *qhMockConfig) ValidatePath(_ context.Context, _ string) error               { return nil }
 func (m *qhMockConfig) RemoveUnderRoot(_ context.Context, path string) error {
 	err := os.Remove(path)
@@ -127,7 +126,6 @@ func (m *qhMockConfig) RemoveUnderRoot(_ context.Context, path string) error {
 func (m *qhMockConfig) PostProcessConfig() api.PostProcessConfig  { return api.PostProcessConfig{} }
 func (m *qhMockConfig) SyncConfig() api.SyncConfig                { return api.SyncConfig{SyncSubtitles: true} }
 func (m *qhMockConfig) LanguageRulesForUI() api.LanguageRulesJSON { return api.LanguageRulesJSON{} }
-func (m *qhMockConfig) AuthEnabled() bool                         { return false }
 func (m *qhMockConfig) BasicAuthEnabled() bool                    { return true }
 func (m *qhMockConfig) OIDCEnabled() bool                         { return false }
 func (m *qhMockConfig) OIDCConfig() auth.OIDCConfig               { return auth.OIDCConfig{} }

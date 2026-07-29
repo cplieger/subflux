@@ -128,13 +128,9 @@ func (c *PollCache) RetryDirty(ctx context.Context) {
 	}
 }
 
-// DirtyCount returns how many cursors currently have a failing persist.
-func (c *PollCache) DirtyCount() int {
-	c.dirtyMu.Lock()
-	defer c.dirtyMu.Unlock()
-	return len(c.dirty)
-}
-
+// dirtySince returns when a cursor's persist first started failing, or the zero
+// time when the cursor is clean. The live dirty COUNT reaches production
+// through the SetDirtyGauge observer, not a separate accessor.
 func (c *PollCache) dirtySince(key api.PollKey) time.Time {
 	c.dirtyMu.Lock()
 	defer c.dirtyMu.Unlock()

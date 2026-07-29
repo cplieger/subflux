@@ -92,13 +92,10 @@ func ExtractReleaseSeason(releaseName string) int {
 	return n
 }
 
-// ReleaseNameMatchesTitle checks if a release name's title portion matches
-// the requested title.
-func ReleaseNameMatchesTitle(reqTitle, releaseName string) bool {
-	cleaned := groupTagRe.ReplaceAllString(releaseName, "")
-	return releaseNameMatchesTitleWith(reqTitle, releaseName, NormalizeTitle(cleaned))
-}
-
+// releaseNameMatchesTitleWith reports whether the release name's title portion
+// matches reqTitle. normalizedCleaned is the caller-hoisted
+// NormalizeTitle(release name with group tags stripped): AnyReleaseNameMatches
+// computes it once and reuses it across the primary and alternative titles.
 func releaseNameMatchesTitleWith(reqTitle, releaseName, normalizedCleaned string) bool {
 	loc := SeasonEpRe.FindStringIndex(releaseName)
 	if loc != nil {

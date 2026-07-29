@@ -329,15 +329,6 @@ func TestResolver_singleStateSnapshot(t *testing.T) {
 		name    string
 	}{
 		{
-			name: "SubtitleRow",
-			resolve: func(t *testing.T, r *resolve.Resolver) {
-				t.Helper()
-				if _, err := r.SubtitleRow(ctx, movieRef("fr", "standard", 0)); err != nil {
-					t.Fatalf("SubtitleRow() unexpected error: %v", err)
-				}
-			},
-		},
-		{
 			name: "SubtitlePath",
 			resolve: func(t *testing.T, r *resolve.Resolver) {
 				t.Helper()

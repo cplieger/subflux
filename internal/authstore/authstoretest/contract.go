@@ -1,16 +1,14 @@
 // Package authstoretest provides a shared, engine-agnostic behavioral contract
 // suite for the composite auth store (cplieger/auth/store.Composite). It
 // depends ONLY on the cplieger/auth library (the domain types and the store
-// interface), so it can be driven against any concrete engine — the legacy
-// SQLite authdb.AuthDB and the new bbolt authstore.Store — without importing
-// either, proving behavioural parity at the AuthStore seam (Requirements 14.1,
-// 14.2).
+// interface), so it pins behaviour at the AuthStore seam rather than at one
+// engine's internals (Requirements 14.1, 14.2). The bbolt authstore.Store is
+// the only engine today.
 //
 // # What this suite is
 //
 // Suite asserts EXACT observable values, not merely "does not error", for the
-// behaviours that are TRUE PARITY between the old SQLite store and the new
-// bbolt store:
+// behaviours every engine behind the seam must share:
 //
 //   - uniqueness: duplicate username (case-insensitive), duplicate
 //     (oidc_issuer, oidc_sub), duplicate passkey credential id, and duplicate
@@ -28,22 +26,17 @@
 //     exclusive boundary (Requirement 10.3);
 //   - sign_count durability across a simulated restart: a raised sign_count
 //     survives a Reopen, and so do the durable user/passkey records
-//     (Requirement 9.5, the durable-and-monotonic half that BOTH engines
-//     share).
+//     (Requirement 9.5, the durable-and-monotonic half every engine owes).
 //
-// Deliberate DIVERGENCES between the two engines are intentionally NOT asserted
-// here, because they would make the shared suite fail against one engine. They
-// are covered by new-store-only tests in the authstore package and documented
-// there:
+// Engine-specific behaviours are deliberately NOT asserted here, so the shared
+// suite never pins one engine's detail. They are covered by store-specific
+// tests in the authstore package and documented there:
 //
 //   - sign_count never REGRESSES on a lower incoming count: the bbolt store
-//     stores max(stored, incoming) (CVE-2023-45669 hardening); the SQLite store
-//     overwrote unconditionally.
-//   - the CloneWarning flag round-trips: the bbolt store persists it; the
-//     SQLite schema has no clone_warning column.
+//     stores max(stored, incoming) (CVE-2023-45669 hardening).
+//   - the CloneWarning flag round-trips: the bbolt store persists it.
 //   - sessions/OIDC states are empty after a restart: they are ephemeral
-//     (in-memory) in the bbolt design; the SQLite store persisted sessions in a
-//     table.
+//     (in-memory) in the bbolt design.
 //
 // # Backing-store dependency
 //
@@ -64,8 +57,8 @@ import (
 
 // Harness builds AuthStore instances over durable storage that survives a
 // simulated restart, so durability can be asserted engine-agnostically. Each
-// engine's test package implements it: the bbolt store over a real *.bolt file,
-// the SQLite store over a file-backed database.
+// engine's test package implements it; the bbolt store does so over a real
+// *.bolt file.
 type Harness interface {
 	// Store returns the live store to exercise.
 	Store() authlibstore.Composite
@@ -110,10 +103,9 @@ func mkUser(name string) *auth.User {
 }
 
 // mkPasskey builds a minimally-valid passkey: a non-empty credential id, public
-// key, and a 16-byte AAGUID are required by the SQLite NOT NULL columns (the
-// old store's INSERT lists every column, so a nil value becomes a NULL rather
-// than the schema default), so the suite always sets them. A real passkey
-// always carries these fields, so this keeps the suite engine-agnostic.
+// key, and a 16-byte AAGUID. A real passkey always carries these fields, so
+// always setting them keeps the suite engine-agnostic — an engine with NOT NULL
+// columns must never be the reason a case fails.
 func mkPasskey(userID int64, credID []byte, name string) *auth.PasskeyCredential {
 	return &auth.PasskeyCredential{
 		UserID:       userID,
@@ -194,8 +186,8 @@ func assertOIDCUniqueness(t *testing.T, s authlibstore.Composite) {
 
 // assertCredentialUniqueness asserts a duplicate passkey credential id and a
 // duplicate API-key hash are each rejected with no partial write. Both checks
-// need a real owner (the SQLite store has a NOT NULL FK), so this helper creates
-// one and exercises both (Requirements 9.3, 16.1).
+// need a real owner (an engine may enforce a NOT NULL owner FK), so this helper
+// creates one and exercises both (Requirements 9.3, 16.1).
 func assertCredentialUniqueness(t *testing.T, s authlibstore.Composite) {
 	t.Helper()
 	ctx := context.Background()
@@ -459,13 +451,13 @@ func assertAPIKeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, othe
 // testSessionExpiry asserts CleanupExpiredSessions evicts idle-expired and
 // absolute-expired sessions, keeps live and exactly-at-boundary sessions, and
 // returns the exact evicted count (Requirement 10.3). The exclusive (strict)
-// boundary is shared by both engines.
+// boundary is part of the seam, not an engine detail.
 func testSessionExpiry(t *testing.T, h Harness) {
 	t.Helper()
 	ctx := context.Background()
 	s := h.Store()
 
-	// Sessions reference a real user (the SQLite store has a NOT NULL FK).
+	// Sessions reference a real user (an engine may enforce a NOT NULL owner FK).
 	u := mkUser("sess-owner")
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -509,7 +501,7 @@ func testSessionExpiry(t *testing.T, h Harness) {
 
 // testSignCountDurableAcrossReopen asserts a raised sign_count and the durable
 // user/passkey records survive a simulated restart (Requirement 9.5, the
-// durable half shared by both engines).
+// durable half every engine owes).
 func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	t.Helper()
 	ctx := context.Background()

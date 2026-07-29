@@ -47,20 +47,6 @@ func TestCache_Set_overwrites(t *testing.T) {
 	}
 }
 
-func TestCache_Clear(t *testing.T) {
-	t.Parallel()
-	c := New(time.Minute)
-	c.Set("a", true)
-	c.Set("b", false)
-	c.Clear()
-	if _, ok := c.Get("a"); ok {
-		t.Error("Get(a) after Clear should miss")
-	}
-	if _, ok := c.Get("b"); ok {
-		t.Error("Get(b) after Clear should miss")
-	}
-}
-
 func TestCache_concurrent(t *testing.T) {
 	t.Parallel()
 	c := New(time.Minute)

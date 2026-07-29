@@ -64,9 +64,9 @@ func (p Params) Int(name string) int {
 // Bool reports whether a bool-typed flag was set.
 func (p Params) Bool(name string) bool { return p.bools[name] }
 
-// Flag type vocabulary for Flag.Type. An empty Type means TypeString.
+// Flag type vocabulary for Flag.Type. An empty Type means a plain string flag
+// (rendered as a bare --name in help).
 const (
-	TypeString   = "string"
 	TypeInt      = "int"
 	TypeBool     = "bool"
 	TypeDuration = "duration"
@@ -76,7 +76,7 @@ const (
 type Flag struct {
 	Name     string
 	Help     string
-	Type     string // TypeString (default), TypeInt, TypeBool, TypeDuration
+	Type     string // empty = string, or TypeInt, TypeBool, TypeDuration
 	Default  string
 	Required bool
 }

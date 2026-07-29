@@ -357,12 +357,7 @@ func abs64(x int64) int64 {
 
 var dpMaxPredecessors = defaultConfig.DPMaxPred
 
-// WeightedMedianOffset computes the weighted median offset from pairs.
-func WeightedMedianOffset(pairs []CuePair) int64 { return weightedMedianOffset(pairs) }
-
-// DPAlign finds the optimal monotonic alignment path.
-func DPAlign(pairs []CuePair) []CuePair { return dpAlign(pairs) }
-
+// weightedMedianOffset computes the weighted median offset from pairs.
 func weightedMedianOffset(pairs []CuePair) int64 {
 	if len(pairs) == 0 {
 		return 0
@@ -387,6 +382,8 @@ func weightedMedianOffset(pairs []CuePair) int64 {
 	return sorted[len(sorted)/2].OffsetMs
 }
 
+// dpAlign finds the optimal monotonic alignment path through the candidate
+// pairs.
 func dpAlign(pairs []CuePair) []CuePair {
 	slices.SortFunc(pairs, compareCuePair)
 

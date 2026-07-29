@@ -57,7 +57,8 @@ func New[T any](ttl time.Duration) *Cache[T] {
 }
 
 // Get returns the cached value for key, or the zero value if the key is
-// absent or expired.
+// absent or expired. Get is read-only: an expired entry is reported as a miss
+// but stays in the map until it is overwritten or Clear reclaims it.
 func (c *Cache[T]) Get(key string) (T, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -121,18 +122,6 @@ func (c *Cache[T]) GetOrFetchCtx(ctx context.Context, key string, fn func(contex
 		}
 		val, _ := res.Val.(T)
 		return val, nil
-	}
-}
-
-// Reap removes expired entries.
-func (c *Cache[T]) Reap() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	now := time.Now()
-	for k, e := range c.entries {
-		if now.After(e.expires) {
-			delete(c.entries, k)
-		}
 	}
 }
 
