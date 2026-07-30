@@ -3,16 +3,12 @@ module github.com/cplieger/subflux
 go 1.26.5
 
 require (
-	// arrapi v1.7.0 is UNPUBLISHED (latest tag: v1.6.0): it ships the
-	// capture-side StatusError body sanitization via runesafe. See go.work
-	// for the local dev resolution until the tag lands.
 	github.com/cplieger/arrapi v1.8.3
 	github.com/cplieger/atomicfile/v2 v2.4.0
 	github.com/cplieger/auth/v2 v2.1.1
 	github.com/cplieger/health v1.4.0
-	// runesafe v1.2.0 is published (Untrusted provenance type +
-	// SanitizeSingleLineBounded); resolved from the proxy, no go.work rider.
-	github.com/cplieger/runesafe v1.2.1
+	github.com/cplieger/pathinside v1.0.0
+	github.com/cplieger/runesafe v1.3.0
 	github.com/cplieger/slogx v1.5.0
 	github.com/cplieger/ssrf/v3 v3.0.0
 	github.com/cplieger/webhttp v1.20.0

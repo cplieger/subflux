@@ -552,8 +552,9 @@ func TestSearchLegBudgets(t *testing.T) {
 // --- golden: result table rendering ---
 
 // TestRenderSearchResults_golden pins the result-table byte format (tier
-// labels, provider column, matched-by, 45-char release truncation, [HI]
-// suffix) against testdata/cli-search-render.golden.
+// labels, provider column, matched-by, the 42-byte release budget with its
+// marker charged inside, [HI] suffix) against
+// testdata/cli-search-render.golden.
 // Regenerate: UPDATE_GOLDEN=1 go test . -run TestRenderSearchResults_golden
 func TestRenderSearchResults_golden(t *testing.T) {
 	results := []cliSearchResult{
@@ -593,13 +594,15 @@ func TestRenderSearchResults_golden(t *testing.T) {
 }
 
 // TestRenderSearchResults_unicode_boundary: a multibyte rune crossing the
-// 42-byte truncation point must never be split (pre-fix, the byte-index
-// cut emitted invalid UTF-8 into the rendered row). The truncation keeps
-// the largest prefix within the byte budget that ends on a rune boundary,
-// then the "..." marker; pure-ASCII truncation stays byte-identical.
-// truncateRelease is runesafe.SanitizeSingleLineBounded(name, 42), so the
-// cap applies to every name over 42 bytes (the historical cut passed
-// 43-45-byte names through marker-free) and unsafe runes become spaces.
+// truncation point must never be split (pre-fix, the byte-index cut emitted
+// invalid UTF-8 into the rendered row). truncateRelease is
+// runesafe.SanitizeSingleLineCapped(name, 42, "..."), which charges the marker
+// INSIDE the 42-byte budget, so the cut lands at byte 39 and a truncated field
+// is exactly 42 bytes -- the table's real budget, where the old bounded preset
+// overshot it to 45. The truncation keeps the largest prefix within the
+// remaining budget that ends on a rune boundary, then the marker; names within
+// the budget render byte-identically to the historical output and unsafe runes
+// become spaces.
 func TestRenderSearchResults_unicode_boundary(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -608,11 +611,11 @@ func TestRenderSearchResults_unicode_boundary(t *testing.T) {
 	}{
 		{
 			// Historical pass-through window: 43-45-byte names used to render
-			// unmarked; the bounded form truncates everything over the 42-byte
-			// budget.
-			name:        "43-byte name truncates under the bounded form",
+			// unmarked; every name over the 42-byte budget now truncates, and
+			// the marker costs name bytes instead of widening the row.
+			name:        "43-byte name truncates within the 42-byte budget",
 			release:     strings.Repeat("a", 43),
-			wantRelease: strings.Repeat("a", 42) + "...",
+			wantRelease: strings.Repeat("a", 39) + "...",
 		},
 		{
 			// Single-line sanitization: an upstream-controlled name must not
@@ -623,26 +626,31 @@ func TestRenderSearchResults_unicode_boundary(t *testing.T) {
 		},
 		{
 			name: "3-byte rune split at the cut",
-			// Bytes 41..43 are 日: the naive [:42] kept one of its 3 bytes.
-			release:     strings.Repeat("a", 41) + "日本語テスト",
-			wantRelease: strings.Repeat("a", 41) + "...",
+			// Bytes 38..40 are 日: a naive [:39] would keep one of its 3 bytes.
+			release:     strings.Repeat("a", 38) + "日本語テスト",
+			wantRelease: strings.Repeat("a", 38) + "...",
 		},
 		{
 			name: "4-byte rune split at the cut",
-			// Bytes 40..43 are 😀: the cut lands two bytes in.
-			release:     strings.Repeat("a", 40) + "😀😀😀",
-			wantRelease: strings.Repeat("a", 40) + "...",
+			// Bytes 37..40 are 😀: the cut lands two bytes in.
+			release:     strings.Repeat("a", 37) + "😀😀😀",
+			wantRelease: strings.Repeat("a", 37) + "...",
 		},
 		{
 			name: "cut aligned on a rune boundary keeps the full budget",
-			// Byte 42 starts 日, so the 42-byte prefix is already valid.
-			release:     strings.Repeat("a", 42) + "日本語テ",
-			wantRelease: strings.Repeat("a", 42) + "...",
+			// Byte 39 starts 日, so the 39-byte prefix is already valid.
+			release:     strings.Repeat("a", 39) + "日本語テ",
+			wantRelease: strings.Repeat("a", 39) + "...",
 		},
 		{
 			name:        "ascii truncation unchanged",
 			release:     strings.Repeat("a", 50),
-			wantRelease: strings.Repeat("a", 42) + "...",
+			wantRelease: strings.Repeat("a", 39) + "...",
+		},
+		{
+			name:        "42-byte name fits the budget marker-free",
+			release:     strings.Repeat("a", 42),
+			wantRelease: strings.Repeat("a", 42),
 		},
 		{
 			name:        "short multibyte name passes through",
@@ -652,6 +660,11 @@ func TestRenderSearchResults_unicode_boundary(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			// The marker-inside-cap contract: no rendered release field may
+			// exceed the column's 42-byte budget, marker included.
+			if len(c.wantRelease) > 42 {
+				t.Fatalf("case expectation %q is %d bytes, over the 42-byte budget", c.wantRelease, len(c.wantRelease))
+			}
 			var buf bytes.Buffer
 			renderSearchResults(&buf, []cliSearchResult{{
 				Provider: "opensubtitles", ReleaseName: c.release,

@@ -8,18 +8,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"sync"
+
+	"github.com/cplieger/pathinside"
 )
 
 const hashBlockSize = 65536
-
-// hasDotDotSegment reports whether p contains ".." as a whole path segment
-// (real traversal), as opposed to a filename that merely contains two dots.
-func hasDotDotSegment(p string) bool {
-	return slices.Contains(strings.Split(p, string(filepath.Separator)), "..")
-}
 
 var hashBufPool = sync.Pool{
 	New: func() any {
@@ -37,9 +31,16 @@ func hashFile(ctx context.Context, path string) (hashStr string, fileSize int64,
 	// produced `path`. Read-only hashing still warrants the guard:
 	// reject non-absolute paths and ".." traversal segments. Only whole
 	// ".." segments are traversal — a filename merely containing ".."
-	// (e.g. "Show.S01E01..720p.mkv") is legitimate and must still hash.
+	// (e.g. "Show.S01E01..720p.mkv") is legitimate and must still hash,
+	// which is exactly pathinside.HasDotDot's component-precise rule.
+	// The test runs on the CLEANED path deliberately: `path` here is
+	// machine-supplied (an arr-reported file path from the media scan),
+	// not a human-written config value, so a traversal that normalizes
+	// away is a spelling of a legitimate location rather than a
+	// suspicious one — the hygiene axis's "a human would not have
+	// written it that way" argument does not apply to this input class.
 	clean := filepath.Clean(path)
-	if !filepath.IsAbs(clean) || hasDotDotSegment(clean) {
+	if !filepath.IsAbs(clean) || pathinside.HasDotDot(clean) {
 		return "", 0, fmt.Errorf("hashFile: unsafe path %q", path)
 	}
 	f, err := os.Open(clean)

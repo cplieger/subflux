@@ -468,3 +468,93 @@ func TestHandleConfigSchema_rejects_non_get(t *testing.T) {
 			rec.Code, http.StatusMethodNotAllowed)
 	}
 }
+
+// TestHandleValidatePath_traversal_guard pins both directions of the
+// validate-path traversal rule. The endpoint judges the path AS WRITTEN
+// (pathinside.HasDotDot, before cleaning), because the value the settings UI
+// keeps is the string the admin typed: validating only the cleaned form would
+// report "<dir>/sub/../.." valid on the strength of a different path than the
+// one that lands in the config. The rule is per COMPONENT, so a directory
+// whose name merely begins with or contains two dots stays valid.
+func TestHandleValidatePath_traversal_guard(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	sep := string(filepath.Separator)
+	dotsDir := filepath.Join(dir, "..extras")
+	if err := os.MkdirAll(dotsDir, 0o750); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	infixDotsDir := filepath.Join(dir, "season.1..2")
+	if err := os.MkdirAll(infixDotsDir, 0o750); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	subDir := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(subDir, 0o750); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	cases := []struct {
+		name      string
+		path      string
+		wantValid bool
+		wantErr   string
+	}{
+		// Accepted: real directories whose names contain two dots but no
+		// ".." component. A substring test would refuse all three.
+		{name: "plain directory", path: dir, wantValid: true},
+		{name: "directory beginning with double dots", path: dotsDir, wantValid: true},
+		{name: "double dots inside directory name", path: infixDotsDir, wantValid: true},
+		// Refused: a ".." component, wherever it sits. The middle case is the
+		// one a cleaning predicate would collapse and accept: it resolves
+		// back to an existing directory, so only the as-written test refuses it.
+		{
+			name:    "traversal segment refused even when it resolves inside",
+			path:    subDir + sep + ".." + sep + "sub",
+			wantErr: "path must not contain a '..' segment",
+		},
+		{
+			name:    "traversal escaping the tree refused",
+			path:    dir + sep + ".." + sep + ".." + sep + "etc",
+			wantErr: "path must not contain a '..' segment",
+		},
+		{
+			name:    "trailing traversal segment refused",
+			path:    dir + sep + "..",
+			wantErr: "path must not contain a '..' segment",
+		},
+		// Pre-existing refusals, unchanged by the traversal rule.
+		{name: "empty path refused", path: "   ", wantErr: "path is empty"},
+		{name: "relative path refused", path: "media" + sep + "tv", wantErr: "path must be absolute"},
+	}
+
+	h := New(&Deps{})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body, err := json.Marshal(map[string]string{"path": tc.path})
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			req := httptest.NewRequestWithContext(context.Background(),
+				http.MethodPost, "/api/config/validate-path", bytes.NewReader(body))
+			rec := httptest.NewRecorder()
+			h.HandleValidatePath(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("HandleValidatePath(%q) status = %d, want %d", tc.path, rec.Code, http.StatusOK)
+			}
+			var got PathValidationResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("Unmarshal(%q): %v", rec.Body.String(), err)
+			}
+			if got.Valid != tc.wantValid {
+				t.Errorf("HandleValidatePath(%q) valid = %v (error %q), want %v",
+					tc.path, got.Valid, got.Error, tc.wantValid)
+			}
+			if got.Error != tc.wantErr {
+				t.Errorf("HandleValidatePath(%q) error = %q, want %q", tc.path, got.Error, tc.wantErr)
+			}
+		})
+	}
+}

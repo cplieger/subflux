@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
 	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/pathinside"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
@@ -201,17 +201,22 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 		api.WriteJSON(w, PathValidationResponse{Error: "path must be absolute"})
 		return
 	}
-	// Clean the path and reject traversal segments before touching the
-	// filesystem. This endpoint is admin-only and read-only (os.Stat),
-	// but the explicit guard satisfies CodeQL's go/path-injection rule
-	// and prevents the cleaned/uncleaned mismatch a caller might rely on.
-	// The check is per SEGMENT, not a substring match: a directory name that
-	// merely begins with two dots (e.g. "/media/..extras") is legitimate.
-	p = filepath.Clean(p)
-	if slices.Contains(strings.Split(p, string(filepath.Separator)), "..") {
+	// Reject traversal in the path AS WRITTEN — before cleaning — then clean
+	// before touching the filesystem. This endpoint is admin-only and
+	// read-only (os.Stat), but the explicit guard satisfies CodeQL's
+	// go/path-injection rule and closes the cleaned/uncleaned mismatch a
+	// caller might rely on: the value the settings UI keeps is the one the
+	// admin typed, so a path validated only after cleaning would report
+	// "/media/tv/../../etc" valid on the strength of a different string
+	// (/etc) than the one that ends up in the config.
+	// The check is per COMPONENT, not a substring match: a directory name
+	// that merely begins with or contains two dots (e.g. "/media/..extras",
+	// "/media/a..b") is legitimate and stays valid.
+	if pathinside.HasDotDot(p) {
 		api.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
 		return
 	}
+	p = filepath.Clean(p)
 
 	info, err := os.Stat(p)
 	if err != nil {
