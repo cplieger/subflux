@@ -156,8 +156,12 @@ func TestHashFile_nonexistent(t *testing.T) {
 }
 
 // TestHashFile_path_guard pins the traversal guard: ".." is rejected only as
-// a whole path segment, so a legitimate filename containing consecutive dots
-// (e.g. "Show.S01E01..720p.mkv") still gets hash matching.
+// a whole path SEGMENT, so a legitimate filename containing consecutive dots
+// (e.g. "Show.S01E01..720p.mkv") or a directory beginning with two dots
+// ("..extras") still gets hash matching. It also pins the deliberate choice
+// of input: the guard judges the CLEANED path, so a traversal that normalizes
+// away inside an absolute media path is not a guard refusal — `path` here is
+// machine-supplied by the media scan, not a human-written config value.
 func TestHashFile_path_guard(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +171,18 @@ func TestHashFile_path_guard(t *testing.T) {
 	if err := os.WriteFile(dotsPath, data, 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
+	extrasDir := filepath.Join(dir, "..extras")
+	if err := os.MkdirAll(extrasDir, 0o750); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	extrasPath := filepath.Join(extrasDir, "Feature.mkv")
+	if err := os.WriteFile(extrasPath, data, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	// filepath.Join would clean this, so build the uncleaned spelling by hand:
+	// "<dir>/sub/../Show.S01E01..720p.mkv" cleans to the file written above.
+	sep := string(filepath.Separator)
+	uncleanedPath := dir + sep + "sub" + sep + ".." + sep + "Show.S01E01..720p.mkv"
 
 	cases := []struct {
 		name      string
@@ -174,7 +190,11 @@ func TestHashFile_path_guard(t *testing.T) {
 		wantGuard bool
 	}{
 		{name: "double dots inside filename accepted", path: dotsPath},
+		{name: "directory beginning with double dots accepted", path: extrasPath},
+		{name: "absolute traversal that cleans away is not a guard refusal", path: uncleanedPath},
 		{name: "relative dotdot segment rejected", path: "../escape.mkv", wantGuard: true},
+		{name: "bare dotdot rejected", path: "..", wantGuard: true},
+		{name: "deep relative traversal rejected", path: "../../etc/passwd", wantGuard: true},
 		{name: "relative path rejected", path: "relative/file.mkv", wantGuard: true},
 	}
 	for _, c := range cases {

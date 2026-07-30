@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/pathinside"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
@@ -247,10 +248,19 @@ func validateBackup(c *yamlBackupConfig) error {
 		{"backup.frequency", c.Frequency.D, defaults.MinBackupFrequency, false},
 	}))
 	if c.Path != "" {
+		// backup.path is a write destination (the scheduler MkdirAll's it and
+		// writes timestamped bbolt snapshots into it), so a traversal spelled
+		// in the configured value is refused. The test is per path COMPONENT:
+		// the previous strings.Contains(c.Path, "..") also refused perfectly
+		// legitimate directory names whose only sin is two adjacent dots
+		// ("/backups/a..b", "/backups/...", "/backups/..archive"), while
+		// pathinside.HasDotDot refuses exactly the ".." components —
+		// including one buried mid-path ("/backups/../etc"), which a
+		// cleaning predicate such as RelEscapes would collapse and accept.
 		if !filepath.IsAbs(c.Path) {
 			ve.Add(configFieldErr("backup.path", "backup.path must be an absolute directory"))
-		} else if strings.Contains(c.Path, "..") {
-			ve.Add(configFieldErr("backup.path", "backup.path must not contain '..'"))
+		} else if pathinside.HasDotDot(c.Path) {
+			ve.Add(configFieldErr("backup.path", "backup.path must not contain a '..' path segment"))
 		}
 	}
 	return ve.Err()

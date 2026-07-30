@@ -2,13 +2,18 @@ package config
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/cplieger/pathinside"
+	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
 // FuzzValidateBackup exercises validateBackup with arbitrary inputs, ensuring
-// it never panics, that disabled configs always pass, and that an enabled
-// config with retention < 1 always fails.
+// it never panics, that disabled configs always pass, that an enabled config
+// with retention < 1 always fails, and that the backup.path rule is exactly
+// "empty, or absolute with no '..' path component".
 func FuzzValidateBackup(f *testing.F) {
 	f.Add(true, "/tmp/backups", int64(24*time.Hour), 7)
 	f.Add(false, "", int64(0), 0)
@@ -17,6 +22,10 @@ func FuzzValidateBackup(f *testing.F) {
 	f.Add(true, "/foo/../bar", int64(time.Hour), 5)
 	f.Add(true, "/valid/path", int64(30*time.Minute), 0)
 	f.Add(true, "/ok", int64(time.Hour), -1)
+	// Legitimate destinations whose names merely contain two dots: refused by
+	// a substring test, accepted by the component-precise rule.
+	f.Add(true, "/backups/a..b", int64(time.Hour), 3)
+	f.Add(true, "/backups/..archive", int64(time.Hour), 3)
 
 	f.Fuzz(func(t *testing.T, enabled bool, path string, freqNs int64, retention int) {
 		cfg := &yamlBackupConfig{
@@ -36,6 +45,18 @@ func FuzzValidateBackup(f *testing.F) {
 		// Invariant 2: if enabled with retention < 1, must error.
 		if enabled && retention < 1 && err == nil {
 			t.Fatal("enabled backup with retention < 1 should error")
+		}
+
+		// Invariant 3: with retention and frequency in range, the only
+		// remaining rule is the path one, and it is exactly "empty, or
+		// absolute with no '..' component". Pinned against the library
+		// predicate so a regression to a substring ".." test — which would
+		// refuse legitimate names like "/backups/a..b" — fails here.
+		if enabled && retention >= 1 && time.Duration(freqNs) >= defaults.MinBackupFrequency {
+			pathOK := path == "" || (filepath.IsAbs(path) && !pathinside.HasDotDot(path))
+			if pathOK != (err == nil) {
+				t.Fatalf("validateBackup(path=%q) err = %v, want error == %v", path, err, !pathOK)
+			}
 		}
 	})
 }

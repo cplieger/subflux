@@ -8,7 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/cplieger/pathinside"
 )
 
 // Container-internal path constants (single source of truth).
@@ -74,21 +75,17 @@ func (c *Config) ValidatePath(ctx context.Context, path string) error {
 	return fmt.Errorf("path %q: %w", path, ErrPathNotAllowed)
 }
 
-// relEscapesRoot reports whether a filepath.Rel result escapes its root. A
-// cleaned relative path escapes exactly when it IS ".." or starts with
-// "../" (OS separator); a plain ".." string prefix would also reject
-// legitimate names that merely BEGIN with two dots, like "..extras/movie.mkv".
-// os.Root independently enforces containment at the syscall layer; this check
-// is the cheap first gate.
-func relEscapesRoot(rel string) bool {
-	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
 // pathUnderCachedRoot checks whether path is contained within root using
 // a pre-opened *os.Root handle. Returns false if the path escapes it.
+//
+// Two layers, and only the second is authoritative: pathinside.RelEscapes is the
+// cheap lexical first gate (separator-precise, so a legitimate name that merely
+// BEGINS with two dots like "..extras/movie.mkv" is not rejected), and the
+// os.Root handle enforces containment at the syscall layer, where a symlink
+// cannot be followed out of the tree.
 func pathUnderCachedRoot(rootDir *os.Root, root, path string) bool {
 	rel, err := filepath.Rel(root, path)
-	if err != nil || relEscapesRoot(rel) {
+	if err != nil || pathinside.RelEscapes(rel) {
 		return false
 	}
 	_, err = rootDir.Stat(rel)
@@ -108,7 +105,7 @@ func pathUnderRoot(root, path string) bool {
 	defer rootDir.Close()
 
 	rel, err := filepath.Rel(root, path)
-	if err != nil || relEscapesRoot(rel) {
+	if err != nil || pathinside.RelEscapes(rel) {
 		return false
 	}
 	_, err = rootDir.Stat(rel)
@@ -163,7 +160,7 @@ func (c *Config) removeUnderSingleRoot(i int, root, path string) (bool, error) {
 		rootDir = rd
 	}
 	rel, err := filepath.Rel(root, path)
-	if err != nil || relEscapesRoot(rel) {
+	if err != nil || pathinside.RelEscapes(rel) {
 		return false, nil
 	}
 	if err := rootDir.Remove(rel); err != nil && !errors.Is(err, fs.ErrNotExist) {

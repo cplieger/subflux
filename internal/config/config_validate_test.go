@@ -437,6 +437,49 @@ func TestValidateBackup_retention_boundary(t *testing.T) {
 	}
 }
 
+// TestValidateBackup_path_traversal pins both directions of the backup.path
+// rule. It is a per-COMPONENT ".." test (pathinside.HasDotDot), not a
+// substring test: a traversal segment anywhere in the configured destination
+// is refused — including one buried mid-path, which a cleaning predicate
+// would collapse and accept — while a directory name that merely contains or
+// begins with two dots is a legitimate destination and must be accepted.
+func TestValidateBackup_path_traversal(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{name: "plain absolute path", path: "/backups"},
+		{name: "double dots inside directory name", path: "/backups/a..b"},
+		{name: "directory beginning with double dots", path: "/backups/..archive"},
+		{name: "triple dots is a directory name", path: "/backups/..."},
+		{name: "trailing separator", path: "/backups/"},
+		{name: "leading traversal", path: "/../etc", wantErr: true},
+		{name: "traversal buried mid-path", path: "/backups/../etc", wantErr: true},
+		{name: "trailing traversal", path: "/backups/..", wantErr: true},
+		{name: "relative path", path: "backups", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := &yamlBackupConfig{
+				Enabled:   true,
+				Retention: 1,
+				Frequency: Duration{D: time.Hour},
+				Path:      tc.path,
+			}
+			err := validateBackup(c)
+			if tc.wantErr && err == nil {
+				t.Errorf("validateBackup(path=%q) = nil, want an error", tc.path)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("validateBackup(path=%q) = %v, want nil", tc.path, err)
+			}
+		})
+	}
+}
+
 func TestValidateSearch_download_max_attempts_default(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

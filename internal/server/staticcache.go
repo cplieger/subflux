@@ -47,11 +47,13 @@ var staticAssets = mustStaticHandler(staticSub)
 // handler overrides it with ETag + `no-cache` for the assets it serves
 // (headers set later replace earlier ones), so browsers revalidate assets
 // with cheap 304s instead of re-downloading the frontend every page load.
+//
+// The three-line wrapper this used to be is webhttp.NoStore() now — the same
+// fixed header, set before the next handler runs and deliberately not locked,
+// so the asset handler still wins. PLACEMENT and the override ordering stay
+// app policy (see cacheControlMW in lifecycle.go); the library exports the
+// mechanism only, which is why this stays a named app-side function rather
+// than webhttp.NoStore() spelled out at the wiring site.
 func cacheControlFor() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "no-store")
-			next.ServeHTTP(w, r)
-		})
-	}
+	return webhttp.NoStore()
 }

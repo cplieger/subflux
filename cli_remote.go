@@ -569,8 +569,8 @@ func searchOneItem(rc *searchRunConfig, item *cliResolvedItem, lang string, down
 // pinned by a golden test and must stay byte-identical to the pre-remote
 // CLI's rendering: index, [score tier], provider, matched-by, release name
 // sanitized and truncated to a 42-byte budget (rune-boundary safe, "..."
-// marker), and the [HI] suffix. Tier arrives on the wire (computed by the
-// server's scorer).
+// marker charged inside the budget), and the [HI] suffix. Tier arrives on the
+// wire (computed by the server's scorer).
 func renderSearchResults(w io.Writer, results []cliSearchResult) {
 	fmt.Fprintf(w, "  %d result(s) ranked by release quality:\n", len(results))
 	for i := range results {
@@ -585,16 +585,25 @@ func renderSearchResults(w io.Writer, results []cliSearchResult) {
 }
 
 // truncateRelease bounds a release name for the fixed-width result table:
-// runesafe's single-line preset replaces control/bidi runes (an
+// runesafe's single-line Capped primitive replaces control/bidi runes (an
 // upstream-controlled name must not forge table rows or reorder terminal
-// output) and names over 42 bytes are cut on a rune boundary with the "..."
-// marker appended (at most 45 bytes total). For pure-ASCII names within the
-// budget the output is byte-identical to the historical rendering (pinned
-// by the golden test); names of 43-45 bytes, which the historical cut
-// passed through marker-free, now truncate like everything over budget.
+// output) and a name over the 42-byte budget is cut on a rune boundary with
+// the "..." marker charged INSIDE the cap, so the rendered field is at most
+// 42 bytes — exactly the table's budget, where the bounded preset's
+// outside-the-cap marker overshot it to 45. A truncated name therefore shows
+// at most 39 bytes of name plus the marker. For names within the budget the
+// output is byte-identical to the historical rendering (pinned by the golden
+// test). The returned cut fact is discarded: the row has no column to report
+// truncation in, and the marker is the operator's cue.
 func truncateRelease(name string) string {
-	return runesafe.SanitizeSingleLineBounded(name, 42)
+	text, _ := runesafe.SanitizeSingleLineCapped(name, 42, releaseTruncMarker)
+	return text
 }
+
+// releaseTruncMarker marks a release name the table had to shorten. It is
+// charged inside truncateRelease's 42-byte budget, so it costs name bytes
+// rather than widening the row.
+const releaseTruncMarker = "..."
 
 // downloadPick posts the picked result to the download endpoint and polls
 // for the outcome. A pick beyond the result count prints a notice and
