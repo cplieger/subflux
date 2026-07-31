@@ -11,9 +11,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
@@ -241,8 +243,9 @@ type seasonEpisode struct {
 
 // --- API calls ---
 
+// findShow resolves gestdown's show ids for a TVDB id, memoized per showCacheKey.
 func (p *Provider) findShow(ctx context.Context, tvdbID int) ([]showResult, error) {
-	cacheKey := fmt.Sprintf("show:%d", tvdbID)
+	cacheKey := showCacheKey(tvdbID)
 	return p.showCache.GetOrFetch(cacheKey, func() ([]showResult, error) {
 		shows, err := p.findShowUncached(ctx, tvdbID)
 		if err != nil || len(shows) == 0 {
@@ -250,6 +253,20 @@ func (p *Provider) findShow(ctx context.Context, tvdbID int) ([]showResult, erro
 		}
 		return shows, nil
 	})
+}
+
+// showCacheKey builds the showCache key for a TVDB id.
+//
+// No component here can carry the separator: the literal is fixed and tvdbID is
+// an int, so the key is injective by construction and byte-identical to the
+// fmt.Sprintf form it replaces. It goes through keyenc anyway so this package
+// has ONE key grammar (see seasonCacheKey, whose showID genuinely can carry a
+// ':'), which is what makes a later component — a title, a language, anything
+// free-form — safe to add without re-deriving that argument. Were the key
+// forgeable, a collision would return another series' show-id list and every
+// season lookup below it would query the wrong show.
+func showCacheKey(tvdbID int) string {
+	return keyenc.Join("show", strconv.Itoa(tvdbID))
 }
 
 func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResult, error) {
@@ -279,8 +296,10 @@ func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResu
 	return result.Shows, nil
 }
 
+// searchSeasonCached fetches one season's subtitles for one language, memoized
+// per seasonCacheKey, then narrows the result to the requested episode.
 func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]api.Subtitle, error) {
-	cacheKey := fmt.Sprintf("season:%s:%d:%s", showID, season, gestLang)
+	cacheKey := seasonCacheKey(showID, season, gestLang)
 
 	allSubs, err := p.subCache.GetOrFetch(cacheKey, func() ([]api.Subtitle, error) {
 		return p.searchSeasonRetry(ctx, showID, season, gestLang, isoLang)
@@ -289,6 +308,24 @@ func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season
 		return nil, err
 	}
 	return filterByEpisode(allSubs, episode), nil
+}
+
+// seasonCacheKey builds the subCache key for one season of one language.
+//
+// showID is the one component that can carry the separator: it is gestdown's
+// own `id` field, copied verbatim out of the shows JSON, so its alphabet is the
+// remote API's choice and not ours. The other three cannot — the literal is
+// fixed, season is an int, and gestLang is a LangRegistry value ("French"), not
+// user text — which is the only reason the fmt.Sprintf form was injective: the
+// ':'-free tail pinned the showID boundary from the right. keyenc escapes
+// element-wise, so injectivity no longer depends on which field sits where. A
+// collision would hand an episode the season list cached for a DIFFERENT show
+// or language, and because those entries are then filtered only by episode
+// NUMBER, the caller would score and download another show's S01E02 subtitle
+// for this video — or an English file recorded as French. Ordinary show ids
+// (gestdown GUIDs) carry neither ':' nor '\', so the key bytes are unchanged.
+func seasonCacheKey(showID string, season int, gestLang string) string {
+	return keyenc.Join("season", showID, strconv.Itoa(season), gestLang)
 }
 
 // filterByEpisode returns only subtitles matching the given episode number.

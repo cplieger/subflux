@@ -1,9 +1,9 @@
 package manualops
 
 import (
-	"strings"
 	"sync"
 
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -59,9 +59,25 @@ func (g *quadGate) lock(key string) (unlock func()) {
 // namespace, so the gate is package-scoped rather than per-handler.
 var downloadPathGate = newQuadGate()
 
-// downloadQuadKey builds the gate key for a quad. The NUL joins cannot
-// collide with field content (media IDs and validated language codes never
-// contain control characters).
+// downloadQuadKey builds the gate key for a quad.
+//
+// One of the four components can carry a separator, and it is not the one the
+// previous comment claimed: mediaID is api.BuildEpisodeID/BuildMovieID output,
+// which falls back to the arr's raw imdbId string when TVDB/TMDB is absent, so
+// its alphabet is Sonarr/Radarr's choice rather than ours. The other three
+// genuinely cannot — api.MediaType and api.Variant are closed constant sets,
+// and lang has passed IsValidLangCode, which rejects every rune below 0x20.
+// That, not "media IDs never contain control characters", is why the old
+// NUL-joined form was injective: the single unconstrained component sat between
+// components whose alphabets pinned the field boundaries. keyenc escapes each
+// component instead, so the key stays injective without that argument — the
+// property matters because a merge would put two unrelated media items behind
+// ONE mutex, serializing an ordinal allocation and its atomic write against a
+// download that has nothing to do with them (distinct quads still write
+// distinct numbered paths, so a merge costs latency, not files).
+//
+// The key bytes change (NUL joins become ':'); the gate map is process-local
+// and rebuilt per run, so no persisted or cross-process value depends on them.
 func downloadQuadKey(mt api.MediaType, mediaID, lang string, variant api.Variant) string {
-	return strings.Join([]string{string(mt), mediaID, lang, string(variant)}, "\x00")
+	return keyenc.Join(string(mt), mediaID, lang, string(variant))
 }

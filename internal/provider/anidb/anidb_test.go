@@ -314,9 +314,13 @@ func TestBuildEpisodeCacheKey(t *testing.T) {
 func TestBuildEpisodeCacheKey_matches_getEpisodeID_format(t *testing.T) {
 	t.Parallel()
 
-	// Regression guard: getEpisodeID builds cache keys via fmt.Sprintf("%d:%d",
-	// seriesID, episodeNo). buildEpisodeCacheKey must produce the same string
-	// for numeric inputs, otherwise every numeric lookup silently misses.
+	// Regression guard: getEpisodeID builds its cache key from two ints and
+	// buildEpisodeCacheKey from a series id plus the XML episode string. Both go
+	// through keyenc.Join, and the literal below is the byte-identity oracle —
+	// the encoding must still spell a numeric key exactly as the previous
+	// fmt.Sprintf("%d:%d") form did, otherwise every numeric lookup silently
+	// misses. TestEpisodeCacheKeyBuildersAgree checks the same agreement through
+	// the real read path.
 	seriesID, epNo := 1234, 7
 	getKey := fmt.Sprintf("%d:%d", seriesID, epNo)
 	if builtKey := buildEpisodeCacheKey(seriesID, strconv.Itoa(epNo)); builtKey != getKey {
