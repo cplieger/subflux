@@ -140,6 +140,17 @@ func TestExtractReleaseSeason(t *testing.T) {
 		{"season only", "Show.S05.1080p", 5},
 		{"season with episode", "Series.S12E03.720p", 12},
 		{"no season marker", "Great.Film.2020.1080p.WEB", 0},
+
+		// Wide digit runs, pinned when the season regex moved from the
+		// bounded S(\d{1,2}) to epmarker's whole-run reading. The bounded
+		// reading truncated: it read "S001" as season 0, "S100" as season 10,
+		// and a 20-digit run as season 99.
+		{"zero-padded season reads whole", "Show.S001E01.720p", 1},
+		{"three-digit season reads whole", "Show S100E200.srt", 100},
+		{"digits too wide to parse are no season", "Show.S99999999999999999999E01.mkv", 0},
+		// Not a season at all either way; pinned because the bounded reading
+		// truncated the year into a plausible-looking "season 20".
+		{"year after s reads whole", "Kids.s2019.1080p", 2019},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -172,6 +183,14 @@ func TestReleaseNameMatchesTitle(t *testing.T) {
 		{"sequel token after space rejected", "dragon ball", "dragon ball z", false},
 		{"title before episode marker matches", "Breaking Bad", "Breaking.Bad.S01E01.720p", true},
 		{"different title before episode marker rejected", "The Office", "Breaking.Bad.S01E01.720p", false},
+
+		// The title is cut at the first marker-shaped token. Pinned when the
+		// marker regex moved from the bounded S\d{1,2}E\d{1,3} to epmarker's
+		// whole-run reading: the bounded regex missed the zero-padded marker
+		// entirely, fell through to the looser substring path, and accepted
+		// "Show" against a release for a different show.
+		{"zero-padded marker still cuts the title", "Show", "Other.Show.S001E01.720p", false},
+		{"zero-padded marker keeps the real title", "Other Show", "Other.Show.S001E01.720p", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

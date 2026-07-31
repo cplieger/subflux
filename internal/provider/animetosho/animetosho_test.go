@@ -510,6 +510,13 @@ func TestFileMatchesEpisodeAbsoluteNumber(t *testing.T) {
 		{"absolute ignored when equal to aired", "Show - 05.mkv", 1, 5, 5, true},
 		{"absolute zero never probes", "Show - 00.mkv", 2, 1, 0, false},
 		{"SxxExx present disables fallback", "Show S01E01 - 26.mkv", 2, 1, 26, false},
+		// The fallback gate is marker SHAPE, not a readable marker: a season
+		// number too wide to parse is still an explicit S##E## numbering, so
+		// the absolute-number probe must stay off.
+		{
+			"unreadable SxxExx also disables fallback",
+			"Show S99999999999999999999E01 - 26.mkv", 2, 1, 26, false,
+		},
 	}
 
 	for _, tt := range tests {
