@@ -180,6 +180,8 @@ ARG CPLIEGER_REACTIVE_VERSION=1.2.5
 ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.0.0
 # renovate: datasource=npm depName=@cplieger/fetch
 ARG CPLIEGER_FETCH_VERSION=2.1.0
+# renovate: datasource=npm depName=@cplieger/keyenc
+ARG CPLIEGER_KEYENC_VERSION=1.0.1
 
 # Pin gate (client-bundle parity, the web-terminal-kiro pattern): the SERVED
 # client compiles from the ARG-pinned npm tarballs below, while
@@ -201,7 +203,8 @@ RUN check_pin() { \
     check_pin actions "$CPLIEGER_ACTIONS_VERSION" && \
     check_pin reactive "$CPLIEGER_REACTIVE_VERSION" && \
     check_pin ui-primitives "$CPLIEGER_UI_PRIMITIVES_VERSION" && \
-    check_pin fetch "$CPLIEGER_FETCH_VERSION"
+    check_pin fetch "$CPLIEGER_FETCH_VERSION" && \
+    check_pin keyenc "$CPLIEGER_KEYENC_VERSION"
 
 RUN mkdir -p node_modules/@cplieger/actions && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/actions/-/actions-${CPLIEGER_ACTIONS_VERSION}.tgz" \
@@ -215,6 +218,9 @@ RUN mkdir -p node_modules/@cplieger/ui-primitives && \
 RUN mkdir -p node_modules/@cplieger/fetch && \
     curl -fsSL "https://registry.npmjs.org/@cplieger/fetch/-/fetch-${CPLIEGER_FETCH_VERSION}.tgz" \
       | tar -xz -C node_modules/@cplieger/fetch --strip-components=1
+RUN mkdir -p node_modules/@cplieger/keyenc && \
+    curl -fsSL "https://registry.npmjs.org/@cplieger/keyenc/-/keyenc-${CPLIEGER_KEYENC_VERSION}.tgz" \
+      | tar -xz -C node_modules/@cplieger/keyenc --strip-components=1
 
 # Type gate: tsconfig.json is noEmit, so this only typechecks the app
 # sources against the pinned @cplieger lib sources fetched above — a lib/app

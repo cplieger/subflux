@@ -89,8 +89,10 @@ packages → `internal/api/`. There are no reverse imports.
 TypeScript typechecked by tsc (`--noEmit`) and bundled by esbuild via its Go
 API (`go run ./cmd/bundle`; no Node in the build). There is no framework;
 reactivity comes from `@cplieger/reactive`, user-initiated mutations go
-through `@cplieger/actions`, HTTP through `@cplieger/fetch`, and
-toasts/dialogs/tooltips from `@cplieger/ui-primitives`. Generated wire types
+through `@cplieger/actions`, HTTP through `@cplieger/fetch`,
+toasts/dialogs/tooltips from `@cplieger/ui-primitives`, and composite keys
+(collection identities, dedupe keys, render signatures) from
+`@cplieger/keyenc`. Generated wire types
 live under `static-src/wire/` (see below). CSS is split per feature and
 concatenated via `MANIFEST` files by the same bundle command.
 

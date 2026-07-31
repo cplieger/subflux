@@ -14,11 +14,23 @@
 // same media.
 
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
+import { join } from "@cplieger/keyenc";
 import { PATH_SYNC_AUDIO, PATH_SYNC_OFFSET } from "./wire/client.gen.js";
 import { decodeSyncAudioResponse } from "./wire/decoders.gen.js";
 import type { SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
 import type { SyncAudioResponse } from "./api-types.js";
 import { refKey } from "./file-ref.js";
+
+// Both dedupe keys nest `refKey(args)`, which is itself a keyenc value, so the
+// OUTER key is a `join` too: nesting is composition, and a raw
+// `sync.audio:${refKey(args)}` would reintroduce the forgeable shape one level
+// up (an inner value may legitimately carry escaped separators, and the outer
+// join must still treat the whole thing as ONE component).
+//
+// These keys never leave the browser. They live in the actions framework's
+// in-flight dedupe map only: the wire `Idempotency-Key` header is populated
+// from a definition's separate `idempotencyKey` field, which subflux sets on no
+// action, and the Go server has no Idempotency-Key middleware to read one.
 
 /** Audio-sync analysis. Long-running (FFmpeg + correlation), retryable on
  *  network failures. dedupe by FileRef so a second click on the same row
@@ -27,7 +39,7 @@ export const audioSyncAction = apiAction<SyncAudioRequest, SyncAudioResponse>({
   name: "sync.audio",
   request: (args) => ({ method: "POST", path: PATH_SYNC_AUDIO, body: args }),
   decode: (data) => decodeSyncAudioResponse(data),
-  dedupe: (args) => `sync.audio:${refKey(args)}`,
+  dedupe: (args) => join("sync.audio", refKey(args)),
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
   error: false, // callers handle inline result UI; toast would be redundant
@@ -38,7 +50,7 @@ export const audioSyncAction = apiAction<SyncAudioRequest, SyncAudioResponse>({
 export const saveManualOffsetAction = apiAction<SyncOffsetRequest>({
   name: "sync.save_offset",
   request: (args) => ({ method: "POST", path: PATH_SYNC_OFFSET, body: args }),
-  dedupe: (args) => `sync.save_offset:${refKey(args)}:${args.offset_ms}`,
+  dedupe: (args) => join("sync.save_offset", refKey(args), String(args.offset_ms)),
   retryable: retryNetwork,
   retry: RETRY_STANDARD,
   error: "Save failed",
