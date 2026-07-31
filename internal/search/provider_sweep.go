@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 	"golang.org/x/sync/errgroup"
 )
@@ -88,6 +88,18 @@ func (e *Engine) searchProvidersFiltered(ctx context.Context,
 
 // buildSearchKey produces a stable singleflight key from request inputs.
 // Two callers with the same key share a single underlying provider sweep.
+//
+// The key is assembled with keyenc rather than by concatenating with a
+// separator, because three of its six fields can contain one. A collision here
+// is not a cache miss: two different requests share one flight, and the second
+// caller receives the FIRST request's subtitle results for its own video. The
+// naive form was forgeable through the middle of the key, where BuildMediaID,
+// the language list and the video path sit adjacent — a configured language
+// code carrying the separator, or a malformed media id, shifts the split and
+// makes two distinct sweeps look identical. The language and provider lists
+// nest by composition (an inner keyenc value escaped again as one outer
+// component) so a separator inside one language code cannot be read as a field
+// boundary either.
 func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 	names := make([]string, len(providers))
 	for i, p := range providers {
@@ -99,19 +111,14 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 	langs := append([]string(nil), req.Languages...)
 	sort.Strings(langs)
 
-	var b strings.Builder
-	b.WriteString(string(req.MediaType))
-	b.WriteByte('|')
-	b.WriteString(api.BuildMediaID(req))
-	b.WriteByte('|')
-	b.WriteString(strings.Join(langs, ","))
-	b.WriteByte('|')
-	b.WriteString(req.VideoPath)
-	b.WriteByte('|')
-	b.WriteString(req.VideoHash)
-	b.WriteByte('|')
-	b.WriteString(strings.Join(names, ","))
-	return b.String()
+	return keyenc.Join(
+		string(req.MediaType),
+		api.BuildMediaID(req),
+		keyenc.Join(langs...),
+		req.VideoPath,
+		req.VideoHash,
+		keyenc.Join(names...),
+	)
 }
 
 // searchProvidersFilteredInner does the actual provider sweep — wrapped by

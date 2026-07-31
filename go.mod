@@ -36,6 +36,8 @@ require github.com/cplieger/xmlx v1.0.0
 
 require github.com/cplieger/httpx/v4 v4.2.1
 
+require github.com/cplieger/keyenc v1.0.0
+
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/cplieger/envx v1.5.1

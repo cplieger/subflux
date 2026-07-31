@@ -16,6 +16,8 @@ github.com/cplieger/httpx/v4 v4.2.1 h1:KrkuZKrOVWD8EoDXW16DJhvN+68Zm+FbSEVtn4ZNv
 github.com/cplieger/httpx/v4 v4.2.1/go.mod h1:bfJDGEQRWEwLu6mlwk49PfDIAETABwhlp+DAWFXo8XE=
 github.com/cplieger/jsonx v1.3.0 h1:m6rpdqXD2nZ74CguFaFXHmaS+V9Em9YVwsPN/X8FPWo=
 github.com/cplieger/jsonx v1.3.0/go.mod h1:6EoDR/SptVUcpEx+YyZcvGym6Je9vBPmhEwG/BwAVv8=
+github.com/cplieger/keyenc v1.0.0 h1:JcFP/Eo+vCWXOyRvUCIVXyJIUOtfy0GkKgOXKE+vU2Q=
+github.com/cplieger/keyenc v1.0.0/go.mod h1:p1k0R76F3pZH5i+OrNd3UazKrcsYL26H3kXly083ozA=
 github.com/cplieger/metrics/v3 v3.0.1 h1:hyEQgUZOXumW1rGMtAk29rLjy2xFAO3RWbd6kzclEHg=
 github.com/cplieger/metrics/v3 v3.0.1/go.mod h1:EghyCDLd5c24KYisJ+tasMxIzC/jHaY31Cklb2Zxw/s=
 github.com/cplieger/pathinside v1.0.0 h1:w58q7tntX7VcVnDmF4r/FNKnvl1yLq4tDac845XTdBU=
