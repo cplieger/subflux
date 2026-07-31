@@ -10,13 +10,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/anidb"
@@ -326,9 +326,6 @@ type attachmentInfo struct {
 	Name string `json:"name"`
 }
 
-// episodeRe matches S01E01 patterns in filenames (case-insensitive).
-var episodeRe = regexp.MustCompile(`(?i)S(\d+)E(\d+)`)
-
 // filterCompleteEntries returns entries with status "complete", capped at
 // maxSearchEntries. Pure function extracted from searchEntries for
 // testability.
@@ -444,29 +441,24 @@ func fileMatchesEpisode(filename string, season, episode, absEpisode int) bool {
 	if filename == "" {
 		return false
 	}
-	matches := episodeRe.FindAllStringSubmatch(filename, -1)
-	for _, m := range matches {
-		s, sErr := strconv.Atoi(m[1])
-		e, eErr := strconv.Atoi(m[2])
-		if sErr != nil || eErr != nil {
-			continue
-		}
-		if s == season && e == episode {
+	for _, m := range epmarker.Find(filename) {
+		if m.Season == season && m.Episode == episode {
 			return true
 		}
 	}
 	// Also try matching " - EP " or " - NN " patterns common in anime.
 	// Only match if the entry has no S##E## pattern at all (pure absolute).
-	if len(matches) == 0 {
-		if standaloneNumberMatch(filename, episode) {
-			return true
-		}
-		if absEpisode > 0 && absEpisode != episode &&
-			standaloneNumberMatch(filename, absEpisode) {
-			return true
-		}
+	// Presence is checked at the marker-shape level, not against the parsed
+	// markers above: a name carrying an unreadable marker still numbers its
+	// episodes explicitly, so it must not fall through to absolute numbering.
+	if epmarker.Present(filename) {
+		return false
 	}
-	return false
+	if standaloneNumberMatch(filename, episode) {
+		return true
+	}
+	return absEpisode > 0 && absEpisode != episode &&
+		standaloneNumberMatch(filename, absEpisode)
 }
 
 // standaloneNumberMatch probes a filename for the standalone episode-number

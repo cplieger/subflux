@@ -2,10 +2,10 @@ package scoring
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/epmarker"
 )
 
 // AnyTitleMatches reports whether candidate matches the primary title or any
@@ -72,21 +72,11 @@ func matchesPair(subSeason, subEpisode, candSeason, candEpisode int) bool {
 	return seasonOK && episodeOK
 }
 
-// SeasonEpRe matches S##E## episode markers in release names (e.g. S01E03).
-var (
-	SeasonEpRe   = regexp.MustCompile(`(?i)S\d{1,2}E\d{1,3}`)
-	SeasonOnlyRe = regexp.MustCompile(`(?i)S(\d{1,2})(?:E\d{1,3})?`)
-)
-
 // ExtractReleaseSeason extracts the season number from a release name via the
 // S##E## or S## pattern. Returns 0 if no season marker is found.
 func ExtractReleaseSeason(releaseName string) int {
-	m := SeasonOnlyRe.FindStringSubmatch(releaseName)
-	if m == nil {
-		return 0
-	}
-	n, err := strconv.Atoi(m[1])
-	if err != nil {
+	n, ok := epmarker.Season(releaseName)
+	if !ok {
 		return 0
 	}
 	return n
@@ -97,9 +87,8 @@ func ExtractReleaseSeason(releaseName string) int {
 // NormalizeTitle(release name with group tags stripped): AnyReleaseNameMatches
 // computes it once and reuses it across the primary and alternative titles.
 func releaseNameMatchesTitleWith(reqTitle, releaseName, normalizedCleaned string) bool {
-	loc := SeasonEpRe.FindStringIndex(releaseName)
-	if loc != nil {
-		return TitlesMatch(reqTitle, releaseName[:loc[0]])
+	if idx := epmarker.FirstIndex(releaseName); idx >= 0 {
+		return TitlesMatch(reqTitle, releaseName[:idx])
 	}
 	a := NormalizeTitle(reqTitle)
 	b := normalizedCleaned
@@ -155,7 +144,11 @@ func NormalizeTitle(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// IsSeasonPack returns true if the release name looks like a season pack.
+// IsSeasonPack returns true if the release name looks like a season pack:
+// it carries a readable season marker and no episode marker at all.
 func IsSeasonPack(releaseName string) bool {
-	return SeasonOnlyRe.MatchString(releaseName) && !SeasonEpRe.MatchString(releaseName)
+	if _, ok := epmarker.Season(releaseName); !ok {
+		return false
+	}
+	return !epmarker.Present(releaseName)
 }

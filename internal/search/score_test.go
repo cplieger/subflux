@@ -171,6 +171,14 @@ func TestIsSeasonPack(t *testing.T) {
 		{"lowercase s01e01", "show.s01e01.720p-grp", false},
 		{"multi-digit season S12", "Show.S12.Complete-GRP", true},
 		{"multi-digit episode S01E101", "Show.S01E101.720p-GRP", false},
+
+		// A wide season is still an episode, not a pack. Pinned when the
+		// marker regex moved from the bounded S\d{1,2}E\d{1,3} to epmarker's
+		// whole-run reading: the bounded regex could not see these markers, so
+		// it classified each single episode as a season pack.
+		{"zero-padded season episode is not a pack", "Show.S001E01.720p", false},
+		{"three-digit season episode is not a pack", "Show S100E200.srt", false},
+		{"unparseable marker is not a pack", "Show.S99999999999999999999E01.mkv", false},
 	}
 
 	for _, tt := range tests {

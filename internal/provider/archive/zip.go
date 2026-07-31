@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
@@ -110,9 +111,6 @@ func ReadZipEntry(f *zip.File) []byte {
 	return content
 }
 
-// episodeRe matches S##E## patterns in filenames.
-var episodeRe = regexp.MustCompile(`(?i)S(\d+)E(\d+)`)
-
 // multiEpRe matches multi-episode ranges like E01E02, E01-E02, E01-02.
 // Requires either a second E prefix or a separator (- or .) between episode
 // numbers to avoid matching single episodes (e.g. E05 as range [0,5]).
@@ -140,20 +138,17 @@ func MatchesMultiEpisodeRange(base string, episode int) bool {
 
 // MatchesEpisode checks if a filename contains the target season+episode.
 // Handles multi-episode files (S01E01E02, S01E01-E02, S01E01-02).
+// Only the last path element is considered: a directory name in the archive
+// path must not decide which episode a member file is.
 func MatchesEpisode(name string, season, episode int) bool {
 	base := filepath.Base(name)
 
 	// Single pass: check standard S##E## and track whether the season matches.
 	seasonMatched := false
-	for _, m := range episodeRe.FindAllStringSubmatch(base, -1) {
-		s, sErr := strconv.Atoi(m[1])
-		e, eErr := strconv.Atoi(m[2])
-		if sErr != nil || eErr != nil {
-			continue
-		}
-		if s == season {
+	for _, m := range epmarker.Find(base) {
+		if m.Season == season {
 			seasonMatched = true
-			if e == episode {
+			if m.Episode == episode {
 				return true
 			}
 		}
