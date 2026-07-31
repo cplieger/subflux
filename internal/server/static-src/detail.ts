@@ -37,6 +37,7 @@ import type {
   SeriesItem,
 } from "./api-types.js";
 import { patch, createCollection, bindList, type ListSpec } from "@cplieger/reactive";
+import { join } from "@cplieger/keyenc";
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
 // on internal navigation (each new openSeriesDetail/openMovieDetail aborts
@@ -87,6 +88,26 @@ function disposeMovieBinding(): void {
  *  (which, unlike `el`, does not skip nulls). */
 function compact(nodes: (HTMLElement | null)[]): HTMLElement[] {
   return nodes.filter((n): n is HTMLElement => n !== null);
+}
+
+/**
+ * Index key for one (language, variant) pair.
+ *
+ * ONE helper for every producer and every consumer on purpose: the subtitle
+ * index is BUILT from the stored files' language/variant and LOOKED UP with the
+ * config target's language/variant, so both ends have to encode identically. If
+ * only one side moved, every lookup would miss and every row would render as
+ * uncovered.
+ *
+ * keyenc-encoded rather than pipe-joined: both fields reach the browser from
+ * the operator's config.yaml (language rules are validated for non-emptiness
+ * only), so a value carrying the separator used to shift the field split and
+ * let two different targets share one bucket. Ordinary codes contain neither
+ * reserved character and so encode verbatim — the separator itself is the only
+ * byte that changed.
+ */
+function langVariantKey(lang: string, variant: string): string {
+  return join(lang, variant);
 }
 
 // --- API response shapes ---
@@ -279,7 +300,7 @@ function collectSeasonSyncEps(
     const mediaId = tvdbMediaId(series.tvdb_id, sg.season, ep.episode);
     const subs = subIdx[mediaId] ?? {};
     for (const t of targetLangs) {
-      const key = `${t.lang}|${t.variant}`;
+      const key = langVariantKey(t.lang, t.variant);
       const entries = subs[key];
       if (entries) {
         for (const sub of entries) {
@@ -347,7 +368,23 @@ function detailRowKey(r: DetailRow): string {
 
 /** Content signature for an episode row: every field that drives the coverage
  *  cell (per-lang entry source/codec/score/path) plus history-button presence.
- *  Stable across a refresh that did not touch this episode -> update no-op. */
+ *  Stable across a refresh that did not touch this episode -> update no-op.
+ *
+ *  Assembled with keyenc at every level instead of a separator per level
+ *  (`:` within an entry, `,` between entries, `|` between targets, `#`
+ *  between sections). Nesting is composition: an inner list gets its own
+ *  `join` and that RESULT becomes one component of the level above, which
+ *  re-escapes it — so a codec or source carrying a separator can no longer
+ *  make two different coverage states produce the same signature. The cost of
+ *  a collision here is bounded: the signature is only compared against the
+ *  row's `data-sig`, so a collision skips a repaint that was needed (a stale
+ *  coverage badge until the next change), never a wrong entity.
+ *
+ *  One consequence to expect when reading a signature by hand: a single target
+ *  with no entries encodes as one empty component, which keyenc hashes rather
+ *  than let it alias the no-component encoding — so an uncovered single-target
+ *  row carries a `sha256:` block. Deterministic and still injective; the
+ *  signature is never split back, only compared. */
 function epSig(
   subs: Partial<Record<string, SubtitleEntry[]>>,
   targetLangs: { lang: string; variant: string }[],
@@ -355,19 +392,21 @@ function epSig(
 ): string {
   let parts: string;
   if (targetLangs.length > 0) {
-    parts = targetLangs
-      .map((t) => {
-        const entries = subs[`${t.lang}|${t.variant}`] ?? [];
-        return entries
-          .map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}:${e.ordinal ?? 0}`)
-          .join(",");
-      })
-      .join("|");
+    parts = join(
+      ...targetLangs.map((t) => {
+        const entries = subs[langVariantKey(t.lang, t.variant)] ?? [];
+        return join(
+          ...entries.map((e) =>
+            join(e.source, e.codec ?? "", String(e.score ?? 0), String(e.ordinal ?? 0)),
+          ),
+        );
+      }),
+    );
   } else {
-    parts = `subs:${Object.keys(subs).length}`;
+    parts = join("subs", String(Object.keys(subs).length));
   }
-  const ic = [...store.get("ignoredCodecs")].sort().join(",");
-  return `${parts}#h:${hasHistory ? 1 : 0}#i:${ic}`;
+  const ic = join(...[...store.get("ignoredCodecs")].sort());
+  return join(parts, hasHistory ? "1" : "0", ic);
 }
 
 // Column header labels (recreated per season since DOM nodes can only appear
@@ -388,7 +427,7 @@ function episodeCoverageChildren(row: DetailEpRow): HTMLElement[] {
   const { subs, targetLangs } = row;
   if (targetLangs.length > 0) {
     return targetLangs.map((t) => {
-      const key = `${t.lang}|${t.variant}`;
+      const key = langVariantKey(t.lang, t.variant);
       const entries = subs[key];
       const langAttr = fmtLangVariant(t.lang, t.variant);
       return coverageBadge(entries ?? null, langAttr);
@@ -421,7 +460,7 @@ function episodeActionChildren(row: DetailEpRow): (HTMLElement | null)[] {
 
   const extEpSubs: SubtitleEntry[] = [];
   for (const t of targetLangs) {
-    const key = `${t.lang}|${t.variant}`;
+    const key = langVariantKey(t.lang, t.variant);
     const entries = subs[key];
     if (entries) {
       for (const sub of entries) {
@@ -747,11 +786,12 @@ export function renderSeriesDetail(
     variant: t.variant,
   }));
 
-  // Index subtitle files by media_id, then by lang|variant.
+  // Index subtitle files by media_id, then by lang|variant (langVariantKey —
+  // the same encoding the per-row lookups below use).
   const byMedia = Object.groupBy(subFiles, (f) => f.media_id);
   const subIdx: Record<string, Partial<Record<string, SubtitleEntry[]>>> = {};
   for (const [mediaId, files] of Object.entries(byMedia)) {
-    subIdx[mediaId] = Object.groupBy(files ?? [], (f) => `${f.language}|${f.variant}`);
+    subIdx[mediaId] = Object.groupBy(files ?? [], (f) => langVariantKey(f.language, f.variant));
   }
 
   if (seasons.length === 0) {
@@ -851,7 +891,7 @@ export function renderSeriesDetail(
 
 // One language-target row of the movie detail table.
 interface MovieRow {
-  key: string; // `${language}|${variant}`
+  key: string; // langVariantKey(language, variant)
   label: string;
   entries: SubtitleEntry[];
   lang: string; // target language code (for the Search popup)
@@ -860,10 +900,12 @@ interface MovieRow {
 }
 
 /** Content signature for a movie language row: the entries' source/codec/score
- *  (everything the coverage badges render). */
+ *  (everything the coverage badges render). Same nested-`join` assembly as
+ *  `epSig`, for the same reason and with the same bounded cost: a collision
+ *  skips a needed repaint (a stale badge), it never misidentifies a row. */
 function movieSig(entries: SubtitleEntry[]): string {
-  const ic = [...store.get("ignoredCodecs")].sort().join(",");
-  return `${entries.map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}`).join(",")}#i:${ic}`;
+  const ic = join(...[...store.get("ignoredCodecs")].sort());
+  return join(join(...entries.map((e) => join(e.source, e.codec ?? "", String(e.score ?? 0)))), ic);
 }
 
 /** Coverage-cell children for a movie row (codec-grouped badges, or the empty
@@ -1043,9 +1085,9 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
     return;
   }
 
-  const subIdx = Object.groupBy(subs, (s) => `${s.language}|${s.variant}`);
+  const subIdx = Object.groupBy(subs, (s) => langVariantKey(s.language, s.variant));
   const rows: MovieRow[] = targets.map((t) => {
-    const key = `${t.language}|${t.variant}`;
+    const key = langVariantKey(t.language, t.variant);
     const entries = (subIdx as Record<string, SubtitleEntry[] | undefined>)[key] ?? [];
     const label = langName(t.language) + (t.variant !== DEFAULT_VARIANT ? ` (${t.variant})` : "");
     return { key, label, entries, lang: t.language, movie: m, sig: movieSig(entries) };

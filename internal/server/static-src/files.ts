@@ -26,6 +26,7 @@ import { openSyncDialog } from "./sync.js";
 import { subtitleRef } from "./file-ref.js";
 import type { MediaType } from "./api-types.js";
 import { computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import { join } from "@cplieger/keyenc";
 
 // --- API response shapes ---
 
@@ -37,8 +38,19 @@ interface BulkDeleteResponse {
 // so the table and the collection both deal exclusively with externals. The
 // FileRef tuple is unique per stored external file (ordinal separates manual
 // siblings); orphans key on their unique per-listing handle.
+//
+// keyenc-encoded rather than pipe-joined: `language` and `variant` come from
+// the operator's config.yaml via the stored row, so a value carrying the
+// separator used to shift the field split and let two different files collapse
+// onto one key. `createCollection` dedupes by key, so the loser DISAPPEARS from
+// the file manager — and with no row there is no delete button, making that
+// file undeletable from the UI. `join` escapes the separator inside each
+// component instead, so no field's content can forge another field's boundary.
+//
+// The orphan short-circuit stays: an orphan handle is a server-minted 32-hex
+// token, already a single unforgeable component.
 const fileKey = (f: FileEntry): string =>
-  f.orphan_handle ?? `${f.media_id}|${f.language}|${f.variant}|${f.ordinal ?? 0}`;
+  f.orphan_handle ?? join(f.media_id, f.language, f.variant, String(f.ordinal ?? 0));
 const files = createCollection<FileEntry>(fileKey);
 
 let currentMediaType: MediaType | "" = "";
@@ -401,7 +413,11 @@ const deleteFileAction = apiAction<FileEntry, unknown, DeleteFileOp>({
     }
     files.upsert(op.entry);
   },
-  dedupe: (f) => `files.delete:${fileKey(f)}`,
+  // Nesting is composition: fileKey is itself a keyenc value, so the outer key
+  // must be a `join` too. A raw `files.delete:${fileKey(f)}` would reintroduce
+  // the forgeable shape one level up, because the inner value legitimately
+  // contains escaped separators.
+  dedupe: (f) => join("files.delete", fileKey(f)),
   success: "File deleted",
   error: "Delete failed",
   retryable: retryNetwork,

@@ -50,6 +50,7 @@ vi.mock("./store.js", () => ({
 }));
 
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
+import { split } from "@cplieger/keyenc";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
 
 const STAR = "\u2605"; // ★ — score prefix in coverage badge detail
@@ -150,6 +151,29 @@ function covText(row: Element | null): string {
   return row.querySelector("td.ep-coverage")?.textContent ?? "";
 }
 
+function reqRow(row: Element | null): HTMLElement {
+  if (!(row instanceof HTMLElement)) {
+    throw new Error("row missing");
+  }
+  return row;
+}
+
+function reqSig(row: Element | null): string {
+  const sig = reqRow(row).dataset["sig"];
+  if (sig === undefined) {
+    throw new Error("row carries no data-sig");
+  }
+  return sig;
+}
+
+/** The pre-keyenc per-entry / per-target block, kept so the collisions it
+ *  allowed are pinned as facts rather than described in comments. */
+function pipeJoinedEntryBlock(entries: SubtitleEntry[]): string {
+  return entries
+    .map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}:${e.ordinal ?? 0}`)
+    .join(",");
+}
+
 describe("detail: renderSeriesDetail", () => {
   beforeEach(() => {
     // The real dom.js `$.coverageContent` getter reads #coverageContent; the
@@ -230,6 +254,97 @@ describe("detail: renderSeriesDetail", () => {
     expect(tbodyB.textContent).toContain("Bravo One");
     expect(tbodyB.textContent).not.toContain("Pilot");
   });
+
+  it("keeps two targets in separate buckets where the pipe-joined index key collapsed them", () => {
+    // The subtitle index is BUILT from each stored file's language/variant and
+    // LOOKED UP with the config target's, so both ends run through the same
+    // langVariantKey. The old `${lang}|${variant}` read both targets below as
+    // "fr|forced|standard", so a file stored for the SECOND target also
+    // satisfied the first: one download lit up two coverage badges.
+    const series: SeriesItem = {
+      ...makeSeries(300, "Show C"),
+      targets: [
+        { language: "fr|forced", variant: "standard", have: 0, total: 1, have_ignored: 0 },
+        { language: "fr", variant: "forced|standard", have: 0, total: 1, have_ignored: 0 },
+      ],
+    };
+    expect(`${series.targets[0]?.language}|${series.targets[0]?.variant}`).toBe(
+      `${series.targets[1]?.language}|${series.targets[1]?.variant}`,
+    ); // the defect
+    const stored: SubtitleEntry = {
+      media_id: "tvdb-300-s01e01",
+      language: "fr",
+      variant: "forced|standard",
+      source: "external",
+      codec: "srt",
+      score: 80,
+      ordinal: 0,
+    };
+
+    renderSeriesDetail(series, makeSeasons("Pilot", "Second", "Return"), [stored], new Set());
+
+    // First target uncovered (dash), second covered — not both covered.
+    expect(covText(seriesTbody().children.item(2))).toBe(
+      `fr|forced${DASH}fr(forced|standard)srt: ext ${STAR}80`,
+    );
+  });
+
+  it("assembles the row signature as nested joins that split back level by level", () => {
+    // The signature nests three levels (entry fields, entries within a target,
+    // targets within the row) plus the history/ignored-codec sections. Nesting
+    // is composition: each level is its own join whose RESULT is one component
+    // of the level above, so every level splits back unambiguously and the leaf
+    // stays byte-identical to the old `source:codec:score:ordinal` form. (The
+    // outer levels re-escape the inner separators — by design, and invisible
+    // because the signature is only ever compared against data-sig.)
+    renderSeriesDetail(
+      makeSeries(302, "Show E"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [epSub("tvdb-302-s01e01", 80)],
+      new Set(),
+    );
+
+    const [targetsBlock, history, ignoredCodecs] = split(reqSig(seriesTbody().children.item(2)));
+    expect([history, ignoredCodecs]).toEqual(["0", ""]);
+    const [enBlock] = split(targetsBlock ?? "");
+    const [entry] = split(enBlock ?? "");
+    expect(entry).toBe("external:srt:80:0");
+    expect(split(entry ?? "")).toEqual(["external", "srt", "80", "0"]);
+  });
+
+  it("repaints an episode where the old signature collapsed two coverage states", () => {
+    const series = makeSeries(301, "Show D"); // single en/standard target
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    const entry = (source: string, codec: string): SubtitleEntry => ({
+      media_id: "tvdb-301-s01e01",
+      language: "en",
+      variant: "standard",
+      source,
+      codec,
+      score: 0,
+      ordinal: 0,
+    });
+    // Two entries, versus one entry whose codec reproduces their joined form.
+    // The old signature separated entry fields with ':' and entries with ',',
+    // so "external:srt:0:0,x:srt:0:0" was reachable both ways and the refresh
+    // from one state to the other short-circuited: the coverage cell kept
+    // painting two badges for a single stored file (a stale badge, never a
+    // wrong entity — the signature only gates the repaint).
+    const twoEntries = [entry("external", "srt"), entry("x", "srt")];
+    const oneEntry = [entry("external", "srt:0:0,x:srt")];
+    expect(pipeJoinedEntryBlock(twoEntries)).toBe(pipeJoinedEntryBlock(oneEntry)); // the defect
+
+    renderSeriesDetail(series, seasons, twoEntries, new Set());
+    const row = reqRow(seriesTbody().children.item(2));
+    const sigBefore = reqSig(row);
+    const covBefore = covText(row);
+
+    renderSeriesDetail(series, seasons, oneEntry, new Set()); // REUSE path
+
+    expect(reqRow(seriesTbody().children.item(2))).toBe(row); // same node, repainted
+    expect(reqSig(row)).not.toBe(sigBefore);
+    expect(covText(row)).not.toBe(covBefore);
+  });
 });
 
 describe("detail: openMovieDetail", () => {
@@ -284,5 +399,46 @@ describe("detail: openMovieDetail", () => {
     expect(tbodyB).not.toBe(tbodyA);
     expect(document.body.contains(aRow as Node)).toBe(false);
     expect(covText(tbodyB.children.item(0))).toBe(`srt: ext ${STAR}80`);
+  });
+
+  it("assembles the language-row signature as nested joins that split back", () => {
+    openMovieDetail(makeMovie(70, [movieSub("en", 90)]));
+
+    const [entriesBlock, ignoredCodecs] = split(reqSig(movieTbody().children.item(0)));
+    expect(ignoredCodecs).toBe("");
+    const [entry] = split(entriesBlock ?? "");
+    expect(entry).toBe("external:srt:90"); // leaf identical to the old inner form
+    expect(split(entry ?? "")).toEqual(["external", "srt", "90"]);
+  });
+
+  it("repaints a language row where the old signature collapsed two coverage states", () => {
+    const entry = (source: string, codec: string): SubtitleEntry => ({
+      media_id: "tmdb-71",
+      language: "en",
+      variant: "standard",
+      source,
+      codec,
+      score: 0,
+      ordinal: 0,
+    });
+    // Same collapse as the episode signature, one level shallower (no ordinal):
+    // ':' between an entry's fields, ',' between entries, so
+    // "external:srt:0,x:srt:0" was reachable from two different entry lists.
+    const twoEntries = [entry("external", "srt"), entry("x", "srt")];
+    const oneEntry = [entry("external", "srt:0,x:srt")];
+    const pipeJoinedMovieBlock = (entries: SubtitleEntry[]): string =>
+      entries.map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}`).join(",");
+    expect(pipeJoinedMovieBlock(twoEntries)).toBe(pipeJoinedMovieBlock(oneEntry)); // the defect
+
+    openMovieDetail(makeMovie(71, twoEntries));
+    const row = reqRow(movieTbody().children.item(0));
+    const sigBefore = reqSig(row);
+    const covBefore = covText(row);
+
+    openMovieDetail(makeMovie(71, oneEntry), true); // REUSE path
+
+    expect(reqRow(movieTbody().children.item(0))).toBe(row); // same node, repainted
+    expect(reqSig(row)).not.toBe(sigBefore);
+    expect(covText(row)).not.toBe(covBefore);
   });
 });

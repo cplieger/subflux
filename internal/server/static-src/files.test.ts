@@ -42,6 +42,7 @@ vi.mock("./dom.js", async (importOriginal) => {
 });
 
 import { openFileManager } from "./files.js";
+import { join } from "@cplieger/keyenc";
 
 // Mirrors the wire FileEntry fields files.ts consumes (only the fields the
 // row builder and the collection key read matter here). No paths on the
@@ -140,6 +141,52 @@ describe("files: renderFiles", () => {
     expect(tbody.children.length).toBe(2);
     expect(tbody.children.item(0)).toBe(firstBefore);
     expect(tbody.children.item(1)).toBe(thirdBefore);
+  });
+
+  it("two files the pipe-joined key collapsed now keep separate rows", async () => {
+    // The old key `${media_id}|${language}|${variant}|${ordinal}` read both of
+    // these as "tmdb-9|fr|forced|standard|0". createCollection dedupes by key,
+    // so one row DISAPPEARED from the manager — and a row that is not rendered
+    // has no delete button, making that file undeletable from the UI.
+    // `language`/`variant` come from the operator's config.yaml via the stored
+    // row, so a value carrying the separator is operator-reachable.
+    const a = { ...extFile("tmdb-9", "fr|forced"), variant: "standard" };
+    const b = { ...extFile("tmdb-9", "fr"), variant: "forced|standard" };
+    const pipeJoined = (f: FileEntry): string =>
+      `${f.media_id}|${f.language}|${f.variant}|${f.ordinal}`;
+    expect(pipeJoined(a)).toBe(pipeJoined(b)); // the defect
+
+    mockListFiles.mockResolvedValueOnce([a, b]);
+    openFileManager("movie", "tmdb-9", "Movie", "/");
+    await tick();
+
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("keeps rows separate where a plain ':' join would also collapse them", async () => {
+    // Proof the fix is an encoding change, not a separator swap: the same
+    // forgery aimed at the NEW separator still fails.
+    const a = { ...extFile("tmdb-11", "fr:forced"), variant: "standard" };
+    const b = { ...extFile("tmdb-11", "fr"), variant: "forced:standard" };
+    const colonJoined = (f: FileEntry): string =>
+      [f.media_id, f.language, f.variant, String(f.ordinal)].join(":");
+    expect(colonJoined(a)).toBe(colonJoined(b)); // naive form collapses
+
+    mockListFiles.mockResolvedValueOnce([a, b]);
+    openFileManager("movie", "tmdb-11", "Movie", "/");
+    await tick();
+
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("encodes an ordinary entry verbatim as the plain ':' join", () => {
+    // fileKey is module-private (it is the collection key), so this pins the
+    // encoding it builds rather than the function: a component free of both
+    // reserved characters is emitted untouched, so an ordinary
+    // media_id/language/variant/ordinal tuple is exactly the ':' join and row
+    // identity stays readable. Guards against a keyenc change that started
+    // escaping ordinary input.
+    expect(join("tmdb-5", "fr", "standard", "0")).toBe("tmdb-5:fr:standard:0");
   });
 
   it.todo("renders empty state when no external files");
