@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"golang.org/x/sync/errgroup"
@@ -106,8 +107,10 @@ func (st *seasonTracker) shouldSkipShow(ctx context.Context, imdbID string, epis
 	return true
 }
 
+// showLevelSkip decides whether a whole series can be skipped for one
+// language, memoized per showSkipCacheKey in the show-skip cache.
 func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episodeCount int, lang string) bool {
-	key := imdbID + "-" + lang
+	key := showSkipCacheKey(imdbID, lang)
 	if skip, ok := st.cache.Get(key); ok {
 		slog.Debug("show skip cache hit", "imdb", imdbID, "lang", lang, "skip", skip)
 		return skip
@@ -133,6 +136,28 @@ func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episo
 	}
 	st.cache.Set(key, skip)
 	return skip
+}
+
+// showSkipCacheKey builds the show-skip cache key for a series and language.
+//
+// Both components are free-form: imdbID is Sonarr's imdbId field passed through
+// unvalidated, and lang is a config language code (checked only for
+// non-emptiness). The previous `imdbID + "-" + lang` form was injective by
+// accident of ORDER, not by construction — locale-style codes ("pt-BR",
+// "zh-Hans") routinely carry the '-', and only their TERMINAL position stopped
+// that from shifting the field boundary, so ("tt1", "pt-BR") and ("tt1-pt",
+// "BR") stayed apart purely because real IMDb ids happen to be '-'-free. Swap
+// the two arguments, or let one arr id through with a '-' in it, and the pair
+// collapses. A collision caches one series' verdict under another's key: the
+// loser is skipped for the rest of the scan on the strength of a DIFFERENT
+// series' OpenSubtitles count, so no subtitle is ever searched for any of its
+// episodes in that language (or the inverse — a genuinely bare series is
+// scanned in full, spending provider budget on a show with nothing to find).
+// keyenc escapes element-wise, so injectivity no longer depends on field order.
+// The key BYTES change here ('-' becomes ':'); this cache is in-memory only, so
+// nothing persisted or cross-process depends on the old spelling.
+func showSkipCacheKey(imdbID, lang string) string {
+	return keyenc.Join(imdbID, lang)
 }
 
 func (st *seasonTracker) shouldSkipSeason(imdbID string, season int, lang string) bool {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/cplieger/httpx/v4"
 	"github.com/cplieger/jsonx"
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
@@ -296,20 +297,40 @@ type subtitleResponse struct {
 
 // --- API calls ---
 
+// searchTitle resolves the SubSource numeric title id for the request,
+// memoized per titleCacheKey.
 func (p *Provider) searchTitle(ctx context.Context, req *api.SearchRequest) (int, error) {
-	// The key must carry EVERY input that changes the query: the title (the
-	// alternative-title fallback retries with a different req.Title, and an
-	// ImdbID-only key would turn those retries into cache hits on the primary
-	// title's miss) and the season (SubSource has per-season title pages, so
-	// an S01-scoped id must not answer an S02 lookup).
+	cacheKey := titleCacheKey(req)
+	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
+		return p.searchTitleUncached(ctx, req)
+	})
+}
+
+// titleCacheKey builds the titleCache key for a request.
+//
+// The key must carry EVERY input that changes the query: the title (the
+// alternative-title fallback retries with a different req.Title, and an
+// ImdbID-only key would turn those retries into cache hits on the primary
+// title's miss) and the season (SubSource has per-season title pages, so an
+// S01-scoped id must not answer an S02 lookup).
+//
+// It is assembled with keyenc because two of those components are ADJACENT
+// free-form arr text: req.ImdbID (passed through from Sonarr/Radarr without
+// validation) and the lowercased req.Title. A ':' in the IMDb id moves the
+// boundary between them, so ("tt1:x", "y") and ("tt1", "x:y") produced one key
+// under the old fmt.Sprintf form — the season, being a ':'-free int, only ever
+// pinned the tail. The cached value is the title id every subsequent query is
+// scoped to, so a collision is not a cache miss: Search hands the WRONG title
+// id to querySubtitles and the provider returns another film's or show's
+// subtitle list, which is then scored against this video's release name and
+// written next to it. Ordinary ids and titles carry neither ':' nor '\', so the
+// key bytes are unchanged.
+func titleCacheKey(req *api.SearchRequest) string {
 	season := 0
 	if req.MediaType == api.MediaTypeEpisode {
 		season = req.Season
 	}
-	cacheKey := fmt.Sprintf("title:%s:%s:%d", req.ImdbID, strings.ToLower(req.Title), season)
-	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
-		return p.searchTitleUncached(ctx, req)
-	})
+	return keyenc.Join("title", req.ImdbID, strings.ToLower(req.Title), strconv.Itoa(season))
 }
 
 func (p *Provider) searchTitleUncached(ctx context.Context, req *api.SearchRequest) (int, error) {

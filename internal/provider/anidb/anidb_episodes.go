@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/xmlx"
 )
@@ -20,16 +21,29 @@ import (
 
 // buildEpisodeCacheKey builds the episodeCache key for a series and
 // episode number string. Numeric episode numbers are normalized to their
-// integer form so lookups from getEpisodeID (which formats keys with %d)
-// match regardless of leading zeros or whitespace in the source XML.
+// integer form so lookups from getEpisodeID (which builds the same key from
+// an int) match regardless of leading zeros or whitespace in the source XML.
 // Non-numeric episode numbers (S1/C1/T1 for specials, credits, trailers)
 // use the trimmed raw string.
+//
+// epNo is the component that can carry the separator: it is chardata straight
+// out of AniDB's episodes XML, so its alphabet belongs to the remote API, and
+// the non-numeric branch stores it verbatim. seriesID cannot (it is an int),
+// which is the only reason the fmt.Sprintf form was injective — the ':'-free
+// head pinned the boundary. A collision does not miss, it answers: the map
+// yields another episode's AniDB episode id, animetosho searches by that id
+// (searchByEpisodeID), and the WRONG episode's subtitle is scored and written
+// next to this video, where it then counts as covered and is never retried.
+// This key is built here (write side, from the XML) and in getEpisodeID (read
+// side, from the resolved episode number); both must stay on this grammar or
+// every lookup misses. Ordinary epNos carry neither ':' nor '\', so the bytes
+// are unchanged.
 func buildEpisodeCacheKey(seriesID int, epNo string) string {
 	epNo = strings.TrimSpace(epNo)
 	if n, err := strconv.Atoi(epNo); err == nil {
-		return fmt.Sprintf("%d:%d", seriesID, n)
+		return keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(n))
 	}
-	return fmt.Sprintf("%d:%s", seriesID, epNo)
+	return keyenc.Join(strconv.Itoa(seriesID), epNo)
 }
 
 // rateLimitAniDB enforces AniDB's 1-req-per-2s policy using a channel-based
@@ -58,8 +72,17 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 //
 // A short-circuit on banUntil suppresses further API traffic when AniDB
 // previously returned an <error> XML body (F2).
+//
+// The cacheKey below is the READ side of the episodeCache grammar whose write
+// side is buildEpisodeCacheKey; the two must agree byte for byte or every
+// lookup misses and the cache degrades to one API call per episode against
+// AniDB's 1-req-per-2s limit. Neither component can carry the separator on
+// this side (both are ints), so keyenc.Join reproduces the previous bytes
+// exactly; it is used anyway so the two sides share one encoder rather than
+// two format strings that can drift apart. See buildEpisodeCacheKey for what a
+// collision costs.
 func (m *Mapper) getEpisodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
-	cacheKey := fmt.Sprintf("%d:%d", seriesID, episodeNo)
+	cacheKey := keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(episodeNo))
 
 	// Fast path: already cached.
 	m.mu.Lock()

@@ -2,14 +2,15 @@ package polling
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/cplieger/arrapi"
 	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -419,8 +420,19 @@ func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
 }
 
 // retryKey is the importRetries map key for one history entry.
+//
+// Neither component can carry the separator today — source is one of the two
+// PollSource constants and entryID is an arr row id — so the key was already
+// injective and keyenc.Join reproduces the fmt.Sprintf bytes exactly. It is
+// adopted because the counter this key indexes gates the poll WATERMARK: two
+// entries sharing a key share one attempt count, so the pair would be
+// abandoned after maxImportRetries attempts between them instead of each, and
+// clearing one entry's counter would release the watermark hold the other
+// still needs — the import that was still failing gets polled past and is
+// picked up only by the next full scan. Nothing about that consequence depends
+// on today's field alphabets, so the key should not either.
 func retryKey(source PollSource, entryID int) string {
-	return fmt.Sprintf("%s:%d", source, entryID)
+	return keyenc.Join(string(source), strconv.Itoa(entryID))
 }
 
 // trackImportOutcome records the retry outcome for one processed history

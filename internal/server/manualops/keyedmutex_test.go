@@ -1,0 +1,154 @@
+package manualops
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/cplieger/keyenc"
+	"github.com/cplieger/subflux/internal/api"
+)
+
+// oldDownloadQuadKey is the NUL-joined form downloadQuadKey replaced, kept as
+// the collision oracle for the pairs below.
+func oldDownloadQuadKey(mt api.MediaType, mediaID, lang string, variant api.Variant) string {
+	return strings.Join([]string{string(mt), mediaID, lang, string(variant)}, "\x00")
+}
+
+// TestDownloadQuadKeyCannotBeForged pins that two DIFFERENT quads never share
+// one gate entry. A merge puts two unrelated media items behind ONE mutex, so an
+// ordinal allocation plus its atomic write and history insert serialize against
+// a download that has nothing to do with them.
+//
+// Exactly one of the four components can carry a separator, and it is not the
+// one the old comment named: mediaID is api.BuildEpisodeID/BuildMovieID output,
+// which falls back to the arr's raw imdbId when TVDB/TMDB is absent. mediaType
+// and variant are closed constant sets, and lang has passed IsValidLangCode.
+//
+// The two tables below are the honest split. The NUL cases collapse the old
+// form but need a control character in lang, which IsValidLangCode rejects — so
+// they were unreachable, and they are here to show that the old form's
+// injectivity rested on that validator rather than on the encoding. The ':'
+// cases are the reachable ones: IsValidLangCode permits ':' (it bars only '/',
+// '\', ".." and controls), so under a plain ':' join the same forge would have
+// been live — keyenc escaping is what keeps them apart.
+func TestDownloadQuadKeyCannotBeForged(t *testing.T) {
+	t.Parallel()
+
+	type quad struct {
+		mediaID string
+		lang    string
+		mt      api.MediaType
+		variant api.Variant
+	}
+	key := func(q quad) string { return downloadQuadKey(q.mt, q.mediaID, q.lang, q.variant) }
+	oldKey := func(q quad) string { return oldDownloadQuadKey(q.mt, q.mediaID, q.lang, q.variant) }
+
+	nulCases := map[string][2]quad{
+		"control separator moves from the media id into the language": {
+			{mt: api.MediaTypeEpisode, mediaID: "tt1\x00fr", lang: "en", variant: api.VariantStandard},
+			{mt: api.MediaTypeEpisode, mediaID: "tt1", lang: "fr\x00en", variant: api.VariantStandard},
+		},
+	}
+	for name, pair := range nulCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if oldKey(pair[0]) != oldKey(pair[1]) {
+				t.Fatalf("case no longer exercises a real collision: %q vs %q", oldKey(pair[0]), oldKey(pair[1]))
+			}
+			if left, right := key(pair[0]), key(pair[1]); left == right {
+				t.Errorf("distinct quads share the gate key %q", left)
+			}
+		})
+	}
+
+	sepCases := map[string][2]quad{
+		"colon moves from the media id into the language": {
+			{mt: api.MediaTypeEpisode, mediaID: "tt1:fr", lang: "en", variant: api.VariantStandard},
+			{mt: api.MediaTypeEpisode, mediaID: "tt1", lang: "fr:en", variant: api.VariantStandard},
+		},
+		"colon in the media id reaches the variant": {
+			{mt: api.MediaTypeMovie, mediaID: "tt1:en:forced", lang: "de", variant: api.VariantHI},
+			{mt: api.MediaTypeMovie, mediaID: "tt1", lang: "en:forced:de", variant: api.VariantHI},
+		},
+	}
+	for name, pair := range sepCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// A plain ':' join — what the naive port of this key would have been.
+			naive := func(q quad) string {
+				return strings.Join([]string{string(q.mt), q.mediaID, q.lang, string(q.variant)}, ":")
+			}
+			if naive(pair[0]) != naive(pair[1]) {
+				t.Fatalf("case does not exercise a separator collision: %q vs %q", naive(pair[0]), naive(pair[1]))
+			}
+			if left, right := key(pair[0]), key(pair[1]); left == right {
+				t.Errorf("distinct quads share the gate key %q", left)
+			}
+		})
+	}
+}
+
+// TestDownloadQuadKeyIsUnescapedForOrdinaryInput pins the shape of the key for
+// real quads. The BYTES deliberately changed (NUL joins became ':'), which is
+// free because the gate map is process-local and rebuilt every run — what must
+// hold is that an ordinary quad still encodes as the plain separator-joined
+// form, and that each component still separates quads that differ only in it.
+func TestDownloadQuadKeyIsUnescapedForOrdinaryInput(t *testing.T) {
+	t.Parallel()
+
+	got := downloadQuadKey(api.MediaTypeEpisode, "tvdb-121361-s01e02", "fr", api.VariantForced)
+	if want := "episode:tvdb-121361-s01e02:fr:forced"; got != want {
+		t.Errorf("downloadQuadKey() = %q, want %q", got, want)
+	}
+	if keyenc.IsHashed(got) {
+		t.Error("an ordinary quad key must not be reduced to a hashed identity")
+	}
+
+	base := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantStandard)
+	others := map[string]string{
+		"media type": downloadQuadKey(api.MediaTypeMovie, "tvdb-1-s01e02", "fr", api.VariantStandard),
+		"media id":   downloadQuadKey(api.MediaTypeEpisode, "tvdb-2-s01e02", "fr", api.VariantStandard),
+		"language":   downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "en", api.VariantStandard),
+		"variant":    downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantForced),
+	}
+	for field, other := range others {
+		if other == base {
+			t.Errorf("quads differing only in %s share the gate key %q", field, base)
+		}
+	}
+}
+
+// TestDownloadQuadGateSerializesOnlyTheSameQuad pins the gate behavior the key
+// feeds: one quad's holder blocks a second acquirer of the SAME quad, while a
+// different quad proceeds immediately.
+func TestDownloadQuadGateSerializesOnlyTheSameQuad(t *testing.T) {
+	t.Parallel()
+
+	g := newQuadGate()
+	a := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantStandard)
+	b := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantForced)
+
+	unlockA := g.lock(a)
+
+	done := make(chan struct{})
+	go func() {
+		unlockB := g.lock(b)
+		unlockB()
+		close(done)
+	}()
+	<-done // a different quad must not wait on A's holder
+
+	blocked := make(chan struct{})
+	go func() {
+		unlockA2 := g.lock(a)
+		unlockA2()
+		close(blocked)
+	}()
+	select {
+	case <-blocked:
+		t.Error("a second acquirer of the same quad was not serialized")
+	default:
+	}
+	unlockA()
+	<-blocked
+}
