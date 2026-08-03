@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/pathinside"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
@@ -249,15 +249,25 @@ func validateBackup(c *yamlBackupConfig) error {
 	}))
 	if c.Path != "" {
 		// backup.path is a write destination (the scheduler MkdirAll's it and
-		// writes timestamped bbolt snapshots into it), so a traversal spelled
-		// in the configured value is refused. The test is per path COMPONENT:
-		// the previous strings.Contains(c.Path, "..") also refused perfectly
-		// legitimate directory names whose only sin is two adjacent dots
-		// ("/backups/a..b", "/backups/...", "/backups/..archive"), while
-		// pathinside.HasDotDot refuses exactly the ".." components —
-		// including one buried mid-path ("/backups/../etc"), which a
-		// cleaning predicate such as RelEscapes would collapse and accept.
-		if !filepath.IsAbs(c.Path) {
+		// writes timestamped bbolt snapshots into it, through atomicfile), so
+		// well-formedness is checked with atomicfile's own gate: the same
+		// validator that write applies, so an accepted config cannot fail at
+		// backup time. filepath.IsAbs was the previous stand-in and is a
+		// different rule — it accepts an embedded NUL the write refuses. The
+		// message stays subflux's own because ErrUnsafePath's text embeds the
+		// offending path and this error reaches the settings UI; ErrEmptyPath
+		// is unreachable under the enclosing guard.
+		//
+		// Traversal stays a separate check because atomicfile deliberately does
+		// not judge it: filepath.Clean normalizes ".." in an absolute path, so
+		// ValidatePath accepts "/backups/../etc". The test is per path
+		// COMPONENT and runs on the value AS WRITTEN: the older
+		// strings.Contains(c.Path, "..") also refused legitimate directory
+		// names whose only sin is two adjacent dots ("/backups/a..b",
+		// "/backups/..archive"), while pathinside.HasDotDot refuses exactly the
+		// ".." components — including one buried mid-path, which a cleaning
+		// predicate such as RelEscapes would collapse and accept.
+		if err := atomicfile.ValidatePath(c.Path); err != nil {
 			ve.Add(configFieldErr("backup.path", "backup.path must be an absolute directory"))
 		} else if pathinside.HasDotDot(c.Path) {
 			ve.Add(configFieldErr("backup.path", "backup.path must not contain a '..' path segment"))

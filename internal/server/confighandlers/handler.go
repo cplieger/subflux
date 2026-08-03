@@ -193,12 +193,20 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := strings.TrimSpace(req.Path)
-	if p == "" {
-		api.WriteJSON(w, PathValidationResponse{Error: "path is empty"})
-		return
-	}
-	if !filepath.IsAbs(p) {
-		api.WriteJSON(w, PathValidationResponse{Error: "path must be absolute"})
+	// atomicfile.ValidatePath is the gate its own writes apply, so a path this
+	// endpoint blesses cannot be one the later config write refuses.
+	// filepath.IsAbs was the previous stand-in and is a different rule: it
+	// accepts an embedded NUL ("/media\x00/tv" is absolute) that every
+	// atomicfile write rejects. Messages stay the caller-facing ones rather
+	// than the library's, whose text embeds the path. ErrUnsafePath also covers
+	// the NUL case, reported here as the absolute-path failure: it cannot be
+	// typed into the settings form, so only a crafted request reaches it.
+	if err := atomicfile.ValidatePath(p); err != nil {
+		msg := "path must be absolute"
+		if errors.Is(err, atomicfile.ErrEmptyPath) {
+			msg = "path is empty"
+		}
+		api.WriteJSON(w, PathValidationResponse{Error: msg})
 		return
 	}
 	// Reject traversal in the path AS WRITTEN — before cleaning — then clean
