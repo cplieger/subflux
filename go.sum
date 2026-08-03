@@ -30,8 +30,8 @@ github.com/cplieger/ssrf/v3 v3.0.0 h1:wIrJ6rDkuMvsNqGQ1J25iTnn/xFxLD2fEwOsdiwNrY
 github.com/cplieger/ssrf/v3 v3.0.0/go.mod h1:887QK6H7IDoYavU5I/0K/0rFRX29bTfP9SeS1x75tls=
 github.com/cplieger/webhttp v1.21.0 h1:dTfAcAZqLO3Fen9xKiWkZ/CH3775+6dkoS4UiG0hi7M=
 github.com/cplieger/webhttp v1.21.0/go.mod h1:RYtweYFUohqE5DIOt06Ypr0j9VHXjxSPBLIG3vM0H44=
-github.com/cplieger/wiregen/v2 v2.0.0 h1:tu9O0DIwi8zemRdg9VZp/Z2BtF66nLJU8CRc6RLz8Sc=
-github.com/cplieger/wiregen/v2 v2.0.0/go.mod h1:h+9oHSsaetH+bHXQtHysBPn/nVHOW4J6JzKXkGpQaBQ=
+github.com/cplieger/wiregen/v2 v2.0.1 h1:zwc20UGpin57bMiwljNXyBeRF8r9d60aSrUI1nBprU8=
+github.com/cplieger/wiregen/v2 v2.0.1/go.mod h1:h+9oHSsaetH+bHXQtHysBPn/nVHOW4J6JzKXkGpQaBQ=
 github.com/cplieger/xmlx v1.0.0 h1:tdUqGwAQ5kufIWwDJjYnWS2AcXoT5URLpfa5KaDR+CA=
 github.com/cplieger/xmlx v1.0.0/go.mod h1:iZ1VwTghHYMNpbDmwX19wApwlAS+TzWVOV4NCq0zirY=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
