@@ -39,6 +39,7 @@
     "@cplieger/ui-primitives": "3.0.0"
   },
   "overrides": {
+    "rolldown": "1.2.1 || >=1.2.3",
     "typed-rest-client": {
       "qs": "6.15.3"
     }
