@@ -12,7 +12,7 @@ require (
 	github.com/cplieger/slogx v1.6.0
 	github.com/cplieger/ssrf/v3 v3.0.0
 	github.com/cplieger/webhttp v1.21.0
-	github.com/cplieger/wiregen/v2 v2.0.0
+	github.com/cplieger/wiregen/v2 v2.0.1
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.16
