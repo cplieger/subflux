@@ -3,8 +3,14 @@
 # --- Build args (global - declared before any FROM so all stages can adopt
 # the default via a bare `ARG NAME` inside the stage) ---
 ARG FFMPEG_VERSION=8.1
-# renovate: datasource=git-refs depName=https://code.videolan.org/videolan/x264.git currentValue=stable
-ARG X264_COMMIT=4613ac3c
+# x264 publishes NO tags and no versioned artifact (only the master/stable/
+# GPLv2-only branches; VideoLAN's snapshot tarballs stopped in 2019), so the
+# commit is the only identifier upstream offers. The marker below is the
+# git-refs datasource's digest mode: `branch=` is the ref Renovate resolves and
+# the ARG holds the commit it resolved to, as a FULL 40-char sha so Renovate's
+# digest comparison is exact. Keep the marker immediately above the ARG.
+# renovate: datasource=git-refs depName=videolan/x264 packageName=https://code.videolan.org/videolan/x264.git branch=stable
+ARG X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
 # --- Source downloads (cached independently) ---
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS sources
