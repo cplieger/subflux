@@ -45,26 +45,7 @@ func PostProcess(cues []Cue, opts PostProcessOptions) []Cue {
 	copy(result, cues)
 
 	for i := range result {
-		text := result[i].Text
-
-		if opts.StripTags {
-			text = stripTags(text)
-		}
-		// Trim whitespace before HI stripping so speaker labels at
-		// line start are matched even when the input has leading spaces.
-		// Without this, a second PostProcess pass would trim first and
-		// then match the speaker pattern, breaking idempotency.
-		if opts.CleanWhitespace {
-			text = cleanWhitespace(text)
-		}
-		if opts.StripHI {
-			text = stripHI(text)
-		}
-		if opts.CleanWhitespace {
-			text = cleanWhitespace(text)
-		}
-
-		result[i].Text = text
+		result[i].Text = cleanCueText(result[i].Text, opts)
 	}
 
 	if opts.RemoveEmpty {
@@ -72,6 +53,51 @@ func PostProcess(cues []Cue, opts PostProcessOptions) []Cue {
 	}
 
 	return result
+}
+
+// cleanCueText runs the per-cue text steps to a fixed point.
+//
+// The steps feed each other in BOTH directions, so no single ordered pass can
+// be idempotent: cleanWhitespace's trim can expose text that stripHI's
+// line-anchored rules then match, and stripHI's deletions can expose leading
+// whitespace for cleanWhitespace to trim. Two fuzz crashers came from that
+// second-order reveal, both rooted in the same mismatch — Go's regexp \s is
+// only [\t\n\f\r ] while strings.TrimSpace follows unicode.IsSpace, so a byte
+// like \v (U+000B) is invisible to every pattern here and still trimmed:
+//
+//	"A0:\vA0:" -> stripHI drops the leading label -> "\vA0:" -> trim -> "A0:",
+//	              itself a speaker label the NEXT call would have stripped.
+//	"♪♪\v♪"    -> stripHI drops the "♪♪" span     -> "\v♪"   -> trim -> "♪",
+//	              itself a music-only line the NEXT call would have dropped.
+//
+// Looping to a fixed point makes idempotency structural rather than resting on
+// every pattern's whitespace class agreeing with unicode.IsSpace. It mirrors
+// how stripHI and stripTags already absorb their own splice-reveals-more
+// problem internally, and it terminates because every step only ever deletes:
+// each iteration either shrinks the text or leaves it identical and stops.
+func cleanCueText(text string, opts PostProcessOptions) string {
+	for {
+		out := text
+		if opts.StripTags {
+			out = stripTags(out)
+		}
+		// Trim ahead of HI stripping so a speaker label at line start is
+		// matched even when the input indents it. The loop would converge on
+		// the same text without this, just a wasted iteration later.
+		if opts.CleanWhitespace {
+			out = cleanWhitespace(out)
+		}
+		if opts.StripHI {
+			out = stripHI(out)
+		}
+		if opts.CleanWhitespace {
+			out = cleanWhitespace(out)
+		}
+		if out == text {
+			return out
+		}
+		text = out
+	}
 }
 
 // PostProcessBytes applies encoding normalization and line ending fixes
