@@ -331,8 +331,6 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetchCoverageSeriesData fetches series, exclude tags, and subtitle files concurrently.
-//
-//nolint:dupl // type-specific wrappers around shared fetchCoverageData
 func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (allSeries []arrapi.Series, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
 	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Sonarr, api.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
@@ -349,8 +347,6 @@ func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (a
 }
 
 // fetchCoverageMoviesData fetches movies, exclude tags, and subtitle files concurrently.
-//
-//nolint:dupl // type-specific wrappers around shared fetchCoverageData
 func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (allMovies []arrapi.Movie, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
 	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Radarr, api.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
