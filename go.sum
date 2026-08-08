@@ -4,8 +4,8 @@ github.com/cplieger/arrapi v1.8.5 h1:jc1wLlWTU8fMJDCRvtPlUlPoq+9LvvDcy3vFvC+z0co
 github.com/cplieger/arrapi v1.8.5/go.mod h1:whGudoMSyvK75H70wl4AMthRwBguH1ucY9PMVM5jJjo=
 github.com/cplieger/atomicfile/v2 v2.7.0 h1:ZsagNRGXyfkncPfaE/rTI5LOe6oNFgG1moQjIVY2LxY=
 github.com/cplieger/atomicfile/v2 v2.7.0/go.mod h1:jgwJ7oU3qahL4NwiF+1iBIzPRpR8LwXnicSalGoJeVA=
-github.com/cplieger/auth/v2 v2.1.1 h1:rViNEhZbyAtAG9T8iNEnozacK+dPEbJn02bLWvKjVFI=
-github.com/cplieger/auth/v2 v2.1.1/go.mod h1:0AE1741V65LpzNlQdqaj9DkQ5Bpz2rtug3d6z0fAnoY=
+github.com/cplieger/auth/v2 v2.1.2 h1:2tQs+3drEQX8X+P1FDwS3bD+lQwC/0w0GNHn4tNqaAE=
+github.com/cplieger/auth/v2 v2.1.2/go.mod h1:7TAUdFLC7do98oe4E//SZ+v2VcleiQVGphB8onXOqNQ=
 github.com/cplieger/envx v1.5.1 h1:uzNePwLQYna5ojRfRKHMVGxHlqdDNwGttBgo0UYPyOM=
 github.com/cplieger/envx v1.5.1/go.mod h1:bdIxSs3VcSw/2zR1d+bNWAnwn/ISYngodlsrV6Re6O8=
 github.com/cplieger/envx/yamlenv v1.2.1 h1:EzLTghpO16rFdf9RImru1t2wMR2QNGpRIvQw7M4jSZA=
