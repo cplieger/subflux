@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/cplieger/arrapi v1.8.5
 	github.com/cplieger/atomicfile/v2 v2.7.0
-	github.com/cplieger/auth/v2 v2.1.1
+	github.com/cplieger/auth/v2 v2.1.2
 	github.com/cplieger/health v1.4.0
 	github.com/cplieger/pathinside v1.0.0
 	github.com/cplieger/runesafe v1.4.0
