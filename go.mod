@@ -28,7 +28,7 @@ require github.com/cplieger/metrics/v3 v3.0.1
 
 require github.com/cplieger/jsonx v1.4.0
 
-require github.com/evanw/esbuild v0.28.1
+require github.com/evanw/esbuild v0.28.2
 
 require golang.org/x/term v0.45.0
 
