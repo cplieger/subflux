@@ -224,23 +224,42 @@ td[data-col="actions"] button {
   }
 }
 
-/* --- Skeleton --- */
+/* --- Skeleton ---
+   Compositor-only shimmer: the box's own paint is static and a pre-painted
+   highlight band on the overlay sweeps across it with `transform`. The previous
+   form animated a registered custom property into `background-position-x`,
+   which forces a style recalc AND a full gradient repaint of every skeleton on
+   every frame for the whole load window (8 concurrent on the coverage table).
+   The band's gradient is feathered at both ends, so the overlay has no hard
+   edge to snap to a device pixel once promoted. */
 .skeleton {
   height: 1rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(90deg, var(--raised) 25%, var(--border) 50%, var(--raised) 75%);
-  background-size: 200% 100%;
-  background-position-x: var(--shimmer-x);
-  animation: shimmer 1.5s infinite linear;
+  background: var(--raised);
+  position: relative;
+
+  /* Clips the sweeping band (honors border-radius); `contain` keeps the
+     overlay's paint from invalidating the surrounding table. */
+  overflow: hidden;
+  contain: paint;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    animation: shimmer 1.5s infinite linear;
+    will-change: transform;
+  }
 }
 
 @keyframes shimmer {
   0% {
-    --shimmer-x: 200%;
+    transform: translateX(-100%);
   }
 
   100% {
-    --shimmer-x: -200%;
+    transform: translateX(100%);
   }
 }
 

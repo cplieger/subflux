@@ -407,13 +407,17 @@ button[data-status="err"] {
     translate: 0;
   }
 
+  /* Static fill + opacity fade: animating background-color repaints the whole
+     viewport every frame (only Chromium has a narrow composited-background-color
+     path). Matches how @cplieger/ui-primitives skins its own backdrops. */
   &::backdrop {
-    background: oklch(0% 0 0deg / 0%);
-    transition: background var(--dur-standard) var(--ease-standard);
+    background: oklch(0% 0 0deg / 50%);
+    opacity: 0;
+    transition: opacity var(--dur-standard) var(--ease-standard);
   }
 
   &[open]::backdrop {
-    background: oklch(0% 0 0deg / 50%);
+    opacity: 1;
   }
 }
 
@@ -428,7 +432,7 @@ button[data-status="err"] {
 
   :where(dialog)::backdrop {
     transition:
-      background var(--dur-standard) var(--ease-standard),
+      opacity var(--dur-standard) var(--ease-standard),
       overlay var(--dur-standard) var(--ease-standard) allow-discrete,
       display var(--dur-standard) var(--ease-standard) allow-discrete;
   }
@@ -441,7 +445,7 @@ button[data-status="err"] {
   }
 
   :where(dialog)[open]::backdrop {
-    background: oklch(0% 0 0deg / 0%);
+    opacity: 0;
   }
 }
 

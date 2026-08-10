@@ -2,12 +2,6 @@
    0. Custom properties
    ================================================================ */
 
-@property --shimmer-x {
-  syntax: "<percentage>";
-  inherits: false;
-  initial-value: 200%;
-}
-
 [data-theme="dark"] {
   color-scheme: dark;
 }
