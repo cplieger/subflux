@@ -196,3 +196,50 @@ func TestAdminSocketConstants(t *testing.T) {
 		t.Error("admin socket must not live under the /config volume")
 	}
 }
+
+// TestEnsureAdminSocketDir_verifiesTheModeItCreated pins the bug that adopting
+// atomicfile.EnsurePrivateDir fixed. Every check in the old implementation ran
+// only on the already-exists path: when its own os.Mkdir succeeded it returned
+// nil having verified nothing, so on a filesystem that does not store the mode
+// asked for, the directory gating the admin socket was born group-accessible
+// and no error was raised anywhere.
+//
+// The widening here is REAL rather than mocked: Linux propagates S_ISGID from a
+// setgid parent to a new subdirectory, so os.Mkdir(…, 0o700) genuinely stores a
+// mode it was not asked for. The witness assertion below fails the test as
+// INVALID rather than passing it vacuously if the kernel ever stops doing that,
+// because a create-path test on a filesystem that honours every mode cannot
+// distinguish a verified create from an unverified one.
+func TestEnsureAdminSocketDir_verifiesTheModeItCreated(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0o700|os.ModeSetgid); err != nil {
+		t.Fatal(err)
+	}
+
+	witness := filepath.Join(parent, "witness")
+	if err := os.Mkdir(witness, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	wfi, err := os.Lstat(witness)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wfi.Mode()&os.ModeSetgid == 0 {
+		t.Skipf("kernel did not widen a 0o700 mkdir under a setgid parent (got %v); "+
+			"this test cannot distinguish a verified create from an unverified one here", wfi.Mode())
+	}
+
+	dir := filepath.Join(parent, "subflux-admin")
+	if err := ensureAdminSocketDir(dir); err != nil {
+		t.Fatalf("ensureAdminSocketDir: %v", err)
+	}
+	fi, err := os.Lstat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode(); got != os.ModeDir|0o700 {
+		t.Fatalf("created dir mode = %v, want %v: the mode it created was not verified",
+			got, os.ModeDir|0o700)
+	}
+}

@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/auth/v2/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
@@ -381,30 +382,18 @@ func adminSocketListener(ctx context.Context, dir, path string) (net.Listener, e
 // Anything else (symlink, foreign owner, wider mode) is a hard error, never
 // chmod'd into compliance: a foreign object at this path means another
 // principal owns the name, and taking it over would hand them the socket.
+//
+// atomicfile.EnsurePrivateDir is that whole policy, and adopting it FIXED a
+// bug this function had. The mode argument to os.Mkdir is a REQUEST: on a
+// filesystem carrying an inheritable group-write ACL the kernel stores 0770
+// for a 0o700 mkdir. Every check below used to run only on the already-exists
+// path, so when our own Mkdir succeeded this returned nil having verified
+// nothing, and the directory gating the admin socket could be born
+// group-writable with no error anywhere. The library repairs what it created
+// and re-stats the OPEN HANDLE to prove the repair took.
 func ensureAdminSocketDir(dir string) error {
-	err := os.Mkdir(dir, 0o700)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, fs.ErrExist) {
-		return fmt.Errorf("create admin socket dir: %w", err)
-	}
-	fi, lerr := os.Lstat(dir)
-	if lerr != nil {
-		return fmt.Errorf("inspect existing admin socket dir: %w", lerr)
-	}
-	if !fi.IsDir() {
-		return fmt.Errorf("admin socket dir %s exists and is not a plain directory (mode %v)", dir, fi.Mode())
-	}
-	if fi.Mode().Perm() != 0o700 {
-		return fmt.Errorf("admin socket dir %s has mode %v, want 0700", dir, fi.Mode().Perm())
-	}
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fmt.Errorf("admin socket dir %s: cannot determine owner", dir)
-	}
-	if int(st.Uid) != os.Geteuid() {
-		return fmt.Errorf("admin socket dir %s owned by uid %d, want effective uid %d", dir, st.Uid, os.Geteuid())
+	if _, err := atomicfile.EnsurePrivateDir(dir, atomicfile.WithLogger(slog.Default())); err != nil {
+		return fmt.Errorf("admin socket dir %s: %w", dir, err)
 	}
 	return nil
 }
