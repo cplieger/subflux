@@ -1,6 +1,6 @@
 module github.com/cplieger/subflux
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/cplieger/arrapi v1.8.5
