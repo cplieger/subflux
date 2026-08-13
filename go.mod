@@ -6,13 +6,13 @@ require (
 	github.com/cplieger/arrapi v1.8.6
 	github.com/cplieger/atomicfile/v2 v2.9.1
 	github.com/cplieger/auth/v2 v2.1.5
-	github.com/cplieger/health v1.5.0
-	github.com/cplieger/pathinside v1.0.0
-	github.com/cplieger/runesafe v1.4.0
-	github.com/cplieger/slogx v1.6.0
+	github.com/cplieger/health v1.5.1
+	github.com/cplieger/pathinside v1.0.1
+	github.com/cplieger/runesafe v1.4.1
+	github.com/cplieger/slogx v1.6.1
 	github.com/cplieger/ssrf/v3 v3.0.1
-	github.com/cplieger/webhttp v1.23.0
-	github.com/cplieger/wiregen/v2 v2.0.3
+	github.com/cplieger/webhttp v1.23.1
+	github.com/cplieger/wiregen/v2 v2.0.4
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.16
@@ -26,15 +26,15 @@ require github.com/cplieger/envx/yamlenv v1.2.2
 
 require github.com/cplieger/metrics/v3 v3.0.2
 
-require github.com/cplieger/jsonx v1.4.0
+require github.com/cplieger/jsonx v1.4.1
 
 require github.com/evanw/esbuild v0.28.2
 
 require golang.org/x/term v0.45.0
 
-require github.com/cplieger/xmlx v1.0.0
+require github.com/cplieger/xmlx v1.0.1
 
-require github.com/cplieger/httpx/v4 v4.3.0
+require github.com/cplieger/httpx/v4 v4.3.1
 
 require github.com/cplieger/keyenc v1.0.2
 
@@ -52,7 +52,7 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/mod v0.39.0 // indirect
+	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
