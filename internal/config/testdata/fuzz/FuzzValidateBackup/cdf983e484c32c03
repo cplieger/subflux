@@ -1,0 +1,5 @@
+go test fuzz v1
+bool(true)
+string("/\x00")
+int64(3600000000096)
+int(3)
