@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/buckets"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"

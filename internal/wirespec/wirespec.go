@@ -137,7 +137,7 @@ func Registry() *wiregen.Registry {
 	// Enum values are auto-discovered from each type's const block in source.
 	// Two need explicit values because they aren't discoverable that way:
 	// MediaType ("series" is valid but has no const), and Role (its
-	// "admin"/"user" constants live in the external github.com/cplieger/auth/v2
+	// "admin"/"user" constants live in the external github.com/cplieger/auth/v3
 	// package, which wiregen does not scan for enum members).
 	r.Enums = map[string]wiregen.EnumDef{
 		"MediaType": {Values: []string{"movie", "episode", "series"}},

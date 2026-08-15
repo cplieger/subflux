@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 )
 
 // This file holds the SessionPersister half of AuthStore.
@@ -62,18 +62,18 @@ func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 // (nil, nil) when none exists (matching the old store's sql.ErrNoRows -> nil
 // mapping). A copy is returned so callers cannot mutate the stored session
 // through the returned pointer.
-func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, error) {
+func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
 	// cloneSession reads the stored struct's fields, so it must run while the
 	// read lock is held: a concurrent UpdateSessionActivity mutates
 	// LastActivity under the write lock, and cloning after RUnlock would race
 	// that write (caught by -race in TestSessions_concurrentAccess).
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	sess, ok := s.sessions[tokenHash]
+	stored, ok := s.sessions[tokenHash]
 	if !ok {
-		return nil, nil
+		return nil, false, nil
 	}
-	return cloneSession(sess), nil
+	return cloneSession(stored), true, nil
 }
 
 // UpdateSessionActivity touches a session's last-activity time (memory only,

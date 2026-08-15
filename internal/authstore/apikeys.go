@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -163,7 +163,7 @@ func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte)
 // GetAPIKeyByHash looks up an API key by its hash (the API-auth hot path),
 // returning (nil, nil) when not found (matching the old store's sql.ErrNoRows
 // -> nil mapping). Decoding fails closed (auth bucket).
-func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, error) {
+func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
 	var out *auth.Key
 	err := s.view(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)
@@ -182,7 +182,7 @@ func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, erro
 		out = rec.toKey()
 		return nil
 	})
-	return out, err
+	return out, out != nil, err
 }
 
 // ListAPIKeysByUserID returns all API keys for a user, ordered by creation date

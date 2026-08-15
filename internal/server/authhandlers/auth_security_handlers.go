@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 

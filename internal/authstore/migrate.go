@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 	bolterrors "go.etcd.io/bbolt/errors"

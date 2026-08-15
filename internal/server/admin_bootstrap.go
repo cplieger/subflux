@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -54,13 +54,13 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 	}
 
 	ctx := r.Context()
-	user, err := s.authStore.GetUserByUsername(ctx, username)
+	user, found, err := s.authStore.GetUserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: reset-password lookup", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
-	if user == nil {
+	if !found {
 		api.NotFoundC(w, r, api.CodeNotFound, "user not found: "+username)
 		return
 	}
@@ -104,13 +104,13 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	}
 
 	ctx := r.Context()
-	user, err := s.authStore.GetUserByUsername(ctx, username)
+	user, found, err := s.authStore.GetUserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: generate-api-key lookup", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
-	if user == nil {
+	if !found {
 		api.NotFoundC(w, r, api.CodeNotFound, "user not found: "+username)
 		return
 	}

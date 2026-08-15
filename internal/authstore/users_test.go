@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/kv"
 	bolt "go.etcd.io/bbolt"
 )
@@ -65,7 +65,7 @@ func TestCreateUser_setsIDAndRoundTrips(t *testing.T) {
 		t.Errorf("CreateUser did not stamp timestamps: created=%v updated=%v", u.CreatedAt, u.UpdatedAt)
 	}
 
-	got, err := s.GetUserByID(ctx, u.ID)
+	got, _, err := s.GetUserByID(ctx, u.ID)
 	if err != nil {
 		t.Fatalf("GetUserByID: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestCreateUser_setsIDAndRoundTrips(t *testing.T) {
 
 func TestGetUserByID_notFound(t *testing.T) {
 	s := newUserStore(t)
-	got, err := s.GetUserByID(t.Context(), 999)
+	got, _, err := s.GetUserByID(t.Context(), 999)
 	if err != nil {
 		t.Fatalf("GetUserByID: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestGetUserByUsername_caseInsensitive(t *testing.T) {
 	}
 
 	for _, q := range []string{"Alice", "alice", "ALICE", "aLiCe"} {
-		got, err := s.GetUserByUsername(ctx, q)
+		got, _, err := s.GetUserByUsername(ctx, q)
 		if err != nil {
 			t.Fatalf("GetUserByUsername(%q): %v", q, err)
 		}
@@ -107,7 +107,7 @@ func TestGetUserByUsername_caseInsensitive(t *testing.T) {
 		}
 	}
 
-	none, err := s.GetUserByUsername(ctx, "bob")
+	none, _, err := s.GetUserByUsername(ctx, "bob")
 	if err != nil {
 		t.Fatalf("GetUserByUsername(bob): %v", err)
 	}
@@ -124,7 +124,7 @@ func TestGetUserByEmail_caseInsensitive(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	got, err := s.GetUserByEmail(ctx, "carol@example.COM")
+	got, _, err := s.GetUserByEmail(ctx, "carol@example.COM")
 	if err != nil {
 		t.Fatalf("GetUserByEmail: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestGetUserByEmail_caseInsensitive(t *testing.T) {
 		t.Errorf("GetUserByEmail(case-insensitive) = %v, want user id %d", got, u.ID)
 	}
 
-	none, err := s.GetUserByEmail(ctx, "nobody@example.com")
+	none, _, err := s.GetUserByEmail(ctx, "nobody@example.com")
 	if err != nil {
 		t.Fatalf("GetUserByEmail(absent): %v", err)
 	}
@@ -149,7 +149,7 @@ func TestGetUserByOIDCSub(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	got, err := s.GetUserByOIDCSub(ctx, "https://idp", "sub-123")
+	got, _, err := s.GetUserByOIDCSub(ctx, "https://idp", "sub-123")
 	if err != nil {
 		t.Fatalf("GetUserByOIDCSub: %v", err)
 	}
@@ -158,11 +158,11 @@ func TestGetUserByOIDCSub(t *testing.T) {
 	}
 
 	// Wrong issuer must not resolve (subject unique only within an issuer).
-	if other, _ := s.GetUserByOIDCSub(ctx, "https://other", "sub-123"); other != nil {
+	if other, _, _ := s.GetUserByOIDCSub(ctx, "https://other", "sub-123"); other != nil {
 		t.Errorf("GetUserByOIDCSub(wrong issuer) = %+v, want nil", other)
 	}
 	// Empty sub never matches.
-	if none, _ := s.GetUserByOIDCSub(ctx, "https://idp", ""); none != nil {
+	if none, _, _ := s.GetUserByOIDCSub(ctx, "https://idp", ""); none != nil {
 		t.Errorf("GetUserByOIDCSub(empty sub) = %+v, want nil", none)
 	}
 }
@@ -251,10 +251,10 @@ func TestUpdateUser_reKeysUsernameIndex(t *testing.T) {
 	}
 
 	// Old username no longer resolves; the new one does.
-	if old, _ := s.GetUserByUsername(ctx, "oldname"); old != nil {
+	if old, _, _ := s.GetUserByUsername(ctx, "oldname"); old != nil {
 		t.Errorf("old username still resolves after rename: %+v", old)
 	}
-	got, err := s.GetUserByUsername(ctx, "newname")
+	got, _, err := s.GetUserByUsername(ctx, "newname")
 	if err != nil {
 		t.Fatalf("GetUserByUsername(newname): %v", err)
 	}
@@ -279,10 +279,10 @@ func TestUpdateUser_reKeysOIDCIndex(t *testing.T) {
 	if err := s.UpdateUser(ctx, u); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
-	if old, _ := s.GetUserByOIDCSub(ctx, "iss", "old-sub"); old != nil {
+	if old, _, _ := s.GetUserByOIDCSub(ctx, "iss", "old-sub"); old != nil {
 		t.Errorf("old (issuer,sub) still resolves after change: %+v", old)
 	}
-	got, _ := s.GetUserByOIDCSub(ctx, "iss", "new-sub")
+	got, _, _ := s.GetUserByOIDCSub(ctx, "iss", "new-sub")
 	if got == nil || got.ID != u.ID {
 		t.Errorf("new (issuer,sub) does not resolve to id %d, got %v", u.ID, got)
 	}
@@ -301,7 +301,7 @@ func TestUpdateUser_preservesCreatedAt(t *testing.T) {
 	if err := s.UpdateUser(ctx, u); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
-	got, _ := s.GetUserByID(ctx, u.ID)
+	got, _, _ := s.GetUserByID(ctx, u.ID)
 	if !got.CreatedAt.Equal(created) {
 		t.Errorf("CreatedAt changed on update: got %v, want %v", got.CreatedAt, created)
 	}
@@ -344,10 +344,10 @@ func TestDeleteUser_cascadesAndIsolates(t *testing.T) {
 	}
 
 	// Victim user and its uniqueness index entries are gone.
-	if got, _ := s.GetUserByID(ctx, victim.ID); got != nil {
+	if got, _, _ := s.GetUserByID(ctx, victim.ID); got != nil {
 		t.Errorf("victim still present after delete: %+v", got)
 	}
-	if got, _ := s.GetUserByUsername(ctx, "victim"); got != nil {
+	if got, _, _ := s.GetUserByUsername(ctx, "victim"); got != nil {
 		t.Errorf("victim username index leaked after delete")
 	}
 	// Freed username can be recreated (clean-break recovery path).
@@ -372,7 +372,7 @@ func TestDeleteUser_cascadesAndIsolates(t *testing.T) {
 	}
 
 	// The other user is fully untouched.
-	if got, _ := s.GetUserByID(ctx, keep.ID); got == nil {
+	if got, _, _ := s.GetUserByID(ctx, keep.ID); got == nil {
 		t.Errorf("keep user removed by victim's delete")
 	}
 	if p, ix := childExists(t, s.db, bucketIxPasskeyUser, bucketAuthPasskeys, keep.ID, kCred); !p || !ix {

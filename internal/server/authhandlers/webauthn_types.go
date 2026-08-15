@@ -3,7 +3,7 @@ package authhandlers
 import (
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/go-webauthn/webauthn/protocol"
 )
 

@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 )
 
 // Context keys. Each uses a distinct private type so keys from different

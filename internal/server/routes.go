@@ -45,7 +45,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.

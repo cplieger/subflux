@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"go.etcd.io/bbolt"
 )
 
@@ -64,7 +64,7 @@ func TestResetPreserving_refusesNilTransform(t *testing.T) {
 		t.Fatalf("ResetPreserving(nil) = %v, want the explicit-transform refusal", err)
 	}
 	// Nothing was touched.
-	u, gerr := s.GetUserByUsername(t.Context(), users[0].Username)
+	u, _, gerr := s.GetUserByUsername(t.Context(), users[0].Username)
 	if gerr != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("user after refused reset = (%+v, %v), want untouched", u, gerr)
 	}
@@ -83,7 +83,7 @@ func TestResetPreserving_identityRoundTrip(t *testing.T) {
 	}
 
 	for _, want := range users {
-		u, err := s.GetUserByUsername(ctx, want.Username)
+		u, _, err := s.GetUserByUsername(ctx, want.Username)
 		if err != nil || u == nil {
 			t.Fatalf("GetUserByUsername(%s) = (%v, %v), want restored", want.Username, u, err)
 		}
@@ -91,7 +91,7 @@ func TestResetPreserving_identityRoundTrip(t *testing.T) {
 			t.Errorf("restored user %s = %+v, want identical to %+v", want.Username, u, want)
 		}
 	}
-	if u, err := s.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != users[0].ID {
+	if u, _, err := s.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("GetUserByOIDCSub = (%+v, %v), want alice via the rebuilt ix_user_oidc", u, err)
 	}
 
@@ -148,10 +148,10 @@ func TestResetPreserving_appliesTransform(t *testing.T) {
 		t.Fatalf("ResetPreserving(transform): %v", err)
 	}
 
-	if u, err := s.GetUserByUsername(ctx, "alice"); err != nil || u != nil {
+	if u, _, err := s.GetUserByUsername(ctx, "alice"); err != nil || u != nil {
 		t.Errorf("old username still resolves: (%+v, %v)", u, err)
 	}
-	u, err := s.GetUserByUsername(ctx, "alice-v2")
+	u, _, err := s.GetUserByUsername(ctx, "alice-v2")
 	if err != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("renamed user = (%+v, %v), want alice's id under the new name", u, err)
 	}
@@ -328,7 +328,7 @@ func TestResetPreserving_failClosedGuards(t *testing.T) {
 			}
 
 			// The failed transaction rolled back: everything is still there.
-			u, gerr := s.GetUserByUsername(ctx, "alice")
+			u, _, gerr := s.GetUserByUsername(ctx, "alice")
 			if gerr != nil || u == nil || u.ID != users[0].ID {
 				t.Errorf("alice after rolled-back reset = (%+v, %v), want untouched", u, gerr)
 			}

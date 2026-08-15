@@ -1,5 +1,5 @@
 // Package authstore re-exports the composite store interface from the
-// standalone github.com/cplieger/auth/v2 library so subflux call sites can
+// standalone github.com/cplieger/auth/v3 library so subflux call sites can
 // continue to refer to authstore.AuthStore without depending on the
 // library's import path directly.
 //
@@ -17,11 +17,11 @@
 // authstore/ remains leaf and only imports the auth library.
 package authstore
 
-import authlibstore "github.com/cplieger/auth/v2/store"
+import authlibstore "github.com/cplieger/auth/v3/store"
 
 // AuthStore is the composite store interface implemented by the concrete
 // authdb persistence layer and consumed by auth/ and server/.
 //
-// This is a type alias of github.com/cplieger/auth/v2/store.Composite — the
+// This is a type alias of github.com/cplieger/auth/v3/store.Composite — the
 // library is the single source of truth for the contract.
 type AuthStore = authlibstore.Composite

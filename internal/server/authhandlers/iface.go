@@ -3,7 +3,7 @@ package authhandlers
 import (
 	"context"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/authstore"
 )
 
@@ -41,8 +41,8 @@ var _ SecurityStore = authstore.AuthStore(nil)
 type OIDCStore interface {
 	CreateOIDCState(ctx context.Context, state, nonce, codeVerifier, redirectURI string) error
 	ConsumeOIDCState(ctx context.Context, state string) (nonce, codeVerifier, redirectURI string, err error)
-	GetUserByOIDCSub(ctx context.Context, issuer, sub string) (*auth.User, error)
-	GetUserByUsername(ctx context.Context, username string) (*auth.User, error)
+	GetUserByOIDCSub(ctx context.Context, issuer, sub string) (user *auth.User, found bool, err error)
+	GetUserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
 	CreateUser(ctx context.Context, user *auth.User) error
 }
 

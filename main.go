@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/auth/v2/ratelimit"
+	"github.com/cplieger/auth/v3/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/api"

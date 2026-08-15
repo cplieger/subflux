@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/store/kv"
@@ -207,7 +207,7 @@ func TestMigrate_coreResetPreservesIrreplaceable(t *testing.T) {
 	}
 	assertAuthBucketsIdentical(t, db, authBefore)
 	as := authstore.New(db.BoltDB())
-	u, err := as.GetUserByUsername(ctx, "alice")
+	u, _, err := as.GetUserByUsername(ctx, "alice")
 	if err != nil || u == nil || u.ID != fx.users[0].ID || u.PasswordHash != "hash-a" {
 		t.Errorf("GetUserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
 	}
@@ -516,12 +516,12 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	// and a live sequence.
 	as := authstore.New(db.BoltDB())
 	for i, want := range fx.users {
-		u, err := as.GetUserByUsername(ctx, want.Username)
+		u, _, err := as.GetUserByUsername(ctx, want.Username)
 		if err != nil || u == nil || u.ID != want.ID || u.PasswordHash != want.PasswordHash {
 			t.Errorf("user %d (%s) after auth reset = (%+v, %v), want preserved", i, want.Username, u, err)
 		}
 	}
-	if u, err := as.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
+	if u, _, err := as.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
 		t.Errorf("GetUserByOIDCSub after auth reset = (%+v, %v), want alice via ix_user_oidc", u, err)
 	}
 	pks, err := as.GetPasskeysByUserID(ctx, fx.users[0].ID)

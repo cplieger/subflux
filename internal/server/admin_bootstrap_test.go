@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/metrics"
 )
@@ -116,7 +116,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 		t.Fatalf("response = %+v, want status ok for admin", env)
 	}
 
-	updated, err := s.authStore.GetUserByUsername(ctx, "admin")
+	updated, _, err := s.authStore.GetUserByUsername(ctx, "admin")
 	if err != nil || updated == nil {
 		t.Fatalf("lookup after reset: %v", err)
 	}

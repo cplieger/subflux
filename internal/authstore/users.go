@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -250,7 +250,7 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 
 // GetUserByID looks up a user by surrogate id, returning (nil, nil) when no
 // such user exists (matching the old store's sql.ErrNoRows -> nil mapping).
-func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, error) {
+func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, bool, error) {
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
 		ub, ok := authBucket(tx, bucketAuthUsers)
@@ -269,12 +269,12 @@ func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, error) {
 		out = rec.toUser()
 		return nil
 	})
-	return out, err
+	return out, out != nil, err
 }
 
 // GetUserByUsername looks up a user case-insensitively by username via
 // ix_user_name, returning (nil, nil) when not found (Requirement 16.1).
-func (s *Store) GetUserByUsername(_ context.Context, username string) (*auth.User, error) {
+func (s *Store) GetUserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
 	return s.userByIndex(bucketIxUserName, userNameIndexKey(username))
 }
 
@@ -282,7 +282,7 @@ func (s *Store) GetUserByUsername(_ context.Context, username string) (*auth.Use
 // (nil, nil) when not found (Requirement 16.1). email is not indexed (it is not
 // unique in the schema), so this is a fail-closed scan of auth_users comparing
 // the ASCII-folded email of each row.
-func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, error) {
+func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
 	target := asciiFold(email)
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
@@ -303,16 +303,16 @@ func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, err
 		}
 		return nil
 	})
-	return out, err
+	return out, out != nil, err
 }
 
 // GetUserByOIDCSub looks up a user by (issuer, sub) via ix_user_oidc, returning
 // (nil, nil) when not found. An empty sub never matches, mirroring the SQLite
 // partial index keyed only on rows with oidc_sub != ”. Matching on subject
 // alone would be unsafe: a subject is unique only within its issuer.
-func (s *Store) GetUserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, error) {
+func (s *Store) GetUserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, bool, error) {
 	if sub == "" {
-		return nil, nil
+		return nil, false, nil
 	}
 	return s.userByIndex(bucketIxUserOIDC, userOIDCIndexKey(issuer, sub))
 }
@@ -320,7 +320,7 @@ func (s *Store) GetUserByOIDCSub(_ context.Context, issuer, sub string) (*auth.U
 // userByIndex resolves a user through an index bucket whose value is the user's
 // be64(id) primary key. It returns (nil, nil) on a missing index entry or a
 // dangling reference, and fails closed on an undecodable user record.
-func (s *Store) userByIndex(indexBucket string, indexKey []byte) (*auth.User, error) {
+func (s *Store) userByIndex(indexBucket string, indexKey []byte) (*auth.User, bool, error) {
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
 		ib, ok := authBucket(tx, indexBucket)
@@ -346,7 +346,7 @@ func (s *Store) userByIndex(indexBucket string, indexKey []byte) (*auth.User, er
 		out = rec.toUser()
 		return nil
 	})
-	return out, err
+	return out, out != nil, err
 }
 
 // ListUsers returns all users ordered by username (case-insensitive, then by
