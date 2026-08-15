@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/store/kv"
@@ -175,7 +175,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 		t.Errorf("GetSyncOffset = (%d, %v), want %d", got, err, wantOffset)
 	}
 	as := authstore.New(db.BoltDB())
-	if u, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
+	if u, _, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
 		t.Errorf("auth user after recovery = (%+v, %v), want alice intact", u, err)
 	}
 

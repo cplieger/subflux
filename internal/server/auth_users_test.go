@@ -68,7 +68,7 @@ func TestCreateUser_Success(t *testing.T) {
 	}
 
 	// Verify user exists in DB.
-	u, err := db.GetUserByUsername(t.Context(), "newuser")
+	u, _, err := db.GetUserByUsername(t.Context(), "newuser")
 	if err != nil || u == nil {
 		t.Fatal("created user not found in DB")
 	}
@@ -152,7 +152,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	}
 
 	// Verify user is gone.
-	u, err := db.GetUserByUsername(t.Context(), "del-victim")
+	u, _, err := db.GetUserByUsername(t.Context(), "del-victim")
 	if err != nil {
 		t.Fatal(err)
 	}

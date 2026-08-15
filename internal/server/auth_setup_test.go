@@ -46,7 +46,7 @@ func TestSetup_Create(t *testing.T) {
 	}
 
 	// Verify user was created with admin role.
-	user, err := db.GetUserByUsername(t.Context(), "admin")
+	user, _, err := db.GetUserByUsername(t.Context(), "admin")
 	if err != nil {
 		t.Fatal(err)
 	}

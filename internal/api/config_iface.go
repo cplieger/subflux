@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 )
 
 // ConfigProvider sub-interfaces. Consumers should accept the narrowest

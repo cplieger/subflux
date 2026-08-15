@@ -51,8 +51,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v2"
-	authlibstore "github.com/cplieger/auth/v2/store"
+	"github.com/cplieger/auth/v3"
+	authlibstore "github.com/cplieger/auth/v3/store"
 )
 
 // Harness builds AuthStore instances over durable storage that survives a
@@ -278,11 +278,11 @@ func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64
 	ctx := context.Background()
 
 	// Victim user gone, username freed.
-	if got, _ := s.GetUserByID(ctx, victimID); got != nil {
-		t.Errorf("victim still present after delete: %+v", got)
+	if got, found, err := s.GetUserByID(ctx, victimID); err != nil || found || got != nil {
+		t.Errorf("GetUserByID(victim) after delete = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
 	}
-	if got, _ := s.GetUserByUsername(ctx, "victim"); got != nil {
-		t.Errorf("victim username still resolves after delete")
+	if got, found, err := s.GetUserByUsername(ctx, "victim"); err != nil || found || got != nil {
+		t.Errorf("GetUserByUsername(%q) after delete = (%+v, %t, %v), want (nil, false, nil)", "victim", got, found, err)
 	}
 	if err := s.CreateUser(ctx, mkUser("victim")); err != nil {
 		t.Errorf("recreate freed username: %v", err)
@@ -292,14 +292,14 @@ func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64
 	if n, _ := s.PasskeyCountForUser(ctx, victimID); n != 0 {
 		t.Errorf("victim passkeys not cascaded: count = %d, want 0", n)
 	}
-	if got, _ := s.GetPasskeyByCredentialID(ctx, vCred); got != nil {
-		t.Errorf("victim passkey still resolvable by credential id after cascade")
+	if got, found, err := s.GetPasskeyByCredentialID(ctx, vCred); err != nil || found || got != nil {
+		t.Errorf("GetPasskeyByCredentialID(victim) after cascade = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, victimID); len(keys) != 0 {
 		t.Errorf("victim api keys not cascaded: count = %d, want 0", len(keys))
 	}
-	if got, _ := s.GetSessionByHash(ctx, "victim-sess"); got != nil {
-		t.Errorf("victim session not cleared on cascade")
+	if got, found, err := s.GetSessionByHash(ctx, "victim-sess"); err != nil || found || got != nil {
+		t.Errorf("GetSessionByHash(%q) after cascade = (%+v, %t, %v), want (nil, false, nil)", "victim-sess", got, found, err)
 	}
 }
 
@@ -309,17 +309,17 @@ func assertKeepUserIntact(t *testing.T, s authlibstore.Composite, keepID int64) 
 	t.Helper()
 	ctx := context.Background()
 
-	if got, _ := s.GetUserByID(ctx, keepID); got == nil {
-		t.Errorf("keep user collaterally deleted")
+	if got, found, err := s.GetUserByID(ctx, keepID); err != nil || !found || got == nil {
+		t.Errorf("GetUserByID(keep) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", got, found, err)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, keepID); n != 1 {
 		t.Errorf("keep passkey collaterally deleted: count = %d, want 1", n)
 	}
-	if got, _ := s.GetAPIKeyByHash(ctx, "keep-hash"); got == nil {
-		t.Errorf("keep api key collaterally deleted")
+	if got, found, err := s.GetAPIKeyByHash(ctx, "keep-hash"); err != nil || !found || got == nil {
+		t.Errorf("GetAPIKeyByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", "keep-hash", got, found, err)
 	}
-	if got, _ := s.GetSessionByHash(ctx, "keep-sess"); got == nil {
-		t.Errorf("keep session collaterally cleared")
+	if got, found, err := s.GetSessionByHash(ctx, "keep-sess"); err != nil || !found || got == nil {
+		t.Errorf("GetSessionByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally cleared", "keep-sess", got, found, err)
 	}
 }
 
@@ -492,7 +492,7 @@ func testSessionExpiry(t *testing.T, h Harness) {
 		t.Errorf("evicted count = %d, want 2", n)
 	}
 	for hash, wantPresent := range map[string]bool{"live": true, "idle": false, "abs": false, "boundary": true} {
-		got, _ := s.GetSessionByHash(ctx, hash)
+		got, _, _ := s.GetSessionByHash(ctx, hash)
 		if present := got != nil; present != wantPresent {
 			t.Errorf("session %q present = %v, want %v", hash, present, wantPresent)
 		}
@@ -521,14 +521,14 @@ func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, cred.CredentialID, 9, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin: %v", err)
 	}
-	if got, _ := s.GetPasskeyByCredentialID(ctx, cred.CredentialID); got == nil || got.SignCount != 9 {
+	if got, _, _ := s.GetPasskeyByCredentialID(ctx, cred.CredentialID); got == nil || got.SignCount != 9 {
 		t.Fatalf("pre-reopen sign_count = %v, want 9", got)
 	}
 
 	// Simulate a process restart.
 	s2 := h.Reopen(t)
 
-	got, err := s2.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	got, _, err := s2.GetPasskeyByCredentialID(ctx, cred.CredentialID)
 	if err != nil {
 		t.Fatalf("GetPasskeyByCredentialID after reopen: %v", err)
 	}
@@ -538,7 +538,7 @@ func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	if got.SignCount != 9 {
 		t.Errorf("sign_count after reopen = %d, want 9 (durable)", got.SignCount)
 	}
-	if gu, _ := s2.GetUserByUsername(ctx, "reopen-owner"); gu == nil {
+	if gu, _, _ := s2.GetUserByUsername(ctx, "reopen-owner"); gu == nil {
 		t.Errorf("durable user did not survive reopen")
 	}
 }

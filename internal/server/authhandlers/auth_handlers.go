@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -41,7 +41,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	dbCtx, dbCancel := dbCtx(ctx)
-	user, err := h.Store.GetUserByUsername(dbCtx, req.Username)
+	user, found, err := h.Store.GetUserByUsername(dbCtx, req.Username)
 	dbCancel()
 	if err != nil {
 		slog.Error("login: db error", "error", err)
@@ -49,7 +49,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user == nil {
+	if !found {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
 		h.RateLimiter.Record(ip, req.Username)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
@@ -99,8 +99,8 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	user := ""
 	token := SessionCookie.ReadCookie(r)
 	if token != "" {
-		if sess, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && sess != nil {
-			if u, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && u != nil {
+		if sess, ok, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && ok {
+			if u, ok, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && ok {
 				user = u.Username
 			}
 		}

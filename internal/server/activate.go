@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/auth/v2"
-	authoidc "github.com/cplieger/auth/v2/oidc"
-	authwebauthn "github.com/cplieger/auth/v2/webauthn"
+	"github.com/cplieger/auth/v3"
+	authoidc "github.com/cplieger/auth/v3/oidc"
+	authwebauthn "github.com/cplieger/auth/v3/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/go-webauthn/webauthn/webauthn"
 )

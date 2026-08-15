@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
@@ -35,7 +35,7 @@ func TestChangePassword_Success(t *testing.T) {
 	}
 
 	// Verify new password works.
-	updated, err := db.GetUserByUsername(t.Context(), "frank")
+	updated, _, err := db.GetUserByUsername(t.Context(), "frank")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 	}
 
 	// Verify new password works.
-	updated, err := db.GetUserByUsername(t.Context(), "mallory")
+	updated, _, err := db.GetUserByUsername(t.Context(), "mallory")
 	if err != nil {
 		t.Fatal(err)
 	}

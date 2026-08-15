@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v2"
-	authwebauthn "github.com/cplieger/auth/v2/webauthn"
+	"github.com/cplieger/auth/v3"
+	authwebauthn "github.com/cplieger/auth/v3/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/search"
@@ -495,12 +495,14 @@ func (fakeOIDCStore) ConsumeOIDCState(context.Context, string) (string, string, 
 	return "", "", "", errMock
 }
 
-func (fakeOIDCStore) GetUserByOIDCSub(context.Context, string, string) (*auth.User, error) {
-	return nil, nil
+func (fakeOIDCStore) GetUserByOIDCSub(context.Context, string, string) (*auth.User, bool, error) {
+	return nil, false, nil
 }
 
-func (fakeOIDCStore) GetUserByUsername(context.Context, string) (*auth.User, error) { return nil, nil }
-func (fakeOIDCStore) CreateUser(context.Context, *auth.User) error                  { return nil }
+func (fakeOIDCStore) GetUserByUsername(context.Context, string) (*auth.User, bool, error) {
+	return nil, false, nil
+}
+func (fakeOIDCStore) CreateUser(context.Context, *auth.User) error { return nil }
 
 // oidcRedirectLocation drives GET /api/auth/oidc through the handler and
 // returns the Location header of the 302.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -110,7 +110,7 @@ func TestGenerateAPIKey_Success(t *testing.T) {
 	// Verify the key is stored as a hash in the DB.
 	h := sha256.Sum256([]byte(key))
 	expectedHash := hex.EncodeToString(h[:])
-	apiKey, err := db.GetAPIKeyByHash(t.Context(), expectedHash)
+	apiKey, _, err := db.GetAPIKeyByHash(t.Context(), expectedHash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 	}
 
 	// Verify the key can be looked up by hash.
-	found, err := db.GetAPIKeyByHash(t.Context(), hash)
+	found, _, err := db.GetAPIKeyByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	}
 
 	// Verify key is gone.
-	found, err := db.GetAPIKeyByHash(t.Context(), hash)
+	found, _, err := db.GetAPIKeyByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}

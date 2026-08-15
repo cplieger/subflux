@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
@@ -187,7 +187,7 @@ func TestLogout_Success(t *testing.T) {
 
 	// Verify session was deleted from DB.
 	hash := auth.SessionHash(token)
-	sess, err := db.GetSessionByHash(t.Context(), hash)
+	sess, _, err := db.GetSessionByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}

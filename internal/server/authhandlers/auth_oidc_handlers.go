@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v2"
-	authoidc "github.com/cplieger/auth/v2/oidc"
+	"github.com/cplieger/auth/v3"
+	authoidc "github.com/cplieger/auth/v3/oidc"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -162,11 +162,11 @@ var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordles
 // Email and username are never used to auto-link; that is an account-takeover
 // vector. A username collision triggers an explicit, password-proven link.
 func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *auth.User, linkToken string, err error) {
-	bySub, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
+	bySub, found, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by sub: %w", err)
 	}
-	if bySub != nil {
+	if found {
 		return bySub, "", nil
 	}
 
@@ -174,11 +174,11 @@ func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims
 	if username == "" {
 		username = claims.Email
 	}
-	byName, err := h.OidcDB.GetUserByUsername(ctx, username)
+	byName, found, err := h.OidcDB.GetUserByUsername(ctx, username)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by username: %w", err)
 	}
-	if byName != nil {
+	if found {
 		// Do NOT auto-link. Require the user to prove ownership of the
 		// existing account with its password before linking the OIDC sub.
 		if byName.PasswordHash == "" {
@@ -233,8 +233,8 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	user, err := h.Store.GetUserByID(ctx, pending.UserID)
-	if err != nil || user == nil {
+	user, found, err := h.Store.GetUserByID(ctx, pending.UserID)
+	if err != nil || !found {
 		slog.Error("oidc link: user lookup", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return

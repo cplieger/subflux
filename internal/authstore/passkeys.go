@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v2"
+	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -247,7 +247,7 @@ func collectPasskeysByUser(tx *bbolt.Tx, userID int64) ([]auth.PasskeyCredential
 // GetPasskeyByCredentialID looks up a passkey by its credential id (the
 // WebAuthn login hot path), returning (nil, nil) when not found (matching the
 // old store's sql.ErrNoRows -> nil mapping). Decoding fails closed.
-func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, error) {
+func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
 	var out *auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
@@ -265,7 +265,7 @@ func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*aut
 		out = rec.toPasskey()
 		return nil
 	})
-	return out, err
+	return out, out != nil, err
 }
 
 // UpdatePasskeyAfterLogin persists the post-login authenticator flags and a
