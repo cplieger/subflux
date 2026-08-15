@@ -56,6 +56,7 @@ export const EXAMPLE_SECTIONS: Sections = {
         api_key: "",
         use_hash: true,
         include_ai_translated: false,
+        include_machine_translated: false,
       },
     },
     betaseries: { enabled: false, priority: 3, settings: { token: "" } },

@@ -83,6 +83,7 @@ func TestFactory_options(t *testing.T) {
 		name     string
 		wantHash bool
 		wantAI   bool
+		wantMT   bool
 	}{
 		// P14: use_hash's product default (true) lives ONLY in the
 		// providerEntries schema declaration; the registry normalizes it in
@@ -94,6 +95,11 @@ func TestFactory_options(t *testing.T) {
 		{name: "use_hash false", extra: map[string]any{"use_hash": false}, wantHash: false, wantAI: false},
 		{name: "include_ai_translated true", extra: map[string]any{"include_ai_translated": true}, wantHash: false, wantAI: true},
 		{name: "include_ai_translated false", extra: map[string]any{"include_ai_translated": false}, wantHash: false, wantAI: false},
+		{name: "include_machine_translated true", extra: map[string]any{"include_machine_translated": true}, wantHash: false, wantMT: true},
+		{name: "include_machine_translated false", extra: map[string]any{"include_machine_translated": false}, wantHash: false, wantMT: false},
+		{name: "both translation flags on", extra: map[string]any{
+			"include_ai_translated": true, "include_machine_translated": true,
+		}, wantAI: true, wantMT: true},
 		{name: "both overridden", extra: map[string]any{
 			"use_hash": false, "include_ai_translated": true,
 		}, wantHash: false, wantAI: true},
@@ -121,6 +127,9 @@ func TestFactory_options(t *testing.T) {
 			}
 			if prov.includeAI != tt.wantAI {
 				t.Errorf("includeAI = %v, want %v", prov.includeAI, tt.wantAI)
+			}
+			if prov.includeMT != tt.wantMT {
+				t.Errorf("includeMT = %v, want %v", prov.includeMT, tt.wantMT)
 			}
 		})
 	}

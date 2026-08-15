@@ -119,7 +119,8 @@ providers:
       password: "" # opensubtitles.com password
       api_key: "" # from opensubtitles.com/consumers
       use_hash: true # match by file hash (fast, exact)
-      include_ai_translated: false # include AI/machine-translated subs
+      include_ai_translated: false # subs from OpenSubtitles' own AI translation pipeline
+      include_machine_translated: false # older machine-translated uploads
   betaseries:
     enabled: false
     priority: 3

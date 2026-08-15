@@ -4,12 +4,35 @@ import { el } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { providerTimeouts } from "./wire/client.gen.js";
 import { cfgProviderBlock, scalarString } from "./config-values.js";
-import type { SchemaSection } from "./api-types.js";
+import type { SchemaField, SchemaSection } from "./api-types.js";
 import { renderField, cfgField, cfgToggle } from "./config-renderers.js";
 
 // --- Inline interfaces for provider API shapes ---
 
 // --- Provider section renderers ---
+
+/** providerFieldValue resolves what a provider setting renders with.
+ *
+ *  An ABSENT key falls back to the schema default, matching both the server
+ *  (provider.NormalizeSettings fills a declared-but-absent field from its
+ *  Default before the factory runs) and the wizard (which already reads
+ *  `f.default`). Without the fallback a field whose default is `true` rendered
+ *  unchecked, and saving the dialog then wrote that false back as the user's
+ *  choice, silently turning the setting off.
+ *
+ *  A PRESENT value is the user's, including `null` from a bare `key:` in YAML:
+ *  the server treats a present-but-null key as set too, so substituting the
+ *  default here would disagree with the value the engine actually uses. */
+export function providerFieldValue(
+  field: SchemaField,
+  settings: Record<string, unknown> | undefined,
+): string {
+  const raw = settings?.[field.key];
+  if (raw === undefined) {
+    return field.default ?? "";
+  }
+  return scalarString(raw);
+}
 
 export function renderProvidersSection(schema: SchemaSection): HTMLElement {
   const sec = el("div", { className: "cfg-section" });
@@ -47,7 +70,7 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
       const settings = block?.settings;
       for (const sf of prov.settings) {
         const fid = `cfg-prov-${prov.name}-s-${sf.key}`;
-        details.appendChild(renderField(fid, sf, scalarString(settings?.[sf.key])));
+        details.appendChild(renderField(fid, sf, providerFieldValue(sf, settings)));
       }
     }
 

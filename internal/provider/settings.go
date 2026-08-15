@@ -25,6 +25,7 @@ const (
 	KeyToken           SettingKey = "token"
 	KeyUseHash         SettingKey = "use_hash"
 	KeyIncludeAI       SettingKey = "include_ai_translated"
+	KeyIncludeMT       SettingKey = "include_machine_translated"
 	KeyAniDBClientKey  SettingKey = "anidb_client_key"
 	KeyMode            SettingKey = "mode"
 	KeyErrorMessage    SettingKey = "error_message"
