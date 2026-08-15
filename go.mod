@@ -5,14 +5,14 @@ go 1.26.6
 require (
 	github.com/cplieger/arrapi v1.8.7
 	github.com/cplieger/atomicfile/v2 v2.9.1
-	github.com/cplieger/auth/v2 v2.1.5
+	github.com/cplieger/auth/v2 v2.1.6
 	github.com/cplieger/health v1.5.1
 	github.com/cplieger/pathinside v1.0.1
 	github.com/cplieger/runesafe v1.4.1
 	github.com/cplieger/slogx v1.6.1
 	github.com/cplieger/ssrf/v3 v3.0.1
 	github.com/cplieger/webhttp v1.23.1
-	github.com/cplieger/wiregen/v2 v2.0.5
+	github.com/cplieger/wiregen/v2 v2.0.6
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.16

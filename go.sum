@@ -4,8 +4,8 @@ github.com/cplieger/arrapi v1.8.7 h1:yjibkRqnTeIuZFXogUKkIivUJJZlZ5vHQTIto4QLnBI
 github.com/cplieger/arrapi v1.8.7/go.mod h1:AoksyDKB+LJM1IY6KuTmUg3zq5fRAmVPMWbvNBp0YlA=
 github.com/cplieger/atomicfile/v2 v2.9.1 h1:ffPe0EEDOUuVJCFpYlj6GbyBBQe6B/M2pYAlgXvXreM=
 github.com/cplieger/atomicfile/v2 v2.9.1/go.mod h1:nGhc6CiB3BdQtQsKh/E4Trp5kr4wRxcpslZYsc/qBRQ=
-github.com/cplieger/auth/v2 v2.1.5 h1:u76BqKyDBvktCn3ZK/395/PCdeb0jSgYWALd1YgNtT0=
-github.com/cplieger/auth/v2 v2.1.5/go.mod h1:gsIfO9xLuADSAeGH7781egpTMNHja/4yR5Ytb6W/y3Y=
+github.com/cplieger/auth/v2 v2.1.6 h1:hvrWR2ELBQ9W0crGi1F5k/n6ujN+vuYX8fsWn4bdC38=
+github.com/cplieger/auth/v2 v2.1.6/go.mod h1:EWDADFGCQTYFJUYQmoVhWoou+WvwpXR7g0V2vgycoew=
 github.com/cplieger/envx v1.6.2 h1:WkkfW0X2zThD0CFa8gyRT0fIkBs92aaJAysrv8DTQ7w=
 github.com/cplieger/envx v1.6.2/go.mod h1:KDD48+0Z6HDkryyvyijGNzEwPb453psx9NKzVlqp9NU=
 github.com/cplieger/envx/yamlenv v1.2.2 h1:esq19+kpbkWzkF8Y6t7M0oq+JwqqbYtqk37miHGp0eY=
@@ -30,8 +30,8 @@ github.com/cplieger/ssrf/v3 v3.0.1 h1:rtRD08Li3O5YKineCNHJWeCfPzmygSNRyWDExtawL0
 github.com/cplieger/ssrf/v3 v3.0.1/go.mod h1:spoZ/AoSyYlf7ha4959OzhvoaWgkSNgCBnvE+GwgkH4=
 github.com/cplieger/webhttp v1.23.1 h1:516SQtv8ARg5MjdqigF8/AXJttWt3LqmKd4rOLXm2bs=
 github.com/cplieger/webhttp v1.23.1/go.mod h1:zamKuC9sws/0ql2zKMroo0bCLUCqvNkgJpK2Ot5GwRo=
-github.com/cplieger/wiregen/v2 v2.0.5 h1:PCCrrKWit7x+iZU9IRKS/ssxICyiuHkUTyr6NCC69G8=
-github.com/cplieger/wiregen/v2 v2.0.5/go.mod h1:4a+9hAOVDz7zzgPt+VVo3kxkVa3Ww3YqfebTEUxbl60=
+github.com/cplieger/wiregen/v2 v2.0.6 h1:GzIYDxDDMcbCDrQ6kp/t8zqZgpTxp4fmn0YVJKNSie0=
+github.com/cplieger/wiregen/v2 v2.0.6/go.mod h1:4a+9hAOVDz7zzgPt+VVo3kxkVa3Ww3YqfebTEUxbl60=
 github.com/cplieger/xmlx v1.0.1 h1:34SuU+x+2qE0uKRtqw3lM66ljYG57z0n+L3Ccp5q8H8=
 github.com/cplieger/xmlx v1.0.1/go.mod h1:+XOW4egV6AeF/Z14oyY4QNPgLkutnGLb5zMXjfhudQE=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
