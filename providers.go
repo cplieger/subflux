@@ -89,7 +89,13 @@ var providerEntries = []providerEntry{
 			},
 			{
 				Key: "include_ai_translated", Label: "Include AI Translated", Type: fieldTypeBool,
-				Default: fieldDefaultFalse, Help: "Include AI/machine-translated subs",
+				Default: fieldDefaultFalse,
+				Help:    "Include subs from OpenSubtitles' own AI translation pipeline",
+			},
+			{
+				Key: "include_machine_translated", Label: "Include Machine Translated",
+				Type: fieldTypeBool, Default: fieldDefaultFalse,
+				Help: "Include older machine-translated uploads (Google Translate era)",
 			},
 		},
 	},

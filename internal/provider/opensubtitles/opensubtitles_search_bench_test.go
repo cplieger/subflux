@@ -31,7 +31,7 @@ func BenchmarkFilterSearchResults(b *testing.B) {
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				filterSearchResults(data, languages, false)
+				filterSearchResults(data, languages, false, false)
 			}
 		})
 	}

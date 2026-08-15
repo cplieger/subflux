@@ -18,6 +18,7 @@ func TestBuildSearchParams(t *testing.T) {
 		wantValue string
 		useHash   bool
 		includeAI bool
+		includeMT bool
 	}{
 		{
 			name:      "languages sorted and mapped",
@@ -151,6 +152,20 @@ func TestBuildSearchParams(t *testing.T) {
 			wantValue: "", // absent
 		},
 		{
+			name:      "machine_translated absent by default",
+			includeMT: false,
+			req:       &api.SearchRequest{Languages: []string{"en"}},
+			wantKey:   "machine_translated",
+			wantValue: "", // absent: the API withholds them unless asked
+		},
+		{
+			name:      "machine_translated requested when included",
+			includeMT: true,
+			req:       &api.SearchRequest{Languages: []string{"en"}},
+			wantKey:   "machine_translated",
+			wantValue: "include",
+		},
+		{
 			name:      "empty languages",
 			req:       &api.SearchRequest{},
 			wantKey:   "languages",
@@ -259,6 +274,7 @@ func TestBuildSearchParams(t *testing.T) {
 			p := &Provider{
 				useHash:   tt.useHash,
 				includeAI: tt.includeAI,
+				includeMT: tt.includeMT,
 			}
 			params := p.buildSearchParams(tt.req,
 				tt.req.Season, tt.req.Episode)
@@ -284,6 +300,7 @@ func TestBuildQueryParams(t *testing.T) {
 		season    int
 		episode   int
 		includeAI bool
+		includeMT bool
 	}{
 		{
 			name:      "title set as query",
@@ -352,6 +369,13 @@ func TestBuildQueryParams(t *testing.T) {
 			wantValue: "",
 		},
 		{
+			name:      "machine_translated requested when included",
+			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}},
+			includeMT: true,
+			wantKey:   "machine_translated",
+			wantValue: "include",
+		},
+		{
 			name:      "no imdb_id or tmdb_id in query params",
 			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, ImdbID: "tt1234567", TmdbID: 550},
 			wantKey:   "imdb_id",
@@ -368,7 +392,7 @@ func TestBuildQueryParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &Provider{includeAI: tt.includeAI}
+			p := &Provider{includeAI: tt.includeAI, includeMT: tt.includeMT}
 			season := tt.season
 			if season == 0 && tt.req.Season > 0 {
 				season = tt.req.Season

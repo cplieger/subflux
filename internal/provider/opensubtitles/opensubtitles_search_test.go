@@ -230,7 +230,7 @@ func TestFilterSearchResults(t *testing.T) {
 
 	t.Run("nil data returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := filterSearchResults(nil, []string{"en"}, false)
+		got := filterSearchResults(nil, []string{"en"}, false, false)
 		if got != nil {
 			t.Errorf("filterSearchResults(nil) = %v, want nil", got)
 		}
@@ -238,7 +238,7 @@ func TestFilterSearchResults(t *testing.T) {
 
 	t.Run("empty data returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := filterSearchResults([]searchResult{}, []string{"en"}, false)
+		got := filterSearchResults([]searchResult{}, []string{"en"}, false, false)
 		if got != nil {
 			t.Errorf("filterSearchResults([]) = %v, want nil", got)
 		}
@@ -247,7 +247,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("basic result mapped correctly", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "Test.Release", 42)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -271,7 +271,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("hash match sets matched_by to hash", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withHash)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -283,7 +283,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("AI translated excluded when includeAI false", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withAI)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 0 {
 			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
 		}
@@ -292,25 +292,46 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("AI translated included when includeAI true", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withAI)}
-		got := filterSearchResults(data, []string{"en"}, true)
+		got := filterSearchResults(data, []string{"en"}, true, false)
 		if len(got) != 1 {
 			t.Errorf("filterSearchResults() = %d results, want 1", len(got))
 		}
 	})
 
-	t.Run("machine translated always excluded", func(t *testing.T) {
+	t.Run("machine translated excluded when includeMT false", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withMachine)}
-		got := filterSearchResults(data, []string{"en"}, true)
+		got := filterSearchResults(data, []string{"en"}, true, false)
 		if len(got) != 0 {
-			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
+			t.Errorf("filterSearchResults(machine-translated, includeAI=true, includeMT=false) = %d results, want 0",
+				len(got))
+		}
+	})
+
+	t.Run("machine translated included when includeMT true", func(t *testing.T) {
+		t.Parallel()
+		data := []searchResult{makeResult("en", "rel", 1, withMachine)}
+		got := filterSearchResults(data, []string{"en"}, false, true)
+		if len(got) != 1 {
+			t.Errorf("filterSearchResults(machine-translated, includeAI=false, includeMT=true) = %d results, want 1",
+				len(got))
+		}
+	})
+
+	t.Run("AI translated stays excluded when only includeMT true", func(t *testing.T) {
+		t.Parallel()
+		data := []searchResult{makeResult("en", "rel", 1, withAI)}
+		got := filterSearchResults(data, []string{"en"}, false, true)
+		if len(got) != 0 {
+			t.Errorf("filterSearchResults(ai-translated, includeAI=false, includeMT=true) = %d results, want 0",
+				len(got))
 		}
 	})
 
 	t.Run("no files skipped", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withNoFiles)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 0 {
 			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
 		}
@@ -319,7 +340,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("language not in requested list skipped", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("fr", "rel", 1)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 0 {
 			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
 		}
@@ -328,7 +349,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("OS language mapped before filtering", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("pt-PT", "rel", 1)}
-		got := filterSearchResults(data, []string{"pt"}, false)
+		got := filterSearchResults(data, []string{"pt"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -340,7 +361,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("hearing impaired flag preserved", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withHI)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -355,7 +376,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("foreign parts only sets forced when not HI", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withForeign)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -367,7 +388,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("foreign parts only suppressed by HI", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withForeign, withHI)}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -379,7 +400,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("ea language mapped to es through filter", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("ea", "spanish-rel", 10)}
-		got := filterSearchResults(data, []string{"es"}, false)
+		got := filterSearchResults(data, []string{"es"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -391,7 +412,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("zh-CN language mapped to zh through filter", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("zh-CN", "chinese-rel", 11)}
-		got := filterSearchResults(data, []string{"zh"}, false)
+		got := filterSearchResults(data, []string{"zh"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -403,7 +424,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("nil languages returns no results", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1)}
-		got := filterSearchResults(data, nil, false)
+		got := filterSearchResults(data, nil, false, false)
 		if len(got) != 0 {
 			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
 		}
@@ -412,7 +433,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("empty languages returns no results", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1)}
-		got := filterSearchResults(data, []string{}, false)
+		got := filterSearchResults(data, []string{}, false, false)
 		if len(got) != 0 {
 			t.Errorf("filterSearchResults() = %d results, want 0", len(got))
 		}
@@ -433,7 +454,7 @@ func TestFilterSearchResults(t *testing.T) {
 				},
 			},
 		}}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
@@ -459,7 +480,7 @@ func TestFilterSearchResults(t *testing.T) {
 			makeResult("fr", "wrong-lang", 3),
 			makeResult("en", "also-good", 4),
 		}
-		got := filterSearchResults(data, []string{"en"}, false)
+		got := filterSearchResults(data, []string{"en"}, false, false)
 		if len(got) != 2 {
 			t.Fatalf("filterSearchResults() = %d results, want 2", len(got))
 		}
@@ -474,9 +495,20 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("machine translated excluded even when AI included", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("en", "rel", 1, withAI, withMachine)}
-		got := filterSearchResults(data, []string{"en"}, true)
+		got := filterSearchResults(data, []string{"en"}, true, false)
 		if len(got) != 0 {
-			t.Errorf("filterSearchResults() = %d results, want 0 (machine always excluded)", len(got))
+			t.Errorf("filterSearchResults(ai+machine, includeAI=true, includeMT=false) = %d results, want 0",
+				len(got))
+		}
+	})
+
+	t.Run("both flags on keeps an ai plus machine result", func(t *testing.T) {
+		t.Parallel()
+		data := []searchResult{makeResult("en", "rel", 1, withAI, withMachine)}
+		got := filterSearchResults(data, []string{"en"}, true, true)
+		if len(got) != 1 {
+			t.Errorf("filterSearchResults(ai+machine, includeAI=true, includeMT=true) = %d results, want 1",
+				len(got))
 		}
 	})
 
@@ -487,7 +519,7 @@ func TestFilterSearchResults(t *testing.T) {
 			makeResult("fr", "french-rel", 2),
 			makeResult("de", "german-rel", 3),
 		}
-		got := filterSearchResults(data, []string{"en", "fr"}, false)
+		got := filterSearchResults(data, []string{"en", "fr"}, false, false)
 		if len(got) != 2 {
 			t.Fatalf("filterSearchResults() = %d results, want 2", len(got))
 		}
@@ -502,7 +534,7 @@ func TestFilterSearchResults(t *testing.T) {
 	t.Run("pt-BR language mapped to pb through filter", func(t *testing.T) {
 		t.Parallel()
 		data := []searchResult{makeResult("pt-BR", "brazilian-rel", 12)}
-		got := filterSearchResults(data, []string{"pb"}, false)
+		got := filterSearchResults(data, []string{"pb"}, false, false)
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}

@@ -68,6 +68,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	// accessor's zero — not the product default.
 	useHash := ps.UseHash
 	includeAI := provider.SettingBool(settings, provider.KeyIncludeAI, false)
+	includeMT := provider.SettingBool(settings, provider.KeyIncludeMT, false)
 
 	// Channel-based token bucket: capacity 1, pre-filled so the first request
 	// proceeds immediately. A background ticker refills at the rate limit interval.
@@ -80,6 +81,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 		apiKey:    ps.APIKey,
 		useHash:   useHash,
 		includeAI: includeAI,
+		includeMT: includeMT,
 		rateCh:    rateCh,
 		client:    provider.NewHTTPClient(provider.HTTPTimeoutExtended),
 	}, nil
@@ -100,6 +102,7 @@ type Provider struct {
 	vip        bool
 	useHash    bool
 	includeAI  bool
+	includeMT  bool
 }
 
 // Name returns the provider identifier for OpenSubtitles.
@@ -216,6 +219,9 @@ func (p *Provider) CountShowSubtitles(ctx context.Context, imdbID, lang string) 
 	params.Set("languages", toOSLang(lang))
 	if !p.includeAI {
 		params.Set("ai_translated", "exclude")
+	}
+	if p.includeMT {
+		params.Set("machine_translated", "include")
 	}
 
 	slog.Debug("opensubtitles show count", "imdb", imdbID, "lang", lang)

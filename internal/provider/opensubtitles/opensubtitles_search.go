@@ -162,7 +162,7 @@ func (p *Provider) paginatedSearch(ctx context.Context, params url.Values,
 			"total_count", resp.TotalCount, "raw", len(resp.Data))
 
 		allResults = append(allResults,
-			filterSearchResults(resp.Data, languages, p.includeAI)...)
+			filterSearchResults(resp.Data, languages, p.includeAI, p.includeMT)...)
 
 		if len(allResults) >= maxResults || page >= resp.TotalPages {
 			break
@@ -182,7 +182,15 @@ func joinOSLangs(langs []string) string {
 }
 
 // commonSearchParams returns the parameters shared by both ID-based and
-// query-based searches: languages, season/episode numbers, and AI filter.
+// query-based searches: languages, season/episode numbers, and the two
+// provenance filters.
+//
+// The API's own defaults are asymmetric, so each provenance flag carries only
+// its non-default direction: AI-translated results come back unless the query
+// excludes them, and machine-translated results stay out unless the query
+// includes them. filterSearchResults re-checks both on the returned
+// attributes, so a server-side change of either default cannot leak results
+// past the user's choice.
 func (p *Provider) commonSearchParams(req *api.SearchRequest,
 	season, episode int,
 ) url.Values {
@@ -198,6 +206,9 @@ func (p *Provider) commonSearchParams(req *api.SearchRequest,
 	}
 	if !p.includeAI {
 		params.Set("ai_translated", "exclude")
+	}
+	if p.includeMT {
+		params.Set("machine_translated", "include")
 	}
 	return params
 }
@@ -248,14 +259,18 @@ func (p *Provider) buildQueryParams(req *api.SearchRequest,
 // --- Result Filtering ---
 
 // filterSearchResults converts raw API search results into Subtitle values,
-// applying language, AI, and machine-translation filters. Pure function.
-func filterSearchResults(data []searchResult, languages []string, includeAI bool) []api.Subtitle {
+// applying language and provenance filters. Both provenance flags default to
+// off, so an auto-generated subtitle is dropped unless the user asked for its
+// kind. Pure function.
+func filterSearchResults(data []searchResult, languages []string,
+	includeAI, includeMT bool,
+) []api.Subtitle {
 	var results []api.Subtitle
 	for _, item := range data {
 		if !includeAI && item.Attributes.AITranslated {
 			continue
 		}
-		if item.Attributes.MachineTranslated {
+		if !includeMT && item.Attributes.MachineTranslated {
 			continue
 		}
 		if len(item.Attributes.Files) == 0 {
