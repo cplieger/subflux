@@ -272,12 +272,21 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 
 // assertVictimCascaded verifies the deleted user is gone, its username is
 // freed, and its passkeys, API keys, and sessions were all cascaded away
-// (Requirement 9.4).
+// (Requirement 9.4). Split in two so each half stays inside gocyclo's ceiling:
+// every lookup now asserts the full (value, found, err) triple, which costs
+// two branches apiece.
 func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64, vCred []byte) {
+	t.Helper()
+	assertVictimIdentityFreed(t, s, victimID)
+	assertVictimChildrenCascaded(t, s, victimID, vCred)
+}
+
+// assertVictimIdentityFreed checks the user record itself is gone and its
+// username can be claimed again.
+func assertVictimIdentityFreed(t *testing.T, s authlibstore.Composite, victimID int64) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Victim user gone, username freed.
 	if got, found, err := s.GetUserByID(ctx, victimID); err != nil || found || got != nil {
 		t.Errorf("GetUserByID(victim) after delete = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
 	}
@@ -287,8 +296,14 @@ func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64
 	if err := s.CreateUser(ctx, mkUser("victim")); err != nil {
 		t.Errorf("recreate freed username: %v", err)
 	}
+}
 
-	// Victim's children gone.
+// assertVictimChildrenCascaded checks the deleted user's passkeys, API keys and
+// sessions went with it.
+func assertVictimChildrenCascaded(t *testing.T, s authlibstore.Composite, victimID int64, vCred []byte) {
+	t.Helper()
+	ctx := context.Background()
+
 	if n, _ := s.PasskeyCountForUser(ctx, victimID); n != 0 {
 		t.Errorf("victim passkeys not cascaded: count = %d, want 0", n)
 	}
