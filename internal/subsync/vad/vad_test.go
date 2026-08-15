@@ -330,7 +330,7 @@ func TestProcessFrameLLR_never_panics(t *testing.T) {
 
 func TestFramesBinaryThresholdTuned_empty_pcm(t *testing.T) {
 	t.Parallel()
-	result := FramesBinaryThresholdTuned(context.Background(), nil, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	result := FramesBinaryThresholdTuned(t.Context(), nil, ModeVeryAggressive, 125, 10, 0, Tuning{})
 	if len(result) != 0 {
 		t.Errorf("FramesBinaryThresholdTuned(nil) len = %d, want 0", len(result))
 	}
@@ -340,7 +340,7 @@ func TestFramesBinaryThresholdTuned_silence(t *testing.T) {
 	t.Parallel()
 	// 10 frames of silence (800 samples at 80 samples/frame).
 	pcm := make([]int16, 800)
-	result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
 	if len(result) != 10 {
 		t.Fatalf("FramesBinaryThresholdTuned(silence) len = %d, want 10", len(result))
 	}
@@ -361,7 +361,7 @@ func TestFramesBinaryThresholdTuned_detects_loud_warmup(t *testing.T) {
 		pcm[i] = 20000
 	}
 	minE := int16(5)
-	result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 0, 3, 1.0, Tuning{minEnergy: &minE})
+	result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 0, 3, 1.0, Tuning{minEnergy: &minE})
 	if len(result) != 20 {
 		t.Fatalf("len = %d, want 20", len(result))
 	}
@@ -415,7 +415,7 @@ func TestFramesBinaryThresholdTuned_frame_windowing(t *testing.T) {
 	t.Parallel()
 	pcm := make([]int16, 160)
 	copy(pcm, loudFrame()) // frame 0 loud; frame 1 stays silent
-	got := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 750, 0, 1.0, Tuning{})
+	got := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 750, 0, 1.0, Tuning{})
 	if len(got) != 2 {
 		t.Fatalf("len(result) = %d, want 2", len(got))
 	}
@@ -432,7 +432,7 @@ func TestFramesBinaryThresholdTuned_overhang_counts_down(t *testing.T) {
 	t.Parallel()
 	pcm := make([]int16, 80*7) // loud frame 0, silence frames 1..6
 	copy(pcm, loudFrame())
-	got := FramesBinaryThresholdTuned(context.Background(), pcm, ModeQuality, 300, 2, 1.0, Tuning{})
+	got := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 300, 2, 1.0, Tuning{})
 	if len(got) != 7 {
 		t.Fatalf("len(result) = %d, want 7", len(got))
 	}
@@ -450,7 +450,7 @@ func TestFramesBinaryThresholdTuned_output_binary(t *testing.T) {
 			pcm[i] = rapid.Int16().Draw(t, "sample")
 		}
 		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
-		result := FramesBinaryThresholdTuned(context.Background(), pcm, mode, 125, 10, 0, Tuning{})
+		result := FramesBinaryThresholdTuned(t.Context(), pcm, mode, 125, 10, 0, Tuning{})
 		// Output length must equal number of frames.
 		if len(result) != nFrames {
 			t.Fatalf("len(result) = %d, want %d", len(result), nFrames)
@@ -470,7 +470,7 @@ func TestFramesBinaryThresholdTuned_empty_returns_empty(t *testing.T) {
 		// Any PCM shorter than 80 samples produces zero frames.
 		n := rapid.IntRange(0, 79).Draw(t, "n")
 		pcm := make([]int16, n)
-		result := FramesBinaryThresholdTuned(context.Background(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+		result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
 		if len(result) != 0 {
 			t.Fatalf("len(result) = %d for %d samples, want 0", len(result), n)
 		}

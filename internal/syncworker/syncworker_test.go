@@ -57,7 +57,7 @@ func runWorkerOn(t *testing.T, req any) (Response, int) {
 		t.Fatalf("marshal request: %v", err)
 	}
 	var out bytes.Buffer
-	code := RunWorker(context.Background(), bytes.NewReader(payload), &out)
+	code := RunWorker(t.Context(), bytes.NewReader(payload), &out)
 	var resp Response
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v (raw %q)", err, out.String())
@@ -105,7 +105,7 @@ func TestRunWorker_unknown_op_errors(t *testing.T) {
 func TestRunWorker_garbage_stdin_errors(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
-	code := RunWorker(context.Background(), strings.NewReader("not json"), &out)
+	code := RunWorker(t.Context(), strings.NewReader("not json"), &out)
 	if code == 0 {
 		t.Errorf("exit code = 0, want nonzero for undecodable request")
 	}
@@ -142,7 +142,7 @@ func TestClient_concurrency_one(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Go(func() {
-			c.Audio(context.Background(), []byte(tinySRT), "/v.mkv", "")
+			c.Audio(t.Context(), []byte(tinySRT), "/v.mkv", "")
 		})
 	}
 	wg.Wait()
@@ -156,7 +156,7 @@ func TestClient_spawn_error_degrades_to_no_change(t *testing.T) {
 	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
 		return nil, errors.New("signal: killed") // the OOM-kill shape
 	})
-	result := c.Reference(context.Background(), []byte(tinySRT), "/v.mkv", "fr", 0)
+	result := c.Reference(t.Context(), []byte(tinySRT), "/v.mkv", "fr", 0)
 	if result.Applied() || result.Method != subsync.MethodNone {
 		t.Errorf("result = %+v, want no-change on worker death", result)
 	}
@@ -170,7 +170,7 @@ func TestClient_response_error_degrades_to_no_change(t *testing.T) {
 	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
 		return &Response{Version: ProtocolVersion, Error: "boom"}, nil
 	})
-	result := c.Audio(context.Background(), []byte(tinySRT), "/v.mkv", "")
+	result := c.Audio(t.Context(), []byte(tinySRT), "/v.mkv", "")
 	if result.Applied() {
 		t.Errorf("result applied despite job error")
 	}
@@ -182,13 +182,21 @@ func TestClient_response_error_degrades_to_no_change(t *testing.T) {
 func TestClient_cancelled_while_queued_returns_no_change(t *testing.T) {
 	t.Parallel()
 	release := make(chan struct{})
+	occupied := make(chan struct{})
+	var once sync.Once
 	c := newSeamClient(func(_ context.Context, _ *Request) (*Response, error) {
+		// Signalled from INSIDE the seam, which run() reaches only after it
+		// holds the single slot. sync.Once because a regression that lets the
+		// cancelled call through would call the seam twice.
+		once.Do(func() { close(occupied) })
 		<-release
 		return &Response{Version: ProtocolVersion}, nil
 	})
-	// Occupy the slot.
-	go c.Audio(context.Background(), nil, "/v.mkv", "")
-	time.Sleep(10 * time.Millisecond)
+	// Occupy the slot, then wait for proof it is held. Without the wait the
+	// cancelled call below can win the free slot, and the test would exercise
+	// the ordinary path instead of the queued-then-cancelled one it names.
+	go c.Audio(t.Context(), nil, "/v.mkv", "")
+	<-occupied
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -208,7 +216,7 @@ func TestSyncWorkerHelperProcess(t *testing.T) {
 	case "":
 		t.Skip("helper process entry, not a test")
 	case "worker":
-		os.Exit(RunWorker(context.Background(), os.Stdin, os.Stdout))
+		os.Exit(RunWorker(t.Context(), os.Stdin, os.Stdout))
 	case "hang":
 		time.Sleep(30 * time.Second)
 		os.Exit(0)
@@ -236,7 +244,7 @@ func TestClient_real_process_roundtrip(t *testing.T) {
 	c := helperClient(t, "worker")
 	// No video file: the reference strategy finds no reference and reports
 	// no-change — proving the exec + JSON plumbing end to end.
-	result := c.Reference(context.Background(), []byte(tinySRT), "/nonexistent/v.mkv", "fr", 0)
+	result := c.Reference(t.Context(), []byte(tinySRT), "/nonexistent/v.mkv", "fr", 0)
 	if result.Applied() || result.Method != subsync.MethodNone {
 		t.Errorf("real-process result = %+v, want clean no-change", result)
 	}
@@ -245,7 +253,7 @@ func TestClient_real_process_roundtrip(t *testing.T) {
 func TestClient_kill_on_cancel(t *testing.T) {
 	t.Parallel()
 	c := helperClient(t, "hang")
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()

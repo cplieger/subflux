@@ -1,7 +1,6 @@
 package animetosho
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -12,9 +11,9 @@ import (
 func TestFactory(t *testing.T) {
 	t.Parallel()
 
-	p, err := Factory(context.Background(), nil)
+	p, err := Factory(t.Context(), nil)
 	if err != nil {
-		t.Fatalf("Factory(context.Background(), nil) unexpected error: %v", err)
+		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
 	if p.Name() != api.ProviderNameAnimeTosho {
 		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameAnimeTosho)
@@ -24,7 +23,7 @@ func TestFactory(t *testing.T) {
 func TestFactory_accepts_any_settings(t *testing.T) {
 	t.Parallel()
 
-	p, err := Factory(context.Background(), map[string]any{"key": "value"})
+	p, err := Factory(t.Context(), map[string]any{"key": "value"})
 	if err != nil {
 		t.Fatalf("Factory(settings) unexpected error: %v", err)
 	}
@@ -37,9 +36,9 @@ func TestFactory_accepts_any_settings(t *testing.T) {
 
 func TestSearch_skips_non_episode(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	req := &api.SearchRequest{MediaType: "movie", Title: "Akira", Languages: []string{"en"}}
-	got, err := p.Search(context.Background(), req)
+	got, err := p.Search(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
 	}
@@ -50,9 +49,9 @@ func TestSearch_skips_non_episode(t *testing.T) {
 
 func TestSearch_skips_empty_title(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	req := &api.SearchRequest{MediaType: "episode", Title: "", Languages: []string{"en"}}
-	got, err := p.Search(context.Background(), req)
+	got, err := p.Search(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
 	}
@@ -65,9 +64,9 @@ func TestSearch_skips_empty_title(t *testing.T) {
 
 func TestDownload_rejects_ssrf_url(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
-	_, err := p.Download(context.Background(), sub)
+	_, err := p.Download(t.Context(), sub)
 	if err == nil {
 		t.Fatal("Download(loopback URL) expected error, got nil")
 	}
@@ -75,9 +74,9 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 
 func TestDownload_rejects_internal_ip(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
-	_, err := p.Download(context.Background(), sub)
+	_, err := p.Download(t.Context(), sub)
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")
 	}

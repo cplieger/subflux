@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,7 +19,7 @@ func FuzzHashFile(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		h, size, err := hashFile(context.Background(), tmp)
+		h, size, err := hashFile(t.Context(), tmp)
 
 		// Files smaller than 2*hashBlockSize are expected to error.
 		if int64(len(data)) < hashBlockSize*2 {

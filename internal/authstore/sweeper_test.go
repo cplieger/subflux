@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -41,7 +40,7 @@ func waitFor(d time.Duration, cond func() bool) bool {
 // store (used as the eviction predicate).
 func sessionPresent(t *testing.T, s *Store, hash string) bool {
 	t.Helper()
-	got, err := s.GetSessionByHash(context.Background(), hash)
+	got, err := s.GetSessionByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatalf("GetSessionByHash: %v", err)
 	}
@@ -66,7 +65,7 @@ func oidcPresent(s *Store, state string) bool {
 // (Requirement 10.3).
 func TestSweeper_evictsExpiredSessionsAndOIDCStates(t *testing.T) {
 	s := newSweeperStore(t, 2*time.Millisecond)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Expired session: idle 48h ago, well past the 24h default idle timeout.
@@ -106,7 +105,7 @@ func TestSweeper_evictsExpiredSessionsAndOIDCStates(t *testing.T) {
 // no more work: an entry that becomes expired only AFTER Close stays put.
 func TestSweeper_closeStopsFurtherSweeps(t *testing.T) {
 	s := newSweeperStore(t, 2*time.Millisecond)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Start the sweeper, then stop it. Close waits for the goroutine to exit.

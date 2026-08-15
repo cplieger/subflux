@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -105,11 +105,11 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 	for i, p := range providers {
 		names[i] = string(p.Name())
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 
 	// Languages may arrive in any order from upstream callers; sort for stability.
 	langs := append([]string(nil), req.Languages...)
-	sort.Strings(langs)
+	slices.Sort(langs)
 
 	return keyenc.Join(
 		string(req.MediaType),

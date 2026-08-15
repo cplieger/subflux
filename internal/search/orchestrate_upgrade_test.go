@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -125,7 +124,7 @@ func TestSearchTargets_upgrade(t *testing.T) {
 			}
 			targets := []api.SubtitleTarget{{Code: "fr"}}
 
-			result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+			result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 			if err != nil {
 				t.Fatalf("SearchTargets() unexpected error: %v", err)
 			}

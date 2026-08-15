@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"testing"
 )
@@ -27,7 +26,7 @@ providers:
     enabled: true
     settings: {}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -67,7 +66,7 @@ providers:
     enabled: true
     settings: {}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -100,7 +99,7 @@ providers:
     enabled: true
     settings: {}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -133,7 +132,7 @@ providers:
     enabled: true
     settings: {}
 `
-	_, err := LoadFromBytes(context.Background(), []byte(yaml))
+	_, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err == nil {
 		t.Fatal("expected error for both variant and variants set")
 	}
@@ -157,7 +156,7 @@ providers:
     enabled: true
     settings: {}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -174,7 +173,7 @@ providers:
 
 func TestExpandVariants_no_variant_stays_empty(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -208,7 +207,7 @@ providers:
     enabled: true
     settings: {}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -237,7 +236,7 @@ providers:
     enabled: true
     settings: {}
 `
-	_, err := LoadFromBytes(context.Background(), []byte(yaml))
+	_, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err == nil {
 		t.Fatal("expected error for both variant and variants in default target")
 	}

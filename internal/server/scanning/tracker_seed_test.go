@@ -72,7 +72,7 @@ func TestSeed_saturated_season_trips_on_first_real_no_result(t *testing.T) {
 		t.Fatal("earlyStop before any recorded outcome; seeding must not set it as a fact")
 	}
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if !st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("seeded season did not trip after its first real no-result (seed 5 + 1 >= threshold 3)")
 	}
@@ -96,7 +96,7 @@ func TestSeed_new_provider_zeroes_seed(t *testing.T) {
 	}}
 	st := seedTracker(reader, []api.ProviderID{"p1", "p2"}, 0, now)
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("season tripped with a fresh provider enabled; new-provider rows-absent must zero the seed")
 	}
@@ -114,7 +114,7 @@ func TestSeed_expired_rows_do_not_count(t *testing.T) {
 	}}
 	st := seedTracker(reader, []api.ProviderID{"p1"}, 0, now)
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("expired backoff rows counted toward the seed; ladder expiry must deflate it")
 	}
@@ -133,7 +133,7 @@ func TestSeed_max_attempts_saturation_counts(t *testing.T) {
 	}}
 	st := seedTracker(reader, []api.ProviderID{"p1"}, 5, now)
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if !st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("maxAttempts-saturated rows did not count toward the seed (3 + 1 >= threshold 3)")
 	}
@@ -153,8 +153,8 @@ func TestSeed_found_resets_seeded_counter(t *testing.T) {
 	st := seedTracker(reader, []api.ProviderID{"p1"}, 0, now)
 
 	// A found result on the season's first outcome wipes the seeded count.
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanFound, 10)
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanFound, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("season tripped after a found result; ScanFound must reset the seeded counter")
 	}
@@ -175,7 +175,7 @@ func TestSeed_partial_provider_suppression_not_counted(t *testing.T) {
 	}}
 	st := seedTracker(reader, []api.ProviderID{"p1", "p2"}, 0, now)
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("partially-suppressed episodes counted toward the seed")
 	}
@@ -194,7 +194,7 @@ func TestSeed_other_language_rows_ignored(t *testing.T) {
 	}}
 	st := seedTracker(reader, []api.ProviderID{"p1"}, 0, now)
 
-	st.recordOutcome(context.Background(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
+	st.recordOutcome(t.Context(), "tt42", 1, "fr", seedPrefix, ScanNoResult, 10)
 	if st.shouldSkipSeason("tt42", 1, "fr") {
 		t.Error("another language's rows seeded this language's counter")
 	}

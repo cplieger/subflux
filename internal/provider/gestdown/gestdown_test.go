@@ -27,9 +27,9 @@ func canceledContext() context.Context {
 func TestFactory(t *testing.T) {
 	t.Parallel()
 
-	p, err := Factory(context.Background(), nil)
+	p, err := Factory(t.Context(), nil)
 	if err != nil {
-		t.Fatalf("Factory(context.Background(), nil) unexpected error: %v", err)
+		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
 	if p.Name() != api.ProviderNameGestdown {
 		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameGestdown)
@@ -40,7 +40,7 @@ func TestFactory(t *testing.T) {
 
 func TestSearch_skips_non_episode(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	// A movie (even with a valid TVDB ID) must be skipped before any network
 	// call; the cancelled context proves no HTTP request is attempted.
 	req := &api.SearchRequest{MediaType: api.MediaTypeMovie, TvdbID: 12345, Languages: []string{"en"}}
@@ -55,7 +55,7 @@ func TestSearch_skips_non_episode(t *testing.T) {
 
 func TestSearch_skips_zero_tvdb_id(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	// An episode with no TVDB ID must be skipped before any network call.
 	req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, TvdbID: 0, Languages: []string{"en"}}
 	got, err := p.Search(canceledContext(), req)
@@ -71,7 +71,7 @@ func TestSearch_skips_zero_tvdb_id(t *testing.T) {
 
 func TestDownload_rejects_ssrf_url(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
 	_, err := p.Download(canceledContext(), sub)
 	if err == nil {
@@ -87,7 +87,7 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 
 func TestDownload_rejects_internal_ip(t *testing.T) {
 	t.Parallel()
-	p, _ := Factory(context.Background(), nil)
+	p, _ := Factory(t.Context(), nil)
 	sub := &api.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
 	_, err := p.Download(canceledContext(), sub)
 	if err == nil {

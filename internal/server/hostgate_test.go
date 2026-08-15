@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +31,7 @@ providers:
     settings:
       api_key: "test"
 ` + extra
-	cfg, err := config.LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := config.LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}

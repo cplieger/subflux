@@ -122,7 +122,7 @@ func TestShowLevelSkipDoesNotShareVerdictAcrossForgedKeys(t *testing.T) {
 		covered: episodes,
 	}}
 	st := newSeasonTracker(counter, showskip.New(time.Hour), seedDeps{})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if !st.showLevelSkip(ctx, bare[0], episodes, bare[1]) {
 		t.Errorf("a series with no upstream subtitles should be skipped")

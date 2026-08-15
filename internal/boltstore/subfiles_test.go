@@ -2,7 +2,6 @@ package boltstore
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -34,7 +33,7 @@ func subFile(lang string, variant api.Variant, source api.SubtitleSource, codec,
 // listFiles is a context-free GetSubtitleFiles for tests.
 func listFiles(t *testing.T, db *DB, mt api.MediaType, prefix string) []api.SubtitleEntry {
 	t.Helper()
-	rows, err := db.GetSubtitleFiles(context.Background(), mt, prefix)
+	rows, err := db.GetSubtitleFiles(t.Context(), mt, prefix)
 	if err != nil {
 		t.Fatalf("GetSubtitleFiles(%q, %q): %v", mt, prefix, err)
 	}
@@ -44,7 +43,7 @@ func listFiles(t *testing.T, db *DB, mt api.MediaType, prefix string) []api.Subt
 // totalFiles is a context-free TotalSubtitleFiles for tests.
 func totalFiles(t *testing.T, db *DB) int {
 	t.Helper()
-	n, err := db.TotalSubtitleFiles(context.Background())
+	n, err := db.TotalSubtitleFiles(t.Context())
 	if err != nil {
 		t.Fatalf("TotalSubtitleFiles: %v", err)
 	}
@@ -74,7 +73,7 @@ func countFileRowsRaw(t *testing.T, db *DB) int {
 // updates.
 func setFileOffset(t *testing.T, db *DB, path string, offset int64) {
 	t.Helper()
-	if err := db.SetSyncOffset(context.Background(), path, offset); err != nil {
+	if err := db.SetSyncOffset(t.Context(), path, offset); err != nil {
 		t.Fatalf("SetSyncOffset(%q): %v", path, err)
 	}
 }
@@ -88,7 +87,7 @@ func TestRecordSubtitleFiles_inserts_and_lists(t *testing.T) {
 		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
 	}
 
-	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", files)
+	changed, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", files)
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
@@ -116,10 +115,10 @@ func TestRecordSubtitleFiles_no_change_returns_false(t *testing.T) {
 	db, _ := openTemp(t)
 	files := []api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}
 
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", files); err != nil {
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", files); err != nil {
 		t.Fatalf("first RecordSubtitleFiles: %v", err)
 	}
-	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", files)
+	changed, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", files)
 	if err != nil {
 		t.Fatalf("second RecordSubtitleFiles: %v", err)
 	}
@@ -133,7 +132,7 @@ func TestRecordSubtitleFiles_no_change_returns_false(t *testing.T) {
 
 func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -141,7 +140,7 @@ func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testin
 	// affect the joined value.
 	setFileOffset(t, db, "/m/x.en.srt", 1500)
 
-	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	changed, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "ass", "/m/x.en.srt")})
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
@@ -166,14 +165,14 @@ func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testin
 
 func TestRecordSubtitleFiles_deletes_stale(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []api.SubtitleFile{
 		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
 		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	// Re-record with only the fr file: the en row must be deleted.
-	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	changed, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt")})
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
@@ -192,11 +191,11 @@ func TestRecordSubtitleFiles_deletes_stale(t *testing.T) {
 
 func TestRecordSubtitleFiles_empty_clears_existing(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	changed, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", nil)
+	changed, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", nil)
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles(nil): %v", err)
 	}
@@ -213,16 +212,16 @@ func TestRecordSubtitleFiles_empty_clears_existing(t *testing.T) {
 
 func TestRecordSubtitleFiles_other_media_unaffected(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/a.en.srt")}); err != nil {
 		t.Fatalf("seed A: %v", err)
 	}
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-2",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-2",
 		[]api.SubtitleFile{subFile("fr", vStd, srcExt, "srt", "/m/b.fr.srt")}); err != nil {
 		t.Fatalf("seed B: %v", err)
 	}
 	// Clearing tmdb-1 must not touch tmdb-2.
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", nil); err != nil {
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", nil); err != nil {
 		t.Fatalf("clear A: %v", err)
 	}
 	if rows := listFiles(t, db, covMT, "tmdb-2"); len(rows) != 1 {
@@ -238,7 +237,7 @@ func TestRecordSubtitleFiles_other_media_unaffected(t *testing.T) {
 func TestUpsertSubtitleFile_insert_then_update_preserves_offset(t *testing.T) {
 	db, _ := openTemp(t)
 	f := subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")
-	if err := db.UpsertSubtitleFile(context.Background(), covMT, "tmdb-1", &f); err != nil {
+	if err := db.UpsertSubtitleFile(t.Context(), covMT, "tmdb-1", &f); err != nil {
 		t.Fatalf("insert upsert: %v", err)
 	}
 	if totalFiles(t, db) != 1 {
@@ -248,7 +247,7 @@ func TestUpsertSubtitleFile_insert_then_update_preserves_offset(t *testing.T) {
 
 	// Update the codec via upsert: offset preserved, no new row.
 	f.Codec = "ass"
-	if err := db.UpsertSubtitleFile(context.Background(), covMT, "tmdb-1", &f); err != nil {
+	if err := db.UpsertSubtitleFile(t.Context(), covMT, "tmdb-1", &f); err != nil {
 		t.Fatalf("update upsert: %v", err)
 	}
 	rows := listFiles(t, db, covMT, "tmdb-1")
@@ -265,14 +264,14 @@ func TestUpsertSubtitleFile_insert_then_update_preserves_offset(t *testing.T) {
 
 func TestDeleteSubtitleFile_removes_and_noop(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []api.SubtitleFile{
 		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
 		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	// Delete the en row.
-	if err := db.DeleteSubtitleFile(context.Background(), covMT, "tmdb-1", "en", vStd, srcExt, "/m/x.en.srt"); err != nil {
+	if err := db.DeleteSubtitleFile(t.Context(), covMT, "tmdb-1", "en", vStd, srcExt, "/m/x.en.srt"); err != nil {
 		t.Fatalf("DeleteSubtitleFile: %v", err)
 	}
 	if rows := listFiles(t, db, covMT, "tmdb-1"); len(rows) != 1 || rows[0].Language != "fr" {
@@ -282,7 +281,7 @@ func TestDeleteSubtitleFile_removes_and_noop(t *testing.T) {
 		t.Errorf("count = %d, want 1", totalFiles(t, db))
 	}
 	// Deleting an absent row is a no-op and does not move the counter.
-	if err := db.DeleteSubtitleFile(context.Background(), covMT, "tmdb-1", "de", vStd, srcExt, "/m/x.de.srt"); err != nil {
+	if err := db.DeleteSubtitleFile(t.Context(), covMT, "tmdb-1", "de", vStd, srcExt, "/m/x.de.srt"); err != nil {
 		t.Fatalf("DeleteSubtitleFile (absent): %v", err)
 	}
 	if totalFiles(t, db) != 1 {
@@ -301,7 +300,7 @@ func TestGetSubtitleFiles_prefix_modes(t *testing.T) {
 		"tvdb-222-s01e01": {subFile("fr", vStd, srcExt, "srt", "/m/222e01.fr.srt")},
 	}
 	for mid, files := range seed {
-		if _, err := db.RecordSubtitleFiles(context.Background(), api.MediaTypeEpisode, mid, files); err != nil {
+		if _, err := db.RecordSubtitleFiles(t.Context(), api.MediaTypeEpisode, mid, files); err != nil {
 			t.Fatalf("seed %s: %v", mid, err)
 		}
 	}
@@ -323,11 +322,11 @@ func TestGetSubtitleFiles_prefix_modes(t *testing.T) {
 func TestGetSubtitleFiles_exact_match_no_prefix_collision(t *testing.T) {
 	db, _ := openTemp(t)
 	// "tmdb-1" must not match "tmdb-12" under an EXACT (no trailing -) query.
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/1.en.srt")}); err != nil {
 		t.Fatalf("seed tmdb-1: %v", err)
 	}
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-12",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-12",
 		[]api.SubtitleFile{subFile("fr", vStd, srcExt, "srt", "/m/12.fr.srt")}); err != nil {
 		t.Fatalf("seed tmdb-12: %v", err)
 	}
@@ -339,7 +338,7 @@ func TestGetSubtitleFiles_exact_match_no_prefix_collision(t *testing.T) {
 
 func TestGetSubtitleFiles_ordered_by_media_id_language_variant_source(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []api.SubtitleFile{
 		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
 		subFile("en", vHI, srcExt, "srt", "/m/x.en.hi.srt"),
 		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
@@ -373,10 +372,10 @@ func TestGetSubtitleFiles_score_and_videopath_from_auto_state(t *testing.T) {
 		ProviderName: testProv, ReleaseName: "Rel.A", Path: "/m/x.en.srt", Score: 90,
 		Meta: &api.DownloadMeta{VideoPath: "/m/x.mkv", Manual: false},
 	}
-	if err := db.SaveDownload(context.Background(), rec); err != nil {
+	if err := db.SaveDownload(t.Context(), rec); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-500", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-500", []api.SubtitleFile{
 		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
 		subFile("en", vStd, srcEmb, "subrip", ""), // embedded: forced score 0, empty video_path
 	}); err != nil {
@@ -406,7 +405,7 @@ func TestGetSubtitleFiles_score_and_videopath_from_auto_state(t *testing.T) {
 
 func TestGetSubtitleFiles_no_auto_state_defaults_to_zero(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -424,7 +423,7 @@ func TestGetSubtitleFiles_no_auto_state_defaults_to_zero(t *testing.T) {
 // codec, then asserts the derived set matches what GetSubtitleFiles reports.
 func TestCoverage_fromKeysWithoutValueDecode(t *testing.T) {
 	db, _ := openTemp(t)
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []api.SubtitleFile{
 		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
 		subFile("en", vHI, srcExt, "srt", "/m/x.en.hi.srt"),
 		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
@@ -467,17 +466,17 @@ func TestTotalSubtitleFiles_counter_matches_raw_after_ops(t *testing.T) {
 	if totalFiles(t, db) != 0 {
 		t.Fatalf("initial count = %d, want 0", totalFiles(t, db))
 	}
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-1", []api.SubtitleFile{
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []api.SubtitleFile{
 		subFile("en", vStd, srcExt, "srt", "/m/a.en.srt"),
 		subFile("fr", vStd, srcExt, "srt", "/m/a.fr.srt"),
 	}); err != nil {
 		t.Fatalf("record A: %v", err)
 	}
 	f := subFile("de", vStd, srcExt, "srt", "/m/b.de.srt")
-	if err := db.UpsertSubtitleFile(context.Background(), covMT, "tmdb-2", &f); err != nil {
+	if err := db.UpsertSubtitleFile(t.Context(), covMT, "tmdb-2", &f); err != nil {
 		t.Fatalf("upsert B: %v", err)
 	}
-	if err := db.DeleteSubtitleFile(context.Background(), covMT, "tmdb-1", "fr", vStd, srcExt, "/m/a.fr.srt"); err != nil {
+	if err := db.DeleteSubtitleFile(t.Context(), covMT, "tmdb-1", "fr", vStd, srcExt, "/m/a.fr.srt"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	// Counter (O(1)) must equal the raw bucket scan (ground truth).
@@ -529,7 +528,7 @@ func TestRecordSubtitleFiles_property_convergence(t *testing.T) {
 			mid := rapid.SampledFrom(mediaPool).Draw(rt, "mid")
 			files := genFiles(rt)
 
-			if _, err := db.RecordSubtitleFiles(context.Background(), covMT, mid, files); err != nil {
+			if _, err := db.RecordSubtitleFiles(t.Context(), covMT, mid, files); err != nil {
 				rt.Fatalf("RecordSubtitleFiles: %v", err)
 			}
 
@@ -579,7 +578,7 @@ func TestGetSubtitleFiles_videopath_from_highest_auto_state(t *testing.T) {
 	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 70, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v70.mkv"})
 	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 95, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v95.mkv"})
 	putStateRow(t, db, covMT, "tmdb-600", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/v80.mkv"})
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-600",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-600",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
@@ -602,7 +601,7 @@ func TestGetSubtitleFiles_videopath_tie_keeps_first_auto_state(t *testing.T) {
 	db, _ := openTemp(t)
 	putStateRow(t, db, covMT, "tmdb-601", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/first.mkv"})
 	putStateRow(t, db, covMT, "tmdb-601", "en", stateRec{Score: 80, Provider: testProv, Path: "/m/x.en.srt", VideoPath: "/m/second.mkv"})
-	if _, err := db.RecordSubtitleFiles(context.Background(), covMT, "tmdb-601",
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-601",
 		[]api.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}

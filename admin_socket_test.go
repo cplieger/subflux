@@ -106,7 +106,7 @@ func TestAdminSocketListener_bindsAndClearsStaleSocket(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "subflux-admin")
 	sock := filepath.Join(dir, "admin.sock")
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First bind, then abandon WITHOUT unlink by closing only after copying
 	// the file into place is impossible for a unix socket — simulate the
@@ -169,7 +169,7 @@ func TestAdminSocketListener_refusedDirLeavesNoListener(t *testing.T) {
 		t.Fatal(err)
 	}
 	sock := filepath.Join(dir, "admin.sock")
-	if _, err := adminSocketListener(context.Background(), dir, sock); err == nil {
+	if _, err := adminSocketListener(t.Context(), dir, sock); err == nil {
 		t.Fatal("want error for non-directory custody path")
 	}
 	// The parent is a plain file, so the lstat fails with ENOTDIR (or

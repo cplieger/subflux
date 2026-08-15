@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -40,7 +39,7 @@ func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestSearchTargets_atomic_write_error_returns_empty(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -109,7 +108,7 @@ func TestSearchProvidersFiltered_embedded_provider_success(t *testing.T) {
 	e := newEngine([]api.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
-	outcome := e.searchProvidersFiltered(context.Background(), req, []api.Provider{embProv})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{embProv})
 
 	if len(outcome.results) != 1 {
 		t.Errorf("results = %d, want 1", len(outcome.results))
@@ -133,7 +132,7 @@ func TestSearchProvidersFiltered_embedded_provider_error(t *testing.T) {
 	e := newEngine([]api.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
-	outcome := e.searchProvidersFiltered(context.Background(), req, []api.Provider{embProv})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{embProv})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0", len(outcome.results))
@@ -179,7 +178,7 @@ func TestSearchTargets_binary_data_rejected(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -231,7 +230,7 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -269,7 +268,7 @@ func TestSearchTargets_force_upgrade_skips_embedded_only(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -310,7 +309,7 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr", Variant: "hi"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -352,7 +351,7 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr", Variant: "forced"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -392,7 +391,7 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 	// Standard variant (default) — HI sub is the only option (fallback).
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -438,7 +437,7 @@ func TestSearchTargets_hash_match_skips_sync(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -475,7 +474,7 @@ func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T)
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -541,7 +540,7 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 		{Code: "fr", Variant: "forced"},
 	}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}

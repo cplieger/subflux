@@ -1,7 +1,6 @@
 package opensubtitles
 
 import (
-	"context"
 	"errors"
 	"maps"
 	"slices"
@@ -47,7 +46,7 @@ func TestFactory_requires_credentials(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := Factory(context.Background(), tt.settings)
+			p, err := Factory(t.Context(), tt.settings)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("Factory() expected error")
@@ -112,7 +111,7 @@ func TestFactory_options(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := Factory(context.Background(), merge(tt.extra))
+			p, err := Factory(t.Context(), merge(tt.extra))
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
@@ -134,7 +133,7 @@ func TestCountShowSubtitles_short_circuits_on_empty_imdb(t *testing.T) {
 	// short-circuit happens before ensureToken/doGet.
 	p := &Provider{}
 	for _, imdb := range []string{"tt0", "tt00000", "0000", "tt"} {
-		count, err := p.CountShowSubtitles(context.Background(), imdb, "en")
+		count, err := p.CountShowSubtitles(t.Context(), imdb, "en")
 		if err != nil {
 			t.Errorf("CountShowSubtitles(%q) error = %v, want nil", imdb, err)
 		}

@@ -2,7 +2,6 @@ package subsync
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,7 +61,7 @@ func TestCrossLangStrategies(t *testing.T) {
 
 			// Strategy 1: CrossLang anchor matching.
 			t.Run("crosslang", func(t *testing.T) {
-				result := crossLangAlign(context.Background(), ref, inc)
+				result := crossLangAlign(t.Context(), ref, inc)
 				t.Logf("offset=%dms confidence=%.3f method=%s",
 					result.Offset, float64(result.Confidence), result.Method)
 				if result.Confidence > 0 {
@@ -72,7 +71,7 @@ func TestCrossLangStrategies(t *testing.T) {
 
 			// Strategy 2: Constant offset (alass).
 			t.Run("alass_offset", func(t *testing.T) {
-				_, offset := syncCues(context.Background(), ref, inc)
+				_, offset := syncCues(t.Context(), ref, inc)
 				conf := constantOffsetConfidence(ref, inc, offset)
 				t.Logf("offset=%dms confidence=%.3f",
 					offset.Milliseconds(), float64(conf))
@@ -81,14 +80,14 @@ func TestCrossLangStrategies(t *testing.T) {
 
 			// Strategy 3: Framerate correction.
 			t.Run("framerate", func(t *testing.T) {
-				result := correctFramerate(context.Background(), ref, inc, "")
+				result := correctFramerate(t.Context(), ref, inc, "")
 				t.Logf("offset=%dms rate=%.6f confidence=%.3f",
 					result.Offset, result.Rate, float64(result.Confidence))
 			})
 
 			// Strategy 4: Split-aware alignment.
 			t.Run("splits", func(t *testing.T) {
-				result := alignWithSplits(context.Background(), ref, inc, 0)
+				result := alignWithSplits(t.Context(), ref, inc, 0)
 				t.Logf("offset=%dms confidence=%.3f method=%s",
 					result.Offset, float64(result.Confidence), result.Method)
 				if result.Confidence > 0 {
@@ -101,7 +100,7 @@ func TestCrossLangStrategies(t *testing.T) {
 				opts := DefaultSyncOptions()
 				opts.EnableFramerate = true
 				opts.EnableSplits = true
-				result := referenceSync(context.Background(), ref, inc, &opts)
+				result := referenceSync(t.Context(), ref, inc, &opts)
 				t.Logf("WINNER: offset=%dms confidence=%.3f method=%s",
 					result.Offset, float64(result.Confidence), result.Method)
 				if result.Applied() {
@@ -187,7 +186,7 @@ func TestCrossLangAlign_early_returns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := crossLangAlign(context.Background(), tt.ref, tt.inc)
+			result := crossLangAlign(t.Context(), tt.ref, tt.inc)
 			if result.Confidence != ConfidenceNone {
 				t.Errorf("crossLangAlign(%s) confidence = %v, want ConfidenceNone", tt.name, result.Confidence)
 			}

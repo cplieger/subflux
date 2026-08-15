@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -114,7 +113,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	}
 
 	// 6. Revoke API key: DELETE /api/auth/apikeys/{id}.
-	keys, err := db.ListAPIKeysByUserID(context.Background(), user.ID)
+	keys, err := db.ListAPIKeysByUserID(t.Context(), user.ID)
 	if err != nil || len(keys) == 0 {
 		t.Fatal("no API keys found to revoke")
 	}
@@ -263,11 +262,11 @@ func TestIntegration_MiddlewareChain(t *testing.T) {
 	// Create an admin user and a regular user for role tests.
 	admin := createTestUser(t, db, "chain-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	regularUser := createTestUser(t, db, "chain-user", "correct-horse-battery-staple")
 	regularUser.Role = "user"
-	db.UpdateUser(context.Background(), regularUser)
+	db.UpdateUser(t.Context(), regularUser)
 
 	adminToken := createTestSession(t, db, admin.ID)
 	userToken := createTestSession(t, db, regularUser.ID)
@@ -354,7 +353,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer coreDB.Close(context.Background())
+	defer coreDB.Close(t.Context())
 
 	db := authstore.New(coreDB.BoltDB())
 	if err := db.Open(); err != nil {
@@ -362,7 +361,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// 1. Verify all auth buckets exist by exercising each one.
 	// If any bucket is missing, the operations below will fail.
@@ -406,13 +405,13 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 
 	// 2. Close and re-open the database; verify durable data is preserved.
 	db.Close()
-	coreDB.Close(context.Background())
+	coreDB.Close(t.Context())
 
 	coreDB, err = boltstore.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer coreDB.Close(context.Background())
+	defer coreDB.Close(t.Context())
 
 	db = authstore.New(coreDB.BoltDB())
 	if err := db.Open(); err != nil {
@@ -512,7 +511,7 @@ func TestSecurity_SetupRaceCondition(t *testing.T) {
 	wg.Wait()
 
 	// Verify exactly 1 user was created.
-	count, err := db.UserCount(context.Background())
+	count, err := db.UserCount(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -584,7 +583,7 @@ func TestSecurity_DisabledUserRejection(t *testing.T) {
 
 	// Disable the user.
 	user.Enabled = false
-	if err := db.UpdateUser(context.Background(), user); err != nil {
+	if err := db.UpdateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 

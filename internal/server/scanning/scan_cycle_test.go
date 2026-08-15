@@ -45,7 +45,7 @@ func TestResumeCycleStart_fresh_cycle_persists_now(t *testing.T) {
 	t.Parallel()
 	db := &fakeScanStore{}
 	before := time.Now()
-	start := resumeCycleStart(context.Background(), db)
+	start := resumeCycleStart(t.Context(), db)
 	after := time.Now()
 
 	if start.Before(before) || start.After(after) {
@@ -61,7 +61,7 @@ func TestResumeCycleStart_dangling_mark_keeps_origin(t *testing.T) {
 	origin := time.Now().Add(-30 * time.Hour)
 	db := &fakeScanStore{mark: origin}
 
-	start := resumeCycleStart(context.Background(), db)
+	start := resumeCycleStart(t.Context(), db)
 	if !start.Equal(origin) {
 		t.Errorf("interrupted cycle start = %v, want the dangling origin %v", start, origin)
 	}
@@ -79,7 +79,7 @@ func TestLoadRecentScans_cutoff_extends_to_cycle_start(t *testing.T) {
 	// Cycle started 3h ago, interval 1h: the cutoff must extend back to the
 	// cycle start so the pass's early segment stays in the resume set.
 	cycleStart := time.Now().Add(-3 * time.Hour)
-	loadRecentScans(context.Background(), db, interval, cycleStart)
+	loadRecentScans(t.Context(), db, interval, cycleStart)
 	if !db.gotCutoff.Equal(cycleStart) {
 		t.Errorf("cutoff = %v, want cycle start %v (duration-aware extension)", db.gotCutoff, cycleStart)
 	}
@@ -87,7 +87,7 @@ func TestLoadRecentScans_cutoff_extends_to_cycle_start(t *testing.T) {
 	// Cycle started 10 minutes ago: the plain interval cutoff applies.
 	fresh := time.Now().Add(-10 * time.Minute)
 	beforeCall := time.Now()
-	loadRecentScans(context.Background(), db, interval, fresh)
+	loadRecentScans(t.Context(), db, interval, fresh)
 	wantMin := beforeCall.Add(-interval)
 	if db.gotCutoff.Before(wantMin.Add(-time.Second)) || db.gotCutoff.After(time.Now().Add(-interval).Add(time.Second)) {
 		t.Errorf("cutoff = %v, want ~now-interval (%v)", db.gotCutoff, wantMin)

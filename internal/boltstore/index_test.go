@@ -102,6 +102,7 @@ func openPropDB(rt *rapid.T) *DB {
 		rt.Fatalf("Open(%q): %v", path, err)
 	}
 	db.db.StrictMode = true // consistency check every commit (test-only)
+	// context.Background(), not a test context: rt is a *rapid.T, which has no Context(), and this runs at cleanup time.
 	rt.Cleanup(func() { _ = db.Close(context.Background()) })
 	return db
 }

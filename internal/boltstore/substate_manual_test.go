@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -31,7 +30,7 @@ func saveManual(t *testing.T, db *DB, provider api.ProviderID, release, path str
 		Score:        score,
 		Meta:         &api.DownloadMeta{Title: "Test", VideoPath: "/media/test.mkv", Manual: true},
 	}
-	if err := db.SaveDownload(context.Background(), rec); err != nil {
+	if err := db.SaveDownload(t.Context(), rec); err != nil {
 		t.Fatalf("SaveDownload(manual %s): %v", path, err)
 	}
 }
@@ -41,7 +40,7 @@ func saveManual(t *testing.T, db *DB, provider api.ProviderID, release, path str
 // not reported locked (Requirement 4.2).
 func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
@@ -80,7 +79,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 // the rows are still visible to a triple read (Requirement 4.3).
 func TestClearManualLock_nonDestructive(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
@@ -154,7 +153,7 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 // manual rows leaves any auto row untouched and is not an error.
 func TestClearManualLock_noManualRowsIsNoop(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
@@ -178,7 +177,7 @@ func TestClearManualLock_noManualRowsIsNoop(t *testing.T) {
 // auto rows for the triple (Requirement 15.6).
 func TestManualDownloadCount(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil || got != 0 {
 		t.Fatalf("empty count = (%d, %v), want (0, nil)", got, err)
@@ -205,7 +204,7 @@ func TestManualDownloadCount(t *testing.T) {
 // (Requirement 15.6).
 func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Auto row (excluded) and two manual rows, one of which has an empty path.
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
@@ -230,7 +229,7 @@ func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 // plain auto row (unnumbered path) contributes nothing.
 func TestNextManualNumber(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Base case: no rows -> 1.
 	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
@@ -266,7 +265,7 @@ func TestNextManualNumber(t *testing.T) {
 // forced variant filename forms as well as the standard form (Requirement 4.4).
 func TestNextManualNumber_variantPaths(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	saveManual(t, db, testProv, "Manual.hi", "/media/test.fr.hi.5.srt", 70)
 	saveManual(t, db, testProv, "Manual.forced", "/media/test.fr.forced.2.srt", 72)
@@ -282,7 +281,7 @@ func TestNextManualNumber_variantPaths(t *testing.T) {
 // the two methods still report the manual state correctly (Requirement 18.3).
 func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)

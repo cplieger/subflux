@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -282,7 +281,7 @@ func TestHandler_returns_prometheus_text_format(t *testing.T) {
 	m.RecordScan(42, 7, 2*time.Second)
 	m.AdaptiveSkip()
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", http.NoBody)
 	rec := httptest.NewRecorder()
 	m.Handler().ServeHTTP(rec, req)
 
@@ -323,7 +322,7 @@ func TestHandler_empty_metrics_returns_scalar_metrics(t *testing.T) {
 	t.Parallel()
 	m := New()
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", http.NoBody)
 	rec := httptest.NewRecorder()
 	m.Handler().ServeHTTP(rec, req)
 
@@ -510,7 +509,7 @@ func TestHandler_write_error_does_not_panic(t *testing.T) {
 	m.RecordScan(10, 2, time.Second)
 
 	w := &errWriter{header: make(http.Header)}
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/metrics", http.NoBody)
 	m.Handler().ServeHTTP(w, req)
 }
@@ -627,7 +626,7 @@ func TestRecordSearch_buckets_concurrent_safe(t *testing.T) {
 
 func renderMetrics(t *testing.T, m *Metrics) string {
 	t.Helper()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", http.NoBody)
 	rec := httptest.NewRecorder()
 	m.Handler().ServeHTTP(rec, req)
 	return rec.Body.String()

@@ -93,7 +93,7 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 			return &closableArrClient{}, nil
 		},
 		launchWorkers: func() { launches++ },
-		ctx:           context.Background(),
+		ctx:           t.Context(),
 	}
 	s.live.Store(&liveState{})
 	return s, &launches
@@ -124,7 +124,7 @@ func TestActivate_fresh_publishes_full_snapshot(t *testing.T) {
 		rpID: "subflux.example.com",
 	}
 
-	if err := s.activate(context.Background(), cfg, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfg, activateHot); err != nil {
 		t.Fatalf("activate() error = %v, want nil", err)
 	}
 
@@ -169,7 +169,7 @@ func TestActivate_reactivate_swaps_and_closes_old_arr_clients(t *testing.T) {
 			radarrCfg: api.ArrConfig{URL: "http://radarr:7878", APIKey: "k"},
 		},
 	}
-	if err := s.activate(context.Background(), cfg, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfg, activateHot); err != nil {
 		t.Fatalf("activate() error = %v, want nil", err)
 	}
 
@@ -195,7 +195,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 			IssuerURL: "https://idp.example.com", ClientID: "id", RedirectURI: "https://x/cb",
 		},
 	}
-	if err := s.activate(context.Background(), on, activateHot); err != nil {
+	if err := s.activate(t.Context(), on, activateHot); err != nil {
 		t.Fatalf("activate(on) error = %v", err)
 	}
 	if s.state().webauthn == nil {
@@ -208,7 +208,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 
 	// Disable both: the snapshot must drop them immediately.
 	off := &activationTestConfig{}
-	if err := s.activate(context.Background(), off, activateHot); err != nil {
+	if err := s.activate(t.Context(), off, activateHot); err != nil {
 		t.Fatalf("activate(off) error = %v", err)
 	}
 	if s.state().webauthn != nil {
@@ -225,7 +225,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 			IssuerURL: "https://other.example.com", ClientID: "id", RedirectURI: "https://x/cb",
 		},
 	}
-	if err := s.activate(context.Background(), on2, activateHot); err != nil {
+	if err := s.activate(t.Context(), on2, activateHot); err != nil {
 		t.Fatalf("activate(on2) error = %v", err)
 	}
 	if s.state().oidc == slotA {
@@ -240,7 +240,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 	s.logSetup = func(level, format string) { calls = append(calls, level+"/"+format) }
 
 	first := &activationTestConfig{}
-	if err := s.activate(context.Background(), first, activateHot); err != nil {
+	if err := s.activate(t.Context(), first, activateHot); err != nil {
 		t.Fatalf("activate(first) error = %v", err)
 	}
 	if len(calls) != 1 || calls[0] != "info/json" {
@@ -249,7 +249,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 
 	// Identical logging section: no re-setup.
 	same := &activationTestConfig{}
-	if err := s.activate(context.Background(), same, activateHot); err != nil {
+	if err := s.activate(t.Context(), same, activateHot); err != nil {
 		t.Fatalf("activate(same) error = %v", err)
 	}
 	if len(calls) != 1 {
@@ -258,7 +258,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 
 	// Changed level: re-setup with the new values.
 	changed := &activationTestConfig{logLevel: "debug", logFormat: "text"}
-	if err := s.activate(context.Background(), changed, activateHot); err != nil {
+	if err := s.activate(t.Context(), changed, activateHot); err != nil {
 		t.Fatalf("activate(changed) error = %v", err)
 	}
 	if len(calls) != 2 || calls[1] != "debug/text" {
@@ -307,14 +307,14 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 
 			// Establish a good live snapshot first.
 			good := &activationTestConfig{}
-			if err := s.activate(context.Background(), good, activateHot); err != nil {
+			if err := s.activate(t.Context(), good, activateHot); err != nil {
 				t.Fatalf("activate(good) error = %v", err)
 			}
 			before := s.state()
 
 			tt.breakServer(s)
 			cfg := tt.cfg
-			if err := s.activate(context.Background(), &cfg, activateHot); err == nil {
+			if err := s.activate(t.Context(), &cfg, activateHot); err == nil {
 				t.Fatal("activate() error = nil, want prepare-phase rejection")
 			}
 
@@ -342,7 +342,7 @@ func TestWorkerLatch_cold_configured_boot_launches_exactly_once(t *testing.T) {
 
 	// Cold boot: the one activation Start performs. The former
 	// "iff wasUnconfigured" guard computed false here and launched NOTHING.
-	if err := s.activate(context.Background(), cfg, activateCold); err != nil {
+	if err := s.activate(t.Context(), cfg, activateCold); err != nil {
 		t.Fatalf("activate(cold) error = %v", err)
 	}
 	if *launches != 1 {
@@ -356,7 +356,7 @@ func TestWorkerLatch_unconfigured_boot_then_n_saves_launches_once(t *testing.T) 
 
 	for i := range 3 {
 		cfg := &activationTestConfig{}
-		if err := s.hotReload(context.Background(), cfg); err != nil {
+		if err := s.hotReload(t.Context(), cfg); err != nil {
 			t.Fatalf("hotReload #%d error = %v", i+1, err)
 		}
 	}
@@ -372,7 +372,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	s.wire = func(context.Context, api.ConfigProvider, api.Store, search.SearchMetrics) (api.SearchEngine, api.Scorer, []api.Provider, error) {
 		return nil, nil, nil, errMock
 	}
-	if err := s.hotReload(context.Background(), &activationTestConfig{}); err == nil {
+	if err := s.hotReload(t.Context(), &activationTestConfig{}); err == nil {
 		t.Fatal("hotReload with failing wire: error = nil, want error")
 	}
 	if *launches != 0 {
@@ -380,7 +380,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	}
 
 	s.wire = okWire
-	if err := s.hotReload(context.Background(), &activationTestConfig{}); err != nil {
+	if err := s.hotReload(t.Context(), &activationTestConfig{}); err != nil {
 		t.Fatalf("hotReload after fixing wire: error = %v", err)
 	}
 	if *launches != 1 {
@@ -394,7 +394,7 @@ func TestWorkerLatch_repeated_identical_put_launches_once(t *testing.T) {
 
 	cfg := &activationTestConfig{}
 	for i := range 2 {
-		if err := s.hotReload(context.Background(), cfg); err != nil {
+		if err := s.hotReload(t.Context(), cfg); err != nil {
 			t.Fatalf("hotReload (identical PUT) #%d error = %v", i+1, err)
 		}
 	}
@@ -414,13 +414,13 @@ func TestActivate_webauthn_failure_is_fatal_on_hot_save(t *testing.T) {
 	s, launches := newActivationTestServer(t)
 
 	good := &activationTestConfig{}
-	if err := s.activate(context.Background(), good, activateHot); err != nil {
+	if err := s.activate(t.Context(), good, activateHot); err != nil {
 		t.Fatalf("activate(good) error = %v", err)
 	}
 	before := s.state()
 
 	bad := &activationTestConfig{rpID: badRPID}
-	err := s.activate(context.Background(), bad, activateHot)
+	err := s.activate(t.Context(), bad, activateHot)
 	if err == nil {
 		t.Fatal("hot activation with a bad RP ID: error = nil, want rejection")
 	}
@@ -441,7 +441,7 @@ func TestActivate_webauthn_failure_degrades_on_cold_boot(t *testing.T) {
 	cfg := &activationTestConfig{rpID: badRPID}
 	s.live.Store(&liveState{cfg: cfg})
 
-	if err := s.activate(context.Background(), cfg, activateCold); err != nil {
+	if err := s.activate(t.Context(), cfg, activateCold); err != nil {
 		t.Fatalf("cold activation with a bad RP ID must degrade, got error %v", err)
 	}
 	if s.state().webauthn != nil {
@@ -456,7 +456,7 @@ func TestActivate_webauthn_failure_degrades_on_cold_boot(t *testing.T) {
 
 	// A later save that fixes the RP ID clears the alert.
 	fixed := &activationTestConfig{rpID: "subflux.example.com"}
-	if err := s.activate(context.Background(), fixed, activateHot); err != nil {
+	if err := s.activate(t.Context(), fixed, activateHot); err != nil {
 		t.Fatalf("activate(fixed) error = %v", err)
 	}
 	if hasAlertSource(s, "webauthn") {
@@ -506,7 +506,7 @@ func (fakeOIDCStore) CreateUser(context.Context, *auth.User) error              
 // returns the Location header of the 302.
 func oidcRedirectLocation(t *testing.T, h *authhandlers.Handler) string {
 	t.Helper()
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/auth/oidc", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleOIDCRedirect(rec, req)
@@ -537,7 +537,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 
 	// Activate with issuer A and complete a SUCCESSFUL discovery.
 	cfgA := &activationTestConfig{oidcOn: true, oidcCfg: oidcCfg(issuerA.URL)}
-	if err := s.activate(context.Background(), cfgA, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfgA, activateHot); err != nil {
 		t.Fatalf("activate(issuer A) error = %v", err)
 	}
 	if loc := oidcRedirectLocation(t, h); !strings.HasPrefix(loc, issuerA.URL+"/auth") {
@@ -546,7 +546,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 
 	// Edit the issuer. The forever-cached-provider bug served issuer A here.
 	cfgB := &activationTestConfig{oidcOn: true, oidcCfg: oidcCfg(issuerB.URL)}
-	if err := s.activate(context.Background(), cfgB, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfgB, activateHot); err != nil {
 		t.Fatalf("activate(issuer B) error = %v", err)
 	}
 	if loc := oidcRedirectLocation(t, h); !strings.HasPrefix(loc, issuerB.URL+"/auth") {
@@ -556,10 +556,10 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 
 	// Disabling OIDC publishes a nil slot: the endpoint reports unconfigured.
 	cfgOff := &activationTestConfig{}
-	if err := s.activate(context.Background(), cfgOff, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfgOff, activateHot); err != nil {
 		t.Fatalf("activate(oidc off) error = %v", err)
 	}
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/auth/oidc", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleOIDCRedirect(rec, req)
@@ -585,7 +585,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return dummyArrClient{}, nil }
 	s.newRadarr = func(_, _ string) (api.RadarrClient, error) { return dummyArrClient{}, nil }
 	s.launchWorkers = func() {}
-	s.ctx = context.Background()
+	s.ctx = t.Context()
 	s.authH.WebAuthnResolver = func() *webauthn.WebAuthn { return s.state().webauthn }
 
 	user := createTestUser(t, authDB, "alice", "correct horse battery staple")
@@ -598,18 +598,18 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 		PublicKey:    []byte("not-a-real-key"),
 		CreatedAt:    time.Now(),
 	}
-	if err := authDB.CreatePasskey(context.Background(), oldCred); err != nil {
+	if err := authDB.CreatePasskey(t.Context(), oldCred); err != nil {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
 
 	// Hot-edit the RP ID to rp-b.example.com.
 	cfgB := &activationTestConfig{rpID: "rp-b.example.com"}
-	if err := s.activate(context.Background(), cfgB, activateHot); err != nil {
+	if err := s.activate(t.Context(), cfgB, activateHot); err != nil {
 		t.Fatalf("activate(rp-b) error = %v", err)
 	}
 
 	// (1) A fresh ceremony begins under the NEW RP ID.
-	beginReq := httptest.NewRequestWithContext(context.Background(),
+	beginReq := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/auth/webauthn/login/begin", http.NoBody)
 	beginRec := httptest.NewRecorder()
 	s.authH.HandleWebAuthnLoginBegin(beginRec, beginReq)
@@ -657,7 +657,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 			"userHandle":        b64(waUser.WebAuthnID()),
 		},
 	})
-	finishReq := httptest.NewRequestWithContext(context.Background(),
+	finishReq := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/auth/webauthn/login/finish", strings.NewReader(string(assertion)))
 	finishReq.Header.Set("X-WebAuthn-Session", begin.SessionToken)
 	finishRec := httptest.NewRecorder()
@@ -668,7 +668,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	}
 
 	// (3) Password recovery remains available.
-	loginReq := httptest.NewRequestWithContext(context.Background(),
+	loginReq := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/auth/login", loginBody("alice", "correct horse battery staple"))
 	loginRec := httptest.NewRecorder()
 	s.authH.HandleLogin(loginRec, loginReq)

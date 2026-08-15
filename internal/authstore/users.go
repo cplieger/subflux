@@ -2,11 +2,12 @@ package authstore
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/auth/v2"
@@ -371,12 +372,11 @@ func (s *Store) ListUsers(_ context.Context) ([]auth.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		li, lj := asciiFold(out[i].Username), asciiFold(out[j].Username)
-		if li != lj {
-			return li < lj
-		}
-		return out[i].ID < out[j].ID
+	slices.SortStableFunc(out, func(a, b auth.User) int {
+		return cmp.Or(
+			cmp.Compare(asciiFold(a.Username), asciiFold(b.Username)),
+			cmp.Compare(a.ID, b.ID),
+		)
 	})
 	return out, nil
 }

@@ -1,7 +1,6 @@
 package yifysubtitles
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -12,9 +11,9 @@ import (
 func TestFactory(t *testing.T) {
 	t.Parallel()
 
-	p, err := Factory(context.Background(), nil)
+	p, err := Factory(t.Context(), nil)
 	if err != nil {
-		t.Fatalf("Factory(context.Background(), nil) unexpected error: %v", err)
+		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
 	if p.Name() != api.ProviderNameYifySubtitles {
 		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameYifySubtitles)

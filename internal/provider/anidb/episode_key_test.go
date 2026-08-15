@@ -1,7 +1,6 @@
 package anidb
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -47,7 +46,7 @@ func TestEpisodeCacheKeyBuildersAgree(t *testing.T) {
 			m := NewMapper("")
 			m.episodeCache[buildEpisodeCacheKey(seriesID, xmlEpNo)] = epID
 
-			got, err := m.getEpisodeID(context.Background(), seriesID, episode)
+			got, err := m.getEpisodeID(t.Context(), seriesID, episode)
 			if err != nil {
 				t.Fatalf("getEpisodeID() error = %v; the write-side key %q did not match the read-side lookup",
 					err, buildEpisodeCacheKey(seriesID, xmlEpNo))

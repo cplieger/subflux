@@ -2,7 +2,6 @@ package subsync
 
 import (
 	"bytes"
-	"context"
 	"math"
 	"os"
 	"path/filepath"
@@ -66,7 +65,7 @@ func TestIntegration_ConstantOffset(t *testing.T) {
 			t.Parallel()
 			shifted := ShiftCues(ref, offset)
 			opts := DefaultSyncOptions()
-			result := SyncWithOptions(context.Background(), ref, shifted, &opts)
+			result := SyncWithOptions(t.Context(), ref, shifted, &opts)
 
 			if !result.Applied() {
 				t.Fatalf("sync not applied for offset %v", offset)
@@ -109,7 +108,7 @@ func TestIntegration_FramerateCorrection(t *testing.T) {
 			ratio := r.from / r.to
 			drifted := scaleCues(ref, ratio)
 
-			result := correctFramerate(context.Background(), ref, drifted, "")
+			result := correctFramerate(t.Context(), ref, drifted, "")
 
 			if result.Confidence <= ConfidenceNone {
 				t.Fatalf("framerate correction failed: confidence=%.2f, method=%s",
@@ -155,7 +154,7 @@ func TestIntegration_SplitAlignment(t *testing.T) {
 		}
 	}
 
-	result := alignWithSplits(context.Background(), ref, modified, 0)
+	result := alignWithSplits(t.Context(), ref, modified, 0)
 
 	if result.Confidence <= ConfidenceNone {
 		t.Fatalf("split alignment failed: confidence=%.2f", float64(result.Confidence))
@@ -184,7 +183,7 @@ func TestIntegration_MultiStrategy_PicksBest(t *testing.T) {
 		EnableSplits:    true,
 		MinConfidence:   0.3,
 	}
-	result := SyncWithOptions(context.Background(), ref, shifted, &opts)
+	result := SyncWithOptions(t.Context(), ref, shifted, &opts)
 
 	if !result.Applied() {
 		t.Fatal("multi-strategy sync not applied")
@@ -200,7 +199,7 @@ func TestIntegration_NoChange_WhenAlreadySynced(t *testing.T) {
 	ref := loadReference(t)
 
 	opts := DefaultSyncOptions()
-	result := SyncWithOptions(context.Background(), ref, ref, &opts)
+	result := SyncWithOptions(t.Context(), ref, ref, &opts)
 
 	// Offset should be 0 (already synced).
 	if result.Offset != 0 {
@@ -220,7 +219,7 @@ func TestIntegration_FramerateCorrection_GoldenSection(t *testing.T) {
 	ratio := 1.03
 	drifted := scaleCues(ref, 1.0/ratio)
 
-	result := correctFramerate(context.Background(), ref, drifted, "")
+	result := correctFramerate(t.Context(), ref, drifted, "")
 
 	t.Logf("golden-section: ratio=%.6f (want ~%.6f), conf=%.2f, method=%s",
 		result.Rate, ratio, float64(result.Confidence), result.Method)

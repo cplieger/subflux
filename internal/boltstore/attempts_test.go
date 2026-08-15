@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"math"
 	"slices"
 	"testing"
@@ -76,7 +75,7 @@ func TestRecordNoResult_newRow(t *testing.T) {
 	bp := defaultParams()
 
 	before := time.Now()
-	if err := db.RecordNoResult(context.Background(), testMT, testMID, testLang, testProv, bp); err != nil {
+	if err := db.RecordNoResult(t.Context(), testMT, testMID, testLang, testProv, bp); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -125,7 +124,7 @@ func TestRecordNoResult_incrementsExponential(t *testing.T) {
 		600 * time.Second, // clamped
 	}
 	for k := 1; k <= len(want); k++ {
-		if err := db.RecordNoResult(context.Background(), testMT, testMID, testLang, testProv, bp); err != nil {
+		if err := db.RecordNoResult(t.Context(), testMT, testMID, testLang, testProv, bp); err != nil {
 			t.Fatalf("RecordNoResult call %d: %v", k, err)
 		}
 		rec, found := readAttempt(t, db, testMT, testMID, testLang, testProv)
@@ -164,7 +163,7 @@ func TestRecordNoResult_nextRetryFormula(t *testing.T) {
 		k := rapid.IntRange(1, 6).Draw(rt, "calls")
 
 		for range k {
-			if err := db.RecordNoResult(context.Background(), testMT, testMID, testLang, testProv, bp); err != nil {
+			if err := db.RecordNoResult(t.Context(), testMT, testMID, testLang, testProv, bp); err != nil {
 				rt.Fatalf("RecordNoResult: %v", err)
 			}
 		}
@@ -208,7 +207,7 @@ func TestRecordNoResult_nextRetryFormula(t *testing.T) {
 // attempts reports no backed-off providers (Requirement 2.4).
 func TestBackedOffProviders_noRowEligible(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 3)
+	got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 3)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -223,10 +222,10 @@ func TestBackedOffProviders_noRowEligible(t *testing.T) {
 func TestBackedOffProviders_futureRetry(t *testing.T) {
 	db, _ := openTemp(t)
 	// A fresh no-result sets next_retry well into the future (InitialDelay 5m).
-	if err := db.RecordNoResult(context.Background(), testMT, testMID, testLang, testProv, defaultParams()); err != nil {
+	if err := db.RecordNoResult(t.Context(), testMT, testMID, testLang, testProv, defaultParams()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
-	got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 100)
+	got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 100)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -248,7 +247,7 @@ func TestBackedOffProviders_thresholdReached(t *testing.T) {
 	})
 
 	// maxAttempts=5, failures=5 -> threshold reached, backed off.
-	got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 5)
+	got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 5)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -257,7 +256,7 @@ func TestBackedOffProviders_thresholdReached(t *testing.T) {
 	}
 
 	// maxAttempts=6 -> below threshold AND past retry -> eligible.
-	got, err = db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 6)
+	got, err = db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 6)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -279,7 +278,7 @@ func TestBackedOffProviders_maxAttemptsZeroRetryOnly(t *testing.T) {
 	})
 
 	for _, maxAttempts := range []int{0, -1} {
-		got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, maxAttempts)
+		got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, maxAttempts)
 		if err != nil {
 			t.Fatalf("BackedOffProviders(maxAttempts=%d): %v", maxAttempts, err)
 		}
@@ -294,7 +293,7 @@ func TestBackedOffProviders_maxAttemptsZeroRetryOnly(t *testing.T) {
 		NextRetry: time.Now().Add(time.Hour),
 		Failures:  99,
 	})
-	got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 0)
+	got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -315,7 +314,7 @@ func TestBackedOffProviders_prefixIsolation(t *testing.T) {
 	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "fr", testProv, attemptRec{NextRetry: future, Failures: 1})
 
 	// Querying tt1/en must return only the tt1/en row, not tt12/en.
-	got, err := db.BackedOffProviders(context.Background(), api.MediaTypeMovie, "tt1", "en", 0)
+	got, err := db.BackedOffProviders(t.Context(), api.MediaTypeMovie, "tt1", "en", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -324,7 +323,7 @@ func TestBackedOffProviders_prefixIsolation(t *testing.T) {
 	}
 
 	// Querying language "f" must NOT match the "fr" row.
-	got, err = db.BackedOffProviders(context.Background(), api.MediaTypeMovie, "tt1", "f", 0)
+	got, err = db.BackedOffProviders(t.Context(), api.MediaTypeMovie, "tt1", "f", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -375,7 +374,7 @@ func TestBackedOffProviders_predicate(t *testing.T) {
 		}
 
 		rawMax := rapid.IntRange(-2, 6).Draw(rt, "maxAttempts")
-		got, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, rawMax)
+		got, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, rawMax)
 		if err != nil {
 			rt.Fatalf("BackedOffProviders: %v", err)
 		}

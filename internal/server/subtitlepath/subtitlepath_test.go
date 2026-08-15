@@ -38,7 +38,7 @@ func TestRemoveUnderRoot(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			rem := &recordingRemover{}
-			err := subtitlepath.RemoveUnderRoot(context.Background(), rem, tc.path)
+			err := subtitlepath.RemoveUnderRoot(t.Context(), rem, tc.path)
 			if tc.wantRefused {
 				if !errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed) {
 					t.Fatalf("want ErrSubtitleExtensionNotAllowed, got %v", err)
@@ -64,7 +64,7 @@ func TestRemoveUnderRootPropagatesContainmentError(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("containment failure")
 	rem := &recordingRemover{err: sentinel}
-	err := subtitlepath.RemoveUnderRoot(context.Background(), rem, "/media/movie.srt")
+	err := subtitlepath.RemoveUnderRoot(t.Context(), rem, "/media/movie.srt")
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("want containment error propagated, got %v", err)
 	}

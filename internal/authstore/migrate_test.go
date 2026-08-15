@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -22,7 +21,7 @@ import (
 // users (one with an OIDC identity), a passkey, and an API key.
 func seededStore(t *testing.T) (*Store, []auth.User, auth.PasskeyCredential, auth.Key) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	s := New(openShared(t, bootstrappedFile(t)))
 
 	alice := &auth.User{Username: "alice", Email: "alice@example.com", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true, OIDCIssuer: "https://idp", OIDCSub: "sub-alice"}
@@ -65,7 +64,7 @@ func TestResetPreserving_refusesNilTransform(t *testing.T) {
 		t.Fatalf("ResetPreserving(nil) = %v, want the explicit-transform refusal", err)
 	}
 	// Nothing was touched.
-	u, gerr := s.GetUserByUsername(context.Background(), users[0].Username)
+	u, gerr := s.GetUserByUsername(t.Context(), users[0].Username)
 	if gerr != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("user after refused reset = (%+v, %v), want untouched", u, gerr)
 	}
@@ -77,7 +76,7 @@ func TestResetPreserving_refusesNilTransform(t *testing.T) {
 // re-allocate a preserved id.
 func TestResetPreserving_identityRoundTrip(t *testing.T) {
 	s, users, pk, key := seededStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := resetWith(s, func(*Rowset) error { return nil }); err != nil {
 		t.Fatalf("ResetPreserving(identity): %v", err)
@@ -134,7 +133,7 @@ func TestResetPreserving_identityRoundTrip(t *testing.T) {
 // dropped API key (with its owner's other rows kept) is gone.
 func TestResetPreserving_appliesTransform(t *testing.T) {
 	s, users, _, _ := seededStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := resetWith(s, func(rs *Rowset) error {
 		for i := range rs.Users {
@@ -169,7 +168,7 @@ func TestResetPreserving_appliesTransform(t *testing.T) {
 // so a post-migration create can never re-allocate a restored id.
 func TestResetPreserving_sequenceBumpsPastTransformedIDs(t *testing.T) {
 	s, users, _, _ := seededStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := resetWith(s, func(rs *Rowset) error {
 		rs.Passkeys[0].ID = 100
@@ -321,7 +320,7 @@ func TestResetPreserving_failClosedGuards(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s, users, pk, key := seededStore(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			err := resetWith(s, tc.transform)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {

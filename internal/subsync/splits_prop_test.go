@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -90,7 +89,7 @@ func TestAlignWithSplits_output_length(t *testing.T) {
 		ref := genCues(t, n, "ref")
 		inc := genCues(t, n, "inc")
 
-		result := alignWithSplits(context.Background(), ref, inc, 0)
+		result := alignWithSplits(t.Context(), ref, inc, 0)
 		if len(result.Cues) != len(inc) {
 			t.Fatalf("alignWithSplits returned %d cues, want %d", len(result.Cues), len(inc))
 		}
@@ -108,7 +107,7 @@ func TestAlignWithSplits_identity(t *testing.T) {
 		n := rapid.IntRange(5, 50).Draw(t, "n")
 		cues := genCues(t, n, "cues")
 
-		result := alignWithSplits(context.Background(), cues, cues, 0)
+		result := alignWithSplits(t.Context(), cues, cues, 0)
 		if len(result.Cues) != len(cues) {
 			t.Fatalf("identity: returned %d cues, want %d", len(result.Cues), len(cues))
 		}
@@ -153,7 +152,7 @@ func TestPerCueOffsets(t *testing.T) {
 		inc := genCues(t, nInc, "inc")
 
 		refSpans := cuesToSpans(ref)
-		offsets := perCueOffsets(context.Background(), refSpans, inc)
+		offsets := perCueOffsets(t.Context(), refSpans, inc)
 
 		if len(offsets) != len(inc) {
 			t.Fatalf("perCueOffsets returned %d offsets, want %d", len(offsets), len(inc))
@@ -175,7 +174,7 @@ func TestPerCueOffsets(t *testing.T) {
 		}
 
 		// Determinism: running again should produce the same result.
-		offsets2 := perCueOffsets(context.Background(), refSpans, inc)
+		offsets2 := perCueOffsets(t.Context(), refSpans, inc)
 		for i := range offsets {
 			if offsets[i] != offsets2[i] {
 				t.Fatalf("perCueOffsets non-deterministic at index %d: %v vs %v", i, offsets[i], offsets2[i])

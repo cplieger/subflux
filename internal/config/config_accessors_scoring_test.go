@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"strconv"
 	"testing"
 
@@ -365,7 +364,7 @@ func BenchmarkResolveTargetsWithFallback(b *testing.B) {
 			},
 		}
 		// Trigger cache build by calling once.
-		cfg.buildCaches(context.Background())
+		cfg.buildCaches(b.Context())
 		return cfg
 	}
 

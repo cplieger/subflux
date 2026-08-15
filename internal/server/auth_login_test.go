@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -134,7 +133,7 @@ func TestLogin_DisabledUser(t *testing.T) {
 	s, db := testAuthServer(t)
 	user := createTestUser(t, db, "disabled", "correct-horse-battery-staple")
 	user.Enabled = false
-	if err := db.UpdateUser(context.Background(), user); err != nil {
+	if err := db.UpdateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 
@@ -188,7 +187,7 @@ func TestLogout_Success(t *testing.T) {
 
 	// Verify session was deleted from DB.
 	hash := auth.SessionHash(token)
-	sess, err := db.GetSessionByHash(context.Background(), hash)
+	sess, err := db.GetSessionByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}

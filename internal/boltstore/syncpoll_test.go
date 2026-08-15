@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 // round-trip through be64.
 func TestSyncOffset_setThenGetRoundTrip(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cases := []struct {
 		name string
@@ -48,7 +47,7 @@ func TestSyncOffset_setThenGetRoundTrip(t *testing.T) {
 func TestSyncOffset_getAbsentReturnsZero(t *testing.T) {
 	db, _ := openTemp(t)
 
-	got, err := db.GetSyncOffset(context.Background(), "/never/written.srt")
+	got, err := db.GetSyncOffset(t.Context(), "/never/written.srt")
 	if err != nil {
 		t.Fatalf("GetSyncOffset(absent): %v", err)
 	}
@@ -61,7 +60,7 @@ func TestSyncOffset_getAbsentReturnsZero(t *testing.T) {
 // replaces the prior offset rather than accumulating or appending.
 func TestSyncOffset_overwriteUpdates(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	const path = "/media/movies/over.fr.srt"
 
 	if err := db.SetSyncOffset(ctx, path, 500); err != nil {
@@ -85,7 +84,7 @@ func TestSyncOffset_overwriteUpdates(t *testing.T) {
 // comparison normalises to UTC and to the stored layout's resolution.
 func TestPollTimestamp_setThenGetRoundTrip(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	want := time.Date(2024, 3, 9, 12, 34, 56, 123456789, time.UTC)
 	for _, key := range []api.PollKey{api.PollKeySonarr, api.PollKeyRadarr} {
@@ -106,7 +105,7 @@ func TestPollTimestamp_setThenGetRoundTrip(t *testing.T) {
 // cursors: setting sonarr does not disturb radarr.
 func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sonarrAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	radarrAt := time.Date(2024, 6, 15, 9, 30, 0, 0, time.UTC)
@@ -138,7 +137,7 @@ func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 func TestPollTimestamp_getAbsentReturnsZeroTime(t *testing.T) {
 	db, _ := openTemp(t)
 
-	got, err := db.GetPollTimestamp(context.Background(), api.PollKeySonarr)
+	got, err := db.GetPollTimestamp(t.Context(), api.PollKeySonarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp(absent): %v", err)
 	}
@@ -152,7 +151,7 @@ func TestPollTimestamp_getAbsentReturnsZeroTime(t *testing.T) {
 // typo from silently creating a new cursor row).
 func TestPollTimestamp_invalidKeyRejected(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := db.SetPollTimestamp(ctx, api.PollKey("Sonarr"), time.Now()); err == nil {
 		t.Error("SetPollTimestamp(invalid key): error = nil, want rejection")

@@ -1,14 +1,13 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
 
 func TestAlignWithSplits_empty_inputs(t *testing.T) {
 	t.Parallel()
-	result := alignWithSplits(context.Background(), nil, nil, 0)
+	result := alignWithSplits(t.Context(), nil, nil, 0)
 	if result.Confidence != ConfidenceNone {
 		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
 	}
@@ -17,7 +16,7 @@ func TestAlignWithSplits_empty_inputs(t *testing.T) {
 func TestAlignWithSplits_empty_reference(t *testing.T) {
 	t.Parallel()
 	inc := makeCues(10, 0, 2*time.Second)
-	result := alignWithSplits(context.Background(), nil, inc, 0)
+	result := alignWithSplits(t.Context(), nil, inc, 0)
 	if result.Confidence != ConfidenceNone {
 		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
 	}
@@ -26,7 +25,7 @@ func TestAlignWithSplits_empty_reference(t *testing.T) {
 func TestAlignWithSplits_identical_subtitles(t *testing.T) {
 	t.Parallel()
 	cues := makeLongCues(30, 10*time.Minute)
-	result := alignWithSplits(context.Background(), cues, cues, 0)
+	result := alignWithSplits(t.Context(), cues, cues, 0)
 	if result.Method != MethodSplit {
 		t.Fatalf("expected method 'split', got %q", result.Method)
 	}
@@ -36,7 +35,7 @@ func TestAlignWithSplits_constant_offset(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 2*time.Second)
-	result := alignWithSplits(context.Background(), ref, inc, 0)
+	result := alignWithSplits(t.Context(), ref, inc, 0)
 	if result.Method != MethodSplit {
 		t.Fatalf("expected method 'split', got %q", result.Method)
 	}
@@ -51,7 +50,7 @@ func TestAlignWithSplits_no_split_emits_no_candidate(t *testing.T) {
 	// penalty forces the single segment.
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 3*time.Second)
-	result := alignWithSplits(context.Background(), ref, inc, 1e12)
+	result := alignWithSplits(t.Context(), ref, inc, 1e12)
 	if result.Method != MethodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
@@ -92,7 +91,7 @@ func TestAlignWithSplits_two_segments(t *testing.T) {
 		}
 	}
 
-	result := alignWithSplits(context.Background(), ref, inc, 500)
+	result := alignWithSplits(t.Context(), ref, inc, 500)
 	if result.Confidence == ConfidenceNone {
 		t.Fatal("expected some confidence for two-segment case")
 	}
@@ -243,7 +242,7 @@ func TestBuildSegments_merges_tiny(t *testing.T) {
 	inc := makeLongCues(20, 10*time.Minute)
 	// Splits at 0, 15, 18 (last segment has only 2 cues).
 	splits := []int{0, 15, 18}
-	segs := buildSegments(context.Background(), ref, inc, splits)
+	segs := buildSegments(t.Context(), ref, inc, splits)
 	// The tiny segment [18:20] should be merged with [15:18].
 	for _, seg := range segs {
 		size := seg.endIdx - seg.startIdx
@@ -272,7 +271,7 @@ func TestAlignWithSplits_default_penalty(t *testing.T) {
 	// splitPenalty <= 0 should use defaultSplitPenalty.
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 2*time.Second)
-	result := alignWithSplits(context.Background(), ref, inc, 0)
+	result := alignWithSplits(t.Context(), ref, inc, 0)
 	if result.Method != MethodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
@@ -282,7 +281,7 @@ func TestAlignWithSplits_negative_penalty(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 2*time.Second)
-	result := alignWithSplits(context.Background(), ref, inc, -100)
+	result := alignWithSplits(t.Context(), ref, inc, -100)
 	if result.Method != MethodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
@@ -291,7 +290,7 @@ func TestAlignWithSplits_negative_penalty(t *testing.T) {
 func TestAlignWithSplits_empty_incorrect(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(10, 5*time.Minute)
-	result := alignWithSplits(context.Background(), ref, nil, 0)
+	result := alignWithSplits(t.Context(), ref, nil, 0)
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("expected no confidence for nil incorrect, got %f",
 			float64(result.Confidence))
@@ -323,7 +322,7 @@ func TestPerCueOffsets_basic(t *testing.T) {
 		{Start: 0, End: 5 * time.Second, Text: "A"},                 // matches ref[0] perfectly
 		{Start: 10 * time.Second, End: 12 * time.Second, Text: "B"}, // matches ref[1] perfectly
 	}
-	offsets := perCueOffsets(context.Background(), ref, inc)
+	offsets := perCueOffsets(t.Context(), ref, inc)
 	if len(offsets) != 2 {
 		t.Fatalf("perCueOffsets returned %d, want 2", len(offsets))
 	}
@@ -340,7 +339,7 @@ func TestPerCueOffsets_no_overlap(t *testing.T) {
 	// Reference and incorrect don't overlap at all.
 	ref := cuesToSpans(makeCues(5, 0, 2*time.Second))
 	inc := makeCues(5, time.Hour, 2*time.Second)
-	offsets := perCueOffsets(context.Background(), ref, inc)
+	offsets := perCueOffsets(t.Context(), ref, inc)
 	if len(offsets) != 5 {
 		t.Fatalf("perCueOffsets returned %d, want 5", len(offsets))
 	}
@@ -541,7 +540,7 @@ func TestAlignWithSplits_three_segments(t *testing.T) {
 		}
 	}
 
-	result := alignWithSplits(context.Background(), ref, inc, 100)
+	result := alignWithSplits(t.Context(), ref, inc, 100)
 	if result.Method != MethodSplit {
 		t.Errorf("expected method 'split', got %q", result.Method)
 	}
@@ -564,7 +563,7 @@ func TestBuildSegments_single_split(t *testing.T) {
 	ref := cuesToSpans(makeLongCues(20, 10*time.Minute))
 	inc := makeLongCues(20, 10*time.Minute)
 	splits := []int{0, 10}
-	segs := buildSegments(context.Background(), ref, inc, splits)
+	segs := buildSegments(t.Context(), ref, inc, splits)
 	if len(segs) != 2 {
 		t.Fatalf("expected 2 segments, got %d", len(segs))
 	}
@@ -622,7 +621,7 @@ func TestBuildSegments_empty_splits(t *testing.T) {
 	t.Parallel()
 	ref := cuesToSpans(makeLongCues(10, 5*time.Minute))
 	inc := makeLongCues(10, 5*time.Minute)
-	segs := buildSegments(context.Background(), ref, inc, nil)
+	segs := buildSegments(t.Context(), ref, inc, nil)
 	if len(segs) != 0 {
 		t.Errorf("buildSegments(nil splits) returned %d segments, want 0", len(segs))
 	}

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -12,7 +11,7 @@ import (
 
 func TestAuthConfig_Defaults(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -47,7 +46,7 @@ func TestAuthConfig_DisableAuth(t *testing.T) {
 auth:
   disable_auth: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -61,7 +60,7 @@ auth:
 
 func TestWebAuthnRPID_empty_default(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -76,7 +75,7 @@ func TestWebAuthnRPID_configured(t *testing.T) {
 auth:
   webauthn_rp_id: "subflux.example.com"
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -97,7 +96,7 @@ auth:
     client_secret: "my-secret"
     redirect_uri: "https://subflux.example.com/api/auth/oidc/callback"
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -127,7 +126,7 @@ auth:
   basic_enabled: false
   oidc_enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -144,7 +143,7 @@ func TestBasicAuthDisabled_requires_oidc(t *testing.T) {
 auth:
   basic_enabled: false
 `
-	if _, err := LoadFromBytes(context.Background(), []byte(yaml)); err == nil {
+	if _, err := LoadFromBytes(t.Context(), []byte(yaml)); err == nil {
 		t.Fatal("LoadFromBytes() = nil error, want lockout-guard error")
 	}
 }
@@ -155,7 +154,7 @@ func TestSessionIdleTimeout_configured(t *testing.T) {
 auth:
   session_idle_timeout: "12h"
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -170,7 +169,7 @@ func TestSessionAbsoluteTimeout_configured(t *testing.T) {
 auth:
   session_absolute_timeout: "14D"
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -186,7 +185,7 @@ func TestCheckBreachedPasswords_explicit_false(t *testing.T) {
 auth:
   check_breached_passwords: false
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}

@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 )
 
@@ -17,7 +16,7 @@ func TestAlignMergeSort_direct(t *testing.T) {
 		{Start: 3000, End: 5000},
 		{Start: 8000, End: 10000},
 	}
-	got := alignMergeSort(context.Background(), ref, inc, -9000)
+	got := alignMergeSort(t.Context(), ref, inc, -9000)
 	if got != 2000 {
 		t.Errorf("alignMergeSort(+2000 offset) = %d, want 2000", got)
 	}
@@ -28,7 +27,7 @@ func TestAlignMergeSort_event_offsets(t *testing.T) {
 	// The four events per pair define the tent function shape.
 	ref := []TimeSpan{{Start: 5000, End: 8000}}
 	inc := []TimeSpan{{Start: 2000, End: 5000}}
-	got := alignMergeSort(context.Background(), ref, inc, -5000)
+	got := alignMergeSort(t.Context(), ref, inc, -5000)
 	if got != 3000 {
 		t.Errorf("alignMergeSort(+3000 offset) = %d, want 3000", got)
 	}
@@ -46,7 +45,7 @@ func TestAlignMergeSort_gap_computation(t *testing.T) {
 		{Start: 11000, End: 14000},
 	}
 	// Expected offset: -1000.
-	got := alignMergeSort(context.Background(), ref, inc, -14000)
+	got := alignMergeSort(t.Context(), ref, inc, -14000)
 	if got != -1000 {
 		t.Errorf("alignMergeSort(-1000 offset) = %d, want -1000", got)
 	}
@@ -57,7 +56,7 @@ func TestAlignMergeSort_bestRating_boundary(t *testing.T) {
 	// If the comparison is wrong, the best offset is never updated or updated incorrectly.
 	ref := []TimeSpan{{Start: 0, End: 5000}}
 	inc := []TimeSpan{{Start: 10000, End: 15000}}
-	got := alignMergeSort(context.Background(), ref, inc, -15000)
+	got := alignMergeSort(t.Context(), ref, inc, -15000)
 	if got != -10000 {
 		t.Errorf("alignMergeSort(-10000 offset) = %d, want -10000", got)
 	}
@@ -69,7 +68,7 @@ func TestAlignMergeSort_bestOffset_selection(t *testing.T) {
 	// When not at the last event, bestOffset = events[i+1].offset.
 	ref := []TimeSpan{{Start: 20000, End: 22000}}
 	inc := []TimeSpan{{Start: 10000, End: 12000}}
-	got := alignMergeSort(context.Background(), ref, inc, -12000)
+	got := alignMergeSort(t.Context(), ref, inc, -12000)
 	if got != 10000 {
 		t.Errorf("alignMergeSort(+10000 offset) = %d, want 10000", got)
 	}
@@ -88,7 +87,7 @@ func TestAlignMergeSort_last_event_boundary(t *testing.T) {
 		{Start: 1000000, End: 1001000}, // 1M ms apart → huge range, few entries
 	}
 	// This should not panic.
-	got := alignConstantOffset(context.Background(), ref, inc)
+	got := alignConstantOffset(t.Context(), ref, inc)
 	if got < -1001000 || got > 0 {
 		t.Errorf("alignConstantOffset(last event boundary) = %d, want within [-1001000, 0]", got)
 	}
@@ -107,7 +106,7 @@ func TestAlignMergeSort_gap_sign(t *testing.T) {
 		{Start: 200, End: 700},
 		{Start: 100200, End: 100700},
 	}
-	got := alignConstantOffset(context.Background(), ref, inc)
+	got := alignConstantOffset(t.Context(), ref, inc)
 	if got != -200 {
 		t.Errorf("AlignMergeSort(gap sign) = %d, want -200", got)
 	}
@@ -127,7 +126,7 @@ func TestAlignMergeSort_event_cap(t *testing.T) {
 	}
 	// rangeSize > 100M → bucket falls back to merge.
 	// With only 2 spans each, events = 2*2*4 = 16, well under cap.
-	got := alignConstantOffset(context.Background(), ref, inc)
+	got := alignConstantOffset(t.Context(), ref, inc)
 	if got != -100 {
 		t.Errorf("alignConstantOffset(extreme timestamps) = %d, want -100", got)
 	}
@@ -144,7 +143,7 @@ func TestAlignMergeSort_first_peak_wins_on_tie(t *testing.T) {
 	inc := []TimeSpan{
 		{Start: 2000, End: 3000},
 	}
-	got := alignMergeSort(context.Background(), ref, inc, -3000)
+	got := alignMergeSort(t.Context(), ref, inc, -3000)
 	if got > 0 {
 		t.Errorf("alignMergeSort(symmetric peaks) = %d, want <= 0 (first peak wins)", got)
 	}

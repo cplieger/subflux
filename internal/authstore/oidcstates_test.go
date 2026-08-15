@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -36,7 +35,7 @@ func putOIDC(s *Store, state string, ts time.Time) {
 
 func TestCreateOIDCState_andConsume_roundTrips(t *testing.T) {
 	s := newOIDCStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateOIDCState(ctx, "state-abc", "nonce-xyz", "verifier-123", "/callback"); err != nil {
 		t.Fatalf("CreateOIDCState: %v", err)
 	}
@@ -60,7 +59,7 @@ func TestCreateOIDCState_andConsume_roundTrips(t *testing.T) {
 // returns not-found (Requirement 16.3).
 func TestConsumeOIDCState_secondConsumeNotFound(t *testing.T) {
 	s := newOIDCStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateOIDCState(ctx, "state-abc", "n", "v", "/cb"); err != nil {
 		t.Fatalf("CreateOIDCState: %v", err)
 	}
@@ -78,7 +77,7 @@ func TestConsumeOIDCState_secondConsumeNotFound(t *testing.T) {
 
 func TestConsumeOIDCState_unknownNotFound(t *testing.T) {
 	s := newOIDCStore(t)
-	_, _, _, err := s.ConsumeOIDCState(context.Background(), "never-created")
+	_, _, _, err := s.ConsumeOIDCState(t.Context(), "never-created")
 	if err == nil {
 		t.Error("ConsumeOIDCState(unknown): expected not-found error, got nil")
 	}
@@ -89,7 +88,7 @@ func TestConsumeOIDCState_unknownNotFound(t *testing.T) {
 // and the returned count.
 func TestCleanupExpiredOIDCStates(t *testing.T) {
 	s := newOIDCStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 	maxAge := 10 * time.Minute
 
@@ -123,7 +122,7 @@ func TestCleanupExpiredOIDCStates(t *testing.T) {
 // both observe the entry). Requirement 16.3.
 func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 	s := newOIDCStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateOIDCState(ctx, "race-state", "nonce-win", "verifier-win", "/cb-win"); err != nil {
 		t.Fatalf("CreateOIDCState: %v", err)
 	}
@@ -161,7 +160,7 @@ func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 // evicted — never on a sweep that evicts nothing.
 func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
 	s := newOIDCStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	logs := capture.Default(t)
 	now := time.Now().UTC()
 	maxAge := 10 * time.Minute

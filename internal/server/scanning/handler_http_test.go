@@ -1,7 +1,6 @@
 package scanning
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -63,7 +62,7 @@ func TestHandleScanSeries_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan/series/1", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -78,7 +77,7 @@ func TestHandleScanSeries_missing_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -93,7 +92,7 @@ func TestHandleScanSeries_non_numeric_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/abc", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -108,7 +107,7 @@ func TestHandleScanSeries_zero_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/0", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -123,7 +122,7 @@ func TestHandleScanSeries_negative_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/-1", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -138,7 +137,7 @@ func TestHandleScanSeries_no_sonarr(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/42", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)
@@ -158,7 +157,7 @@ func TestHandleScanSeason_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan/season/1/2", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -174,7 +173,7 @@ func TestHandleScanSeason_missing_season(t *testing.T) {
 	h := newValidationHandler()
 
 	// Only series ID, no season segment.
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -189,7 +188,7 @@ func TestHandleScanSeason_non_numeric_series_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/abc/2", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -204,7 +203,7 @@ func TestHandleScanSeason_zero_series_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/0/2", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -219,7 +218,7 @@ func TestHandleScanSeason_non_numeric_season(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42/abc", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -234,7 +233,7 @@ func TestHandleScanSeason_negative_season(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42/-1", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -249,7 +248,7 @@ func TestHandleScanSeason_no_sonarr(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42/2", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -267,7 +266,7 @@ func TestHandleScanSeason_trailing_slash(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42/2/", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -283,7 +282,7 @@ func TestHandleScanSeason_zero_season_allowed(t *testing.T) {
 	h := newValidationHandler()
 
 	// Season 0 (specials) is valid; should fail on sonarr nil, not season validation.
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/season/42/0", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeason(rec, req)
@@ -306,7 +305,7 @@ func TestHandleScanItem_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan/item", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -321,7 +320,7 @@ func TestHandleScanItem_invalid_json(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader("not json"))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -337,7 +336,7 @@ func TestHandleScanItem_zero_media_id(t *testing.T) {
 	h := newValidationHandler()
 
 	body := `{"media_type":"episode","media_id":0}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -353,7 +352,7 @@ func TestHandleScanItem_negative_media_id(t *testing.T) {
 	h := newValidationHandler()
 
 	body := `{"media_type":"movie","media_id":-5}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -369,7 +368,7 @@ func TestHandleScanItem_movie_no_radarr(t *testing.T) {
 	h := newValidationHandler()
 
 	body := `{"media_type":"movie","media_id":42}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -389,7 +388,7 @@ func TestHandleScanItem_episode_no_sonarr(t *testing.T) {
 	h := newValidationHandler()
 
 	body := `{"media_type":"episode","media_id":42}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -410,7 +409,7 @@ func TestHandleScanItem_default_type_is_episode(t *testing.T) {
 
 	// No media_type specified; should default to episode path (sonarr check).
 	body := `{"media_id":42}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -430,7 +429,7 @@ func TestHandleScanItem_invalid_media_type(t *testing.T) {
 	h := newValidationHandler()
 
 	body := `{"media_type":"series","media_id":42}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/item", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleScanItem(rec, req)
@@ -451,7 +450,7 @@ func TestHandleScanMovie_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan/movie/42", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)
@@ -466,7 +465,7 @@ func TestHandleScanMovie_missing_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/movie/", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)
@@ -481,7 +480,7 @@ func TestHandleScanMovie_non_numeric_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/movie/abc", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)
@@ -496,7 +495,7 @@ func TestHandleScanMovie_zero_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/movie/0", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)
@@ -511,7 +510,7 @@ func TestHandleScanMovie_negative_id(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/movie/-1", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)
@@ -526,7 +525,7 @@ func TestHandleScanMovie_no_radarr(t *testing.T) {
 	t.Parallel()
 	h := newValidationHandler()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/movie/42", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanMovie(rec, req)

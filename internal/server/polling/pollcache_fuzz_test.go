@@ -33,7 +33,7 @@ func FuzzPollCacheRoundtrip(f *testing.F) {
 			},
 		)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		cache.Set(ctx, key, ts)
 
 		// Verify DB write-through.

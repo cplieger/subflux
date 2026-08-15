@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -53,7 +52,7 @@ func childExists(t *testing.T, db *bolt.DB, indexBucket, primaryBucket string, u
 
 func TestCreateUser_setsIDAndRoundTrips(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	u := &auth.User{Username: "Alice", Email: "Alice@Example.COM", Role: auth.RoleAdmin, PasswordHash: "hash", Enabled: true}
 	if err := s.CreateUser(ctx, u); err != nil {
@@ -81,7 +80,7 @@ func TestCreateUser_setsIDAndRoundTrips(t *testing.T) {
 
 func TestGetUserByID_notFound(t *testing.T) {
 	s := newUserStore(t)
-	got, err := s.GetUserByID(context.Background(), 999)
+	got, err := s.GetUserByID(t.Context(), 999)
 	if err != nil {
 		t.Fatalf("GetUserByID: %v", err)
 	}
@@ -92,7 +91,7 @@ func TestGetUserByID_notFound(t *testing.T) {
 
 func TestGetUserByUsername_caseInsensitive(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "Alice", Role: auth.RoleUser}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -119,7 +118,7 @@ func TestGetUserByUsername_caseInsensitive(t *testing.T) {
 
 func TestGetUserByEmail_caseInsensitive(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "carol", Email: "Carol@Example.com", Role: auth.RoleUser}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -144,7 +143,7 @@ func TestGetUserByEmail_caseInsensitive(t *testing.T) {
 
 func TestGetUserByOIDCSub(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "dora", Role: auth.RoleUser, OIDCIssuer: "https://idp", OIDCSub: "sub-123"}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -170,7 +169,7 @@ func TestGetUserByOIDCSub(t *testing.T) {
 
 func TestCreateUser_duplicateUsernameRejected(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateUser(ctx, &auth.User{Username: "Eve", Role: auth.RoleUser}); err != nil {
 		t.Fatalf("CreateUser first: %v", err)
 	}
@@ -186,7 +185,7 @@ func TestCreateUser_duplicateUsernameRejected(t *testing.T) {
 
 func TestCreateUser_duplicateOIDCRejected(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateUser(ctx, &auth.User{Username: "frank", Role: auth.RoleUser, OIDCIssuer: "iss", OIDCSub: "x"}); err != nil {
 		t.Fatalf("CreateUser first: %v", err)
 	}
@@ -202,7 +201,7 @@ func TestCreateUser_duplicateOIDCRejected(t *testing.T) {
 
 func TestUserCount(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if n, _ := s.UserCount(ctx); n != 0 {
 		t.Fatalf("UserCount on empty = %d, want 0", n)
 	}
@@ -218,7 +217,7 @@ func TestUserCount(t *testing.T) {
 
 func TestListUsers_orderedByUsername(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, name := range []string{"charlie", "Alice", "bob"} {
 		if err := s.CreateUser(ctx, &auth.User{Username: name, Role: auth.RoleUser}); err != nil {
 			t.Fatalf("CreateUser %q: %v", name, err)
@@ -240,7 +239,7 @@ func TestListUsers_orderedByUsername(t *testing.T) {
 
 func TestUpdateUser_reKeysUsernameIndex(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "oldname", Role: auth.RoleUser}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -270,7 +269,7 @@ func TestUpdateUser_reKeysUsernameIndex(t *testing.T) {
 
 func TestUpdateUser_reKeysOIDCIndex(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "grace", Role: auth.RoleUser, OIDCIssuer: "iss", OIDCSub: "old-sub"}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -291,7 +290,7 @@ func TestUpdateUser_reKeysOIDCIndex(t *testing.T) {
 
 func TestUpdateUser_preservesCreatedAt(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "heidi", Role: auth.RoleUser}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -313,7 +312,7 @@ func TestUpdateUser_preservesCreatedAt(t *testing.T) {
 
 func TestDeleteUser_cascadesAndIsolates(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	victim := &auth.User{Username: "victim", Role: auth.RoleUser}
 	keep := &auth.User{Username: "keep", Role: auth.RoleUser}
@@ -389,7 +388,7 @@ func TestDeleteUser_cascadesAndIsolates(t *testing.T) {
 
 func TestDeleteUser_absentIsNoOp(t *testing.T) {
 	s := newUserStore(t)
-	if err := s.DeleteUser(context.Background(), 12345); err != nil {
+	if err := s.DeleteUser(t.Context(), 12345); err != nil {
 		t.Errorf("DeleteUser(absent) = %v, want nil", err)
 	}
 }
@@ -412,7 +411,7 @@ func TestAsciiFold_uppercaseZ(t *testing.T) {
 // its OIDC index entry.
 func TestCreateUser_errorsWhenOIDCIndexBucketMissing(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.db.Update(func(tx *bolt.Tx) error {
 		return tx.DeleteBucket([]byte(bucketIxUserOIDC))
 	}); err != nil {
@@ -429,7 +428,7 @@ func TestCreateUser_errorsWhenOIDCIndexBucketMissing(t *testing.T) {
 // registered (issuer, sub) must be rejected with errConflict.
 func TestUpdateUser_rejectsOIDCCollision(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	a := &auth.User{Username: "collide-a", Role: auth.RoleUser, OIDCIssuer: "iss", OIDCSub: "shared-sub"}
 	if err := s.CreateUser(ctx, a); err != nil {
 		t.Fatalf("CreateUser(a): %v", err)
@@ -451,7 +450,7 @@ func TestUpdateUser_rejectsOIDCCollision(t *testing.T) {
 // back a brand-new user (the clean-break recovery path).
 func TestDeleteUser_freesOIDCIndexForReuse(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	a := &auth.User{Username: "oidc-victim", Role: auth.RoleUser, OIDCIssuer: "iss-x", OIDCSub: "sub-x"}
 	if err := s.CreateUser(ctx, a); err != nil {
 		t.Fatalf("CreateUser(a): %v", err)
@@ -472,7 +471,7 @@ func TestDeleteUser_freesOIDCIndexForReuse(t *testing.T) {
 // makes the cascade's Bucket.Delete return ErrIncompatibleValue.
 func TestDeleteUser_propagatesAPIKeyCascadeError(t *testing.T) {
 	s := newUserStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	u := &auth.User{Username: "cascade-user", Role: auth.RoleUser}
 	if err := s.CreateUser(ctx, u); err != nil {
 		t.Fatalf("CreateUser: %v", err)

@@ -6,7 +6,6 @@ package server
 // configured user, full scans (manual AND scheduled) by admins only.
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,7 +19,7 @@ import (
 // authenticated user in context (nil user = no principal).
 func cancelReq(t *testing.T, s *Server, id string, user *auth.User) *httptest.ResponseRecorder {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	if user != nil {
 		ctx = api.NewUserContext(ctx, user)
 	}
@@ -158,7 +157,7 @@ func TestHandleCancelActivity_missing_id_400(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(api.NewUserContext(context.Background(), plainUser()),
+	req := httptest.NewRequestWithContext(api.NewUserContext(t.Context(), plainUser()),
 		http.MethodPost, "/api/activity//cancel", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleCancelActivity(rec, req)
@@ -175,7 +174,7 @@ func TestDismissActivity_never_stops_running_scans(t *testing.T) {
 	id, stopped := startScanEntry(s, activity.SourceManual,
 		activity.ScanScope{Kind: activity.ScanKindSeries, MediaID: 42}, auth.RoleUser)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissActivity(rec, req)

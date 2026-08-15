@@ -73,7 +73,7 @@ func TestRequireConfigured_blocks_unconfigured(t *testing.T) {
 	})
 	handler := s.requireConfigured(inner)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler(rec, req)
@@ -100,7 +100,7 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 	})
 	handler := s.requireConfigured(inner)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler(rec, req)

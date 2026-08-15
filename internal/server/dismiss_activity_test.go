@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +12,7 @@ func TestHandleDismissActivity_missing_id_returns_400(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissActivity(rec, req)
@@ -31,7 +30,7 @@ func TestHandleDismissActivity_cancels_queued_entry(t *testing.T) {
 	id := s.activity.Start("Scan", "queued scan", "manual")
 	s.activity.SetQueued(id, true)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissActivity(rec, req)
@@ -53,7 +52,7 @@ func TestHandleDismissActivity_dismisses_completed_entry(t *testing.T) {
 	id := s.activity.Start("Scan", "done scan", "manual")
 	s.activity.End(id)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissActivity(rec, req)
@@ -72,7 +71,7 @@ func TestHandleDismissActivity_nonexistent_id_returns_204(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id=nonexistent", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissActivity(rec, req)

@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ func TestAudioSyncFromPCM_too_few_cues(t *testing.T) {
 	t.Parallel()
 	cues := makeCues(4, 0, 2*time.Second)
 	pcm := make([]int16, 8000)
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("audioSyncFromPCM(4 cues) confidence = %f, want 0", float64(result.Confidence))
 	}
@@ -28,7 +27,7 @@ func TestAudioSyncFromPCM_zero_frames(t *testing.T) {
 	t.Parallel()
 	cues := makeCues(10, 0, 2*time.Second)
 	pcm := make([]int16, 50)
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("audioSyncFromPCM(zero frames) confidence = %f, want 0", float64(result.Confidence))
 	}
@@ -38,7 +37,7 @@ func TestAudioSyncFromPCM_silence_completes(t *testing.T) {
 	t.Parallel()
 	cues := makeLongCues(10, 20*time.Second)
 	pcm := make([]int16, 8000*30)
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(silence) method = %q, want %q", result.Method, MethodAudio)
 	}
@@ -52,7 +51,7 @@ func TestAudioSyncFromPCM_with_dialogue_hints(t *testing.T) {
 	cues := makeLongCues(10, 20*time.Second)
 	dialogueCues := makeLongCues(8, 18*time.Second)
 	pcm := make([]int16, 8000*30)
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{DialogueCues: dialogueCues, IsASS: true})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{DialogueCues: dialogueCues, IsASS: true})
 	if result.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(dialogue hints) method = %q, want %q", result.Method, MethodAudio)
 	}
@@ -66,7 +65,7 @@ func TestAudioSyncFromPCM_tonal_signal_no_panic(t *testing.T) {
 	for i := range pcm {
 		pcm[i] = int16(5000 * math.Sin(float64(i)*2*math.Pi*440/8000))
 	}
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(tonal) method = %q, want %q", result.Method, MethodAudio)
 	}
@@ -85,7 +84,7 @@ func TestAudioSyncFromPCM_excessive_offset_rejected(t *testing.T) {
 		{Start: 1200 * time.Millisecond, End: 1400 * time.Millisecond, Text: "Line five"},
 	}
 	pcm := make([]int16, 8000*2)
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(excessive) method = %q, want %q", result.Method, MethodAudio)
 	}
@@ -98,7 +97,7 @@ func TestAudioSyncFromPCM_safe_precise_agreement(t *testing.T) {
 	for i := range 8000 * 5 {
 		pcm[i] = int16(3000 * math.Sin(float64(i)*2*math.Pi*300/8000))
 	}
-	result := audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
 	if result.Method != MethodAudio {
 		t.Errorf("audioSyncFromPCM(agreement) method = %q, want %q", result.Method, MethodAudio)
 	}

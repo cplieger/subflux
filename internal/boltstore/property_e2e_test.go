@@ -112,7 +112,7 @@ func allPubSubPaths() []string {
 // ix_state_quad projection, and the maintained counters equal a full primary
 // re-scan (Requirements 14.3, 18.5).
 func TestPublicStore_indexEqualsRescan(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	rapid.Check(t, func(rt *rapid.T) {
 		db := openPropDB(rt)
 		env := &statEnv{gone: map[string]bool{}}

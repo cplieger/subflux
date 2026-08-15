@@ -110,7 +110,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ls := &LiveState{Radarr: tt.radarr, Sonarr: tt.sonarr}
-			cover, history := ResolveMediaIDs(context.Background(), ls, tt.mediaType, tt.arrID, tt.season, tt.episode)
+			cover, history := ResolveMediaIDs(t.Context(), ls, tt.mediaType, tt.arrID, tt.season, tt.episode)
 			if cover != tt.wantCover {
 				t.Errorf("coverageID = %q, want %q", cover, tt.wantCover)
 			}
@@ -170,7 +170,7 @@ func TestLookupMediaTitle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ls := &LiveState{Radarr: tt.radarr, Sonarr: tt.sonarr}
-			if got := LookupMediaTitle(context.Background(), ls, tt.mediaType, tt.arrID); got != tt.want {
+			if got := LookupMediaTitle(t.Context(), ls, tt.mediaType, tt.arrID); got != tt.want {
 				t.Errorf("LookupMediaTitle() = %q, want %q", got, tt.want)
 			}
 		})
@@ -236,7 +236,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	}
 	req.SetVideoPath(videoPath)
 
-	if ok := RunDownload(context.Background(), deps, ls, &testsupport.NopStore{}, srtProvider{}, req, "act-9"); !ok {
+	if ok := RunDownload(t.Context(), deps, ls, &testsupport.NopStore{}, srtProvider{}, req, "act-9"); !ok {
 		t.Fatal("RunDownload() = false, want success")
 	}
 
@@ -374,7 +374,7 @@ func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 
 	for i := 1; i <= 2; i++ {
 		req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
-		if ok := RunDownload(context.Background(), deps, ls, store, prov, req, "act"); !ok {
+		if ok := RunDownload(t.Context(), deps, ls, store, prov, req, "act"); !ok {
 			t.Fatalf("RunDownload(top pick %d) = false, want success", i)
 		}
 	}
@@ -407,11 +407,11 @@ func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 	store := &ordinalStore{}
 	prov := &seqProvider{}
 
-	if ok := RunDownload(context.Background(), deps, ls, store, prov,
+	if ok := RunDownload(t.Context(), deps, ls, store, prov,
 		downloadReq(videoPath, "sub-top", true), "act"); !ok {
 		t.Fatal("RunDownload(top pick) = false, want success")
 	}
-	if ok := RunDownload(context.Background(), deps, ls, store, prov,
+	if ok := RunDownload(t.Context(), deps, ls, store, prov,
 		downloadReq(videoPath, "sub-manual", false), "act"); !ok {
 		t.Fatal("RunDownload(manual) = false, want success")
 	}
@@ -462,7 +462,7 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 		wg.Go(func() {
 			req := downloadReq(videoPath, fmt.Sprintf("sub-%d", i), true)
 			<-start
-			results[i] = RunDownload(context.Background(), deps, ls, store, prov, req, "act")
+			results[i] = RunDownload(t.Context(), deps, ls, store, prov, req, "act")
 		})
 	}
 	close(start)

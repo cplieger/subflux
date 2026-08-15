@@ -62,7 +62,7 @@ func TestRunDBMaintenance_forwardsReconciledDeletionsAndMetrics(t *testing.T) {
 		},
 	}
 
-	scheduler.RunDBMaintenance(context.Background(), deps)
+	scheduler.RunDBMaintenance(t.Context(), deps)
 
 	if !slices.Equal(gotPaths, []string{"/m/a.fr.srt", "/m/b.en.srt"}) {
 		t.Errorf("DeleteSubtitleFiles paths = %v, want the two reconciled paths", gotPaths)
@@ -90,7 +90,7 @@ func TestRunDBMaintenance_diskFullReconcileError_raisesPersistentAlert(t *testin
 		// ReconcileMetrics left nil: also exercises the nil-safe metrics path.
 	}
 
-	scheduler.RunDBMaintenance(context.Background(), deps)
+	scheduler.RunDBMaintenance(t.Context(), deps)
 
 	visible := al.VisibleAlerts()
 	if len(visible) != 1 {
@@ -115,7 +115,7 @@ func TestGuardedScan_skipsWhenScanAlreadyInProgress(t *testing.T) {
 		},
 	}
 
-	scheduler.GuardedScan(context.Background(), deps)
+	scheduler.GuardedScan(t.Context(), deps)
 
 	if stateFuncCalled {
 		t.Error("GuardedScan started a scan (read live state) despite one already being in progress")
@@ -183,7 +183,7 @@ func TestPrepareFullScan_hoists_activity_and_registration(t *testing.T) {
 		t.Fatal("no live stop registration before run")
 	}
 
-	run(context.Background())
+	run(t.Context())
 
 	entry, _ = log.Get(actID)
 	if !entry.Done || entry.Failed || entry.Cancelled {

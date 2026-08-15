@@ -1,7 +1,6 @@
 package opensubtitles
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -21,7 +20,7 @@ func TestSetHeaders(t *testing.T) {
 	t.Run("sets required headers without token", func(t *testing.T) {
 		t.Parallel()
 		p := &Provider{apiKey: "test-api-key"}
-		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://example.com", http.NoBody)
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://example.com", http.NoBody)
 
 		p.setHeaders(req)
 
@@ -40,7 +39,7 @@ func TestSetHeaders(t *testing.T) {
 	t.Run("sets authorization header with token", func(t *testing.T) {
 		t.Parallel()
 		p := &Provider{apiKey: "key", token: "my-token"}
-		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://example.com", http.NoBody)
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://example.com", http.NoBody)
 
 		p.setHeaders(req)
 

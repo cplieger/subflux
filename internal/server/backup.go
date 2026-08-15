@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/atomicfile/v2"
@@ -130,7 +130,7 @@ func pruneBackups(dir string, keep int) {
 	if err != nil || len(matches) <= keep {
 		return
 	}
-	sort.Strings(matches)
+	slices.Sort(matches)
 	for _, old := range matches[:len(matches)-keep] {
 		if rmErr := os.Remove(old); rmErr != nil {
 			slog.Warn("backup: prune failed", "file", old, "error", rmErr)

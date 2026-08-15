@@ -69,7 +69,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	user := &auth.User{Username: "admin", PasswordHash: hash, Role: auth.RoleAdmin, Enabled: true}
 	if err := s.authStore.CreateUser(ctx, user); err != nil {
 		t.Fatal(err)

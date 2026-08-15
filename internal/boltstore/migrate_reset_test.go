@@ -45,7 +45,7 @@ type resetFixture struct {
 // lock.
 func seedResetFixture(t *testing.T, path string) *resetFixture {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	db, err := Open(path)
 	if err != nil {
 		t.Fatalf("Open(%q): %v", path, err)
@@ -108,7 +108,7 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 // seedResetAuth writes the auth half of the fixture over the shared handle.
 func seedResetAuth(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	as := authstore.New(db.BoltDB())
 
 	alice := &auth.User{Username: "alice", Email: "alice@example.com", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true, OIDCIssuer: "https://idp", OIDCSub: "sub-alice"}
@@ -191,6 +191,7 @@ func TestMigrate_coreResetPreservesIrreplaceable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
@@ -263,7 +264,7 @@ func assertAuthBucketsIdentical(t *testing.T, db *DB, before map[string]map[stri
 // their locks still hold.
 func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	entries, err := db.GetState(ctx, &api.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
@@ -314,7 +315,7 @@ func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 // assertCoreResetOffsets proves the sync offsets survived verbatim.
 func assertCoreResetOffsets(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	for p, want := range fx.offsets {
 		got, err := db.GetSyncOffset(ctx, p)
 		if err != nil || got != want {
@@ -328,7 +329,7 @@ func assertCoreResetOffsets(t *testing.T, db *DB, fx *resetFixture) {
 // scan state.
 func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	if score, _, found, err := db.CurrentScore(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard); err != nil || found {
 		t.Errorf("CurrentScore after reset = (%d, found=%v, %v), want no auto row", score, found, err)
 	}
@@ -356,7 +357,7 @@ func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 // RecordSubtitleFiles re-lists the file, GetSubtitleFiles reports the offset.
 func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := db.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt1", []api.SubtitleFile{
 		{Language: "en", Variant: api.VariantStandard, Source: api.SourceExternal, Codec: "subrip", Path: "/m/tt1.en.1.srt"},
 	}); err != nil {
@@ -388,6 +389,7 @@ func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 // drop what a newer (or instrumented) build wrote.
 func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "subflux.bolt")
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 
 	// Seed an auto row first (id 1) so the manual row lands at id 2 and the
@@ -500,6 +502,7 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
@@ -635,6 +638,7 @@ func TestResetCorePreserving_property(t *testing.T) {
 		if err != nil {
 			rt.Fatalf("Open: %v", err)
 		}
+		// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 		ctx := context.Background()
 
 		wantOffsets := seedPropertyStore(rt, db, quads, offsetPaths)
@@ -657,6 +661,7 @@ func TestResetCorePreserving_property(t *testing.T) {
 // seedPropertyStore applies a random operation sequence (auto saves, manual
 // saves, offset writes, backoff rows) and returns the final offsets map.
 func seedPropertyStore(rt *rapid.T, db *DB, quads []resetPropQuad, offsetPaths []string) map[string]int64 {
+	// context.Background(): rt is a *rapid.T, so no testing context exists here.
 	ctx := context.Background()
 	wantOffsets := map[string]int64{}
 	n := rapid.IntRange(0, 25).Draw(rt, "ops")
@@ -730,6 +735,7 @@ func snapshotManualRows(rt *rapid.T, db *DB) (map[string]int, []string) {
 // survivors, ordering, fresh sequential ids, offsets, counters, and the
 // index-equals-rescan invariant.
 func assertPropertyReset(rt *rapid.T, db *DB, wantManual map[string]int, wantOrder []string, wantOffsets map[string]int64) {
+	// context.Background(): rt is a *rapid.T, so no testing context exists here.
 	ctx := context.Background()
 	got := map[string]int{}
 	var gotOrder []string

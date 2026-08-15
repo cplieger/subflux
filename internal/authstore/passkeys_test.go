@@ -2,7 +2,6 @@ package authstore
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -48,7 +47,7 @@ func sampleCred(userID int64, credID []byte, name string) *auth.PasskeyCredentia
 
 func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// A credential id containing a NUL byte exercises the fixed-offset
 	// separator in the ix_passkey_user key (binary credential ids are legal).
@@ -90,7 +89,7 @@ func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 
 func TestGetPasskeyByCredentialID_notFound(t *testing.T) {
 	s := newPasskeyStore(t)
-	got, err := s.GetPasskeyByCredentialID(context.Background(), []byte("nope"))
+	got, err := s.GetPasskeyByCredentialID(t.Context(), []byte("nope"))
 	if err != nil {
 		t.Fatalf("GetPasskeyByCredentialID: %v", err)
 	}
@@ -101,7 +100,7 @@ func TestGetPasskeyByCredentialID_notFound(t *testing.T) {
 
 func TestCreatePasskey_duplicateCredentialIDRejected(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	credID := []byte("dup-cred")
 	if err := s.CreatePasskey(ctx, sampleCred(1, credID, "first")); err != nil {
 		t.Fatalf("CreatePasskey first: %v", err)
@@ -122,7 +121,7 @@ func TestCreatePasskey_duplicateCredentialIDRejected(t *testing.T) {
 
 func TestGetPasskeysByUserID_orderedAndIsolated(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	base := time.Now().UTC().Truncate(time.Second)
 	// Insert out of chronological order; result must come back by CreatedAt asc.
@@ -155,7 +154,7 @@ func TestGetPasskeysByUserID_orderedAndIsolated(t *testing.T) {
 
 func TestUpdatePasskeyAfterLogin_monotonicAndFlags(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	credID := []byte("cred-mono")
 	cred := sampleCred(1, credID, "key")
 	cred.SignCount = 5
@@ -192,7 +191,7 @@ func TestUpdatePasskeyAfterLogin_monotonicAndFlags(t *testing.T) {
 // detection state must be durable, not just in-memory (Requirement 9.5).
 func TestUpdatePasskeyAfterLogin_durableAcrossReopen(t *testing.T) {
 	path := bootstrappedFile(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	credID := []byte("cred-durable")
 
 	// First session: create at 5, bump to 42, then close the file entirely.
@@ -246,7 +245,7 @@ func TestUpdatePasskeyAfterLogin_durableAcrossReopen(t *testing.T) {
 
 func TestUpdatePasskeyAfterLogin_absentIsNoOp(t *testing.T) {
 	s := newPasskeyStore(t)
-	err := s.UpdatePasskeyAfterLogin(context.Background(), []byte("ghost"), 9, auth.PasskeyFlags{})
+	err := s.UpdatePasskeyAfterLogin(t.Context(), []byte("ghost"), 9, auth.PasskeyFlags{})
 	if err != nil {
 		t.Errorf("UpdatePasskeyAfterLogin(absent) = %v, want nil", err)
 	}
@@ -254,7 +253,7 @@ func TestUpdatePasskeyAfterLogin_absentIsNoOp(t *testing.T) {
 
 func TestRenamePasskey_ownershipEnforced(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	owner := sampleCred(1, []byte("owner-cred"), "old-name")
 	if err := s.CreatePasskey(ctx, owner); err != nil {
@@ -283,7 +282,7 @@ func TestRenamePasskey_ownershipEnforced(t *testing.T) {
 
 func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	owner := sampleCred(1, []byte("del-cred"), "key")
 	if err := s.CreatePasskey(ctx, owner); err != nil {
@@ -315,7 +314,7 @@ func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 
 func TestPasskeyCountForUser(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if n, _ := s.PasskeyCountForUser(ctx, 1); n != 0 {
 		t.Fatalf("count on empty = %d, want 0", n)
 	}
@@ -341,7 +340,7 @@ func TestPasskeyCountForUser(t *testing.T) {
 // user's passkey is untouched.
 func TestDeleteUser_cascadesRealPasskeys(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	victim := &auth.User{Username: "victim", Role: auth.RoleUser}
 	keep := &auth.User{Username: "keep", Role: auth.RoleUser}
@@ -402,7 +401,7 @@ func seedCorruptPasskey(t *testing.T, s *Store, userID int64, credID []byte) {
 // index entry.
 func TestCreatePasskey_errorsWhenIndexBucketMissing(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.db.Update(func(tx *bolt.Tx) error {
 		return tx.DeleteBucket([]byte(bucketIxPasskeyUser))
 	}); err != nil {
@@ -417,7 +416,7 @@ func TestCreatePasskey_errorsWhenIndexBucketMissing(t *testing.T) {
 // owner delete emits the "passkey deleted" line exactly once.
 func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 	s := newPasskeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	cred := sampleCred(1, []byte("del-pk-cred"), "k")
 	if err := s.CreatePasskey(ctx, cred); err != nil {
 		t.Fatalf("CreatePasskey: %v", err)
@@ -437,7 +436,7 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeletePasskey_propagatesUpdateError(t *testing.T) {
 	s := newPasskeyStore(t)
 	seedCorruptPasskey(t, s, 1, []byte("corrupt-cred"))
-	if err := s.DeletePasskey(context.Background(), 999, 1); err == nil {
+	if err := s.DeletePasskey(t.Context(), 999, 1); err == nil {
 		t.Fatal("DeletePasskey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

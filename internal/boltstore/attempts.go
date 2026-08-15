@@ -2,12 +2,13 @@ package boltstore
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -225,8 +226,8 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return out[i].NextRetry.Before(out[j].NextRetry)
+	slices.SortStableFunc(out, func(a, b api.BackoffEntry) int {
+		return a.NextRetry.Compare(b.NextRetry)
 	})
 	return out, nil
 }
@@ -276,11 +277,11 @@ func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, medi
 	// Order by media id, then ascending next_retry (mirrors the old
 	// `ORDER BY media_id, next_retry ASC`). The scan already groups rows by
 	// media id ascending, but next_retry within a media id is unordered.
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].MediaID != out[j].MediaID {
-			return out[i].MediaID < out[j].MediaID
-		}
-		return out[i].NextRetry.Before(out[j].NextRetry)
+	slices.SortStableFunc(out, func(a, b api.BackoffEntry) int {
+		return cmp.Or(
+			cmp.Compare(a.MediaID, b.MediaID),
+			a.NextRetry.Compare(b.NextRetry),
+		)
 	})
 	return out, nil
 }

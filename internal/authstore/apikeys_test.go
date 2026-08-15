@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -38,7 +37,7 @@ func sampleKey(userID int64, hash, label string) *auth.Key {
 
 func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	exp := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
 	key := sampleKey(7, "hash-abc", "ci-token")
@@ -74,7 +73,7 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 
 func TestGetAPIKeyByHash_notFound(t *testing.T) {
 	s := newAPIKeyStore(t)
-	got, err := s.GetAPIKeyByHash(context.Background(), "nope")
+	got, err := s.GetAPIKeyByHash(t.Context(), "nope")
 	if err != nil {
 		t.Fatalf("GetAPIKeyByHash: %v", err)
 	}
@@ -85,7 +84,7 @@ func TestGetAPIKeyByHash_notFound(t *testing.T) {
 
 func TestCreateAPIKey_duplicateHashRejectedNoPartialWrite(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := s.CreateAPIKey(ctx, sampleKey(1, "dup-hash", "first")); err != nil {
 		t.Fatalf("CreateAPIKey first: %v", err)
 	}
@@ -106,14 +105,14 @@ func TestCreateAPIKey_duplicateHashRejectedNoPartialWrite(t *testing.T) {
 
 func TestCreateAPIKey_emptyHashRejected(t *testing.T) {
 	s := newAPIKeyStore(t)
-	if err := s.CreateAPIKey(context.Background(), sampleKey(1, "", "no-hash")); err == nil {
+	if err := s.CreateAPIKey(t.Context(), sampleKey(1, "", "no-hash")); err == nil {
 		t.Fatal("CreateAPIKey with empty hash = nil, want error")
 	}
 }
 
 func TestListAPIKeysByUserID_scopedAndOrdered(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	base := time.Now().UTC().Truncate(time.Second)
 	mk := func(userID int64, hash, label string, at time.Time) {
@@ -146,7 +145,7 @@ func TestListAPIKeysByUserID_scopedAndOrdered(t *testing.T) {
 
 func TestListAPIKeysByUserID_emptyUser(t *testing.T) {
 	s := newAPIKeyStore(t)
-	got, err := s.ListAPIKeysByUserID(context.Background(), 99)
+	got, err := s.ListAPIKeysByUserID(t.Context(), 99)
 	if err != nil {
 		t.Fatalf("ListAPIKeysByUserID: %v", err)
 	}
@@ -157,7 +156,7 @@ func TestListAPIKeysByUserID_emptyUser(t *testing.T) {
 
 func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	owner := sampleKey(1, "owner-hash", "key")
 	if err := s.CreateAPIKey(ctx, owner); err != nil {
@@ -190,7 +189,7 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 
 func TestDeleteAPIKey_absentIsNoOp(t *testing.T) {
 	s := newAPIKeyStore(t)
-	if err := s.DeleteAPIKey(context.Background(), 12345, 1); err != nil {
+	if err := s.DeleteAPIKey(t.Context(), 12345, 1); err != nil {
 		t.Errorf("DeleteAPIKey(absent) = %v, want nil", err)
 	}
 }
@@ -201,7 +200,7 @@ func TestDeleteAPIKey_absentIsNoOp(t *testing.T) {
 // user's key is untouched.
 func TestDeleteUser_cascadesRealAPIKeys(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	victim := &auth.User{Username: "victim", Role: auth.RoleUser}
 	keep := &auth.User{Username: "keep", Role: auth.RoleUser}
@@ -260,7 +259,7 @@ func seedCorruptAPIKey(t *testing.T, s *Store, userID int64, hash string) {
 // owner delete emits the "api key deleted" line exactly once.
 func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 	s := newAPIKeyStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	key := sampleKey(1, "del-log-hash", "k")
 	if err := s.CreateAPIKey(ctx, key); err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
@@ -280,7 +279,7 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeleteAPIKey_propagatesUpdateError(t *testing.T) {
 	s := newAPIKeyStore(t)
 	seedCorruptAPIKey(t, s, 1, "corrupt-hash")
-	if err := s.DeleteAPIKey(context.Background(), 999, 1); err == nil {
+	if err := s.DeleteAPIKey(t.Context(), 999, 1); err == nil {
 		t.Fatal("DeleteAPIKey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

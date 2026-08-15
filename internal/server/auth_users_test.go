@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -16,12 +15,12 @@ func TestListUsers_AdminOnly(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "list-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	// Second user exists so list has more than one entry.
 	regular := createTestUser(t, db, "list-user", "correct-horse-battery-staple")
 	regular.Role = "user"
-	db.UpdateUser(context.Background(), regular)
+	db.UpdateUser(t.Context(), regular)
 
 	// Admin can list users. Non-admin rejection is enforced by the
 	// requireRole(admin) middleware (see routes.go) and verified by the
@@ -47,7 +46,7 @@ func TestCreateUser_Success(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "create-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	body := `{"username":"newuser","password":"new-user-password-here","role":"user","email":"new@example.com"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
@@ -69,7 +68,7 @@ func TestCreateUser_Success(t *testing.T) {
 	}
 
 	// Verify user exists in DB.
-	u, err := db.GetUserByUsername(context.Background(), "newuser")
+	u, err := db.GetUserByUsername(t.Context(), "newuser")
 	if err != nil || u == nil {
 		t.Fatal("created user not found in DB")
 	}
@@ -83,7 +82,7 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "role-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	body := `{"username":"badrole","password":"some-password-here-now","role":"superadmin"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
@@ -101,7 +100,7 @@ func TestCreateUser_EmptyUsername(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "empty-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	body := `{"username":"","password":"some-password-here-now"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
@@ -119,7 +118,7 @@ func TestCreateUser_UsernameTooLong(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "create-long-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	longName := strings.Repeat("u", 65) // exceeds maxUsernameLen=64
 	body := `{"username":"` + longName + `","password":"some-password-here-now"}`
@@ -138,7 +137,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "del-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	victim := createTestUser(t, db, "del-victim", "correct-horse-battery-staple")
 
@@ -153,7 +152,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	}
 
 	// Verify user is gone.
-	u, err := db.GetUserByUsername(context.Background(), "del-victim")
+	u, err := db.GetUserByUsername(t.Context(), "del-victim")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +166,7 @@ func TestDeleteUser_CannotDeleteSelf(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "self-del", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/users/"+strconv.FormatInt(admin.ID, 10), http.NoBody)
@@ -185,7 +184,7 @@ func TestDeleteUser_InvalidID(t *testing.T) {
 	s, db := testAuthServer(t)
 	admin := createTestUser(t, db, "inv-admin", "correct-horse-battery-staple")
 	admin.Role = "admin"
-	db.UpdateUser(context.Background(), admin)
+	db.UpdateUser(t.Context(), admin)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/abc", http.NoBody)
 	req = req.WithContext(api.NewUserContext(req.Context(), admin))

@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -16,7 +15,7 @@ func BenchmarkCorrectFramerate(b *testing.B) {
 		b.Run(cueCountLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				correctFramerate(context.Background(), ref, inc, "")
+				correctFramerate(b.Context(), ref, inc, "")
 			}
 		})
 	}

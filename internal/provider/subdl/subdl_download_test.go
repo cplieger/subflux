@@ -3,7 +3,6 @@ package subdl
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -33,7 +32,7 @@ func TestDownload_rejects_non_relative_path(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			sub := &api.Subtitle{DownloadURL: tt.url}
-			_, err := p.Download(context.Background(), sub)
+			_, err := p.Download(t.Context(), sub)
 			if err == nil {
 				t.Errorf("Download(%q) expected error", tt.url)
 			}

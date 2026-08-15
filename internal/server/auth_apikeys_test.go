@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -54,7 +53,7 @@ func TestListAPIKeys_WithData(t *testing.T) {
 			Label:     "key-" + strconv.Itoa(i),
 			CreatedAt: time.Now(),
 		}
-		if err := db.CreateAPIKey(context.Background(), key); err != nil {
+		if err := db.CreateAPIKey(t.Context(), key); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -111,7 +110,7 @@ func TestGenerateAPIKey_Success(t *testing.T) {
 	// Verify the key is stored as a hash in the DB.
 	h := sha256.Sum256([]byte(key))
 	expectedHash := hex.EncodeToString(h[:])
-	apiKey, err := db.GetAPIKeyByHash(context.Background(), expectedHash)
+	apiKey, err := db.GetAPIKeyByHash(t.Context(), expectedHash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +138,7 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 		Label:     "test-cli-key",
 		CreatedAt: time.Now(),
 	}
-	if err := db.CreateAPIKey(context.Background(), apiKey); err != nil {
+	if err := db.CreateAPIKey(t.Context(), apiKey); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +150,7 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 	}
 
 	// Verify the key can be looked up by hash.
-	found, err := db.GetAPIKeyByHash(context.Background(), hash)
+	found, err := db.GetAPIKeyByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,12 +204,12 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 		Label:     "to-revoke",
 		CreatedAt: time.Now(),
 	}
-	if err := db.CreateAPIKey(context.Background(), apiKey); err != nil {
+	if err := db.CreateAPIKey(t.Context(), apiKey); err != nil {
 		t.Fatal(err)
 	}
 
 	// List keys to get the ID.
-	keys, err := db.ListAPIKeysByUserID(context.Background(), user.ID)
+	keys, err := db.ListAPIKeysByUserID(t.Context(), user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +230,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	}
 
 	// Verify key is gone.
-	found, err := db.GetAPIKeyByHash(context.Background(), hash)
+	found, err := db.GetAPIKeyByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}

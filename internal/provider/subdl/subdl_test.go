@@ -1,7 +1,6 @@
 package subdl
 
 import (
-	"context"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -10,17 +9,17 @@ import (
 
 func TestFactory_requires_api_key(t *testing.T) {
 	t.Parallel()
-	if _, err := Factory(context.Background(), nil); err == nil {
-		t.Fatal("Factory(context.Background(), nil) expected error")
+	if _, err := Factory(t.Context(), nil); err == nil {
+		t.Fatal("Factory(t.Context(), nil) expected error")
 	}
-	if _, err := Factory(context.Background(), map[string]any{"api_key": ""}); err == nil {
+	if _, err := Factory(t.Context(), map[string]any{"api_key": ""}); err == nil {
 		t.Fatal("Factory(empty key) expected error")
 	}
 }
 
 func TestFactory_with_api_key(t *testing.T) {
 	t.Parallel()
-	p, err := Factory(context.Background(), map[string]any{"api_key": "test"})
+	p, err := Factory(t.Context(), map[string]any{"api_key": "test"})
 	if err != nil {
 		t.Fatalf("Factory() unexpected error: %v", err)
 	}

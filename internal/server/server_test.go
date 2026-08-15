@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -34,7 +33,7 @@ func TestHandleHealth_returns_ok(t *testing.T) {
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 	s.ready.Set(true)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/health", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleHealth(rec, req)
@@ -61,7 +60,7 @@ func TestHandleHealth_not_ready(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/health", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleHealth(rec, req)
@@ -88,7 +87,7 @@ func TestHandleScan_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)
@@ -107,7 +106,7 @@ func TestSecurityHeaders_sets_all_headers(t *testing.T) {
 	})
 	handler := securityChain(inner)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -158,7 +157,7 @@ func TestSecurityHeaders_passes_through_to_next_handler(t *testing.T) {
 	})
 	handler := securityChain(inner)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/", http.NoBody)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -201,12 +200,12 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      context.Background(),
+		ctx:      t.Context(),
 	}
 	ls := &liveState{cfg: &qhMockConfig{}}
 	s.live.Store(ls)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)
@@ -252,7 +251,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      context.Background(),
+		ctx:      t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -265,7 +264,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 	}
 	s.scanning.Store(true)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)
@@ -303,12 +302,12 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      context.Background(),
+		ctx:      t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 	s.scanning.Store(true)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)
@@ -331,11 +330,11 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      context.Background(),
+		ctx:      t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleScan(rec, req)

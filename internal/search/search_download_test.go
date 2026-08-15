@@ -2,7 +2,6 @@ package search
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -94,7 +93,7 @@ func TestSyncSubtitle(t *testing.T) {
 			mc := &mockConfig{searchCfg: api.SearchConfig{}}
 			e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-			got, offset := e.syncSubtitle(context.Background(), defaultData, videoPath, "fr", tc.syncCfg)
+			got, offset := e.syncSubtitle(t.Context(), defaultData, videoPath, "fr", tc.syncCfg)
 
 			if tc.wantSame && !bytes.Equal(got, defaultData) {
 				t.Errorf("syncSubtitle() modified data, want original")
@@ -135,7 +134,7 @@ func TestSyncSubtitle_with_reference_srt(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	got, _ := e.syncSubtitle(context.Background(), []byte(incSRT), videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
+	got, _ := e.syncSubtitle(t.Context(), []byte(incSRT), videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
 	// External SRT is no longer used by auto sync (embedded-only).
 	// Data should be unchanged.
 	if string(got) != incSRT {
@@ -154,7 +153,7 @@ func TestEngine_SyncAndPostProcess_no_reference(t *testing.T) {
 	mc := &mockConfig{}
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	got, offsetMs := e.SyncAndPostProcess(context.Background(), data, videoPath, "fr", api.DefaultVariant)
+	got, offsetMs := e.SyncAndPostProcess(t.Context(), data, videoPath, "fr", api.DefaultVariant)
 
 	// No reference SRT exists, so data passes through PostProcess only.
 	// PostProcess normalizes line endings to CRLF and ensures trailing CRLF.
@@ -176,7 +175,7 @@ func TestDownloadFromProvider_not_found(t *testing.T) {
 	e := newEngine([]api.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "nonexistent"}
-	_, err := e.downloadFromProvider(context.Background(), sub)
+	_, err := e.downloadFromProvider(t.Context(), sub)
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error for unknown provider, got nil")
 	}
@@ -193,7 +192,7 @@ func TestDownloadFromProvider_success_with_metrics(t *testing.T) {
 	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "os"}
-	data, err := e.downloadFromProvider(context.Background(), sub)
+	data, err := e.downloadFromProvider(t.Context(), sub)
 	if err != nil {
 		t.Fatalf("downloadFromProvider() unexpected error: %v", err)
 	}
@@ -213,7 +212,7 @@ func TestDownloadFromProvider_error_with_metrics(t *testing.T) {
 	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "os"}
-	_, err := e.downloadFromProvider(context.Background(), sub)
+	_, err := e.downloadFromProvider(t.Context(), sub)
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error, got nil")
 	}
@@ -237,13 +236,13 @@ func TestDetectExisting_finds_external_subs(t *testing.T) {
 		}
 	}
 
-	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 
 	if len(result.External) != 3 {
-		t.Fatalf("detectExisting(context.Background(), ) found %d external subs, want 3", len(result.External))
+		t.Fatalf("detectExisting(t.Context(), ) found %d external subs, want 3", len(result.External))
 	}
 
 	// Verify the parsed metadata.
@@ -288,12 +287,12 @@ func TestDetectExisting_ignores_empty_lang_segment(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 	if len(result.External) != 0 {
-		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 0 (empty lang filtered)", len(result.External))
+		t.Errorf("detectExisting(t.Context(), ) found %d external subs, want 0 (empty lang filtered)", len(result.External))
 	}
 }
 
@@ -305,7 +304,7 @@ func TestSyncAgainstReference_no_reference_returns_original(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 	data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n\n")
 
-	result := syncAgainstReference(context.Background(), data, videoPath, "fr")
+	result := syncAgainstReference(t.Context(), data, videoPath, "fr")
 
 	if result.Applied() {
 		t.Errorf("syncAgainstReference(no ref) applied, want false")
@@ -340,7 +339,7 @@ func TestSyncAgainstReference_with_reference_syncs(t *testing.T) {
 		"4\n00:00:18,000 --> 00:00:20,000\nInc4\n\n" +
 		"5\n00:00:23,000 --> 00:00:25,000\nInc5\n\n"
 
-	result := syncAgainstReference(context.Background(), []byte(incSRT), videoPath, "fr")
+	result := syncAgainstReference(t.Context(), []byte(incSRT), videoPath, "fr")
 
 	// External SRT is no longer used by auto sync (embedded-only).
 	if result.Applied() {
@@ -368,7 +367,7 @@ func TestSyncAgainstReference_embedded_fallback(t *testing.T) {
 	}
 
 	// Verify ffprobe can parse the hand-crafted MKV; skip if not.
-	refCues, err := subsync.ExtractEmbeddedSRT(context.Background(), videoPath, "", "fr", nil)
+	refCues, err := subsync.ExtractEmbeddedSRT(t.Context(), videoPath, "", "fr", nil)
 	if err != nil || len(refCues) < 5 {
 		t.Skipf("ffprobe cannot extract from hand-crafted MKV (cues=%d, err=%v)", len(refCues), err)
 	}
@@ -380,7 +379,7 @@ func TestSyncAgainstReference_embedded_fallback(t *testing.T) {
 		"4\n00:00:18,000 --> 00:00:20,000\nInc4\n\n" +
 		"5\n00:00:23,000 --> 00:00:25,000\nInc5\n\n"
 
-	result := syncAgainstReference(context.Background(), []byte(incSRT), videoPath, "fr")
+	result := syncAgainstReference(t.Context(), []byte(incSRT), videoPath, "fr")
 
 	if !result.Applied() {
 		t.Error("syncAgainstReference(embedded fallback) not applied, want applied")
@@ -406,7 +405,7 @@ func TestSyncAgainstReference_embedded_skipped_when_same_lang(t *testing.T) {
 	}
 
 	data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n\n")
-	result := syncAgainstReference(context.Background(), data, videoPath, "fr")
+	result := syncAgainstReference(t.Context(), data, videoPath, "fr")
 
 	if result.Applied() {
 		t.Error("syncAgainstReference(same lang embedded) applied, want false")
@@ -438,7 +437,7 @@ func TestSyncSubtitle_reference_exists_but_already_in_sync(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	got, _ := e.syncSubtitle(context.Background(), data, videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
+	got, _ := e.syncSubtitle(t.Context(), data, videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
 
 	// Should return original data unchanged (offset == 0 path).
 	if !bytes.Equal(got, data) {

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +9,7 @@ import (
 
 func TestLoadFromBytes_allowed_hosts_unset_is_inactive(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -31,7 +30,7 @@ allowed_hosts:
   - subflux.example.com
   - 192.168.1.5
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -69,7 +68,7 @@ func TestLoadFromBytes_allowed_hosts_rejects_malformed_entries(t *testing.T) {
 allowed_hosts:
   - "http://subflux.example.com"
 `
-	_, err := LoadFromBytes(context.Background(), []byte(yaml))
+	_, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err == nil {
 		t.Fatal("LoadFromBytes() = nil error for a URL in allowed_hosts, want validation error")
 	}

@@ -187,7 +187,7 @@ type scanRig struct {
 
 func newScanRig(t *testing.T) *scanRig {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 	rig := &scanRig{
 		ctx: ctx, cancel: cancel,
@@ -234,7 +234,7 @@ func (rig *scanRig) post(t *testing.T, handler http.HandlerFunc, target, body st
 	} else {
 		rd = strings.NewReader(body)
 	}
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, target, rd)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, target, rd)
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 	var accepted ScanAccepted
@@ -476,7 +476,7 @@ func TestScan_queued_cancel_ends_cancelled_not_success(t *testing.T) {
 	rig := newScanRig(t)
 
 	// Simulate another manual scan holding the slot so ours queues.
-	if !rig.guard.Acquire(context.Background(), nil) {
+	if !rig.guard.Acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 
@@ -526,6 +526,7 @@ func TestScan_request_context_cancellation_never_reaches_scan(t *testing.T) {
 	rig.engine.started = make(chan int)
 	rig.engine.release = make(chan struct{})
 
+	// Parent stays context.Background(): this stands in for the REQUEST context, cancelled below to prove the cancellation never reaches the scan.
 	reqCtx, cancelReq := context.WithCancel(context.Background())
 	req := httptest.NewRequestWithContext(reqCtx, http.MethodPost, "/api/scan/series/42", http.NoBody)
 	rec := httptest.NewRecorder()
@@ -673,7 +674,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	}
 	res := make(chan result, 1)
 	go func() {
-		resumed, outcome := processItems(context.Background(), stop, deps, ls,
+		resumed, outcome := processItems(t.Context(), stop, deps, ls,
 			queue, nil, &stats, "act1", 0)
 		res <- result{resumed, outcome}
 	}()
@@ -713,7 +714,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		ls := &LiveState{Cfg: &testsupport.NopConfig{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
-		outcome := RunFullScan(context.Background(), make(chan struct{}), deps, ls, actID)
+		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID)
 		if outcome != activity.OutcomeCompleted {
 			t.Fatalf("outcome = %q, want completed", outcome)
 		}
@@ -869,7 +870,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 
 	res := make(chan activity.Outcome, 1)
 	go func() {
-		_, outcome := processItems(context.Background(), stop, deps, ls,
+		_, outcome := processItems(t.Context(), stop, deps, ls,
 			queue, nil, &stats, "act1", 0)
 		res <- outcome
 	}()
@@ -899,7 +900,7 @@ func TestScan_queued_stop_cancels_without_slot_release(t *testing.T) {
 
 	// Scan A holds the slot for the WHOLE test — B must reach its terminal
 	// state without A ever releasing.
-	if !rig.guard.Acquire(context.Background(), nil) {
+	if !rig.guard.Acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 	defer rig.guard.Release()
@@ -939,7 +940,7 @@ func TestScan_queued_shutdown_unblocks_without_slot_release(t *testing.T) {
 	t.Parallel()
 	rig := newScanRig(t)
 
-	if !rig.guard.Acquire(context.Background(), nil) {
+	if !rig.guard.Acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 	defer rig.guard.Release()
@@ -972,7 +973,7 @@ func TestScan_queued_shutdown_unblocks_without_slot_release(t *testing.T) {
 
 func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	cfg := &testsupport.NopConfig{}
@@ -1025,11 +1026,11 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 
 	// Hold the slot so the accepted scan QUEUES: the reload lands between
 	// queue admission and execution.
-	if !guard.Acquire(context.Background(), nil) {
+	if !guard.Acquire(t.Context(), nil) {
 		t.Fatal("test setup: could not take the scan slot")
 	}
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/scan/series/42", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleScanSeries(rec, req)

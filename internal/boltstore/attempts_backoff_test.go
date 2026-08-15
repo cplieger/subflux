@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
 	putAttemptRow(t, db, api.MediaTypeMovie, "tt200", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 2})
 
-	got, err := db.GetBackoffItems(context.Background())
+	got, err := db.GetBackoffItems(t.Context())
 	if err != nil {
 		t.Fatalf("GetBackoffItems: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", api.ProviderID(""),
 		attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffItems(context.Background())
+	got, err := db.GetBackoffItems(t.Context())
 	if err != nil {
 		t.Fatalf("GetBackoffItems: %v", err)
 	}
@@ -74,7 +73,7 @@ func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 // without error.
 func TestGetBackoffItems_empty(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.GetBackoffItems(context.Background())
+	got, err := db.GetBackoffItems(t.Context())
 	if err != nil {
 		t.Fatalf("GetBackoffItems: %v", err)
 	}
@@ -100,7 +99,7 @@ func TestGetBackoffByPrefix_mediaIDThenNextRetry(t *testing.T) {
 	putAttemptRow(t, db, api.MediaTypeMovie, "ttB", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(context.Background(), api.MediaTypeMovie, "")
+	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "")
 	if err != nil {
 		t.Fatalf("GetBackoffByPrefix: %v", err)
 	}
@@ -139,7 +138,7 @@ func TestGetBackoffByPrefix_prefixInclusionAndType(t *testing.T) {
 	// Same media id under a different media type must not match the movie query.
 	putAttemptRow(t, db, api.MediaTypeEpisode, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(context.Background(), api.MediaTypeMovie, "tt1")
+	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "tt1")
 	if err != nil {
 		t.Fatalf("GetBackoffByPrefix: %v", err)
 	}
@@ -171,7 +170,7 @@ func TestGetBackoffByPrefix_excludesEmptyProvider(t *testing.T) {
 	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", api.ProviderID(""), attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(context.Background(), api.MediaTypeMovie, "")
+	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "")
 	if err != nil {
 		t.Fatalf("GetBackoffByPrefix: %v", err)
 	}
@@ -225,7 +224,7 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 
 		prefix := rapid.SampledFrom([]string{"", "tt1", "tt12", "tt2", "tt20", "ttX"}).Draw(rt, "prefix")
 
-		got, err := db.GetBackoffByPrefix(context.Background(), api.MediaTypeMovie, prefix)
+		got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, prefix)
 		if err != nil {
 			rt.Fatalf("GetBackoffByPrefix: %v", err)
 		}

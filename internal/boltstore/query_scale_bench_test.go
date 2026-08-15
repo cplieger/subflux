@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -100,7 +99,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 // media type at parity in the single-language worst case); the benchmark
 // remains to catch regressions and to price GetManualLocks' full walk.
 func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	db, err := Open(filepath.Join(b.TempDir(), "bench.bolt"))
 	if err != nil {
 		b.Fatal(err)

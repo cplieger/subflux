@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ func dlRec(mt api.MediaType, mid, lang string, prov api.ProviderID, release, pat
 // seedFile upserts one external subtitle_files row for a media item.
 func seedFile(t *testing.T, db *DB, mt api.MediaType, mid, lang, path string) {
 	t.Helper()
-	if err := db.UpsertSubtitleFile(context.Background(), mt, mid, &api.SubtitleFile{
+	if err := db.UpsertSubtitleFile(t.Context(), mt, mid, &api.SubtitleFile{
 		Language: lang, Variant: api.Variant("standard"), Source: api.SourceExternal,
 		Codec: "subrip", Path: path,
 	}); err != nil {
@@ -35,7 +34,7 @@ func seedFile(t *testing.T, db *DB, mt api.MediaType, mid, lang, path string) {
 // seedScan records one scan_state row for a media item.
 func seedScan(t *testing.T, db *DB, mt api.MediaType, mid string) {
 	t.Helper()
-	if err := db.RecordScanState(context.Background(), &api.ScanRecord{
+	if err := db.RecordScanState(t.Context(), &api.ScanRecord{
 		MediaType: mt, MediaID: mid, Title: "Title " + mid,
 	}); err != nil {
 		t.Fatalf("RecordScanState(%s): %v", mid, err)
@@ -45,7 +44,7 @@ func seedScan(t *testing.T, db *DB, mt api.MediaType, mid string) {
 // TestDeleteStateByPaths_emptyInput is a no-op that returns an empty result.
 func TestDeleteStateByPaths_emptyInput(t *testing.T) {
 	db, _ := openTemp(t)
-	res, err := db.DeleteStateByPaths(context.Background(), nil)
+	res, err := db.DeleteStateByPaths(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("DeleteStateByPaths(nil): %v", err)
 	}
@@ -58,7 +57,7 @@ func TestDeleteStateByPaths_emptyInput(t *testing.T) {
 // backed by the given path.
 func TestDeleteStateByPaths_noMatch(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt1", "fr",
 		api.ProviderNameOpenSubtitles, "R", "/p/tt1.fr.srt", "/media/tt1.mkv", 100, false)); err != nil {
@@ -84,7 +83,7 @@ func TestDeleteStateByPaths_noMatch(t *testing.T) {
 // cleared. Counters are consistent afterward.
 func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	const video = "/media/show.s01e01.mkv"
 
 	// Auto fr + manual fr + auto en, all backed by the same video file.
@@ -141,7 +140,7 @@ func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 // scan_state for a media item left with no remaining state are removed.
 func TestDeleteStateByPaths_cleansOrphanedCoverage(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	const video = "/media/movie.mkv"
 
 	seedFile(t, db, api.MediaTypeMovie, "tt9", "fr", "/p/tt9.fr.srt")
@@ -172,7 +171,7 @@ func TestDeleteStateByPaths_cleansOrphanedCoverage(t *testing.T) {
 // video file (only one of two languages is deleted).
 func TestDeleteStateByPaths_preservesCoverageWhenStateRemains(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Same media item, two languages backed by DIFFERENT video files.
 	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt7", "fr",
@@ -213,7 +212,7 @@ func TestDeleteStateByPaths_preservesCoverageWhenStateRemains(t *testing.T) {
 // safe no-op with consistent counters.
 func TestDeleteStateByPaths_idempotent(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	const video = "/media/idem.mkv"
 
 	seedFile(t, db, api.MediaTypeMovie, "tti", "fr", "/p/tti.fr.srt")
@@ -252,7 +251,7 @@ func TestDeleteStateByPaths_idempotent(t *testing.T) {
 // leaves unrelated media, rows, backoff, and coverage intact.
 func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Target row.
 	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttDel", "fr",
@@ -306,7 +305,7 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 // remain for either.
 func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	const videoA = "/media/a.mkv"
 	const videoB = "/media/b.mkv"
 
@@ -358,7 +357,7 @@ func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 // mustStats reads Stats and fails the test on error.
 func mustStats(t *testing.T, db *DB) (downloads, attempts int, _ error) {
 	t.Helper()
-	d, a, err := db.Stats(context.Background())
+	d, a, err := db.Stats(t.Context())
 	if err != nil {
 		t.Fatalf("Stats: %v", err)
 	}

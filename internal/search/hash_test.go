@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -24,7 +23,7 @@ func TestHashFile_known_content(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, size, err := hashFile(context.Background(), path)
+	hash, size, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(zeros) unexpected error: %v", err)
 	}
@@ -48,7 +47,7 @@ func TestHashFile_nonzero_content(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, size, err := hashFile(context.Background(), path)
+	hash, size, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(one) unexpected error: %v", err)
 	}
@@ -72,7 +71,7 @@ func TestHashFile_tail_contributes(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, size, err := hashFile(context.Background(), path)
+	hash, size, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(tail) unexpected error: %v", err)
 	}
@@ -97,7 +96,7 @@ func TestHashFile_overlapping_head_tail(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, size, err := hashFile(context.Background(), path)
+	hash, size, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(overlap) unexpected error: %v", err)
 	}
@@ -119,7 +118,7 @@ func TestHashFile_file_too_small(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	_, size, err := hashFile(context.Background(), path)
+	_, size, err := hashFile(t.Context(), path)
 	if err == nil {
 		t.Fatal("hashFile(too small) expected error, got nil")
 	}
@@ -137,7 +136,7 @@ func TestHashFile_empty_file(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	_, size, err := hashFile(context.Background(), path)
+	_, size, err := hashFile(t.Context(), path)
 	if err == nil {
 		t.Fatal("hashFile(empty) expected error, got nil")
 	}
@@ -149,7 +148,7 @@ func TestHashFile_empty_file(t *testing.T) {
 func TestHashFile_nonexistent(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := hashFile(context.Background(), "/nonexistent/path/to/file.bin")
+	_, _, err := hashFile(t.Context(), "/nonexistent/path/to/file.bin")
 	if err == nil {
 		t.Fatal("hashFile(nonexistent) expected error, got nil")
 	}
@@ -199,7 +198,7 @@ func TestHashFile_path_guard(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, _, err := hashFile(context.Background(), c.path)
+			_, _, err := hashFile(t.Context(), c.path)
 			guardErr := err != nil && strings.Contains(err.Error(), "unsafe path")
 			if c.wantGuard && !guardErr {
 				t.Errorf("hashFile(%q) error = %v, want unsafe-path guard rejection", c.path, err)
@@ -225,7 +224,7 @@ func TestHashFile_uint64_overflow_wraps(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, _, err := hashFile(context.Background(), path)
+	hash, _, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(overflow) unexpected error: %v", err)
 	}
@@ -248,7 +247,7 @@ func TestHashFile_large_file_head_tail_independent(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	hash, size, err := hashFile(context.Background(), path)
+	hash, size, err := hashFile(t.Context(), path)
 	if err != nil {
 		t.Fatalf("hashFile(large) unexpected error: %v", err)
 	}
@@ -296,8 +295,8 @@ func TestHashFile_middle_bytes_irrelevant(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		hash1, size1, err1 := hashFile(context.Background(), path1)
-		hash2, size2, err2 := hashFile(context.Background(), path2)
+		hash1, size1, err1 := hashFile(t.Context(), path1)
+		hash2, size2, err2 := hashFile(t.Context(), path2)
 		if err1 != nil {
 			t.Fatal(err1)
 		}
@@ -312,7 +311,7 @@ func TestHashFile_middle_bytes_irrelevant(t *testing.T) {
 		}
 
 		// Determinism: hash same file twice.
-		hash1b, _, err := hashFile(context.Background(), path1)
+		hash1b, _, err := hashFile(t.Context(), path1)
 		if err != nil {
 			t.Fatal(err)
 		}

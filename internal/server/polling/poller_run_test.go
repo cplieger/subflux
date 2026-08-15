@@ -187,7 +187,7 @@ func TestPollOnce_sonarr_nil_radarr_nil(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 	// Should not panic with nil sonarr/radarr.
-	p.PollOnce(context.Background())
+	p.PollOnce(t.Context())
 }
 
 func TestPollOnce_sonarr_no_events(t *testing.T) {
@@ -207,7 +207,7 @@ func TestPollOnce_sonarr_no_events(t *testing.T) {
 		deps:      deps,
 		stateFunc: func() *LiveState { return ls },
 	}
-	p.PollOnce(context.Background())
+	p.PollOnce(t.Context())
 	if len(metrics.imports) != 0 {
 		t.Errorf("expected 0 imports, got %d", len(metrics.imports))
 	}
@@ -233,7 +233,7 @@ func TestPollOnce_returns_zero_when_no_events(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 
-	if n := p.PollOnce(context.Background()); n != 0 {
+	if n := p.PollOnce(t.Context()); n != 0 {
 		t.Errorf("PollOnce with no events: got %d, want 0", n)
 	}
 }
@@ -271,7 +271,7 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	// processPollImport; the count we care about is the entries-observed
 	// count from the GetHistorySince response, not the imports-applied
 	// count. Adaptive burst keys off the former.
-	if n := p.PollOnce(context.Background()); n != 2 {
+	if n := p.PollOnce(t.Context()); n != 2 {
 		t.Errorf("PollOnce with 2 sonarr entries: got %d, want 2", n)
 	}
 }
@@ -297,7 +297,7 @@ func TestBurstPollConstants_in_canonical_relationship(t *testing.T) {
 func TestNewPoller_defaultTTL_caches_tags(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{} })
-	ctx := context.Background()
+	ctx := t.Context()
 	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
 	time.Sleep(ttlProbeDelay)
 	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
@@ -312,7 +312,7 @@ func TestNewPoller_shortInterval_TTL_expires(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
 	cfg := &mockCfg{interval: time.Millisecond}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ctx := context.Background()
+	ctx := t.Context()
 	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
 	time.Sleep(ttlProbeDelay)
 	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
@@ -327,7 +327,7 @@ func TestNewPoller_longInterval_TTL_caches(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ctx := context.Background()
+	ctx := t.Context()
 	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
 	time.Sleep(ttlProbeDelay)
 	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
@@ -345,7 +345,7 @@ func TestPollOnce_no_spurious_warns_within_interval(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg} // nil arrs: g.Wait() returns nil, cycle is fast
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.PollOnce(context.Background())
+	p.PollOnce(t.Context())
 	if sink.CountLevel(slog.LevelWarn, "poll cycle error") > 0 {
 		t.Errorf("unexpected WARN 'poll cycle error' for a clean cycle")
 	}
@@ -360,7 +360,7 @@ func TestPollOnce_warns_when_exceeds_interval(t *testing.T) {
 	cfg := &mockCfg{interval: 0, langs: []string{"en"}} // any elapsed dur > 0 exceeds
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.PollOnce(context.Background())
+	p.PollOnce(t.Context())
 	if sink.CountLevel(slog.LevelWarn, "poll cycle exceeded interval") == 0 {
 		t.Errorf("want WARN 'poll cycle exceeded interval' with a 0 interval")
 	}
@@ -380,7 +380,7 @@ func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Radarr: radarr}
 	p := NewPoller(deps, func() *LiveState { return ls })
-	if got := p.PollOnce(context.Background()); got != 3 {
+	if got := p.PollOnce(t.Context()); got != 3 {
 		t.Errorf("PollOnce() = %d, want 3 (sonarr 2 + radarr 1)", got)
 	}
 }
@@ -392,7 +392,7 @@ func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{42: {}}}
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ids := p.getExcludeTagIDs(context.Background(), fake, "ok", nil, 0)
+	ids := p.getExcludeTagIDs(t.Context(), fake, "ok", nil, 0)
 	if ids == nil {
 		t.Fatalf("getExcludeTagIDs on success returned nil")
 	}
@@ -409,7 +409,7 @@ func drainOne(t *testing.T, p *Poller) {
 	t.Helper()
 	select {
 	case b := <-p.work:
-		p.executeBatch(context.Background(), &b)
+		p.executeBatch(t.Context(), &b)
 	default:
 		t.Fatal("no batch queued; detection did not enqueue")
 	}
@@ -423,7 +423,7 @@ func TestDetectExecute_sonarr_processes_nonEmpty_path(t *testing.T) {
 	sonarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/one.mkv")}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
-	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+	if got := p.detectSonarr(t.Context(), ls); got != 1 {
 		t.Fatalf("detectSonarr = %d, want 1", got)
 	}
 	if len(store.deletedPaths) != 0 {
@@ -449,7 +449,7 @@ func TestDetectExecute_continues_after_each_entry(t *testing.T) {
 	}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
-	p.detectSonarr(context.Background(), ls)
+	p.detectSonarr(t.Context(), ls)
 	drainOne(t, p)
 	if len(store.deletedPaths) != 2 {
 		t.Fatalf("executeBatch deletes = %d, want 2", len(store.deletedPaths))
@@ -466,13 +466,13 @@ func TestDetect_fetches_while_batch_queued(t *testing.T) {
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
 
-	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+	if got := p.detectSonarr(t.Context(), ls); got != 1 {
 		t.Fatalf("first detect = %d, want 1", got)
 	}
 	// Batch 1 is queued, NOT executed. Detection must still run: the mock
 	// returns the same entry regardless of since, so a second detect
 	// observing it proves the fetch happened while work was pending.
-	if got := p.detectSonarr(context.Background(), ls); got != 1 {
+	if got := p.detectSonarr(t.Context(), ls); got != 1 {
 		t.Fatalf("second detect while batch queued = %d, want 1 (detection must not block on execution)", got)
 	}
 }
@@ -490,9 +490,9 @@ func TestDetect_queue_full_defers_batch(t *testing.T) {
 	for range cap(p.work) {
 		p.work <- sourceBatch{source: PollSourceRadarr, key: api.PollKeyRadarr}
 	}
-	before := p.detectSince(context.Background(), api.PollKeySonarr)
-	p.detectSonarr(context.Background(), ls)
-	after := p.detectSince(context.Background(), api.PollKeySonarr)
+	before := p.detectSince(t.Context(), api.PollKeySonarr)
+	p.detectSonarr(t.Context(), ls)
+	after := p.detectSince(t.Context(), api.PollKeySonarr)
 	if !after.Equal(before) {
 		t.Errorf("detection cursor advanced %v -> %v despite deferred batch; deferred entries would be lost", before, after)
 	}
@@ -506,7 +506,7 @@ func TestDetectExecute_radarr_processes_on_success(t *testing.T) {
 	radarr := &mockHistoryPoller{history: []arrapi.HistoryRecord{histEntry("/nonexistent/movie.mkv")}}
 	ls := &LiveState{Cfg: cfg, Radarr: radarr}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
-	if got := p.detectRadarr(context.Background(), ls); got != 1 {
+	if got := p.detectRadarr(t.Context(), ls); got != 1 {
 		t.Errorf("detectRadarr on success = %d, want 1", got)
 	}
 	drainOne(t, p)

@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -128,7 +127,7 @@ func TestIsTransient_suffixBypassFixed(t *testing.T) {
 func TestRetryOnRateLimit_retriesAPIRateLimitError(t *testing.T) {
 	t.Parallel()
 	calls := 0
-	err := RetryOnRateLimit(context.Background(), 3, time.Millisecond, func() error {
+	err := RetryOnRateLimit(t.Context(), 3, time.Millisecond, func() error {
 		calls++
 		return &api.RateLimitError{Msg: "429"}
 	})
@@ -147,7 +146,7 @@ func TestRetryOnRateLimit_passesThroughNonRateLimitError(t *testing.T) {
 	t.Parallel()
 	calls := 0
 	sentinel := errors.New("boom")
-	err := RetryOnRateLimit(context.Background(), 3, time.Millisecond, func() error {
+	err := RetryOnRateLimit(t.Context(), 3, time.Millisecond, func() error {
 		calls++
 		return sentinel
 	})

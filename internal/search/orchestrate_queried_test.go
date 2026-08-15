@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -45,7 +44,7 @@ func TestSearchTargets_queried_counts_provider_traffic(t *testing.T) {
 				scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 			req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-			result, err := e.SearchTargets(context.Background(), req, "",
+			result, err := e.SearchTargets(t.Context(), req, "",
 				[]api.SubtitleTarget{{Code: "fr"}})
 			if err != nil {
 				t.Fatalf("SearchTargets() unexpected error: %v", err)
@@ -70,7 +69,7 @@ func TestSearchTargets_queried_zero_when_skipped(t *testing.T) {
 		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	result, err := e.SearchTargets(context.Background(), req, "",
+	result, err := e.SearchTargets(t.Context(), req, "",
 		[]api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
@@ -96,7 +95,7 @@ func TestSearchTargets_queried_zero_when_backed_off(t *testing.T) {
 		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	result, err := e.SearchTargets(context.Background(), req, "",
+	result, err := e.SearchTargets(t.Context(), req, "",
 		[]api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
@@ -123,7 +122,7 @@ func TestSearchTargets_queried_zero_when_all_providers_timed_out(t *testing.T) {
 		WithTimeout(fakeHealth{timedOut: true}))
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	result, err := e.SearchTargets(context.Background(), req, "",
+	result, err := e.SearchTargets(t.Context(), req, "",
 		[]api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)

@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -67,7 +66,7 @@ func BenchmarkHandler(b *testing.B) {
 	}
 
 	handler := m.Handler()
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/metrics", http.NoBody)
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -92,7 +91,7 @@ func BenchmarkRender(b *testing.B) {
 			}
 
 			handler := m.Handler()
-			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", http.NoBody)
+			req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/metrics", http.NoBody)
 			b.ReportAllocs()
 			for b.Loop() {
 				rec := httptest.NewRecorder()

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"net"
 	"testing"
@@ -111,7 +110,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("Validate() = %v, want nil", err)
 		}
-		cfg.buildCaches(context.Background())
+		cfg.buildCaches(t.Context())
 		got := cfg.TrustedProxyNets()
 		if len(got) != 2 {
 			t.Fatalf("TrustedProxyNets() len = %d, want 2", len(got))
@@ -141,7 +140,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("Validate() = %v, want nil", err)
 		}
-		cfg.buildCaches(context.Background())
+		cfg.buildCaches(t.Context())
 		if got := cfg.TrustedProxyNets(); len(got) != 0 {
 			t.Errorf("TrustedProxyNets() = %v, want empty (trust-nothing default)", got)
 		}

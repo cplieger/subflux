@@ -75,6 +75,36 @@ func (p *blockingProvider) Search(ctx context.Context, _ *api.SearchRequest) ([]
 	return nil, nil
 }
 
+// waitForGateContention polls the engine's media gate until some key has two
+// referents. mediaGate.lock increments refs BEFORE blocking on the per-key
+// mutex, so refs==2 is proof the second caller is AT the gate rather than
+// merely started — which is what makes the serialization assertion
+// non-vacuous. Without it, releasing early lets the first caller finish, the
+// second acquire an uncontended gate, and maxSeen==1 pass for the wrong
+// reason. Deadline-bounded, so it fails closed with a diagnostic.
+func waitForGateContention(t *testing.T, g *mediaGate) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		g.mu.Lock()
+		highest := 0
+		for _, e := range g.locks {
+			if e.refs > highest {
+				highest = e.refs
+			}
+		}
+		g.mu.Unlock()
+		if highest >= 2 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("media gate never reached 2 referents (highest=%d): the second caller "+
+				"never reached the gate, so the serialization assertion would be vacuous", highest)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func (p *blockingProvider) Download(context.Context, *api.Subtitle) ([]byte, error) {
 	return nil, nil
 }
@@ -101,17 +131,18 @@ func TestSearchTargets_media_gate_serializes_same_item(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, _ = e.SearchTargets(context.Background(), req1, videoPath, targets)
+		_, _ = e.SearchTargets(t.Context(), req1, videoPath, targets)
 	}()
 	// Ensure the first call is inside provider work before starting the second.
 	<-p.entered
 	go func() {
 		defer wg.Done()
-		_, _ = e.SearchTargets(context.Background(), req2, videoPath, targets)
+		_, _ = e.SearchTargets(t.Context(), req2, videoPath, targets)
 	}()
 
-	// Give the second call time to reach the gate, then release everything.
-	time.Sleep(50 * time.Millisecond)
+	// Prove the second call is BLOCKED at the gate before releasing, so the
+	// assertion below measures contention rather than sequential execution.
+	waitForGateContention(t, e.gate)
 	close(p.release)
 	wg.Wait()
 
@@ -139,13 +170,13 @@ func TestSearchTargets_media_gate_distinct_items_run_concurrently(t *testing.T) 
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, _ = e.SearchTargets(context.Background(),
+		_, _ = e.SearchTargets(t.Context(),
 			&api.SearchRequest{MediaType: "movie", ImdbID: "tt111"},
 			filepath.Join(dir, "a.mkv"), targets)
 	}()
 	go func() {
 		defer wg.Done()
-		_, _ = e.SearchTargets(context.Background(),
+		_, _ = e.SearchTargets(t.Context(),
 			&api.SearchRequest{MediaType: "movie", ImdbID: "tt222"},
 			filepath.Join(dir, "b.mkv"), targets)
 	}()
@@ -177,7 +208,7 @@ func TestSearchTargets_stamps_post_work_searched(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
-	_, err := e.SearchTargets(context.Background(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	_, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -205,6 +236,7 @@ func TestSearchTargets_cancelled_run_does_not_stamp(t *testing.T) {
 	}
 	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
+	// Parent stays context.Background(): the goroutine below is cancelled at an instant this test picks, so nothing else may cancel it.
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -235,7 +267,7 @@ func TestInventoryCoverage_stamps_not_searched(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
-	e.InventoryCoverage(context.Background(), req, videoPath)
+	e.InventoryCoverage(t.Context(), req, videoPath)
 
 	stamps := ms.recorded()
 	if len(stamps) != 1 {

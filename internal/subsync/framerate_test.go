@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ func TestCorrectFramerate_too_few_cues(t *testing.T) {
 	t.Parallel()
 	ref := makeCues(5, 0, 2*time.Second)
 	inc := makeCues(5, 0, 2*time.Second)
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Rate != 1.0 {
 		t.Fatalf("expected rate 1.0, got %f", result.Rate)
 	}
@@ -27,7 +26,7 @@ func TestCorrectFramerate_too_short_duration(t *testing.T) {
 	// 30 cues but only 1 minute of content.
 	ref := makeCues(30, 0, 2*time.Second)
 	inc := makeCues(30, 0, 2*time.Second)
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Confidence != ConfidenceNone {
 		t.Fatalf("expected no confidence for short duration, got %f", float64(result.Confidence))
 	}
@@ -45,7 +44,7 @@ func TestCorrectFramerate_known_ratio_23976_to_25(t *testing.T) {
 	ratio := 25.0 / 23.976
 	inc := scaleCuesForTest(ref, ratio)
 
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Confidence == ConfidenceNone {
 		t.Fatal("expected framerate detection, got no confidence")
 	}
@@ -57,7 +56,7 @@ func TestCorrectFramerate_known_ratio_23976_to_25(t *testing.T) {
 func TestCorrectFramerate_identical_subtitles(t *testing.T) {
 	t.Parallel()
 	ref := makeLongCues(50, 10*time.Minute)
-	result := correctFramerate(context.Background(), ref, ref, "")
+	result := correctFramerate(t.Context(), ref, ref, "")
 	// Identical subtitles should show no framerate issue.
 	if result.Applied() {
 		t.Fatalf("expected no correction for identical subtitles, got rate=%f offset=%d",
@@ -224,7 +223,7 @@ func TestCorrectFramerate_non_linear_drift(t *testing.T) {
 			Text:  c.Text,
 		}
 	}
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	// Non-linear drift should produce no confidence.
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("CorrectFramerate(non-linear drift) confidence = %f, want 0",
@@ -262,7 +261,7 @@ func TestGoldenSectionSearch_ratio_near_one(t *testing.T) {
 	ref := makeLongCues(50, 10*time.Minute)
 	// Tiny ratio deviation: 1.000001 — effectively identical.
 	observedRatio := 1.000001
-	result := goldenSectionSearch(context.Background(), ref, ref, observedRatio, 0.95)
+	result := goldenSectionSearch(t.Context(), ref, ref, observedRatio, 0.95)
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("goldenSectionSearch(ratio~1.0) confidence = %f, want 0",
 			float64(result.Confidence))
@@ -279,7 +278,7 @@ func TestGoldenSectionSearch_real_ratio(t *testing.T) {
 	// Apply a custom ratio of 1.03 (not in knownRatios).
 	inc := scaleCuesForTest(ref, 1.03)
 	// observedRatio should be close to 1.03.
-	result := goldenSectionSearch(context.Background(), ref, inc, 1.03, 0.95)
+	result := goldenSectionSearch(t.Context(), ref, inc, 1.03, 0.95)
 	if result.Confidence == ConfidenceNone {
 		t.Fatal("expected some confidence from GSS with real ratio")
 	}
@@ -330,7 +329,7 @@ func TestMatchKnownRatio(t *testing.T) {
 				ref = makeCues(5, 0, time.Second)
 				cues = ref
 			}
-			result, ok := matchKnownRatio(context.Background(), tc.ratio, cues, 0.95, tc.videoFPS, ref)
+			result, ok := matchKnownRatio(t.Context(), tc.ratio, cues, 0.95, tc.videoFPS, ref)
 			if ok != tc.wantOK {
 				t.Fatalf("matchKnownRatio(%v, videoFPS=%v) ok = %v, want %v", tc.ratio, tc.videoFPS, ok, tc.wantOK)
 			}
@@ -406,7 +405,7 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 		}
 	}
 
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 
 	// The function should still produce a result (via GSS fallthrough).
 	if result.Confidence == ConfidenceNone {
@@ -426,7 +425,7 @@ func TestCorrectFramerate_cue_count_mismatch_too_large(t *testing.T) {
 	// Reference has 100 cues, incorrect has 50 → 50% difference > 25% threshold.
 	ref := makeLongCues(100, 30*time.Minute)
 	inc := makeLongCues(50, 30*time.Minute)
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Confidence != ConfidenceNone {
 		t.Errorf("CorrectFramerate(100 ref, 50 inc) confidence = %f, want 0 (cue count mismatch)",
 			float64(result.Confidence))
@@ -442,7 +441,7 @@ func TestCorrectFramerate_cue_count_mismatch_at_boundary(t *testing.T) {
 	// Should NOT trigger the early return (passes through to drift analysis).
 	ref := makeLongCues(100, 30*time.Minute)
 	inc := makeLongCues(75, 30*time.Minute)
-	result := correctFramerate(context.Background(), ref, inc, "")
+	result := correctFramerate(t.Context(), ref, inc, "")
 	// At exactly 25%, the check is > 0.25, so it should NOT bail out.
 	// The result depends on drift analysis, but confidence should not be
 	// ConfidenceNone due to the cue count check specifically.

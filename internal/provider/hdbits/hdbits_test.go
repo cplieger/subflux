@@ -1,7 +1,6 @@
 package hdbits
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,7 +88,7 @@ func TestFactory_requires_credentials(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := Factory(context.Background(), tt.settings)
+			p, err := Factory(t.Context(), tt.settings)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("Factory() expected error")
@@ -111,7 +110,7 @@ func TestFactory_requires_credentials(t *testing.T) {
 // stored and read back a few milliseconds later must still be present, which
 // fails if the cache were constructed with a zero (or near-zero) TTL.
 func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
-	p, err := Factory(context.Background(), map[string]any{
+	p, err := Factory(t.Context(), map[string]any{
 		settingUsername: "user",
 		settingPasskey:  "passkey",
 	})
@@ -504,7 +503,7 @@ func TestHdbLangToISO_unmapped_returns_empty(t *testing.T) {
 
 func TestFactory_initializes_provider_correctly(t *testing.T) {
 	t.Parallel()
-	p, err := Factory(context.Background(), map[string]any{"username": "testuser", "passkey": "testkey"})
+	p, err := Factory(t.Context(), map[string]any{"username": "testuser", "passkey": "testkey"})
 	if err != nil {
 		t.Fatalf("Factory() error: %v", err)
 	}
@@ -786,7 +785,7 @@ func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
 		dlCache: dlcache.New(10, 1<<20),
 	}
 
-	_, err := p.Download(context.Background(), &api.Subtitle{ID: "123"})
+	_, err := p.Download(t.Context(), &api.Subtitle{ID: "123"})
 	if err == nil {
 		t.Fatal("Download() with a failing transport expected an error")
 	}

@@ -13,9 +13,10 @@
 package cliparse
 
 import (
+	"cmp"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -371,7 +372,7 @@ func minInt(values ...int) int {
 func SortByName(specs []Spec) []Spec {
 	out := make([]Spec, len(specs))
 	copy(out, specs)
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	slices.SortFunc(out, func(a, b Spec) int { return cmp.Compare(a.Name, b.Name) })
 	return out
 }
 

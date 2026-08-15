@@ -1,7 +1,6 @@
 package crosslang
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -245,7 +244,7 @@ func TestAlign_recoversConstantOffset(t *testing.T) {
 	ref := makeNumberedCues(10, 0)
 	inc := makeNumberedCues(10, 500*time.Millisecond) // 500ms late
 
-	got := Align(context.Background(), ref, inc)
+	got := Align(t.Context(), ref, inc)
 
 	if got.Confidence <= 0.3 {
 		t.Fatalf("Align confidence = %v, want > 0.3 for a clean constant offset", got.Confidence)
@@ -293,7 +292,7 @@ func TestAlign_earlyReturnsHaveZeroConfidence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := Align(context.Background(), tt.ref, tt.inc)
+			got := Align(t.Context(), tt.ref, tt.inc)
 			if got.Confidence != 0 {
 				t.Errorf("Align(%s) confidence = %v, want 0", tt.name, got.Confidence)
 			}

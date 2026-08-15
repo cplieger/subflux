@@ -313,13 +313,13 @@ func TestDetectExisting_embedded_tracks(t *testing.T) {
 		{Lang: "de", Codec: "subrip", HearingImpaired: false, Forced: true},
 	}}
 
-	result, err := detectExisting(context.Background(), videoPath, detector, nil)
+	result, err := detectExisting(t.Context(), videoPath, detector, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 
 	if len(result.Embedded) != 3 {
-		t.Fatalf("detectExisting(context.Background(), ).Embedded = %d tracks, want 3", len(result.Embedded))
+		t.Fatalf("detectExisting(t.Context(), ).Embedded = %d tracks, want 3", len(result.Embedded))
 	}
 	if result.Embedded[0].Lang != "en" || result.Embedded[0].Codec != "subrip" {
 		t.Errorf("Embedded[0] = %+v, want en/subrip", result.Embedded[0])
@@ -334,15 +334,15 @@ func TestDetectExisting_embedded_tracks(t *testing.T) {
 
 func TestDetectExisting_empty_video_path(t *testing.T) {
 	t.Parallel()
-	result, err := detectExisting(context.Background(), "", noopDetector{}, nil)
+	result, err := detectExisting(t.Context(), "", noopDetector{}, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 	if len(result.Embedded) != 0 {
-		t.Errorf("detectExisting(context.Background(), \"\").Embedded = %d, want 0", len(result.Embedded))
+		t.Errorf("detectExisting(t.Context(), \"\").Embedded = %d, want 0", len(result.Embedded))
 	}
 	if len(result.External) != 0 {
-		t.Errorf("detectExisting(context.Background(), \"\").External = %d, want 0", len(result.External))
+		t.Errorf("detectExisting(t.Context(), \"\").External = %d, want 0", len(result.External))
 	}
 }
 
@@ -357,7 +357,7 @@ func TestDetectExisting_detector_error_partial_result(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result, err := detectExisting(context.Background(), videoPath,
+	result, err := detectExisting(t.Context(), videoPath,
 		errDetector{err: errors.New("ffprobe exploded")}, nil)
 	if err == nil {
 		t.Fatal("detectExisting() error = nil, want detector error")
@@ -417,12 +417,12 @@ func TestDetectExisting_multiple_extensions(t *testing.T) {
 		}
 	}
 
-	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 	if len(result.External) != 4 {
-		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 4 (all extensions)", len(result.External))
+		t.Errorf("detectExisting(t.Context(), ) found %d external subs, want 4 (all extensions)", len(result.External))
 	}
 }
 
@@ -437,12 +437,12 @@ func TestDetectExisting_no_matching_subs(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result, err := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	result, err := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if err != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", err)
 	}
 	if len(result.External) != 0 {
-		t.Errorf("detectExisting(context.Background(), ) found %d external subs, want 0 (no match)", len(result.External))
+		t.Errorf("detectExisting(t.Context(), ) found %d external subs, want 0 (no match)", len(result.External))
 	}
 }
 
