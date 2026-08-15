@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"strings"
 	"testing"
 )
@@ -19,7 +18,7 @@ func FuzzLoadFromBytes(f *testing.F) {
 	f.Add([]byte(minimalValidYAML()))                             // a config that actually loads
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		cfg, err := LoadFromBytes(context.Background(), data)
+		cfg, err := LoadFromBytes(t.Context(), data)
 		if err != nil {
 			return // rejected input: nothing further to assert
 		}

@@ -19,7 +19,7 @@ func TestRegister_and_LoadAll(t *testing.T) {
 		return &fakeProvider{name: "test"}, nil
 	})
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"test": {Enabled: true, Settings: map[string]any{"key": "val"}},
 	})
 	if err != nil {
@@ -47,7 +47,7 @@ func TestLoadAll_skips_disabled(t *testing.T) {
 		return &fakeProvider{name: "enabled"}, nil
 	})
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"disabled": {Enabled: false},
 		"enabled":  {Enabled: true},
 	})
@@ -66,7 +66,7 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"unknown": {Enabled: true},
 	})
 	// Unknown provider is skipped with a warning; zero providers loading is
@@ -86,7 +86,7 @@ func TestLoadAll_unknown_provider_with_valid(t *testing.T) {
 		return &fakeProvider{name: "good"}, nil
 	})
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"good":    {Enabled: true},
 		"unknown": {Enabled: true},
 	})
@@ -106,7 +106,7 @@ func TestLoadAll_factory_error(t *testing.T) {
 		return nil, cause
 	})
 
-	_, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"broken": {Enabled: true},
 	})
 	if err == nil {
@@ -130,7 +130,7 @@ func TestLoadAll_partial_success(t *testing.T) {
 		return nil, errors.New("init failed")
 	})
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"good":   {Enabled: true},
 		"broken": {Enabled: true},
 	})
@@ -152,7 +152,7 @@ func TestLoadAll_no_providers_loaded(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"test": {Enabled: false},
 	})
 	// All-disabled is a deliberate, valid state after the embedded-detector
@@ -169,7 +169,7 @@ func TestLoadAll_empty_config(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{})
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{})
 	if err != nil {
 		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestLoadAll_deterministic_order(t *testing.T) {
 
 	// Run multiple times to verify ordering is stable.
 	for range 10 {
-		providers, err := r.LoadAll(context.Background(), cfg)
+		providers, err := r.LoadAll(t.Context(), cfg)
 		if err != nil {
 			t.Fatalf("LoadAll() unexpected error: %v", err)
 		}
@@ -248,7 +248,7 @@ func TestLoadAll_passes_settings_to_factory(t *testing.T) {
 	})
 
 	want := map[string]any{"user": "alice", "pass": "secret"}
-	_, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"test": {Enabled: true, Settings: want},
 	})
 	if err != nil {
@@ -275,7 +275,7 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 		return &fakeProvider{name: "second"}, nil
 	})
 
-	providers, err := r.LoadAll(context.Background(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
 		"dup": {Enabled: true},
 	})
 	if err != nil {

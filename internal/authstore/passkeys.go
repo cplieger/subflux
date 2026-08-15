@@ -2,11 +2,12 @@ package authstore
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/auth/v2"
@@ -203,11 +204,11 @@ func (s *Store) GetPasskeysByUserID(_ context.Context, userID int64) ([]auth.Pas
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
-			return out[i].CreatedAt.Before(out[j].CreatedAt)
-		}
-		return out[i].ID < out[j].ID
+	slices.SortStableFunc(out, func(a, b auth.PasskeyCredential) int {
+		return cmp.Or(
+			a.CreatedAt.Compare(b.CreatedAt),
+			cmp.Compare(a.ID, b.ID),
+		)
 	})
 	return out, nil
 }

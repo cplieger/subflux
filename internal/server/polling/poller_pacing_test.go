@@ -1,7 +1,6 @@
 package polling
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
 		req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1"}
-		retryable, queried := p.processPollImport(context.Background(), ls, path, buildOK(req), nil)
+		retryable, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
 		if retryable || !queried {
 			t.Errorf("processPollImport = (retryable %v, queried %v), want (false, true)", retryable, queried)
 		}
@@ -53,7 +52,7 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
 		req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1"}
-		_, queried := p.processPollImport(context.Background(), ls, path, buildOK(req), nil)
+		_, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
 		if queried {
 			t.Errorf("queried = true for a skipped-group result, want false")
 		}
@@ -62,7 +61,7 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 	t.Run("gone file skips without querying", func(t *testing.T) {
 		ls := &LiveState{Cfg: &mockCfg{langs: []string{"en"}}, Engine: &mockEngine{}}
 		p := &Poller{deps: fullDeps(&mockStore{})}
-		retryable, queried := p.processPollImport(context.Background(), ls,
+		retryable, queried := p.processPollImport(t.Context(), ls,
 			"/nonexistent/gone.mkv", buildOK(nil), nil)
 		if retryable || queried {
 			t.Errorf("gone file = (retryable %v, queried %v), want (false, false)", retryable, queried)
@@ -84,7 +83,7 @@ func TestExecuteBatch_skip_entries_pay_no_delay(t *testing.T) {
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Engine: &mockEngine{}}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
 
-	if got := p.detectSonarr(context.Background(), ls); got != 2 {
+	if got := p.detectSonarr(t.Context(), ls); got != 2 {
 		t.Fatalf("detectSonarr = %d, want 2", got)
 	}
 	start := time.Now()
@@ -111,7 +110,7 @@ func TestExecuteBatch_paces_between_querying_entries(t *testing.T) {
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Engine: &mockEngine{result: queriedResult(1)}}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
 
-	if got := p.detectSonarr(context.Background(), ls); got != 2 {
+	if got := p.detectSonarr(t.Context(), ls); got != 2 {
 		t.Fatalf("detectSonarr = %d, want 2", got)
 	}
 	start := time.Now()

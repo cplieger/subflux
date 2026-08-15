@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -35,7 +34,7 @@ func mkSession(hash string, userID int64, created, lastActivity time.Time) *auth
 
 func TestCreateSession_andGetByHash_roundTrips(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 	exp := now.Add(time.Hour)
 	want := mkSession("h1", 7, now, now)
@@ -62,7 +61,7 @@ func TestCreateSession_andGetByHash_roundTrips(t *testing.T) {
 
 func TestGetSessionByHash_absentReturnsNilNil(t *testing.T) {
 	s := newSessionStore(t)
-	got, err := s.GetSessionByHash(context.Background(), "missing")
+	got, err := s.GetSessionByHash(t.Context(), "missing")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
@@ -76,7 +75,7 @@ func TestGetSessionByHash_absentReturnsNilNil(t *testing.T) {
 // OIDCExpiry pointer.
 func TestGetSessionByHash_returnsCopy(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 	// wantExp is the expected stored expiry, captured independently of the
 	// pointer handed to CreateSession so later mutations of that pointer cannot
@@ -113,7 +112,7 @@ func TestGetSessionByHash_returnsCopy(t *testing.T) {
 
 func TestUpdateSessionActivity_single(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	t0 := time.Now().UTC()
 	if err := s.CreateSession(ctx, mkSession("h1", 1, t0, t0)); err != nil {
 		t.Fatalf("CreateSession: %v", err)
@@ -134,7 +133,7 @@ func TestUpdateSessionActivity_single(t *testing.T) {
 
 func TestDeleteSession(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	t0 := time.Now().UTC()
 	if err := s.CreateSession(ctx, mkSession("h1", 1, t0, t0)); err != nil {
 		t.Fatalf("CreateSession: %v", err)
@@ -156,7 +155,7 @@ func TestDeleteSession(t *testing.T) {
 // another user's sessions.
 func TestDeleteUserSessions_keepsOneAndOnlyThatUser(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	t0 := time.Now().UTC()
 	// User 1 has three sessions; user 2 has one.
 	for _, h := range []string{"u1a", "u1b", "u1keep"} {
@@ -200,7 +199,7 @@ func TestDeleteUserSessions_keepsOneAndOnlyThatUser(t *testing.T) {
 // case, the exclusive boundary, and the returned count.
 func TestCleanupExpiredSessions(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 	idle := time.Hour
 	abs := 24 * time.Hour
@@ -242,7 +241,7 @@ func TestCleanupExpiredSessions(t *testing.T) {
 // race or panic.
 func TestSessions_concurrentAccess(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	const workers = 8
@@ -289,7 +288,7 @@ func TestSessions_concurrentAccess(t *testing.T) {
 // evicted — never on a sweep that evicts nothing.
 func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	s := newSessionStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	logs := capture.Default(t)
 	now := time.Now().UTC()
 	idle := time.Hour

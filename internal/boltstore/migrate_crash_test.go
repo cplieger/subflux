@@ -79,10 +79,10 @@ func seedCrashFixture(t *testing.T, path string) {
 		t.Fatalf("Open for auth seed: %v", err)
 	}
 	as := authstore.New(db.BoltDB())
-	if err := as.CreateUser(context.Background(), &auth.User{Username: "alice", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true}); err != nil {
+	if err := as.CreateUser(t.Context(), &auth.User{Username: "alice", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 }
@@ -101,7 +101,7 @@ func TestMigrateCrashChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("child open failed without crashing: %v", err)
 	}
-	_ = db.Close(context.Background())
+	_ = db.Close(t.Context())
 }
 
 // runCrashChild re-executes the test binary as the crash child with the
@@ -137,6 +137,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if err != nil {
 		t.Fatalf("recovery open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 

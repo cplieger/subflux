@@ -97,6 +97,7 @@ func newHTTPHarness(db api.Store, cfg api.ConfigProvider, providers []api.Provid
 		Alerts:    activity.NewAlertLog(100),
 		Events:    fakeEvents{},
 		BGTracker: wg,
+		// context.Background(): no *testing.T in scope, and ServerCtx is the server's long-lived context, not a request or test one.
 		ServerCtx: func() context.Context { return context.Background() },
 		StateFunc: func() *LiveState {
 			return &LiveState{Cfg: cfg, Engine: engine, Providers: providers}
@@ -118,7 +119,7 @@ func TestHandleManualDownload_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search/download", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -133,7 +134,7 @@ func TestHandleManualDownload_invalid_json(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader("not json"))
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -162,7 +163,7 @@ func TestHandleManualDownload_missing_required_fields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			req := httptest.NewRequestWithContext(context.Background(),
+			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/search/download", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
 			h.HandleManualDownload(rec, req)
@@ -180,7 +181,7 @@ func TestHandleManualDownload_invalid_lang_returns_400(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en/../.."}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -196,7 +197,7 @@ func TestHandleManualDownload_invalid_media_type_returns_400(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en","media_type":"invalid"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -212,7 +213,7 @@ func TestHandleManualDownload_provider_not_found(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"provider":"nonexistent","subtitle_id":"1","media_id":42,"language":"en"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -240,7 +241,7 @@ func TestHandleManualDownload_download_error_returns_202(t *testing.T) {
 		[]api.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleManualDownload(rec, req)
@@ -260,7 +261,7 @@ func TestHandleClearLock_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search/clear-lock", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -275,7 +276,7 @@ func TestHandleClearLock_invalid_json(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/clear-lock", strings.NewReader("bad"))
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -301,7 +302,7 @@ func TestHandleClearLock_missing_required_fields(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			req := httptest.NewRequestWithContext(context.Background(),
+			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/search/clear-lock", strings.NewReader(tc.body))
 			rec := httptest.NewRecorder()
 			h.HandleClearLock(rec, req)
@@ -319,7 +320,7 @@ func TestHandleClearLock_invalid_lang_returns_400(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"media_type":"movie","media_id":"tt123","language":"en/../../etc"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/clear-lock", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -335,7 +336,7 @@ func TestHandleClearLock_invalid_media_type_returns_400(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"media_type":"invalid","media_id":"tt123","language":"fr"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/clear-lock", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -351,7 +352,7 @@ func TestHandleClearLock_success(t *testing.T) {
 	h := newValidationHarness()
 
 	body := `{"media_type":"movie","media_id":"tt123","language":"fr"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/clear-lock", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -376,7 +377,7 @@ func TestHandleClearLock_db_error(t *testing.T) {
 	h, _ := newHTTPHarness(&clearLockErrorStore{}, &testsupport.NopConfig{}, nil)
 
 	body := `{"media_type":"movie","media_id":"tt123","language":"fr"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/clear-lock", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleClearLock(rec, req)
@@ -393,7 +394,7 @@ func TestHandleManualSearch_rejects_non_get(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -408,7 +409,7 @@ func TestHandleManualSearch_no_providers_returns_empty(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=fr&type=movie", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -428,7 +429,7 @@ func TestHandleManualSearch_invalid_lang_returns_400(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=en/../../etc&type=movie", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -443,7 +444,7 @@ func TestHandleManualSearch_invalid_media_type_returns_400(t *testing.T) {
 	t.Parallel()
 	h := newValidationHarness()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=en&type=invalid", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -482,7 +483,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 			},
 		}})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=fr&type=movie", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -530,7 +531,7 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 			},
 		})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=fr&type=movie", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -593,7 +594,7 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 			},
 		}})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/search?imdb=tt1234567&lang=fr&type=movie", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleManualSearch(rec, req)
@@ -644,7 +645,7 @@ func TestHandleManualSearch_release_length_boundary(t *testing.T) {
 		q.Set("lang", "fr")
 		q.Set("type", "movie")
 		q.Set("release", strings.Repeat("a", releaseLen))
-		req := httptest.NewRequestWithContext(context.Background(),
+		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodGet, "/api/search?"+q.Encode(), http.NoBody)
 		rec := httptest.NewRecorder()
 		h.HandleManualSearch(rec, req)

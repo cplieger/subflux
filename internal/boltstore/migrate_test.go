@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -140,7 +139,7 @@ func seedPopulatedV1Store(t *testing.T, path string) {
 	if err != nil {
 		t.Fatalf("Open(%q): %v", path, err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	rec := &api.DownloadRecord{
 		MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en",
 		ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Rel.A",
@@ -190,7 +189,7 @@ func TestOpen_refusesNewerStamp(t *testing.T) {
 
 			db, err := Open(path)
 			if err == nil {
-				_ = db.Close(context.Background())
+				_ = db.Close(t.Context())
 				t.Fatalf("Open with newer %s stamp: error = nil, want the downgrade-guard refusal", domain.name)
 			}
 			if !errors.Is(err, errSchemaNewer) {
@@ -227,7 +226,7 @@ func TestOpen_refusesBothDomainsNewer(t *testing.T) {
 
 	db, err := Open(path)
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("Open with both stamps newer: error = nil, want the combined downgrade refusal")
 	}
 	if !errors.Is(err, errSchemaNewer) {
@@ -269,7 +268,7 @@ func TestOpen_failsClosedOnMalformedStamp(t *testing.T) {
 
 		db, err := Open(path)
 		if err == nil {
-			_ = db.Close(context.Background())
+			_ = db.Close(t.Context())
 			t.Fatal("Open with malformed core stamp: error = nil, want fail-closed refusal")
 		}
 		if !errors.Is(err, errSchemaStampInvalid) {
@@ -291,7 +290,7 @@ func TestOpen_failsClosedOnMalformedStamp(t *testing.T) {
 
 		db, err := Open(path)
 		if err == nil {
-			_ = db.Close(context.Background())
+			_ = db.Close(t.Context())
 			t.Fatal("Open with malformed stamp in an empty file: error = nil, want fail-closed refusal")
 		}
 		if !errors.Is(err, errSchemaStampInvalid) {
@@ -311,7 +310,7 @@ func TestOpen_failsClosedOnMissingStampInPopulatedFile(t *testing.T) {
 
 	db, err := Open(path)
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("Open with missing stamp in populated file: error = nil, want fail-closed refusal")
 	}
 	if !errors.Is(err, errSchemaStampInvalid) {
@@ -332,7 +331,7 @@ func TestOpen_freshFileBootstrapsWithoutMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openWithDomains on fresh file: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
@@ -425,7 +424,7 @@ func TestOpen_malformedRegistryFailsLoudly(t *testing.T) {
 	bad := testCoreDomain(1, []migration{{from: 1, to: 3, kind: migrateInPlace, run: func(*bolt.Tx) error { return nil }}})
 	db, err := openWithDomains(path, bad, testAuthDomain(1, nil))
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("open with malformed registry: error = nil, want loud validation failure")
 	}
 	if !strings.Contains(err.Error(), "invalid core migration registry") {
@@ -451,7 +450,7 @@ func TestOpen_refusesUnbridgeableVersion(t *testing.T) {
 	core.base = 2
 	db, err := openWithDomains(path, core, testAuthDomain(1, nil))
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("open with unbridgeable version: error = nil, want refusal")
 	}
 	if !strings.Contains(err.Error(), "no registered core migration from schema v1") {
@@ -486,10 +485,10 @@ func TestOpen_runsPendingLadderSequentially(t *testing.T) {
 	}
 
 	// Migrated store stays fully usable.
-	if _, err := db.GetState(context.Background(), &api.StateQuery{}); err != nil {
+	if _, err := db.GetState(t.Context(), &api.StateQuery{}); err != nil {
 		t.Errorf("GetState after migration: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
@@ -571,7 +570,7 @@ func TestOpen_interruptedLadderResumes(t *testing.T) {
 	}
 	db, err := openWithDomains(path, testCoreDomain(3, failing), testAuthDomain(1, nil))
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("open with failing step 2: error = nil, want failure")
 	}
 	if !errors.Is(err, boom) {
@@ -591,7 +590,7 @@ func TestOpen_interruptedLadderResumes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resume open: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 	if got := rawReadStamp(t, path, metaKeyCoreSchemaVersion); string(got) != string(kv.Be64(3)) {
@@ -687,7 +686,7 @@ func TestOpen_inPlaceStepCannotTouchOtherDomainStamp(t *testing.T) {
 			}}
 			db, err := openWithDomains(path, testCoreDomain(2, []migration{evil}), testAuthDomain(1, nil))
 			if err == nil {
-				_ = db.Close(context.Background())
+				_ = db.Close(t.Context())
 				t.Fatal("open with a stamp-touching step: error = nil, want the invariant refusal")
 			}
 			if !strings.Contains(err.Error(), "other domain's schema stamp") {
@@ -730,7 +729,7 @@ func TestOpen_snapshotFailureAbortsMigration(t *testing.T) {
 
 	db, err := openWithDomains(path, testCoreDomain(2, []migration{markerStep(1)}), testAuthDomain(1, nil))
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("open with unwritable snapshot: error = nil, want abort")
 	}
 	if !strings.Contains(err.Error(), "pre-migration snapshot") {
@@ -760,7 +759,7 @@ func TestOpen_fastPathWritesNoSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 	if snaps := migrationSnapshots(t, path); len(snaps) != 0 {
@@ -779,7 +778,7 @@ func TestOpen_afterTestBumpProductionOpenRefuses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("test bump: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
@@ -848,7 +847,7 @@ func BenchmarkOpenFastPath(b *testing.B) {
 	if err != nil {
 		b.Fatalf("seed Open: %v", err)
 	}
-	if err := db.Close(context.Background()); err != nil {
+	if err := db.Close(b.Context()); err != nil {
 		b.Fatalf("seed Close: %v", err)
 	}
 	b.ReportAllocs()
@@ -857,7 +856,7 @@ func BenchmarkOpenFastPath(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Open: %v", err)
 		}
-		if err := rdb.Close(context.Background()); err != nil {
+		if err := rdb.Close(b.Context()); err != nil {
 			b.Fatalf("Close: %v", err)
 		}
 	}

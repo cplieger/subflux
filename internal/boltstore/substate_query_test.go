@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -39,7 +38,7 @@ func manualRec(provider api.ProviderID, release, path string, score int) *api.Do
 func TestCurrentScore_notFoundWhenNoRow(t *testing.T) {
 	db, _ := openTemp(t)
 
-	score, imported, found, err := db.CurrentScore(context.Background(), testMT, testMID, testLang, api.VariantStandard)
+	score, imported, found, err := db.CurrentScore(t.Context(), testMT, testMID, testLang, api.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestCurrentScore_notFoundWhenNoRow(t *testing.T) {
 // original import time (Requirement 3.4, cross-check with 3.1).
 func TestCurrentScore_highestAutoScoreAndImported(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Release.A", "/media/test.fr.srt", 70)); err != nil {
 		t.Fatalf("first SaveDownload: %v", err)
@@ -95,7 +94,7 @@ func TestCurrentScore_highestAutoScoreAndImported(t *testing.T) {
 // (Requirement 3.4).
 func TestCurrentScore_ignoresManualRows(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Auto row at score 40, plus a higher-scoring manual row at 99.
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Rel", "/media/test.fr.srt", 40)); err != nil {
@@ -136,7 +135,7 @@ func TestCurrentScore_ignoresManualRows(t *testing.T) {
 func TestDownloadedRefs_emptyForUnknownTriple(t *testing.T) {
 	db, _ := openTemp(t)
 
-	refs, err := db.DownloadedRefs(context.Background(), testMT, testMID, testLang)
+	refs, err := db.DownloadedRefs(t.Context(), testMT, testMID, testLang)
 	if err != nil {
 		t.Fatalf("DownloadedRefs: %v", err)
 	}
@@ -150,7 +149,7 @@ func TestDownloadedRefs_emptyForUnknownTriple(t *testing.T) {
 // manual rows, deduplicating repeats (Requirement 3.5).
 func TestDownloadedRefs_distinctAcrossAutoAndManual(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Auto row (release R1/opensubtitles), then two manual rows: one distinct
 	// pair (R2/subdl) and one duplicate of the auto pair (R1/opensubtitles).
@@ -196,7 +195,7 @@ func TestDownloadedRefs_distinctAcrossAutoAndManual(t *testing.T) {
 // same triple is still returned.
 func TestDownloadedRefs_excludesEmptyReleaseName(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Auto row with an EMPTY release name (legacy provider that exposed none).
 	if err := db.SaveDownload(ctx, autoRec(testProv, "", "/media/test.fr.srt", 50)); err != nil {
@@ -292,7 +291,7 @@ func equalIDs(a, b []int64) bool {
 // providers so each filter has both a match and a non-match to exclude.
 func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// (type, mid, lang, provider) fixture, one row each.
 	putStateRow(t, db, api.MediaTypeEpisode, "ep-fr-os", "fr", stateRec{Provider: api.ProviderNameOpenSubtitles, Title: "Ep FR OS"})
@@ -370,7 +369,7 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 // a search term of "100%" must NOT behave like the SQL wildcard.
 func TestGetState_titleSearchTreatsWildcardsLiterally(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	putStateRow(t, db, api.MediaTypeMovie, "m-pct", "en", stateRec{Title: "100% Complete"})
 	putStateRow(t, db, api.MediaTypeMovie, "m-num", "en", stateRec{Title: "1000 Leagues"})
@@ -427,7 +426,7 @@ func stateMIDs(entries []api.StateEntry) []string {
 // rows are inserted in a single transaction for speed; exactly 1000 come back.
 func TestGetState_defaultThousandRowCap(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	const total = defaultQueryLimit + 1
 	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -488,7 +487,7 @@ func itoa(n int) string {
 // row (higher id) must precede the earlier one.
 func TestGetState_orderingMediaImportedDescThenIDDesc(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t1 := time.Date(2021, 6, 1, 12, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour) // strictly newer
@@ -514,7 +513,7 @@ func TestGetState_orderingMediaImportedDescThenIDDesc(t *testing.T) {
 // with strictly descending import times give a deterministic full order.
 func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	base := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 	ids := make([]int64, 5)
@@ -569,7 +568,7 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 // double-count, and that both counters track deletes (Requirements 15.1, 18.1).
 func TestStats_countersTrackInsertsAndDeletes(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Fresh store: both counters zero.
 	if d, a, err := db.Stats(ctx); err != nil || d != 0 || a != 0 {
@@ -642,7 +641,7 @@ func TestStats_countersTrackInsertsAndDeletes(t *testing.T) {
 // media_type, media_id.
 func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// episode/tt-b/en: two manual rows (count 2).
 	putStateRow(t, db, api.MediaTypeEpisode, "tt-b", "en", stateRec{Manual: true, Path: "/m/b.en.1.srt"})
@@ -678,7 +677,7 @@ func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 // reports no locks.
 func TestGetManualLocks_emptyWhenNoManualRows(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	putStateRow(t, db, api.MediaTypeMovie, "m-1", "en", stateRec{Manual: false})
 	got, err := db.GetManualLocks(ctx)
@@ -699,7 +698,7 @@ func TestGetManualLocks_emptyWhenNoManualRows(t *testing.T) {
 // [AND media_id LIKE escape(prefix)||'%' ESCAPE '\']`.
 func TestHistoryMediaIDs_distinctTypeFilteredAndLiteralPrefix(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// tt-1 has two languages (and an auto+manual mix) -> still one distinct id.
 	putStateRow(t, db, api.MediaTypeEpisode, "tt-1", "en", stateRec{Manual: false})
@@ -739,7 +738,7 @@ func TestHistoryMediaIDs_distinctTypeFilteredAndLiteralPrefix(t *testing.T) {
 // only an id that literally starts with "tt%", never an arbitrary "tt"-prefixed id.
 func TestHistoryMediaIDs_prefixWildcardLiteral(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	putStateRow(t, db, api.MediaTypeMovie, "tt%special", "en", stateRec{})
 	putStateRow(t, db, api.MediaTypeMovie, "ttother", "en", stateRec{})
@@ -813,7 +812,7 @@ func TestAsciiLower(t *testing.T) {
 // last scanned).
 func TestCurrentScore_multipleAutoRowsHighestWins(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Three auto rows in ascending id order with the peak score in the middle,
@@ -840,7 +839,7 @@ func TestCurrentScore_multipleAutoRowsHighestWins(t *testing.T) {
 // carry distinct media_imported values so the winner is observable.
 func TestCurrentScore_tieKeepsFirstScanned(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	earlier := time.Now().Add(-time.Hour).Round(0)
 	later := time.Now().Round(0)

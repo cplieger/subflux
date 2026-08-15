@@ -100,7 +100,7 @@ func TestRecordProviderNoResults_adaptive_enabled_records(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	e.recordProviderNoResults(context.Background(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
 	if !ms.failureCalled {
 		t.Error("recordProviderNoResults() did not call RecordNoResult when adaptive enabled")
 	}
@@ -115,7 +115,7 @@ func TestRecordProviderNoResults_adaptive_disabled_noop(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	e.recordProviderNoResults(context.Background(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
 	if ms.failureCalled {
 		t.Error("recordProviderNoResults() called RecordNoResult when adaptive disabled")
 	}
@@ -380,7 +380,7 @@ func TestRecordProviderNoResults_store_error_continues(t *testing.T) {
 	e := newEngine(nil, errStore, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	// Should not panic even when store returns error.
-	e.recordProviderNoResults(context.Background(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1", "prov2"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1", "prov2"})
 }
 
 // --- checkUpgradeEligibility ---
@@ -405,14 +405,14 @@ func TestCheckUpgradeEligibility_perfect_score_not_eligible(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	existing, detErr := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	existing, detErr := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if detErr != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", detErr)
 	}
 	searchCfg := mc.Search()
 	cutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
 
-	score, eligible := e.checkUpgradeEligibility(context.Background(),
+	score, eligible := e.checkUpgradeEligibility(t.Context(),
 		&existing, &searchCfg, "movie", "tt123", "fr", "standard", "Test", cutoff)
 
 	if eligible {
@@ -443,14 +443,14 @@ func TestCheckUpgradeEligibility_no_store_record_not_eligible(t *testing.T) {
 	}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	existing, detErr := detectExisting(context.Background(), videoPath, noopDetector{}, nil)
+	existing, detErr := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if detErr != nil {
 		t.Fatalf("detectExisting() unexpected error: %v", detErr)
 	}
 	searchCfg := mc.Search()
 	cutoff := time.Now().AddDate(0, 0, -searchCfg.UpgradeWindowDays)
 
-	_, eligible := e.checkUpgradeEligibility(context.Background(),
+	_, eligible := e.checkUpgradeEligibility(t.Context(),
 		&existing, &searchCfg, "movie", "tt123", "fr", "standard", "Test", cutoff)
 
 	if eligible {

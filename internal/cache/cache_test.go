@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"pgregory.net/rapid"
@@ -40,18 +41,22 @@ func TestCache_Get_missing_key(t *testing.T) {
 
 func TestCache_Get_expired_entry(t *testing.T) {
 	t.Parallel()
-	c := New[string](time.Nanosecond)
+	// Fake clock: a realistic TTL and an exact advance past it, replacing a
+	// nanosecond TTL plus a millisecond sleep chosen to be "surely enough".
+	synctest.Test(t, func(t *testing.T) {
+		c := New[string](time.Hour)
 
-	c.Set("key1", "value1")
-	time.Sleep(time.Millisecond) // Ensure TTL expires.
+		c.Set("key1", "value1")
+		time.Sleep(time.Hour + time.Second)
 
-	got, ok := c.Get("key1")
-	if ok {
-		t.Errorf("Get(\"key1\") returned ok=true after expiry, want false")
-	}
-	if got != "" {
-		t.Errorf("Get(\"key1\") = %v after expiry, want zero value", got)
-	}
+		got, ok := c.Get("key1")
+		if ok {
+			t.Errorf("Get(\"key1\") returned ok=true after expiry, want false")
+		}
+		if got != "" {
+			t.Errorf("Get(\"key1\") = %v after expiry, want zero value", got)
+		}
+	})
 }
 
 // TestCache_Get_is_read_only verifies Get does not remove expired entries: it
@@ -59,22 +64,24 @@ func TestCache_Get_expired_entry(t *testing.T) {
 // the caller's responsibility via Clear.
 func TestCache_Get_is_read_only(t *testing.T) {
 	t.Parallel()
-	c := New[string](50 * time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
+		c := New[string](time.Hour)
 
-	c.Set("key1", "value1")
-	time.Sleep(60 * time.Millisecond) // let key1 expire
+		c.Set("key1", "value1")
+		time.Sleep(time.Hour + time.Second) // let key1 expire
 
-	_, ok := c.Get("key1") // Should return false (expired) but not mutate.
-	if ok {
-		t.Error("Get() returned ok=true for expired entry")
-	}
+		_, ok := c.Get("key1") // Should return false (expired) but not mutate.
+		if ok {
+			t.Error("Get() returned ok=true for expired entry")
+		}
 
-	c.mu.RLock()
-	_, present := c.entries["key1"]
-	c.mu.RUnlock()
-	if !present {
-		t.Error("Get() evicted the expired entry; it must be read-only")
-	}
+		c.mu.RLock()
+		_, present := c.entries["key1"]
+		c.mu.RUnlock()
+		if !present {
+			t.Error("Get() evicted the expired entry; it must be read-only")
+		}
+	})
 }
 
 func TestCache_Set_overwrites_existing(t *testing.T) {
@@ -203,10 +210,10 @@ func TestCache_GetOrFetchCtx_caches_result(t *testing.T) {
 		return 42, nil
 	}
 
-	if v, err := c.GetOrFetchCtx(context.Background(), "k", fn); err != nil || v != 42 {
+	if v, err := c.GetOrFetchCtx(t.Context(), "k", fn); err != nil || v != 42 {
 		t.Fatalf("first GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
 	}
-	if v, err := c.GetOrFetchCtx(context.Background(), "k", fn); err != nil || v != 42 {
+	if v, err := c.GetOrFetchCtx(t.Context(), "k", fn); err != nil || v != 42 {
 		t.Fatalf("second GetOrFetchCtx = (%d, %v), want (42, nil)", v, err)
 	}
 	if calls != 1 {
@@ -362,7 +369,7 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 	t.Run("basic fetch", func(t *testing.T) {
 		t.Parallel()
 		c := New[string](time.Hour)
-		ctx := context.Background()
+		ctx := t.Context()
 		got, err := c.GetOrFetchCtx(ctx, "k1", func(ctx context.Context) (string, error) {
 			return "v1", nil
 		})
@@ -381,6 +388,7 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 		fetchDone := make(chan struct{})
 
 		// Caller A: will be cancelled mid-flight.
+		// Parent stays context.Background(): only this test may cancel ctxA, mid-flight and at an instant it chooses.
 		ctxA, cancelA := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
@@ -405,7 +413,7 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 		cancelA()
 
 		// Caller B: independent context, should get the result.
-		ctxB := context.Background()
+		ctxB := t.Context()
 		var gotB string
 		var errB error
 		go func() {
@@ -416,7 +424,11 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 			})
 		}()
 
-		// Let the fetch complete.
+		// Give B time to join the flight, then release A's fetch. Not a
+		// false-green risk: if B arrives late it starts its own fetch and the
+		// t.Error inside its fetch fn above fires, so this fails closed. Left
+		// as a sleep because the exact alternative (synctest.Wait) needs the
+		// whole subtest in a bubble, which is more churn than the guess costs.
 		time.Sleep(10 * time.Millisecond)
 		close(fetchDone)
 		wg.Wait()

@@ -24,7 +24,7 @@ func TestPollCache_Get_calls_readFn_on_miss(t *testing.T) {
 		},
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
 	)
-	got := pc.Get(context.Background(), api.PollKey("sonarr"))
+	got := pc.Get(t.Context(), api.PollKey("sonarr"))
 	if !got.Equal(expected) {
 		t.Errorf("Get() = %v, want %v", got, expected)
 	}
@@ -44,8 +44,8 @@ func TestPollCache_Get_returns_cached_after_Set(t *testing.T) {
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
 	)
 	now := time.Now()
-	pc.Set(context.Background(), api.PollKey("radarr"), now)
-	got := pc.Get(context.Background(), api.PollKey("radarr"))
+	pc.Set(t.Context(), api.PollKey("radarr"), now)
+	got := pc.Get(t.Context(), api.PollKey("radarr"))
 	if !got.Equal(now) {
 		t.Errorf("Get() after Set = %v, want %v", got, now)
 	}
@@ -65,8 +65,8 @@ func TestPollCache_Set_with_failing_setFn_still_caches(t *testing.T) {
 		},
 	)
 	now := time.Now()
-	pc.Set(context.Background(), api.PollKey("key"), now)
-	got := pc.Get(context.Background(), api.PollKey("key"))
+	pc.Set(t.Context(), api.PollKey("key"), now)
+	got := pc.Get(t.Context(), api.PollKey("key"))
 	if !got.Equal(now) {
 		t.Errorf("Get() after failed Set = %v, want %v", got, now)
 	}
@@ -84,9 +84,9 @@ func TestPollCache_concurrent(t *testing.T) {
 	for i := range 100 {
 		wg.Go(func() {
 			if i%2 == 0 {
-				pc.Set(context.Background(), api.PollKey("k"), time.Now())
+				pc.Set(t.Context(), api.PollKey("k"), time.Now())
 			} else {
-				pc.Get(context.Background(), api.PollKey("k"))
+				pc.Get(t.Context(), api.PollKey("k"))
 			}
 		})
 	}
@@ -105,7 +105,7 @@ func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
 		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return errors.New("db boom") },
 	)
-	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
+	pc.Set(t.Context(), api.PollKeySonarr, time.Now())
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) == 0 {
 		t.Errorf("Set with failing setFn: want the dirty-cursor WARN")
 	}
@@ -121,7 +121,7 @@ func TestPollCacheSet_silent_when_setFn_ok(t *testing.T) {
 		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
 		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
 	)
-	pc.Set(context.Background(), api.PollKeySonarr, time.Now())
+	pc.Set(t.Context(), api.PollKeySonarr, time.Now())
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) > 0 {
 		t.Errorf("Set with ok setFn: unexpected dirty-cursor WARN")
 	}
@@ -153,17 +153,17 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 
 	first := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
 	second := first.Add(time.Minute)
-	pc.Set(context.Background(), api.PollKeySonarr, first)  // fails -> dirty
-	pc.Set(context.Background(), api.PollKeySonarr, second) // fails -> still dirty, memory advanced
+	pc.Set(t.Context(), api.PollKeySonarr, first)  // fails -> dirty
+	pc.Set(t.Context(), api.PollKeySonarr, second) // fails -> still dirty, memory advanced
 
 	// While dirty, retries against a still-failing store keep it dirty.
-	pc.RetryDirty(context.Background())
+	pc.RetryDirty(t.Context())
 	if pc.dirtySince(api.PollKeySonarr).IsZero() {
 		t.Fatalf("cursor cleared while the store is still failing")
 	}
 
 	failing.Store(false)
-	pc.RetryDirty(context.Background())
+	pc.RetryDirty(t.Context())
 	if !pc.dirtySince(api.PollKeySonarr).IsZero() {
 		t.Errorf("cursor still dirty after the store healed")
 	}
@@ -177,7 +177,7 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 		t.Errorf("gauge transitions = %v, want final 0", gaugeVals)
 	}
 	// Memory still serves the advanced position throughout.
-	if got := pc.Get(context.Background(), api.PollKeySonarr); !got.Equal(second) {
+	if got := pc.Get(t.Context(), api.PollKeySonarr); !got.Equal(second) {
 		t.Errorf("Get = %v, want in-memory %v", got, second)
 	}
 }

@@ -2,11 +2,12 @@ package authstore
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/auth/v2"
@@ -198,11 +199,13 @@ func (s *Store) ListAPIKeysByUserID(_ context.Context, userID int64) ([]auth.Key
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
-			return out[i].CreatedAt.After(out[j].CreatedAt)
-		}
-		return out[i].ID > out[j].ID
+	// Descending: newest CreatedAt first, then descending ID as the tie-break,
+	// so the argument order is reversed against the ascending comparators.
+	slices.SortStableFunc(out, func(a, b auth.Key) int {
+		return cmp.Or(
+			b.CreatedAt.Compare(a.CreatedAt),
+			cmp.Compare(b.ID, a.ID),
+		)
 	})
 	return out, nil
 }

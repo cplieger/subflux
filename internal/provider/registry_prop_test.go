@@ -50,7 +50,7 @@ func TestLoadAll_property_invariants(t *testing.T) {
 			}
 		}
 
-		result, err := r.LoadAll(context.Background(), cfgs)
+		result, err := r.LoadAll(t.Context(), cfgs)
 
 		// Invariant 3: if error and no successful providers, result is nil.
 		// With partial success, error + non-nil result is valid when some providers loaded.

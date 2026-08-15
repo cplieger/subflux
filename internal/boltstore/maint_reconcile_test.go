@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,7 +49,7 @@ func rmfile(t *testing.T, path string) {
 func assertDownloadsConsistent(t *testing.T, db *DB) {
 	t.Helper()
 	downloads, _, _ := mustStats(t, db)
-	entries, err := db.GetState(context.Background(), &api.StateQuery{})
+	entries, err := db.GetState(t.Context(), &api.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
@@ -63,7 +62,7 @@ func assertDownloadsConsistent(t *testing.T, db *DB) {
 // TestReconcileState_noRecords is a no-op on an empty store.
 func TestReconcileState_noRecords(t *testing.T) {
 	db, _ := openTemp(t)
-	res, err := db.ReconcileState(context.Background())
+	res, err := db.ReconcileState(t.Context())
 	if err != nil {
 		t.Fatalf("ReconcileState: %v", err)
 	}
@@ -77,7 +76,7 @@ func TestReconcileState_noRecords(t *testing.T) {
 // when every video and subtitle file still exists.
 func TestReconcileState_allPresentIsNoop(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := mkfile(t, filepath.Join(dir, "movie.mkv"))
@@ -110,7 +109,7 @@ func TestReconcileState_allPresentIsNoop(t *testing.T) {
 // subtitle paths (Requirement 7.1).
 func TestReconcileState_videoGoneDeletesFanout(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := filepath.Join(dir, "show.s01e01.mkv")
@@ -184,7 +183,7 @@ func TestReconcileState_videoGoneDeletesFanout(t *testing.T) {
 // (Requirement 7.2).
 func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := mkfile(t, filepath.Join(dir, "movie.mkv"))
@@ -254,7 +253,7 @@ func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 // backoff is cleared (Requirement 7.3).
 func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := mkfile(t, filepath.Join(dir, "movie.mkv"))
@@ -331,7 +330,7 @@ func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
 // counts once in ResetCount.
 func TestReconcileState_allSubsGoneAutoOnlyReset(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := mkfile(t, filepath.Join(dir, "movie.mkv"))
@@ -385,7 +384,7 @@ func TestReconcileState_allSubsGoneAutoOnlyReset(t *testing.T) {
 // rows, backoff, and coverage completely intact.
 func TestReconcileState_unrelatedMediaUntouched(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	// Doomed item: video will be removed.
@@ -442,7 +441,7 @@ func TestReconcileState_unrelatedMediaUntouched(t *testing.T) {
 // second pass reports no further work.
 func TestReconcileState_idempotent(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	// Triple A: video gone (delete branch).

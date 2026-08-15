@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -60,7 +59,7 @@ func TestParseManualSearchQuery(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, tc.url, http.NoBody)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.url, http.NoBody)
 			req, lang, mediaType, arrID := manualops.ParseSearchQuery(r)
 
 			if lang != tc.wantLang {

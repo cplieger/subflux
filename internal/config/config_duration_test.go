@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"testing"
@@ -212,7 +211,7 @@ adaptive:
 search:
   provider_timeout: 2h
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -315,7 +314,7 @@ providers:
 search:
   provider_timeout: "not_a_duration"
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected error for invalid duration string")
 	}
@@ -347,7 +346,7 @@ search:
   provider_timeout:
     nested: value
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected error for non-string duration node")
 	}

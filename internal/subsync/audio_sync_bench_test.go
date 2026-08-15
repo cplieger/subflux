@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -42,7 +41,7 @@ func BenchmarkAudioSync(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				audioSyncFromPCM(context.Background(), cues, pcm, AudioSyncHints{})
+				audioSyncFromPCM(b.Context(), cues, pcm, AudioSyncHints{})
 			}
 		})
 	}

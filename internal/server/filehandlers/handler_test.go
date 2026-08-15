@@ -897,7 +897,7 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "embedded",
 			Path:   "/media/movie.srt",
 		}
-		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(embedded) = true, want false")
 		}
@@ -910,7 +910,7 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "external",
 			Path:   "",
 		}
-		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(empty path) = true, want false")
 		}
@@ -923,7 +923,7 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source: "external",
 			Path:   "/etc/passwd",
 		}
-		got := h.deleteExternalFile(context.Background(),
+		got := h.deleteExternalFile(t.Context(),
 			&testsupport.NopConfig{PathErr: config.ErrPathNotAllowed}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(invalid path) = true, want false")
@@ -941,7 +941,7 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/nonexistent/movie.en.srt",
 		}
-		got := h.deleteExternalFile(context.Background(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
 		if !got {
 			t.Error("deleteExternalFile(nonexistent file) = false, want true")
 		}

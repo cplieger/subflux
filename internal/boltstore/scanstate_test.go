@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -20,7 +19,7 @@ const scanMTEp = api.MediaTypeEpisode
 // recordScan is a context-free RecordScanState for tests.
 func recordScan(t *testing.T, db *DB, mt api.MediaType, mid, title, audio string, season, episode int) {
 	t.Helper()
-	if err := db.RecordScanState(context.Background(), &api.ScanRecord{
+	if err := db.RecordScanState(t.Context(), &api.ScanRecord{
 		MediaType: mt, MediaID: mid, Title: title, AudioLang: audio, Season: season, Episode: episode,
 	}); err != nil {
 		t.Fatalf("RecordScanState(%q): %v", mid, err)
@@ -83,7 +82,7 @@ func TestRecordScanState_upsert_updates_same_row(t *testing.T) {
 // getScans is a context-free GetScanStates for tests.
 func getScans(t *testing.T, db *DB, mt api.MediaType, prefix string) []api.ScanStateRow {
 	t.Helper()
-	rows, err := db.GetScanStates(context.Background(), mt, prefix)
+	rows, err := db.GetScanStates(t.Context(), mt, prefix)
 	if err != nil {
 		t.Fatalf("GetScanStates(%q, %q): %v", mt, prefix, err)
 	}
@@ -173,7 +172,7 @@ func scannedAtOf(rows []api.ScanStateRow) string {
 
 func TestRecentlyScanned_empty_returns_empty_map(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.RecentlyScanned(context.Background(), time.Now())
+	got, err := db.RecentlyScanned(t.Context(), time.Now())
 	if err != nil {
 		t.Fatalf("RecentlyScanned: %v", err)
 	}
@@ -193,7 +192,7 @@ func TestRecentlyScanned_inclusive_cutoff_boundary(t *testing.T) {
 	setScannedAt(t, db, scanMTEp, "exact", "E", "eng", 1, 1, cutoff)
 	setScannedAt(t, db, scanMTEp, "after", "A", "eng", 1, 1, cutoff.Add(time.Hour))
 
-	got, err := db.RecentlyScanned(context.Background(), cutoff)
+	got, err := db.RecentlyScanned(t.Context(), cutoff)
 	if err != nil {
 		t.Fatalf("RecentlyScanned: %v", err)
 	}
@@ -217,7 +216,7 @@ func TestRecentlyScanned_future_cutoff_returns_empty(t *testing.T) {
 	db, _ := openTemp(t)
 	setScannedAt(t, db, scanMTEp, "x", "X", "eng", 1, 1, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
 
-	got, err := db.RecentlyScanned(context.Background(), time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC))
+	got, err := db.RecentlyScanned(t.Context(), time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("RecentlyScanned: %v", err)
 	}
@@ -234,7 +233,7 @@ func TestRecentlyScanned_includes_all_media_types(t *testing.T) {
 	setScannedAt(t, db, scanMTEp, "tvdb-1-s01e01", "Ep", "eng", 1, 1, base.Add(time.Hour))
 	setScannedAt(t, db, api.MediaTypeMovie, "tmdb-2", "Mov", "eng", 0, 0, base.Add(2*time.Hour))
 
-	got, err := db.RecentlyScanned(context.Background(), base)
+	got, err := db.RecentlyScanned(t.Context(), base)
 	if err != nil {
 		t.Fatalf("RecentlyScanned: %v", err)
 	}
@@ -247,7 +246,7 @@ func TestRecentlyScanned_includes_all_media_types(t *testing.T) {
 
 func TestLastScanTime_empty_returns_empty(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.LastScanTime(context.Background())
+	got, err := db.LastScanTime(t.Context())
 	if err != nil {
 		t.Fatalf("LastScanTime: %v", err)
 	}
@@ -261,7 +260,7 @@ func TestLastScanTime_returns_most_recent_formatted(t *testing.T) {
 	setScannedAt(t, db, scanMTEp, "old", "Old", "eng", 1, 1, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	setScannedAt(t, db, api.MediaTypeMovie, "new", "New", "fre", 0, 0, time.Date(2026, 6, 15, 12, 30, 0, 0, time.UTC))
 
-	got, err := db.LastScanTime(context.Background())
+	got, err := db.LastScanTime(t.Context())
 	if err != nil {
 		t.Fatalf("LastScanTime: %v", err)
 	}
@@ -274,7 +273,7 @@ func TestLastScanTime_after_record_returns_timestamp(t *testing.T) {
 	db, _ := openTemp(t)
 	recordScan(t, db, api.MediaTypeMovie, "tmdb-1", "M", "eng", 0, 0)
 
-	got, err := db.LastScanTime(context.Background())
+	got, err := db.LastScanTime(t.Context())
 	if err != nil {
 		t.Fatalf("LastScanTime: %v", err)
 	}

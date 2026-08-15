@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -150,7 +149,7 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte("hello world"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := atomicfile.ReadBounded(context.Background(), path, 1024)
+		got, err := atomicfile.ReadBounded(t.Context(), path, 1024)
 		if err != nil {
 			t.Fatalf("atomicfile.ReadBounded(%q, 1024) error: %v", path, err)
 		}
@@ -166,7 +165,7 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte(strings.Repeat("x", 100)), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		_, err := atomicfile.ReadBounded(context.Background(), path, 50)
+		_, err := atomicfile.ReadBounded(t.Context(), path, 50)
 		if err == nil {
 			t.Fatal("atomicfile.ReadBounded() expected error for oversized file, got nil")
 		}
@@ -183,7 +182,7 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := atomicfile.ReadBounded(context.Background(), path, 50)
+		got, err := atomicfile.ReadBounded(t.Context(), path, 50)
 		if err != nil {
 			t.Fatalf("atomicfile.ReadBounded(%q, 50) error: %v", path, err)
 		}
@@ -194,7 +193,7 @@ func TestReadBounded(t *testing.T) {
 
 	t.Run("nonexistent file returns error", func(t *testing.T) {
 		t.Parallel()
-		_, err := atomicfile.ReadBounded(context.Background(), "/nonexistent/path/file.txt", 1024)
+		_, err := atomicfile.ReadBounded(t.Context(), "/nonexistent/path/file.txt", 1024)
 		if err == nil {
 			t.Fatal("atomicfile.ReadBounded(nonexistent) expected error, got nil")
 		}
@@ -207,7 +206,7 @@ func TestReadBounded(t *testing.T) {
 		if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
-		got, err := atomicfile.ReadBounded(context.Background(), path, 1024)
+		got, err := atomicfile.ReadBounded(t.Context(), path, 1024)
 		if err != nil {
 			t.Fatalf("atomicfile.ReadBounded(%q, 1024) error: %v", path, err)
 		}

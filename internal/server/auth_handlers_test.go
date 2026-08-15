@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,7 +35,7 @@ func TestChangePassword_Success(t *testing.T) {
 	}
 
 	// Verify new password works.
-	updated, err := db.GetUserByUsername(context.Background(), "frank")
+	updated, err := db.GetUserByUsername(t.Context(), "frank")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,17 +96,17 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	user.PasswordHash = hash
-	if err := db.UpdateUser(context.Background(), user); err != nil {
+	if err := db.UpdateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 
 	// Invalidate all sessions.
-	if err := db.DeleteUserSessions(context.Background(), user.ID, ""); err != nil {
+	if err := db.DeleteUserSessions(t.Context(), user.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 
 	// Verify new password works.
-	updated, err := db.GetUserByUsername(context.Background(), "mallory")
+	updated, err := db.GetUserByUsername(t.Context(), "mallory")
 	if err != nil {
 		t.Fatal(err)
 	}

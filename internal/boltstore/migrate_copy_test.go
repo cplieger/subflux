@@ -110,6 +110,7 @@ func TestMigrate_copyStepIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("copy migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
@@ -220,6 +221,7 @@ func TestMigrate_copyStepTransform(t *testing.T) {
 	if err != nil {
 		t.Fatalf("copy migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
@@ -253,7 +255,7 @@ func TestMigrate_copyStepFailureLeavesOriginal(t *testing.T) {
 	core, auth := copyDomains(failing)
 	db, err := openWithDomains(path, core, auth)
 	if err == nil {
-		_ = db.Close(context.Background())
+		_ = db.Close(t.Context())
 		t.Fatal("copy migration with failing transform: error = nil, want failure")
 	}
 	if !errors.Is(err, boom) {
@@ -306,6 +308,7 @@ func TestMigrate_copyStepRenamesBucket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rename copy migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
@@ -370,6 +373,7 @@ func TestMigrate_copyStepMergesBuckets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("merge copy migration open: %v", err)
 	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 

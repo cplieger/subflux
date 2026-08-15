@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -85,7 +84,7 @@ func TestProvidersForTarget(t *testing.T) {
 func TestLoadFromBytes_embedded_subtitles_defaults(t *testing.T) {
 	t.Parallel()
 	// Absent section: defaults (true/true/false) via the pre-defaulted decode.
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -104,7 +103,7 @@ embedded_subtitles:
   ignore_vobsub: false
   ignore_ass: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -124,7 +123,7 @@ func TestLoadFromBytes_embedded_subtitles_partial_section(t *testing.T) {
 embedded_subtitles:
   ignore_pgs: false
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -174,7 +173,7 @@ providers:` + tt.block + `
     settings:
       api_key: "test"
 `
-			_, err := LoadFromBytes(context.Background(), []byte(yaml))
+			_, err := LoadFromBytes(t.Context(), []byte(yaml))
 			if err == nil {
 				t.Fatal("LoadFromBytes() = nil error, want targeted providers.embedded rejection")
 			}
@@ -236,7 +235,7 @@ providers:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := LoadFromBytes(context.Background(), []byte(tt.yaml))
+			_, err := LoadFromBytes(t.Context(), []byte(tt.yaml))
 			if err == nil {
 				t.Fatal("LoadFromBytes() = nil error, want targeted filter-list rejection")
 			}
@@ -262,7 +261,7 @@ languages:
 	var cfg *Config
 	var err error
 	logs := captureLogs(t, func() {
-		cfg, err = LoadFromBytes(context.Background(), []byte(yaml))
+		cfg, err = LoadFromBytes(t.Context(), []byte(yaml))
 	})
 	if err != nil {
 		t.Fatalf("LoadFromBytes(zero providers) unexpected error: %v", err)

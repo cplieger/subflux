@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -33,7 +32,7 @@ func BenchmarkSyncCues(b *testing.B) {
 		b.Run(cueCountLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				syncCues(context.Background(), ref, inc)
+				syncCues(b.Context(), ref, inc)
 			}
 		})
 	}
@@ -56,7 +55,7 @@ func BenchmarkAlignConstantOffset(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				alignConstantOffset(context.Background(), ref, inc)
+				alignConstantOffset(b.Context(), ref, inc)
 			}
 		})
 	}

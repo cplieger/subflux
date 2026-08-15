@@ -15,7 +15,7 @@ func TestStatsCache(t *testing.T) {
 	t.Run("returns_computed_value", func(t *testing.T) {
 		t.Parallel()
 		var c statsCache
-		resp := c.get(context.Background(), func(_ context.Context) api.Stats {
+		resp := c.get(t.Context(), func(_ context.Context) api.Stats {
 			return api.Stats{Downloads: 42}
 		})
 		if resp.Downloads != 42 {
@@ -31,9 +31,9 @@ func TestStatsCache(t *testing.T) {
 			calls.Add(1)
 			return api.Stats{Downloads: 10}
 		}
-		c.get(context.Background(), fn)
-		c.get(context.Background(), fn)
-		c.get(context.Background(), fn)
+		c.get(t.Context(), fn)
+		c.get(t.Context(), fn)
+		c.get(t.Context(), fn)
 		if got := calls.Load(); got != 1 {
 			t.Errorf("compute called %d times, want 1 (cached)", got)
 		}
@@ -47,9 +47,9 @@ func TestStatsCache(t *testing.T) {
 			n := calls.Add(1)
 			return api.Stats{Downloads: int(n) * 10}
 		}
-		resp1 := c.get(context.Background(), fn)
+		resp1 := c.get(t.Context(), fn)
 		c.invalidate()
-		resp2 := c.get(context.Background(), fn)
+		resp2 := c.get(t.Context(), fn)
 		if resp1.Downloads == resp2.Downloads {
 			t.Error("invalidate did not force recompute")
 		}
@@ -66,12 +66,12 @@ func TestStatsCache(t *testing.T) {
 			calls.Add(1)
 			return api.Stats{Downloads: 5}
 		}
-		c.get(context.Background(), fn)
+		c.get(t.Context(), fn)
 		// Manually expire the entry by backdating storedAt.
 		if e := c.mu.Load(); e != nil {
 			c.mu.Store(&statsCacheEntry{resp: e.resp, storedAt: time.Now().Add(-2 * statsCacheTTL)})
 		}
-		c.get(context.Background(), fn)
+		c.get(t.Context(), fn)
 		if got := calls.Load(); got != 2 {
 			t.Errorf("compute called %d times, want 2 (expired)", got)
 		}

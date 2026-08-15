@@ -26,7 +26,7 @@ func TestSearchTargets_manually_locked_skips(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestSearchTargets_adaptive_backoff_skips(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestSearchTargets_no_results_records_failure(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestSearchTargets_success_downloads_and_saves(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestSearchTargets_hi_fallback(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestSearchTargets_forced_subs_filtered_out(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestSearchTargets_below_min_score(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 		Languages: []string{"fr"},
 	}
 
-	outcome := e.searchProvidersFiltered(context.Background(), req,
+	outcome := e.searchProvidersFiltered(t.Context(), req,
 		[]api.Provider{goodProv, badProv})
 
 	if len(outcome.results) != 1 {
@@ -304,7 +304,7 @@ func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 		Languages: []string{"fr"},
 	}
 
-	outcome := e.searchProvidersFiltered(context.Background(), req,
+	outcome := e.searchProvidersFiltered(t.Context(), req,
 		[]api.Provider{bad1, bad2})
 
 	if len(outcome.results) != 0 {
@@ -326,7 +326,7 @@ func TestTargetLocked_manual_lock_true(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	if !e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
 		t.Error("targetLocked() = false for locked quad, want true")
 	}
 }
@@ -337,7 +337,7 @@ func TestTargetLocked_not_locked_false(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	if e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
 		t.Error("targetLocked() = true, want false (not locked)")
 	}
 }
@@ -350,7 +350,7 @@ func TestTargetLocked_store_error_fails_closed(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	if !e.targetLocked(context.Background(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
 		t.Error("targetLocked() = false on store error, want true (fail closed)")
 	}
 }
@@ -374,7 +374,7 @@ func TestFilterBackedOff_removes_backed_off_providers(t *testing.T) {
 
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
-	result := e.filterBackedOff(context.Background(), "movie", "tt123", "fr",
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
 		[]api.Provider{prov1, prov2})
 
 	if len(result) != 1 {
@@ -422,7 +422,7 @@ func TestSearchTargets_existing_regular_subtitle_skips(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -455,7 +455,7 @@ func TestSearchTargets_download_failure_continues(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, "", targets)
+	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -508,7 +508,7 @@ func TestSearchTargets_partial_failure_records_for_succeeded_only(t *testing.T) 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -553,7 +553,7 @@ func TestSearchTargets_exact_min_score_is_accepted(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	targets := []api.SubtitleTarget{{Code: "fr"}}
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestFilterBackedOff_query_error_returns_all_providers(t *testing.T) {
 
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
-	result := e.filterBackedOff(context.Background(), "movie", "tt123", "fr",
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
 		[]api.Provider{prov1, prov2})
 
 	if len(result) != 2 {
@@ -616,7 +616,7 @@ func TestFilterBackedOff_adaptive_disabled_returns_all(t *testing.T) {
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(context.Background(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (disabled)", len(result))
@@ -633,7 +633,7 @@ func TestFilterBackedOff_no_backed_off_returns_all(t *testing.T) {
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(context.Background(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (none backed off)", len(result))
@@ -652,7 +652,7 @@ func TestSearchProvidersFiltered_records_timeout_on_failure(t *testing.T) {
 	e := newEngine([]api.Provider{bad}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(context.Background(), req, []api.Provider{bad})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{bad})
 
 	if errored := outcome.errored(); len(errored) != 1 {
 		t.Errorf("errored = %v, want 1 entry", errored)
@@ -683,7 +683,7 @@ func TestSearchProvidersFiltered_records_success_clears_timeout(t *testing.T) {
 	e.timeout.RecordFailure("good", nil)
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(context.Background(), req, []api.Provider{good})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{good})
 
 	if len(outcome.succeeded()) != 1 {
 		t.Errorf("succeeded = %v, want 1 entry", outcome.succeeded())
@@ -711,7 +711,7 @@ func TestSearchProvidersFiltered_skips_timed_out_provider(t *testing.T) {
 	}
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(context.Background(), req, []api.Provider{p})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{p})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0 (provider timed out)", len(outcome.results))
@@ -751,7 +751,7 @@ func TestSearchTargets_computes_video_hash_when_empty(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	_, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	_, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -780,7 +780,7 @@ func TestSearchTargets_skips_hash_when_already_set(t *testing.T) {
 	}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 
-	_, err := e.SearchTargets(context.Background(), req, "", targets)
+	_, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -813,7 +813,7 @@ func TestSearchTargets_counts_searched_and_skipped(t *testing.T) {
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}, {Code: "en"}}
 
-	result, err := e.SearchTargets(context.Background(), req, videoPath, targets)
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}

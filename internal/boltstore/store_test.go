@@ -94,7 +94,7 @@ func TestOpen_reopenIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Open error: %v", err)
 	}
-	if err := db1.Close(context.Background()); err != nil {
+	if err := db1.Close(t.Context()); err != nil {
 		t.Fatalf("first Close error: %v", err)
 	}
 
@@ -136,7 +136,7 @@ func TestOpen_heldLockFailsFast(t *testing.T) {
 	elapsed := time.Since(start)
 
 	if err == nil {
-		_ = second.Close(context.Background())
+		_ = second.Close(t.Context())
 		t.Fatal("second Open of a held file: error = nil, want a fail-fast lock error")
 	}
 	// Generous upper bound: the timeout is openTimeout; allow slack for slow CI
@@ -158,10 +158,10 @@ func TestOpen_emptyPath(t *testing.T) {
 // construction path can defer Close unconditionally.
 func TestClose_safeOnZeroValue(t *testing.T) {
 	var d *DB
-	if err := d.Close(context.Background()); err != nil {
+	if err := d.Close(t.Context()); err != nil {
 		t.Errorf("Close on nil *DB: %v, want nil", err)
 	}
-	if err := (&DB{}).Close(context.Background()); err != nil {
+	if err := (&DB{}).Close(t.Context()); err != nil {
 		t.Errorf("Close on zero DB: %v, want nil", err)
 	}
 }

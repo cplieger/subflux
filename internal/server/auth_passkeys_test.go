@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -49,7 +48,7 @@ func TestListPasskeys_WithData(t *testing.T) {
 			Name:         "Key " + strconv.Itoa(i),
 			CreatedAt:    time.Now(),
 		}
-		if err := db.CreatePasskey(context.Background(), pk); err != nil {
+		if err := db.CreatePasskey(t.Context(), pk); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -86,11 +85,11 @@ func TestRenamePasskey_Success(t *testing.T) {
 		Name:         "Old Name",
 		CreatedAt:    time.Now(),
 	}
-	if err := db.CreatePasskey(context.Background(), passkey); err != nil {
+	if err := db.CreatePasskey(t.Context(), passkey); err != nil {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(context.Background(), user.ID)
+	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}
@@ -206,11 +205,11 @@ func TestDeletePasskey_Success(t *testing.T) {
 		Name:         "To Delete",
 		CreatedAt:    time.Now(),
 	}
-	if err := db.CreatePasskey(context.Background(), passkey); err != nil {
+	if err := db.CreatePasskey(t.Context(), passkey); err != nil {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(context.Background(), user.ID)
+	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}
@@ -227,7 +226,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 	}
 
 	// Verify passkey is gone.
-	remaining, err := db.GetPasskeysByUserID(context.Background(), user.ID)
+	remaining, err := db.GetPasskeysByUserID(t.Context(), user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +248,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := db.CreateUser(context.Background(), user); err != nil {
+	if err := db.CreateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 
@@ -261,11 +260,11 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 		Name:         "Only Passkey",
 		CreatedAt:    now,
 	}
-	if err := db.CreatePasskey(context.Background(), passkey); err != nil {
+	if err := db.CreatePasskey(t.Context(), passkey); err != nil {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(context.Background(), user.ID)
+	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}
@@ -301,7 +300,7 @@ func TestAuthMe_WithPasskeys(t *testing.T) {
 		Name:         "My Passkey",
 		CreatedAt:    time.Now(),
 	}
-	if err := db.CreatePasskey(context.Background(), pk); err != nil {
+	if err := db.CreatePasskey(t.Context(), pk); err != nil {
 		t.Fatal(err)
 	}
 

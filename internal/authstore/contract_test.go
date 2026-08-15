@@ -1,7 +1,6 @@
 package authstore_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -35,7 +34,7 @@ func newBoltHarness(t *testing.T) authstoretest.Harness {
 	if err != nil {
 		t.Fatalf("boltstore.Open(%q): %v", path, err)
 	}
-	if err := core.Close(context.Background()); err != nil {
+	if err := core.Close(t.Context()); err != nil {
 		t.Fatalf("boltstore.Close: %v", err)
 	}
 	h := &boltHarness{path: path}
@@ -99,7 +98,7 @@ func TestAuthStoreContract(t *testing.T) {
 // assertion and is intentionally not in the shared suite.
 func TestSignCount_neverRegresses(t *testing.T) {
 	h := newBoltHarness(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	s := h.Store()
 
 	u := &auth.User{Username: "monotonic", Role: auth.RoleUser, Enabled: true}
@@ -136,7 +135,7 @@ func TestSignCount_neverRegresses(t *testing.T) {
 // so this is a new-store-only assertion.
 func TestCloneWarning_roundTrips(t *testing.T) {
 	h := newBoltHarness(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	s := h.Store()
 
 	u := &auth.User{Username: "clone", Role: auth.RoleUser, Enabled: true}
@@ -164,7 +163,7 @@ func TestCloneWarning_roundTrips(t *testing.T) {
 // so this is a new-store-only assertion.
 func TestEphemeral_emptyAfterReopen(t *testing.T) {
 	h := newBoltHarness(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	s := h.Store()
 
 	u := &auth.User{Username: "durable", Role: auth.RoleUser, Enabled: true}

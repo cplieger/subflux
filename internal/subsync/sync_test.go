@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -9,7 +8,7 @@ import (
 func TestSyncWithOptions_empty_incorrect(t *testing.T) {
 	t.Parallel()
 	opts := DefaultSyncOptions()
-	result := SyncWithOptions(context.Background(), nil, nil, &opts)
+	result := SyncWithOptions(t.Context(), nil, nil, &opts)
 	if result.Method != MethodNone {
 		t.Fatalf("expected method 'none', got %q", result.Method)
 	}
@@ -23,7 +22,7 @@ func TestSyncWithOptions_no_reference_no_audio(t *testing.T) {
 	inc := makeLongCues(30, 10*time.Minute)
 	opts := DefaultSyncOptions()
 	opts.EnableAudio = false
-	result := SyncWithOptions(context.Background(), nil, inc, &opts)
+	result := SyncWithOptions(t.Context(), nil, inc, &opts)
 	// No reference and no audio: should return original cues.
 	if len(result.Cues) != len(inc) {
 		t.Fatalf("expected %d cues, got %d", len(inc), len(result.Cues))
@@ -37,7 +36,7 @@ func TestSyncWithOptions_constant_offset(t *testing.T) {
 	opts := DefaultSyncOptions()
 	opts.EnableFramerate = false
 	opts.EnableSplits = false
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	// Accept any method that finds the correct offset.
 	if result.Method == MethodNone {
 		t.Fatalf("expected a sync method, got %q", result.Method)
@@ -52,7 +51,7 @@ func TestSyncWithOptions_with_reference(t *testing.T) {
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 3*time.Second)
 	opts := DefaultSyncOptions()
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if len(result.Cues) != len(inc) {
 		t.Fatalf("expected %d cues, got %d", len(inc), len(result.Cues))
 	}
@@ -64,7 +63,7 @@ func TestSyncWithOptions_audio_disabled(t *testing.T) {
 	opts := DefaultSyncOptions()
 	opts.EnableAudio = false
 	opts.VideoPath = "/some/video.mkv"
-	result := SyncWithOptions(context.Background(), nil, inc, &opts)
+	result := SyncWithOptions(t.Context(), nil, inc, &opts)
 	// Audio disabled: should not attempt audio sync.
 	if result.Method == MethodAudio {
 		t.Fatal("audio sync should not run when disabled")
@@ -77,7 +76,7 @@ func TestSyncWithOptions_audio_no_video_path(t *testing.T) {
 	opts := DefaultSyncOptions()
 	opts.EnableAudio = true
 	opts.VideoPath = ""
-	result := SyncWithOptions(context.Background(), nil, inc, &opts)
+	result := SyncWithOptions(t.Context(), nil, inc, &opts)
 	if result.Method == MethodAudio {
 		t.Fatal("audio sync should not run without video path")
 	}
@@ -171,7 +170,7 @@ func TestReferenceSync_prefers_higher_confidence(t *testing.T) {
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 2*time.Second)
 	opts := DefaultSyncOptions()
-	result := referenceSync(context.Background(), ref, inc, &opts)
+	result := referenceSync(t.Context(), ref, inc, &opts)
 	if result.Confidence == ConfidenceNone {
 		t.Fatal("expected some confidence from reference sync")
 	}
@@ -206,7 +205,7 @@ func TestSyncWithOptions_zero_min_confidence_defaults(t *testing.T) {
 		EnableSplits:    false,
 		MinConfidence:   0, // should default to 0.5
 	}
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if result.Method == MethodNone {
 		t.Errorf("expected a sync method, got %q", result.Method)
 	}
@@ -221,7 +220,7 @@ func TestSyncWithOptions_negative_min_confidence_defaults(t *testing.T) {
 		EnableSplits:    false,
 		MinConfidence:   -1, // should default to 0.5
 	}
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if result.Method == MethodNone {
 		t.Errorf("expected a sync method, got %q", result.Method)
 	}
@@ -239,7 +238,7 @@ func TestReferenceSync_framerate_strong_returns_early(t *testing.T) {
 		EnableSplits:    true,
 		MinConfidence:   0.5,
 	}
-	result := referenceSync(context.Background(), ref, inc, &opts)
+	result := referenceSync(t.Context(), ref, inc, &opts)
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
@@ -274,7 +273,7 @@ func TestReferenceSync_splits_strong_returns_early(t *testing.T) {
 		SplitPenalty:    100,
 		MinConfidence:   0.5,
 	}
-	result := referenceSync(context.Background(), ref, inc, &opts)
+	result := referenceSync(t.Context(), ref, inc, &opts)
 	// Should use split method since there's a clear split point.
 	if len(result.Cues) != 40 {
 		t.Errorf("expected 40 cues, got %d", len(result.Cues))
@@ -292,7 +291,7 @@ func TestSyncWithOptions_low_confidence_fallback(t *testing.T) {
 		EnableSplits:    false,
 		MinConfidence:   0.99, // very high threshold → nothing passes
 	}
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if len(result.Cues) != 3 {
 		t.Fatalf("expected 3 cues in fallback, got %d", len(result.Cues))
 	}
@@ -308,7 +307,7 @@ func TestSyncWithOptions_reference_below_threshold_returns_best(t *testing.T) {
 		EnableSplits:    false,
 		MinConfidence:   0.99, // very high → offset sync won't meet it
 	}
-	result := SyncWithOptions(context.Background(), ref, inc, &opts)
+	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	// Should still return the best result found (any method).
 	if result.Method == MethodNone {
 		t.Errorf("expected a sync method, got %q", result.Method)
@@ -320,13 +319,13 @@ func TestSyncWithOptions_nil_opts_uses_defaults(t *testing.T) {
 	ref := makeLongCues(30, 10*time.Minute)
 	inc := ShiftCues(ref, 2*time.Second)
 
-	result := SyncWithOptions(context.Background(), ref, inc, nil)
+	result := SyncWithOptions(t.Context(), ref, inc, nil)
 
 	if result.Method == MethodNone {
-		t.Errorf("SyncWithOptions(context.Background(), ref, inc, nil) method = %q, want a sync method", result.Method)
+		t.Errorf("SyncWithOptions(t.Context(), ref, inc, nil) method = %q, want a sync method", result.Method)
 	}
 	if len(result.Cues) != len(inc) {
-		t.Errorf("SyncWithOptions(context.Background(), ref, inc, nil) cue count = %d, want %d", len(result.Cues), len(inc))
+		t.Errorf("SyncWithOptions(t.Context(), ref, inc, nil) cue count = %d, want %d", len(result.Cues), len(inc))
 	}
 }
 
@@ -348,8 +347,8 @@ func TestSyncWithOptions_gate_reads_calibrated_confidence(t *testing.T) {
 	}
 	// referenceSync is deterministic for fixed inputs, so calling it
 	// directly yields the same winner SyncWithOptions gates on.
-	direct := referenceSync(context.Background(), ref, inc, &opts)
-	got := SyncWithOptions(context.Background(), ref, inc, &opts)
+	direct := referenceSync(t.Context(), ref, inc, &opts)
+	got := SyncWithOptions(t.Context(), ref, inc, &opts)
 
 	if got.Confidence != direct.Confidence {
 		t.Errorf("gated confidence = %f, want calibrated winner confidence %f",
@@ -382,7 +381,7 @@ func TestReferenceSync_no_candidates_returns_original(t *testing.T) {
 		EnableSplits:    false,
 		MinConfidence:   0.5,
 	}
-	result := referenceSync(context.Background(), ref, inc, &opts)
+	result := referenceSync(t.Context(), ref, inc, &opts)
 	if result.Method != MethodNone {
 		t.Errorf("referenceSync(zero-length cues) method = %q, want %q", result.Method, MethodNone)
 	}

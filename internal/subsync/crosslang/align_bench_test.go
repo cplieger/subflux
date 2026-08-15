@@ -1,7 +1,6 @@
 package crosslang
 
 import (
-	"context"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -45,7 +44,7 @@ func BenchmarkAlign(b *testing.B) {
 		b.Run(sizeLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				_ = Align(context.Background(), ref, inc)
+				_ = Align(b.Context(), ref, inc)
 			}
 		})
 	}

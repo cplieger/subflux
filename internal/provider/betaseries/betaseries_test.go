@@ -1,7 +1,6 @@
 package betaseries
 
 import (
-	"context"
 	"errors"
 	"io"
 	"testing"
@@ -58,7 +57,7 @@ func TestFactory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := Factory(context.Background(), tt.settings)
+			p, err := Factory(t.Context(), tt.settings)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("Factory() expected error")

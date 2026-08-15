@@ -187,7 +187,7 @@ func runCorpusCase(t *testing.T, root string, c corpusCase) corpusRecord {
 		return errRecord(fmt.Sprintf("subtitle unusable: err=%v cues=%d", err, len(incCues)))
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	videoPath := filepath.Join(root, filepath.FromSlash(c.id))
 	refCues, err := ExtractEmbeddedSRT(ctx, videoPath, "", "", nil)
 	if err != nil || len(refCues) < MinCuesForSync {
@@ -391,7 +391,7 @@ func writeCorpusManifest(t *testing.T, root string) {
 		sum := sha256.Sum256(raw)
 		c.sha256 = hex.EncodeToString(sum[:])
 
-		refCues, err := ExtractEmbeddedSRT(context.Background(), path, "", "", nil)
+		refCues, err := ExtractEmbeddedSRT(t.Context(), path, "", "", nil)
 		if err != nil || len(refCues) < MinCuesForSync {
 			c.ref = corpusRefNone
 		} else {

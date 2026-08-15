@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -46,7 +45,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	// Regular (non-admin) account: link-on-login migrates it to SSO-only.
 	// (The last-local-admin guard only blocks admins.)
 	user.Role = auth.RoleUser
-	if err := db.UpdateUser(context.Background(), user); err != nil {
+	if err := db.UpdateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,7 +53,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "wrong"); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong password status = %d, want 401", rec.Code)
 	}
-	got, _ := db.GetUserByID(context.Background(), user.ID)
+	got, _ := db.GetUserByID(t.Context(), user.ID)
 	if got.OIDCSub != "" {
 		t.Fatalf("OIDCSub = %q, want empty after failed link", got.OIDCSub)
 	}
@@ -63,7 +62,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "correct-horse-battery-staple"); rec.Code != http.StatusOK {
 		t.Fatalf("correct password status = %d, want 200; body %s", rec.Code, rec.Body.String())
 	}
-	got, _ = db.GetUserByID(context.Background(), user.ID)
+	got, _ = db.GetUserByID(t.Context(), user.ID)
 	if got.OIDCSub != "new-sub" {
 		t.Fatalf("OIDCSub = %q, want new-sub after successful link", got.OIDCSub)
 	}
@@ -82,7 +81,7 @@ func TestOIDCLink_refuses_last_local_admin(t *testing.T) {
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 for last local admin; body %s", rec.Code, rec.Body.String())
 	}
-	got, _ := db.GetUserByID(context.Background(), admin.ID)
+	got, _ := db.GetUserByID(t.Context(), admin.ID)
 	if got.OIDCSub != "" || got.PasswordHash == "" {
 		t.Fatal("account must be unchanged when migration is refused")
 	}
@@ -105,7 +104,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 
 	// OIDC-only account: no password, no passkey → unlink refused.
 	oidcOnly := &auth.User{Username: "oidconly", Role: auth.RoleUser, Enabled: true, OIDCSub: "sub-x", OIDCIssuer: "iss"}
-	if err := db.CreateUser(context.Background(), oidcOnly); err != nil {
+	if err := db.CreateUser(t.Context(), oidcOnly); err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/oidc/link", http.NoBody)
@@ -120,7 +119,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	withPass := createTestUser(t, db, "haspass", "correct-horse-battery-staple")
 	withPass.OIDCSub = "sub-y"
 	withPass.OIDCIssuer = "iss"
-	if err := db.UpdateUser(context.Background(), withPass); err != nil {
+	if err := db.UpdateUser(t.Context(), withPass); err != nil {
 		t.Fatal(err)
 	}
 	req2 := httptest.NewRequest(http.MethodDelete, "/api/auth/oidc/link", http.NoBody)
@@ -130,7 +129,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	if rec2.Code != http.StatusOK {
 		t.Fatalf("unlink (has password) status = %d, want 200; body %s", rec2.Code, rec2.Body.String())
 	}
-	got, _ := db.GetUserByID(context.Background(), withPass.ID)
+	got, _ := db.GetUserByID(t.Context(), withPass.ID)
 	if got.OIDCSub != "" {
 		t.Fatalf("OIDCSub = %q, want empty after unlink", got.OIDCSub)
 	}

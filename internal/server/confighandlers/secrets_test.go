@@ -2,7 +2,6 @@ package confighandlers
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -547,7 +546,7 @@ func TestAtomicWriteConfig_writes_content(t *testing.T) {
 	path := filepath.Join(dir, "config.yaml")
 	data := []byte("key: value\n")
 
-	if err := atomicWriteConfig(context.Background(), path, data); err != nil {
+	if err := atomicWriteConfig(t.Context(), path, data); err != nil {
 		t.Fatalf("atomicWriteConfig(%q) error = %v", path, err)
 	}
 
@@ -565,7 +564,7 @@ func TestAtomicWriteConfig_sets_permissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
-	if err := atomicWriteConfig(context.Background(), path, []byte("test")); err != nil {
+	if err := atomicWriteConfig(t.Context(), path, []byte("test")); err != nil {
 		t.Fatalf("atomicWriteConfig error = %v", err)
 	}
 
@@ -589,7 +588,7 @@ func TestAtomicWriteConfig_overwrites_existing(t *testing.T) {
 	}
 
 	newData := []byte("new content")
-	if err := atomicWriteConfig(context.Background(), path, newData); err != nil {
+	if err := atomicWriteConfig(t.Context(), path, newData); err != nil {
 		t.Fatalf("atomicWriteConfig error = %v", err)
 	}
 
@@ -603,7 +602,7 @@ func TestAtomicWriteConfig_nonexistent_dir_returns_error(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "nonexistent", "config.yaml")
 
-	err := atomicWriteConfig(context.Background(), path, []byte("test"))
+	err := atomicWriteConfig(t.Context(), path, []byte("test"))
 	if err == nil {
 		t.Error("atomicWriteConfig(nonexistent dir) error = nil, want error")
 	}
@@ -614,7 +613,7 @@ func TestAtomicWriteConfig_empty_data(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
-	if err := atomicWriteConfig(context.Background(), path, []byte{}); err != nil {
+	if err := atomicWriteConfig(t.Context(), path, []byte{}); err != nil {
 		t.Fatalf("atomicWriteConfig(empty) error = %v", err)
 	}
 
@@ -633,11 +632,11 @@ func TestAtomicWriteConfig_cap_boundary(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 
-	if err := atomicWriteConfig(context.Background(), path, make([]byte, int(maxBodySize))); err != nil {
+	if err := atomicWriteConfig(t.Context(), path, make([]byte, int(maxBodySize))); err != nil {
 		t.Fatalf("atomicWriteConfig(exactly maxBodySize) error = %v, want nil", err)
 	}
 
-	err := atomicWriteConfig(context.Background(), path, make([]byte, int(maxBodySize)+1))
+	err := atomicWriteConfig(t.Context(), path, make([]byte, int(maxBodySize)+1))
 	if !errors.Is(err, atomicfile.ErrFileTooLarge) {
 		t.Errorf("atomicWriteConfig(maxBodySize+1) error = %v, want atomicfile.ErrFileTooLarge", err)
 	}

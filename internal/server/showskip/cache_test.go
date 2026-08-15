@@ -3,6 +3,7 @@ package showskip
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -27,13 +28,18 @@ func TestCache_Get_hit(t *testing.T) {
 
 func TestCache_Get_expired(t *testing.T) {
 	t.Parallel()
-	c := New(time.Millisecond)
-	c.Set("key1", true)
-	time.Sleep(5 * time.Millisecond)
-	skip, ok := c.Get("key1")
-	if ok || skip {
-		t.Errorf("Get(expired) = (%v, %v), want (false, false)", skip, ok)
-	}
+	// Fake clock: the TTL can be a realistic hour instead of a 1ms hack, the
+	// advance is exact rather than "5ms should be enough", and it costs no
+	// wall-clock time.
+	synctest.Test(t, func(t *testing.T) {
+		c := New(time.Hour)
+		c.Set("key1", true)
+		time.Sleep(time.Hour + time.Second)
+		skip, ok := c.Get("key1")
+		if ok || skip {
+			t.Errorf("Get(expired) = (%v, %v), want (false, false)", skip, ok)
+		}
+	})
 }
 
 func TestCache_Set_overwrites(t *testing.T) {
@@ -66,16 +72,18 @@ func TestCache_concurrent(t *testing.T) {
 
 func TestCache_Prune_removes_expired(t *testing.T) {
 	t.Parallel()
-	c := New(time.Millisecond)
-	c.Set("a", true)
-	c.Set("b", false)
-	time.Sleep(5 * time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
+		c := New(time.Hour)
+		c.Set("a", true)
+		c.Set("b", false)
+		time.Sleep(time.Hour + time.Second)
 
-	c.Prune()
+		c.Prune()
 
-	if len(c.entries) != 0 {
-		t.Errorf("after Prune of expired entries, len(entries) = %d, want 0", len(c.entries))
-	}
+		if len(c.entries) != 0 {
+			t.Errorf("after Prune of expired entries, len(entries) = %d, want 0", len(c.entries))
+		}
+	})
 }
 
 func TestCache_Prune_keeps_live(t *testing.T) {

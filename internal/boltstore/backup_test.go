@@ -32,7 +32,7 @@ func backupArtifactName(t time.Time) string {
 // round-trips.
 func TestBackupInto_roundTripsThroughOpen(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Seed one auto download row so the snapshot has observable content.
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
@@ -86,7 +86,7 @@ func TestBackupInto_roundTripsThroughOpen(t *testing.T) {
 // did.
 func TestBackupInto_overwritesExistingDest(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}

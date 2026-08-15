@@ -1,7 +1,6 @@
 package subdl
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -558,7 +557,7 @@ func TestSearch_redactsAPIKeyFromTransportError(t *testing.T) {
 		})},
 	}
 
-	_, err := p.Search(context.Background(), &api.SearchRequest{
+	_, err := p.Search(t.Context(), &api.SearchRequest{
 		MediaType: "movie", ImdbID: "tt1375666", Languages: []string{"en"},
 	})
 	if err == nil {

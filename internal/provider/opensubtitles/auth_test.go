@@ -89,7 +89,7 @@ func TestRateLimit_no_wait_when_token_available(t *testing.T) {
 	p := &Provider{vip: false, rateCh: rateCh}
 
 	start := time.Now()
-	err := p.rateLimit(context.Background())
+	err := p.rateLimit(t.Context())
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -107,7 +107,7 @@ func TestRateLimit_blocks_when_no_token_available(t *testing.T) {
 	// Don't pre-fill — no token available, so rateLimit blocks.
 	p := &Provider{vip: false, rateCh: rateCh}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()
@@ -130,12 +130,12 @@ func TestRateLimit_refills_token_after_interval(t *testing.T) {
 	p := &Provider{vip: true, rateCh: rateCh} // VIP = 200ms refill
 
 	// Consume the token.
-	if err := p.rateLimit(context.Background()); err != nil {
+	if err := p.rateLimit(t.Context()); err != nil {
 		t.Fatalf("first rateLimit() unexpected error: %v", err)
 	}
 
 	// Wait for refill (VIP = 200ms, give 400ms budget).
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 400*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()
@@ -157,7 +157,7 @@ func TestRateLimit_respects_context_cancellation(t *testing.T) {
 	// No token — will block until context cancelled.
 	p := &Provider{vip: false, rateCh: rateCh}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()

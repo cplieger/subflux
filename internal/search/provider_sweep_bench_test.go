@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -35,7 +34,7 @@ func BenchmarkSearchProviders(b *testing.B) {
 		}
 		b.Run(fmt.Sprintf("providers=%d", n), func(b *testing.B) {
 			b.ReportAllocs()
-			ctx := context.Background()
+			ctx := b.Context()
 			for b.Loop() {
 				_ = e.searchProvidersFilteredInner(ctx, req, providers)
 			}

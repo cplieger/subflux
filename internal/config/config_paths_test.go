@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -17,7 +16,7 @@ func TestValidatePath(t *testing.T) {
 	t.Run("no_roots_refuses", func(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{}
-		err := cfg.ValidatePath(context.Background(), "/any/path")
+		err := cfg.ValidatePath(t.Context(), "/any/path")
 		if err == nil {
 			t.Fatal("ValidatePath() with no roots = nil, want refusal error (fail closed, matching RemoveUnderRoot)")
 		}
@@ -30,7 +29,7 @@ func TestValidatePath(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		cfg := &Config{MediaRootDirs: []string{dir}}
-		err := cfg.ValidatePath(context.Background(), "/nonexistent/outside/path")
+		err := cfg.ValidatePath(t.Context(), "/nonexistent/outside/path")
 		if err == nil {
 			t.Error("ValidatePath() expected error for path outside roots")
 		}
@@ -44,7 +43,7 @@ func TestValidatePath(t *testing.T) {
 			t.Fatalf("WriteFile() unexpected error: %v", err)
 		}
 		cfg := &Config{MediaRootDirs: []string{dir}}
-		if err := cfg.ValidatePath(context.Background(), path); err != nil {
+		if err := cfg.ValidatePath(t.Context(), path); err != nil {
 			t.Errorf("ValidatePath() unexpected error for valid path: %v", err)
 		}
 	})
@@ -58,7 +57,7 @@ func TestValidatePath(t *testing.T) {
 			t.Fatalf("WriteFile() unexpected error: %v", err)
 		}
 		cfg := &Config{MediaRootDirs: []string{root1, root2}}
-		if err := cfg.ValidatePath(context.Background(), path); err != nil {
+		if err := cfg.ValidatePath(t.Context(), path); err != nil {
 			t.Errorf("ValidatePath() unexpected error for path under second root: %v", err)
 		}
 	})
@@ -66,7 +65,7 @@ func TestValidatePath(t *testing.T) {
 	t.Run("nonexistent_root_rejects", func(t *testing.T) {
 		t.Parallel()
 		cfg := &Config{MediaRootDirs: []string{"/nonexistent_root_abc123"}}
-		err := cfg.ValidatePath(context.Background(), "/nonexistent_root_abc123/file.mkv")
+		err := cfg.ValidatePath(t.Context(), "/nonexistent_root_abc123/file.mkv")
 		if err == nil {
 			t.Error("ValidatePath() expected error for nonexistent root")
 		}
@@ -134,7 +133,7 @@ func TestRemoveUnderRoot_no_roots_refuses(t *testing.T) {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
 	cfg := &Config{}
-	err := cfg.RemoveUnderRoot(context.Background(), path)
+	err := cfg.RemoveUnderRoot(t.Context(), path)
 	if err == nil {
 		t.Errorf("RemoveUnderRoot with no media_roots = nil, want refusal error")
 	}
@@ -157,7 +156,7 @@ func TestRemoveUnderRoot_file_under_root_removed(t *testing.T) {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
 	cfg := &Config{MediaRootDirs: []string{dir}}
-	if err := cfg.RemoveUnderRoot(context.Background(), path); err != nil {
+	if err := cfg.RemoveUnderRoot(t.Context(), path); err != nil {
 		t.Errorf("RemoveUnderRoot(%q) = %v, want nil", path, err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -170,7 +169,7 @@ func TestRemoveUnderRoot_nonexistent_file_returns_nil(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "gone.srt")
 	cfg := &Config{MediaRootDirs: []string{dir}}
-	if err := cfg.RemoveUnderRoot(context.Background(), path); err != nil {
+	if err := cfg.RemoveUnderRoot(t.Context(), path); err != nil {
 		t.Errorf("RemoveUnderRoot(%q) = %v, want nil for nonexistent file", path, err)
 	}
 }
@@ -184,7 +183,7 @@ func TestRemoveUnderRoot_outside_all_roots_returns_error(t *testing.T) {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
 	cfg := &Config{MediaRootDirs: []string{root}}
-	err := cfg.RemoveUnderRoot(context.Background(), path)
+	err := cfg.RemoveUnderRoot(t.Context(), path)
 	if err == nil {
 		t.Fatal("RemoveUnderRoot() = nil, want error for path outside roots")
 	}

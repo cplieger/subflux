@@ -1,7 +1,6 @@
 package subsource
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,12 +13,12 @@ import (
 func TestFactory_requires_api_key(t *testing.T) {
 	t.Parallel()
 
-	_, err := Factory(context.Background(), nil)
+	_, err := Factory(t.Context(), nil)
 	if err == nil {
-		t.Fatal("Factory(context.Background(), nil) expected error for missing api_key")
+		t.Fatal("Factory(t.Context(), nil) expected error for missing api_key")
 	}
 
-	_, err = Factory(context.Background(), map[string]any{"api_key": ""})
+	_, err = Factory(t.Context(), map[string]any{"api_key": ""})
 	if err == nil {
 		t.Fatal("Factory(empty key) expected error")
 	}
@@ -28,7 +27,7 @@ func TestFactory_requires_api_key(t *testing.T) {
 func TestFactory_with_api_key(t *testing.T) {
 	t.Parallel()
 
-	p, err := Factory(context.Background(), map[string]any{"api_key": "test-key"})
+	p, err := Factory(t.Context(), map[string]any{"api_key": "test-key"})
 	if err != nil {
 		t.Fatalf("Factory() unexpected error: %v", err)
 	}

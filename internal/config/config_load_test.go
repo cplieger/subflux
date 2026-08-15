@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -17,7 +16,7 @@ import (
 
 func TestLoadFromBytes_minimal_valid(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -28,7 +27,7 @@ func TestLoadFromBytes_minimal_valid(t *testing.T) {
 
 func TestLoadFromBytes_defaults_applied(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -82,7 +81,7 @@ func TestLoadFromBytes_defaults_applied(t *testing.T) {
 
 func TestLoadFromBytes_invalid_yaml(t *testing.T) {
 	t.Parallel()
-	_, err := LoadFromBytes(context.Background(), []byte("{{invalid yaml"))
+	_, err := LoadFromBytes(t.Context(), []byte("{{invalid yaml"))
 	if err == nil {
 		t.Fatal("LoadFromBytes(invalid yaml) expected error")
 	}
@@ -103,7 +102,7 @@ providers:
   os:
     enabled: true
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected validation error")
 	}
@@ -111,9 +110,9 @@ providers:
 
 func TestLoadFromBytes_empty_input(t *testing.T) {
 	t.Parallel()
-	_, err := LoadFromBytes(context.Background(), []byte(""))
+	_, err := LoadFromBytes(t.Context(), []byte(""))
 	if err == nil {
-		t.Fatal("LoadFromBytes(context.Background(), empty) expected error")
+		t.Fatal("LoadFromBytes(t.Context(), empty) expected error")
 	}
 }
 
@@ -125,25 +124,25 @@ func TestLoadFromBytes_data_exactly_at_max_size(t *testing.T) {
 	for i := range data {
 		data[i] = 'x'
 	}
-	_, err := LoadFromBytes(context.Background(), data)
+	_, err := LoadFromBytes(t.Context(), data)
 	if err == nil {
-		t.Fatal("LoadFromBytes(context.Background(), maxConfigSize) expected error (invalid YAML)")
+		t.Fatal("LoadFromBytes(t.Context(), maxConfigSize) expected error (invalid YAML)")
 	}
 	// Must be a parse error, not a "too large" error.
 	if errors.Is(err, ErrConfigTooLarge) {
-		t.Errorf("LoadFromBytes(context.Background(), maxConfigSize) = %q, want parse error not size error", err)
+		t.Errorf("LoadFromBytes(t.Context(), maxConfigSize) = %q, want parse error not size error", err)
 	}
 }
 
 func TestLoadFromBytes_data_one_over_max_size(t *testing.T) {
 	t.Parallel()
 	data := make([]byte, maxConfigSize+1)
-	_, err := LoadFromBytes(context.Background(), data)
+	_, err := LoadFromBytes(t.Context(), data)
 	if err == nil {
-		t.Fatal("LoadFromBytes(context.Background(), maxConfigSize+1) expected error")
+		t.Fatal("LoadFromBytes(t.Context(), maxConfigSize+1) expected error")
 	}
 	if !errors.Is(err, ErrConfigTooLarge) {
-		t.Errorf("LoadFromBytes(context.Background(), maxConfigSize+1) = %q, want 'too large' error", err)
+		t.Errorf("LoadFromBytes(t.Context(), maxConfigSize+1) = %q, want 'too large' error", err)
 	}
 }
 
@@ -165,7 +164,7 @@ providers:
   os:
     enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -197,7 +196,7 @@ providers:
   os:
     enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -226,7 +225,7 @@ providers:
   os:
     enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -242,7 +241,7 @@ func TestLoad_reads_file(t *testing.T) {
 	t.Parallel()
 	path := writeConfig(t, minimalValidYAML())
 
-	cfg, err := Load(context.Background(), path)
+	cfg, err := Load(t.Context(), path)
 	if err != nil {
 		t.Fatalf("Load(%q) unexpected error: %v", path, err)
 	}
@@ -255,7 +254,7 @@ func TestLoad_applies_defaults(t *testing.T) {
 	t.Parallel()
 	path := writeConfig(t, minimalValidYAML())
 
-	cfg, err := Load(context.Background(), path)
+	cfg, err := Load(t.Context(), path)
 	if err != nil {
 		t.Fatalf("Load(%q) unexpected error: %v", path, err)
 	}
@@ -269,9 +268,9 @@ func TestLoad_applies_defaults(t *testing.T) {
 
 func TestLoad_missing_file(t *testing.T) {
 	t.Parallel()
-	_, err := Load(context.Background(), "/nonexistent/config.yaml")
+	_, err := Load(t.Context(), "/nonexistent/config.yaml")
 	if err == nil {
-		t.Fatal("Load(context.Background(), missing) expected error")
+		t.Fatal("Load(t.Context(), missing) expected error")
 	}
 }
 
@@ -279,9 +278,9 @@ func TestLoad_invalid_yaml_file(t *testing.T) {
 	t.Parallel()
 	path := writeConfig(t, "{{invalid")
 
-	_, err := Load(context.Background(), path)
+	_, err := Load(t.Context(), path)
 	if err == nil {
-		t.Fatal("Load(context.Background(), invalid yaml) expected error")
+		t.Fatal("Load(t.Context(), invalid yaml) expected error")
 	}
 }
 
@@ -302,9 +301,9 @@ providers:
 `
 	path := writeConfig(t, data)
 
-	_, err := Load(context.Background(), path)
+	_, err := Load(t.Context(), path)
 	if err == nil {
-		t.Fatal("Load(context.Background(), invalid config) expected error")
+		t.Fatal("Load(t.Context(), invalid config) expected error")
 	}
 }
 
@@ -316,9 +315,9 @@ func TestLoad_file_too_large(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
-	_, err := Load(context.Background(), path)
+	_, err := Load(t.Context(), path)
 	if err == nil {
-		t.Fatal("Load(context.Background(), too large) expected error")
+		t.Fatal("Load(t.Context(), too large) expected error")
 	}
 }
 
@@ -335,13 +334,13 @@ func TestLoad_file_exactly_at_max_size(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
-	_, err := Load(context.Background(), path)
+	_, err := Load(t.Context(), path)
 	if err == nil {
-		t.Fatal("Load(context.Background(), maxConfigSize) expected error (invalid YAML)")
+		t.Fatal("Load(t.Context(), maxConfigSize) expected error (invalid YAML)")
 	}
 	// The error must be a parse error, NOT a "too large" error.
 	if errors.Is(err, ErrConfigTooLarge) {
-		t.Errorf("Load(context.Background(), maxConfigSize) = %q, want parse error not size error", err)
+		t.Errorf("Load(t.Context(), maxConfigSize) = %q, want parse error not size error", err)
 	}
 }
 
@@ -358,9 +357,9 @@ func TestLoad_unreadable_file(t *testing.T) {
 	if err := os.Chmod(path, 0o000); err != nil {
 		t.Fatalf("Chmod() unexpected error: %v", err)
 	}
-	_, err := Load(context.Background(), path)
+	_, err := Load(t.Context(), path)
 	if err == nil {
-		t.Fatal("Load(context.Background(), unreadable) expected error")
+		t.Fatal("Load(t.Context(), unreadable) expected error")
 	}
 }
 
@@ -385,7 +384,7 @@ providers:
   os:
     enabled: true
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -415,7 +414,7 @@ providers:
 media_roots:
   - "${CONFIG_ROOT}/media"
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -465,7 +464,7 @@ func TestLoad_logs_arr_flags(t *testing.T) {
 	// "config loaded" line logs sonarr=true and radarr=false.
 	path := writeConfig(t, minimalValidYAML())
 	out := captureLogs(t, func() {
-		cfg, err := Load(context.Background(), path)
+		cfg, err := Load(t.Context(), path)
 		if err != nil {
 			t.Fatalf("Load(minimalValidYAML) = %v, want nil", err)
 		}
@@ -484,7 +483,7 @@ func TestLoad_logs_arr_flags(t *testing.T) {
 
 func TestBuildCaches_opens_valid_media_root(t *testing.T) {
 	cfg := &Config{MediaRootDirs: []string{t.TempDir()}}
-	cfg.buildCaches(context.Background())
+	cfg.buildCaches(t.Context())
 	defer func() { _ = cfg.Close() }()
 
 	// A live context plus one accessible root yields exactly one cached handle.
@@ -522,7 +521,7 @@ providers:
     settings:
       api_key: "test"
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected decode error for non-numeric priority")
 	}
@@ -541,7 +540,7 @@ providers:
 func TestLoadFromBytes_syntax_error_withholds_document_text(t *testing.T) {
 	t.Parallel()
 	data := "sonarr:\n  api_key: \"pasted-literal-secret\"\n\t\tbad: tab-indent\n"
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected syntax error for tab indentation")
 	}
@@ -561,7 +560,7 @@ func TestLoadFromBytes_syntax_error_withholds_document_text(t *testing.T) {
 func TestLoadFromBytes_unknown_key_rejected(t *testing.T) {
 	t.Parallel()
 	data := minimalValidYAML() + "poll_intervall: 30s\n"
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes(misspelled key) expected error")
 	}
@@ -586,7 +585,7 @@ func TestLoadFromBytes_env_var_in_duration_field_passes_probe(t *testing.T) {
 	data := minimalValidYAML() + `search:
   scan_delay: ${SUBFLUX_TEST_SCAN_DELAY}
 `
-	cfg, err := LoadFromBytes(context.Background(), []byte(data))
+	cfg, err := LoadFromBytes(t.Context(), []byte(data))
 	if err != nil {
 		t.Fatalf("LoadFromBytes(${VAR} in Duration field) unexpected error: %v", err)
 	}
@@ -606,7 +605,7 @@ func TestLoadFromBytes_unknown_key_detected_beside_var_int(t *testing.T) {
   min_score: ${SUBFLUX_TEST_UNSET_MIN_SCORE}
   scan_intervall: 24h
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes(unknown key beside ${VAR} int) expected error")
 	}
@@ -625,7 +624,7 @@ func TestLoadFromBytes_unknown_key_detected_beside_var_int(t *testing.T) {
 func TestLoadFromBytes_multi_document_rejected(t *testing.T) {
 	t.Parallel()
 	data := minimalValidYAML() + "---\nproviders:\n  opensubtitles:\n    enabled: false\n"
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes(multi-document) expected error")
 	}
@@ -647,7 +646,7 @@ func TestLoadFromBytes_duration_error_vocabulary_passes_through(t *testing.T) {
 	data := minimalValidYAML() + `search:
   provider_timeout: "not_a_duration"
 `
-	_, err := LoadFromBytes(context.Background(), []byte(data))
+	_, err := LoadFromBytes(t.Context(), []byte(data))
 	if err == nil {
 		t.Fatal("LoadFromBytes() expected error for invalid duration")
 	}

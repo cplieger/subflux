@@ -1,7 +1,6 @@
 package search
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func BenchmarkHashFile(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 			b.ReportAllocs()
 			for range b.N {

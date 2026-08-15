@@ -147,7 +147,7 @@ func TestQueryInt_property_result_always_non_negative(t *testing.T) {
 
 func TestSleepCtx_zero_duration_returns_immediately(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	err := sleepCtx(ctx, 0)
 	if err != nil {
 		t.Errorf("sleepCtx(ctx, 0) = %v, want nil", err)
@@ -156,7 +156,7 @@ func TestSleepCtx_zero_duration_returns_immediately(t *testing.T) {
 
 func TestSleepCtx_negative_duration_returns_immediately(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	err := sleepCtx(ctx, -1)
 	if err != nil {
 		t.Errorf("sleepCtx(ctx, -1) = %v, want nil", err)
@@ -179,7 +179,7 @@ func TestSleepCtx_cancelled_context_returns_error(t *testing.T) {
 
 func TestSleepCtx_short_duration_completes(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	err := sleepCtx(ctx, 1*time.Millisecond)
 	if err != nil {
 		t.Errorf("sleepCtx(ctx, 1ms) = %v, want nil", err)

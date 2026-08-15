@@ -37,7 +37,7 @@ import (
 // "tt12\x00en\x00" (Requirement 8.3).
 func TestQuery_prefixCollision_BackedOffProviders(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	bp := api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
 
 	// Record a no-result for tt12 only — this puts a backed-off provider row
@@ -72,7 +72,7 @@ func TestQuery_prefixCollision_BackedOffProviders(t *testing.T) {
 // after each component, preventing prefix collisions (Requirement 8.3).
 func TestQuery_prefixCollision_DownloadedRefs(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 
 	video := filepath.Join(dir, "movie.mkv")
@@ -123,7 +123,7 @@ func TestQuery_ascendingNextRetry(t *testing.T) {
 			attemptRec{LastTried: base, NextRetry: base.Add(d), Failures: 1})
 	}
 
-	got, err := db.GetBackoffItems(context.Background())
+	got, err := db.GetBackoffItems(t.Context())
 	if err != nil {
 		t.Fatalf("GetBackoffItems: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestQuery_ascendingNextRetry(t *testing.T) {
 // whose scanned_at is one nanosecond earlier is excluded (Requirement 5.4).
 func TestQuery_RecentlyScanned_inclusiveCutoff(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Use setScannedAt to control exact timestamps.
 	cutoff := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
@@ -248,7 +248,7 @@ func TestFaultInjection_updateAbortSeesNeither(t *testing.T) {
 // pass with all those files gone at once. This proves the bounded-batch
 // reconcile is idempotent and convergent (Requirement 7.5).
 func TestReconcileConvergence(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Setup: build a reproducible state with 4 subtitle rows across 2 videos.
 	setup := func(db *DB, dir string) {
@@ -399,7 +399,7 @@ func openTempAt(t *testing.T, dir string) *DB {
 // single-writer concurrency guarantee: Update serializes writers, View is
 // concurrent with writes (Requirements 13.3, 14.3).
 func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	dir := t.TempDir()
 	db := openTempAt(t, dir)
 

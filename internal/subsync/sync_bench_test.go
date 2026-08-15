@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -38,7 +37,7 @@ func BenchmarkSyncWithOptions(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				SyncWithOptions(context.Background(), ref, inc, &opts)
+				SyncWithOptions(b.Context(), ref, inc, &opts)
 			}
 		})
 	}

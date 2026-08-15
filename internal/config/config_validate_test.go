@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -169,7 +168,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validate(context.Background(), tt.cfg)
+			err := validate(t.Context(), tt.cfg)
 			if tt.wantErr && err == nil {
 				t.Fatalf("validate() = nil, want error")
 			}
@@ -354,7 +353,7 @@ func TestValidate(t *testing.T) {
 			t.Parallel()
 			cfg := validBase()
 			tt.mutate(cfg)
-			err := validate(context.Background(), cfg)
+			err := validate(t.Context(), cfg)
 			if tt.wantErr && err == nil {
 				t.Fatalf("validate() = nil, want error")
 			}
@@ -379,7 +378,7 @@ func TestValidate_logs_inaccessible_media_root(t *testing.T) {
 	out := captureLogs(t, func() {
 		// validate returns other errors (no arr, etc.); we only care that it
 		// reaches the media-root stat loop and logs the inaccessible warning.
-		_ = validate(context.Background(), cfg)
+		_ = validate(t.Context(), cfg)
 	})
 
 	if !strings.Contains(out, "media root not accessible") {
@@ -390,7 +389,7 @@ func TestValidate_logs_inaccessible_media_root(t *testing.T) {
 func TestValidate_existing_media_root_no_warn(t *testing.T) {
 	cfg := &Config{MediaRootDirs: []string{t.TempDir()}}
 	out := captureLogs(t, func() {
-		_ = validate(context.Background(), cfg)
+		_ = validate(t.Context(), cfg)
 	})
 
 	// An existing root stats successfully, so no inaccessible-root warning.

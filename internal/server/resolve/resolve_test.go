@@ -88,7 +88,7 @@ func TestSubtitlePath_resolutionTable(t *testing.T) {
 		{MediaID: "tmdb-1271", Language: "en", Variant: "standard", Source: string(api.SourceEmbedded)},
 	}
 	r := newResolver(&fakeStore{rows: rows}, nil, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string
@@ -137,7 +137,7 @@ func TestSubtitlePath_ambiguity(t *testing.T) {
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.ass", ""),
 	}
 	r := newResolver(&fakeStore{rows: rows}, nil, nil)
-	_, err := r.SubtitlePath(context.Background(), movieRef("fr", "standard", 0))
+	_, err := r.SubtitlePath(t.Context(), movieRef("fr", "standard", 0))
 	if !errors.Is(err, resolve.ErrAmbiguous) {
 		t.Fatalf("err = %v, want ErrAmbiguous", err)
 	}
@@ -150,7 +150,7 @@ func TestSubtitlePath_containmentInvariant(t *testing.T) {
 	rows := []api.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "")}
 	st := &resolve.State{Cfg: denyValidator{}}
 	r := &resolve.Resolver{Store: &fakeStore{rows: rows}, State: func() *resolve.State { return st }}
-	_, err := r.SubtitlePath(context.Background(), movieRef("fr", "standard", 0))
+	_, err := r.SubtitlePath(t.Context(), movieRef("fr", "standard", 0))
 	if !errors.Is(err, resolve.ErrPathInvariant) {
 		t.Fatalf("err = %v, want ErrPathInvariant", err)
 	}
@@ -163,7 +163,7 @@ func TestSubtitlePath_containmentInvariant(t *testing.T) {
 // no-video-recorded 404.
 func TestVideoPathForFile(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("row join", func(t *testing.T) {
 		t.Parallel()
@@ -203,7 +203,7 @@ func TestVideoPathForFile(t *testing.T) {
 // file by season/episode, and the not-found taxonomy.
 func TestVideoPath_mediaRef(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	radarr := &fakeRadarr{movie: arrapi.Movie{
 		ID: 42, MovieFile: &arrapi.MovieFile{Path: "/media/movies/Inception.mkv"},
@@ -316,7 +316,7 @@ func singleSnapshotState(sonarr *fakeSonarr, radarr *fakeRadarr) (fn func() *res
 // containment validation.
 func TestResolver_singleStateSnapshot(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	rows := []api.SubtitleEntry{
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", ""),
 		extRow("tmdb-1271", "de", "standard", "/media/movie.de.srt", "/media/movie.mkv"),

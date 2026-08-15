@@ -37,6 +37,7 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	}
 	t.Cleanup(func() { authDB.Close() })
 
+	// Not t.Context(): the limiter's sweeper is torn down by the rl.Stop() cleanup below, so its context must outlive the test body.
 	rl := ratelimit.NewRateLimiter(context.Background(), ratelimit.DefaultConfig())
 	t.Cleanup(func() { rl.Stop() })
 
@@ -119,7 +120,7 @@ func createTestUser(t *testing.T, db *authstore.Store, username, password string
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if err := db.CreateUser(context.Background(), user); err != nil {
+	if err := db.CreateUser(t.Context(), user); err != nil {
 		t.Fatal(err)
 	}
 	return user
@@ -142,7 +143,7 @@ func createTestSession(t *testing.T, db *authstore.Store, userID int64) string {
 		CreatedAt:    now,
 		LastActivity: now,
 	}
-	if err := db.CreateSession(context.Background(), sess); err != nil {
+	if err := db.CreateSession(t.Context(), sess); err != nil {
 		t.Fatal(err)
 	}
 	return token

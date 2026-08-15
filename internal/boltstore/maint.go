@@ -2,12 +2,13 @@ package boltstore
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -639,17 +640,13 @@ func (d *DB) reconcileMissingGroups(
 	for k := range subMissing {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].mt != keys[j].mt {
-			return keys[i].mt < keys[j].mt
-		}
-		if keys[i].mid != keys[j].mid {
-			return keys[i].mid < keys[j].mid
-		}
-		if keys[i].lang != keys[j].lang {
-			return keys[i].lang < keys[j].lang
-		}
-		return keys[i].variant < keys[j].variant
+	slices.SortStableFunc(keys, func(a, b stateQuadInfo) int {
+		return cmp.Or(
+			cmp.Compare(a.mt, b.mt),
+			cmp.Compare(a.mid, b.mid),
+			cmp.Compare(a.lang, b.lang),
+			cmp.Compare(a.variant, b.variant),
+		)
 	})
 
 	var resetCount int64

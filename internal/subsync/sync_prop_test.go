@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -41,7 +40,7 @@ func TestSyncWithOptions_preserves_cue_count(t *testing.T) {
 			MinConfidence:   ShouldApplyThreshold,
 		}
 
-		result := SyncWithOptions(context.Background(), reference, incorrect, opts)
+		result := SyncWithOptions(t.Context(), reference, incorrect, opts)
 
 		if len(result.Cues) != n {
 			t.Fatalf("cue count changed: got %d, want %d (method=%s)",

@@ -30,7 +30,7 @@ func TestHandleSaveConfig_response_redacts_expanded_secret(t *testing.T) {
 
 	h := New(&Deps{
 		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
-			return config.LoadFromBytes(context.Background(), data)
+			return config.LoadFromBytes(t.Context(), data)
 		},
 		// Nonexistent path: a true empty baseline, MergeSecrets leaves the body as-is.
 		ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
@@ -54,7 +54,7 @@ providers:
     settings:
       api_key: "test"
 `
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleSaveConfig(rec, req)
@@ -84,6 +84,7 @@ func writeTestFile(path, content string) error {
 func newPathHandler(configPath string) *Handler {
 	return New(&Deps{
 		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+			// context.Background(): no *testing.T in scope in this helper.
 			return config.LoadFromBytes(context.Background(), data)
 		},
 		ConfigPath: func() string { return configPath },
@@ -101,7 +102,7 @@ func TestHandleGetConfig_reads_file(t *testing.T) {
 
 	h := newPathHandler(configPath)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -122,7 +123,7 @@ func TestHandleGetConfig_missing_file_returns_500(t *testing.T) {
 	t.Parallel()
 	h := newPathHandler("/nonexistent/config.yaml")
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -145,7 +146,7 @@ func TestHandleGetConfig_oversized_file_returns_500(t *testing.T) {
 
 	h := newPathHandler(configPath)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -171,7 +172,7 @@ func TestHandleGetConfig_file_exactly_at_max_size(t *testing.T) {
 
 	h := newPathHandler(configPath)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -187,7 +188,7 @@ func TestHandleGetConfig_directory_returns_500(t *testing.T) {
 	t.Parallel()
 	h := newPathHandler(t.TempDir()) // Point at a directory, not a file.
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -209,7 +210,7 @@ func TestHandleGetConfig_redacts_secrets(t *testing.T) {
 
 	h := newPathHandler(configPath)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfig(rec, req)
@@ -233,7 +234,7 @@ func TestHandleSaveConfig_invalid_yaml_returns_400(t *testing.T) {
 	h := newPathHandler(filepath.Join(dir, "config.yaml"))
 
 	body := "not: valid: yaml: config: [[[["
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleSaveConfig(rec, req)
@@ -271,7 +272,7 @@ providers:
   os:
     enabled: true
 `
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleSaveConfig(rec, req)
@@ -290,7 +291,7 @@ func TestHandleSaveConfig_post_method_accepted(t *testing.T) {
 	// POST with invalid YAML should return 400 (validation error),
 	// not 405 (method not allowed). This verifies POST is accepted.
 	body := "not: valid: yaml: config: [[[["
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.HandleSaveConfig(rec, req)
@@ -338,7 +339,7 @@ func TestHandleResetConfig_rejects_when_configured(t *testing.T) {
 		ConfigPath: func() string { return "" },
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config/reset", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleResetConfig(rec, req)
@@ -357,7 +358,7 @@ func TestHandleResetConfig_no_default_config(t *testing.T) {
 		ConfigPath: func() string { return "" },
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config/reset", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleResetConfig(rec, req)
@@ -381,7 +382,7 @@ func TestHandleResetConfig_writes_default(t *testing.T) {
 		ConfigPath:    func() string { return configPath },
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config/reset", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleResetConfig(rec, req)
@@ -429,7 +430,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 		Registry:   reg,
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config/schema", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleConfigSchema(rec, req)
@@ -458,7 +459,7 @@ func TestHandleConfigSchema_rejects_non_get(t *testing.T) {
 		Registry:   provider.NewRegistry(),
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config/schema", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleConfigSchema(rec, req)
@@ -536,7 +537,7 @@ func TestHandleValidatePath_traversal_guard(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal: %v", err)
 			}
-			req := httptest.NewRequestWithContext(context.Background(),
+			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/config/validate-path", bytes.NewReader(body))
 			rec := httptest.NewRecorder()
 			h.HandleValidatePath(rec, req)

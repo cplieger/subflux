@@ -2,7 +2,6 @@ package subsync
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +18,7 @@ func TestIntegration_MKV_EmbeddedExtraction(t *testing.T) {
 		t.Skip("test5.mkv not found; download from https://sourceforge.net/projects/matroska/files/test_files/")
 	}
 
-	cues, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	cues, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT: %v", err)
 	}
@@ -50,7 +49,7 @@ func TestIntegration_MKV_SyncFromEmbedded(t *testing.T) {
 	}
 
 	// Extract reference cues from the MKV.
-	ref, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	ref, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil || len(ref) < 5 {
 		t.Skipf("insufficient embedded cues: %d, err=%v", len(ref), err)
 	}
@@ -58,7 +57,7 @@ func TestIntegration_MKV_SyncFromEmbedded(t *testing.T) {
 	// Shift by 3 seconds and sync back.
 	shifted := ShiftCues(ref, 3*time.Second)
 	syncOpts := DefaultSyncOptions()
-	result := SyncWithOptions(context.Background(), ref, shifted, &syncOpts)
+	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
 	if !result.Applied() {
 		t.Fatal("sync not applied for MKV embedded reference")
@@ -80,7 +79,7 @@ func TestIntegration_MKV_AudioSync(t *testing.T) {
 		t.Skip("test5.mkv not found")
 	}
 
-	ref, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	ref, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil || len(ref) < 5 {
 		t.Skipf("insufficient embedded cues: %d", len(ref))
 	}
@@ -90,7 +89,7 @@ func TestIntegration_MKV_AudioSync(t *testing.T) {
 		VideoPath:   mkvPath,
 		EnableAudio: true,
 	}
-	result := SyncWithOptions(context.Background(), nil, shifted, &opts)
+	result := SyncWithOptions(t.Context(), nil, shifted, &opts)
 
 	t.Logf("audio sync: method=%s, offset=%dms, conf=%.2f",
 		result.Method, result.Offset, float64(result.Confidence))
@@ -109,7 +108,7 @@ func TestIntegration_MP4_EmbeddedExtraction(t *testing.T) {
 		t.Skip("test_subtitled.mp4 not found; create with: ffmpeg -i test5.mkv -map 0:v:0 -map 0:a:0 -map 0:s:0 -c:v copy -c:a copy -c:s mov_text test_subtitled.mp4")
 	}
 
-	cues, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	cues, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT(mp4): %v", err)
 	}
@@ -138,14 +137,14 @@ func TestIntegration_MP4_SyncFromEmbedded(t *testing.T) {
 		t.Skip("test_subtitled.mp4 not found")
 	}
 
-	ref, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	ref, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil || len(ref) < 5 {
 		t.Skipf("insufficient MP4 embedded cues: %d, err=%v", len(ref), err)
 	}
 
 	shifted := ShiftCues(ref, 3*time.Second)
 	syncOpts := DefaultSyncOptions()
-	result := SyncWithOptions(context.Background(), ref, shifted, &syncOpts)
+	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
 	if !result.Applied() {
 		t.Fatal("sync not applied for MP4 embedded reference")
@@ -167,7 +166,7 @@ func TestIntegration_MP4_AudioSync(t *testing.T) {
 		t.Skip("test_subtitled.mp4 not found")
 	}
 
-	ref, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	ref, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil || len(ref) < 5 {
 		t.Skipf("insufficient MP4 embedded cues: %d", len(ref))
 	}
@@ -177,7 +176,7 @@ func TestIntegration_MP4_AudioSync(t *testing.T) {
 		VideoPath:   mp4Path,
 		EnableAudio: true,
 	}
-	result := SyncWithOptions(context.Background(), nil, shifted, &opts)
+	result := SyncWithOptions(t.Context(), nil, shifted, &opts)
 
 	t.Logf("MP4 audio sync: method=%s, offset=%dms, conf=%.2f",
 		result.Method, result.Offset, float64(result.Confidence))
@@ -200,11 +199,11 @@ func TestIntegration_CrossContainer_SameContent(t *testing.T) {
 		t.Skip("test_subtitled.mp4 not found")
 	}
 
-	mkvCues, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	mkvCues, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil {
 		t.Fatalf("MKV extract: %v", err)
 	}
-	mp4Cues, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	mp4Cues, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil {
 		t.Fatalf("MP4 extract: %v", err)
 	}
@@ -260,7 +259,7 @@ func TestIntegration_FFmpeg_MKV_CueCount(t *testing.T) {
 	}
 
 	ffmpegCues := loadFFmpegReference(t, "ffmpeg_mkv_eng.srt")
-	ourCues, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	ourCues, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT: %v", err)
 	}
@@ -278,7 +277,7 @@ func TestIntegration_FFmpeg_MKV_TimingMatch(t *testing.T) {
 	}
 
 	ffmpegCues := loadFFmpegReference(t, "ffmpeg_mkv_eng.srt")
-	ourCues, err := ExtractEmbeddedSRT(context.Background(), mkvPath, "", "", nil)
+	ourCues, err := ExtractEmbeddedSRT(t.Context(), mkvPath, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT: %v", err)
 	}
@@ -313,7 +312,7 @@ func TestIntegration_FFmpeg_MP4_CueCount(t *testing.T) {
 	}
 
 	ffmpegCues := loadFFmpegReference(t, "ffmpeg_mp4_eng.srt")
-	ourCues, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	ourCues, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT: %v", err)
 	}
@@ -331,7 +330,7 @@ func TestIntegration_FFmpeg_MP4_TimingMatch(t *testing.T) {
 	}
 
 	ffmpegCues := loadFFmpegReference(t, "ffmpeg_mp4_eng.srt")
-	ourCues, err := ExtractEmbeddedSRT(context.Background(), mp4Path, "", "", nil)
+	ourCues, err := ExtractEmbeddedSRT(t.Context(), mp4Path, "", "", nil)
 	if err != nil {
 		t.Fatalf("ExtractEmbeddedSRT: %v", err)
 	}

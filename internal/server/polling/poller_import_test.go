@@ -70,7 +70,7 @@ func TestProcessPollImport_file_gone(t *testing.T) {
 		stateFunc: func() *LiveState { return ls },
 	}
 
-	p.processPollImport(context.Background(), ls, "/nonexistent/video.mkv",
+	p.processPollImport(t.Context(), ls, "/nonexistent/video.mkv",
 		func() (*ImportResult, error) {
 			t.Fatal("buildFn should not be called when file is gone")
 			return nil, nil
@@ -92,7 +92,7 @@ func TestProcessPollImport_warns_when_cleanup_errors(t *testing.T) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(errStore{}), stateFunc: func() *LiveState { return ls }}
-	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-err.mkv",
+	p.processPollImport(t.Context(), ls, "/nonexistent/cleanup-err.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") == 0 {
@@ -106,7 +106,7 @@ func TestProcessPollImport_silent_when_cleanup_ok(t *testing.T) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg}
 	p := &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}
-	p.processPollImport(context.Background(), ls, "/nonexistent/cleanup-ok.mkv",
+	p.processPollImport(t.Context(), ls, "/nonexistent/cleanup-ok.mkv",
 		func() (*ImportResult, error) { t.Fatal("buildFn must not run for a missing file"); return nil, nil },
 		nil)
 	if sink.CountLevel(slog.LevelWarn, "poll: cleanup failed") > 0 {
@@ -143,7 +143,7 @@ func TestProcessPollImport_search_success(t *testing.T) {
 	}
 
 	req := &api.SearchRequest{MediaType: api.MediaTypeMovie, Title: "Test"}
-	p.processPollImport(context.Background(), ls, videoPath,
+	p.processPollImport(t.Context(), ls, videoPath,
 		func() (*ImportResult, error) {
 			return &ImportResult{
 				Req:       req,
@@ -173,7 +173,7 @@ func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	calls := 0
-	p.processPollImport(context.Background(), ls, video,
+	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { calls++; return nil })
 	if calls != 1 {
@@ -187,7 +187,7 @@ func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 	engine := &mockEngine{result: api.SearchResult{CoverageChanged: true}}
 	p, ls := importPoller(engine)
 	calls := 0
-	p.processPollImport(context.Background(), ls, video,
+	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { calls++; return nil })
 	if calls != 0 {
@@ -201,7 +201,7 @@ func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 	video := tempVideo(t)
 	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
-	p.processPollImport(context.Background(), ls, video,
+	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return errors.New("notify boom") })
 	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") == 0 {
@@ -215,7 +215,7 @@ func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 	video := tempVideo(t)
 	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
-	p.processPollImport(context.Background(), ls, video,
+	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
 		func(_ context.Context, _ int) error { return nil })
 	if sink.CountLevel(slog.LevelWarn, "failed to notify arr") > 0 {
@@ -254,7 +254,7 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 			entry := arrapi.HistoryRecord{SeriesID: 10, EpisodeID: 20, Data: map[string]string{"importedPath": video}}
-			p.processSonarrImport(context.Background(), ls, &entry, tt.excludeIDs)
+			p.processSonarrImport(t.Context(), ls, &entry, tt.excludeIDs)
 
 			if !slices.Equal(metrics.imports, tt.want) {
 				t.Errorf("metrics.imports = %v, want %v", metrics.imports, tt.want)
@@ -291,7 +291,7 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
 			entry := arrapi.HistoryRecord{MovieID: 30, Data: map[string]string{"importedPath": video}}
-			p.processRadarrImport(context.Background(), ls, &entry, tt.excludeIDs)
+			p.processRadarrImport(t.Context(), ls, &entry, tt.excludeIDs)
 
 			if !slices.Equal(metrics.imports, tt.want) {
 				t.Errorf("metrics.imports = %v, want %v", metrics.imports, tt.want)

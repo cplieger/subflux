@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -71,7 +70,7 @@ func TestSaveDownload_autoInsertSetsNow(t *testing.T) {
 	db, _ := openTemp(t)
 	before := time.Now()
 
-	if err := db.SaveDownload(context.Background(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
@@ -100,7 +99,7 @@ func TestSaveDownload_autoInsertSetsNow(t *testing.T) {
 func TestSaveDownload_autoUpgradePreservesImported(t *testing.T) {
 	db, _ := openTemp(t)
 
-	if err := db.SaveDownload(context.Background(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("first SaveDownload: %v", err)
 	}
 	first := readTripleRows(t, db, testMT, testMID, testLang)
@@ -111,7 +110,7 @@ func TestSaveDownload_autoUpgradePreservesImported(t *testing.T) {
 	origImported := first[0].MediaImported
 
 	// A later upgrade with a different provider/score/release.
-	if err := db.SaveDownload(context.Background(), autoRec(api.ProviderNameSubDL, "Release.B", "/media/test.fr.srt", 95)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(api.ProviderNameSubDL, "Release.B", "/media/test.fr.srt", 95)); err != nil {
 		t.Fatalf("second SaveDownload: %v", err)
 	}
 
@@ -144,12 +143,12 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 	putAttemptRow(t, db, testMT, testMID, testLang, api.ProviderNameSubDL, attemptRec{NextRetry: future, Failures: 1})
 	putAttemptRow(t, db, testMT, "other-id", testLang, testProv, attemptRec{NextRetry: future, Failures: 1})
 
-	if err := db.SaveDownload(context.Background(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
 	// The triple's backoff is gone.
-	backed, err := db.BackedOffProviders(context.Background(), testMT, testMID, testLang, 0)
+	backed, err := db.BackedOffProviders(t.Context(), testMT, testMID, testLang, 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -158,7 +157,7 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 	}
 
 	// The unrelated triple's backoff survives.
-	other, err := db.BackedOffProviders(context.Background(), testMT, "other-id", testLang, 0)
+	other, err := db.BackedOffProviders(t.Context(), testMT, "other-id", testLang, 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders(other): %v", err)
 	}
@@ -206,7 +205,7 @@ func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 		{"/media/test.fr.2.srt", 2},
 	}
 	for _, p := range paths {
-		if err := db.SaveDownload(context.Background(), manualRec(p.path, p.ordinal)); err != nil {
+		if err := db.SaveDownload(t.Context(), manualRec(p.path, p.ordinal)); err != nil {
 			t.Fatalf("SaveDownload(%s): %v", p.path, err)
 		}
 	}
@@ -243,7 +242,7 @@ func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 func TestSaveDownload_manualDoesNotTouchAutoRow(t *testing.T) {
 	db, _ := openTemp(t)
 
-	if err := db.SaveDownload(context.Background(), autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
 	autoBefore, _ := partitionRows(readTripleRows(t, db, testMT, testMID, testLang))
@@ -255,7 +254,7 @@ func TestSaveDownload_manualDoesNotTouchAutoRow(t *testing.T) {
 		Path: "/media/test.fr.1.srt", Score: 50,
 		Meta: &api.DownloadMeta{Manual: true},
 	}
-	if err := db.SaveDownload(context.Background(), manual); err != nil {
+	if err := db.SaveDownload(t.Context(), manual); err != nil {
 		t.Fatalf("manual SaveDownload: %v", err)
 	}
 
@@ -277,7 +276,7 @@ func TestSaveDownload_manualDoesNotTouchAutoRow(t *testing.T) {
 func TestSaveDownload_indexAndCounterMaintained(t *testing.T) {
 	db, _ := openTemp(t)
 
-	if err := db.SaveDownload(context.Background(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 

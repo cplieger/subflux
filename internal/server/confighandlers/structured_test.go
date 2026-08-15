@@ -63,7 +63,7 @@ func newStructuredHandlerAt(t *testing.T, cfgPath string,
 	return New(&Deps{
 		SchemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection { return structuredTestSchema() },
 		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
-			return config.LoadFromBytes(context.Background(), data)
+			return config.LoadFromBytes(t.Context(), data)
 		},
 		HotReload:  hotReload,
 		State:      func() StateView { return StateView{} },
@@ -85,7 +85,7 @@ func (pingOKRadarr) Ping(context.Context) error { return nil }
 
 func doStructuredSave(t *testing.T, h *Handler, payload string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config/structured", strings.NewReader(payload))
 	rec := httptest.NewRecorder()
 	h.HandleSaveConfigStructured(rec, req)
@@ -126,7 +126,7 @@ languages:
     - code: en
 # ` + strings.Repeat("x", int(maxBodySize)) + "\n"
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config", strings.NewReader(""))
 	rec := httptest.NewRecorder()
 	h.saveMu.Lock()
@@ -215,7 +215,7 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 		t.Fatalf("read saved config: %v", err)
 	}
 	// The persisted file is server-canonical YAML that the real loader parses.
-	cfg, err := config.LoadFromBytes(context.Background(), saved)
+	cfg, err := config.LoadFromBytes(t.Context(), saved)
 	if err != nil {
 		t.Fatalf("saved YAML does not round-trip through LoadFromBytes: %v\n%s", err, saved)
 	}
@@ -339,7 +339,7 @@ languages:
 `
 	h, _ := newStructuredHandler(t, existing)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config/structured", nil)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfigStructured(rec, req)
@@ -390,7 +390,7 @@ providers:
 `
 	h, cfgPath := newStructuredHandler(t, existing)
 
-	getReq := httptest.NewRequestWithContext(context.Background(),
+	getReq := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config/structured", nil)
 	getRec := httptest.NewRecorder()
 	h.HandleGetConfigStructured(getRec, getReq)
@@ -404,11 +404,11 @@ providers:
 	}
 
 	saved, _ := os.ReadFile(cfgPath)
-	cfg, err := config.LoadFromBytes(context.Background(), saved)
+	cfg, err := config.LoadFromBytes(t.Context(), saved)
 	if err != nil {
 		t.Fatalf("round-tripped config does not load: %v\n%s", err, saved)
 	}
-	orig, err := config.LoadFromBytes(context.Background(), []byte(existing))
+	orig, err := config.LoadFromBytes(t.Context(), []byte(existing))
 	if err != nil {
 		t.Fatalf("original config does not load: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestStructuredGet_reports_secret_presence_without_values(t *testing.T) {
 		"",
 	}, "\n"))
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config/structured", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfigStructured(rec, req)
@@ -497,7 +497,7 @@ func TestStructuredGet_empty_secret_not_reported_present(t *testing.T) {
 		"",
 	}, "\n"))
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/config/structured", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleGetConfigStructured(rec, req)
@@ -640,7 +640,7 @@ func TestStructuredSave_baseline_failure_with_explicit_secrets_saves(t *testing.
 		t.Errorf("hot reload calls = %d, want 1", reloads)
 	}
 	saved, _ := os.ReadFile(cfgPath)
-	if _, err := config.LoadFromBytes(context.Background(), saved); err != nil {
+	if _, err := config.LoadFromBytes(t.Context(), saved); err != nil {
 		t.Errorf("repaired config does not load: %v\n%s", err, saved)
 	}
 	if !strings.Contains(string(saved), "k-new") {
@@ -684,7 +684,7 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read saved config: %v", err)
 			}
-			cfg, err := config.LoadFromBytes(context.Background(), saved)
+			cfg, err := config.LoadFromBytes(t.Context(), saved)
 			if err != nil {
 				t.Fatalf("saved config does not load: %v\n%s", err, saved)
 			}

@@ -1,7 +1,6 @@
 package testsupport
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 func TestNopStoreContract(t *testing.T) {
 	t.Parallel()
 	s := &NopStore{}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("RecordNoResult_does_not_error", func(t *testing.T) {
 		t.Parallel()

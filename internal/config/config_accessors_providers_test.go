@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 
 func TestAccessors_return_configured_values(t *testing.T) {
 	t.Parallel()
-	cfg, err := LoadFromBytes(context.Background(), []byte(minimalValidYAML()))
+	cfg, err := LoadFromBytes(t.Context(), []byte(minimalValidYAML()))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
@@ -255,7 +254,7 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 		Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 		SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
-	if err := validate(context.Background(), cfg); err != nil {
+	if err := validate(t.Context(), cfg); err != nil {
 		t.Errorf("validate() unexpected error for radarr with public_url only: %v", err)
 	}
 }
@@ -392,7 +391,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 				PollIntervalCfg: Duration{D: 30 * time.Second},
 				SearchCfg:       yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 			}
-			if err := validate(context.Background(), cfg); err != nil {
+			if err := validate(t.Context(), cfg); err != nil {
 				t.Errorf("validate() unexpected error for min_score=%d: %v", score, err)
 			}
 		})
@@ -405,7 +404,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 func TestConfig_Validate_property(t *testing.T) {
 	t.Parallel()
 	yaml := minimalValidYAML()
-	cfg, err := LoadFromBytes(context.Background(), []byte(yaml))
+	cfg, err := LoadFromBytes(t.Context(), []byte(yaml))
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}

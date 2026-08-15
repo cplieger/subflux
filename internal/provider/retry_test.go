@@ -139,7 +139,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 			}
 			p := WrapRetry(inner, 3, time.Millisecond)
 
-			_, err := p.Download(context.Background(), &api.Subtitle{})
+			_, err := p.Download(t.Context(), &api.Subtitle{})
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tc.wantErr)
 			}
@@ -184,7 +184,7 @@ func TestRetryProvider_cancellation_during_backoff(t *testing.T) {
 	}
 	p := WrapRetry(inner, 3, 500*time.Millisecond)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
@@ -220,7 +220,7 @@ func TestRetryProvider_backoff_doubles_between_attempts(t *testing.T) {
 	}
 	p := WrapRetry(inner, 4, 50*time.Millisecond)
 
-	_, err := p.Download(context.Background(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &api.Subtitle{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestRetryProvider_maxAttempts_one_calls_once_no_backoff(t *testing.T) {
 	p := WrapRetry(inner, 1, 500*time.Millisecond)
 
 	start := time.Now()
-	_, err := p.Download(context.Background(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &api.Subtitle{})
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -279,7 +279,7 @@ func TestRetryProvider_delegates_search(t *testing.T) {
 	inner := &retryFakeProvider{name: "test"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	results, err := p.Search(context.Background(), &api.SearchRequest{})
+	results, err := p.Search(t.Context(), &api.SearchRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	if !ok {
 		t.Fatal("wrapped provider does not implement ShowSubtitleCounter")
 	}
-	count, err := counter.CountShowSubtitles(context.Background(), "tt123", "en")
+	count, err := counter.CountShowSubtitles(t.Context(), "tt123", "en")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestRetryProvider_zero_retries_delegates_directly(t *testing.T) {
 	}
 	p := WrapRetry(inner, 0, time.Millisecond)
 
-	data, err := p.Download(context.Background(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &api.Subtitle{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestRetryProvider_negative_retries_delegates_directly(t *testing.T) {
 	}
 	p := WrapRetry(inner, -1, time.Millisecond)
 
-	_, err := p.Download(context.Background(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &api.Subtitle{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -430,7 +430,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 		name := fmt.Sprintf("attempts=%d", attempts)
 		b.Run("Download/"+name, func(b *testing.B) {
 			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
-			ctx := context.Background()
+			ctx := b.Context()
 			b.ResetTimer()
 			for range b.N {
 				_, _ = rp.Download(ctx, sub)
@@ -438,7 +438,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 		})
 		b.Run("Search/"+name, func(b *testing.B) {
 			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
-			ctx := context.Background()
+			ctx := b.Context()
 			req := &api.SearchRequest{Title: "test"}
 			b.ResetTimer()
 			for range b.N {
@@ -472,7 +472,7 @@ func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 	recs := capture.Default(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{{data: []byte("ok")}}}
 	p := WrapRetry(inner, 3, time.Millisecond)
-	data, err := p.Download(context.Background(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &api.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
@@ -493,7 +493,7 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 		{data: []byte("ok")},                        // success on the second attempt
 	}}
 	p := WrapRetry(inner, 3, time.Millisecond)
-	data, err := p.Download(context.Background(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &api.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
@@ -539,7 +539,7 @@ func TestRetryProvider_search_clamps_release_names(t *testing.T) {
 	}}
 	p := WrapRetry(inner, 1, time.Millisecond)
 
-	subs, err := p.Search(context.Background(), &api.SearchRequest{})
+	subs, err := p.Search(t.Context(), &api.SearchRequest{})
 	if err != nil {
 		t.Fatalf("Search() error = %v, want nil", err)
 	}

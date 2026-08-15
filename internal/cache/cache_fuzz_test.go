@@ -79,6 +79,7 @@ func FuzzGetOrFetchCtx_cancellation(f *testing.F) {
 		}
 
 		c := New[string](time.Minute)
+		// Parent stays context.Background(): the test decides below whether to cancel early, so it must own the only cancellation.
 		ctx, cancel := context.WithCancel(context.Background())
 
 		if cancelEarly {

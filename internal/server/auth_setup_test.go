@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,7 +46,7 @@ func TestSetup_Create(t *testing.T) {
 	}
 
 	// Verify user was created with admin role.
-	user, err := db.GetUserByUsername(context.Background(), "admin")
+	user, err := db.GetUserByUsername(t.Context(), "admin")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ var driftBP = api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hou
 // attempts counter).
 func seedAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api.ProviderID) {
 	t.Helper()
-	if err := db.RecordNoResult(context.Background(), mt, mid, lang, p, driftBP); err != nil {
+	if err := db.RecordNoResult(t.Context(), mt, mid, lang, p, driftBP); err != nil {
 		t.Fatalf("RecordNoResult(%s/%s/%s/%s): %v", mt, mid, lang, p, err)
 	}
 }
@@ -39,7 +38,7 @@ func assertBackoffConsistent(t *testing.T, db *DB, wantRows int) {
 // is empty.
 func TestCleanupDrift_emptyIsNoop(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "os")
 	seedAttempt(t, db, api.MediaTypeMovie, "id2", "fr", "bs")
 
@@ -54,7 +53,7 @@ func TestCleanupDrift_emptyIsNoop(t *testing.T) {
 // fields are ignored once the blanket clear runs.
 func TestCleanupDrift_adaptiveDisabledClearsAll(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "os")
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "fr", "bs")
 	seedAttempt(t, db, api.MediaTypeMovie, "id2", "es", "sd")
@@ -76,7 +75,7 @@ func TestCleanupDrift_adaptiveDisabledClearsAll(t *testing.T) {
 // the config, preserving kept-language rows (Requirement 7.7).
 func TestCleanupDrift_removedLanguages(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	// Two languages across two providers and two media items; "fr" and "de"
 	// are removed, "en" is kept.
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "os")
@@ -110,7 +109,7 @@ func TestCleanupDrift_removedLanguages(t *testing.T) {
 // the config, preserving kept-provider rows (Requirement 7.7).
 func TestCleanupDrift_removedProviders(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "os")
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "bs")
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "fr", "sd")
@@ -139,7 +138,7 @@ func TestCleanupDrift_removedProviders(t *testing.T) {
 // language or its provider drifted out.
 func TestCleanupDrift_combinedLanguagesAndProviders(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	seedAttempt(t, db, api.MediaTypeMovie, "id1", "en", "os") // kept
 	seedAttempt(t, db, api.MediaTypeMovie, "id1", "fr", "os") // removed language
 	seedAttempt(t, db, api.MediaTypeMovie, "id1", "en", "bs") // removed provider
@@ -163,7 +162,7 @@ func TestCleanupDrift_combinedLanguagesAndProviders(t *testing.T) {
 // languages and providers match no stored row.
 func TestCleanupDrift_noMatchingDriftIsNoop(t *testing.T) {
 	db, _ := openTemp(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	seedAttempt(t, db, api.MediaTypeEpisode, "id1", "en", "os")
 	seedAttempt(t, db, api.MediaTypeMovie, "id2", "fr", "bs")
 	assertBackoffConsistent(t, db, 2)

@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"math/rand/v2"
 	"testing"
 
@@ -33,7 +32,7 @@ func BenchmarkCrossCorrelateEdges(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for range b.N {
-				crossCorrelateEdges(context.Background(), a, bSig)
+				crossCorrelateEdges(b.Context(), a, bSig)
 			}
 		})
 	}

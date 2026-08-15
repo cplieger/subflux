@@ -21,7 +21,7 @@ func openCycleDB(t *testing.T) *DB {
 
 func TestScanCycleMark_roundtrip(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	db := openCycleDB(t)
 
 	got, err := db.ScanCycleStart(ctx)
@@ -63,7 +63,7 @@ func TestScanCycleMark_roundtrip(t *testing.T) {
 
 func TestRecordScanState_searched_flag_roundtrip(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	db := openCycleDB(t)
 
 	put := func(id string, searched bool) {

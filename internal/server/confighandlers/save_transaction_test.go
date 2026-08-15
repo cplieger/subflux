@@ -85,7 +85,7 @@ languages:
 	<-firstInside
 
 	// Save B through the raw entry point while A is mid-transaction.
-	reqB := httptest.NewRequestWithContext(context.Background(),
+	reqB := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPut, "/api/config", strings.NewReader(rawBodyB))
 	recB := httptest.NewRecorder()
 	h.HandleSaveConfig(recB, reqB)
@@ -108,7 +108,7 @@ languages:
 	if err != nil {
 		t.Fatalf("read persisted config: %v", err)
 	}
-	cfg, err := config.LoadFromBytes(context.Background(), saved)
+	cfg, err := config.LoadFromBytes(t.Context(), saved)
 	if err != nil {
 		t.Fatalf("persisted config does not load: %v\n%s", err, saved)
 	}
@@ -135,7 +135,7 @@ func TestResetConfig_serializes_with_saves(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		req := httptest.NewRequestWithContext(context.Background(),
+		req := httptest.NewRequestWithContext(t.Context(),
 			http.MethodPost, "/api/config/reset", http.NoBody)
 		h.HandleResetConfig(httptest.NewRecorder(), req)
 	}()

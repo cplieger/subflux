@@ -1,7 +1,6 @@
 package subsync
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -26,6 +25,6 @@ func BenchmarkAlignWithSplits(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for range b.N {
-		_ = alignWithSplits(context.Background(), ref, inc, 7.0)
+		_ = alignWithSplits(b.Context(), ref, inc, 7.0)
 	}
 }

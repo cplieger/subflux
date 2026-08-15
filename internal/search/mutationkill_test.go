@@ -2,7 +2,6 @@ package search
 
 import (
 	"bytes"
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -58,8 +57,8 @@ func TestEngine_SyncAndPostProcess_HI_variant_preserves_HI(t *testing.T) {
 	e := newEngine(nil, &mockStore{}, &stripHITestConfig{}, nil,
 		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
-	hiOut, _ := e.SyncAndPostProcess(context.Background(), hiCue, videoPath, "fr", api.VariantHI)
-	stdOut, _ := e.SyncAndPostProcess(context.Background(), hiCue, videoPath, "fr", api.DefaultVariant)
+	hiOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", api.VariantHI)
+	stdOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", api.DefaultVariant)
 
 	if !bytes.Contains(hiOut, []byte("door creaks")) {
 		t.Errorf("HI variant stripped the HI cue, want it preserved:\n%s", hiOut)

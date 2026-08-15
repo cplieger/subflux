@@ -1,7 +1,6 @@
 package embedded
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -240,7 +239,7 @@ func TestNormalizeTrack_returns_nil(t *testing.T) {
 func TestDetector_DetectTracks_nonexistent_returns_error(t *testing.T) {
 	t.Parallel()
 	d := Detector{}
-	tracks, err := d.DetectTracks(context.Background(), "/nonexistent/file.mkv")
+	tracks, err := d.DetectTracks(t.Context(), "/nonexistent/file.mkv")
 	if err == nil {
 		t.Fatal("DetectTracks(nonexistent) error = nil, want error")
 	}

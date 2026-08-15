@@ -12,7 +12,7 @@ func TestNewUserContext_round_trip(t *testing.T) {
 	t.Parallel()
 
 	user := &auth.User{ID: 42, Username: "testuser", Role: "admin"}
-	ctx := NewUserContext(context.Background(), user)
+	ctx := NewUserContext(t.Context(), user)
 
 	got := UserFromContext(ctx)
 
@@ -30,7 +30,7 @@ func TestNewUserContext_round_trip(t *testing.T) {
 func TestUserFromContext_returns_nil_for_empty_context(t *testing.T) {
 	t.Parallel()
 
-	got := UserFromContext(context.Background())
+	got := UserFromContext(t.Context())
 
 	if got != nil {
 		t.Errorf("UserFromContext(empty) = %v, want nil", got)
@@ -40,7 +40,7 @@ func TestUserFromContext_returns_nil_for_empty_context(t *testing.T) {
 func TestUserFromContext_returns_nil_for_wrong_type(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.WithValue(context.Background(), userContextKeyT{}, "not a user")
+	ctx := context.WithValue(t.Context(), userContextKeyT{}, "not a user")
 
 	got := UserFromContext(ctx)
 
@@ -52,7 +52,7 @@ func TestUserFromContext_returns_nil_for_wrong_type(t *testing.T) {
 func TestNewUserContext_nil_user_round_trip(t *testing.T) {
 	t.Parallel()
 
-	ctx := NewUserContext(context.Background(), nil)
+	ctx := NewUserContext(t.Context(), nil)
 
 	got := UserFromContext(ctx)
 
@@ -70,7 +70,7 @@ func TestUserFromContext_round_trip_preserves_identity(t *testing.T) {
 		role := rapid.SampledFrom([]string{"admin", "user", "viewer"}).Draw(t, "role")
 
 		user := &auth.User{ID: id, Username: username, Role: auth.Role(role)}
-		ctx := NewUserContext(context.Background(), user)
+		ctx := NewUserContext(t.Context(), user)
 		got := UserFromContext(ctx)
 
 		if got == nil {
@@ -93,7 +93,7 @@ func TestSessionHashFromContext_roundtrip(t *testing.T) {
 	t.Parallel()
 
 	const hash = "deadbeefcafe"
-	ctx := NewSessionHashContext(context.Background(), hash)
+	ctx := NewSessionHashContext(t.Context(), hash)
 	if got := SessionHashFromContext(ctx); got != hash {
 		t.Errorf("SessionHashFromContext = %q, want %q", got, hash)
 	}
@@ -102,7 +102,7 @@ func TestSessionHashFromContext_roundtrip(t *testing.T) {
 func TestSessionHashFromContext_empty_when_absent(t *testing.T) {
 	t.Parallel()
 
-	if got := SessionHashFromContext(context.Background()); got != "" {
+	if got := SessionHashFromContext(t.Context()); got != "" {
 		t.Errorf("SessionHashFromContext(empty ctx) = %q, want \"\"", got)
 	}
 }
@@ -111,13 +111,13 @@ func TestSessionHashFromContext_distinct_from_user_key(t *testing.T) {
 	t.Parallel()
 
 	// A user-valued context must not leak into the session-hash key.
-	ctx := NewUserContext(context.Background(), &auth.User{ID: 1, Username: "u"})
+	ctx := NewUserContext(t.Context(), &auth.User{ID: 1, Username: "u"})
 	if got := SessionHashFromContext(ctx); got != "" {
 		t.Errorf("SessionHashFromContext on user-only ctx = %q, want \"\"", got)
 	}
 
 	// And vice versa: a session-hash context must not expose a user.
-	ctx = NewSessionHashContext(context.Background(), "hash")
+	ctx = NewSessionHashContext(t.Context(), "hash")
 	if got := UserFromContext(ctx); got != nil {
 		t.Errorf("UserFromContext on sesshash-only ctx = %v, want nil", got)
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -18,7 +17,7 @@ func TestSetupLogging_valid_level(t *testing.T) {
 	setupLogging("debug", "text")
 
 	handler := slog.Default().Handler()
-	if handler.Enabled(context.Background(), slog.LevelDebug) != true {
+	if handler.Enabled(t.Context(), slog.LevelDebug) != true {
 		t.Error("setupLogging(\"debug\", \"text\"): expected debug level to be enabled")
 	}
 }
@@ -27,10 +26,10 @@ func TestSetupLogging_invalid_level_defaults_to_info(t *testing.T) {
 	setupLogging("bogus", "text")
 
 	handler := slog.Default().Handler()
-	if handler.Enabled(context.Background(), slog.LevelDebug) {
+	if handler.Enabled(t.Context(), slog.LevelDebug) {
 		t.Error("setupLogging(\"bogus\", \"text\"): debug should not be enabled (expected info default)")
 	}
-	if !handler.Enabled(context.Background(), slog.LevelInfo) {
+	if !handler.Enabled(t.Context(), slog.LevelInfo) {
 		t.Error("setupLogging(\"bogus\", \"text\"): info should be enabled")
 	}
 }

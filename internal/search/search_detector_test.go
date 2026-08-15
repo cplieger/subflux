@@ -49,7 +49,7 @@ func TestSearchTargets_usable_embedded_track_suppresses_search(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(context.Background(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestSearchTargets_ignored_codec_triggers_search(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(context.Background(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestSearchTargets_detector_error_fail_open_coverage_retained(t *testing.T) 
 		errDetector{err: errors.New("ffprobe exploded")})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(context.Background(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestInventoryCoverage_detector_error_skips_replacement(t *testing.T) {
 		errDetector{err: errors.New("ffprobe exploded")})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	changed := e.InventoryCoverage(context.Background(), req, videoPath)
+	changed := e.InventoryCoverage(t.Context(), req, videoPath)
 	if changed {
 		t.Error("InventoryCoverage() = true, want false on detector error")
 	}
@@ -220,7 +220,7 @@ func TestSearchTargets_hi_fallback_edge_no_embedded_in_scoring(t *testing.T) {
 	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(context.Background(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}

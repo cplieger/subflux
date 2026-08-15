@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -47,7 +46,7 @@ func TestHandleDismissAlert(t *testing.T) {
 				query = "?id=" + strconv.Itoa(id)
 			}
 
-			req := httptest.NewRequestWithContext(context.Background(),
+			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodDelete, "/api/alerts"+query, http.NoBody)
 			w := httptest.NewRecorder()
 

@@ -97,6 +97,7 @@ func (s *suite) skip(msg string) {
 // "000" on transport errors) and raw body, and returning the body with
 // trailing newlines stripped the way bash's $(api_get ...) captures do.
 func (s *suite) doRequest(timeout time.Duration, method, url, contentType, body string) string {
+	// context.Background(): no *testing.T in scope on the suite receiver.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var rdr io.Reader
@@ -159,6 +160,7 @@ func (s *suite) apiPut(path, body string) string {
 // "" and false on transport error or HTTP status >= 400 (-f suppresses the
 // body on failure). It does not touch lastStatus/lastBody.
 func (s *suite) curlSF(timeout time.Duration, url string) (string, bool) {
+	// context.Background(): no *testing.T in scope on the suite receiver.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -183,6 +185,7 @@ func (s *suite) curlSF(timeout time.Duration, url string) (string, bool) {
 // stream. "000" only on transport errors (curl still reports the status on
 // -f failures and stream timeouts).
 func (s *suite) sseProbe(timeout time.Duration, url string) string {
+	// context.Background(): no *testing.T in scope on the suite receiver.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

@@ -34,7 +34,7 @@ func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 	s.alerts.AddAlert("old", "old error",
 		activity.AlertTransient, activity.LevelError, -time.Second)
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetAlerts(rec, req)
@@ -60,7 +60,7 @@ func TestHandleGetAlerts_empty_when_no_alerts(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetAlerts(rec, req)
@@ -88,7 +88,7 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 		s.activity.End(id)
 	}
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetActivity(rec, req)
@@ -122,7 +122,7 @@ func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
 	unregister := s.stops.RegisterStop(runningID, func() {})
 	defer unregister()
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetActivity(rec, req)
@@ -159,7 +159,7 @@ func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 	s.activity.Start("Scan", "scan 1", "scheduled")
 	s.activity.Start("Upgrade", "upgrade 1", "manual")
 
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetActivity(rec, req)
@@ -200,7 +200,8 @@ func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie)
 		StateFunc: func() *manualops.LiveState {
 			return &manualops.LiveState{Providers: []api.Provider{&stubProvider{name: "os"}}}
 		},
-		BGTracker:  &s.bgWg,
+		BGTracker: &s.bgWg,
+		// context.Background(): no *testing.T in scope, and ServerCtx is the server's long-lived context, not a request or test one.
 		ServerCtx:  func() context.Context { return context.Background() },
 		Resolve:    resolver,
 		DecodeJSON: decodeJSONBodyAny,
@@ -224,7 +225,7 @@ func TestHandleManualDownload_unknown_media_returns_404(t *testing.T) {
 	s := newManualDownloadServer(&qhMockConfig{}, statusFakeRadarr{path: "/media/movie.mkv"})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":9999,"language":"en"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	s.manualH.HandleManualDownload(rec, req)
@@ -246,7 +247,7 @@ func TestHandleManualDownload_containment_invariant_returns_500(t *testing.T) {
 	s := newManualDownloadServer(&pathValidationErrorConfig{}, statusFakeRadarr{path: "/evil/path.mkv"})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/search/download", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	s.manualH.HandleManualDownload(rec, req)
@@ -284,7 +285,7 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 
 	// Method dispatch lives in routes.go ("DELETE /api/alerts" binds
 	// handleDismissAlert directly); the handler owns only the dismissal.
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/alerts?id="+strconv.Itoa(id), http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleDismissAlert(rec, req)
@@ -308,7 +309,7 @@ func TestHandleGetActivity_empty_returns_empty_array(t *testing.T) {
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 
 	// No activities added — entries is nil.
-	req := httptest.NewRequestWithContext(context.Background(),
+	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleGetActivity(rec, req)

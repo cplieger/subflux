@@ -1,7 +1,6 @@
 package authstore
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ func bootstrappedFile(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("boltstore.Open(%q): %v", path, err)
 	}
-	if err := core.Close(context.Background()); err != nil {
+	if err := core.Close(t.Context()); err != nil {
 		t.Fatalf("boltstore.Close: %v", err)
 	}
 	return path
