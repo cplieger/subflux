@@ -21,7 +21,10 @@ func TestNormalizeFFprobeLang(t *testing.T) {
 		{input: "fr", want: "fr"},
 		{input: "en-US", want: "en"},
 		{input: "fr-FR", want: "fr"},
-		{input: "pt-BR", want: "pt"},
+		// Brazilian Portuguese: the region decides the target, so it must not be
+		// discarded before it is read. Truncating at the hyphen used to answer
+		// "pt" here and route a Brazilian audio track to European Portuguese.
+		{input: "pt-BR", want: "pb"},
 		{input: "und", want: ""},
 		{input: "undetermined", want: ""},
 		{input: "", want: ""},
@@ -187,19 +190,27 @@ func TestShortStreamType(t *testing.T) {
 	}
 }
 
+// An unrecognized code must not be returned verbatim. The internal code space
+// is two-letter; a three-letter code leaking into it becomes a filename segment
+// and a state key that no configured target can ever match.
 func TestNormalizeFFprobeLang_three_letter_unknown(t *testing.T) {
 	t.Parallel()
 	got := NormalizeFFprobeLang("xyz", testLangMapper)
-	if got != "xyz" {
-		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "xyz", got, "xyz")
+	if got != "" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "xyz", got, "")
 	}
 }
 
 func TestNormalizeFFprobeLang_bcp47_with_region(t *testing.T) {
 	t.Parallel()
+	// por-BR canonicalizes to pt-BR, which is Brazilian Portuguese.
 	got := NormalizeFFprobeLang("por-BR", testLangMapper)
-	if got != "pt" {
-		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "por-BR", got, "pt")
+	if got != "pb" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "por-BR", got, "pb")
+	}
+	// A region that names no separate target is discarded after being read.
+	if got := NormalizeFFprobeLang("por-PT", testLangMapper); got != "pt" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "por-PT", got, "pt")
 	}
 }
 
@@ -309,16 +320,27 @@ func TestParseProbeOutput(t *testing.T) {
 	}
 }
 
-func TestNormalizeFFprobeLang_leadingDashNotTruncated(t *testing.T) {
+func TestNormalizeFFprobeLang_malformedTagRejected(t *testing.T) {
 	t.Parallel()
-	// A tag beginning with '-' has no primary subtag before the dash, so it is
-	// returned verbatim rather than truncated to the empty string.
-	if got := NormalizeFFprobeLang("-en", nil); got != "-en" {
-		t.Errorf("NormalizeFFprobeLang(%q, nil) = %q, want %q", "-en", got, "-en")
+	// A tag beginning with '-' has no primary subtag, so it names no language.
+	// It used to be returned verbatim, which put "-en" in the code space.
+	if got := NormalizeFFprobeLang("-en", testLangMapper); got != "" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "-en", got, "")
 	}
-	// A normal BCP 47 tag still truncates at the dash.
-	if got := NormalizeFFprobeLang("en-US", nil); got != "en" {
-		t.Errorf("NormalizeFFprobeLang(%q, nil) = %q, want %q", "en-US", got, "en")
+	// A well-formed BCP 47 tag still resolves to its primary language.
+	if got := NormalizeFFprobeLang("en-US", testLangMapper); got != "en" {
+		t.Errorf("NormalizeFFprobeLang(%q) = %q, want %q", "en-US", got, "en")
+	}
+}
+
+// Canonicalization is injected, so without it there is no code space to resolve
+// into and every tag yields "" rather than a half-normalized guess.
+func TestNormalizeFFprobeLang_nilMapper(t *testing.T) {
+	t.Parallel()
+	for _, in := range []string{"en", "eng", "pt-BR", "und", "xyz"} {
+		if got := NormalizeFFprobeLang(in, nil); got != "" {
+			t.Errorf("NormalizeFFprobeLang(%q, nil) = %q, want %q", in, got, "")
+		}
 	}
 }
 

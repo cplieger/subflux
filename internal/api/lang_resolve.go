@@ -77,8 +77,14 @@ var langNameMap = map[string]string{
 	"tamil": "ta", "telugu": "te", "urdu": "ur",
 	"icelandic": "is", "macedonian": "mk", "albanian": "sq",
 	"welsh": "cy", "irish": "ga",
-	// Regional variants returned by Sonarr/Radarr.
-	"flemish": "nl", "portuguese (brazil)": "pt", "spanish (latino)": "es",
+	// Regional variants returned by Sonarr/Radarr. Brazilian Portuguese is a
+	// separate subtitle target from European Portuguese everywhere else in
+	// subflux, so it must resolve to the internal "pb" code: mapping it to "pt"
+	// made an arr-reported original language of Portuguese (Brazil) match the
+	// European Portuguese language rule. Flemish and Latin American Spanish
+	// have no separate internal code, so collapsing those two IS correct.
+	"flemish": "nl", "portuguese (brazil)": LangBrazilianPortuguese,
+	"spanish (latino)": "es",
 	// Additional Sonarr/Radarr languages.
 	"malayalam": "ml", "kannada": "kn", "afrikaans": "af",
 	"marathi": "mr", "tagalog": "tl", "romansh": "rm",
@@ -90,22 +96,22 @@ var langNameMap = map[string]string{
 	"swahili": "sw", "uzbek": "uz", "yoruba": "yo", "zulu": "zu",
 }
 
-// LangNameToISO converts a language name (as returned by Sonarr/Radarr)
-// to an ISO 639-1 code. Accepts full names ("english") or 2-letter ASCII codes.
-// Returns empty string for unrecognized input.
+// LangNameToISO converts a language name or code (as returned by
+// Sonarr/Radarr) to subflux's internal code space. Accepts full names
+// ("english"), the regional-variant names arr reports, and any published
+// language code. Returns "" for unrecognized input.
+//
+// The name table is consulted first and its value is used verbatim, because a
+// name carries a product decision a code system cannot express: arr's
+// "Portuguese (Brazil)" means the internal "pb", and "Tagalog" means "tl" even
+// though canonicalization would fold that onto the three-letter "fil" and leave
+// the two-letter namespace.
 func LangNameToISO(name string) string {
 	if name == "" {
 		return ""
 	}
-	lower := strings.ToLower(name)
-	if code, ok := langNameMap[lower]; ok {
+	if code, ok := langNameMap[strings.ToLower(name)]; ok {
 		return code
 	}
-	// If it's already a 2-letter ASCII code, return as-is.
-	if len(lower) == 2 &&
-		lower[0] >= 'a' && lower[0] <= 'z' &&
-		lower[1] >= 'a' && lower[1] <= 'z' {
-		return lower
-	}
-	return ""
+	return CanonicalLangCode(name)
 }

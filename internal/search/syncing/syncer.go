@@ -23,7 +23,8 @@ type Syncer struct {
 	// process isolation (P13).
 	Exec SyncExec
 
-	// LangMapper maps ISO 639-3 codes to ISO 639-1 for ffprobe track selection.
+	// LangMapper resolves a raw ffprobe stream language tag onto subflux's
+	// internal code space for track selection.
 	LangMapper subsync.LangMapper
 
 	// MinConfidence is the minimum confidence threshold for auto-sync.

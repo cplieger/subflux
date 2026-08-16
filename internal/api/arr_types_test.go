@@ -59,13 +59,17 @@ func TestLangNameToISO(t *testing.T) {
 		{"two letter code passthrough", "en", "en"},
 		{"two letter code uppercase", "EN", "en"},
 		{"two letter code mixed", "Fr", "fr"},
-		{"three letter string not in map", "eng", ""},
+		{"three letter code is canonicalized", "eng", "en"},
+		{"unassigned two letter code rejected", "bb", ""},
 		{"unknown language name", "klingon", ""},
 		{"single character", "e", ""},
 		{"numeric string", "42", ""},
 		{"special characters", "en!", ""},
 		{"whitespace only", " ", ""},
-		{"regional variant with parens", "Portuguese (Brazil)", "pt"},
+		// Brazilian Portuguese is a separate subtitle target from European
+		// Portuguese, so the arr name must resolve to the internal "pb" code;
+		// answering "pt" matched the wrong language rule.
+		{"regional variant with parens", "Portuguese (Brazil)", "pb"},
 		{"regional variant spanish latino", "Spanish (Latino)", "es"},
 		{"alias maps to same code as primary", "flemish", "nl"},
 		{"two letter non-ascii rejected", "\u00f1\u00e9", ""},
@@ -109,7 +113,7 @@ func TestParseAudioLangs(t *testing.T) {
 		{"single with trailing slash", "English/", []string{"en"}},
 		{"single with leading slash", "/English", []string{"en"}},
 		{"only separators", "/,/", nil},
-		{"regional variant with parens", "English/Portuguese (Brazil)", []string{"en", "pt"}},
+		{"regional variant with parens", "English/Portuguese (Brazil)", []string{"en", "pb"}},
 	}
 
 	for _, tt := range tests {
@@ -313,7 +317,11 @@ func TestLangNameToISO_known_names_always_return_two_letter_code(t *testing.T) {
 	})
 }
 
-func TestLangNameToISO_two_letter_ascii_passthrough(t *testing.T) {
+// A two-letter code that names a real language resolves to its canonical
+// spelling; one the IANA registry does not assign is rejected rather than echoed
+// back. Echoing it back put a non-language in the code space, where it became a
+// filename segment and a state key matching no configured target.
+func TestLangNameToISO_two_letter_code_handling(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -321,8 +329,11 @@ func TestLangNameToISO_two_letter_ascii_passthrough(t *testing.T) {
 
 		got := LangNameToISO(code)
 
-		if got != code {
-			t.Errorf("LangNameToISO(%q) = %q, want %q (passthrough)", code, got, code)
+		if want := CanonicalLangCode(code); got != want {
+			t.Errorf("LangNameToISO(%q) = %q, want %q", code, got, want)
+		}
+		if got != "" && len(got) != 2 {
+			t.Errorf("LangNameToISO(%q) = %q (len %d), want len 2", code, got, len(got))
 		}
 	})
 }

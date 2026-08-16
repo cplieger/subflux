@@ -150,14 +150,6 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			wantHI:    true,
 		},
 		{
-			name:      "unknown_alpha3_used_as_is",
-			index:     8,
-			codec:     "srt",
-			lang:      "xyz",
-			trackName: "Unknown",
-			wantLang:  "xyz",
-		},
-		{
 			name:      "bcp47_extracts_primary_subtag",
 			index:     9,
 			codec:     "srt",
@@ -166,22 +158,24 @@ func TestNormalizeTrack_valid(t *testing.T) {
 			wantLang:  "en",
 		},
 		{
-			name:      "bcp47_with_alpha3_primary",
+			// Brazilian Portuguese is a separate coverage target from European
+			// Portuguese, so the region has to be read before it is dropped.
+			// Truncating at the hyphen reported this track as "pt".
+			name:      "bcp47_region_selects_brazilian_portuguese",
 			index:     10,
 			codec:     "srt",
 			lang:      "por-BR",
 			trackName: "Portuguese BR",
-			wantLang:  "pt",
+			wantLang:  "pb",
 		},
 		{
-			// A leading dash is not a subtag boundary (index 0): the tag is
-			// left intact rather than truncated to an empty language.
-			name:      "leading_dash_not_truncated",
+			// A region that names no separate target is dropped once read.
+			name:      "bcp47_european_region_stays_pt",
 			index:     11,
 			codec:     "srt",
-			lang:      "-en",
-			trackName: "name",
-			wantLang:  "-en",
+			lang:      "por-PT",
+			trackName: "Portuguese PT",
+			wantLang:  "pt",
 		},
 	}
 	for _, tt := range tests {
@@ -219,6 +213,15 @@ func TestNormalizeTrack_returns_nil(t *testing.T) {
 	}{
 		{name: "empty_language", lang: ""},
 		{name: "undefined_language", lang: "und"},
+		// A track language that names no language is dropped rather than being
+		// reported as coverage. Each of these used to become a coverage entry
+		// under a code no configured target could match.
+		{name: "unknown_alpha3", lang: "xyz"},
+		{name: "malformed_tag_leading_dash", lang: "-en"},
+		{name: "unassigned_two_letter_code", lang: "xx"},
+		// Cantonese is a real language with no ISO 639-1 code, so it has no
+		// spelling in subflux's two-letter space.
+		{name: "language_without_two_letter_code", lang: "yue"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -286,10 +289,14 @@ func TestNormalizeCodecName(t *testing.T) {
 func TestNormalizeTrack_valid_output_invariants(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		lang := rapid.StringMatching(`[a-z]{3}`).Draw(t, "lang")
-		if lang == "und" {
-			lang = "eng"
-		}
+		// Draw from codes that name a real language: an arbitrary three-letter
+		// string is not one, and a track tagged with a non-language is now
+		// dropped rather than reported as coverage under a made-up code.
+		lang := rapid.SampledFrom([]string{
+			"eng", "fre", "fra", "ger", "deu", "spa", "por", "pob", "jpn",
+			"chi", "zho", "nob", "nor", "en", "fr", "pb", "pt", "pt-BR",
+			"por-BR", "en-US", "zh-Hant", "ENG", " eng ",
+		}).Draw(t, "lang")
 		codec := rapid.StringMatching(`[a-z]{2,6}`).Draw(t, "codec")
 		name := rapid.StringMatching(`[A-Za-z ]{0,30}`).Draw(t, "name")
 		index := rapid.IntRange(1, 100).Draw(t, "index")
@@ -298,11 +305,19 @@ func TestNormalizeTrack_valid_output_invariants(t *testing.T) {
 
 		got := normalizeTrack(index, codec, lang, name, forced, hi)
 		if got == nil {
-			t.Fatalf("normalizeTrack = nil for valid lang %q", lang)
+			t.Fatalf("normalizeTrack(%d, %q, %q, ...) = nil, want non-nil for a real language",
+				index, codec, lang)
 			return
 		}
-		if got.lang == "" || got.lang == "und" {
-			t.Errorf("lang = %q, want non-empty and not 'und'", got.lang)
+		// The language becomes a filename segment and part of the bbolt state
+		// key, so it has to be in the two-letter internal space.
+		if len(got.lang) != 2 {
+			t.Errorf("normalizeTrack(%d, %q, %q, ...).lang = %q (len %d), want len 2",
+				index, codec, lang, got.lang, len(got.lang))
+		}
+		if got.lang == "und" {
+			t.Errorf("normalizeTrack(%d, %q, %q, ...).lang = %q, want a real language",
+				index, codec, lang, got.lang)
 		}
 		if got.codec != codec {
 			t.Errorf("codec = %q, want %q", got.codec, codec)
