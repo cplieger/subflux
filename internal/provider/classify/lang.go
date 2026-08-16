@@ -1,55 +1,30 @@
 package classify
 
-import "strings"
+import (
+	"strings"
 
-const langEng = "eng"
+	"github.com/cplieger/subflux/internal/api"
+)
 
-// alpha3to2 maps ISO 639-3/639-2 codes to ISO 639-1 codes.
-var alpha3to2 = map[string]string{
-	langEng: "en", "fre": "fr", "fra": "fr", "ger": "de", "deu": "de",
-	"spa": "es", "ita": "it", "por": "pt", "rus": "ru", "jpn": "ja",
-	"chi": "zh", "zho": "zh", "kor": "ko", "ara": "ar", "hin": "hi",
-	"tha": "th", "vie": "vi", "pol": "pl", "nld": "nl", "dut": "nl",
-	"swe": "sv", "nor": "no", "nob": "no", "nno": "nn", "dan": "da",
-	"fin": "fi", "tur": "tr", "hun": "hu", "ces": "cs", "cze": "cs",
-	"ron": "ro", "rum": "ro", "bul": "bg", "hrv": "hr", "slk": "sk",
-	"slo": "sk", "slv": "sl", "ukr": "uk", "ell": "el", "gre": "el",
-	"heb": "he", "ind": "id", "msa": "ms", "may": "ms", "cat": "ca",
-	"eus": "eu", "baq": "eu", "glg": "gl", "srp": "sr", "bos": "bs",
-	"lit": "lt", "lav": "lv", "est": "et",
-	"isl": "is", "ice": "is", "mkd": "mk", "mac": "mk",
-	"sqi": "sq", "alb": "sq", "mlt": "mt",
-	"cym": "cy", "wel": "cy", "gle": "ga",
-	"kat": "ka", "geo": "ka", "hye": "hy", "arm": "hy",
-	"aze": "az", "kaz": "kk", "uzb": "uz", "mon": "mn",
-	"mya": "my", "bur": "my", "khm": "km", "lao": "lo",
-	"tam": "ta", "tel": "te", "kan": "kn", "mal": "ml", "mar": "mr",
-	"ben": "bn", "guj": "gu", "pan": "pa", "urd": "ur", "nep": "ne",
-	"sin": "si", "afr": "af", "swa": "sw", "amh": "am", "som": "so",
-	"hau": "ha", "yor": "yo", "ibo": "ig", "zul": "zu", "xho": "xh",
-	// pb = Brazilian Portuguese (internal code, not ISO).
-	"pob": "pb",
-}
-
-// Alpha2FromAlpha3 converts an ISO 639-2/3 code to ISO 639-1.
-// Returns the input unchanged if it is already 2 characters.
-// Returns empty string if the code is unknown.
+// Alpha2FromAlpha3 resolves any published language code onto subflux's internal
+// code space: ISO 639-1 two-letter codes plus "pb" for Brazilian Portuguese.
+//
+// It accepts ISO 639-1, both ISO 639-2 variants, ISO 639-3 and BCP 47 tags, in
+// any letter case. It returns "" for anything that names no language subflux can
+// represent, which includes a language with no ISO 639-1 assignment (Cantonese,
+// Filipino) — a three-letter code in a two-letter namespace matches nothing.
+//
+// Two behaviours are worth knowing at the call sites, because a hand-written
+// table used to decide them differently. A region is consulted before it is
+// discarded, so "pt-BR" resolves to "pb" rather than "pt". And an unrecognized
+// two-letter input is now rejected rather than passed through: the old table
+// returned any two letters unchanged, which let "xx" pose as a language.
+//
+// The name is kept for its committed fuzz corpus
+// (testdata/fuzz/FuzzAlpha2FromAlpha3) even though the function now resolves
+// more than alpha-3.
 func Alpha2FromAlpha3(code string) string {
-	code = strings.ToLower(code)
-	if len(code) == 2 {
-		// Reject non-letter 2-char inputs (e.g. "0x", "12", "a!").
-		// The mapping is ISO 639-1 codes, all of which are letters.
-		for _, r := range code {
-			if r < 'a' || r > 'z' {
-				return ""
-			}
-		}
-		return code
-	}
-	if v, ok := alpha3to2[code]; ok {
-		return v
-	}
-	return ""
+	return api.CanonicalLangCode(code)
 }
 
 // SanitizeImdbID strips the "tt" prefix and leading zeros from an IMDB ID,
@@ -82,7 +57,8 @@ var LangRegistry = map[string]string{
 	"lt": "Lithuanian", "lv": "Latvian", "et": "Estonian",
 	"is": "Icelandic", "ga": "Irish", "cy": "Welsh",
 	"ka": "Georgian", "mn": "Mongolian", "km": "Khmer",
-	"lo": "Lao", "my": "Burmese", "pb": "Brazilian Portuguese",
+	"lo": "Lao", "my": "Burmese",
+	api.LangBrazilianPortuguese: "Brazilian Portuguese",
 }
 
 // LangNameToISO2 is the reverse of LangRegistry: English name → ISO-2 code.

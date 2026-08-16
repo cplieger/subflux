@@ -157,16 +157,21 @@ func TestAlpha2FromAlpha3_result_length_invariant(t *testing.T) {
 	})
 }
 
-// PBT: Alpha2FromAlpha3 is idempotent for known codes; applying twice
-// gives the same result as applying once.
-func TestAlpha2FromAlpha3_idempotent_known_codes(t *testing.T) {
+// PBT: Alpha2FromAlpha3 is idempotent for every input, not just the codes a
+// table happened to list. Idempotence is what lets a caller canonicalize
+// defensively without changing the answer — LookupLangName relies on it, and
+// so does every provider that canonicalizes an already-internal code.
+func TestAlpha2FromAlpha3_idempotent(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		keys := make([]string, 0, len(alpha3to2))
-		for k := range alpha3to2 {
-			keys = append(keys, k)
-		}
-		code := rapid.SampledFrom(keys).Draw(t, "alpha3")
+		code := rapid.OneOf(
+			rapid.StringMatching(`[a-zA-Z]{0,5}`),
+			rapid.StringMatching(`[a-zA-Z]{2,3}(-[A-Za-z]{2,4})?`),
+			rapid.SampledFrom([]string{
+				"eng", "por", "pob", "pb", "pt", "pt-BR", "por-BR", "nob", "nor",
+				"cmn", "zho", "iw", "he", "yue", "fil", "tgl", "und", "xx",
+			}),
+		).Draw(t, "code")
 
 		once := Alpha2FromAlpha3(code)
 		twice := Alpha2FromAlpha3(once)
@@ -176,6 +181,79 @@ func TestAlpha2FromAlpha3_idempotent_known_codes(t *testing.T) {
 				code, once, once, twice)
 		}
 	})
+}
+
+// Brazilian Portuguese is the one language whose internal code is not an ISO
+// 639 code, so every spelling that names it has to arrive at "pb" and "pb"
+// itself has to survive the round trip. A regression here silently routes
+// Brazilian subtitles to the European Portuguese target.
+func TestAlpha2FromAlpha3_brazilianPortuguese(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"internal code round-trips", "pb", "pb"},
+		{"internal alpha-3 spelling", "pob", "pb"},
+		{"uppercase internal code", "PB", "pb"},
+		{"BCP 47 tag", "pt-BR", "pb"},
+		{"BCP 47 tag lowercased", "pt-br", "pb"},
+		{"BCP 47 tag from alpha-3 base", "por-BR", "pb"},
+		{"European Portuguese stays pt", "pt", "pt"},
+		{"explicit European region stays pt", "pt-PT", "pt"},
+		{"alpha-3 without region stays pt", "por", "pt"},
+		// "br" is Breton in ISO 639-1, and Breton has a two-letter code, so it
+		// resolves to itself. Two providers spell Brazilian Portuguese "br" on
+		// the wire; that is a private wire format, so the translation belongs in
+		// their dialect tables and must run BEFORE this function sees the code.
+		{"br is Breton, resolving to itself", "br", "br"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Alpha2FromAlpha3(tt.input); got != tt.want {
+				t.Errorf("Alpha2FromAlpha3(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// The table this function replaced returned any two letters unchanged, so "xx"
+// posed as a language all the way into a filename and a state key. It also had
+// no entry for several code systems langtag knows.
+func TestAlpha2FromAlpha3_registryBackedContract(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"unassigned two-letter code is rejected", "xx", ""},
+		{"unassigned two-letter code zz is rejected", "zz", ""},
+		{"deprecated iw folds to he", "iw", "he"},
+		{"deprecated in folds to id", "in", "id"},
+		{"deprecated ji folds to yi", "ji", "yi"},
+		{"macrolanguage member nob reports no", "nob", "no"},
+		{"macrolanguage member cmn reports zh", "cmn", "zh"},
+		{"Persian alpha-3 the old table lacked", "per", "fa"},
+		{"Persian terminological variant", "fas", "fa"},
+		// A language with no ISO 639-1 assignment cannot enter a two-letter
+		// namespace: it would match no configured target and no display name.
+		{"Cantonese has no two-letter code", "yue", ""},
+		{"Filipino has no two-letter code", "fil", ""},
+		{"region is discarded once consulted", "en-US", "en"},
+		{"script is discarded", "zh-Hant", "zh"},
+		{"surrounding whitespace is tolerated", "  eng  ", "en"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Alpha2FromAlpha3(tt.input); got != tt.want {
+				t.Errorf("Alpha2FromAlpha3(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestSanitizeImdbID(t *testing.T) {

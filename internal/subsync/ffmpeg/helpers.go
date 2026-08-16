@@ -98,35 +98,34 @@ func preferNonForced(candidates []Track) []Track {
 	return candidates
 }
 
-// NormalizeFFprobeLang normalizes ffprobe language tags to ISO 639-1.
-// Handles ISO 639-2/3 codes, BCP 47 tags, and "und"/"undetermined".
+// NormalizeFFprobeLang resolves an ffprobe stream language tag onto subflux's
+// internal code space via mapper, which owns canonicalization; this function
+// contributes only the ffprobe-specific conventions.
+//
+// ffprobe writes "und" (and some muxers "undetermined") for a track nobody
+// tagged. Those are rejected here so an untagged track can never present itself
+// as a language — the property FuzzNormalizeFFprobeLangUnd pins. mapper rejects
+// them too, so the guard is redundant by construction and kept deliberately:
+// this is where the container convention is documented, and it holds even if a
+// caller injects a different mapper.
+//
+// Everything else is mapper's call. This function previously truncated the tag
+// at the first hyphen before consulting mapper, which discarded the region and
+// collapsed a "pt-BR" audio track onto European Portuguese, and it returned an
+// unrecognized three-letter code verbatim, putting it in a two-letter namespace.
+// Both are gone: the whole tag reaches mapper, and an unresolvable tag yields "".
+//
+// A nil mapper yields "" for any tag: with no canonicalizer there is nothing
+// that could resolve one.
 func NormalizeFFprobeLang(lang string, mapper LangMapper) string {
-	if lang == "" {
+	if lang == "" || mapper == nil {
 		return ""
 	}
-
-	lang = strings.ToLower(lang)
-
-	if lang == "und" || lang == "undetermined" {
+	switch strings.ToLower(strings.TrimSpace(lang)) {
+	case "und", "undetermined":
 		return ""
 	}
-
-	// Extract primary subtag from BCP 47 (e.g. "en-US" -> "en").
-	if i := strings.IndexByte(lang, '-'); i > 0 {
-		lang = lang[:i]
-	}
-
-	if len(lang) == 2 {
-		return lang
-	}
-
-	if mapper != nil {
-		if alpha2 := mapper(lang); alpha2 != "" {
-			return alpha2
-		}
-	}
-
-	return lang
+	return mapper(lang)
 }
 
 // parseFrameRate parses ffprobe's r_frame_rate fraction (e.g. "24000/1001").

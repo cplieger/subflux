@@ -36,7 +36,12 @@ require github.com/cplieger/xmlx v1.0.1
 
 require github.com/cplieger/httpx/v4 v4.3.1
 
-require github.com/cplieger/keyenc v1.0.2
+require (
+	github.com/cplieger/keyenc v1.0.2
+	github.com/cplieger/langtag v1.0.1
+)
+
+require golang.org/x/text v0.41.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
