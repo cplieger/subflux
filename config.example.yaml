@@ -57,6 +57,9 @@ poll_interval: 30s
 # Audio-to-subtitle language mapping using ISO 639-1 codes.
 # https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
 # Special code: "pb" = Brazilian Portuguese (distinct from "pt" = European Portuguese).
+# Codes are checked when the config loads, so a typo is reported at startup
+# instead of silently matching nothing. Use the two-letter form: "en", not "eng"
+# or "EN", and "pb" rather than "pt-BR". The error names the code to use.
 # At least one of "rules" or "default" must be configured.
 languages:
   rules:
