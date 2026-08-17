@@ -55,7 +55,7 @@ export default [
           // carrying its own copy reads its own allowDefaultProject (often with
           // repo-specific entries), so a fix here cannot help it — see the
           // dest-relocation revert in scripts/classify-repos.py.
-          allowDefaultProject: ["*.mjs", "*.test.ts", "*.property.test.ts", "fc-strict-setup.ts"],
+          allowDefaultProject: ["*.mjs", "*.test.ts", "*.property.test.ts"],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
@@ -194,7 +194,6 @@ export default [
       "**/*.test.ts",
       "**/*.fuzz.test.ts",
       "**/*.property.test.ts",
-      "fc-strict-setup.ts",
       "test-stubs/**",
     ],
     ...tseslint.configs.disableTypeChecked,
