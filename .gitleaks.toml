@@ -1,9 +1,57 @@
+# gitleaks configuration for cplieger/subflux
+#
+# THE DEFECT THIS FILE FIXES. The previous version carried a legacy singular
+# `[allowlist]` table and NO `[extend]` block. Without `[extend]`, gitleaks
+# builds its ruleset from this file alone, and this file defines no rules, so
+# the secret gate matched nothing whatever the tree contained. Measured with
+# gitleaks 8.30.1 against a working tree carrying a planted `ghp_` GitHub PAT:
+# 0 findings with the old config, the PAT invisible; 3 findings the moment
+# `useDefault = true` was added, the PAT plus the two fixtures named below.
+# Never remove the `[extend]` block. On its own, `[[allowlists]]` allows
+# nothing, because there is nothing to allow.
+#
+# Both CI scans pin that same scanner version: the gating working-tree pass
+# (`gitleaks dir .`) in cplieger/ci's ci.yaml, and the advisory full-history
+# pass (`gitleaks git .`) in security-scan.yaml. The array `[[allowlists]]`
+# form below is only honored by a scanner that supports it, so downgrading
+# either pin silently reopens the hole this file closes.
+
 title = "subflux gitleaks config"
 
-[allowlist]
-description = "Test fixtures and schema examples with placeholder secrets"
+# Extend the bundled default rule set rather than redefining it.
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# False positives: identifier-shaped names, not credentials
+# ---------------------------------------------------------------------------
+#
+# Both patterns exist for one rule, `generic-api-key`, which keys on the
+# IDENTIFIER sitting next to a value (`key`, `token`, `secret`) rather than on
+# the value's shape. That makes a placeholder named for what it is, or a struct
+# field literally called `Key`, read as a credential.
+#
+#   `_test\.go$` covers the config-redaction tests under
+#   internal/server/confighandlers, whose inputs are credential-shaped on
+#   purpose: TestRedactSecrets feeds placeholders (anidb-key-123, abc123,
+#   my-secret-key) and asserts the response comes back redacted. A test that
+#   cannot hold a fake secret cannot test redaction.
+#
+#   sections_providers.go is the settings-UI schema: 32 field descriptors whose
+#   Go struct field is named `Key`. The rule matches that field name against
+#   the adjacent literal (`Key: "normalize_utf8"`), which is a form identifier
+#   the web UI renders, not a value that authenticates anything.
+#
+# `targetRules` is load-bearing, so never simplify this to a bare `paths` list.
+# Scoping to the one low-precision heuristic rule keeps every provider rule
+# (github-pat, aws-access-token, private-key blocks) live over these same
+# files, so a real credential pasted into a test is still caught. Measured on
+# the planted PAT above: the rule-scoped form reports it and drops the
+# fixtures, while a blanket path allowlist reports neither.
+[[allowlists]]
+description = "generic-api-key over Go test fixtures and the settings-schema `Key` struct field: identifier-shaped names, not credentials"
+targetRules = ["generic-api-key"]
 paths = [
-  '''internal/config/config_auth_test\.go''',
-  '''internal/server/pure_test\.go''',
-  '''internal/config/schema/sections_providers\.go''',
+  '''_test\.go$''',
+  '''(^|/)internal/config/schema/sections_providers\.go$''',
 ]
