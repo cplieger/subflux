@@ -12,10 +12,27 @@ export default defineConfig({
     //   // @vitest-environment happy-dom
     environment: "node",
     pool: "threads",
-    isolate: false,
+
+    // Each test file gets its own module graph. isolate:false was faster but
+    // unsound for this suite: several files replace a WHOLE module for their
+    // own purposes (events.test.ts stubs ./status.js, status.test.ts mocks
+    // @cplieger/actions to capture every action registration), and with a
+    // shared registry whichever file loads first wins for the rest of the
+    // worker. status.test.ts then saw a status.js whose top-level apiAction
+    // calls had already run under events.test.ts's mock, so its dispatcher map
+    // stayed empty and the stop-control test failed with "undefined is not a
+    // spy". It only surfaced where workers are scarce enough to pack those two
+    // files together, which is why it was invisible locally and red in CI on
+    // every run: 0 failures in 5 local attempts at 20 CPUs, 1 in 3 pinned to 4,
+    // 100% on the 4-CPU runner. vibekit's config carries the same note after
+    // the same bug. Measured cost here: 1.48s to 1.53s.
+    isolate: true,
 
     include: ["**/*.test.ts"],
-    exclude: ["../static/**", "node_modules/**"],
+    // .stryker-tmp holds Stryker's sandbox, a full copy of this directory. A
+    // run that dies before cleanTempDir leaves it behind, and without this the
+    // next plain `vitest --run` collects every test twice.
+    exclude: ["../static/**", "node_modules/**", "**/.stryker-tmp/**"],
 
     passWithNoTests: false,
     allowOnly: false,
