@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"go.etcd.io/bbolt"
 )
 

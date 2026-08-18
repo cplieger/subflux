@@ -8,8 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	extmetrics "github.com/cplieger/metrics/v3"
+	extmetrics "github.com/cplieger/metrics/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // Metrics holds all application metrics.
@@ -87,30 +88,36 @@ func New() *Metrics {
 	}
 
 	m.registry = extmetrics.NewRegistry("subflux")
-	m.registry.RegisterLabeledCounter(m.searches)
-	m.registry.RegisterLabeledCounter(m.errors)
-	m.registry.RegisterLabeledCounter(m.downloads)
-	m.registry.RegisterLabeledCounter(m.dlErrors)
-	m.registry.RegisterLabeledHistogram(m.durations)
-	m.registry.RegisterLabeledCounter(m.imports)
-	m.registry.RegisterCounter(m.scansTotal)
-	m.registry.RegisterCounter(m.scanItems)
-	m.registry.RegisterCounter(m.scanFound)
-	m.registry.RegisterGauge(m.scanDur)
-	m.registry.RegisterCounter(m.adaptSkips)
-	m.registry.RegisterCounter(m.embDetErrs)
-	m.registry.RegisterLabeledCounter(m.httpRequests)
-	m.registry.RegisterHistogram(m.httpDuration)
-	m.registry.RegisterCounter(m.httpPanics)
-	m.registry.RegisterGauge(m.storeFileBytes)
-	m.registry.RegisterGauge(m.storeFreelistBytes)
-	m.registry.RegisterGauge(m.reconcileDuration)
-	m.registry.RegisterCounter(m.reconcileDeleted)
-	m.registry.RegisterCounter(m.reconcileReset)
-	m.registry.RegisterGauge(m.backupLastSuccess)
-	m.registry.RegisterGauge(m.backupDuration)
-	m.registry.RegisterGauge(m.configured)
-	m.registry.RegisterGauge(m.pollCursorsDirty)
+	// MustRegister is the right door here: New has no error result and every
+	// failure it can report (bad metric name, bad label set, family collision,
+	// invalid registry prefix) is a programming error fixed at the literal
+	// above, not runtime state a caller could handle.
+	m.registry.MustRegister(
+		m.searches,
+		m.errors,
+		m.downloads,
+		m.dlErrors,
+		m.durations,
+		m.imports,
+		m.scansTotal,
+		m.scanItems,
+		m.scanFound,
+		m.scanDur,
+		m.adaptSkips,
+		m.embDetErrs,
+		m.httpRequests,
+		m.httpDuration,
+		m.httpPanics,
+		m.storeFileBytes,
+		m.storeFreelistBytes,
+		m.reconcileDuration,
+		m.reconcileDeleted,
+		m.reconcileReset,
+		m.backupLastSuccess,
+		m.backupDuration,
+		m.configured,
+		m.pollCursorsDirty,
+	)
 
 	return m
 }
@@ -155,9 +162,11 @@ func (m *Metrics) RecordScan(items, found int, dur time.Duration) {
 	m.scanDur.Set(dur.Seconds())
 }
 
-// RecordHTTP records one HTTP request (method, path, status, duration).
-func (m *Metrics) RecordHTTP(method, path string, status int, d time.Duration) {
-	extmetrics.RecordHTTP(m.httpRequests, m.httpDuration, d, method, path, strconv.Itoa(status))
+// RecordHTTP records one HTTP request. It takes webhttp's named-field record
+// rather than four positional values so the two adjacent strings cannot be
+// transposed on the way to a metric label.
+func (m *Metrics) RecordHTTP(rm webhttp.RequestMetric) {
+	extmetrics.RecordHTTP(m.httpRequests, m.httpDuration, rm.Latency, rm.Method, rm.Path, strconv.Itoa(rm.Status))
 }
 
 // RecordPanic records one HTTP handler panic recovered by the webhttp.Recoverer

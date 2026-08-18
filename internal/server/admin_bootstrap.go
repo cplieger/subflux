@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // handleAdminBootstrap serves CLI auth commands (reset-password, generate-api-key)
@@ -65,11 +65,12 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	if errLen := auth.ValidatePasswordLength(password, true); errLen != nil {
+	if errLen := auth.ValidateSoloPasswordLength(password); errLen != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, errLen.Error())
 		return
 	}
-	if errCtx := auth.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
+	pctx := auth.PasswordContext{Username: username, ForbiddenWords: []string{"subflux"}}
+	if errCtx := auth.ValidatePasswordContext(password, pctx); errCtx != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, errCtx.Error())
 		return
 	}

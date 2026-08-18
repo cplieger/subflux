@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -32,12 +33,16 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nonce, err := authoidc.GenerateState()
+	// The library mints only one flavour of opaque random; the nonce is that
+	// value retyped for its role, so the conversion is written once, here at
+	// the mint, and every hop afterwards is compiler-checked.
+	nonceState, err := authoidc.GenerateState()
 	if err != nil {
 		slog.Error("oidc: generate nonce", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
+	nonce := authoidc.Nonce(nonceState)
 
 	verifier, challenge, err := authoidc.GeneratePKCE()
 	if err != nil {
@@ -55,7 +60,12 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL := oidcProv.AuthorizationURL(state, nonce, challenge)
+	authURL, urlErr := oidcProv.AuthorizationURL(state, nonce, challenge)
+	if urlErr != nil {
+		slog.Error("oidc: build authorization URL", "error", urlErr)
+		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		return
+	}
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
@@ -72,8 +82,8 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	stateParam := q.Get("state")
-	code := q.Get("code")
+	stateParam := authoidc.State(q.Get("state"))
+	code := authoidc.Code(q.Get("code"))
 
 	if errParam := q.Get("error"); errParam != "" {
 		desc := q.Get("error_description")
@@ -240,8 +250,10 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := ClientIP(r)
-	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(user.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
@@ -250,13 +262,13 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 
 	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !okPass {
-		h.RateLimiter.Record(ip, user.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
 			slog.String("reason", "link_password_invalid"))
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
-	h.RateLimiter.Reset(ip, user.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 
 	// Link-on-login is a MIGRATION to SSO governance: it removes the local
 	// password and passkeys so the IdP becomes the sole control point. Never
@@ -324,7 +336,7 @@ func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
 		return
 	}
 	for i := range passkeys {
-		if derr := h.Store.DeletePasskey(ctx, passkeys[i].ID, userID); derr != nil {
+		if derr := h.Store.DeletePasskey(ctx, auth.PasskeyRef{ID: passkeys[i].ID, UserID: userID}); derr != nil {
 			slog.Warn("oidc link: delete passkey", "error", derr)
 		}
 	}

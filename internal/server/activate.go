@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	authwebauthn "github.com/cplieger/auth/v3/webauthn"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -168,7 +168,11 @@ func (s *Server) buildWebAuthn(cfg api.ConfigProvider, mode activationMode) (wa 
 	if rpID == "" {
 		return nil, false, nil
 	}
-	wa, err = authwebauthn.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
+	wa, err = authwebauthn.New(authwebauthn.RPConfig{
+		ID:          rpID,
+		DisplayName: "Subflux",
+		Origins:     []string{"https://" + rpID},
+	})
 	if err == nil {
 		return wa, false, nil
 	}

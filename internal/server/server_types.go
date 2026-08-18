@@ -6,9 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -24,7 +23,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/wiring"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
 )
@@ -57,7 +56,7 @@ type storeFacade struct {
 // config-derived capabilities carried by the live snapshot (liveState) and
 // resolved per request, so a hot config edit takes effect without a restart.
 type authDeps struct {
-	authStore     authstore.AuthStore
+	authStore     AuthStore
 	adminDB       authhandlers.AuthAdminStore
 	secDB         authhandlers.SecurityStore
 	oidcDB        authhandlers.OIDCStore

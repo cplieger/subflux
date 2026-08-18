@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 )
 
 // SetupStatus is the JSON response for GET /api/auth/setup.

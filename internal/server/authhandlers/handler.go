@@ -10,12 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/authstore"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -30,7 +29,7 @@ type AuthConfig interface {
 // Handler holds all dependencies for the auth handler family.
 // Constructed by the server package and stored on the Server struct.
 type Handler struct {
-	Store       authstore.AuthStore
+	Store       AccountStore
 	AdminDB     AuthAdminStore
 	SecDB       SecurityStore
 	OidcDB      OIDCStore
@@ -154,10 +153,15 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 // passwords that contain the username or app name), checks against breach
 // databases (if checkBreach is true), and returns the Argon2id hash.
 func ValidateAndHashPassword(ctx context.Context, password, username string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
-	if errLen := auth.ValidatePasswordLength(password, passwordOnly); errLen != nil {
+	validateLen := auth.ValidateMultiFactorPasswordLength
+	if passwordOnly {
+		validateLen = auth.ValidateSoloPasswordLength
+	}
+	if errLen := validateLen(password); errLen != nil {
 		return "", errLen.Error(), nil
 	}
-	if errCtx := auth.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
+	pctx := auth.PasswordContext{Username: username, ForbiddenWords: []string{"subflux"}}
+	if errCtx := auth.ValidatePasswordContext(password, pctx); errCtx != nil {
 		return "", errCtx.Error(), nil
 	}
 	if checkBreach {

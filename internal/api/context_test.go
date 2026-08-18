@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"pgregory.net/rapid"
 )
 

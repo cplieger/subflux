@@ -14,7 +14,7 @@ import (
 	"net/http"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // MaxDefaultBodySize is the default JSON body size cap for most handlers (1 MiB),

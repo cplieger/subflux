@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 )
 
@@ -221,7 +221,7 @@ func TestCleanupExpiredSessions(t *testing.T) {
 		t.Fatalf("CreateSession(boundary): %v", err)
 	}
 
-	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err := s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestSessions_concurrentAccess(t *testing.T) {
 	for range 2 {
 		wg.Go(func() {
 			for range iters {
-				_, _ = s.CleanupExpiredSessions(ctx, time.Now(), time.Hour, 24*time.Hour)
+				_, _ = s.CleanupExpiredSessions(ctx, time.Now(), auth.SessionTimeouts{Idle: time.Hour, Absolute: 24 * time.Hour})
 			}
 		})
 	}
@@ -298,7 +298,7 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if err := s.CreateSession(ctx, mkSession("live", 1, now, now)); err != nil {
 		t.Fatalf("CreateSession(live): %v", err)
 	}
-	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err := s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions(none expired): %v", err)
 	}
@@ -313,7 +313,7 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if err := s.CreateSession(ctx, mkSession("expired", 1, now.Add(-2*time.Hour), now.Add(-2*time.Hour))); err != nil {
 		t.Fatalf("CreateSession(expired): %v", err)
 	}
-	n, err = s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err = s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions(one expired): %v", err)
 	}

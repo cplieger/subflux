@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // HostAllowlist returns the parsed exact-match Host allowlist built from
@@ -33,7 +33,7 @@ func (c *Config) HostAllowlist() *webhttp.HostPolicy {
 // (deny-all when nothing valid remains) rather than silently deactivate.
 func parseAllowedHosts(entries []string) (*webhttp.HostPolicy, error) {
 	policy, invalid := webhttp.ParseHostList(entries,
-		webhttp.WithLoopbackExempt(),
+		webhttp.WithLoopbackExempt(true),
 		webhttp.WithHostAllowlistError("host_not_allowed",
 			"host not allowed; add it to allowed_hosts in the server settings"))
 	if len(invalid) > 0 {

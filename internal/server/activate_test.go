@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authwebauthn "github.com/cplieger/auth/v3/webauthn"
+	"github.com/cplieger/auth/v4"
+	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/metrics"
 	"github.com/cplieger/subflux/internal/search"
@@ -487,11 +487,11 @@ func fakeIssuer(t *testing.T) *httptest.Server {
 // redirect handler only needs CreateOIDCState to succeed.
 type fakeOIDCStore struct{}
 
-func (fakeOIDCStore) CreateOIDCState(context.Context, string, string, string, string) error {
+func (fakeOIDCStore) CreateOIDCState(context.Context, auth.OIDCState, auth.OIDCNonce, auth.OIDCCodeVerifier, string) error {
 	return nil
 }
 
-func (fakeOIDCStore) ConsumeOIDCState(context.Context, string) (string, string, string, error) {
+func (fakeOIDCStore) ConsumeOIDCState(context.Context, auth.OIDCState) (auth.OIDCNonce, auth.OIDCCodeVerifier, string, error) {
 	return "", "", "", errMock
 }
 
@@ -638,9 +638,9 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	// (2) Finishing with the OLD RP's credential fails predictably: the
 	// assertion carries clientData bound to the old origin, so verification
 	// rejects it with a clean 401 envelope.
-	waUser, err := authwebauthn.NewWebAuthnUser(user, nil)
+	waUser, err := authwebauthn.NewUser(user, nil)
 	if err != nil {
-		t.Fatalf("NewWebAuthnUser: %v", err)
+		t.Fatalf("NewUser: %v", err)
 	}
 	clientData, _ := json.Marshal(map[string]string{
 		"type":      "webauthn.get",

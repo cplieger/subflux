@@ -5,13 +5,13 @@ go 1.26.7
 require (
 	github.com/cplieger/arrapi/v2 v2.0.0
 	github.com/cplieger/atomicfile/v2 v2.9.1
-	github.com/cplieger/auth/v3 v3.0.0
+	github.com/cplieger/auth/v4 v4.0.0
 	github.com/cplieger/health v1.5.1
 	github.com/cplieger/pathinside/v2 v2.0.0
 	github.com/cplieger/runesafe/v2 v2.0.0
 	github.com/cplieger/slogx v1.6.1
 	github.com/cplieger/ssrf/v3 v3.0.1
-	github.com/cplieger/webhttp v1.23.1
+	github.com/cplieger/webhttp/v2 v2.0.0
 	github.com/cplieger/wiregen/v2 v2.0.6
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
@@ -24,7 +24,7 @@ require (
 
 require github.com/cplieger/envx/yamlenv/v2 v2.0.0
 
-require github.com/cplieger/metrics/v3 v3.0.3
+require github.com/cplieger/metrics/v4 v4.0.0
 
 require github.com/cplieger/jsonx v1.4.2
 
@@ -37,8 +37,8 @@ require github.com/cplieger/xmlx v1.0.2
 require github.com/cplieger/httpx/v5 v5.0.0
 
 require (
-	github.com/cplieger/keyenc v1.0.4
-	github.com/cplieger/langtag v1.0.5
+	github.com/cplieger/keyenc v1.0.3
+	github.com/cplieger/langtag/v2 v2.0.0
 )
 
 require golang.org/x/text v0.41.0 // indirect

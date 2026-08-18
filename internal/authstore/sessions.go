@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 )
 
 // This file holds the SessionPersister half of AuthStore.
@@ -125,13 +125,13 @@ func (s *Store) deleteUserSessionsExcept(userID int64, exceptHash string) {
 
 // CleanupExpiredSessions evicts every session past its idle OR absolute timeout
 // and returns the count evicted (Requirement 10.3). A session is expired when
-// last_activity is strictly before now-idleTimeout OR created_at is strictly
-// before now-absTimeout, matching the exclusive cutoff comparison of the old
-// SQLite delete (last_activity < idleCutoff OR created_at < absCutoff). Live
-// sessions are kept.
-func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time, idleTimeout, absTimeout time.Duration) (int64, error) {
-	idleCutoff := now.Add(-idleTimeout)
-	absCutoff := now.Add(-absTimeout)
+// last_activity is strictly before now-timeouts.Idle OR created_at is strictly
+// before now-timeouts.Absolute, matching the exclusive cutoff comparison of the
+// old SQLite delete (last_activity < idleCutoff OR created_at < absCutoff).
+// Live sessions are kept.
+func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time, timeouts auth.SessionTimeouts) (int64, error) {
+	idleCutoff := now.Add(-timeouts.Idle)
+	absCutoff := now.Add(-timeouts.Absolute)
 
 	var total int64
 	s.mu.Lock()

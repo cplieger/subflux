@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -25,8 +26,10 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := ClientIP(r)
-	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(user.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
@@ -35,11 +38,11 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
 	if err != nil || !ok {
-		h.RateLimiter.Record(ip, user.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid current password")
 		return
 	}
-	h.RateLimiter.Reset(ip, user.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 
 	ctx := r.Context()
 	// Password can authenticate on its own whenever basic auth is enabled,

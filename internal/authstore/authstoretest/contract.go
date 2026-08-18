@@ -1,5 +1,5 @@
 // Package authstoretest provides a shared, engine-agnostic behavioral contract
-// suite for the composite auth store (cplieger/auth/store.Composite). It
+// suite for subflux's auth store against the auth library's persistence SPI. It
 // depends ONLY on the cplieger/auth library (the domain types and the store
 // interface), so it pins behaviour at the AuthStore seam rather than at one
 // engine's internals (Requirements 14.1, 14.2). The bbolt authstore.Store is
@@ -51,9 +51,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authlibstore "github.com/cplieger/auth/v3/store"
+	"github.com/cplieger/auth/v4"
 )
+
+// SPI is the full auth persistence surface this contract suite exercises: the
+// union of every role interface a storage engine behind the seam implements.
+// The suite is the one consumer that legitimately needs all five at once —
+// it asserts the behaviour of the seam as a whole — so the union is declared
+// here, at its point of use, rather than published by the library.
+type SPI interface {
+	auth.UserStore
+	auth.SessionPersister
+	auth.PasskeyStore
+	auth.KeyStore
+	auth.OIDCStateStore
+}
 
 // Harness builds AuthStore instances over durable storage that survives a
 // simulated restart, so durability can be asserted engine-agnostically. Each
@@ -61,13 +73,13 @@ import (
 // *.bolt file.
 type Harness interface {
 	// Store returns the live store to exercise.
-	Store() authlibstore.Composite
+	Store() SPI
 	// Reopen simulates a process restart: it closes the current store and
 	// reopens durable state from the same backing file, returning a fresh
 	// store. Durable records (users, passkeys, API keys) MUST survive; whether
 	// ephemeral records (sessions, OIDC states) survive is engine-specific and
 	// is not asserted by the shared suite.
-	Reopen(t *testing.T) authlibstore.Composite
+	Reopen(t *testing.T) SPI
 }
 
 // Suite runs the engine-agnostic behavioural contract against any AuthStore
@@ -146,7 +158,7 @@ func testUniqueness(t *testing.T, h Harness) {
 
 // assertUsernameUniqueness asserts a duplicate username is rejected
 // case-insensitively with no partial write (Requirements 9.3, 16.1).
-func assertUsernameUniqueness(t *testing.T, s authlibstore.Composite) {
+func assertUsernameUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
 	if err := s.CreateUser(ctx, mkUser("Alice")); err != nil {
@@ -162,7 +174,7 @@ func assertUsernameUniqueness(t *testing.T, s authlibstore.Composite) {
 
 // assertOIDCUniqueness asserts a duplicate (issuer, sub) is rejected while a
 // distinct sub under the same issuer is allowed (Requirement 9.3).
-func assertOIDCUniqueness(t *testing.T, s authlibstore.Composite) {
+func assertOIDCUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
 	const issuer = "https://idp"
@@ -188,7 +200,7 @@ func assertOIDCUniqueness(t *testing.T, s authlibstore.Composite) {
 // duplicate API-key hash are each rejected with no partial write. Both checks
 // need a real owner (an engine may enforce a NOT NULL owner FK), so this helper
 // creates one and exercises both (Requirements 9.3, 16.1).
-func assertCredentialUniqueness(t *testing.T, s authlibstore.Composite) {
+func assertCredentialUniqueness(t *testing.T, s SPI) {
 	t.Helper()
 	ctx := context.Background()
 	owner := mkUser("pk-owner")
@@ -275,7 +287,7 @@ func testDeleteUserCascade(t *testing.T, h Harness) {
 // (Requirement 9.4). Split in two so each half stays inside gocyclo's ceiling:
 // every lookup now asserts the full (value, found, err) triple, which costs
 // two branches apiece.
-func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64, vCred []byte) {
+func assertVictimCascaded(t *testing.T, s SPI, victimID int64, vCred []byte) {
 	t.Helper()
 	assertVictimIdentityFreed(t, s, victimID)
 	assertVictimChildrenCascaded(t, s, victimID, vCred)
@@ -283,7 +295,7 @@ func assertVictimCascaded(t *testing.T, s authlibstore.Composite, victimID int64
 
 // assertVictimIdentityFreed checks the user record itself is gone and its
 // username can be claimed again.
-func assertVictimIdentityFreed(t *testing.T, s authlibstore.Composite, victimID int64) {
+func assertVictimIdentityFreed(t *testing.T, s SPI, victimID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -300,7 +312,7 @@ func assertVictimIdentityFreed(t *testing.T, s authlibstore.Composite, victimID 
 
 // assertVictimChildrenCascaded checks the deleted user's passkeys, API keys and
 // sessions went with it.
-func assertVictimChildrenCascaded(t *testing.T, s authlibstore.Composite, victimID int64, vCred []byte) {
+func assertVictimChildrenCascaded(t *testing.T, s SPI, victimID int64, vCred []byte) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -320,7 +332,7 @@ func assertVictimChildrenCascaded(t *testing.T, s authlibstore.Composite, victim
 
 // assertKeepUserIntact verifies the unrelated user and all its records survive
 // another user's delete cascade (Requirement 9.4 isolation).
-func assertKeepUserIntact(t *testing.T, s authlibstore.Composite, keepID int64) {
+func assertKeepUserIntact(t *testing.T, s SPI, keepID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -392,7 +404,7 @@ func testCredentialOwnership(t *testing.T, h Harness) {
 
 // assertPasskeyOwnership verifies a non-owner can neither rename nor delete a
 // passkey while the owner can (Requirement 16.4).
-func assertPasskeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, otherID int64) {
+func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -407,27 +419,27 @@ func assertPasskeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, oth
 	pkID := pks[0].ID
 
 	// Non-owner rename is a no-op: the name is unchanged.
-	if err := s.RenamePasskey(ctx, pkID, otherID, "hijacked"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: otherID}, "hijacked"); err != nil {
 		t.Fatalf("RenamePasskey(non-owner): %v", err)
 	}
 	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "original" {
 		t.Errorf("non-owner rename mutated passkey: %+v", pks)
 	}
 	// Non-owner delete is a no-op: the passkey survives.
-	if err := s.DeletePasskey(ctx, pkID, otherID); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: otherID}); err != nil {
 		t.Fatalf("DeletePasskey(non-owner): %v", err)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, ownerID); n != 1 {
 		t.Errorf("non-owner delete removed passkey: count = %d, want 1", n)
 	}
 	// Owner rename and delete take effect.
-	if err := s.RenamePasskey(ctx, pkID, ownerID, "renamed"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: ownerID}, "renamed"); err != nil {
 		t.Fatalf("RenamePasskey(owner): %v", err)
 	}
 	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "renamed" {
 		t.Errorf("owner rename did not take effect: %+v", pks)
 	}
-	if err := s.DeletePasskey(ctx, pkID, ownerID); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: ownerID}); err != nil {
 		t.Fatalf("DeletePasskey(owner): %v", err)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, ownerID); n != 0 {
@@ -437,7 +449,7 @@ func assertPasskeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, oth
 
 // assertAPIKeyOwnership verifies a non-owner cannot delete an API key while the
 // owner can (Requirement 16.4).
-func assertAPIKeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, otherID int64) {
+func assertAPIKeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -449,13 +461,13 @@ func assertAPIKeyOwnership(t *testing.T, s authlibstore.Composite, ownerID, othe
 		t.Fatalf("ListAPIKeysByUserID(owner) = (%d, %v), want (1, nil)", len(keys), kerr)
 	}
 	keyID := keys[0].ID
-	if err := s.DeleteAPIKey(ctx, keyID, otherID); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: keyID, UserID: otherID}); err != nil {
 		t.Fatalf("DeleteAPIKey(non-owner): %v", err)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, ownerID); len(keys) != 1 {
 		t.Errorf("non-owner delete removed api key: count = %d, want 1", len(keys))
 	}
-	if err := s.DeleteAPIKey(ctx, keyID, ownerID); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: keyID, UserID: ownerID}); err != nil {
 		t.Fatalf("DeleteAPIKey(owner): %v", err)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, ownerID); len(keys) != 0 {
@@ -499,7 +511,7 @@ func testSessionExpiry(t *testing.T, h Harness) {
 		t.Fatalf("CreateSession(boundary): %v", err)
 	}
 
-	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err := s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions: %v", err)
 	}

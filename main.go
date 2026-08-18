@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/api"
@@ -37,15 +37,15 @@ import (
 	"github.com/cplieger/subflux/internal/server"
 	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/subflux/internal/wiring"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // Compile-time interface satisfaction checks.
 var (
-	_ api.Store           = (*boltstore.DB)(nil)
-	_ authstore.AuthStore = (*authstore.Store)(nil)
-	_ api.ConfigProvider  = (*config.Config)(nil)
-	_ api.Scorer          = (*scorer.Engine)(nil)
+	_ api.Store          = (*boltstore.DB)(nil)
+	_ server.AuthStore   = (*authstore.Store)(nil)
+	_ api.ConfigProvider = (*config.Config)(nil)
+	_ api.Scorer         = (*scorer.Engine)(nil)
 )
 
 //go:embed config.example.yaml
@@ -231,8 +231,8 @@ func runServer() int {
 
 		// Auth setup. WebAuthn/OIDC are built by activation on the first
 		// successful config save, never here.
-		rateLimiter := ratelimit.NewRateLimiter(ctx, ratelimit.DefaultConfig())
-		defer rateLimiter.Stop()
+		rateLimiter := ratelimit.New(ctx, ratelimit.DefaultConfig())
+		defer stopRateLimiter(ctx, rateLimiter)
 		if err := srv.SetAuth(authDB, rateLimiter); err != nil {
 			slog.Error("failed to assemble authenticator", "error", err)
 			return 1
@@ -291,8 +291,8 @@ func runConfiguredServer(cfg *config.Config) int {
 		append(serverOptions(reg, syncExec), server.WithConfig(cfg))...)
 
 	// Auth setup.
-	rateLimiter := ratelimit.NewRateLimiter(ctx, ratelimit.DefaultConfig())
-	defer rateLimiter.Stop()
+	rateLimiter := ratelimit.New(ctx, ratelimit.DefaultConfig())
+	defer stopRateLimiter(ctx, rateLimiter)
 	if err := srv.SetAuth(authDB, rateLimiter); err != nil {
 		slog.Error("failed to assemble authenticator", "error", err)
 		return 1
@@ -396,6 +396,23 @@ func ensureAdminSocketDir(dir string) error {
 		return fmt.Errorf("admin socket dir %s: %w", dir, err)
 	}
 	return nil
+}
+
+// rateLimiterShutdownTimeout bounds the wait for the rate limiter's prune
+// goroutine to exit. It is generous: the goroutine only has to notice a closed
+// channel, so exceeding this means it is wedged, which is worth a log line.
+const rateLimiterShutdownTimeout = 5 * time.Second
+
+// stopRateLimiter stops the limiter's prune goroutine and waits for it to exit.
+// The wait runs on a context detached from ctx, because ctx is already cancelled
+// by the time this deferred call runs: waiting on it would report a timeout the
+// instant shutdown began, before the goroutine had any chance to leave.
+func stopRateLimiter(ctx context.Context, rl *ratelimit.RateLimiter) {
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rateLimiterShutdownTimeout)
+	defer cancel()
+	if err := rl.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("rate limiter shutdown did not complete", "error", err)
+	}
 }
 
 // serveAndWait starts fn in a goroutine and blocks until ctx is cancelled

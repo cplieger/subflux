@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/cplieger/auth/v4"
 )
 
 // This file holds the background sweeper that evicts expired sessions and OIDC
@@ -127,11 +129,12 @@ func (s *Store) SetSessionTimeouts(idle, absolute time.Duration) {
 // the read lock because SetSessionTimeouts may update them concurrently.
 func (s *Store) sweepOnce(now time.Time) {
 	s.mu.RLock()
-	idle, absolute, oidcTTL := s.idleTimeout, s.absTimeout, s.oidcTTL
+	timeouts := auth.SessionTimeouts{Idle: s.idleTimeout, Absolute: s.absTimeout}
+	oidcTTL := s.oidcTTL
 	s.mu.RUnlock()
 
 	ctx := context.Background()
-	if _, err := s.CleanupExpiredSessions(ctx, now, idle, absolute); err != nil {
+	if _, err := s.CleanupExpiredSessions(ctx, now, timeouts); err != nil {
 		slog.Debug("auth sweeper: session cleanup failed", "error", err)
 	}
 	if _, err := s.CleanupExpiredOIDCStates(ctx, now, oidcTTL); err != nil {

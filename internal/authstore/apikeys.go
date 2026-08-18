@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -241,27 +241,27 @@ func collectAPIKeysByUser(tx *bbolt.Tx, userID int64) ([]auth.Key, error) {
 	return out, nil
 }
 
-// DeleteAPIKey removes the API key identified by surrogate id, but only when it
-// belongs to userID (Requirement 16.4, mirroring the SQLite
+// DeleteAPIKey removes the API key ref identifies, but only when it belongs to
+// ref.UserID (Requirement 16.4, mirroring the SQLite
 // `DELETE ... WHERE id=? AND user_id=?`). It resolves the key hash via a
 // user-scoped index walk, so it can only ever delete the supplied user's own
 // key. It deletes the primary row and its ix_apikey_user entry in one Update; a
-// non-matching (id, userID) is a no-op returning nil.
-func (s *Store) DeleteAPIKey(_ context.Context, id, userID int64) error {
+// ref matching no row is a no-op returning nil.
+func (s *Store) DeleteAPIKey(_ context.Context, ref auth.KeyRef) error {
 	var deleted bool
 	err := s.update(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)
 		if !ok {
 			return nil
 		}
-		hash, found, err := s.findUserAPIKeyByID(tx, userID, id)
+		hash, found, err := s.findUserAPIKeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
 		if err := kb.Delete([]byte(hash)); err != nil {
 			return fmt.Errorf("authstore: delete api key: %w", err)
 		}
-		if err := idxDelete(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(userID, hash)); err != nil {
+		if err := idxDelete(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(ref.UserID, hash)); err != nil {
 			return err
 		}
 		deleted = true
@@ -271,7 +271,7 @@ func (s *Store) DeleteAPIKey(_ context.Context, id, userID int64) error {
 		return err
 	}
 	if deleted {
-		slog.Info("api key deleted", "key_id", id, "user_id", userID)
+		slog.Info("api key deleted", "key_id", ref.ID, "user_id", ref.UserID)
 	}
 	return nil
 }

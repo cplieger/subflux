@@ -1,3 +1,13 @@
+// Package authstore is subflux's bbolt-backed implementation of the auth
+// library's persistence SPI. Durable records (users, passkeys, API keys) live
+// in bbolt buckets in the same file as the core store; ephemeral records
+// (sessions, in-flight OIDC login states) live only in memory.
+//
+// Subflux uses the library's domain types (auth.User, auth.Session, auth.Key,
+// auth.PasskeyCredential) directly, so Store implements every role interface
+// of the SPI with zero adapter glue. The package imports only the auth
+// library and the core store's bucket/codec helpers, which keeps it a leaf and
+// keeps the contract suite (authstoretest) free of an import cycle.
 package authstore
 
 import (
@@ -5,23 +15,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/buckets"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
 
-// Compile-time assertion: *Store implements the composite AuthStore interface
-// (UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore).
-var _ AuthStore = (*Store)(nil)
+// Compile-time assertions: *Store implements every role interface of the auth
+// library's persistence SPI. Naming the five roles individually, rather than
+// one composite, keeps the failure message pointing at the role that broke.
+var (
+	_ auth.UserStore        = (*Store)(nil)
+	_ auth.SessionPersister = (*Store)(nil)
+	_ auth.PasskeyStore     = (*Store)(nil)
+	_ auth.KeyStore         = (*Store)(nil)
+	_ auth.OIDCStateStore   = (*Store)(nil)
+)
 
 // oidcRec is an in-flight OIDC login state held only in memory. It is never
 // persisted: an in-progress login that does not survive a restart simply
 // retries.
 type oidcRec struct {
 	createdAt    time.Time // creation instant; expiry derives from sweep maxAge
-	nonce        string
-	codeVerifier string
+	nonce        auth.OIDCNonce
+	codeVerifier auth.OIDCCodeVerifier
 	redirectURI  string
 }
 
@@ -36,11 +53,11 @@ type oidcRec struct {
 // Bucket bootstrap is owned by the core store, which creates the auth buckets
 // alongside the core buckets in one Update on Open.
 type Store struct {
-	db       *bbolt.DB                // shared with the core store (one file, one lock)
-	sessions map[string]*auth.Session // ephemeral, never persisted
-	oidc     map[string]*oidcRec      // ephemeral, never persisted
-	stop     chan struct{}            // sweeper shutdown signal (closed by Close)
-	done     chan struct{}            // closed by the sweeper goroutine on exit; nil until Open
+	db       *bbolt.DB                   // shared with the core store (one file, one lock)
+	sessions map[string]*auth.Session    // ephemeral, never persisted
+	oidc     map[auth.OIDCState]*oidcRec // ephemeral, never persisted
+	stop     chan struct{}               // sweeper shutdown signal (closed by Close)
+	done     chan struct{}               // closed by the sweeper goroutine on exit; nil until Open
 
 	// Sweeper timings, set in New to the package defaults (sweeper.go). They
 	// live on the Store rather than as Open arguments because Open takes none
@@ -64,7 +81,7 @@ func New(db *bbolt.DB) *Store {
 	return &Store{
 		db:            db,
 		sessions:      make(map[string]*auth.Session),
-		oidc:          make(map[string]*oidcRec),
+		oidc:          make(map[auth.OIDCState]*oidcRec),
 		stop:          make(chan struct{}),
 		sweepInterval: defaultSweepInterval,
 		idleTimeout:   defaultSessionIdleTimeout,

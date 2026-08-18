@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -165,7 +165,7 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 
 	// Wrong user cannot delete: the key is still present afterward
 	// (mirrors DELETE ... WHERE id=? AND user_id=? affecting zero rows).
-	if err := s.DeleteAPIKey(ctx, owner.ID, 2); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: owner.ID, UserID: 2}); err != nil {
 		t.Fatalf("DeleteAPIKey(wrong owner): %v", err)
 	}
 	if got, _, _ := s.GetAPIKeyByHash(ctx, "owner-hash"); got == nil {
@@ -176,7 +176,7 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Real owner deletes; both the primary and its index entry go away.
-	if err := s.DeleteAPIKey(ctx, owner.ID, 1); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: owner.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeleteAPIKey(owner): %v", err)
 	}
 	if got, _, _ := s.GetAPIKeyByHash(ctx, "owner-hash"); got != nil {
@@ -189,7 +189,7 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 
 func TestDeleteAPIKey_absentIsNoOp(t *testing.T) {
 	s := newAPIKeyStore(t)
-	if err := s.DeleteAPIKey(t.Context(), 12345, 1); err != nil {
+	if err := s.DeleteAPIKey(t.Context(), auth.KeyRef{ID: 12345, UserID: 1}); err != nil {
 		t.Errorf("DeleteAPIKey(absent) = %v, want nil", err)
 	}
 }
@@ -265,7 +265,7 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
 	logs := capture.Default(t)
-	if err := s.DeleteAPIKey(ctx, key.ID, 1); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: key.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeleteAPIKey: %v", err)
 	}
 	if got := logs.CountExact("api key deleted"); got != 1 {
@@ -279,7 +279,7 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeleteAPIKey_propagatesUpdateError(t *testing.T) {
 	s := newAPIKeyStore(t)
 	seedCorruptAPIKey(t, s, 1, "corrupt-hash")
-	if err := s.DeleteAPIKey(t.Context(), 999, 1); err == nil {
+	if err := s.DeleteAPIKey(t.Context(), auth.KeyRef{ID: 999, UserID: 1}); err == nil {
 		t.Fatal("DeleteAPIKey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

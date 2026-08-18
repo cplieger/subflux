@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -104,7 +104,7 @@ func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.SecDB.DeleteAPIKey(r.Context(), keyID, user.ID); err != nil {
+	if err := h.SecDB.DeleteAPIKey(r.Context(), auth.KeyRef{ID: keyID, UserID: user.ID}); err != nil {
 		slog.Error("revoke api key: db error", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return

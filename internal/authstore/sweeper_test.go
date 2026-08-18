@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -52,7 +53,7 @@ func sessionPresent(t *testing.T, s *Store, hash string) bool {
 // the entry is expected gone, or as a final assertion; the sweeper test only
 // uses it after eviction is expected, and via the in-package map under lock for
 // the live check.
-func oidcPresent(s *Store, state string) bool {
+func oidcPresent(s *Store, state auth.OIDCState) bool {
 	s.mu.RLock()
 	_, ok := s.oidc[state]
 	s.mu.RUnlock()

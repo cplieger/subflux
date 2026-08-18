@@ -34,7 +34,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // Canonical JSON response keys and sentinel error messages shared
@@ -104,7 +104,7 @@ func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
 // errors, use InternalErrorC(w, r, err, code), which logs the raw error and
 // returns a generic message.
 func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
-	webhttp.WriteError(w, r, status, string(code), msg)
+	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }
 
 // Ok writes a 200 {"ok": true} response — the standard "action succeeded" reply
@@ -125,5 +125,5 @@ type StatusResponse struct {
 // envelope and pulls the request id from r's context (nil-safe on r). The wire
 // shape is identical to the previous hand-built errorResponse.
 func writeError(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
-	webhttp.WriteError(w, r, status, string(code), msg)
+	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }

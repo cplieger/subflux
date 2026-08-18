@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -27,10 +28,12 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := ClientIP(r)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(req.Username)
 
 	// Rate limit check.
-	allowed, retryAfter := h.RateLimiter.Allow(ip, req.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		Audit(r, slog.LevelWarn, AuditLoginRateLimited, false, req.Username,
 			slog.Int("retry_after_seconds", int(retryAfter.Seconds())+1))
@@ -51,7 +54,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if !found {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
@@ -60,7 +63,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if !user.Enabled {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
@@ -69,7 +72,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	passOK, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !passOK {
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "invalid_password"))
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
@@ -78,7 +81,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Password verified: clear failure counters (anti soft-lockout, OWASP
 	// ASVS 2.2.1) and create session directly.
-	h.RateLimiter.Reset(ip, req.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)

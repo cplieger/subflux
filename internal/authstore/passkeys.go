@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -310,19 +310,18 @@ func (s *Store) UpdatePasskeyAfterLogin(_ context.Context, credID []byte, signCo
 	})
 }
 
-// RenamePasskey sets the friendly name of the passkey identified by surrogate
-// id, but only when it belongs to userID (Requirement 16.4). It resolves the
-// credential id by a user-scoped walk of ix_passkey_user, so a passkey owned by
-// a different user is never visited and cannot be renamed. A non-matching
-// (id, userID) is a no-op returning nil, matching the SQLite UPDATE affecting
-// zero rows.
-func (s *Store) RenamePasskey(_ context.Context, id, userID int64, name string) error {
+// RenamePasskey sets the friendly name of the passkey ref identifies, but only
+// when it belongs to ref.UserID (Requirement 16.4). It resolves the credential
+// id by a user-scoped walk of ix_passkey_user, so a passkey owned by a
+// different user is never visited and cannot be renamed. A ref matching no row
+// is a no-op returning nil, matching the SQLite UPDATE affecting zero rows.
+func (s *Store) RenamePasskey(_ context.Context, ref auth.PasskeyRef, name string) error {
 	return s.update(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
 		if !ok {
 			return nil
 		}
-		credID, rec, found, err := s.findUserPasskeyByID(tx, userID, id)
+		credID, rec, found, err := s.findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
@@ -338,27 +337,26 @@ func (s *Store) RenamePasskey(_ context.Context, id, userID int64, name string) 
 	})
 }
 
-// DeletePasskey removes the passkey identified by surrogate id, but only when
-// it belongs to userID (Requirement 16.4). Like RenamePasskey it resolves the
-// credential id via a user-scoped index walk, so it can only ever delete the
-// supplied user's own passkey. It deletes the primary row and its
-// ix_passkey_user entry in one Update; a non-matching (id, userID) is a no-op
-// returning nil.
-func (s *Store) DeletePasskey(_ context.Context, id, userID int64) error {
+// DeletePasskey removes the passkey ref identifies, but only when it belongs to
+// ref.UserID (Requirement 16.4). Like RenamePasskey it resolves the credential
+// id via a user-scoped index walk, so it can only ever delete the supplied
+// user's own passkey. It deletes the primary row and its ix_passkey_user entry
+// in one Update; a ref matching no row is a no-op returning nil.
+func (s *Store) DeletePasskey(_ context.Context, ref auth.PasskeyRef) error {
 	var deleted bool
 	err := s.update(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
 		if !ok {
 			return nil
 		}
-		credID, _, found, err := s.findUserPasskeyByID(tx, userID, id)
+		credID, _, found, err := s.findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
 		if err := pb.Delete(credID); err != nil {
 			return fmt.Errorf("authstore: delete passkey: %w", err)
 		}
-		if err := idxDelete(tx, bucketIxPasskeyUser, passkeyUserIndexKey(userID, credID)); err != nil {
+		if err := idxDelete(tx, bucketIxPasskeyUser, passkeyUserIndexKey(ref.UserID, credID)); err != nil {
 			return err
 		}
 		deleted = true
@@ -368,7 +366,7 @@ func (s *Store) DeletePasskey(_ context.Context, id, userID int64) error {
 		return err
 	}
 	if deleted {
-		slog.Info("passkey deleted", "passkey_id", id, "user_id", userID)
+		slog.Info("passkey deleted", "passkey_id", ref.ID, "user_id", ref.UserID)
 	}
 	return nil
 }

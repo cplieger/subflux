@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -262,7 +262,7 @@ func TestRenamePasskey_ownershipEnforced(t *testing.T) {
 
 	// A different user attempting to rename by the same surrogate id must be a
 	// no-op (Requirement 16.4): the name is unchanged.
-	if err := s.RenamePasskey(ctx, owner.ID, 2, "hijacked"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 2}, "hijacked"); err != nil {
 		t.Fatalf("RenamePasskey(wrong owner): %v", err)
 	}
 	got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID)
@@ -271,7 +271,7 @@ func TestRenamePasskey_ownershipEnforced(t *testing.T) {
 	}
 
 	// The real owner can rename.
-	if err := s.RenamePasskey(ctx, owner.ID, 1, "new-name"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 1}, "new-name"); err != nil {
 		t.Fatalf("RenamePasskey(owner): %v", err)
 	}
 	got, _, _ = s.GetPasskeyByCredentialID(ctx, owner.CredentialID)
@@ -290,7 +290,7 @@ func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Wrong user cannot delete: the credential is still present afterward.
-	if err := s.DeletePasskey(ctx, owner.ID, 2); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 2}); err != nil {
 		t.Fatalf("DeletePasskey(wrong owner): %v", err)
 	}
 	if got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID); got == nil {
@@ -301,7 +301,7 @@ func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Real owner deletes; both the primary and its index entry go away.
-	if err := s.DeletePasskey(ctx, owner.ID, 1); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeletePasskey(owner): %v", err)
 	}
 	if got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID); got != nil {
@@ -422,7 +422,7 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
 	logs := capture.Default(t)
-	if err := s.DeletePasskey(ctx, cred.ID, 1); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: cred.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeletePasskey: %v", err)
 	}
 	if got := logs.CountExact("passkey deleted"); got != 1 {
@@ -436,7 +436,7 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeletePasskey_propagatesUpdateError(t *testing.T) {
 	s := newPasskeyStore(t)
 	seedCorruptPasskey(t, s, 1, []byte("corrupt-cred"))
-	if err := s.DeletePasskey(t.Context(), 999, 1); err == nil {
+	if err := s.DeletePasskey(t.Context(), auth.PasskeyRef{ID: 999, UserID: 1}); err == nil {
 		t.Fatal("DeletePasskey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

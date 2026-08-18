@@ -36,10 +36,6 @@ type Store interface {
 	Close(ctx context.Context) error
 }
 
-// (AuthStore composite moved to internal/auth/store_iface.go for
-// consumer-placement; sub-interfaces remain here because they're
-// referenced by server/ narrow interfaces individually.)
-
 // --- Configuration ---
 
 // ConfigProvider gives read access to configuration.

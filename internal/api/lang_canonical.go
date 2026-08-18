@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 // LangBrazilianPortuguese is subflux's internal code for Brazilian Portuguese.

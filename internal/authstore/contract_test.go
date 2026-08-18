@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authlibstore "github.com/cplieger/auth/v3/store"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/authstore/authstoretest"
 	"github.com/cplieger/subflux/internal/boltstore"
@@ -66,12 +65,12 @@ func (h *boltHarness) open(t *testing.T) {
 	h.s = s
 }
 
-func (h *boltHarness) Store() authlibstore.Composite { return h.s }
+func (h *boltHarness) Store() authstoretest.SPI { return h.s }
 
 // Reopen simulates a process restart: stop the sweeper, close the shared
 // handle, and reopen durable state from the same file. Ephemeral state
 // (sessions, OIDC) is in-memory by design and is therefore empty after this.
-func (h *boltHarness) Reopen(t *testing.T) authlibstore.Composite {
+func (h *boltHarness) Reopen(t *testing.T) authstoretest.SPI {
 	t.Helper()
 	if err := h.s.Close(); err != nil {
 		t.Fatalf("authstore.Close on reopen: %v", err)

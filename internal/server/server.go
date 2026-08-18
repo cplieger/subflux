@@ -20,18 +20,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
 )
@@ -66,7 +66,7 @@ type Metrics interface {
 	RecordEmbeddedDetectorError()
 	RecordScan(items, found int, dur time.Duration)
 	RecordImport(source api.PollKey)
-	RecordHTTP(method, path string, status int, d time.Duration)
+	RecordHTTP(rm webhttp.RequestMetric)
 	RecordPanic()
 	TotalSearches() int64
 	Handler() http.HandlerFunc
@@ -140,13 +140,27 @@ func (s *Server) authBypass() bool {
 // disk-churn protection.
 const sessionActivityThrottle = 60 * time.Second
 
+// AuthStore is the persistence surface SetAuth requires: the union of the
+// narrow interfaces its consumers declare — the library's own Authenticator
+// contract plus the four handler-side roles. The auth library publishes no
+// composite of its own (v4 merged the store SPI into its root package and
+// exposes it as role interfaces), so the union is declared here, at the one
+// site that fans a single concrete store out to all five consumers.
+type AuthStore interface {
+	auth.AuthenticatorStore
+	authhandlers.AccountStore
+	authhandlers.AuthAdminStore
+	authhandlers.SecurityStore
+	authhandlers.OIDCStore
+}
+
 // SetAuth configures authentication dependencies on the server. WebAuthn and
 // OIDC are deliberately absent from the signature: both are config-derived
 // capabilities that activation builds into the live snapshot, resolved per
 // request through the handler's resolver funcs. SetAuth returns an error only
 // when the assembled authenticator configuration is rejected by the auth
 // library's construction validation (a programming error, not runtime state).
-func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker) error {
+func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 	s.authStore = store
 	s.adminDB = store
 	s.secDB = store
@@ -160,18 +174,24 @@ func (s *Server) SetAuth(store authstore.AuthStore, rl ratelimit.Checker) error 
 	// startup-time copy would silently ignore later edits). Activity writes
 	// are throttled in the verifier, replacing the former debouncer+batcher
 	// subsystem.
-	authn, err := auth.NewAuthenticator(store,
+	authn, err := auth.New(store,
 		auth.WithBypass(s.authBypass),
 		auth.WithCookie(authhandlers.SessionCookie),
 		auth.WithUnauthorizedResponse(authhandlers.UnauthorizedResponse),
 		auth.WithIdleTimeout(config.DefaultSessionIdleTimeout),
 		auth.WithAbsTimeout(config.DefaultSessionAbsoluteTimeout),
 		auth.WithActivityThrottle(sessionActivityThrottle),
-		auth.WithTimeoutSource(func() (idle, absolute time.Duration) {
+		auth.WithTimeoutSource(func() auth.SessionTimeouts {
 			if ls := s.state(); ls != nil && ls.cfg != nil {
-				return ls.cfg.SessionIdleTimeout(), ls.cfg.SessionAbsoluteTimeout()
+				return auth.SessionTimeouts{
+					Idle:     ls.cfg.SessionIdleTimeout(),
+					Absolute: ls.cfg.SessionAbsoluteTimeout(),
+				}
 			}
-			return config.DefaultSessionIdleTimeout, config.DefaultSessionAbsoluteTimeout
+			return auth.SessionTimeouts{
+				Idle:     config.DefaultSessionIdleTimeout,
+				Absolute: config.DefaultSessionAbsoluteTimeout,
+			}
 		}),
 	)
 	if err != nil {

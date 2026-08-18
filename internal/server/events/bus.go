@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/cplieger/webhttp/sse"
+	"github.com/cplieger/webhttp/v2/sse"
 )
 
 // EventBus publishes subflux's typed events to connected SSE clients.

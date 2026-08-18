@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authwebauthn "github.com/cplieger/auth/v3/webauthn"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -58,7 +59,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, nil)
+	webauthnUser, err := authwebauthn.NewUser(user, nil)
 	if err != nil {
 		slog.Error("webauthn info: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -116,19 +117,21 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	ip := ClientIP(r)
-	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(user.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
 		return
 	}
 	if okPass, perr := auth.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
-		h.RateLimiter.Record(ip, user.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid password")
 		return
 	}
-	h.RateLimiter.Reset(ip, user.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 
 	ctx := r.Context()
 	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
@@ -138,7 +141,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, creds)
+	webauthnUser, err := authwebauthn.NewUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -199,7 +202,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	webauthnUser, err := authwebauthn.NewWebAuthnUser(user, creds)
+	webauthnUser, err := authwebauthn.NewUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register finish: nil user", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
@@ -266,15 +269,18 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	if cfg := h.Config(); cfg != nil {
 		oidcEnabled = cfg.OIDCEnabled()
 	}
-	hasPassword := user.PasswordHash != ""
-	oidcLinked := user.OIDCSub != ""
-
-	if !auth.CanDisableAuthMethod(auth.MethodPasskey, hasPassword, passkeyCount-1, oidcEnabled, oidcLinked) {
+	remaining := auth.MethodAvailability{
+		PasskeyCount: passkeyCount - 1,
+		HasPassword:  user.PasswordHash != "",
+		OIDCEnabled:  oidcEnabled,
+		OIDCLinked:   user.OIDCSub != "",
+	}
+	if !auth.CanDisableMethod(auth.MethodPasskey, remaining) {
 		api.ConflictC(w, r, api.CodeConflict, "cannot remove last authentication method")
 		return
 	}
 
-	if err := h.SecDB.DeletePasskey(ctx, passkeyID, user.ID); err != nil {
+	if err := h.SecDB.DeletePasskey(ctx, auth.PasskeyRef{ID: passkeyID, UserID: user.ID}); err != nil {
 		slog.Error("delete passkey: db error", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
@@ -316,7 +322,7 @@ func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.SecDB.RenamePasskey(r.Context(), passkeyID, user.ID, req.Name); err != nil {
+	if err := h.SecDB.RenamePasskey(r.Context(), auth.PasskeyRef{ID: passkeyID, UserID: user.ID}, req.Name); err != nil {
 		slog.Error("rename passkey: db error", "error", err)
 		api.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return

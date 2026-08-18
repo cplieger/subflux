@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // TrustedProxyNets returns the parsed trusted reverse-proxy CIDR set used for

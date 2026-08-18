@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -37,14 +37,21 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	}
 	t.Cleanup(func() { authDB.Close() })
 
-	// Not t.Context(): the limiter's sweeper is torn down by the rl.Stop() cleanup below, so its context must outlive the test body.
-	rl := ratelimit.NewRateLimiter(context.Background(), ratelimit.DefaultConfig())
-	t.Cleanup(func() { rl.Stop() })
+	// Not t.Context(): the limiter's sweeper is torn down by the rl.Shutdown()
+	// cleanup below, so its context must outlive the test body.
+	rlCtx, rlCancel := context.WithCancel(context.Background())
+	rl := ratelimit.New(rlCtx, ratelimit.DefaultConfig())
+	t.Cleanup(func() {
+		rlCancel()
+		if err := rl.Shutdown(context.Background()); err != nil {
+			t.Errorf("rate limiter Shutdown: %v", err)
+		}
+	})
 
 	// The production authenticator shape (library authenticator + subflux's
 	// cookie and 401 policies), minus the live-config timeout source: tests
 	// pin static 24h/7d timeouts.
-	authn, err := auth.NewAuthenticator(authDB,
+	authn, err := auth.New(authDB,
 		auth.WithCookie(authhandlers.SessionCookie),
 		auth.WithUnauthorizedResponse(authhandlers.UnauthorizedResponse),
 		auth.WithIdleTimeout(24*time.Hour),

@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // =============================================================================
@@ -161,7 +162,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 type noopMetrics struct{}
 
 func (noopMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) {}
-func (noopMetrics) RecordHTTP(_, _ string, _ int, _ time.Duration)          {}
+func (noopMetrics) RecordHTTP(webhttp.RequestMetric)                        {}
 func (noopMetrics) RecordPanic()                                            {}
 func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
 func (noopMetrics) AdaptiveSkip()                                           {}
