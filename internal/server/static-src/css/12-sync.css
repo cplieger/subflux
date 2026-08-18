@@ -144,13 +144,26 @@
   border-radius: 0;
   transition: background var(--dur-micro) var(--ease-micro);
 
+  /* CONCENTRIC with .sync-timecode, which is the box these two corners follow:
+     inner = outer − border − inset, and that container carries no border, so
+     6 − 0 − 2 = 4px. Reusing --radius-sm here (the container's own value) put
+     6px against a 6px arc at a 2px inset, which widens the background around
+     the corner from 2.00px on the straight edges to 2.83px at the corner.
+     Why the rule reads this way: a border-radius corner is a quarter circle
+     whose centre sits `radius` in from both edges, so two arcs are concentric
+     only when the inner radius is short by the gap between them. See
+     https://cloudfour.com/thinks/the-math-behind-nesting-rounded-corners/
+     (which omits the border term) and subflux-ui.md "Visual Consistency
+     Rules". */
+  --tc-corner: calc(var(--radius-sm) - var(--sp-1));
+
   &:first-child {
     border-block-end: none;
-    border-radius: 0 var(--radius-sm) 0 0;
+    border-radius: 0 var(--tc-corner) 0 0;
   }
 
   &:last-child {
-    border-radius: 0 0 var(--radius-sm) 0;
+    border-radius: 0 0 var(--tc-corner) 0;
   }
 
   &:hover {
