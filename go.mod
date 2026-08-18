@@ -3,16 +3,16 @@ module github.com/cplieger/subflux
 go 1.26.7
 
 require (
-	github.com/cplieger/arrapi v1.8.10
-	github.com/cplieger/atomicfile/v2 v2.9.2
-	github.com/cplieger/auth/v3 v3.0.2
-	github.com/cplieger/health v1.5.2
-	github.com/cplieger/pathinside v1.0.2
-	github.com/cplieger/runesafe v1.4.2
-	github.com/cplieger/slogx v1.6.2
-	github.com/cplieger/ssrf/v3 v3.0.2
-	github.com/cplieger/webhttp v1.23.2
-	github.com/cplieger/wiregen/v2 v2.0.7
+	github.com/cplieger/arrapi v1.8.8
+	github.com/cplieger/atomicfile/v2 v2.9.1
+	github.com/cplieger/auth/v3 v3.0.0
+	github.com/cplieger/health v1.5.1
+	github.com/cplieger/pathinside/v2 v2.0.0
+	github.com/cplieger/runesafe v1.4.1
+	github.com/cplieger/slogx v1.6.1
+	github.com/cplieger/ssrf/v3 v3.0.1
+	github.com/cplieger/webhttp v1.23.1
+	github.com/cplieger/wiregen/v2 v2.0.6
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/nwaples/rardecode/v2 v2.3.0
 	github.com/ulikunitz/xz v0.5.16
@@ -22,7 +22,7 @@ require (
 	pgregory.net/rapid v1.3.0
 )
 
-require github.com/cplieger/envx/yamlenv v1.2.3
+require github.com/cplieger/envx/yamlenv/v2 v2.0.0
 
 require github.com/cplieger/metrics/v3 v3.0.3
 
@@ -45,8 +45,8 @@ require golang.org/x/text v0.41.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
-	github.com/cplieger/envx v1.6.4
-	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
+	github.com/cplieger/envx/v2 v2.0.0
+	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.3.0 // indirect

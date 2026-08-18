@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/envx"
+	"github.com/cplieger/envx/v2"
 	"github.com/cplieger/runesafe"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/apipaths"
@@ -55,7 +56,7 @@ const (
 // empty string if SUBFLUX_URL is malformed (caller decides how to fail;
 // keeps the no-os.Exit-from-helpers contract).
 func serverURL() (string, bool) {
-	u := envx.String("SUBFLUX_URL", "http://127.0.0.1:8374")
+	u := cmp.Or(envx.String("SUBFLUX_URL"), "http://127.0.0.1:8374")
 	u = strings.TrimRight(strings.TrimSpace(u), "/")
 	parsed, err := url.Parse(u)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -105,7 +106,7 @@ func cliRequestWith(client *http.Client, timeout time.Duration, method, path str
 	// server. SUBFLUX_API_KEY (generate one with `subflux generate-api-key`)
 	// authenticates the CLI via the X-API-Key header the server's verifier
 	// reads; without it, commands against an auth-enabled instance answer 401.
-	if key := envx.String("SUBFLUX_API_KEY", ""); key != "" {
+	if key := envx.String("SUBFLUX_API_KEY"); key != "" {
 		req.Header.Set("X-API-Key", key)
 	}
 	resp, err := client.Do(req)
