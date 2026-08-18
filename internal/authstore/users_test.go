@@ -493,3 +493,46 @@ func TestDeleteUser_propagatesAPIKeyCascadeError(t *testing.T) {
 		t.Fatal("DeleteUser with a failing API-key cascade = nil, want a non-nil error")
 	}
 }
+
+// TestUserByIndex_danglingEntryIsAnIntegrityFault pins the distinction the
+// found result alone cannot make: an index entry naming a user id that is not
+// in auth_users is a broken invariant, not a normal "no such user". Both
+// index-backed lookups must report it as an error so a caller does not act on
+// it as absence (create the user, then collide with the index entry it could
+// not see).
+func TestUserByIndex_danglingEntryIsAnIntegrityFault(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+
+	// A name index entry pointing at user id 42, which no auth_users row holds.
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(bucketIxUserName)).Put(userNameIndexKey("ghost"), kv.Be64(42))
+	}); err != nil {
+		t.Fatalf("seed dangling name index entry: %v", err)
+	}
+	user, found, err := s.GetUserByUsername(ctx, "ghost")
+	if !errors.Is(err, errDanglingIndex) {
+		t.Errorf("GetUserByUsername(dangling) err = %v, want errDanglingIndex", err)
+	}
+	if user != nil || found {
+		t.Errorf("GetUserByUsername(dangling) = (%+v, %t), want (nil, false)", user, found)
+	}
+
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(bucketIxUserOIDC)).Put(userOIDCIndexKey("https://idp", "sub-1"), kv.Be64(43))
+	}); err != nil {
+		t.Fatalf("seed dangling oidc index entry: %v", err)
+	}
+	user, found, err = s.GetUserByOIDCSub(ctx, "https://idp", "sub-1")
+	if !errors.Is(err, errDanglingIndex) {
+		t.Errorf("GetUserByOIDCSub(dangling) err = %v, want errDanglingIndex", err)
+	}
+	if user != nil || found {
+		t.Errorf("GetUserByOIDCSub(dangling) = (%+v, %t), want (nil, false)", user, found)
+	}
+
+	// A genuinely absent user is still plain absence, not the integrity fault.
+	if _, found, err := s.GetUserByUsername(ctx, "nobody"); err != nil || found {
+		t.Errorf("GetUserByUsername(absent) = (found %t, err %v), want (false, nil)", found, err)
+	}
+}

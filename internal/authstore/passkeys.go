@@ -245,8 +245,8 @@ func collectPasskeysByUser(tx *bbolt.Tx, userID int64) ([]auth.PasskeyCredential
 }
 
 // GetPasskeyByCredentialID looks up a passkey by its credential id (the
-// WebAuthn login hot path), returning (nil, nil) when not found (matching the
-// old store's sql.ErrNoRows -> nil mapping). Decoding fails closed.
+// WebAuthn login hot path), reporting absence through found rather than a nil
+// credential with a nil error. Decoding fails closed.
 func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
 	var out *auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {

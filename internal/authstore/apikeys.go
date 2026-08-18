@@ -161,8 +161,8 @@ func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte)
 }
 
 // GetAPIKeyByHash looks up an API key by its hash (the API-auth hot path),
-// returning (nil, nil) when not found (matching the old store's sql.ErrNoRows
-// -> nil mapping). Decoding fails closed (auth bucket).
+// reporting absence through found rather than a nil key with a nil error.
+// Decoding fails closed (auth bucket).
 func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
 	var out *auth.Key
 	err := s.view(func(tx *bbolt.Tx) error {

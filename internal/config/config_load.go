@@ -15,7 +15,6 @@ import (
 	"github.com/cplieger/envx/yamlenv/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
-	"go.yaml.in/yaml/v3"
 )
 
 // Compile-time assertion: *Config satisfies api.ConfigProvider.
@@ -270,17 +269,20 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 
 // appOwnedDecodeErr reports whether a decode error came from this package's
 // own UnmarshalYAML implementations (Duration's "invalid duration ..."):
-// neither a *yaml.TypeError nor "yaml:"-prefixed. yamlenv.Load returns such
-// errors unchanged onto the two operator surfaces (the startup log and the
-// PUT /api/config response body): their vocabulary is app-owned, value-safe
-// by construction (Duration deliberately withholds the offending scalar),
-// and pinned by tests. Everything yaml.v3 itself produces stays sanitized
-// by the library.
+// yamlenv wraps exactly those in *yamlenv.UnmarshalerError, and never wraps one
+// of yaml.v3's own errors, so the type IS the provenance answer. yamlenv.Load
+// returns such errors unchanged onto the two operator surfaces (the startup log
+// and the PUT /api/config response body): their vocabulary is app-owned,
+// value-safe by construction (Duration deliberately withholds the offending
+// scalar), and pinned by tests. Everything yaml.v3 itself produces stays
+// sanitized by the library.
+//
+// The former test — no *yaml.TypeError and no "yaml:" message prefix — decided
+// provenance from yaml.v3's wording, so a reworded prefix upstream would have
+// flipped it toward disclosing a library error on both surfaces.
 func appOwnedDecodeErr(err error) bool {
-	if _, ok := errors.AsType[*yaml.TypeError](err); ok {
-		return false
-	}
-	return !strings.HasPrefix(err.Error(), "yaml:")
+	_, ok := errors.AsType[*yamlenv.UnmarshalerError](err)
+	return ok
 }
 
 // buildCaches pre-computes lookup structures after config is fully loaded.

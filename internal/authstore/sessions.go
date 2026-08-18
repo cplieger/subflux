@@ -21,7 +21,7 @@ import (
 //   - CreateSession stores by token hash; a copy is held so a caller mutating
 //     the passed struct afterwards cannot mutate stored state.
 //   - GetSessionByHash returns a copy (callers cannot mutate the stored row),
-//     and (nil, nil) when absent (matching sql.ErrNoRows -> nil).
+//     and reports absence through found.
 //   - UpdateSessionActivity / DeleteSession / DeleteUserSessions on an absent
 //     row are no-ops returning nil (matching an UPDATE/DELETE affecting 0 rows).
 //   - CleanupExpiredSessions evicts a session past EITHER the idle timeout
@@ -58,10 +58,10 @@ func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 	return nil
 }
 
-// GetSessionByHash returns a copy of the session with the given token hash, or
-// (nil, nil) when none exists (matching the old store's sql.ErrNoRows -> nil
-// mapping). A copy is returned so callers cannot mutate the stored session
-// through the returned pointer.
+// GetSessionByHash returns a copy of the session with the given token hash,
+// reporting absence through found rather than a nil session with a nil error. A
+// copy is returned so callers cannot mutate the stored session through the
+// returned pointer.
 func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
 	// cloneSession reads the stored struct's fields, so it must run while the
 	// read lock is held: a concurrent UpdateSessionActivity mutates
