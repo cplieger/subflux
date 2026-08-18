@@ -46,7 +46,7 @@ require golang.org/x/text v0.41.0 // indirect
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/cplieger/envx v1.6.2
-	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.3.0 // indirect
