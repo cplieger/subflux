@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/jsonx"
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/ssrf/v3"
@@ -184,7 +184,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource download", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource download", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
@@ -387,7 +387,7 @@ func (p *Provider) doSearch(ctx context.Context, params url.Values) ([]searchRes
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource title search", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource title search", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
@@ -436,7 +436,7 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subsource subtitles", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subsource subtitles", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 

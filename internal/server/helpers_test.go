@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"

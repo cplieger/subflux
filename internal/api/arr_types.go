@@ -1,6 +1,6 @@
 package api
 
-import "github.com/cplieger/arrapi"
+import "github.com/cplieger/arrapi/v2"
 
 // The Sonarr/Radarr DTOs are consumed directly as github.com/cplieger/arrapi
 // types throughout subflux; there are no api.* aliases for them. This file

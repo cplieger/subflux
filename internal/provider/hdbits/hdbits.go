@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httputil"
@@ -309,7 +309,7 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, p.passkey)
+		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, httpx.Secret(p.passkey))
 	}
 	defer resp.Body.Close()
 

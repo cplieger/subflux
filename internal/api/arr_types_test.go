@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"pgregory.net/rapid"
 )
 

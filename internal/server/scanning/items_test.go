@@ -3,7 +3,7 @@ package scanning
 import (
 	"testing"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 )
 
 // SortByTitle returns every input item; one episode and one movie together

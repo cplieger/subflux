@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/search/release"

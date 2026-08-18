@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 )
 
 // FuzzExtractAltTitlesNoDuplicates verifies that ExtractAltTitles never

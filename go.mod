@@ -3,12 +3,12 @@ module github.com/cplieger/subflux
 go 1.26.7
 
 require (
-	github.com/cplieger/arrapi v1.8.8
+	github.com/cplieger/arrapi/v2 v2.0.0
 	github.com/cplieger/atomicfile/v2 v2.9.1
 	github.com/cplieger/auth/v3 v3.0.0
 	github.com/cplieger/health v1.5.1
 	github.com/cplieger/pathinside/v2 v2.0.0
-	github.com/cplieger/runesafe v1.4.1
+	github.com/cplieger/runesafe/v2 v2.0.0
 	github.com/cplieger/slogx v1.6.1
 	github.com/cplieger/ssrf/v3 v3.0.1
 	github.com/cplieger/webhttp v1.23.1
@@ -34,7 +34,7 @@ require golang.org/x/term v0.45.0
 
 require github.com/cplieger/xmlx v1.0.2
 
-require github.com/cplieger/httpx/v4 v4.3.2
+require github.com/cplieger/httpx/v5 v5.0.0
 
 require (
 	github.com/cplieger/keyenc v1.0.4

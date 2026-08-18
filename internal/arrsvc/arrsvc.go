@@ -12,7 +12,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -46,7 +47,7 @@ var (
 
 // NewSonarr builds a Sonarr service for the given base URL and API key.
 func NewSonarr(baseURL, apiKey string) (*Sonarr, error) {
-	c, err := arrapi.NewSonarr(baseURL, apiKey,
+	c, err := arrapi.NewSonarr(baseURL, httpx.Secret(apiKey),
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func NewSonarr(baseURL, apiKey string) (*Sonarr, error) {
 
 // NewRadarr builds a Radarr service for the given base URL and API key.
 func NewRadarr(baseURL, apiKey string) (*Radarr, error) {
-	c, err := arrapi.NewRadarr(baseURL, apiKey,
+	c, err := arrapi.NewRadarr(baseURL, httpx.Secret(apiKey),
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err

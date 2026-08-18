@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"golang.org/x/sync/errgroup"
 )
 

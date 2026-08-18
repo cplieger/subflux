@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/runesafe"
+	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
@@ -247,7 +247,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl download", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl download", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
@@ -277,7 +277,7 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl search", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl search", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 

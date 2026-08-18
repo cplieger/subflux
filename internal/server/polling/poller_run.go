@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"

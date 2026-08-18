@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v4"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider/classify"
 )

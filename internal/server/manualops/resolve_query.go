@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 )
 
