@@ -22,22 +22,22 @@ import (
 // aliased to webhttp.MaxJSONBody so the limit has a single definition.
 const MaxDefaultBodySize = webhttp.MaxJSONBody
 
-// RequireMethod checks that the request method matches the expected value. On a
+// requireMethod checks that the request method matches the expected value. On a
 // mismatch it delegates to webhttp.RequireMethod, which sets the RFC-9110 Allow
 // header to the permitted method and writes subflux's {error,code,request_id}
 // 405 envelope (code "method_not_allowed"), then returns false.
-func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	return webhttp.RequireMethod(w, r, method)
 }
 
-// RequireGET is sugar for RequireMethod(w, r, http.MethodGet).
+// RequireGET is sugar for requireMethod(w, r, http.MethodGet).
 func RequireGET(w http.ResponseWriter, r *http.Request) bool {
-	return RequireMethod(w, r, http.MethodGet)
+	return requireMethod(w, r, http.MethodGet)
 }
 
-// RequirePOST is sugar for RequireMethod(w, r, http.MethodPost).
+// RequirePOST is sugar for requireMethod(w, r, http.MethodPost).
 func RequirePOST(w http.ResponseWriter, r *http.Request) bool {
-	return RequireMethod(w, r, http.MethodPost)
+	return requireMethod(w, r, http.MethodPost)
 }
 
 // DecodeJSONBody decodes a JSON request body into dst under a size cap, via

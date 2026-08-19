@@ -88,10 +88,10 @@ func TestRequireMethod(t *testing.T) {
 			req := httptest.NewRequest(tc.got, "/x", http.NoBody)
 			rec := httptest.NewRecorder()
 
-			ok := RequireMethod(rec, req, tc.want)
+			ok := requireMethod(rec, req, tc.want)
 
 			if ok != tc.pass {
-				t.Errorf("RequireMethod(got %s, want %s) = %v, want %v",
+				t.Errorf("requireMethod(got %s, want %s) = %v, want %v",
 					tc.got, tc.want, ok, tc.pass)
 			}
 			if rec.Code != tc.wantCode {
@@ -110,7 +110,7 @@ func TestRequireMethod(t *testing.T) {
 	}
 }
 
-// RequireGET and RequirePOST are sugar over RequireMethod; verify each wires
+// RequireGET and RequirePOST are sugar over requireMethod; verify each wires
 // the correct method by rejecting the opposite verb with 405.
 func TestRequireGET_and_RequirePOST_reject_opposite_method(t *testing.T) {
 	t.Parallel()

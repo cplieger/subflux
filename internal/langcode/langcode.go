@@ -40,9 +40,9 @@ import (
 // being handed to Parse.
 const BrazilianPortuguese = "pb"
 
-// BrazilianPortugueseTag is the BCP 47 tag that BrazilianPortuguese
+// brazilianPortugueseTag is the BCP 47 tag that BrazilianPortuguese
 // stands for. Any canonicalization landing on this tag yields the internal code.
-const BrazilianPortugueseTag = "pt-BR"
+const brazilianPortugueseTag = "pt-BR"
 
 // langAliases are the identifiers subflux accepts whose canonical BCP 47 form it
 // cannot use. Each one must be recognized before langtag.Parse, never as a
@@ -104,7 +104,7 @@ func Canonical(raw string) string {
 	if !ok {
 		return ""
 	}
-	if t.String() == BrazilianPortugueseTag {
+	if t.String() == brazilianPortugueseTag {
 		return BrazilianPortuguese
 	}
 	// Tag.Language folds macrolanguages and deprecated codes (nob and nor both

@@ -11,7 +11,7 @@
 // package holding both would hand every provider implementation the server's
 // 500-writer and hand the server a subtitle-download byte cap.
 //
-// The prelude and the response helpers are one concern, not two: RequireMethod
+// The prelude and the response helpers are one concern, not two: requireMethod
 // and DecodeJSONBody are observable only through the envelope this package
 // defines — their whole failure output is a 405 or a 400 in that shape.
 //
