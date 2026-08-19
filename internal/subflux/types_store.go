@@ -195,7 +195,7 @@ func (d *ConfigDrift) Empty() bool {
 }
 
 // CleanupResult holds the outcome of a media cleanup operation.
-// Used by both CleanupForMediaUpgrade and ReconcileState.
+// Used by both DeleteStateByPaths and ReconcileState.
 type CleanupResult struct {
 	// Paths are subtitle file paths whose DB entries were removed.
 	// The caller is responsible for validating and deleting files from disk.

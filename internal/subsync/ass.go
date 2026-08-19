@@ -144,7 +144,7 @@ func fallbackToMostUsed(dialogue map[string]bool, unknown []string, styleCounts 
 	}
 }
 
-// FFmpegExtractASSDialogue extracts an ASS subtitle stream, parses it,
+// ffmpegExtractASSDialogue extracts an ASS subtitle stream, parses it,
 // and returns dialogue cues and mask cues separately.
 //
 // dialogueCues: filtered to dialogue styles only (for correlation signal).

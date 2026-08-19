@@ -109,7 +109,7 @@ type Entry struct {
 	Cancellable  bool              `json:"cancellable,omitempty"`
 }
 
-// New creates an ActivityLog with the given max capacity.
+// New creates a Log with the given max capacity.
 func New(maxItems int) *Log {
 	return &Log{maxItems: maxItems, index: make(map[string]int, maxItems)}
 }

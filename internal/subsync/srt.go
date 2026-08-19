@@ -32,7 +32,7 @@ type TimeSpan struct {
 
 // --- Public API ---
 
-// CuesToSpans converts subtitle cues to time spans.
+// cuesToSpans converts subtitle cues to time spans.
 func cuesToSpans(cues []Cue) []TimeSpan {
 	spans := make([]TimeSpan, len(cues))
 	for i, c := range cues {

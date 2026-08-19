@@ -275,7 +275,7 @@ func TestGoldenSectionSearch_real_ratio(t *testing.T) {
 	t.Parallel()
 	// Use a non-standard ratio that doesn't match any known pair.
 	ref := makeLongCues(100, 30*time.Minute)
-	// Apply a custom ratio of 1.03 (not in knownRatios).
+	// Apply a custom ratio of 1.03 (not in framerate.KnownRatios).
 	inc := scaleCuesForTest(ref, 1.03)
 	// observedRatio should be close to 1.03.
 	result := goldenSectionSearch(t.Context(), ref, inc, 1.03, 0.95)
@@ -388,8 +388,9 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 	ref := makeLongCues(100, 30*time.Minute)
 
 	// The known ratio 25/23.976 ≈ 1.04270937...
-	// Apply a slightly different ratio (1.043) that's within framerateRatioTolerance
-	// of the known pair, but different enough that applying the exact known ratio
+	// Apply a slightly different ratio (1.043) that's within
+	// defaultFramerateConfig.RatioTolerance of the known pair, but different
+	// enough that applying the exact known ratio
 	// produces >200ms residual on some cues.
 	actualRatio := 1.043
 	inc := make([]Cue, len(ref))

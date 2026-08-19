@@ -31,7 +31,7 @@ type segment struct {
 	offset   time.Duration // best constant offset for this segment
 }
 
-// AlignWithSplits performs split-aware alignment between reference and
+// alignWithSplits performs split-aware alignment between reference and
 // incorrect subtitles. It detects points where the timing offset changes
 // abruptly (commercial breaks, different cuts) and aligns each segment
 // independently.

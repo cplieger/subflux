@@ -288,9 +288,7 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	}
 }
 
-// --- handleGetActivity method check ---
-
-// --- asyncAction conflict path ---
+// --- handleGetActivity ---
 
 func TestHandleGetActivity_empty_returns_empty_array(t *testing.T) {
 	t.Parallel()
