@@ -88,15 +88,25 @@ method (*NopConfig).EmbeddedPolicy
 method (*NopStore).Close
 method (*panicStore).Close
 
-# --- External-library store contract (cplieger/auth/v2) ---------------------
-# internal/authstore/authdb.go:16 asserts `var _ AuthStore = (*Store)(nil)`,
-# where AuthStore is a type alias of github.com/cplieger/auth/v2/store.Composite
-# (UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore).
-# All ten methods below are members of that interface, verified in the resolved
-# auth/v2@v2.1.1 store package. Their callers are the auth library's own
-# authenticator, session, passkey, and API-key paths — a different module, which
-# is exactly what punused documents it cannot see. Removing any one breaks the
-# assertion at compile time (verified for UserCount).
+# --- External-library store contract (cplieger/auth/v4) ---------------------
+# internal/authstore/authdb.go:27-31 asserts *Store against the auth library's
+# persistence SPI as FIVE separate role interfaces — auth.UserStore,
+# auth.SessionPersister, auth.PasskeyStore, auth.KeyStore, auth.OIDCStateStore —
+# so a failure names the role that broke. v4 merged the store SPI into the auth
+# root package, so there is no `store.Composite` and no `AuthStore` alias here
+# any more; the union subflux does declare is server.AuthStore, at the one site
+# that fans a single concrete store out to five consumers.
+# All ten methods below are members of those roles. Their callers are the auth
+# library's own authenticator, session, passkey, and API-key paths — a different
+# module, which is exactly what punused documents it cannot see. Removing any one
+# breaks an assertion at compile time (verified for UserCount).
+#
+# This header was re-verified against v4 on 2026-08-19. It previously cited
+# auth/v2, a `store.Composite` alias, `authdb.go:16` (which is the `"time"`
+# import) and "the resolved auth/v2@v2.1.1 store package", a version that no
+# longer resolves. The methods were still correctly adjudicated; only the
+# evidence had rotted, which this file's own header calls the difference between
+# an adjudication and an amnesty.
 method (*Store).GetUserByID
 method (*Store).GetUserByEmail
 method (*Store).UserCount

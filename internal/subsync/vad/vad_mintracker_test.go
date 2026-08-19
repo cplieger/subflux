@@ -59,7 +59,6 @@ func medianSmoothReference(frameCounter int32, sv [16]int16, meanVal int16) int1
 	return int16(tmp >> 15)
 }
 
-// assertLow16 compares the first 16 elements of got to want.
 // low16 projects the first 16 entries of a tracker vector into a comparable
 // array. It returns the value instead of asserting on it, so the comparison and
 // its message stay at the call site.

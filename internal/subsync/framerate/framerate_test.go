@@ -7,7 +7,6 @@ import (
 
 const tol = 1e-9
 
-// assertApprox fails when got is not within tol of want.
 // approxEq reports whether got is within tol of want. It returns the
 // comparison rather than performing the assertion, so each call site keeps its
 // own failure message and reads as the thing it is checking.

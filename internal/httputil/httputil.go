@@ -1,5 +1,5 @@
 // Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx/v4; this package
+// Behavioral logic is delegated to github.com/cplieger/httpx/v5; this package
 // retains application-specific constants and thin adapters that bridge httpx
 // error types to the internal api.* error types used across the codebase.
 package httputil

@@ -39,7 +39,10 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		return
 	}
 
-	go s.runAuthCleanup(ctx)
+	// On bgWg like every other background goroutine: without it the drain below
+	// reports "all background goroutines stopped" while this one can still be
+	// inside ceremonies.Cleanup(). It was the only one not registered.
+	s.bgWg.Go(func() { s.runAuthCleanup(ctx) })
 
 	if onReady != nil {
 		s.ready.Set(true)
@@ -64,9 +67,12 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		slog.Error("HTTP server error", "error", err)
 	}
 
-	// subflux's own background goroutines (scans, downloads, scheduler, poller)
-	// drain on a separate bounded budget OUTSIDE Run, so a stuck goroutine can't
-	// hang shutdown past 10s.
+	// subflux's own background goroutines drain on a separate bounded budget
+	// OUTSIDE Run, so a stuck goroutine can't hang shutdown past 10s. The set is
+	// whatever registered on bgWg: the four worker-set members, the worker-launch
+	// waiter, auth cleanup, the S12 full scan, and the handler-spawned scans and
+	// manual downloads that go through BGTracker (which IS &s.bgWg). Naming them
+	// individually is how the list went stale last time.
 	bgDone := make(chan struct{})
 	go func() {
 		s.bgWg.Wait()
