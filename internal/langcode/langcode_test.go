@@ -1,4 +1,4 @@
-package api
+package langcode
 
 import (
 	"testing"
@@ -86,8 +86,8 @@ func TestCanonicalLangCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := CanonicalLangCode(tt.input); got != tt.want {
-				t.Errorf("CanonicalLangCode(%q) = %q, want %q", tt.input, got, tt.want)
+			if got := Canonical(tt.input); got != tt.want {
+				t.Errorf("Canonical(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -123,8 +123,8 @@ func TestValidLangCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ValidLangCode(tt.input); got != tt.want {
-				t.Errorf("ValidLangCode(%q) = %v, want %v", tt.input, got, tt.want)
+			if got := Valid(tt.input); got != tt.want {
+				t.Errorf("Valid(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -143,16 +143,16 @@ func TestCanonicalLangCode_namespaceInvariant(t *testing.T) {
 			rapid.String(),
 		).Draw(t, "raw")
 
-		got := CanonicalLangCode(raw)
+		got := Canonical(raw)
 		if got == "" {
 			return
 		}
 		if len(got) != 2 {
-			t.Fatalf("CanonicalLangCode(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
+			t.Fatalf("Canonical(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
 		}
 		for _, r := range got {
 			if r < 'a' || r > 'z' {
-				t.Fatalf("CanonicalLangCode(%q) = %q, want lowercase ASCII letters", raw, got)
+				t.Fatalf("Canonical(%q) = %q, want lowercase ASCII letters", raw, got)
 			}
 		}
 	})
@@ -174,16 +174,16 @@ func TestCanonicalLangCode_idempotent(t *testing.T) {
 			}),
 		).Draw(t, "raw")
 
-		once := CanonicalLangCode(raw)
-		twice := CanonicalLangCode(once)
+		once := Canonical(raw)
+		twice := Canonical(once)
 		if once != twice {
-			t.Fatalf("CanonicalLangCode not idempotent: CanonicalLangCode(%q) = %q, CanonicalLangCode(%q) = %q",
+			t.Fatalf("Canonical not idempotent: Canonical(%q) = %q, Canonical(%q) = %q",
 				raw, once, once, twice)
 		}
 	})
 }
 
-// PBT: ValidLangCode agrees with CanonicalLangCode being a fixed point. The two
+// PBT: Valid agrees with Canonical being a fixed point. The two
 // are separate entry points and config validation trusts the pair to answer
 // consistently — a code reported valid must be one canonicalization leaves alone.
 func TestValidLangCode_agreesWithCanonical(t *testing.T) {
@@ -194,10 +194,10 @@ func TestValidLangCode_agreesWithCanonical(t *testing.T) {
 			rapid.StringMatching(`[a-zA-Z]{2,3}(-[A-Za-z0-9]{2,4})?`),
 		).Draw(t, "raw")
 
-		canon := CanonicalLangCode(raw)
+		canon := Canonical(raw)
 		want := canon != "" && canon == raw
-		if got := ValidLangCode(raw); got != want {
-			t.Fatalf("ValidLangCode(%q) = %v, want %v (CanonicalLangCode(%q) = %q)",
+		if got := Valid(raw); got != want {
+			t.Fatalf("Valid(%q) = %v, want %v (Canonical(%q) = %q)",
 				raw, got, want, raw, canon)
 		}
 	})
@@ -209,14 +209,14 @@ func TestValidLangCode_agreesWithCanonical(t *testing.T) {
 func TestCanonicalLangCode_internalCodesAreStable(t *testing.T) {
 	t.Parallel()
 	for name, code := range langNameMap {
-		if !ValidLangCode(code) {
-			t.Errorf("langNameMap[%q] = %q, which ValidLangCode rejects; "+
-				"CanonicalLangCode(%q) = %q", name, code, code, CanonicalLangCode(code))
+		if !Valid(code) {
+			t.Errorf("langNameMap[%q] = %q, which Valid rejects; "+
+				"Canonical(%q) = %q", name, code, code, Canonical(code))
 		}
 	}
 }
 
-func FuzzCanonicalLangCode(f *testing.F) {
+func FuzzCanonical(f *testing.F) {
 	f.Add("en")
 	f.Add("eng")
 	f.Add("pb")
@@ -232,24 +232,24 @@ func FuzzCanonicalLangCode(f *testing.F) {
 	f.Add("en-u-0a-0a-u-00-00")
 
 	f.Fuzz(func(t *testing.T, raw string) {
-		got := CanonicalLangCode(raw)
+		got := Canonical(raw)
 		if got == "" {
 			return
 		}
 		if len(got) != 2 {
-			t.Fatalf("CanonicalLangCode(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
+			t.Fatalf("Canonical(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
 		}
 		for _, r := range got {
 			if r < 'a' || r > 'z' {
-				t.Fatalf("CanonicalLangCode(%q) = %q, want lowercase ASCII letters", raw, got)
+				t.Fatalf("Canonical(%q) = %q, want lowercase ASCII letters", raw, got)
 			}
 		}
 		// A canonical code is valid, and canonicalizing it again is a no-op.
-		if !ValidLangCode(got) {
-			t.Fatalf("CanonicalLangCode(%q) = %q, which ValidLangCode rejects", raw, got)
+		if !Valid(got) {
+			t.Fatalf("Canonical(%q) = %q, which Valid rejects", raw, got)
 		}
-		if again := CanonicalLangCode(got); again != got {
-			t.Fatalf("CanonicalLangCode not idempotent: %q -> %q -> %q", raw, got, again)
+		if again := Canonical(got); again != got {
+			t.Fatalf("Canonical not idempotent: %q -> %q -> %q", raw, got, again)
 		}
 	})
 }

@@ -1,4 +1,4 @@
-package api
+package langcode
 
 import (
 	"log/slog"
@@ -22,13 +22,13 @@ func logUnknownLang(raw string) {
 	}
 }
 
-// ParseAudioLangs splits a comma/slash-separated audio languages string
+// ParseAudioList splits a comma/slash-separated audio languages string
 // into deduplicated ISO 639-1 codes.
-func ParseAudioLangs(raw string) []string {
+func ParseAudioList(raw string) []string {
 	if !strings.ContainsAny(raw, "/,") {
 		// Single language, no separator — fast path avoids map allocation.
 		trimmed := strings.TrimSpace(raw)
-		if code := LangNameToISO(trimmed); code != "" {
+		if code := FromName(trimmed); code != "" {
 			return []string{code}
 		}
 		logUnknownLang(trimmed)
@@ -41,7 +41,7 @@ func ParseAudioLangs(raw string) []string {
 		return r == '/' || r == ','
 	}) {
 		trimmed := strings.TrimSpace(part)
-		code := LangNameToISO(trimmed)
+		code := FromName(trimmed)
 		if code == "" {
 			logUnknownLang(trimmed)
 			continue
@@ -83,7 +83,7 @@ var langNameMap = map[string]string{
 	// made an arr-reported original language of Portuguese (Brazil) match the
 	// European Portuguese language rule. Flemish and Latin American Spanish
 	// have no separate internal code, so collapsing those two IS correct.
-	"flemish": "nl", "portuguese (brazil)": LangBrazilianPortuguese,
+	"flemish": "nl", "portuguese (brazil)": BrazilianPortuguese,
 	"spanish (latino)": "es",
 	// Additional Sonarr/Radarr languages.
 	"malayalam": "ml", "kannada": "kn", "afrikaans": "af",
@@ -96,7 +96,7 @@ var langNameMap = map[string]string{
 	"swahili": "sw", "uzbek": "uz", "yoruba": "yo", "zulu": "zu",
 }
 
-// LangNameToISO converts a language name or code (as returned by
+// FromName converts a language name or code (as returned by
 // Sonarr/Radarr) to subflux's internal code space. Accepts full names
 // ("english"), the regional-variant names arr reports, and any published
 // language code. Returns "" for unrecognized input.
@@ -106,12 +106,12 @@ var langNameMap = map[string]string{
 // "Portuguese (Brazil)" means the internal "pb", and "Tagalog" means "tl" even
 // though canonicalization would fold that onto the three-letter "fil" and leave
 // the two-letter namespace.
-func LangNameToISO(name string) string {
+func FromName(name string) string {
 	if name == "" {
 		return ""
 	}
 	if code, ok := langNameMap[strings.ToLower(name)]; ok {
 		return code
 	}
-	return CanonicalLangCode(name)
+	return Canonical(name)
 }

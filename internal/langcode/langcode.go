@@ -1,4 +1,27 @@
-package api
+// Package langcode maps any language identifier subflux meets — a provider
+// payload, an ffprobe stream tag, an arr API response, a config file — onto the
+// one internal code space, and is the only place that mapping happens.
+//
+// The space is ISO 639-1 two-letter codes plus BrazilianPortuguese. That is not
+// a naming preference: the code becomes a segment of the subtitle filename on
+// disk and part of the bbolt state key, so a code outside the space cannot
+// survive a round trip through a scan.
+//
+// Canonical is the canonicalizer; FromName sits in front of it with the table of
+// language NAMES the arrs report, because a name carries a product decision a
+// code system cannot express. Both are reached indirectly by design:
+// classify.Alpha2FromAlpha3 and ffmpeg.NormalizeFFprobeLang (through its
+// injected LangMapper, which is what keeps internal/subsync free of provider
+// imports) call in from outside rather than reimplementing the fold. Three
+// hand-written normalizers used to each collapse regions differently; that is
+// what this replaced.
+//
+// The per-provider dialect tables deliberately stay in their provider packages.
+// They are wire formats owned by one provider's spelling, not identifiers
+// subflux accepts, and each must translate before the code arrives here: hdbits
+// means Brazilian by "br" and Slovenian by "si", which the registry reads as
+// Breton and Sinhala.
+package langcode
 
 import (
 	"strings"
@@ -6,7 +29,7 @@ import (
 	"github.com/cplieger/langtag/v2"
 )
 
-// LangBrazilianPortuguese is subflux's internal code for Brazilian Portuguese.
+// BrazilianPortuguese is subflux's internal code for Brazilian Portuguese.
 //
 // It is not an ISO 639 code. Subflux invented it so that a Brazilian target
 // stays distinguishable from a European Portuguese one inside a two-letter code
@@ -15,11 +38,11 @@ import (
 // bbolt state key. langtag rejects it for the same reason it rejects any tag the
 // IANA registry does not list, so it is translated at the boundary instead of
 // being handed to Parse.
-const LangBrazilianPortuguese = "pb"
+const BrazilianPortuguese = "pb"
 
-// LangBrazilianPortugueseTag is the BCP 47 tag that LangBrazilianPortuguese
+// BrazilianPortugueseTag is the BCP 47 tag that BrazilianPortuguese
 // stands for. Any canonicalization landing on this tag yields the internal code.
-const LangBrazilianPortugueseTag = "pt-BR"
+const BrazilianPortugueseTag = "pt-BR"
 
 // langAliases are the identifiers subflux accepts whose canonical BCP 47 form it
 // cannot use. Each one must be recognized before langtag.Parse, never as a
@@ -44,19 +67,19 @@ const LangBrazilianPortugueseTag = "pt-BR"
 // Breton and Sinhala. Admitting one here would apply one provider's private
 // meaning to every source.
 var langAliases = map[string]string{
-	LangBrazilianPortuguese: LangBrazilianPortuguese,
-	"pob":                   LangBrazilianPortuguese,
-	"tl":                    "tl",
-	"bh":                    "bh",
+	BrazilianPortuguese: BrazilianPortuguese,
+	"pob":               BrazilianPortuguese,
+	"tl":                "tl",
+	"bh":                "bh",
 }
 
-// CanonicalLangCode maps one raw language identifier — from a provider payload,
+// Canonical maps one raw language identifier — from a provider payload,
 // an ffprobe stream tag, an arr API response, or a config file — onto subflux's
 // internal code space, and returns "" when the input names no language subflux
 // can represent.
 //
 // The internal space is ISO 639-1 two-letter codes plus
-// LangBrazilianPortuguese. That is not a naming preference: the code becomes a
+// BrazilianPortuguese. That is not a naming preference: the code becomes a
 // segment of the subtitle filename and part of the bbolt state key, so a code
 // outside the space cannot survive a round trip through a scan.
 //
@@ -70,7 +93,7 @@ var langAliases = map[string]string{
 //     "fil"), and admitting one would place a three-letter code in a
 //     two-letter namespace, where it matches no configured target and no
 //     display name — silently, forever.
-func CanonicalLangCode(raw string) string {
+func Canonical(raw string) string {
 	if raw == "" {
 		return ""
 	}
@@ -81,8 +104,8 @@ func CanonicalLangCode(raw string) string {
 	if !ok {
 		return ""
 	}
-	if t.String() == LangBrazilianPortugueseTag {
-		return LangBrazilianPortuguese
+	if t.String() == BrazilianPortugueseTag {
+		return BrazilianPortuguese
 	}
 	// Tag.Language folds macrolanguages and deprecated codes (nob and nor both
 	// report "no", iw reports "he"), which is exactly the collapse the internal
@@ -94,7 +117,7 @@ func CanonicalLangCode(raw string) string {
 	return base
 }
 
-// ValidLangCode reports whether raw is a language code subflux can act on: it
+// Valid reports whether raw is a language code subflux can act on: it
 // names a real language, and it is already written the way the internal space
 // spells it.
 //
@@ -103,8 +126,8 @@ func CanonicalLangCode(raw string) string {
 // nothing canonicalizes a configured target at match time — subtitle targets
 // are compared against provider results by exact string. So "eng" names a
 // language and still matches nothing, and telling a user their config is fine
-// would be a lie. Callers report CanonicalLangCode(raw) as the spelling to use.
-func ValidLangCode(raw string) bool {
-	code := CanonicalLangCode(raw)
+// would be a lie. Callers report Canonical(raw) as the spelling to use.
+func Valid(raw string) bool {
+	code := Canonical(raw)
 	return code != "" && code == raw
 }

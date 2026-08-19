@@ -2,7 +2,7 @@ package arrsvc
 
 import (
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/langcode"
 )
 
 // The Sonarr/Radarr DTOs are consumed directly as github.com/cplieger/arrapi
@@ -17,7 +17,7 @@ func OriginalLangCode(lang *arrapi.Language) string {
 	if lang == nil {
 		return ""
 	}
-	return api.LangNameToISO(lang.Name)
+	return langcode.FromName(lang.Name)
 }
 
 // AudioLanguages parses a file's MediaInfo audio-languages string into
@@ -26,7 +26,7 @@ func AudioLanguages(mi *arrapi.MediaInfo) []string {
 	if mi == nil || mi.AudioLanguages == "" {
 		return nil
 	}
-	return api.ParseAudioLangs(mi.AudioLanguages)
+	return langcode.ParseAudioList(mi.AudioLanguages)
 }
 
 // SeasonEpisodeFileCount returns the number of episode files for a specific

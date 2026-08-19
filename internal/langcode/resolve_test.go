@@ -1,4 +1,4 @@
-package api
+package langcode
 
 import (
 	"slices"
@@ -32,7 +32,7 @@ func TestLogUnknownLang_logs_only_nonempty_name(t *testing.T) {
 	}
 }
 
-// --- LangNameToISO ---
+// --- FromName ---
 
 func TestLangNameToISO(t *testing.T) {
 	t.Parallel()
@@ -72,18 +72,18 @@ func TestLangNameToISO(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := LangNameToISO(tt.input)
+			got := FromName(tt.input)
 
 			if got != tt.want {
-				t.Errorf("LangNameToISO(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("FromName(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
 }
 
-// --- ParseAudioLangs ---
+// --- ParseAudioList ---
 
-// --- ParseAudioLangs ---
+// --- ParseAudioList ---
 
 func TestParseAudioLangs(t *testing.T) {
 	t.Parallel()
@@ -115,10 +115,10 @@ func TestParseAudioLangs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ParseAudioLangs(tt.raw)
+			got := ParseAudioList(tt.raw)
 
 			if !slices.Equal(got, tt.want) {
-				t.Errorf("ParseAudioLangs(%q) = %v, want %v", tt.raw, got, tt.want)
+				t.Errorf("ParseAudioList(%q) = %v, want %v", tt.raw, got, tt.want)
 			}
 		})
 	}
@@ -139,10 +139,10 @@ func TestLangNameToISO_known_names_always_return_two_letter_code(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		name := rapid.SampledFrom(knownNames).Draw(t, "lang_name")
 
-		code := LangNameToISO(name)
+		code := FromName(name)
 
 		if len(code) != 2 {
-			t.Errorf("LangNameToISO(%q) = %q, want 2-letter code", name, code)
+			t.Errorf("FromName(%q) = %q, want 2-letter code", name, code)
 		}
 	})
 }
@@ -161,13 +161,13 @@ func TestLangNameToISO_two_letter_code_handling(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		code := rapid.StringMatching(`[a-z]{2}`).Draw(t, "code")
 
-		got := LangNameToISO(code)
+		got := FromName(code)
 
-		if want := CanonicalLangCode(code); got != want {
-			t.Errorf("LangNameToISO(%q) = %q, want %q", code, got, want)
+		if want := Canonical(code); got != want {
+			t.Errorf("FromName(%q) = %q, want %q", code, got, want)
 		}
 		if got != "" && len(got) != 2 {
-			t.Errorf("LangNameToISO(%q) = %q (len %d), want len 2", code, got, len(got))
+			t.Errorf("FromName(%q) = %q (len %d), want len 2", code, got, len(got))
 		}
 	})
 }
@@ -187,10 +187,10 @@ func TestLangNameToISO_case_insensitive(t *testing.T) {
 		// Test uppercase variant.
 		upper := strings.ToUpper(base)
 
-		got := LangNameToISO(upper)
+		got := FromName(upper)
 
 		if got == "" {
-			t.Errorf("LangNameToISO(%q) = empty, want non-empty (base=%q)", upper, base)
+			t.Errorf("FromName(%q) = empty, want non-empty (base=%q)", upper, base)
 		}
 	})
 }
@@ -212,12 +212,12 @@ func TestParseAudioLangs_never_contains_duplicates(t *testing.T) {
 		sep := rapid.SampledFrom([]string{"/", ","}).Draw(t, "sep")
 		raw := strings.Join(parts, sep)
 
-		codes := ParseAudioLangs(raw)
+		codes := ParseAudioList(raw)
 
 		seen := make(map[string]bool)
 		for _, code := range codes {
 			if seen[code] {
-				t.Errorf("ParseAudioLangs(%q) contains duplicate %q", raw, code)
+				t.Errorf("ParseAudioList(%q) contains duplicate %q", raw, code)
 			}
 			seen[code] = true
 		}
@@ -241,14 +241,14 @@ func TestParseAudioLangs_output_always_two_letter_lowercase(t *testing.T) {
 		sep := rapid.SampledFrom([]string{"/", ","}).Draw(t, "sep")
 		raw := strings.Join(parts, sep)
 
-		codes := ParseAudioLangs(raw)
+		codes := ParseAudioList(raw)
 
 		for _, code := range codes {
 			if len(code) != 2 {
-				t.Errorf("ParseAudioLangs(%q) contains non-2-letter code %q", raw, code)
+				t.Errorf("ParseAudioList(%q) contains non-2-letter code %q", raw, code)
 			}
 			if code != strings.ToLower(code) {
-				t.Errorf("ParseAudioLangs(%q) contains non-lowercase code %q", raw, code)
+				t.Errorf("ParseAudioList(%q) contains non-lowercase code %q", raw, code)
 			}
 		}
 	})
@@ -265,11 +265,11 @@ func TestLangNameToISO_idempotent(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		name := rapid.SampledFrom(knownNames).Draw(t, "lang_name")
 
-		first := LangNameToISO(name)
-		second := LangNameToISO(first)
+		first := FromName(name)
+		second := FromName(first)
 
 		if second != first {
-			t.Errorf("LangNameToISO not idempotent: %q -> %q -> %q", name, first, second)
+			t.Errorf("FromName not idempotent: %q -> %q -> %q", name, first, second)
 		}
 	})
 }
@@ -281,10 +281,10 @@ func TestLangNameToISO_all_map_entries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			got := LangNameToISO(name)
+			got := FromName(name)
 
 			if got != wantCode {
-				t.Errorf("LangNameToISO(%q) = %q, want %q", name, got, wantCode)
+				t.Errorf("FromName(%q) = %q, want %q", name, got, wantCode)
 			}
 		})
 	}
