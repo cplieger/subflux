@@ -122,9 +122,9 @@ func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, q api.Sho
 	return r.counter.CountShowSubtitles(ctx, q)
 }
 
-// ClearCache forwards to the inner provider if it implements api.CacheClearer.
+// ClearCache forwards to the inner provider if it implements CacheClearer.
 func (r *retryProvider) ClearCache() {
-	if cc, ok := r.inner.(api.CacheClearer); ok {
+	if cc, ok := r.inner.(CacheClearer); ok {
 		cc.ClearCache()
 	}
 }

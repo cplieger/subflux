@@ -104,8 +104,8 @@ type Provider struct {
 
 // Compile-time interface checks.
 var (
-	_ api.Provider     = (*Provider)(nil)
-	_ api.CacheClearer = (*Provider)(nil)
+	_ api.Provider          = (*Provider)(nil)
+	_ provider.CacheClearer = (*Provider)(nil)
 )
 
 // --- Provider API (Name, Search, Download) ---

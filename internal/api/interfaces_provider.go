@@ -63,14 +63,6 @@ type ShowSubtitleQuery struct {
 	Language string
 }
 
-// CacheClearer is an optional interface for providers that cache download
-// data (e.g. season pack zips). Called after scan completion to free memory.
-// Providers implementing this get compile-time verification via
-// var _ api.CacheClearer = (*Provider)(nil).
-type CacheClearer interface {
-	ClearCache()
-}
-
 // --- Provider Registry ---
 
 // ProviderRegistry manages provider factories and schema metadata.

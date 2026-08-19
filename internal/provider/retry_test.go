@@ -326,7 +326,7 @@ func TestRetryProvider_ClearCache_delegates(t *testing.T) {
 	inner := &retryFakeCacheProvider{retryFakeProvider: retryFakeProvider{name: "test"}}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	cc, ok := p.(api.CacheClearer)
+	cc, ok := p.(CacheClearer)
 	if !ok {
 		t.Fatal("wrapped provider does not implement ClearCache")
 	}
