@@ -98,15 +98,10 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 		return "", err
 	}
 
-	if len(data) == 0 {
-		slog.Warn("downloaded empty subtitle data",
-			"media", req.MediaLabel(), "lang", lang,
-			"provider", best.sub.Provider)
-		return "", fmt.Errorf("%w: %s", ErrEmptyResponse, best.sub.Provider)
-	}
-
-	// Reject binary archives that providers returned as-is when zip
-	// extraction failed (e.g. RAR files from HDBits).
+	// Reject anything that is not subtitle text: a zero-byte body (a
+	// provider's empty 200) and a binary archive a provider returned as-is
+	// when zip extraction failed (e.g. RAR files from HDBits).
+	// subtitlefile.Validate is the single authority for both.
 	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("downloaded data is not a subtitle file",
 			"media", req.MediaLabel(), "lang", lang,

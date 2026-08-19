@@ -27,18 +27,28 @@ var knownArchiveMagic = []struct {
 	{"zip-empty", []byte("PK\x05\x06")},
 }
 
+// ErrEmpty indicates the download carried no bytes at all. Exported because
+// it is the one refusal a caller must be able to tell apart: a zero-byte body
+// is an absent subtitle, not a malformed one, so blaming the archive format in
+// the operator-facing text would misdiagnose it.
+var ErrEmpty = errors.New("empty subtitle data")
+
 // errBinary indicates the downloaded data is a binary archive that could not be
-// extracted, not a subtitle file. Unexported: Validate returns nothing else, so
-// an exported sentinel would tell a caller only what err != nil already does,
-// and none of the six consumers branches on it.
+// extracted, not a subtitle file. Unexported: ErrEmpty is the only refusal a
+// caller distinguishes, so this one is its residue — no consumer branches on it.
 var errBinary = errors.New("binary archive data, not a subtitle")
 
-// Validate checks whether data looks like subtitle text rather
-// than a binary archive. Returns errBinary if the data matches a known
-// archive magic signature or has too many non-text bytes.
+// Validate checks whether data is subtitle text: non-empty, and not a binary
+// archive. Returns ErrEmpty for a zero-length payload and errBinary when the
+// data matches a known archive magic signature or has too many non-text bytes.
+//
+// Rejecting empty is a contract, not a convenience: every caller is a download
+// boundary, and accepting zero bytes turns a provider's empty 200 into a
+// successful download of no subtitle — a file on disk and a coverage row that
+// both claim a subtitle nothing can read.
 func Validate(data []byte) error {
 	if len(data) == 0 {
-		return nil
+		return ErrEmpty
 	}
 
 	for _, m := range knownArchiveMagic {

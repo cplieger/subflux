@@ -18,11 +18,11 @@ func FuzzCountNonText(f *testing.F) {
 	})
 }
 
-// FuzzValidate pins the error contract downstream relies on:
-// Validate never panics, and every non-nil error it returns wraps
-// errBinary. Callers branch on errors.Is(err, errBinary) to decide a
-// download was an archive rather than a subtitle, so a non-wrapping error
-// would silently break that dispatch.
+// FuzzValidate pins the error contract downstream relies on: Validate never
+// panics, every refusal is classifiable — it wraps ErrEmpty or errBinary,
+// never a bare error — and a zero-byte payload is always refused, because
+// accepting it turns a provider's empty 200 into a saved subtitle of no bytes.
+// Callers branch on errors.Is to tell an absent download from an archive one.
 func FuzzValidate(f *testing.F) {
 	f.Add([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n\n"))
 	f.Add([]byte{0x50, 0x4B, 0x03, 0x04}) // ZIP magic
@@ -30,7 +30,14 @@ func FuzzValidate(f *testing.F) {
 	f.Add([]byte(""))
 	f.Add([]byte("plain text subtitle content"))
 	f.Fuzz(func(t *testing.T, data []byte) {
-		if err := Validate(data); err != nil && !errors.Is(err, errBinary) {
+		err := Validate(data)
+		if len(data) == 0 {
+			if !errors.Is(err, ErrEmpty) {
+				t.Fatalf("Validate(zero bytes) = %v, want ErrEmpty", err)
+			}
+			return
+		}
+		if err != nil && !errors.Is(err, errBinary) {
 			t.Errorf("Validate(%q) error = %v, want it to wrap errBinary", data, err)
 		}
 	})

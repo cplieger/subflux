@@ -189,6 +189,48 @@ func TestSearchTargets_binary_data_rejected(t *testing.T) {
 	}
 }
 
+// A provider that answers 200 with no bytes must not produce a saved
+// subtitle. The engine used to catch this with its own length check before
+// calling subtitlefile.Validate; the check now lives in Validate alone, so
+// this pins that the boundary is still closed from the engine's side.
+func TestSearchTargets_empty_data_rejected(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	videoPath := filepath.Join(dir, "movie.mkv")
+
+	ms := &mockStore{}
+	mc := &mockConfig{
+		searchCfg: subflux.SearchConfig{},
+		minScore:  0,
+	}
+	p := &mockProvider{
+		name: "test",
+		results: []subflux.Subtitle{
+			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
+		},
+		data: []byte{},
+	}
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
+
+	req := &subflux.SearchRequest{
+		MediaType:   "movie",
+		ImdbID:      "tt123",
+		ReleaseName: "Movie-GRP",
+	}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+
+	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
+	if err != nil {
+		t.Fatalf("SearchTargets() unexpected error: %v", err)
+	}
+	if paths := result.Paths(); len(paths) != 0 {
+		t.Errorf("SearchTargets() = %v, want empty: a zero-byte body was saved as a subtitle", paths)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "movie.fr.srt")); statErr == nil {
+		t.Error("a zero-byte subtitle file was written next to the media file")
+	}
+}
+
 // --- filterByVariant: forced and hi variants ---
 
 // --- SearchTargets: ForceUpgrade paths ---

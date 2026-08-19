@@ -352,31 +352,31 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		wantErr error
 		name    string
 		data    []byte
-		wantErr bool
 	}{
-		{"empty data is valid", []byte{}, false},
-		{"nil data is valid", nil, false},
-		{"valid SRT content", []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"), false},
-		{"valid ASS content", []byte("[Script Info]\nTitle: Test\n"), false},
-		{"rar4 magic detected", append([]byte("Rar!\x1a\x07\x00"), make([]byte, 100)...), true},
-		{"rar5 magic detected", append([]byte("Rar!\x1a\x07\x01\x00"), make([]byte, 100)...), true},
-		{"7z magic detected", append([]byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}, make([]byte, 100)...), true},
-		{"gzip magic detected", append([]byte{0x1f, 0x8b}, bytes.Repeat([]byte("subtitle text\n"), 8)...), true},
-		{"xz magic detected", append([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, make([]byte, 100)...), true},
-		{"bzip2 magic detected", append([]byte("BZh9"), bytes.Repeat([]byte("subtitle text\n"), 8)...), true},
-		{"high non-text ratio rejected", bytes.Repeat([]byte{0x01}, 100), true},
-		{"mostly text with few control chars accepted", append(
+		{ErrEmpty, "empty data is refused", []byte{}},
+		{ErrEmpty, "nil data is refused", nil},
+		{nil, "valid SRT content", []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n")},
+		{nil, "valid ASS content", []byte("[Script Info]\nTitle: Test\n")},
+		{errBinary, "rar4 magic detected", append([]byte("Rar!\x1a\x07\x00"), make([]byte, 100)...)},
+		{errBinary, "rar5 magic detected", append([]byte("Rar!\x1a\x07\x01\x00"), make([]byte, 100)...)},
+		{errBinary, "7z magic detected", append([]byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}, make([]byte, 100)...)},
+		{errBinary, "gzip magic detected", append([]byte{0x1f, 0x8b}, bytes.Repeat([]byte("subtitle text\n"), 8)...)},
+		{errBinary, "xz magic detected", append([]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, make([]byte, 100)...)},
+		{errBinary, "bzip2 magic detected", append([]byte("BZh9"), bytes.Repeat([]byte("subtitle text\n"), 8)...)},
+		{errBinary, "high non-text ratio rejected", bytes.Repeat([]byte{0x01}, 100)},
+		{nil, "mostly text with few control chars accepted", append(
 			bytes.Repeat([]byte("Hello world\n"), 40),
 			0x01,
-		), false},
-		{"exactly 10% non-text passes", append(bytes.Repeat([]byte{0x01}, 51), bytes.Repeat([]byte("A"), 459)...), false},
-		{"just over 10% non-text rejected", append(bytes.Repeat([]byte{0x01}, 52), bytes.Repeat([]byte("A"), 458)...), true},
-		{"single byte matching start of bzip2 magic passes", []byte("B"), false},
-		{"two bytes partial bzip2 magic passes", []byte("Bz"), false},
-		{"zip magic detected", append([]byte("PK\x03\x04"), make([]byte, 100)...), true},
-		{"zip empty archive magic detected", append([]byte("PK\x05\x06"), make([]byte, 100)...), true},
+		)},
+		{nil, "exactly 10% non-text passes", append(bytes.Repeat([]byte{0x01}, 51), bytes.Repeat([]byte("A"), 459)...)},
+		{errBinary, "just over 10% non-text rejected", append(bytes.Repeat([]byte{0x01}, 52), bytes.Repeat([]byte("A"), 458)...)},
+		{nil, "single byte matching start of bzip2 magic passes", []byte("B")},
+		{nil, "two bytes partial bzip2 magic passes", []byte("Bz")},
+		{errBinary, "zip magic detected", append([]byte("PK\x03\x04"), make([]byte, 100)...)},
+		{errBinary, "zip empty archive magic detected", append([]byte("PK\x05\x06"), make([]byte, 100)...)},
 	}
 
 	for _, tt := range tests {
@@ -385,17 +385,49 @@ func TestValidate(t *testing.T) {
 
 			err := Validate(tt.data)
 
-			if tt.wantErr {
+			if tt.wantErr != nil {
 				if err == nil {
-					t.Fatal("Validate() = nil, want error")
+					t.Fatalf("Validate() = nil, want %v", tt.wantErr)
 				}
-				if !errors.Is(err, errBinary) {
-					t.Errorf("Validate() error = %v, want errBinary", err)
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("Validate() error = %v, want %v", err, tt.wantErr)
 				}
 				return
 			}
 			if err != nil {
 				t.Errorf("Validate() unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// A zero-byte body is the shape a provider's empty 200 arrives in, and every
+// Validate caller is a download boundary: the search engine, the manual
+// download, and four providers all hand it the bytes they are about to write.
+// Accepting it writes an empty .srt next to the media file and records coverage
+// for a subtitle nothing can read, so the refusal must be classifiable rather
+// than left to each caller's own length check.
+func TestValidate_emptyIsAClassifiableRefusal(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name string
+		data []byte
+	}{
+		{"nil", nil},
+		{"zero-length slice", []byte{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := Validate(tt.data)
+			if err == nil {
+				t.Fatal("Validate() = nil: a zero-byte payload would be saved as a subtitle")
+			}
+			if !errors.Is(err, ErrEmpty) {
+				t.Errorf("Validate() error = %v, want ErrEmpty so callers can tell absence from corruption", err)
+			}
+			if errors.Is(err, errBinary) {
+				t.Error("Validate() blamed the archive format for a payload that had no bytes")
 			}
 		})
 	}
