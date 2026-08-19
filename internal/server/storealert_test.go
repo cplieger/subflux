@@ -1,4 +1,4 @@
-package serveradapter_test
+package server
 
 import (
 	"errors"
@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
-// RecordStoreWriteError is the one adapter method with real branching: a
-// disk-full / I/O failure must escalate to a persistent operator alert (so the
-// server warns before crash-looping), while ordinary or nil errors must not.
-// The other adapter methods are pure pass-through to activity/events and are
-// covered where those packages are tested.
-func TestAlertAdapter_RecordStoreWriteError(t *testing.T) {
+// recordStoreWriteError is the one branching member the deleted serveradapter
+// package carried: a disk-full / I/O failure must escalate to a persistent
+// operator alert (so the server warns before crash-looping), while ordinary or
+// nil errors must not. Ported here with the function itself — the three store
+// write paths that call it (backup snapshot, poll heartbeat, and the
+// scheduler's reconcile via the injected recorder) all meet in this package.
+func TestRecordStoreWriteError(t *testing.T) {
 	tests := []struct {
 		name           string
 		err            error
@@ -27,12 +27,12 @@ func TestAlertAdapter_RecordStoreWriteError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			al := activity.NewAlertLog(10)
-			a := &serveradapter.AlertAdapter{A: al}
+			t.Parallel()
+			s := &Server{alerts: activity.NewAlertLog(10)}
 
-			a.RecordStoreWriteError(tt.err)
+			s.recordStoreWriteError(tt.err)
 
-			visible := al.VisibleAlerts()
+			visible := s.alerts.VisibleAlerts()
 			if !tt.wantPersistent {
 				if len(visible) != 0 {
 					t.Fatalf("got %d alerts, want 0 (no escalation expected)", len(visible))

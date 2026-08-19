@@ -45,8 +45,8 @@ func (fakeActivity) Progress(string, int, int, string)                    {}
 // fakeEvents satisfies EventPublisher with no-ops.
 type fakeEvents struct{}
 
-func (fakeEvents) PublishNotify(events.NotifyLevel, string)                    {}
-func (fakeEvents) PublishCoverageUpdate(api.MediaType, string, string, string) {}
+func (fakeEvents) PublishNotify(events.NotifyLevel, string)    {}
+func (fakeEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
 
 // httpFakeRadarr resolves any movie ID to a fixed file path, so MediaRef
 // resolution succeeds in handler tests without a live arr.

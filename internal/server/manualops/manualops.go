@@ -93,9 +93,10 @@ var (
 )
 
 // EventPublisher publishes events to SSE clients.
+// *events.EventBus satisfies it structurally.
 type EventPublisher interface {
 	PublishNotify(level events.NotifyLevel, text string)
-	PublishCoverageUpdate(mediaType api.MediaType, mediaID, language, source string)
+	PublishCoverageUpdate(ev *events.CoverageEvent)
 }
 
 // LiveState holds the runtime state needed for a manual search pass.

@@ -15,7 +15,6 @@ import (
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 )
 
@@ -57,7 +56,7 @@ func (s *Server) initHandlers() {
 			// the error and raise the persistent operator alert here instead of
 			// waiting for the next maintenance window.
 			if err != nil {
-				(&serveradapter.AlertAdapter{A: s.alerts}).RecordStoreWriteError(err)
+				s.recordStoreWriteError(err)
 			}
 			return err
 		},
@@ -180,9 +179,9 @@ func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handle
 		// api.Store is a compile-checked superset of manualops.DownloadStore,
 		// so the implicit interface conversion needs no assertion.
 		DBFunc:   func() manualops.DownloadStore { return s.db },
-		Activity: &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
-		Events:   &serveradapter.ManualEventAdapter{E: s.events},
+		Activity: s.activity,
+		Alerts:   s.alerts,
+		Events:   s.events,
 		StateFunc: func() *manualops.LiveState {
 			ls := s.state()
 			return &manualops.LiveState{

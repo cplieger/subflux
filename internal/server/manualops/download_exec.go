@@ -98,7 +98,12 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 
 	// Publish success events.
 	deps.Events.PublishNotify(events.NotifySuccess, "Subtitle downloaded")
-	deps.Events.PublishCoverageUpdate(mediaType, effectiveMediaID, req.Language, string(req.Provider))
+	deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+		MediaType: mediaType,
+		MediaID:   effectiveMediaID,
+		Language:  req.Language,
+		Source:    string(req.Provider),
+	})
 
 	return true
 }

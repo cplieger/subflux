@@ -20,6 +20,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -107,21 +108,26 @@ type recEvents struct {
 	dones  []scanEvt
 }
 
-func (r *recEvents) PublishCoverageUpdate(api.MediaType, string) {}
+func (r *recEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
 
-func (r *recEvents) PublishScanStart(action, detail string, source activity.ActivitySource, actID string) {
+func (r *recEvents) PublishScanStart(ev *events.ScanEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.starts = append(r.starts, scanEvt{action: action, detail: detail, source: source, actID: actID})
+	r.starts = append(r.starts, scanEvt{
+		action: ev.Action, detail: ev.Detail, source: ev.Source, actID: ev.ActivityID,
+	})
 }
 
-func (r *recEvents) PublishScanDone(action, detail string, source activity.ActivitySource, actID string, outcome activity.Outcome) {
+func (r *recEvents) PublishScanDone(ev *events.ScanEvent) {
 	if r.onDone != nil {
-		r.onDone(actID)
+		r.onDone(ev.ActivityID)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.dones = append(r.dones, scanEvt{action: action, detail: detail, source: source, actID: actID, outcome: outcome})
+	r.dones = append(r.dones, scanEvt{
+		action: ev.Action, detail: ev.Detail, source: ev.Source,
+		actID: ev.ActivityID, outcome: ev.Outcome,
+	})
 }
 
 func (r *recEvents) doneEvents() []scanEvt {

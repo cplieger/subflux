@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -299,7 +300,9 @@ func inventorySkipped(ctx context.Context, deps *Deps, ls *LiveState,
 	}
 	req := EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
 	if changed := ls.Engine.InventoryCoverage(ctx, &req, ep.EpisodeFile.Path); changed {
-		deps.Events.PublishCoverageUpdate(api.MediaTypeEpisode, api.BuildMediaID(&req))
+		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+			MediaType: api.MediaTypeEpisode, MediaID: api.BuildMediaID(&req),
+		})
 	}
 }
 

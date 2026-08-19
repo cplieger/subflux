@@ -14,6 +14,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/showskip"
 )
 
@@ -55,10 +56,11 @@ type ScanMetrics interface {
 
 // EventPublisher publishes events to SSE clients. Scan events carry the
 // activity id (both) and the terminal outcome (scan:done).
+// *events.EventBus satisfies it structurally.
 type EventPublisher interface {
-	PublishCoverageUpdate(mediaType api.MediaType, mediaID string)
-	PublishScanStart(action, detail string, source activity.ActivitySource, actID string)
-	PublishScanDone(action, detail string, source activity.ActivitySource, actID string, outcome activity.Outcome)
+	PublishCoverageUpdate(ev *events.CoverageEvent)
+	PublishScanStart(ev *events.ScanEvent)
+	PublishScanDone(ev *events.ScanEvent)
 }
 
 // ActivityTracker manages scan activity lifecycle.
@@ -87,7 +89,7 @@ type ActivityTracker interface {
 // no longer report cancellable, so a cancel arriving after completion
 // answers 409, never a 204 for work that is already done. Callers keep a
 // deferred unregister as the panic fallback; the release is idempotent.
-func FinishScanActivity(unregister func(), tracker ActivityTracker, events EventPublisher,
+func FinishScanActivity(unregister func(), tracker ActivityTracker, publisher EventPublisher,
 	actID, action, detail string, source activity.ActivitySource, outcome activity.Outcome,
 ) {
 	unregister()
@@ -101,7 +103,9 @@ func FinishScanActivity(unregister func(), tracker ActivityTracker, events Event
 	case activity.OutcomeShutdown:
 		return
 	}
-	events.PublishScanDone(action, detail, source, actID, outcome)
+	publisher.PublishScanDone(&events.ScanEvent{
+		Action: action, Detail: detail, Source: source, ActivityID: actID, Outcome: outcome,
+	})
 }
 
 // stopRequested reports (without blocking) whether the stop signal fired.

@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
@@ -209,7 +210,9 @@ func (h *Handler) startBackgroundScan(w http.ResponseWriter, action, detail stri
 	}
 	stopCh := make(chan struct{})
 	unregister := h.deps.Stops.RegisterStop(actID, func() { close(stopCh) })
-	h.deps.Events.PublishScanStart(action, detail, activity.SourceManual, actID)
+	h.deps.Events.PublishScanStart(&events.ScanEvent{
+		Action: action, Detail: detail, Source: activity.SourceManual, ActivityID: actID,
+	})
 
 	h.deps.BGTracker.Add(1)
 	go func() {

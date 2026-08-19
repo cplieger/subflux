@@ -20,7 +20,6 @@ import (
 	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"pgregory.net/rapid"
 )
 
@@ -194,9 +193,9 @@ func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie)
 	}
 	s.manualH = manualops.NewHandler(manualops.HandlerDeps{
 		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) },
-		Activity: &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
-		Events:   &serveradapter.ManualEventAdapter{E: s.events},
+		Activity: s.activity,
+		Alerts:   s.alerts,
+		Events:   s.events,
 		StateFunc: func() *manualops.LiveState {
 			return &manualops.LiveState{Providers: []api.Provider{&stubProvider{name: "os"}}}
 		},

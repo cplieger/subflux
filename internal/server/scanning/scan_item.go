@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/events"
 )
 
 // ScanEpisode searches for subtitles for a single episode.
@@ -39,7 +40,9 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	paths := result.Paths()
 	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := api.BuildMediaID(&req)
-		deps.Events.PublishCoverageUpdate(api.MediaTypeEpisode, mediaID)
+		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+			MediaType: api.MediaTypeEpisode, MediaID: mediaID,
+		})
 		if len(paths) > 0 && ls.Sonarr != nil {
 			if err := ls.Sonarr.RescanSeries(ctx, series.ID); err != nil {
 				slog.Warn("failed to refresh series", "series_id", series.ID, "error", err)
@@ -95,7 +98,9 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	paths := result.Paths()
 	if len(paths) > 0 || result.CoverageChanged {
 		mediaID := api.BuildMediaID(&req)
-		deps.Events.PublishCoverageUpdate(api.MediaTypeMovie, mediaID)
+		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+			MediaType: api.MediaTypeMovie, MediaID: mediaID,
+		})
 		if len(paths) > 0 && ls.Radarr != nil {
 			if err := ls.Radarr.RescanMovie(ctx, m.ID); err != nil {
 				slog.Warn("failed to refresh movie", "movie_id", m.ID, "error", err)

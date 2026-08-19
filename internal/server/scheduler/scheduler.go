@@ -12,8 +12,8 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"github.com/cplieger/subflux/internal/server/showskip"
 )
 
@@ -49,9 +49,20 @@ type Deps struct {
 	Backoff          scanning.BackoffPrefixReader
 	Metrics          scanning.ScanMetrics
 	ReconcileMetrics ReconcileMetrics // nil-safe; omit to skip reconcile metrics
-	Events           *serveradapter.ScanEventAdapter
-	Activity         *serveradapter.ActivityAdapter
-	Alerts           *serveradapter.AlertAdapter
+	// Events, Activity and Alerts are the scan-engine surfaces; the
+	// scheduler uses StartScan/PublishScanStart itself and hands the same
+	// three straight to scanning.Deps, so they are scanning's interfaces
+	// rather than duplicates. *events.EventBus, *activity.Log and
+	// *activity.AlertLog satisfy them directly.
+	Events   scanning.EventPublisher
+	Activity scanning.ActivityTracker
+	Alerts   scanning.AlertRecorder
+	// RecordStoreWriteError escalates a failed store write to a persistent
+	// operator alert when the error looks like disk exhaustion. Owned by the
+	// composition root because classification needs the storage engine and
+	// the same escalation serves the backup and poll-heartbeat writes.
+	// Nil-safe; omit to skip the escalation.
+	RecordStoreWriteError func(err error)
 	// Stops registers the graceful stop callback of the running full scan;
 	// scheduled scans register too (stoppable by admins).
 	Stops               *activity.StopRegistry
@@ -141,7 +152,9 @@ const (
 func PrepareFullScan(deps *Deps, source activity.ActivitySource) (actID string, run func(ctx context.Context)) {
 	actID, _ = deps.Activity.StartScan(FullScanAction, FullScanDetail, source,
 		activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
-	deps.Events.PublishScanStart(FullScanAction, FullScanDetail, source, actID)
+	deps.Events.PublishScanStart(&events.ScanEvent{
+		Action: FullScanAction, Detail: FullScanDetail, Source: source, ActivityID: actID,
+	})
 	stopCh := make(chan struct{})
 	unregister := deps.Stops.RegisterStop(actID, func() { close(stopCh) })
 	run = func(ctx context.Context) {
@@ -193,8 +206,8 @@ func RunDBMaintenance(ctx context.Context, deps *Deps) {
 		slog.Warn("db maintenance: reconcile failed", "error", err)
 		// Surface a persistent alert on disk-full or repeated write failure
 		// so operators are notified before the system crash-loops.
-		if deps.Alerts != nil {
-			deps.Alerts.RecordStoreWriteError(err)
+		if deps.RecordStoreWriteError != nil {
+			deps.RecordStoreWriteError(err)
 		}
 	} else if len(result.Deleted.Paths) > 0 || result.ResetCount > 0 {
 		slog.Info("db maintenance: reconciled stale entries",

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // initScanHandler creates the scanning.Handler and stores it on the Server.
@@ -27,11 +26,11 @@ func (s *Server) initScanHandler() *scanning.Handler {
 		},
 		CtxFunc:         func() context.Context { return s.lifetime },
 		ScanDeps:        s.scanDeps,
-		Activity:        &serveradapter.ActivityAdapter{A: s.activity},
+		Activity:        s.activity,
 		Stops:           &s.stops,
 		ScanGuard:       &s.scanGuard,
-		Alerts:          &serveradapter.AlertAdapter{A: s.alerts},
-		Events:          &serveradapter.ScanEventAdapter{E: s.events},
+		Alerts:          s.alerts,
+		Events:          s.events,
 		InvalidateStats: func() { s.queryH.InvalidateStats() },
 		BGTracker:       &s.bgWg,
 	})

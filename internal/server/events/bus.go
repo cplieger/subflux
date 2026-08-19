@@ -72,6 +72,39 @@ func (eb *EventBus) Publish(e Event) {
 	eb.hub.Publish(sse.Event{Name: string(e.Type), Data: data})
 }
 
+// PublishCoverageUpdate publishes a coverage-update event: a subtitle file
+// appeared or disappeared for a media item, so the UI refreshes that row.
+// Callers that know only the media identity (the scan engine) leave the
+// language/source fields zero; the manual download/clear-lock path fills
+// them. Taking the payload STRUCT rather than positional arguments is what
+// lets one method serve both — the two call shapes used to be two adapter
+// methods with the same name and different signatures, and the wider one
+// took three adjacent same-typed strings. By pointer only to keep the
+// 80-byte payload off the argument copy; it is dereferenced immediately and
+// never retained.
+func (eb *EventBus) PublishCoverageUpdate(ev *CoverageEvent) {
+	eb.Publish(Event{Type: CoverageUpdate, Data: *ev})
+}
+
+// PublishScanStart publishes scan:start for a scan activity that has just
+// been accepted. Outcome is meaningless here and is ignored if set.
+func (eb *EventBus) PublishScanStart(ev *ScanEvent) {
+	eb.Publish(Event{Type: ScanStart, Data: *ev})
+}
+
+// PublishScanDone publishes scan:done with the scan's four-valued terminal
+// outcome (see ScanEvent.Outcome).
+func (eb *EventBus) PublishScanDone(ev *ScanEvent) {
+	eb.Publish(Event{Type: ScanDone, Data: *ev})
+}
+
+// PublishNotify publishes a user-facing toast notification at the given
+// severity. It keeps positional arguments because the two are different
+// types, so a transposition does not compile.
+func (eb *EventBus) PublishNotify(level NotifyLevel, text string) {
+	eb.Publish(Event{Type: Notify, Data: NotifyEvent{Level: level, Text: text}})
+}
+
 // ClientCount returns the number of connected SSE clients.
 func (eb *EventBus) ClientCount() int {
 	return eb.hub.ClientCount()

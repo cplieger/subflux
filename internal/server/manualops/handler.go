@@ -11,6 +11,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
@@ -176,7 +177,9 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
 		"variant", key.Variant)
 
-	h.deps.Events.PublishCoverageUpdate(key.MediaType, key.MediaID, key.Language, "")
+	h.deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+		MediaType: key.MediaType, MediaID: key.MediaID, Language: key.Language,
+	})
 
 	api.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }
