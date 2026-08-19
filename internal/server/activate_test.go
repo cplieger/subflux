@@ -29,9 +29,8 @@ import (
 // --- Fixtures ---
 
 // activationCfg builds the REAL config the activation path consumes, varying
-// only the sections these tests drive. It replaces the hand-written
-// api.ConfigProvider fake that used to sit here: the snapshot holds
-// *config.Config, so the fixture is a config, and the knobs are YAML.
+// only the sections these tests drive. The snapshot holds *config.Config, so
+// the fixture is a config and the knobs are YAML.
 //
 // The base document (testConfig) always configures sonarr and never radarr,
 // which is what the snapshot assertions below key on.

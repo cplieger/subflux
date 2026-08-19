@@ -70,7 +70,7 @@ var (
 // pathGuard is the media-path half of the configuration, and the only half
 // these handlers read: validate a path against the configured media roots
 // before answering with it, and delete under those roots through the same
-// containment. 2 of the 28 values the config offers — the file manager reads
+// containment. 2 of the 37 values the config offers — the file manager reads
 // no language rule, no provider setting and no scoring weight.
 //
 // RemoveUnderRoot appears here as well as on remover because the bulk-delete

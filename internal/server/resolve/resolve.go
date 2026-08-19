@@ -117,7 +117,7 @@ type FileStore interface {
 }
 
 // pathValidator is the containment check run on every resolved path as
-// defense-in-depth. ONE of the 28 values the configuration offers — resolution
+// defense-in-depth. ONE of the 37 values the configuration offers — resolution
 // derives its paths from the store and the arrs, so the only thing it asks the
 // config is whether the path it produced sits under a configured media root.
 type pathValidator interface {

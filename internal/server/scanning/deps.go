@@ -9,7 +9,7 @@ import (
 // widths of one concern: an interface goes next to its consumer when a package
 // has exactly one, and into this file when the package has several to compare.
 //
-// A scan pass reads 4 of the 28 values the configuration offers, and the HTTP
+// A scan pass reads 4 of the 37 values the configuration offers, and the HTTP
 // preflight in front of it reads 2 of those 4. Neither reads a scoring weight,
 // a provider setting, an auth switch or the server runtime — a scan asks the
 // config what to look for and how fast, and asks the engine for everything
@@ -23,7 +23,7 @@ import (
 
 // scanHandlerCfg is what the scan HTTP handlers read before any scan starts:
 // the pacing config for the per-item delay, and the language targets used to
-// answer the preflight. 2 of the 28 values the config offers — these handlers
+// answer the preflight. 2 of the 37 values the config offers — these handlers
 // resolve the arr item, decide the status code and hand off.
 type scanHandlerCfg interface {
 	Search() api.SearchConfig
@@ -32,7 +32,7 @@ type scanHandlerCfg interface {
 
 // ScanCfg is what a scan pass reads: the preflight's two plus the configured
 // language list the search request carries, and the adaptive-backoff settings
-// the pass seeds its season tracker from. 4 of the 28 values the config offers.
+// the pass seeds its season tracker from. 4 of the 37 values the config offers.
 //
 // Exported because the scheduler names it: the scheduler reads Search() for its
 // own interval and carries the same value straight into LiveState, so a second

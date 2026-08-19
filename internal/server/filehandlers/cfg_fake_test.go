@@ -8,9 +8,9 @@ import (
 )
 
 // fakePathGuard is the config double for this package's tests, sized to
-// pathGuard: TWO methods, the containment check and the confined remove. It
-// replaces the shared 28-method testsupport.NopConfig, of which these tests set
-// exactly one field — the injected error, kept here as pathErr.
+// pathGuard: TWO methods out of the 37 a *config.Config offers — the
+// containment check and the confined remove. One knob, pathErr, which is the
+// only thing these tests ever varied.
 //
 // RemoveUnderRoot really removes, tolerating an already-missing path, because
 // the delete-gate tests assert on what is left on disk. The tolerated errors

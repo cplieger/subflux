@@ -5,9 +5,8 @@ import (
 )
 
 // fakeCoverageCfg is the config double for this package's tests, sized to
-// coverageCfg: THREE methods, the exact surface the coverage handlers read.
-// It replaces the shared 28-method testsupport.NopConfig, of which these tests
-// set two fields and the handlers dialed three methods.
+// coverageCfg: THREE methods out of the 37 a *config.Config offers, and the
+// exact surface the coverage handlers read. The tests set two of the three.
 type fakeCoverageCfg struct {
 	targets   []api.SubtitleTarget
 	embedded  api.EmbeddedPolicy

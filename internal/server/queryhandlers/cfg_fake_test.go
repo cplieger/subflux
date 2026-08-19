@@ -9,8 +9,8 @@ import (
 // reporting the configuration is this family's job, plus the 4 extra that
 // search.SearchCfg adds (Sync, ProvidersForTarget, MinScoreForTarget,
 // ProviderPriority) because the score-simulation and provider-timeout tests
-// build a REAL search engine over the same value. 15 methods, against the 28 of
-// the shared testsupport.NopConfig it replaces.
+// build a REAL search engine over the same value. 15 methods out of the 37 a
+// *config.Config offers.
 //
 // A real *config.Config would need none, but these tests assert on what the
 // handlers PROJECT from a config, so the fixture has to return exactly what the

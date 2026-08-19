@@ -44,7 +44,7 @@ type Deps struct {
 
 // LiveState holds the runtime state needed by media handlers. It carries no
 // configuration: the media browser lists what the arrs know, and reads 0 of
-// the 28 values the config offers.
+// the 37 values the config offers.
 type LiveState struct {
 	Sonarr MediaSonarrClient // nil when sonarr not configured
 	Radarr MediaRadarrClient // nil when radarr not configured

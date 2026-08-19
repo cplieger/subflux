@@ -21,7 +21,7 @@ var ignoredCodecTable = []struct {
 // goes through.
 //
 // The parameter is an anonymous one-method interface because that is the whole
-// of what this resolver reads: 1 of the 28 values the configuration offers.
+// of what this resolver reads: 1 of the 37 values the configuration offers.
 // Every caller's own config surface already carries EmbeddedPolicy, so each
 // satisfies this structurally without naming anything.
 func IgnoredCodecsFromConfig(cfg interface{ EmbeddedPolicy() api.EmbeddedPolicy }) map[string]bool {

@@ -64,7 +64,7 @@ type Deps struct {
 // coverageCfg is what the coverage endpoints read out of the configuration:
 // the language targets each media item earns, the embedded-codec policy that
 // decides which existing tracks count, and the arr exclude-tag list. 3 of the
-// 28 values the config offers — these handlers report coverage against the
+// 37 values the config offers — these handlers report coverage against the
 // language rules, so they ask nothing about providers, scoring or paths.
 type coverageCfg interface {
 	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget

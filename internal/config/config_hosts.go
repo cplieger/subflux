@@ -10,8 +10,8 @@ import (
 // HostAllowlist returns the parsed exact-match Host allowlist built from
 // allowed_hosts. It is inactive (a safe pass-through) when allowed_hosts is
 // unset — the backward-compatible default — and active as soon as any
-// non-blank entry is configured. Not part of the ConfigProvider interface;
-// consumed directly by the server's host gate (like TrustedProxyNets).
+// non-blank entry is configured. Read by the server's host gate on every
+// activation, which re-wraps the middleware chain with the returned policy.
 func (c *Config) HostAllowlist() *webhttp.HostPolicy {
 	return c.cachedHostPolicy
 }

@@ -66,7 +66,7 @@ type queryEngine interface {
 // queryCfg is the configuration surface the introspection endpoints render:
 // /api/config/parsed echoes the parsed settings back to the UI, /api/state/stats
 // reports the scan interval, and the per-item state view resolves targets and
-// the embedded-codec policy. 11 of the 28 values the config offers — wide for a
+// the embedded-codec policy. 11 of the 37 values the config offers — wide for a
 // handler package because reporting the configuration IS this family's job, and
 // still short of the whole by the auth, logging, port and media-path halves it
 // never reads.
@@ -110,7 +110,7 @@ type Deps struct {
 	// package never does, and taking the store as a parameter just to forward it
 	// is what made these handlers look like a store consumer twelve methods
 	// wide. cfg stays a parameter because it is hot-reloadable and arrives with
-	// each request's live snapshot — 2 of the 28 values the config offers, named
+	// each request's live snapshot — 2 of the 37 values the config offers, named
 	// from coverage for the same reason the store half named FileReader there:
 	// the contract belongs to the function, and re-listing it here is how the
 	// two halves of one signature drift apart.

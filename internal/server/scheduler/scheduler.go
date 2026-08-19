@@ -74,7 +74,7 @@ type Deps struct {
 // LiveState holds the live state needed by the scheduler.
 //
 // Cfg and Engine are both typed as scanning's own interfaces, for the same
-// reason Deps.ScanDB is. The scheduler reads exactly ONE of the 28 values the
+// reason Deps.ScanDB is. The scheduler reads exactly ONE of the 37 values the
 // config offers — Search(), for the scan interval and the upgrade flag it logs
 // — and otherwise only carries the value into scanning.LiveState. A separate
 // one-method declaration here would have to be assignable to scanning's

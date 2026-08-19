@@ -12,8 +12,9 @@ import (
 // TrustedProxyNets returns the parsed trusted reverse-proxy CIDR set used for
 // spoof-safe client-IP resolution. It is empty when trusted_proxies is unset
 // (the default), in which case the client IP resolves to the unspoofable
-// socket peer and X-Forwarded-For is ignored. Not part of the ConfigProvider
-// interface; consumed directly by the composition root (like AuthDisabled).
+// socket peer and X-Forwarded-For is ignored. Read by internal/server's
+// activation on every reload, which holds this concrete type, so a
+// trusted_proxies edit re-parses without a restart.
 //
 // The returned set is a deep copy. This one is worth the allocation: it is the
 // set that decides whether X-Forwarded-For is honoured, so a caller holding a

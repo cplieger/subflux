@@ -109,12 +109,11 @@ providers:
 // (ValidatePath, RemoveUnderRoot) answer against something the test owns.
 // extra is appended YAML for whatever section the individual test needs.
 //
-// It replaces the 28-method hand-written fake this file used to carry. The
-// server's live snapshot holds the concrete *config.Config, so a fake would
+// The server's live snapshot holds the concrete *config.Config, so a fake would
 // have to BE one; and the loader is what makes a config's accessors agree with
 // each other — targets derived from the rules, caches built, roots opened —
 // which a fake with independent per-method returns could always contradict.
-// Every knob the fake exposed as a struct field is a YAML key here.
+// Every knob is a YAML key.
 func testConfig(t *testing.T, extra ...string) *config.Config {
 	t.Helper()
 	return testConfigInRoot(t, t.TempDir(), extra...)

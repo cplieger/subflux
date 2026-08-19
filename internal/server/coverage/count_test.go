@@ -38,9 +38,7 @@ func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.Me
 
 // countMissingConfig is coverage.CountCfg and nothing else: the language
 // targets the count is measured against, plus the embedded-codec policy the
-// row index is filtered by. The former version embedded the shared 28-method
-// no-op config to satisfy a whole-configuration parameter, of which this suite
-// exercises one.
+// row index is filtered by. 2 of the 37 values a *config.Config offers.
 type countMissingConfig struct {
 	targets []api.SubtitleTarget
 }

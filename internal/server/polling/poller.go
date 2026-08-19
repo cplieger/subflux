@@ -49,7 +49,7 @@ type PollerStore interface {
 
 // pollerCfg is what a poll cycle reads out of the configuration: how often to
 // wake, the exclude-tag list and pacing, the media-root containment check for
-// the imported file, and the language targets the import earns. 5 of the 28
+// the imported file, and the language targets the import earns. 5 of the 37
 // values the config offers — polling reacts to an arr import, so it asks
 // nothing about scoring, providers, auth or the server runtime.
 type pollerCfg interface {

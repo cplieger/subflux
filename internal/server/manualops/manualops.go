@@ -121,7 +121,7 @@ type tierLabeller interface {
 
 // pathValidator is the containment check a manual download runs before it
 // writes: the resolved subtitle path must sit under a configured media root.
-// ONE of the 28 values the config offers — scoring, language rules and provider
+// ONE of the 37 values the config offers — scoring, language rules and provider
 // settings all reach this package through the engine and the scorer, already
 // resolved, so the config itself is asked for nothing else.
 type pathValidator interface {

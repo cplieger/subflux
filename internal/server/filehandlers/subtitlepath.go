@@ -29,7 +29,7 @@ import (
 // silent skip.
 var errSubtitleExtensionNotAllowed = errors.New("extension does not carry the subtitle delete capability")
 
-// remover is the containment-delete seam this gate delegates to: one of the 28
+// remover is the containment-delete seam this gate delegates to: one of the 37
 // values the config offers, and the only one the gate itself needs.
 type remover interface {
 	RemoveUnderRoot(ctx context.Context, path string) error

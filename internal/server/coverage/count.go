@@ -23,7 +23,7 @@ type FileReader interface {
 
 // CountCfg is what the missing-count pass reads out of the configuration: the
 // language targets a media item earns, and the embedded-codec policy that
-// decides which existing tracks count as usable. 2 of the 28 values the config
+// decides which existing tracks count as usable. 2 of the 37 values the config
 // offers — counting is arithmetic over targets and rows, so it asks nothing
 // about providers, scoring, paths or the server runtime.
 //

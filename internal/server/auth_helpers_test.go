@@ -70,11 +70,10 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 	}
-	// check_breached_passwords: OFF. The 28-method fake this replaced returned
-	// false from CheckBreachedPasswords while the real config DEFAULTS IT ON,
-	// so these tests have never run the production default — and turning it on
-	// here would send every password in the suite to HIBP over the network.
-	// The fixture now says so instead of a fake answering quietly.
+	// check_breached_passwords: OFF, stated rather than inherited. The real
+	// config DEFAULTS IT ON, so these tests have never run the production
+	// default; turning it on here would send every password in the suite to
+	// HIBP over the network, so the fixture says which value it wants.
 	s.live.Store(&liveState{cfg: testConfig(t, "auth:\n  check_breached_passwords: false")})
 	s.authH = &authhandlers.Handler{
 		Store:       authDB,

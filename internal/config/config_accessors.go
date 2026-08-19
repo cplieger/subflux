@@ -100,9 +100,9 @@ func (c *Config) ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.Pr
 }
 
 // MinScoreForTarget returns the minimum score for a target,
-// falling back to the global min_score.
-// The mediaType parameter is part of the ConfigProvider interface
-// for future per-media-type score overrides; currently unused.
+// falling back to the global min_score. The mediaType parameter is part of
+// search.SearchCfg's signature for future per-media-type score overrides;
+// currently unused.
 func (c *Config) MinScoreForTarget(t *api.SubtitleTarget, _ api.MediaType) int {
 	if t.MinScore != nil {
 		return *t.MinScore

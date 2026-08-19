@@ -21,7 +21,7 @@ import (
 // AuthConfig is the authentication half of the configuration, and the only
 // part these handlers read: whether password login is on at all, whether a new
 // password must be checked against the breach corpus, and whether OIDC is
-// available as an alternative factor. 3 of the 28 values the config offers.
+// available as an alternative factor. 3 of the 37 values the config offers.
 //
 // Exported because the composition root names it: the Config resolver below is
 // how the handlers see a hot-reloaded config, and the root has to write that

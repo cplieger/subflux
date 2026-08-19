@@ -91,11 +91,6 @@ type RadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// --- Config loading ---
-
-// ConfigLoader parses and validates config from raw YAML bytes.
-type ConfigLoader func(data []byte) (ConfigProvider, error)
-
 // --- Schema ---
 
 // SchemaFunc returns the full configuration schema for the UI.

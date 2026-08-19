@@ -70,5 +70,6 @@ func (c *Config) CheckBreachedPasswords() bool {
 func (c *Config) WebAuthnRPID() string { return c.Auth.WebAuthnRPID }
 
 // AuthDisabled returns whether authentication is completely bypassed.
-// This is an undocumented escape hatch; not part of the ConfigProvider interface.
+// This is an undocumented escape hatch. Read live per request by the
+// authenticator's bypass predicate, so toggling it hot-applies.
 func (c *Config) AuthDisabled() bool { return c.Auth.DisableAuth }

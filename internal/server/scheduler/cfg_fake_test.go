@@ -8,8 +8,8 @@ import (
 // fakeScanCfg is the zero-value config double for the scheduler tests, sized to
 // scanning.ScanCfg — the type LiveState.Cfg names, because the scheduler reads
 // Search() for its own interval and carries the same value into the scan pass.
-// FOUR methods, replacing the shared 28-method testsupport.NopConfig these
-// tests used to hand in, of which they read one.
+// FOUR methods out of the 37 a *config.Config offers, of which these tests
+// read one — Search(), for the scan interval.
 type fakeScanCfg struct {
 	targets     []api.SubtitleTarget
 	languages   []string

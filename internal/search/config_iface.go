@@ -6,7 +6,7 @@ import "github.com/cplieger/subflux/internal/api"
 // weights and floors it ranks candidates by, the provider allow-list and
 // priority order it queries in, the concurrency and retry limits it paces
 // itself with, and the sync/post-process settings it applies to a download.
-// 9 of the 28 values the configuration offers — the widest consumer surface in
+// 9 of the 37 values the configuration offers — the widest consumer surface in
 // the app, and still short of the whole by the auth, logging, server-runtime,
 // media-path and UI halves a search never reads.
 //

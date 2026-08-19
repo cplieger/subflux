@@ -45,54 +45,65 @@ internal/apipaths/paths.gen.go:
 # product decision (see the review report), not a licence to grow the catalog.
 internal/api/error_codes.go:
 
-# --- api interface members forced by interface-to-interface assignment -------
-# Consumer packages declare NARROW config/store/client interfaces and are handed
-# a value whose static type is the WIDE api interface. Go permits that
-# assignment only while the wide interface declares every method the narrow one
-# needs, so these members are load-bearing even though no call site dials them
-# through the api interface. Proven by deleting each and building:
-#   MinScoreForTarget/ProvidersForTarget/ProviderPriority
-#     main.go:520 api.ConfigProvider -> search.SearchCfg
-#   PollInterval    internal/server/polling/poller.go:64
-#                   var _ PollerCfg = api.ConfigProvider(nil)
-#   EmbeddedPolicy  internal/server/coverage/count.go:15 and
-#                   queryhandlers/query.go:181 -> search.IgnoredCodecsFromConfig
+# --- Interface members reached only through a narrow interface --------------
+# A consumer declares a narrow interface and is handed a value of a wider type,
+# so gopls attributes the call to the narrow member and the declaration on the
+# other side looks unused. Two entries are left, and each names its dialer:
+#   EmbeddedPolicy  coverage.CountCfg declares it (count.go) and the bound
+#                   missing-count closure dials it, but only the tests construct
+#                   a CountCfg directly, so gopls sees test-only use.
 #   Ping (SonarrClient + RadarrClient)
-#                   confighandlers/handler.go:277,279 -> newArrPinger's
-#                   anonymous interface{ Ping(context.Context) error }
+#                   confighandlers' newArrPinger returns an anonymous
+#                   interface{ Ping(context.Context) error }, which is what the
+#                   connectivity check dials.
 #
-# The two STORE members that used to sit here are gone, along with the cause.
-# UpsertSubtitleFile and DeleteSubtitleFile were listed because api.Store was
-# what got passed inward and the narrow interfaces had to be reachable from it;
-# api.Store is deleted, every consumer now takes its own interface directly, and
-# both methods are dialed through those. Nothing to excuse.
-method ProvidersForTarget
-method MinScoreForTarget
-method ProviderPriority
-method PollInterval
+# FIVE entries were removed here rather than re-justified, because the thing
+# that forced them is gone. MinScoreForTarget, ProvidersForTarget and
+# ProviderPriority were listed for `api.ConfigProvider -> search.SearchCfg`, and
+# PollInterval for a `var _ PollerCfg = api.ConfigProvider(nil)` assertion that
+# checked the wrong direction (that a 28-method interface still carried 5, true
+# of any superset). api.ConfigProvider is deleted: every consumer names the
+# config surface it calls, *config.Config is handed to those names directly, and
+# all four methods are now dialed through the interface that declares them.
+# Verified by re-running punused on internal/search, internal/server/polling and
+# internal/config — none of the four is reported any more.
+#
+# The two STORE members that used to sit here went the same way when api.Store
+# was deleted.
 method EmbeddedPolicy
 method Ping
 
 # --- Concrete implementations reached only through their interface -----------
 # The mirror image of the block above: production dials these through an
 # interface, so gopls attributes the reference to the interface member and the
-# implementation looks unused. Each is pinned by a compile-time assertion that
-# fails if the method is removed (verified by renaming each and building):
-#   (*Config).EmbeddedPolicy   config_load.go:21 var _ api.ConfigProvider
-#                              (the nine per-facet assertions that used to sit
-#                              in config_accessors.go went with C11's flattening
-#                              of ConfigProvider; the composite one is the check)
-#   (*Config).Validate         config_types.go:308 var _ Validator
-#   (*NopConfig).EmbeddedPolicy testsupport/nopconfig.go:38 var _ api.ConfigProvider
+# implementation looks unused.
+#   (*Config).EmbeddedPolicy   Dialed through the FOUR narrow interfaces that
+#                              declare it -- queryhandlers' queryCfg,
+#                              coveragehandlers' coverageCfg, coverage.CountCfg
+#                              and search.SearchCfg -- each of which is handed a
+#                              *config.Config by name at the composition root
+#                              (server_init.go, main.go's search.WithConfig).
+#                              Those typed parameters ARE the compile-time check
+#                              that used to be a `var _ api.ConfigProvider`
+#                              assertion in config_load.go: removing the method
+#                              breaks every one of the four assignments.
+#   (*Config).Validate         config_types.go var _ Validator. NOTE for
+#                              maintainers: this is the only reference. Nothing
+#                              in production calls Validate -- LoadFromBytes
+#                              calls the package-level validate(ctx, cfg)
+#                              directly -- and config.Validator's only consumer
+#                              is the test that asserts the two agree. The
+#                              interface, the method and that test form a closed
+#                              loop; whether the type should carry a
+#                              self-validation method at all is a pending
+#                              decision, not a licence to keep it.
 #
-# The two store fakes' Close methods that used to be listed here are gone with
-# the fakes' reason to have them: nothing reaches Close through an interface
-# (main.go calls it on the concrete *boltstore.DB), so NopStore no longer
-# declares one and panicStore, which existed only to be exhaustive against
-# api.Store, is deleted.
+# (*NopConfig).EmbeddedPolicy was removed: internal/testsupport/nopconfig.go is
+# deleted. It existed to satisfy api.ConfigProvider whole, and the seven
+# packages that shared its 28 no-op methods now each carry a fixture sized to
+# the interface their own subject names.
 method (*Config).EmbeddedPolicy
 method (*Config).Validate
-method (*NopConfig).EmbeddedPolicy
 
 # --- External-library store contract (cplieger/auth/v4) ---------------------
 # internal/authstore/authdb.go:27-31 asserts *Store against the auth library's

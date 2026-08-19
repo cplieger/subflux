@@ -6,19 +6,17 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// fakeManualCfg is the config double for this package's tests. TEN methods,
-// against the 28 of the shared testsupport.NopConfig it replaces, and the
-// width is the union of two demands: pathValidator's ONE — all this package
-// itself asks a config for — plus the 9 of search.SearchCfg, because these
-// tests build a REAL search.Engine over the same value to exercise scoring and
-// the download pipeline end to end.
+// fakeManualCfg is the config double for this package's tests. TEN methods out
+// of the 37 a *config.Config offers, and the width is the union of two demands:
+// pathValidator's ONE — all this package itself asks a config for — plus the 9
+// of search.SearchCfg, because these tests build a REAL search.Engine over the
+// same value to exercise scoring and the download pipeline end to end.
 //
 // Every method returns a zero value, which is what the suite needs: it asserts
 // on the download pipeline's effects, and the scoring inputs come from the
 // engine's own fixtures. ValidatePath accepts everything on purpose — the arr
 // fakes here resolve to /media paths that no test-owned media root contains, so
-// a real *config.Config (which every other retired fake gave way to) would
-// reject the fixture rather than exercise it.
+// a real *config.Config would reject the fixture rather than exercise it.
 type fakeManualCfg struct{}
 
 var (
