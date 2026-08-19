@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"

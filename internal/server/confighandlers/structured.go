@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 	yaml "go.yaml.in/yaml/v3"

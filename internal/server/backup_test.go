@@ -4,9 +4,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
-	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/atomicfile/v3"
 )
 
 func TestPruneBackups_keepsNewestAndSkipsLiveDB(t *testing.T) {
@@ -120,5 +121,18 @@ func TestEnforceBackupMode_refusesASymlinkInsteadOfChmodingItsTarget(t *testing.
 	}
 	if got := fi.Mode().Perm(); got != 0o644 {
 		t.Errorf("victim mode = %v, want 0644 untouched: the enforcement followed the symlink", got)
+	}
+}
+
+// TestAtomicfileIsTheV3Module pins which major every atomicfile call site
+// resolves to. /v2 and /v3 are distinct modules that can coexist in one build,
+// so a file left behind on /v2 during the major migration compiles silently
+// while missing v3's unconditional symlink refusal and temp-side fsync — the
+// guarantees the test above and the config writes rely on.
+func TestAtomicfileIsTheV3Module(t *testing.T) {
+	t.Parallel()
+	const want = "github.com/cplieger/atomicfile/v3"
+	if got := reflect.TypeOf(atomicfile.PendingFile{}).PkgPath(); got != want {
+		t.Errorf("atomicfile package path = %q, want %q", got, want)
 	}
 }

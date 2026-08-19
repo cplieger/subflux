@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
+	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/envx/yamlenv/v2"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
