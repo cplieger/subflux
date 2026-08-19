@@ -287,25 +287,61 @@ func (s *Server) applyLogging(oldCfg, newCfg api.ConfigProvider) {
 // launch blocks in Start and hotReload and their broken "iff wasUnconfigured"
 // guard (WithConfig stores configured=true at construction, so a configured
 // cold boot computed false and launched nothing).
+//
+// It signals rather than launches, because the workers must run on the context
+// the process handed Start: the first successful activation can be a hot
+// config save, whose context belongs to the HTTP request that carried it, and
+// workers started on that context would stop the moment the operator's browser
+// received its 200.
 func (s *Server) startWorkers() {
 	s.workersOnce.Do(func() {
-		launch := s.launchWorkers
-		if launch == nil {
-			launch = s.launchWorkerSet
+		if s.launchWorkers != nil {
+			s.launchWorkers()
+			return
 		}
-		launch()
+		// Buffered by one and latched by workersOnce, so this send never
+		// blocks an activation. A Server that never Started (a handler test)
+		// simply leaves the signal unread.
+		select {
+		case s.workerLaunchSignal() <- struct{}{}:
+		default:
+		}
 	})
 }
 
-// launchWorkerSet starts the real background goroutines on the server
-// context. Reconcile is a scheduler-internal stage, not a worker.
-func (s *Server) launchWorkerSet() {
+// workerLaunchSignal returns the launch channel, creating it on first use so
+// that a Server assembled as a struct literal behaves like one from New rather
+// than dropping the signal into a nil channel.
+func (s *Server) workerLaunchSignal() chan struct{} {
+	s.workerLaunchOnce.Do(func() {
+		if s.workerLaunch == nil {
+			s.workerLaunch = make(chan struct{}, 1)
+		}
+	})
+	return s.workerLaunch
+}
+
+// awaitWorkerLaunch launches the background worker set on the context handed
+// to Start, when an activation asks for it. It is started by Start and returns
+// either once it has launched or when the process context ends, so the workers
+// take their lifetime from the process rather than from a struct field.
+func (s *Server) awaitWorkerLaunch(ctx context.Context) {
+	select {
+	case <-s.workerLaunchSignal():
+		s.launchWorkerSet(ctx)
+	case <-ctx.Done():
+	}
+}
+
+// launchWorkerSet starts the real background goroutines on the context handed
+// to Start. Reconcile is a scheduler-internal stage, not a worker.
+func (s *Server) launchWorkerSet(ctx context.Context) {
 	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics"})
 	s.bgWg.Add(4)
-	go func() { defer s.bgWg.Done(); s.runScheduler(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runPoller(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runBackup(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runStoreMetrics(s.ctx) }()
+	go func() { defer s.bgWg.Done(); s.runScheduler(ctx) }()
+	go func() { defer s.bgWg.Done(); s.runPoller(ctx) }()
+	go func() { defer s.bgWg.Done(); s.runBackup(ctx) }()
+	go func() { defer s.bgWg.Done(); s.runStoreMetrics(ctx) }()
 }
 
 // --- OIDC lazy slot ---

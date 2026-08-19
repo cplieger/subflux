@@ -683,23 +683,39 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 // --- Latch seam sanity ---
 
 // TestStartWorkers_defaults_to_real_launcher guards the nil seam: a Server
-// built without the test override must fall through to launchWorkerSet (the
-// four real goroutines), which requires the full dep set — so this only
-// asserts the nil-check dispatch, via a server whose context is already
-// cancelled (all four workers exit immediately).
+// built without the test override must fall through to the real worker set
+// (the four goroutines launched by awaitWorkerLaunch on the context handed to
+// Start), which requires the full dep set — so this asserts the nil-check
+// dispatch and the launch signal reaching the dispatcher, via a context that
+// is cancelled the moment the workers are running (all four exit immediately).
 func TestStartWorkers_defaults_to_real_launcher(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	s.ctx = ctx
+	defer cancel()
 
 	// newTestServer does not build the poller; initHandlers constructs the
-	// pieces the real worker set touches, and the cancelled context makes
-	// each worker exit immediately.
+	// pieces the real worker set touches.
 	s.initHandlers()
 
+	// The dispatcher stands in for Start: it is the only thing that hands the
+	// worker set its lifetime, so the launch is observable only through it.
+	launched := make(chan struct{})
+	s.bgWg.Go(func() {
+		defer close(launched)
+		s.awaitWorkerLaunch(ctx)
+	})
+
 	s.startWorkers()
+	select {
+	case <-launched:
+	case <-time.After(5 * time.Second):
+		t.Fatal("launch signal did not reach awaitWorkerLaunch")
+	}
+
+	// Only now cancel, so each worker exits from a live context rather than
+	// racing the dispatcher's own ctx.Done arm.
+	cancel()
 	done := make(chan struct{})
 	go func() { s.bgWg.Wait(); close(done) }()
 	select {

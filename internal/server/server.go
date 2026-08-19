@@ -26,10 +26,14 @@ import (
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/server/polling"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -58,30 +62,51 @@ func mustSub(fsys embed.FS, dir string) fs.FS {
 	return sub
 }
 
-// Metrics is the observability interface consumed by the server package.
-type Metrics interface {
-	RecordSearch(provider api.ProviderID, dur time.Duration, err error)
-	RecordDownload(provider api.ProviderID, err error)
-	AdaptiveSkip()
-	RecordEmbeddedDetectorError()
-	RecordScan(items, found int, dur time.Duration)
-	RecordImport(source api.PollKey)
+// TransportMetrics records the HTTP surface's own behaviour and exposes the
+// scrape endpoint.
+type TransportMetrics interface {
 	RecordHTTP(rm webhttp.RequestMetric)
 	RecordPanic()
-	TotalSearches() int64
 	Handler() http.HandlerFunc
+}
 
-	// Store observability (Requirement 17).
+// StoreMetrics records bbolt store observability (Requirement 17): how large
+// the file and its freelist have grown, and that a hot backup completed.
+type StoreMetrics interface {
 	RecordStoreFileSize(bytes int64)
 	RecordStoreFreelistBytes(bytes int64)
-	RecordReconcile(deleted int, reset int64, dur time.Duration)
 	RecordBackupSuccess(dur time.Duration)
+}
 
-	// Mode observability: 1 when a valid configuration is active, 0 unconfigured.
+// ModeMetrics reports which mode the process is serving in: 1 when a valid
+// configuration is active, 0 unconfigured.
+type ModeMetrics interface {
 	SetConfigured(ok bool)
+}
 
-	// Poll-cursor durability: count of cursors whose durable persist is failing.
+// DurabilityMetrics reports the poll-cursor durability gauge: the count of
+// cursors whose durable persist is failing.
+type DurabilityMetrics interface {
 	SetPollCursorsDirty(n int)
+}
+
+// Metrics is the observability surface the server package wires. It is a
+// composition of roles rather than a flat method list: the first group is the
+// seams the subsystems declare for themselves, the rest are the server's own.
+// A consumer takes the one role it records against; this union exists only
+// because the composition root wires a single concrete recorder to all of
+// them, and it is the only place their sum is named.
+type Metrics interface {
+	search.SearchMetrics
+	scanning.ScanMetrics
+	polling.PollerMetrics
+	queryhandlers.MetricsReader
+	scheduler.ReconcileMetrics
+
+	TransportMetrics
+	StoreMetrics
+	ModeMetrics
+	DurabilityMetrics
 }
 
 // sleepCtx pauses for d, returning early if ctx is cancelled.
@@ -111,7 +136,6 @@ func New(db api.Store, reg api.ProviderRegistry, opts ...Option) *Server {
 			ffmpegSem:    semaphore.NewWeighted(3),
 			posterClient: newPosterClient(),
 		},
-		ctx: context.Background(),
 	}
 	for _, o := range opts {
 		o(s)
@@ -230,6 +254,7 @@ func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 // boots today keeps booting.
 func (s *Server) Start(ctx context.Context, onReady func()) {
 	s.ctx = ctx
+	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 	ls := s.state()
 
 	if err := s.activate(ctx, ls.cfg, activateCold); err != nil {
@@ -260,6 +285,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 // StartUnconfigured starts the HTTP server without a valid config.
 func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
 	s.ctx = ctx
+	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 
 	slog.Warn("starting in unconfigured mode; " +
 		"scans and searches are disabled until a valid configuration is saved")

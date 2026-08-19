@@ -92,7 +92,18 @@ type previewDeps struct {
 // Server is the main application server.
 type Server struct {
 	stores storeFacade
-	ctx    context.Context
+	// ctx is the process-scoped lifetime, written once by Start or
+	// StartUnconfigured from the context the process hands the server and
+	// never derived from an *http.Request.
+	//
+	// It is read only by the three server-scoped uses the concurrency audit
+	// ratified: the S12 full-scan launcher (a client disconnect must never
+	// cancel a scan, so background runs take their context from here and not
+	// from the handler that started them), the ServerCtx/CtxFunc seams the
+	// handler families declare for work that outlives a request, and the lazy
+	// OIDC discovery every request shares. The background worker set no
+	// longer reads it: it is handed the context at start (awaitWorkerLaunch).
+	ctx context.Context
 	pollDeps
 	previewDeps
 	db           api.Store
@@ -123,10 +134,20 @@ type Server struct {
 	// package never owns slog configuration itself).
 	logSetup func(level, format string)
 	// launchWorkers overrides the background-worker launch inside the
-	// workersOnce latch. Nil means the real worker set (launchWorkerSet);
-	// tests inject a counter to assert launch cardinality.
+	// workersOnce latch. Nil means the real worker set, launched by
+	// awaitWorkerLaunch on the context handed to Start; tests inject a
+	// counter to assert launch cardinality.
 	launchWorkers func()
-	defaultConfig []byte
+	// workerLaunch carries the "an activation succeeded, launch the workers"
+	// signal from activate to the goroutine Start owns. It is a signal and
+	// not a direct call so the worker set can only ever run on the process
+	// context Start was handed, never on the context of the HTTP request
+	// that happened to carry the first successful config save. Reach it
+	// through workerLaunchSignal, never directly: a nil channel would make
+	// the signal vanish into the select's default arm.
+	workerLaunch     chan struct{}
+	workerLaunchOnce sync.Once
+	defaultConfig    []byte
 	// hostGateInner is the middleware chain INSIDE the Host allowlist gate,
 	// assembled once by buildHandler before the listener opens;
 	// applyHostAllowlist re-wraps it with the live config's HostPolicy.
