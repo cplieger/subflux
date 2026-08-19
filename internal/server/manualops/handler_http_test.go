@@ -85,7 +85,7 @@ type harnessStore interface {
 // validation, and no-op activity/alert/event sinks. The returned WaitGroup
 // is the handler's BGTracker; Wait it before finishing tests that reach the
 // background download path.
-func newHTTPHarness(db harnessStore, cfg api.ConfigProvider, providers []api.Provider) (*Handler, *sync.WaitGroup) {
+func newHTTPHarness(db harnessStore, cfg *testsupport.NopConfig, providers []api.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,

@@ -215,7 +215,7 @@ type ScanEngine interface {
 
 // LiveState holds the runtime state needed for a scan pass.
 type LiveState struct {
-	Cfg         api.ConfigProvider
+	Cfg         ScanCfg
 	Engine      ScanEngine
 	Sonarr      ScanSonarrClient
 	Radarr      ScanRadarrClient

@@ -47,19 +47,18 @@ type PollerStore interface {
 	DeleteStateByPaths(ctx context.Context, paths []string) (api.CleanupResult, error)
 }
 
-// PollerCfg is the narrow configuration interface consumed by the poller
-// subsystem. The full api.ConfigProvider satisfies it via structural typing.
-// Declaring it here documents the poller's actual dependency surface.
-type PollerCfg interface {
+// pollerCfg is what a poll cycle reads out of the configuration: how often to
+// wake, the exclude-tag list and pacing, the media-root containment check for
+// the imported file, and the language targets the import earns. 5 of the 28
+// values the config offers — polling reacts to an arr import, so it asks
+// nothing about scoring, providers, auth or the server runtime.
+type pollerCfg interface {
 	PollInterval() time.Duration
 	Search() api.SearchConfig
 	ValidatePath(ctx context.Context, path string) error
 	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
 	LanguageCodes() []string
 }
-
-// Compile-time assertion: api.ConfigProvider satisfies PollerCfg.
-var _ PollerCfg = api.ConfigProvider(nil)
 
 // PollSource identifies the arr system that produced an import event.
 type PollSource string

@@ -73,11 +73,14 @@ type Deps struct {
 
 // LiveState holds the live state needed by the scheduler.
 //
-// Engine is typed as scanning's own interface for the same reason Deps.ScanDB
-// is: the scheduler never calls it, it only carries it into scanning.LiveState,
-// and a second declaration of the same two methods here could only drift.
+// Cfg and Engine are both typed as scanning's own interfaces, for the same
+// reason Deps.ScanDB is. The scheduler reads exactly ONE of the 28 values the
+// config offers — Search(), for the scan interval and the upgrade flag it logs
+// — and otherwise only carries the value into scanning.LiveState. A separate
+// one-method declaration here would have to be assignable to scanning's
+// four-method surface anyway, so it could only drift.
 type LiveState struct {
-	Cfg       api.ConfigProvider
+	Cfg       scanning.ScanCfg
 	Engine    scanning.ScanEngine
 	Sonarr    api.SonarrClient
 	Radarr    api.RadarrClient

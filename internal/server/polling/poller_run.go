@@ -58,7 +58,7 @@ type importSearcher interface {
 
 // LiveState holds the hot-reloadable runtime state the poller reads each cycle.
 type LiveState struct {
-	Cfg    PollerCfg
+	Cfg    pollerCfg
 	Engine importSearcher
 	Sonarr PollSonarrClient
 	Radarr PollRadarrClient

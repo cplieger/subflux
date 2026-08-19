@@ -90,7 +90,7 @@ var (
 // this from the SAME generation. An Engine field existed here and no handler
 // ever read it.
 type HandlerState struct {
-	Cfg    api.ConfigProvider
+	Cfg    scanHandlerCfg
 	Sonarr ScanHandlerSonarr // nil when sonarr not configured
 	Radarr ScanHandlerRadarr // nil when radarr not configured
 }

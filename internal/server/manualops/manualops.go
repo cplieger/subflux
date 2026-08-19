@@ -119,12 +119,21 @@ type tierLabeller interface {
 	ScoreToTier(score int) api.ScoreTier
 }
 
+// pathValidator is the containment check a manual download runs before it
+// writes: the resolved subtitle path must sit under a configured media root.
+// ONE of the 28 values the config offers — scoring, language rules and provider
+// settings all reach this package through the engine and the scorer, already
+// resolved, so the config itself is asked for nothing else.
+type pathValidator interface {
+	ValidatePath(ctx context.Context, path string) error
+}
+
 // LiveState holds the runtime state needed for a manual search pass.
 // Sonarr/Radarr are the narrow by-ID surfaces manual downloads use;
 // SonarrLib/RadarrLib are the library-listing surfaces the resolve
 // endpoint uses (all nil when the corresponding arr is not configured).
 type LiveState struct {
-	Cfg       api.ConfigProvider
+	Cfg       pathValidator
 	Engine    manualEngine
 	Scorer    tierLabeller
 	Sonarr    ManualSonarrClient
