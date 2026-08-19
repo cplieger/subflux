@@ -46,11 +46,8 @@ const (
 
 // --- Factory and Provider ---
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 // Factory creates an OpenSubtitles provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.Username == "" || ps.Password == "" {
 		return nil, errors.New("opensubtitles: username and password required")

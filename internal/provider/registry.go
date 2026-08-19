@@ -46,10 +46,51 @@ func (e *RegistryError) Error() string {
 
 func (e *RegistryError) Unwrap() error { return e.Err }
 
+// Provider is what a subtitle source must offer to be registered here: the name
+// config and logs identify it by, a search over one media item, and a download
+// of one result. THREE methods, against a denominator of five — the exported
+// methods the nine implementations offer between them. Those three are the
+// intersection: every implementation has all three, and the two that are not
+// universal (CountShowSubtitles on opensubtitles, ClearCache on hdbits) are
+// declared as their own one-method interfaces in cache.go and discovered by type
+// assertion. Nothing in this contract is optional, which is why the optional
+// pair is not in it.
+//
+// Declared in this package because this package is the consumer: FactoryFunc
+// below returns one, Registry.LoadAll builds them, and WrapRetry wraps one.
+// EXPORTED against the unexported-by-default rule because the nine Factory
+// functions in the subpackages name it in their return type, and providers.go
+// types them as FactoryFunc — the name has to cross the package boundary for the
+// registration table to exist at all.
+//
+// Returning an interface from those factories is the stdlib registry idiom, not
+// a lapse from "return structs": image.RegisterFormat takes constructors of a
+// uniform signature returning image.Image, and image/png exports Decode with no
+// concrete alternative (ratified as C14). This is also the only interface in
+// subflux with real polymorphism — nine implementations plus the retry wrapper,
+// where every other one has exactly one.
+type Provider interface {
+	// Name returns the provider identifier (e.g. "opensubtitles", "yifysubtitles").
+	Name() api.ProviderID
+
+	// Search finds subtitles matching the request.
+	Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error)
+
+	// Download fetches the subtitle content for the given search result.
+	//
+	// A subtitle the upstream no longer holds is reported as an error
+	// wrapping api.ErrSubtitleAbsent, never as a successful download of zero
+	// bytes: absence and a truncated or corrupt payload are different
+	// operator problems, and returning nil bytes with a nil error made them
+	// read the same. Implementations therefore never return (nil, nil) —
+	// every return either carries subtitle content or names why it does not.
+	Download(ctx context.Context, sub *api.Subtitle) ([]byte, error)
+}
+
 // FactoryFunc creates a provider from config settings.
 // The context parameter enables cancellation during provider initialization
 // (e.g. credential validation, API pings) and respects shutdown signals.
-type FactoryFunc func(ctx context.Context, settings map[string]any) (api.Provider, error)
+type FactoryFunc func(ctx context.Context, settings map[string]any) (Provider, error)
 
 // providerFactories is the declarative registration table. Populated via
 // Register; iterated by LoadAll. Keyed by provider name.
@@ -116,13 +157,13 @@ func (r *Registry) Schema(name api.ProviderID) (string, []api.ProviderSchemaFiel
 // acquisition providers is a valid "embedded detection and coverage only"
 // setup. The counts are WARN-logged so operators can still distinguish a
 // typo (unknown>0) from a deliberate all-disabled state.
-func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]api.Provider, error) {
+func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]Provider, error) {
 	toLoad, disabled, unknown := r.classifyProviders(providers)
 
 	result, errs := partitionResults(r.buildProviders(ctx, toLoad, providers))
 
 	// Sort by name for deterministic ordering.
-	slices.SortFunc(result, func(a, b api.Provider) int {
+	slices.SortFunc(result, func(a, b Provider) int {
 		return cmp.Compare(a.Name(), b.Name())
 	})
 	for _, p := range result {
@@ -147,7 +188,7 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api
 // loadResult is the outcome of building one provider during LoadAll: exactly
 // one of provider or err is set, and name identifies the entry either way.
 type loadResult struct {
-	provider api.Provider
+	provider Provider
 	err      error
 	name     api.ProviderID
 }
@@ -207,7 +248,7 @@ func (r *Registry) buildProviders(ctx context.Context, toLoad []api.ProviderID, 
 // partitionResults separates successfully built providers from initialization
 // failures, wrapping each failure in a typed RegistryError and logging it. The
 // input order is preserved so the joined error is deterministic.
-func partitionResults(results []loadResult) (providers []api.Provider, errs []error) {
+func partitionResults(results []loadResult) (providers []Provider, errs []error) {
 	for _, lr := range results {
 		if lr.err != nil {
 			errs = append(errs, &RegistryError{Kind: ErrProviderInit, Provider: lr.name, Err: lr.err})

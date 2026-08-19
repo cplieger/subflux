@@ -242,7 +242,7 @@ func TestResolveShowCounter_picks_first(t *testing.T) {
 	t.Parallel()
 	first := &mockShowCounter{counts: map[string]int{"tt1-fr": 0}}
 	second := &mockShowCounter{counts: map[string]int{"tt1-fr": 99}}
-	counter := provider.ResolveShowCounter([]api.Provider{first, second})
+	counter := provider.ResolveShowCounter([]provider.Provider{first, second})
 	st := newSeasonTracker(counter, showskip.New(1*time.Hour), seedDeps{})
 	count, _ := st.counter.CountShowSubtitles(t.Context(), api.ShowSubtitleQuery{ImdbID: "tt1", Language: "fr"})
 	if count != 0 {

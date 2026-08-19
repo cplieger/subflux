@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -17,7 +18,7 @@ import (
 
 // searchProvider executes a single provider search and classifies the outcome.
 // If trackTimeout is true, failures/successes are recorded in the timeout tracker.
-func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
+func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
 	req *api.SearchRequest, trackTimeout bool,
 ) ([]api.Subtitle, api.ProviderID, error) {
 	start := time.Now()
@@ -63,7 +64,7 @@ func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
 // duplicate provider HTTP requests. The key includes VideoPath/VideoHash
 // so requests differing only by file artifact get separate calls.
 func (e *Engine) searchProvidersFiltered(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider,
+	req *api.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
 	key := buildSearchKey(req, providers)
 	// Use a detached context for the shared work so that a single caller's
@@ -100,7 +101,7 @@ func (e *Engine) searchProvidersFiltered(ctx context.Context,
 // nest by composition (an inner keyenc value escaped again as one outer
 // component) so a separator inside one language code cannot be read as a field
 // boundary either.
-func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
+func buildSearchKey(req *api.SearchRequest, providers []provider.Provider) string {
 	names := make([]string, len(providers))
 	for i, p := range providers {
 		names[i] = string(p.Name())
@@ -124,7 +125,7 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 // searchProvidersFilteredInner does the actual provider sweep — wrapped by
 // searchProvidersFiltered to provide singleflight deduplication.
 func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider,
+	req *api.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
 	var (
 		mu          sync.Mutex
@@ -202,7 +203,7 @@ func (e *Engine) downloadFromProvider(ctx context.Context, sub *api.Subtitle) ([
 }
 
 // unionProviders returns the union of providers across targets that need searching.
-func (e *Engine) unionProviders(states []targetState) []api.Provider {
+func (e *Engine) unionProviders(states []targetState) []provider.Provider {
 	names := make(map[api.ProviderID]bool)
 	for i := range states {
 		if !states[i].needsSearch {
@@ -212,7 +213,7 @@ func (e *Engine) unionProviders(states []targetState) []api.Provider {
 			names[n] = true
 		}
 	}
-	var out []api.Provider
+	var out []provider.Provider
 	for _, p := range e.providers {
 		if names[p.Name()] {
 			out = append(out, p)

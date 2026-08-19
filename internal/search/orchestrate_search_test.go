@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 )
 
@@ -47,7 +48,7 @@ func TestSearchTargets_adaptive_backoff_skips(t *testing.T) {
 	}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -75,7 +76,7 @@ func TestSearchTargets_no_results_records_failure(t *testing.T) {
 		searchCfg:   api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -113,7 +114,7 @@ func TestSearchTargets_success_downloads_and_saves(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -159,7 +160,7 @@ func TestSearchTargets_hi_fallback(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -195,7 +196,7 @@ func TestSearchTargets_forced_subs_filtered_out(t *testing.T) {
 			},
 		},
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -230,7 +231,7 @@ func TestSearchTargets_below_min_score(t *testing.T) {
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "title"},
 		},
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -266,7 +267,7 @@ func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 		name:      "bad",
 		searchErr: errors.New("provider error"),
 	}
-	e := newEngine([]api.Provider{goodProv, badProv}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{goodProv, badProv}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -274,7 +275,7 @@ func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 	}
 
 	outcome := e.searchProvidersFiltered(t.Context(), req,
-		[]api.Provider{goodProv, badProv})
+		[]provider.Provider{goodProv, badProv})
 
 	if len(outcome.results) != 1 {
 		t.Errorf("searchProvidersFiltered() returned %d results, want 1", len(outcome.results))
@@ -297,7 +298,7 @@ func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 
 	bad1 := &mockProvider{name: "bad1", searchErr: errors.New("timeout")}
 	bad2 := &mockProvider{name: "bad2", searchErr: errors.New("connection refused")}
-	e := newEngine([]api.Provider{bad1, bad2}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{bad1, bad2}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -305,7 +306,7 @@ func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 	}
 
 	outcome := e.searchProvidersFiltered(t.Context(), req,
-		[]api.Provider{bad1, bad2})
+		[]provider.Provider{bad1, bad2})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0", len(outcome.results))
@@ -375,7 +376,7 @@ func TestFilterBackedOff_removes_backed_off_providers(t *testing.T) {
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
 	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
-		[]api.Provider{prov1, prov2})
+		[]provider.Provider{prov1, prov2})
 
 	if len(result) != 1 {
 		t.Fatalf("filterBackedOff() returned %d providers, want 1", len(result))
@@ -413,7 +414,7 @@ func TestSearchTargets_existing_regular_subtitle_skips(t *testing.T) {
 		},
 		data: []byte("new subtitle"),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -446,7 +447,7 @@ func TestSearchTargets_download_failure_continues(t *testing.T) {
 		},
 		downloadErr: errors.New("network error"),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -474,7 +475,7 @@ func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
 		searchCfg: api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", searchErr: errors.New("api down")}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
@@ -503,7 +504,7 @@ func TestSearchTargets_partial_failure_records_for_succeeded_only(t *testing.T) 
 	}
 	good := &mockProvider{name: "good", results: nil} // succeeds with no results
 	bad := &mockProvider{name: "bad", searchErr: errors.New("api down")}
-	e := newEngine([]api.Provider{good, bad}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{good, bad}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}}
@@ -550,7 +551,7 @@ func TestSearchTargets_exact_min_score_is_accepted(t *testing.T) {
 		searchCfg: api.SearchConfig{},
 		minScore:  exactScore,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
@@ -600,7 +601,7 @@ func TestFilterBackedOff_query_error_returns_all_providers(t *testing.T) {
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
 	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
-		[]api.Provider{prov1, prov2})
+		[]provider.Provider{prov1, prov2})
 
 	if len(result) != 2 {
 		t.Errorf("filterBackedOff() returned %d providers, want 2 (error fallback)", len(result))
@@ -616,7 +617,7 @@ func TestFilterBackedOff_adaptive_disabled_returns_all(t *testing.T) {
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []provider.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (disabled)", len(result))
@@ -633,7 +634,7 @@ func TestFilterBackedOff_no_backed_off_returns_all(t *testing.T) {
 	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []provider.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (none backed off)", len(result))
@@ -649,10 +650,10 @@ func TestSearchProvidersFiltered_records_timeout_on_failure(t *testing.T) {
 	}}
 	metrics := &mockMetrics{}
 	bad := &mockProvider{name: "bad", searchErr: errors.New("timeout")}
-	e := newEngine([]api.Provider{bad}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{bad}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{bad})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{bad})
 
 	if errored := outcome.errored(); len(errored) != 1 {
 		t.Errorf("errored = %v, want 1 entry", errored)
@@ -676,14 +677,14 @@ func TestSearchProvidersFiltered_records_success_clears_timeout(t *testing.T) {
 	good := &mockProvider{name: "good", results: []api.Subtitle{
 		{Provider: "good", ReleaseName: "Movie-GRP"},
 	}}
-	e := newEngine([]api.Provider{good}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{good}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	// Pre-record some failures.
 	e.timeout.RecordFailure("good", nil)
 	e.timeout.RecordFailure("good", nil)
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{good})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{good})
 
 	if len(outcome.succeeded()) != 1 {
 		t.Errorf("succeeded = %v, want 1 entry", outcome.succeeded())
@@ -703,7 +704,7 @@ func TestSearchProvidersFiltered_skips_timed_out_provider(t *testing.T) {
 	p := &mockProvider{name: "timed-out", results: []api.Subtitle{
 		{Provider: "timed-out", ReleaseName: "Movie-GRP"},
 	}}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	// Trip the provider timeout (threshold=5).
 	for range 5 {
@@ -711,7 +712,7 @@ func TestSearchProvidersFiltered_skips_timed_out_provider(t *testing.T) {
 	}
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{p})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{p})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0 (provider timed out)", len(outcome.results))
@@ -742,7 +743,7 @@ func TestSearchTargets_computes_video_hash_when_empty(t *testing.T) {
 		searchCfg: api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -770,7 +771,7 @@ func TestSearchTargets_skips_hash_when_already_set(t *testing.T) {
 		searchCfg: api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -808,7 +809,7 @@ func TestSearchTargets_counts_searched_and_skipped(t *testing.T) {
 		searchCfg:   api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	targets := []api.SubtitleTarget{{Code: "fr"}, {Code: "en"}}

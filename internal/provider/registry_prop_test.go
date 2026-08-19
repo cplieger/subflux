@@ -31,7 +31,7 @@ func TestLoadAll_property_invariants(t *testing.T) {
 			switch state {
 			case 0: // enabled
 				idx := i
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+				r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 					if idx == failIdx {
 						return nil, errors.New("factory error")
 					}
@@ -40,7 +40,7 @@ func TestLoadAll_property_invariants(t *testing.T) {
 				cfgs[name] = api.ProviderCfg{Enabled: true}
 				enabledNames = append(enabledNames, string(name))
 			case 1: // disabled
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+				r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 					rt.Fatalf("disabled factory called for %s", name)
 					return nil, nil
 				})

@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
-// stubProvider implements api.Provider for provider-listing tests.
+// stubProvider implements provider.Provider for provider-listing tests.
 type stubProvider struct {
 	name string
 }
@@ -29,7 +30,7 @@ func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, err
 
 // newStateHandler builds a Handler whose LiveState carries the given config
 // and providers, with Configured reporting true.
-func newStateHandler(cfg *fakeQueryCfg, providers []api.Provider) *Handler {
+func newStateHandler(cfg *fakeQueryCfg, providers []provider.Provider) *Handler {
 	return New(Deps{
 		QueryDB: &mockQueryStore{},
 		State: func() *LiveState {
@@ -47,7 +48,7 @@ func TestHandleProviders_returns_provider_info(t *testing.T) {
 			"yify":          {Enabled: false},
 		},
 	}
-	h := newStateHandler(cfg, []api.Provider{&stubProvider{name: "opensubtitles"}})
+	h := newStateHandler(cfg, []provider.Provider{&stubProvider{name: "opensubtitles"}})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/providers", nil)
 	rec := httptest.NewRecorder()

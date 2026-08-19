@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search/syncing"
 )
 
 func BenchmarkSearchProviders(b *testing.B) {
 	for _, n := range []int{1, 5, 10} {
-		providers := make([]api.Provider, n)
+		providers := make([]provider.Provider, n)
 		for i := range providers {
 			providers[i] = &mockProvider{name: fmt.Sprintf("prov%d", i)}
 		}
@@ -44,7 +45,7 @@ func BenchmarkSearchProviders(b *testing.B) {
 
 func BenchmarkBuildSearchKey(b *testing.B) {
 	for _, n := range []int{1, 5, 10} {
-		providers := make([]api.Provider, n)
+		providers := make([]provider.Provider, n)
 		for i := range providers {
 			providers[i] = &mockProvider{name: fmt.Sprintf("prov%d", i)}
 		}

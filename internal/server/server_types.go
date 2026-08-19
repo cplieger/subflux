@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -59,7 +60,7 @@ type liveState struct {
 	radarr    api.RadarrClient
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
-	providers []api.Provider
+	providers []provider.Provider
 }
 
 // storeFacade groups the narrow store interfaces.

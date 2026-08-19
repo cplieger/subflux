@@ -22,9 +22,6 @@ import (
 
 const langBrazilianPT = "Brazilian Portuguese"
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
 	providerName = api.ProviderNameYifySubtitles
 	serverURL    = "https://yifysubtitles.ch"
@@ -34,7 +31,7 @@ const (
 )
 
 // Factory creates a YIFY Subtitles provider from settings.
-func Factory(_ context.Context, _ map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 	return &Provider{
 		client: provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 	}, nil

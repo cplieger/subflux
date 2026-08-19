@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -695,7 +696,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 	newDeps := func(db *fakeScanStore, ev *recEvents, log *activity.Log) *Deps {
 		return &Deps{
 			DB: db, Metrics: nopScanMetrics{}, Events: ev, Activity: log,
-			Alerts: nopAlerts{}, ClearCaches: func([]api.Provider) {},
+			Alerts: nopAlerts{}, ClearCaches: func([]provider.Provider) {},
 		}
 	}
 

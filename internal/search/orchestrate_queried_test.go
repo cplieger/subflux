@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 )
 
@@ -40,7 +41,7 @@ func TestSearchTargets_queried_counts_provider_traffic(t *testing.T) {
 			t.Parallel()
 			ms := &mockStore{}
 			mc := &mockConfig{searchCfg: api.SearchConfig{}}
-			e := newEngine([]api.Provider{tc.provider}, ms, mc, nil,
+			e := newEngine([]provider.Provider{tc.provider}, ms, mc, nil,
 				scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 			req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
@@ -65,7 +66,7 @@ func TestSearchTargets_queried_zero_when_skipped(t *testing.T) {
 	ms := &mockStore{manualLocked: true}
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	p := &mockProvider{name: "test"}
-	e := newEngine([]api.Provider{p}, ms, mc, nil,
+	e := newEngine([]provider.Provider{p}, ms, mc, nil,
 		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
@@ -91,7 +92,7 @@ func TestSearchTargets_queried_zero_when_backed_off(t *testing.T) {
 		searchCfg:   api.SearchConfig{},
 	}
 	p := &mockProvider{name: "test"}
-	e := newEngine([]api.Provider{p}, backedStore, mc, &mockMetrics{},
+	e := newEngine([]provider.Provider{p}, backedStore, mc, &mockMetrics{},
 		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
@@ -113,7 +114,7 @@ func TestSearchTargets_queried_zero_when_backed_off(t *testing.T) {
 func TestSearchTargets_queried_zero_when_all_providers_timed_out(t *testing.T) {
 	t.Parallel()
 	p := &mockProvider{name: "test"}
-	e := New([]api.Provider{p},
+	e := New([]provider.Provider{p},
 		WithStore(&mockStore{}),
 		WithConfig(&mockConfig{searchCfg: api.SearchConfig{}}),
 		WithScorer(scorer.New(&api.DefaultScores)),

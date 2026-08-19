@@ -25,9 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
 	providerName     = api.ProviderNameAnimeTosho
 	feedURL          = "https://feed.animetosho.org/json"
@@ -39,7 +36,7 @@ const (
 )
 
 // Factory creates an AnimeTosho provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	anidbKey, _ := ps.Custom[string(provider.KeyAniDBClientKey)].(string)
 	if anidbKey == "" {

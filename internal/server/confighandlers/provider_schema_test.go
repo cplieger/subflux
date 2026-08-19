@@ -20,7 +20,7 @@ import (
 // same shape for the /api/config/schema endpoint test.
 
 func registerStub(reg *provider.Registry, name string) {
-	reg.Register(api.ProviderID(name), func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	reg.Register(api.ProviderID(name), func(_ context.Context, _ map[string]any) (provider.Provider, error) {
 		return &schemaStubProvider{name: name}, nil
 	})
 }

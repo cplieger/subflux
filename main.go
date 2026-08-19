@@ -519,7 +519,7 @@ func newConfigLoader() confighandlers.ConfigLoader {
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
 func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg *config.Config, db search.SearchStore, m search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+	return func(ctx context.Context, cfg *config.Config, db search.SearchStore, m search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err

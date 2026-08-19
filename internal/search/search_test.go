@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"pgregory.net/rapid"
 )
@@ -129,7 +130,7 @@ func TestFilterProviders_respects_target_include(t *testing.T) {
 	mc := &mockFilterConfig{}
 	p1 := &mockProvider{name: "os"}
 	p2 := &mockProvider{name: "yify"}
-	e := newEngine([]api.Provider{p1, p2}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p1, p2}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	target := &api.SubtitleTarget{Code: "fr", Providers: []api.ProviderID{"os"}}
 	got := e.filterProviders(target)

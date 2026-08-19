@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -44,7 +45,7 @@ func TestNew_UnconfiguredMode_NoPanic(t *testing.T) {
 // empty values; sufficient for unconfigured-mode startup.
 type nopProviderRegistry struct{}
 
-func (nopProviderRegistry) LoadAll(_ context.Context, _ map[api.ProviderID]api.ProviderCfg) ([]api.Provider, error) {
+func (nopProviderRegistry) LoadAll(_ context.Context, _ map[api.ProviderID]api.ProviderCfg) ([]provider.Provider, error) {
 	return nil, nil
 }
 func (nopProviderRegistry) ProviderNames() []api.ProviderID { return nil }

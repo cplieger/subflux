@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/search/timeout"
@@ -90,8 +91,8 @@ type Engine struct {
 	syncExec        syncing.SyncExec
 	searchGroup     singleflight.Group
 	hashGroup       singleflight.Group
-	providersByName map[api.ProviderID]api.Provider
-	providers       []api.Provider
+	providersByName map[api.ProviderID]provider.Provider
+	providers       []provider.Provider
 }
 
 // Option configures the search Engine.
@@ -148,13 +149,13 @@ func (atomicWriter) WriteFile(ctx context.Context, path string, data []byte) err
 
 // New creates a search engine. The providers slice is required; all other
 // dependencies are supplied via functional options.
-func New(providers []api.Provider, opts ...Option) *Engine {
+func New(providers []provider.Provider, opts ...Option) *Engine {
 	e := &Engine{providers: providers, gate: newMediaGate(), syncExec: syncing.InProcessExec{}}
 	for _, o := range opts {
 		o(e)
 	}
 	// Build O(1) lookup map for downloadFromProvider.
-	e.providersByName = make(map[api.ProviderID]api.Provider, len(providers))
+	e.providersByName = make(map[api.ProviderID]provider.Provider, len(providers))
 	for _, p := range providers {
 		e.providersByName[p.Name()] = p
 	}

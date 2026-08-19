@@ -7,38 +7,15 @@ import (
 	"github.com/cplieger/arrapi/v2"
 )
 
-// This file contains implementation/provider contracts: interfaces that
-// implementations provide (Provider, ProviderRegistry, ArrClient,
-// Scorer, SubtitleProcessor, etc.).
-// Consumer contracts live in interfaces.go.
+// This file holds the two arr client contracts and the provider-adjacent types
+// that were declared beside the Provider interface.
 //
-// Note: MetricsRecorder uses consumer-side placement (Go idiom): narrow
-// interfaces are defined at each consumer site (search.SearchMetrics,
-// scanning.ScanMetrics, polling.PollerMetrics, queryhandlers.MetricsReader,
-// server.ServerMetrics). The concrete *obs.Metrics satisfies all via
-// structural typing.
-// WireFunc lives in internal/wiring/ as wiring.Func.
-
-// --- Provider ---
-
-// Provider is the interface all subtitle providers must implement.
-type Provider interface {
-	// Name returns the provider identifier (e.g. "opensubtitles", "yifysubtitles").
-	Name() ProviderID
-
-	// Search finds subtitles matching the request.
-	Search(ctx context.Context, req *SearchRequest) ([]Subtitle, error)
-
-	// Download fetches the subtitle content for the given search result.
-	//
-	// A subtitle the upstream no longer holds is reported as an error
-	// wrapping ErrSubtitleAbsent, never as a successful download of zero
-	// bytes: absence and a truncated or corrupt payload are different
-	// operator problems, and returning nil bytes with a nil error made them
-	// read the same. Implementations therefore never return (nil, nil) —
-	// every return either carries subtitle content or names why it does not.
-	Download(ctx context.Context, sub *Subtitle) ([]byte, error)
-}
+// Provider moved to internal/provider, beside the FactoryFunc that returns it
+// and the Registry that builds it. It follows the same consumer-side placement
+// the observability seams already use: search.SearchMetrics, scanning.ScanMetrics,
+// polling.PollerMetrics, queryhandlers.MetricsReader and server.ServerMetrics are
+// each declared where they are read, and one *obs.Metrics satisfies all five
+// structurally. The wiring func type is wiring.Func, in internal/wiring.
 
 // ShowSubtitleQuery names the two values a show-level count is taken over.
 // They are both free-form strings that no call site can tell apart by shape,

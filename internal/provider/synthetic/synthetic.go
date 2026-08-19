@@ -63,7 +63,7 @@ const (
 const providerName = api.ProviderNameSynthetic
 
 // Factory creates a synthetic provider from config settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	_ = ps // synthetic uses only provider-specific keys from Custom
 	p := &syntheticProvider{
@@ -97,9 +97,6 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 
 	return p, nil
 }
-
-// Compile-time interface assertion.
-var _ api.Provider = (*syntheticProvider)(nil)
 
 // syntheticProvider answers searches and downloads from generated data.
 type syntheticProvider struct {

@@ -84,7 +84,7 @@ type LiveState struct {
 	Engine    scanning.ScanEngine
 	Sonarr    api.SonarrClient
 	Radarr    api.RadarrClient
-	Providers []api.Provider
+	Providers []provider.Provider
 }
 
 // Run runs the periodic scan and DB maintenance tickers until ctx is cancelled.

@@ -148,7 +148,7 @@ method UpdatePasskeyAfterLogin
 # api/types_search.go:140). The assertion names the TYPE, so punused still sees
 # the method as unreferenced.
 #   MatchMethod        api/types_search.go:140
-#   RegistryErrorKind  provider/registry.go:31 (also rendered by
+#   RegistryErrorKind  provider/registry.go:32 (also rendered by
 #                      RegistryError.Error's "registry error: %s" fallback)
 #   SyncMethod         subsync/confidence.go:25
 method (MatchMethod).String
@@ -177,7 +177,7 @@ method (*Pattern).String
 # --- error and errors-unwrap protocol members -------------------------------
 # Satisfying `error` is what makes these types returnable, and errors.Is/As
 # reach Unwrap through an anonymous interface inside the stdlib. Verified by
-# renaming: provider/registry.go:216 appends &RegistryError{} to a []error.
+# renaming: provider/registry.go:255 appends &RegistryError{} to a []error.
 # api.RateLimitError is returned as an error from httpwire.go:72 and
 # betaseries.go:180; RegistryError.Unwrap is what lets registry_test.go:118's
 # errors.Is(err, cause) find the provider's own failure.

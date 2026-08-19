@@ -23,9 +23,6 @@ import (
 
 const sourceSeriessub = "seriessub"
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const baseURL = "https://api.betaseries.com/"
 
 const (
@@ -33,7 +30,7 @@ const (
 )
 
 // Factory creates a BetaSeries provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.Token == "" {
 		return nil, errors.New("betaseries: token required")

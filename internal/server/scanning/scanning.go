@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/showskip"
@@ -31,7 +32,7 @@ type Deps struct {
 	Alerts        AlertRecorder
 	ShowSkipCache *showskip.Cache
 	// ClearCaches clears provider download caches after scan completion.
-	ClearCaches func(providers []api.Provider)
+	ClearCaches func(providers []provider.Provider)
 }
 
 // ScanStore is the narrow store interface for scan state tracking.
@@ -220,7 +221,7 @@ type LiveState struct {
 	Sonarr      ScanSonarrClient
 	Radarr      ScanRadarrClient
 	ShowCounter showCounter
-	Providers   []api.Provider
+	Providers   []provider.Provider
 }
 
 // ScanOutcome is a type alias for api.ScanOutcome.

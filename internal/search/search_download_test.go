@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subsync"
 )
@@ -172,7 +173,7 @@ func TestDownloadFromProvider_not_found(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	p := &mockProvider{name: "os"}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "nonexistent"}
 	_, err := e.downloadFromProvider(t.Context(), sub)
@@ -189,7 +190,7 @@ func TestDownloadFromProvider_success_with_metrics(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "os", data: []byte("subtitle data")}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "os"}
 	data, err := e.downloadFromProvider(t.Context(), sub)
@@ -209,7 +210,7 @@ func TestDownloadFromProvider_error_with_metrics(t *testing.T) {
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "os", downloadErr: errors.New("timeout")}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	sub := &api.Subtitle{Provider: "os"}
 	_, err := e.downloadFromProvider(t.Context(), sub)

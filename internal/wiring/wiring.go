@@ -19,9 +19,9 @@ package wiring
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/embedded"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -50,7 +50,7 @@ type Func func(
 	cfg *config.Config,
 	db search.SearchStore,
 	m search.SearchMetrics,
-) (*search.Engine, *scorer.Engine, []api.Provider, error)
+) (*search.Engine, *scorer.Engine, []provider.Provider, error)
 
 // Compile-time assertion: embedded.Detector satisfies
 // search.TrackDetector. This lives here (rather than in embedded/ or

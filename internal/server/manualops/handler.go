@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -204,7 +205,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 
 	// Find the provider first (free check) so we can return 400 immediately.
-	var prov api.Provider
+	var prov provider.Provider
 	for _, p := range ls.Providers {
 		if p.Name() == req.Provider {
 			prov = p
@@ -257,7 +258,7 @@ type DownloadAccepted struct {
 }
 
 // runManualDownload performs the actual download in the background.
-func (h *Handler) runManualDownload(ls *LiveState, prov api.Provider,
+func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
 	req *DownloadRequest, actID string,
 ) {
 	serverCtx := h.deps.ServerCtx()

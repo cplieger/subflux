@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 )
 
@@ -30,7 +31,7 @@ func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -70,7 +71,7 @@ func TestSearchTargets_atomic_write_error_returns_empty(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -105,10 +106,10 @@ func TestSearchProvidersFiltered_embedded_provider_success(t *testing.T) {
 			{Provider: "embedded", ReleaseName: "embedded-track", Language: "en"},
 		},
 	}
-	e := newEngine([]api.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{embProv})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{embProv})
 
 	if len(outcome.results) != 1 {
 		t.Errorf("results = %d, want 1", len(outcome.results))
@@ -129,10 +130,10 @@ func TestSearchProvidersFiltered_embedded_provider_error(t *testing.T) {
 		name:      "embedded",
 		searchErr: errors.New("ffprobe not found"),
 	}
-	e := newEngine([]api.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{embProv})
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{embProv})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0", len(outcome.results))
@@ -169,7 +170,7 @@ func TestSearchTargets_binary_data_rejected(t *testing.T) {
 		},
 		data: rarData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -220,7 +221,7 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:    "movie",
@@ -258,7 +259,7 @@ func TestSearchTargets_force_upgrade_skips_embedded_only(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:    "movie",
@@ -300,7 +301,7 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -342,7 +343,7 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -381,7 +382,7 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -428,7 +429,7 @@ func TestSearchTargets_hash_match_skips_sync(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",
@@ -466,7 +467,7 @@ func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T)
 	metrics := &mockMetrics{}
 	p1 := &mockProvider{name: "prov1", results: nil}
 	p2 := &mockProvider{name: "prov2", results: nil}
-	e := newEngine([]api.Provider{p1, p2}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p1, p2}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType: "movie",
@@ -527,7 +528,7 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 		data: subData,
 	}
 	metrics := &mockMetrics{}
-	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{
 		MediaType:   "movie",

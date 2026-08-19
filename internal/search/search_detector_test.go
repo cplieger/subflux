@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 )
 
@@ -46,7 +47,7 @@ func TestSearchTargets_usable_embedded_track_suppresses_search(t *testing.T) {
 		results: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 	}
 	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "srt"}}}
-	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
 	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
@@ -82,7 +83,7 @@ func TestSearchTargets_ignored_codec_triggers_search(t *testing.T) {
 		data:    subData,
 	}
 	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "pgs"}}}
-	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
 	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
@@ -125,7 +126,7 @@ func TestSearchTargets_detector_error_fail_open_coverage_retained(t *testing.T) 
 		results: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 		data:    subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{},
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{},
 		errDetector{err: errors.New("ffprobe exploded")})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
@@ -217,7 +218,7 @@ func TestSearchTargets_hi_fallback_edge_no_embedded_in_scoring(t *testing.T) {
 	p := &mockProvider{name: "test"}
 	// HI-only embedded track in a usable text codec.
 	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "srt", HearingImpaired: true}}}
-	e := newEngine([]api.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
 	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})

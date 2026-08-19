@@ -5,6 +5,7 @@ import (
 
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
 // TestBuildSearchKeyCannotBeForged pins the property buildSearchKey exists to
@@ -20,7 +21,7 @@ import (
 // non-emptiness) or a malformed arr media id shifts the split. Each case below
 // is a pair that the naive form collapsed.
 func TestBuildSearchKeyCannotBeForged(t *testing.T) {
-	providers := []api.Provider{&mockProvider{name: "prov1"}}
+	providers := []provider.Provider{&mockProvider{name: "prov1"}}
 
 	req := func(mediaID string, langs []string, path, hash string) *api.SearchRequest {
 		return &api.SearchRequest{
@@ -72,7 +73,7 @@ func TestBuildSearchKeyCannotBeForged(t *testing.T) {
 // separator-joined form and remains readable in a log line. It also pins the
 // sort that makes the key order-independent.
 func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
-	providers := []api.Provider{&mockProvider{name: "b"}, &mockProvider{name: "a"}}
+	providers := []provider.Provider{&mockProvider{name: "b"}, &mockProvider{name: "a"}}
 	base := &api.SearchRequest{
 		MediaType: api.MediaTypeEpisode,
 		ImdbID:    "tt0903747",
@@ -102,7 +103,7 @@ func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
 	// Language and provider order must not change the key.
 	reordered := *base
 	reordered.Languages = []string{"en", "fr"}
-	if other := buildSearchKey(&reordered, []api.Provider{&mockProvider{name: "a"}, &mockProvider{name: "b"}}); other != got {
+	if other := buildSearchKey(&reordered, []provider.Provider{&mockProvider{name: "a"}, &mockProvider{name: "b"}}); other != got {
 		t.Errorf("key depends on input order: %q vs %q", got, other)
 	}
 }
@@ -111,7 +112,7 @@ func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
 // inflate the key: the sweep key embeds a filesystem path, and these keys index
 // the singleflight map for the lifetime of a flight.
 func TestBuildSearchKeyIsBounded(t *testing.T) {
-	providers := []api.Provider{&mockProvider{name: "prov1"}}
+	providers := []provider.Provider{&mockProvider{name: "prov1"}}
 	huge := make([]byte, keyenc.MaxComponentBytes+1)
 	for i := range huge {
 		huge[i] = 'x'

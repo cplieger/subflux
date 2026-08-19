@@ -29,9 +29,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
 	providerName  = api.ProviderNameSubSource
 	baseURL       = "https://api.subsource.net/api/v1"
@@ -40,7 +37,7 @@ const (
 )
 
 // Factory creates a SubSource provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.APIKey == "" {
 		return nil, errors.New("subsource: api_key is required")

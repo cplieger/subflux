@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
@@ -22,7 +23,7 @@ const DownloadTimeout = 5 * time.Minute
 // consumers (the remote CLI's poll loop) learn where the file landed.
 // Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	prov api.Provider, req *DownloadRequest, actID string,
+	prov provider.Provider, req *DownloadRequest, actID string,
 ) bool {
 	// Download the subtitle.
 	sub := api.Subtitle{

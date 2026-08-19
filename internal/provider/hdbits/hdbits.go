@@ -72,7 +72,7 @@ var hdbAcceptedExts = func() map[string]bool {
 }()
 
 // Factory creates an HDBits provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.Username == "" || ps.Passkey == "" {
 		return nil, errors.New("hdbits: username and passkey required")
@@ -102,11 +102,11 @@ type Provider struct {
 	cfg          hdbitsConfig
 }
 
-// Compile-time interface checks.
-var (
-	_ api.Provider          = (*Provider)(nil)
-	_ provider.CacheClearer = (*Provider)(nil)
-)
+// Compile-time check on the CacheClearer opt-in: it is discovered by type
+// assertion in provider.ClearCaches, so nothing else would catch a rename.
+// The Provider contract itself needs no assertion — Factory returns this type
+// as a provider.Provider.
+var _ provider.CacheClearer = (*Provider)(nil)
 
 // --- Provider API (Name, Search, Download) ---
 

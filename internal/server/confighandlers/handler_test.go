@@ -403,7 +403,7 @@ func TestHandleResetConfig_writes_default(t *testing.T) {
 
 // --- HandleConfigSchema ---
 
-// schemaStubProvider implements api.Provider for schema registry setup.
+// schemaStubProvider implements provider.Provider for schema registry setup.
 type schemaStubProvider struct {
 	name string
 }
@@ -421,7 +421,7 @@ func (p *schemaStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byt
 func TestHandleConfigSchema_returns_json(t *testing.T) {
 	t.Parallel()
 	reg := provider.NewRegistry()
-	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (provider.Provider, error) {
 		return &schemaStubProvider{name: "gestdown"}, nil
 	})
 

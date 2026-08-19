@@ -130,7 +130,7 @@ func TestClearProviderCaches_calls_cache_clearers(t *testing.T) {
 	cc := &mockCacheClearer{stubProvider: stubProvider{name: "hdbits"}}
 	plain := &stubProvider{name: "os"}
 
-	provider.ClearCaches([]api.Provider{plain, cc})
+	provider.ClearCaches([]provider.Provider{plain, cc})
 
 	if !cc.cleared {
 		t.Error("ClearCache not called on provider implementing cacheClearer")
@@ -141,7 +141,7 @@ func TestClearProviderCaches_no_clearers(t *testing.T) {
 	t.Parallel()
 	plain := &stubProvider{name: "os"}
 	// Should not panic with no cacheClearer providers.
-	provider.ClearCaches([]api.Provider{plain})
+	provider.ClearCaches([]provider.Provider{plain})
 }
 
 func TestClearProviderCaches_nil_providers(t *testing.T) {

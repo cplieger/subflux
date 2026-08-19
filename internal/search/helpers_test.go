@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
@@ -160,7 +161,7 @@ func (m *mockFilterConfig) ProvidersForTarget(target *api.SubtitleTarget, all []
 }
 
 // newEngine is a test helper that mirrors the old 7-parameter New signature.
-func newEngine(providers []api.Provider, db SearchStore, cfg SearchCfg,
+func newEngine(providers []provider.Provider, db SearchStore, cfg SearchCfg,
 	m SearchMetrics, sc Scorer, syncer SubtitleSyncer, tracks TrackDetector,
 ) *Engine {
 	return New(providers, WithStore(db), WithConfig(cfg),

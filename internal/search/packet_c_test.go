@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
@@ -121,7 +122,7 @@ func TestSearchTargets_media_gate_serializes_same_item(t *testing.T) {
 		release: make(chan struct{}),
 		entered: make(chan struct{}),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req1 := &api.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
 	req2 := &api.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
@@ -163,7 +164,7 @@ func TestSearchTargets_media_gate_distinct_items_run_concurrently(t *testing.T) 
 		entered:    make(chan struct{}),
 		enteredTwo: make(chan struct{}),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	targets := []api.SubtitleTarget{{Code: "fr"}}
 	var wg sync.WaitGroup
@@ -205,7 +206,7 @@ func TestSearchTargets_stamps_post_work_searched(t *testing.T) {
 	ms := &stampStore{}
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
 	_, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
@@ -234,7 +235,7 @@ func TestSearchTargets_cancelled_run_does_not_stamp(t *testing.T) {
 		release: make(chan struct{}),
 		entered: make(chan struct{}),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	// Parent stays context.Background(): the goroutine below is cancelled at an instant this test picks, so nothing else may cancel it.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -264,7 +265,7 @@ func TestInventoryCoverage_stamps_not_searched(t *testing.T) {
 	ms := &stampStore{}
 	mc := &mockConfig{searchCfg: api.SearchConfig{}}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
 	e.InventoryCoverage(t.Context(), req, videoPath)

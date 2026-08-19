@@ -26,9 +26,6 @@ import (
 	"github.com/cplieger/subflux/internal/provider/classify"
 )
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
 	providerName = api.ProviderNameSubDL
 	apiURL       = "https://api.subdl.com/api/v1"
@@ -36,7 +33,7 @@ const (
 )
 
 // Factory creates a SubDL provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.APIKey == "" {
 		return nil, errors.New("subdl: api_key is required")

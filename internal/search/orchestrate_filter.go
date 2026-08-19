@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
 // --- Eligibility ---
@@ -74,7 +75,7 @@ func logNoResults(state *targetState, scored []scoredSub,
 // --- Pipeline filtering ---
 
 // filterProviders returns the subset of engine providers allowed for the target.
-func (e *Engine) filterProviders(target *api.SubtitleTarget) []api.Provider {
+func (e *Engine) filterProviders(target *api.SubtitleTarget) []provider.Provider {
 	allNames := make([]api.ProviderID, len(e.providers))
 	for i, p := range e.providers {
 		allNames[i] = p.Name()
@@ -84,7 +85,7 @@ func (e *Engine) filterProviders(target *api.SubtitleTarget) []api.Provider {
 	for _, n := range allowedNames {
 		allowedSet[n] = struct{}{}
 	}
-	var out []api.Provider
+	var out []provider.Provider
 	for _, p := range e.providers {
 		if _, ok := allowedSet[p.Name()]; ok {
 			out = append(out, p)

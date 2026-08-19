@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 )
 
 // --- Target state building ---
@@ -203,7 +204,7 @@ func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *
 
 // filterBackedOff removes providers that are currently in adaptive backoff
 // for the given media+language combination.
-func (e *Engine) filterBackedOff(ctx context.Context, mediaType api.MediaType, mediaID, lang string, providers []api.Provider) []api.Provider {
+func (e *Engine) filterBackedOff(ctx context.Context, mediaType api.MediaType, mediaID, lang string, providers []provider.Provider) []provider.Provider {
 	adaptive := e.cfg.Adaptive()
 	if !adaptive.Enabled {
 		return providers
@@ -221,7 +222,7 @@ func (e *Engine) filterBackedOff(ctx context.Context, mediaType api.MediaType, m
 	for _, name := range backedOff {
 		backedOffSet[name] = struct{}{}
 	}
-	var eligible []api.Provider
+	var eligible []provider.Provider
 	for _, p := range providers {
 		if _, ok := backedOffSet[p.Name()]; ok {
 			if e.metrics != nil {

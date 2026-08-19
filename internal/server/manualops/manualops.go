@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -140,7 +141,7 @@ type LiveState struct {
 	Radarr    ManualRadarrClient
 	SonarrLib ResolveSonarrClient
 	RadarrLib ResolveRadarrClient
-	Providers []api.Provider
+	Providers []provider.Provider
 }
 
 // isValidLockVariant accepts the canonical variants plus empty (empty means

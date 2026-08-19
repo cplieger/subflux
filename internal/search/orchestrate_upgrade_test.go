@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 )
 
@@ -115,7 +116,7 @@ func TestSearchTargets_upgrade(t *testing.T) {
 				results: tc.providerResults,
 				data:    tc.providerData,
 			}
-			e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+			e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
 
 			req := &api.SearchRequest{
 				MediaType:   "movie",

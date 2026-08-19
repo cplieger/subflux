@@ -21,7 +21,7 @@ func FuzzWrapRetryAll(f *testing.F) {
 			return // reasonable bounds
 		}
 
-		providers := make([]api.Provider, count)
+		providers := make([]Provider, count)
 		for i := range count {
 			providers[i] = &fakeWrapProvider{name: api.ProviderID(string(rune('a' + i%26)))}
 		}

@@ -27,14 +27,14 @@ const maxRetryBackoff = 30 * time.Second
 // is not retried because the scan engine already handles partial results
 // and per-provider timeouts.
 type retryProvider struct {
-	inner       api.Provider
+	inner       Provider
 	maxAttempts int
 	initBackoff time.Duration
 }
 
 // WrapRetryAll wraps each provider with download retry logic.
-func WrapRetryAll(providers []api.Provider, maxAttempts int, initBackoff time.Duration) []api.Provider {
-	wrapped := make([]api.Provider, len(providers))
+func WrapRetryAll(providers []Provider, maxAttempts int, initBackoff time.Duration) []Provider {
+	wrapped := make([]Provider, len(providers))
 	for i, p := range providers {
 		wrapped[i] = WrapRetry(p, maxAttempts, initBackoff)
 	}
@@ -44,7 +44,7 @@ func WrapRetryAll(providers []api.Provider, maxAttempts int, initBackoff time.Du
 // WrapRetry wraps a provider with download retry logic.
 // If the inner provider implements ShowSubtitleCounter, the wrapper
 // preserves that interface.
-func WrapRetry(p api.Provider, maxAttempts int, initBackoff time.Duration) api.Provider {
+func WrapRetry(p Provider, maxAttempts int, initBackoff time.Duration) Provider {
 	rp := &retryProvider{inner: p, maxAttempts: maxAttempts, initBackoff: initBackoff}
 	if c, ok := p.(ShowSubtitleCounter); ok {
 		return &retryCounterProvider{retryProvider: rp, counter: c}

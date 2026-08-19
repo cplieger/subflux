@@ -25,9 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
 	providerName = api.ProviderNameGestdown
 	baseURL      = "https://api.gestdown.info"
@@ -41,7 +38,7 @@ type Provider struct {
 }
 
 // Factory creates a Gestdown provider. No configuration is required.
-func Factory(_ context.Context, _ map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 	return &Provider{
 		client:    provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		showCache: cache.New[[]showResult](cache.DefaultTTL),

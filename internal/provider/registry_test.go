@@ -14,7 +14,7 @@ func TestRegister_and_LoadAll(t *testing.T) {
 	r := NewRegistry()
 
 	called := false
-	r.Register("test", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("test", func(_ context.Context, _ map[string]any) (Provider, error) {
 		called = true
 		return &fakeProvider{name: "test"}, nil
 	})
@@ -39,11 +39,11 @@ func TestRegister_and_LoadAll(t *testing.T) {
 func TestLoadAll_skips_disabled(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("disabled", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("disabled", func(_ context.Context, _ map[string]any) (Provider, error) {
 		t.Fatal("factory should not be called for disabled provider")
 		return nil, nil
 	})
-	r.Register("enabled", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("enabled", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "enabled"}, nil
 	})
 
@@ -82,7 +82,7 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 func TestLoadAll_unknown_provider_with_valid(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("good", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("good", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "good"}, nil
 	})
 
@@ -102,7 +102,7 @@ func TestLoadAll_factory_error(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 	cause := errors.New("init failed")
-	r.Register("broken", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("broken", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, cause
 	})
 
@@ -123,10 +123,10 @@ func TestLoadAll_factory_error(t *testing.T) {
 func TestLoadAll_partial_success(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("good", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("good", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "good"}, nil
 	})
-	r.Register("broken", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("broken", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, errors.New("init failed")
 	})
 
@@ -182,7 +182,7 @@ func TestLoadAll_deterministic_order(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
-		r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+		r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(name)}, nil
 		})
 	}
@@ -220,7 +220,7 @@ func TestRegister_panics_empty_name(t *testing.T) {
 			t.Fatal("Register(\"\", f) did not panic")
 		}
 	}()
-	r.Register("", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, nil
 	})
 }
@@ -242,7 +242,7 @@ func TestLoadAll_passes_settings_to_factory(t *testing.T) {
 	r := NewRegistry()
 
 	var got map[string]any
-	r.Register("test", func(_ context.Context, s map[string]any) (api.Provider, error) {
+	r.Register("test", func(_ context.Context, s map[string]any) (Provider, error) {
 		got = s
 		return &fakeProvider{name: "test"}, nil
 	})
@@ -268,10 +268,10 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	r.Register("dup", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("dup", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "first"}, nil
 	})
-	r.Register("dup", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("dup", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "second"}, nil
 	})
 
@@ -330,7 +330,7 @@ func TestProviderNames_sorted(t *testing.T) {
 	r := NewRegistry()
 	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
 		n := name
-		r.Register(n, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+		r.Register(n, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(n)}, nil
 		})
 	}
@@ -359,7 +359,7 @@ func TestProviderNames_empty_registry(t *testing.T) {
 
 // --- Test Helpers ---
 
-// fakeProvider implements api.Provider for testing.
+// fakeProvider implements Provider for testing.
 type fakeProvider struct {
 	name string
 }

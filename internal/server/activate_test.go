@@ -18,6 +18,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -80,8 +81,8 @@ type closableArrClient struct {
 func (c *closableArrClient) Close() { c.closed++ }
 
 // okWire is a wiring.Func that always succeeds with one stub provider.
-func okWire(_ context.Context, _ *config.Config, _ search.SearchStore, _ search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
-	return nil, nil, []api.Provider{&stubProvider{name: "mock"}}, nil
+func okWire(_ context.Context, _ *config.Config, _ search.SearchStore, _ search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
+	return nil, nil, []provider.Provider{&stubProvider{name: "mock"}}, nil
 }
 
 // newActivationTestServer builds the minimal Server the activation path
@@ -265,7 +266,7 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 		{
 			name: "wire failure",
 			breakServer: func(s *Server) {
-				s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+				s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 					return nil, nil, nil, errMock
 				}
 			},
@@ -354,7 +355,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+	s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 		return nil, nil, nil, errMock
 	}
 	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err == nil {

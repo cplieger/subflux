@@ -24,7 +24,7 @@ type CacheClearer interface {
 
 // ClearCaches calls ClearCache on any provider that implements
 // CacheClearer. Typically called at scan completion to free memory.
-func ClearCaches(providers []api.Provider) {
+func ClearCaches(providers []Provider) {
 	for _, p := range providers {
 		if cc, ok := p.(CacheClearer); ok {
 			cc.ClearCache()
@@ -45,7 +45,7 @@ type ShowSubtitleCounter interface {
 
 // ResolveShowCounter finds the first provider implementing ShowSubtitleCounter.
 // Called at the composition root to inject the resolved counter into LiveState.
-func ResolveShowCounter(providers []api.Provider) ShowSubtitleCounter {
+func ResolveShowCounter(providers []Provider) ShowSubtitleCounter {
 	for _, p := range providers {
 		if c, ok := p.(ShowSubtitleCounter); ok {
 			return c

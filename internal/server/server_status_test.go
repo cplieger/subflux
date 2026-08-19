@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -197,7 +197,7 @@ func newManualDownloadServer(cfg *config.Config, radarr resolve.RadarrMovie) *Se
 		Alerts:   s.alerts,
 		Events:   s.events,
 		StateFunc: func() *manualops.LiveState {
-			return &manualops.LiveState{Providers: []api.Provider{&stubProvider{name: "os"}}}
+			return &manualops.LiveState{Providers: []provider.Provider{&stubProvider{name: "os"}}}
 		},
 		BGTracker: &s.bgWg,
 		// context.Background(): no *testing.T in scope, and ServerCtx is the server's long-lived context, not a request or test one.

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
 )
@@ -125,7 +126,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 		out = append(out, ProviderInfo{
 			Name:    string(name),
 			Enabled: cfg.Enabled,
-			Loaded: slices.ContainsFunc(ls.Providers, func(p api.Provider) bool {
+			Loaded: slices.ContainsFunc(ls.Providers, func(p provider.Provider) bool {
 				return p.Name() == name
 			}),
 		})

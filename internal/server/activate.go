@@ -13,6 +13,7 @@ import (
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -60,7 +61,7 @@ type activationCandidate struct {
 	radarr    api.RadarrClient
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
-	providers []api.Provider
+	providers []provider.Provider
 	drift     api.ConfigDrift
 	// webauthnDegraded records the cold-boot degrade path so finalize keeps
 	// the persistent alert instead of dismissing it.

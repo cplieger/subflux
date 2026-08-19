@@ -133,7 +133,7 @@ func testConfigInRoot(t *testing.T, root string, extra ...string) *config.Config
 	return cfg
 }
 
-// stubProvider implements api.Provider for test setup.
+// stubProvider implements provider.Provider for test setup.
 type stubProvider struct {
 	name string
 }

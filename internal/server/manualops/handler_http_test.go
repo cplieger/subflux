@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
@@ -55,7 +56,7 @@ func (httpFakeRadarr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
 	return arrapi.Movie{ID: 42, MovieFile: &arrapi.MovieFile{Path: "/media/movie.mkv"}}, nil
 }
 
-// httpStubProvider implements api.Provider for test setup.
+// httpStubProvider implements provider.Provider for test setup.
 type httpStubProvider struct {
 	name string
 }
@@ -85,7 +86,7 @@ type harnessStore interface {
 // validation, and no-op activity/alert/event sinks. The returned WaitGroup
 // is the handler's BGTracker; Wait it before finishing tests that reach the
 // background download path.
-func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []api.Provider) (*Handler, *sync.WaitGroup) {
+func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []provider.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -247,7 +248,7 @@ func (p *dlFailingProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte
 func TestHandleManualDownload_download_error_returns_202(t *testing.T) {
 	t.Parallel()
 	h, wg := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
-		[]api.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
+		[]provider.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -478,7 +479,7 @@ func (p *resultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.
 func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	t.Parallel()
 	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
-		[]api.Provider{&resultProvider{
+		[]provider.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
 			results: []api.Subtitle{
 				{
@@ -527,7 +528,7 @@ func (p *searchFailingProvider) Search(_ context.Context, _ *api.SearchRequest) 
 func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 	t.Parallel()
 	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
-		[]api.Provider{
+		[]provider.Provider{
 			&searchFailingProvider{httpStubProvider{name: "bad"}},
 			&resultProvider{
 				httpStubProvider: httpStubProvider{name: "good"},
@@ -584,7 +585,7 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 		},
 	}
 	h, _ := newHTTPHarness(db, fakeManualCfg{},
-		[]api.Provider{&resultProvider{
+		[]provider.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
 			results: []api.Subtitle{
 				{
