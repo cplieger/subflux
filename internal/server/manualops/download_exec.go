@@ -2,6 +2,7 @@ package manualops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -50,13 +51,19 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 		return false
 	}
 
-	// Reject binary data that isn't a valid subtitle file.
+	// Reject bytes that are not a subtitle. subtitlefile.Validate owns both
+	// refusals; only the operator-facing text distinguishes them, because
+	// blaming the archive format for a body that had no bytes misdiagnoses it.
 	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
+		alert := fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider)
+		if errors.Is(err, subtitlefile.ErrEmpty) {
+			alert = fmt.Sprintf("%s returned an empty file for this subtitle", req.Provider)
+		}
 		NotifyError(deps, ErrorNotice{
 			Source: alertSourceManual,
-			Alert:  fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider),
+			Alert:  alert,
 			UI:     "Downloaded file is not a valid subtitle",
 		})
 		return false
