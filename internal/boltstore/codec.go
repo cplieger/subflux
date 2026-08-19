@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -24,7 +24,7 @@ import (
 
 // attemptRec is the search_attempts value: per-(media_type, media_id,
 // language, provider) adaptive-backoff state. The four key components plus
-// these fields reconstruct an api.BackoffEntry.
+// these fields reconstruct an subflux.BackoffEntry.
 type attemptRec struct {
 	LastTried time.Time `json:"last_tried"`
 	NextRetry time.Time `json:"next_retry"`
@@ -41,32 +41,32 @@ type attemptRec struct {
 // id -> quad map from a full index walk, and a row dumped by the bbolt CLI is
 // meaningful on its own. The putState chokepoint derives the ix_state_quad key
 // FROM these value fields, so key and value can never disagree. Provider is
-// api.ProviderID to match api.DownloadRecord.ProviderName /
-// api.StateEntry.Provider exactly.
+// subflux.ProviderID to match subflux.DownloadRecord.ProviderName /
+// subflux.StateEntry.Provider exactly.
 type stateRec struct {
-	MediaImported time.Time      `json:"media_imported"`
-	MediaType     api.MediaType  `json:"media_type"`
-	MediaID       string         `json:"media_id"`
-	Language      string         `json:"language"`
-	Variant       api.Variant    `json:"variant"`
-	Provider      api.ProviderID `json:"provider"`
-	ReleaseName   string         `json:"release_name"`
-	Path          string         `json:"path"`
-	Title         string         `json:"title"`
-	ImdbID        string         `json:"imdb_id"`
-	ReleaseTag    string         `json:"release_tag"`
-	VideoPath     string         `json:"video_path"`
-	ID            int64          `json:"id"` // NextSequence surrogate
-	Score         int            `json:"score"`
-	Season        int            `json:"season"`
-	Episode       int            `json:"episode"`
-	Manual        bool           `json:"manual"`
+	MediaImported time.Time          `json:"media_imported"`
+	MediaType     subflux.MediaType  `json:"media_type"`
+	MediaID       string             `json:"media_id"`
+	Language      string             `json:"language"`
+	Variant       subflux.Variant    `json:"variant"`
+	Provider      subflux.ProviderID `json:"provider"`
+	ReleaseName   string             `json:"release_name"`
+	Path          string             `json:"path"`
+	Title         string             `json:"title"`
+	ImdbID        string             `json:"imdb_id"`
+	ReleaseTag    string             `json:"release_tag"`
+	VideoPath     string             `json:"video_path"`
+	ID            int64              `json:"id"` // NextSequence surrogate
+	Score         int                `json:"score"`
+	Season        int                `json:"season"`
+	Episode       int                `json:"episode"`
+	Manual        bool               `json:"manual"`
 }
 
 // fileRec is the subtitle_files value. The media_type, media_id, language,
 // variant, source, and path all live in the key (so per-media coverage is a
 // key-only prefix walk), leaving only these fields in the value. With the key
-// components they reconstruct an api.SubtitleEntry. A subtitle's cumulative
+// components they reconstruct an subflux.SubtitleEntry. A subtitle's cumulative
 // sync offset is NOT stored here: it lives solely in the sync_offsets bucket
 // (keyed by bare path), which GetSubtitleFiles joins at read time.
 type fileRec struct {
@@ -76,7 +76,7 @@ type fileRec struct {
 
 // scanRec is the scan_state value, one row per (media_type, media_id) carried
 // in the key. With the key components these fields reconstruct an
-// api.ScanStateRow / mirror an api.ScanRecord.
+// subflux.ScanStateRow / mirror an subflux.ScanRecord.
 type scanRec struct {
 	ScannedAt time.Time `json:"scanned_at"`
 	Title     string    `json:"title"`

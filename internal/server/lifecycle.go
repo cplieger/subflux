@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -263,7 +263,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // can carry the activity id.
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	if !s.scanning.CompareAndSwap(false, true) {
@@ -282,7 +282,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		// or the owner is inside its accept instant, where conflict is the
 		// honest answer (a re-click lands after the window).
 		if !s.scanning.CompareAndSwap(false, true) {
-			httpapi.ConflictC(w, r, api.CodeScanInProgress, "scan already in progress")
+			httpapi.ConflictC(w, r, subflux.CodeScanInProgress, "scan already in progress")
 			return
 		}
 	}
@@ -320,7 +320,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 			http.ServeFileFS(w, r, staticSub, loginHTML)
 			return
 		}
-		httpapi.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
+		httpapi.UnauthorizedC(w, r, subflux.CodeUnauthorized, auth.ErrUnauthenticated.Error())
 		return
 	}
 

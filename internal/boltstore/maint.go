@@ -11,8 +11,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -35,7 +35,7 @@ const deletePathBatchSize = 200
 // and scan_state are owned per media item (language is irrelevant to coverage
 // ownership), so orphan cleanup is keyed by this pair.
 type mediaRef struct {
-	mt  api.MediaType
+	mt  subflux.MediaType
 	mid string
 }
 
@@ -43,7 +43,7 @@ type mediaRef struct {
 // search_attempts has no variant dimension, so backoff cleanup after
 // quad-level state deletes is deduplicated per language triple.
 type tripleRef struct {
-	mt   api.MediaType
+	mt   subflux.MediaType
 	mid  string
 	lang string
 }
@@ -67,9 +67,9 @@ type tripleRef struct {
 // caller can remove them from disk as a fallback (the arr usually deletes them
 // already). Work is split into bounded Update transactions; the operation is
 // idempotent, so re-running it on the same paths is a safe no-op.
-func (d *DB) DeleteStateByPaths(_ context.Context, videoPaths []string) (api.CleanupResult, error) {
+func (d *DB) DeleteStateByPaths(_ context.Context, videoPaths []string) (subflux.CleanupResult, error) {
 	if len(videoPaths) == 0 {
-		return api.CleanupResult{}, nil
+		return subflux.CleanupResult{}, nil
 	}
 
 	var subPaths []string
@@ -77,7 +77,7 @@ func (d *DB) DeleteStateByPaths(_ context.Context, videoPaths []string) (api.Cle
 		end := min(start+deletePathBatchSize, len(videoPaths))
 		batchPaths, err := d.deletePathsBatch(videoPaths[start:end])
 		if err != nil {
-			return api.CleanupResult{}, err
+			return subflux.CleanupResult{}, err
 		}
 		subPaths = append(subPaths, batchPaths...)
 	}
@@ -86,7 +86,7 @@ func (d *DB) DeleteStateByPaths(_ context.Context, videoPaths []string) (api.Cle
 		slog.Info("deleted state by video paths",
 			"video_paths", len(videoPaths), "subtitle_paths", len(subPaths))
 	}
-	return api.CleanupResult{Paths: subPaths}, nil
+	return subflux.CleanupResult{Paths: subPaths}, nil
 }
 
 // deletePathsBatch processes one bounded batch of video paths in a single
@@ -203,7 +203,7 @@ func collectVideoPathIDs(tx *bolt.Tx, videoPath string) ([]int64, error) {
 // It is the "media left with no state" predicate that gates orphan cleanup
 // (matching the old findOrphans GROUP BY). The check is index-only (no primary
 // dereference).
-func mediaHasState(tx *bolt.Tx, mt api.MediaType, mid string) (bool, error) {
+func mediaHasState(tx *bolt.Tx, mt subflux.MediaType, mid string) (bool, error) {
 	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
 		return false, errors.New("boltstore: ix_state_quad bucket not found")
@@ -219,7 +219,7 @@ func mediaHasState(tx *bolt.Tx, mt api.MediaType, mid string) (bool, error) {
 // the TotalSubtitleFiles counter is decremented in the same tx. Keys are
 // collected before deletion because bbolt skips the next key if you delete
 // during cursor iteration.
-func deleteSubtitleFilesByMedia(tx *bolt.Tx, mt api.MediaType, mid string) error {
+func deleteSubtitleFilesByMedia(tx *bolt.Tx, mt subflux.MediaType, mid string) error {
 	b := tx.Bucket([]byte(bucketSubtitleFiles))
 	if b == nil {
 		return errors.New("boltstore: subtitle_files bucket not found")
@@ -283,7 +283,7 @@ func cleanOrphanedCoverageFor(tx *bolt.Tx, media map[mediaRef]struct{}) error {
 // DeleteStateByPaths / ReconcileState use. Keys are collected before deletion
 // (bbolt skips the next key if you delete during cursor iteration). The
 // operation is idempotent: re-running it finds the matching rows already gone.
-func (d *DB) CleanupDrift(_ context.Context, drift api.ConfigDrift) error {
+func (d *DB) CleanupDrift(_ context.Context, drift subflux.ConfigDrift) error {
 	if drift.Empty() {
 		slog.Debug("config drift: no cleanup needed")
 		return nil
@@ -311,7 +311,7 @@ func (d *DB) CleanupDrift(_ context.Context, drift api.ConfigDrift) error {
 // clearAllAttempts deletes every search_attempts row (the adaptive-disabled
 // branch), logging the count when non-zero.
 func clearAllAttempts(tx *bolt.Tx, b *bolt.Bucket) error {
-	n, err := deleteAttemptsMatching(tx, b, func(string, api.ProviderID) bool { return true })
+	n, err := deleteAttemptsMatching(tx, b, func(string, subflux.ProviderID) bool { return true })
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func clearAttemptsForLanguages(tx *bolt.Tx, b *bolt.Bucket, languages []string) 
 	for _, l := range languages {
 		removed[l] = struct{}{}
 	}
-	n, err := deleteAttemptsMatching(tx, b, func(lang string, _ api.ProviderID) bool {
+	n, err := deleteAttemptsMatching(tx, b, func(lang string, _ subflux.ProviderID) bool {
 		_, ok := removed[lang]
 		return ok
 	})
@@ -349,15 +349,15 @@ func clearAttemptsForLanguages(tx *bolt.Tx, b *bolt.Bucket, languages []string) 
 // clearAttemptsForProviders deletes the search_attempts rows whose provider key
 // component is in the removed set, logging the count when non-zero. An empty set
 // is a no-op.
-func clearAttemptsForProviders(tx *bolt.Tx, b *bolt.Bucket, providers []api.ProviderID) error {
+func clearAttemptsForProviders(tx *bolt.Tx, b *bolt.Bucket, providers []subflux.ProviderID) error {
 	if len(providers) == 0 {
 		return nil
 	}
-	removed := make(map[api.ProviderID]struct{}, len(providers))
+	removed := make(map[subflux.ProviderID]struct{}, len(providers))
 	for _, p := range providers {
 		removed[p] = struct{}{}
 	}
-	n, err := deleteAttemptsMatching(tx, b, func(_ string, provider api.ProviderID) bool {
+	n, err := deleteAttemptsMatching(tx, b, func(_ string, provider subflux.ProviderID) bool {
 		_, ok := removed[provider]
 		return ok
 	})
@@ -377,12 +377,12 @@ func clearAttemptsForProviders(tx *bolt.Tx, b *bolt.Bucket, providers []api.Prov
 // the primary bucket collecting matching keys first,
 // then deletes them after the cursor walk (bbolt skips the next key if you
 // delete mid-iteration). It returns the number of rows deleted (for logging).
-func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string, provider api.ProviderID) bool) (int, error) {
+func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string, provider subflux.ProviderID) bool) (int, error) {
 	type attemptComponents struct {
-		mt   api.MediaType
+		mt   subflux.MediaType
 		mid  string
 		lang string
-		prov api.ProviderID
+		prov subflux.ProviderID
 	}
 	var toDelete []attemptComponents
 	c := b.Cursor()
@@ -395,12 +395,12 @@ func deleteAttemptsMatching(tx *bolt.Tx, b *bolt.Bucket, match func(lang string,
 			continue
 		}
 		lang := parts[2]
-		prov := api.ProviderID(parts[3])
+		prov := subflux.ProviderID(parts[3])
 		if !match(lang, prov) {
 			continue
 		}
 		toDelete = append(toDelete, attemptComponents{
-			mt:   api.MediaType(parts[0]),
+			mt:   subflux.MediaType(parts[0]),
 			mid:  parts[1],
 			lang: lang,
 			prov: prov,
@@ -477,13 +477,13 @@ const (
 // interrupted pass converges on re-run (Requirement 7.5): a deleted row stays
 // gone, and a reset auto row has an empty sub_path that classifies as skip on
 // the next pass, so media_imported is not bumped again.
-func (d *DB) ReconcileState(ctx context.Context) (api.ReconcileResult, error) {
+func (d *DB) ReconcileState(ctx context.Context) (subflux.ReconcileResult, error) {
 	entries, err := d.loadReconcileEntries()
 	if err != nil {
-		return api.ReconcileResult{}, err
+		return subflux.ReconcileResult{}, err
 	}
 	if len(entries) == 0 {
-		return api.ReconcileResult{}, nil
+		return subflux.ReconcileResult{}, nil
 	}
 
 	slog.Info("reconcile: starting", "rows", len(entries))
@@ -498,23 +498,23 @@ func (d *DB) ReconcileState(ctx context.Context) (api.ReconcileResult, error) {
 	// Branch 1: video gone. Delegate the whole fan-out to DeleteStateByPaths,
 	// which deletes rows + orphaned files + backoff + orphaned scan_state in
 	// bounded transactions.
-	var deleted api.CleanupResult
+	var deleted subflux.CleanupResult
 	if len(videoGonePaths) > 0 {
 		deleted, err = d.DeleteStateByPaths(ctx, videoGonePaths)
 		if err != nil {
-			return api.ReconcileResult{Deleted: deleted}, err
+			return subflux.ReconcileResult{Deleted: deleted}, err
 		}
 	}
 
 	// Branches 2 and 3: reset/delete missing-subtitle rows in bounded batches.
 	resetCount, err := d.reconcileMissingGroups(subMissing, subPresent)
 	if err != nil {
-		return api.ReconcileResult{Deleted: deleted, ResetCount: resetCount}, err
+		return subflux.ReconcileResult{Deleted: deleted, ResetCount: resetCount}, err
 	}
 
 	slog.Info("reconcile: complete",
 		"deleted_paths", len(deleted.Paths), "reset_groups", resetCount)
-	return api.ReconcileResult{Deleted: deleted, ResetCount: resetCount}, nil
+	return subflux.ReconcileResult{Deleted: deleted, ResetCount: resetCount}, nil
 }
 
 // loadReconcileEntries snapshots every subtitle_state row with a non-empty

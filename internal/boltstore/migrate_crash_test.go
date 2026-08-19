@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -152,7 +152,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Irreplaceable fixture: the manual row, its lock, the offset, the user.
-	entries, err := db.GetState(ctx, &api.StateQuery{})
+	entries, err := db.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
@@ -167,7 +167,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if manuals != 1 {
 		t.Errorf("manual rows after recovery = %d, want 1", manuals)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked = (%v, %v), want locked", locked, err)
 	}
@@ -187,15 +187,15 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Sequence: a fresh insert must allocate past every surviving id.
-	rec := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt8", Language: "en",
-		ProviderName: api.ProviderNameOpenSubtitles, Path: "/m/tt8.en.srt", Score: 5,
-		Meta: &api.DownloadMeta{Title: "T8", VideoPath: "/m/tt8.mkv"},
+	rec := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt8", Language: "en",
+		ProviderName: subflux.ProviderNameOpenSubtitles, Path: "/m/tt8.en.srt", Score: 5,
+		Meta: &subflux.DownloadMeta{Title: "T8", VideoPath: "/m/tt8.mkv"},
 	}
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after recovery: %v", err)
 	}
-	after, err := db.GetState(ctx, &api.StateQuery{})
+	after, err := db.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState after insert: %v", err)
 	}

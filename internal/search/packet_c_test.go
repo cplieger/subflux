@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -24,26 +24,26 @@ type stampStore struct {
 	testsupport.NopStore
 
 	mu     sync.Mutex
-	stamps []api.ScanRecord
+	stamps []subflux.ScanRecord
 }
 
-func (s *stampStore) RecordScanState(_ context.Context, rec *api.ScanRecord) error {
+func (s *stampStore) RecordScanState(_ context.Context, rec *subflux.ScanRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stamps = append(s.stamps, *rec)
 	return nil
 }
 
-func (s *stampStore) recorded() []api.ScanRecord {
+func (s *stampStore) recorded() []subflux.ScanRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]api.ScanRecord(nil), s.stamps...)
+	return append([]subflux.ScanRecord(nil), s.stamps...)
 }
 
 // blockingProvider parks every Search call until released, counting
 // concurrent entries so the test can prove mutual exclusion per media item.
 type blockingProvider struct {
-	name       api.ProviderID
+	name       subflux.ProviderID
 	inFlight   atomic.Int32
 	maxSeen    atomic.Int32
 	release    chan struct{}
@@ -53,9 +53,9 @@ type blockingProvider struct {
 	enterCount atomic.Int32
 }
 
-func (p *blockingProvider) Name() api.ProviderID { return p.name }
+func (p *blockingProvider) Name() subflux.ProviderID { return p.name }
 
-func (p *blockingProvider) Search(ctx context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *blockingProvider) Search(ctx context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	cur := p.inFlight.Add(1)
 	defer p.inFlight.Add(-1)
 	for {
@@ -106,7 +106,7 @@ func waitForGateContention(t *testing.T, g *mediaGate) {
 	}
 }
 
-func (p *blockingProvider) Download(context.Context, *api.Subtitle) ([]byte, error) {
+func (p *blockingProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -116,17 +116,17 @@ func TestSearchTargets_media_gate_serializes_same_item(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &stampStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &blockingProvider{
 		name:    "block",
 		release: make(chan struct{}),
 		entered: make(chan struct{}),
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req1 := &api.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
-	req2 := &api.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	req1 := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
+	req2 := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt777"}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -157,28 +157,28 @@ func TestSearchTargets_media_gate_distinct_items_run_concurrently(t *testing.T) 
 	dir := t.TempDir()
 
 	ms := &stampStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &blockingProvider{
 		name:       "block",
 		release:    make(chan struct{}),
 		entered:    make(chan struct{}),
 		enteredTwo: make(chan struct{}),
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		_, _ = e.SearchTargets(t.Context(),
-			&api.SearchRequest{MediaType: "movie", ImdbID: "tt111"},
+			&subflux.SearchRequest{MediaType: "movie", ImdbID: "tt111"},
 			filepath.Join(dir, "a.mkv"), targets)
 	}()
 	go func() {
 		defer wg.Done()
 		_, _ = e.SearchTargets(t.Context(),
-			&api.SearchRequest{MediaType: "movie", ImdbID: "tt222"},
+			&subflux.SearchRequest{MediaType: "movie", ImdbID: "tt222"},
 			filepath.Join(dir, "b.mkv"), targets)
 	}()
 
@@ -204,12 +204,12 @@ func TestSearchTargets_stamps_post_work_searched(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &stampStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
-	_, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
+	_, err := e.SearchTargets(t.Context(), req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -229,21 +229,21 @@ func TestSearchTargets_cancelled_run_does_not_stamp(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &stampStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &blockingProvider{
 		name:    "block",
 		release: make(chan struct{}),
 		entered: make(chan struct{}),
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	// Parent stays context.Background(): the goroutine below is cancelled at an instant this test picks, so nothing else may cancel it.
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_, _ = e.SearchTargets(ctx, &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"},
-			videoPath, []api.SubtitleTarget{{Code: "fr"}})
+		_, _ = e.SearchTargets(ctx, &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"},
+			videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	}()
 	<-p.entered
 	cancel() // cancel mid-provider-work: the item is unfinished
@@ -263,11 +263,11 @@ func TestInventoryCoverage_stamps_not_searched(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &stampStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", Title: "T"}
 	e.InventoryCoverage(t.Context(), req, videoPath)
 
 	stamps := ms.recorded()

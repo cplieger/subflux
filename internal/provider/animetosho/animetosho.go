@@ -15,19 +15,19 @@ import (
 	"strings"
 
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/anidb"
 	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	providerName     = api.ProviderNameAnimeTosho
+	providerName     = subflux.ProviderNameAnimeTosho
 	feedURL          = "https://feed.animetosho.org/json"
 	storageURL       = "https://animetosho.org/storage/attach/"
 	maxSearchEntries = 6 // Max torrent entries to check for subtitles.
@@ -56,12 +56,12 @@ type Provider struct {
 }
 
 // Name returns the provider identifier for AnimeTosho.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // Search queries AnimeTosho for subtitles matching req. Tries AniDB episode ID
 // lookup first (more precise for anime), then falls back to title+season search.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
-	if req.MediaType != api.MediaTypeEpisode {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	if req.MediaType != subflux.MediaTypeEpisode {
 		slog.Debug("animetosho: not an episode, skipping",
 			"media_type", req.MediaType)
 		return nil, nil
@@ -107,7 +107,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 // Download fetches the subtitle content for the given search result.
 // The download URL is validated against SSRF before the request is made.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("animetosho: %w", err)
@@ -151,7 +151,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	return result, nil
 }
 
-func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	entries, err := p.searchEntriesByEID(ctx, anidbEpID)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (p *Provider) searchByEpisodeID(ctx context.Context, anidbEpID int, req *ap
 	return p.collectSubtitles(ctx, entries, req), nil
 }
 
-func (p *Provider) searchByTitle(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) searchByTitle(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	entries, err := p.searchEntries(ctx, req.Title, req.Season)
 	if err != nil {
 		return nil, fmt.Errorf("search entries: %w", err)
@@ -171,10 +171,10 @@ func (p *Provider) searchByTitle(ctx context.Context, req *api.SearchRequest) ([
 // entries. Shared by searchByEpisodeID and searchByTitle.
 // Fetches entry details concurrently (bounded at maxSearchEntries) since
 // AnimeTosho has no documented rate limit and entries are independent.
-func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *api.SearchRequest) []api.Subtitle {
+func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, req *subflux.SearchRequest) []subflux.Subtitle {
 	type entryResult struct {
 		title string
-		subs  []api.Subtitle
+		subs  []subflux.Subtitle
 	}
 
 	// Fetch all entries concurrently with bounded concurrency.
@@ -203,7 +203,7 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 	_ = g.Wait()
 
 	// Collect and deduplicate results in original order.
-	var out []api.Subtitle
+	var out []subflux.Subtitle
 	seen := make(map[string]bool)
 	for _, r := range results {
 		for i := range r.subs {
@@ -291,7 +291,7 @@ func (p *Provider) searchEntries(ctx context.Context,
 func (p *Provider) getSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
 	season, episode, absEpisode int,
-) ([]api.Subtitle, error) {
+) ([]subflux.Subtitle, error) {
 	slog.Debug("animetosho fetching entry subtitles", "entry_id", entryID)
 
 	var result entryDetail
@@ -347,10 +347,10 @@ func filterCompleteEntries(entries []feedEntry) []feedEntry {
 // Pure function extracted from getSubtitlesForEntry for testability.
 func filterAttachments(result entryDetail, languages []string,
 	season, episode, absEpisode int,
-) []api.Subtitle {
+) []subflux.Subtitle {
 	files := matchFiles(result.Files, season, episode, absEpisode)
 
-	var subs []api.Subtitle
+	var subs []subflux.Subtitle
 	for _, file := range files {
 		for _, att := range file.Attachments {
 			if sub, ok := attachmentToSubtitle(att, languages); ok {
@@ -366,12 +366,12 @@ func filterAttachments(result entryDetail, languages []string,
 // attachment is not a usable subtitle in one of the requested languages.
 // Unknown languages default to English; Brazilian Portuguese is detected from
 // the subtitle name.
-func attachmentToSubtitle(att entryAttachment, languages []string) (api.Subtitle, bool) {
+func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subtitle, bool) {
 	if att.Type != attachTypeSubtitle {
-		return api.Subtitle{}, false
+		return subflux.Subtitle{}, false
 	}
 	if att.ID <= 0 {
-		return api.Subtitle{}, false
+		return subflux.Subtitle{}, false
 	}
 	lang := classify.Alpha2FromAlpha3(att.Info.Lang)
 	if lang == "" {
@@ -383,18 +383,18 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (api.Subtitle
 		lang = "pb"
 	}
 	if !slices.Contains(languages, lang) {
-		return api.Subtitle{}, false
+		return subflux.Subtitle{}, false
 	}
 
 	hexID := fmt.Sprintf("%08x", att.ID)
 	dlURL := fmt.Sprintf("%s%s/%d.xz", storageURL, hexID, att.ID)
 
-	return api.Subtitle{
+	return subflux.Subtitle{
 		Provider:    providerName,
 		ID:          strconv.Itoa(att.ID),
 		Language:    lang,
 		DownloadURL: dlURL,
-		MatchedBy:   api.MatchByTitle,
+		MatchedBy:   subflux.MatchByTitle,
 	}, true
 }
 

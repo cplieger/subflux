@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzPollCacheRoundtrip verifies that Set(k, t) followed by Get(k) returns
@@ -17,17 +17,17 @@ func FuzzPollCacheRoundtrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, unixSec int64, useSonarr bool) {
 		ts := time.Unix(unixSec, 0).UTC()
-		key := api.PollKeySonarr
+		key := subflux.PollKeySonarr
 		if !useSonarr {
-			key = api.PollKeyRadarr
+			key = subflux.PollKeyRadarr
 		}
 
 		var stored time.Time
 		cache := NewPollCache(
-			func(_ context.Context, _ api.PollKey) (time.Time, error) {
+			func(_ context.Context, _ subflux.PollKey) (time.Time, error) {
 				return time.Time{}, nil
 			},
-			func(_ context.Context, _ api.PollKey, t time.Time) error {
+			func(_ context.Context, _ subflux.PollKey, t time.Time) error {
 				stored = t
 				return nil
 			},

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestParseReleaseName_empty_returns_zero_info(t *testing.T) {
@@ -131,7 +131,7 @@ func TestCompareSource(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var ms api.MatchSet
+			var ms subflux.MatchSet
 			CompareSource(&ms, tc.a, tc.b)
 			if ms.Source != tc.want {
 				t.Errorf("CompareSource(%q, %q).Source = %v, want %v", tc.a, tc.b, ms.Source, tc.want)

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scheduler"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -21,10 +21,10 @@ import (
 type fakeStore struct {
 	*testsupport.NopStore
 	reconcileErr error
-	reconcile    api.ReconcileResult
+	reconcile    subflux.ReconcileResult
 }
 
-func (f *fakeStore) ReconcileState(context.Context) (api.ReconcileResult, error) {
+func (f *fakeStore) ReconcileState(context.Context) (subflux.ReconcileResult, error) {
 	return f.reconcile, f.reconcileErr
 }
 
@@ -44,8 +44,8 @@ func (f *fakeReconcileMetrics) RecordReconcile(deleted int, reset int64, _ time.
 func TestRunDBMaintenance_forwardsReconciledDeletionsAndMetrics(t *testing.T) {
 	store := &fakeStore{
 		NopStore: &testsupport.NopStore{},
-		reconcile: api.ReconcileResult{
-			Deleted:    api.CleanupResult{Paths: []string{"/m/a.fr.srt", "/m/b.en.srt"}},
+		reconcile: subflux.ReconcileResult{
+			Deleted:    subflux.CleanupResult{Paths: []string{"/m/a.fr.srt", "/m/b.en.srt"}},
 			ResetCount: 3,
 		},
 	}

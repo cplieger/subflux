@@ -21,7 +21,6 @@ package wirespec
 import (
 	"net/http"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -35,6 +34,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/wiregen/v2"
 )
 
@@ -69,28 +69,28 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[coverage.TargetCoverage](),
 		wiregen.TypeRef[coveragehandlers.SeriesItem](),
 		wiregen.TypeRef[coveragehandlers.MovieItem](),
-		wiregen.TypeRef[api.SubtitleEntry](),
-		wiregen.TypeRef[api.Stats](),
-		wiregen.TypeRef[api.ProviderStatus](),
-		wiregen.TypeRef[api.ProvidersResponse](),
-		wiregen.TypeRef[api.MeResponse](),
-		wiregen.TypeRef[api.SchemaField](),
-		wiregen.TypeRef[api.SchemaOption](),
-		wiregen.TypeRef[api.SchemaSection](),
-		wiregen.TypeRef[api.ProviderSchema](),
-		wiregen.TypeRef[api.StateEntry](),
-		wiregen.TypeRef[api.ScorePreview](),
-		wiregen.TypeRef[api.SearchTarget](),
-		wiregen.TypeRef[api.SearchTargets](),
-		wiregen.TypeRef[api.SetupStatus](),
-		wiregen.TypeRef[api.LoginSuccess](),
-		wiregen.TypeRef[api.SignalData](),
-		wiregen.TypeRef[api.PasskeyRegistered](),
-		wiregen.TypeRef[api.KeyGenerated](),
-		wiregen.TypeRef[api.BackoffEntry](),
-		wiregen.TypeRef[api.ManualLockEntry](),
-		wiregen.TypeRef[api.StatusResponse](),
-		wiregen.TypeRef[api.AdminUserCreatedResponse](),
+		wiregen.TypeRef[subflux.SubtitleEntry](),
+		wiregen.TypeRef[subflux.Stats](),
+		wiregen.TypeRef[subflux.ProviderStatus](),
+		wiregen.TypeRef[subflux.ProvidersResponse](),
+		wiregen.TypeRef[subflux.MeResponse](),
+		wiregen.TypeRef[subflux.SchemaField](),
+		wiregen.TypeRef[subflux.SchemaOption](),
+		wiregen.TypeRef[subflux.SchemaSection](),
+		wiregen.TypeRef[subflux.ProviderSchema](),
+		wiregen.TypeRef[subflux.StateEntry](),
+		wiregen.TypeRef[subflux.ScorePreview](),
+		wiregen.TypeRef[subflux.SearchTarget](),
+		wiregen.TypeRef[subflux.SearchTargets](),
+		wiregen.TypeRef[subflux.SetupStatus](),
+		wiregen.TypeRef[subflux.LoginSuccess](),
+		wiregen.TypeRef[subflux.SignalData](),
+		wiregen.TypeRef[subflux.PasskeyRegistered](),
+		wiregen.TypeRef[subflux.KeyGenerated](),
+		wiregen.TypeRef[subflux.BackoffEntry](),
+		wiregen.TypeRef[subflux.ManualLockEntry](),
+		wiregen.TypeRef[subflux.StatusResponse](),
+		wiregen.TypeRef[subflux.AdminUserCreatedResponse](),
 		wiregen.TypeRef[events.CoverageEvent](),
 		wiregen.TypeRef[events.NotifyEvent](),
 		wiregen.TypeRef[events.ScanEvent](),
@@ -102,11 +102,11 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[activity.Alert](),
 		wiregen.TypeRef[queryhandlers.ProviderInfo](),
 		wiregen.TypeRef[queryhandlers.ParsedConfig](),
-		wiregen.TypeRef[api.LanguageRulesJSON](),
-		wiregen.TypeRef[api.AudioRuleJSON](),
-		wiregen.TypeRef[api.SubtitleTargJSON](),
-		wiregen.TypeRef[api.Scores](),
-		wiregen.TypeRef[api.PostProcessConfig](),
+		wiregen.TypeRef[subflux.LanguageRulesJSON](),
+		wiregen.TypeRef[subflux.AudioRuleJSON](),
+		wiregen.TypeRef[subflux.SubtitleTargJSON](),
+		wiregen.TypeRef[subflux.Scores](),
+		wiregen.TypeRef[subflux.PostProcessConfig](),
 		wiregen.TypeRef[authhandlers.UserInfo](),
 		wiregen.TypeRef[authhandlers.APIKeyInfo](),
 		wiregen.TypeRef[authhandlers.PasskeyInfo](),
@@ -149,7 +149,7 @@ func Registry() *wiregen.Registry {
 		// both auto-discovered from the activity package's const blocks.
 		"ScanKind": {}, "Outcome": {},
 		// SSE event names (events.EventType consts) and the error-code
-		// catalog (api.ErrorCode consts) — both auto-discovered, so a new
+		// catalog (subflux.ErrorCode consts) — both auto-discovered, so a new
 		// code/event lands in TS on the next generate.
 		"EventType": {}, "ErrorCode": {},
 	}
@@ -207,8 +207,8 @@ func Registry() *wiregen.Registry {
 func Endpoints() []wiregen.Endpoint {
 	seriesItem := wiregen.TypeRef[coveragehandlers.SeriesItem]()
 	movieItem := wiregen.TypeRef[coveragehandlers.MovieItem]()
-	subtitleEntry := wiregen.TypeRef[api.SubtitleEntry]()
-	statusResp := wiregen.TypeRef[api.StatusResponse]()
+	subtitleEntry := wiregen.TypeRef[subflux.SubtitleEntry]()
+	statusResp := wiregen.TypeRef[subflux.StatusResponse]()
 	scanAccepted := wiregen.TypeRef[scanning.ScanAccepted]()
 
 	return []wiregen.Endpoint{
@@ -223,7 +223,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "authSetupStatus", Method: http.MethodGet, Path: "/api/auth/setup", AuthGroup: GroupPublic,
-			Response: wiregen.TypeRef[api.SetupStatus](),
+			Response: wiregen.TypeRef[subflux.SetupStatus](),
 		},
 		{
 			Name: "authSetupCreate", Method: http.MethodPost, Path: "/api/auth/setup", AuthGroup: GroupPublic,
@@ -231,7 +231,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "login", Method: http.MethodPost, Path: "/api/auth/login", AuthGroup: GroupPublic,
-			HasBody: true, Response: wiregen.TypeRef[api.LoginSuccess](),
+			HasBody: true, Response: wiregen.TypeRef[subflux.LoginSuccess](),
 		},
 		{Name: "logout", Method: http.MethodPost, Path: "/api/auth/logout", AuthGroup: GroupPublic},
 		{
@@ -264,7 +264,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "me", Method: http.MethodGet, Path: "/api/auth/me", AuthGroup: GroupUser,
-			Response: wiregen.TypeRef[api.MeResponse](),
+			Response: wiregen.TypeRef[subflux.MeResponse](),
 		},
 		{
 			Name: "changePassword", Method: http.MethodPut, Path: "/api/auth/password", AuthGroup: GroupUser,
@@ -276,7 +276,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "webauthnSignalData", Method: http.MethodGet, Path: "/api/auth/webauthn/signal-data",
-			AuthGroup: GroupUser, Response: wiregen.TypeRef[api.SignalData](),
+			AuthGroup: GroupUser, Response: wiregen.TypeRef[subflux.SignalData](),
 		},
 		{
 			Name: "webauthnRegisterBegin", Method: http.MethodPost, Path: "/api/auth/webauthn/register/begin",
@@ -294,7 +294,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "configSchema", Method: http.MethodGet, Path: "/api/config/schema", AuthGroup: GroupUser,
-			Response: wiregen.TypeRef[api.SchemaSection](), RespShape: wiregen.RespArray,
+			Response: wiregen.TypeRef[subflux.SchemaSection](), RespShape: wiregen.RespArray,
 		},
 		{
 			Name: "validateConfigPath", Method: http.MethodPost, Path: "/api/config/validate-path",
@@ -337,7 +337,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "createUser", Method: http.MethodPost, Path: "/api/auth/users", AuthGroup: GroupAdmin,
-			HasBody: true, Response: wiregen.TypeRef[api.AdminUserCreatedResponse](),
+			HasBody: true, Response: wiregen.TypeRef[subflux.AdminUserCreatedResponse](),
 		},
 		{Name: "deleteUser", Method: http.MethodDelete, Path: "/api/auth/users/{id}", AuthGroup: GroupAdmin},
 		{
@@ -346,7 +346,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "generateAPIKey", Method: http.MethodPost, Path: "/api/auth/apikeys", AuthGroup: GroupAdmin,
-			HasBody: true, Response: wiregen.TypeRef[api.KeyGenerated](),
+			HasBody: true, Response: wiregen.TypeRef[subflux.KeyGenerated](),
 		},
 		{Name: "revokeAPIKey", Method: http.MethodDelete, Path: "/api/auth/apikeys/{id}", AuthGroup: GroupAdmin},
 		{
@@ -390,15 +390,15 @@ func Endpoints() []wiregen.Endpoint {
 		{
 			Name: "searchTargets", Method: http.MethodGet, Path: "/api/search/targets",
 			AuthGroup: GroupUserConfigured, Query: true,
-			Response: wiregen.TypeRef[api.SearchTargets](),
+			Response: wiregen.TypeRef[subflux.SearchTargets](),
 		},
 		{
 			Name: "listState", Method: http.MethodGet, Path: "/api/state", AuthGroup: GroupUserConfigured,
-			Query: true, Response: wiregen.TypeRef[api.StateEntry](), RespShape: wiregen.RespArray,
+			Query: true, Response: wiregen.TypeRef[subflux.StateEntry](), RespShape: wiregen.RespArray,
 		},
 		{
 			Name: "stateStats", Method: http.MethodGet, Path: "/api/state/stats", AuthGroup: GroupUserConfigured,
-			Response: wiregen.TypeRef[api.Stats](),
+			Response: wiregen.TypeRef[subflux.Stats](),
 		},
 		{
 			Name: "stateIDs", Method: http.MethodGet, Path: "/api/state/ids", AuthGroup: GroupUserConfigured,
@@ -406,7 +406,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "listBackoff", Method: http.MethodGet, Path: "/api/backoff", AuthGroup: GroupUserConfigured,
-			Response: wiregen.TypeRef[api.BackoffEntry](), RespShape: wiregen.RespArray,
+			Response: wiregen.TypeRef[subflux.BackoffEntry](), RespShape: wiregen.RespArray,
 		},
 		{
 			Name: "backoffPrefix", Method: http.MethodGet, Path: "/api/backoff/prefix",
@@ -414,7 +414,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "listLocks", Method: http.MethodGet, Path: "/api/locks", AuthGroup: GroupUserConfigured,
-			Response: wiregen.TypeRef[api.ManualLockEntry](), RespShape: wiregen.RespArray,
+			Response: wiregen.TypeRef[subflux.ManualLockEntry](), RespShape: wiregen.RespArray,
 		},
 		{
 			Name: "listProviders", Method: http.MethodGet, Path: "/api/providers", AuthGroup: GroupUserConfigured,
@@ -422,7 +422,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "providerTimeouts", Method: http.MethodGet, Path: "/api/providers/timeout",
-			AuthGroup: GroupUserConfigured, Response: wiregen.TypeRef[api.ProvidersResponse](),
+			AuthGroup: GroupUserConfigured, Response: wiregen.TypeRef[subflux.ProvidersResponse](),
 		},
 		{
 			Name: "mediaSeries", Method: http.MethodGet, Path: "/api/media/series",
@@ -467,7 +467,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "scoreRelease", Method: http.MethodPost, Path: "/api/score", AuthGroup: GroupUserConfigured,
-			HasBody: true, Response: wiregen.TypeRef[api.ScorePreview](),
+			HasBody: true, Response: wiregen.TypeRef[subflux.ScorePreview](),
 		},
 		{
 			Name: "listFiles", Method: http.MethodGet, Path: "/api/files", AuthGroup: GroupUserConfigured,

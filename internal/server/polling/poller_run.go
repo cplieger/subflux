@@ -11,15 +11,15 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
 // PollerMetrics is the narrow metrics interface consumed by the poller.
 type PollerMetrics interface {
-	RecordImport(source api.PollKey)
+	RecordImport(source subflux.PollKey)
 }
 
 // PollerEvents is the narrow events interface consumed by the poller.
@@ -53,7 +53,7 @@ type Deps struct {
 // eight methods — an import is a search and nothing else, so the poller never
 // sees score simulation, timeout state, or post-download processing.
 type importSearcher interface {
-	SearchTargets(ctx context.Context, req *api.SearchRequest, videoPath string, targets []api.SubtitleTarget) (api.SearchResult, error)
+	SearchTargets(ctx context.Context, req *subflux.SearchRequest, videoPath string, targets []subflux.SubtitleTarget) (subflux.SearchResult, error)
 }
 
 // LiveState holds the hot-reloadable runtime state the poller reads each cycle.
@@ -76,7 +76,7 @@ type Poller struct {
 	tagCache      *cache.Cache[map[int]struct{}]
 	importRetries map[string]int
 	work          chan sourceBatch
-	detectHigh    map[api.PollKey]time.Time
+	detectHigh    map[subflux.PollKey]time.Time
 	retryMu       sync.Mutex
 	detectMu      sync.Mutex
 }
@@ -86,7 +86,7 @@ type Poller struct {
 // advanceWatermark compares against after execution).
 type sourceBatch struct {
 	source  PollSource
-	key     api.PollKey
+	key     subflux.PollKey
 	since   time.Time
 	entries []arrapi.HistoryRecord
 }
@@ -118,7 +118,7 @@ func NewPoller(deps Deps, stateFunc StateFunc) *Poller { //nolint:gocritic // hu
 		tagCache:      cache.New[map[int]struct{}](ttl),
 		importRetries: make(map[string]int),
 		work:          make(chan sourceBatch, 8),
-		detectHigh:    make(map[api.PollKey]time.Time),
+		detectHigh:    make(map[subflux.PollKey]time.Time),
 	}
 }
 
@@ -188,8 +188,8 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 
 	g, gCtx := errgroup.WithContext(ctx)
 	if ls.Sonarr != nil {
-		if p.deps.PollCache.Get(ctx, api.PollKeySonarr).IsZero() {
-			p.deps.PollCache.Set(ctx, api.PollKeySonarr, time.Now().UTC())
+		if p.deps.PollCache.Get(ctx, subflux.PollKeySonarr).IsZero() {
+			p.deps.PollCache.Set(ctx, subflux.PollKeySonarr, time.Now().UTC())
 		}
 		g.Go(func() error {
 			sonarrCount.Store(int32(p.detectSonarr(gCtx, ls))) //nolint:gosec // G115: poll count fits int32
@@ -197,8 +197,8 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 		})
 	}
 	if ls.Radarr != nil {
-		if p.deps.PollCache.Get(ctx, api.PollKeyRadarr).IsZero() {
-			p.deps.PollCache.Set(ctx, api.PollKeyRadarr, time.Now().UTC())
+		if p.deps.PollCache.Get(ctx, subflux.PollKeyRadarr).IsZero() {
+			p.deps.PollCache.Set(ctx, subflux.PollKeyRadarr, time.Now().UTC())
 		}
 		g.Go(func() error {
 			radarrCount.Store(int32(p.detectRadarr(gCtx, ls))) //nolint:gosec // G115: poll count fits int32
@@ -224,7 +224,7 @@ func (p *Poller) PollOnce(ctx context.Context) int {
 // detectSince returns the cursor a detection fetch should use: the durable
 // watermark, or the in-memory fetched-through position when it is ahead
 // (entries between the two are already queued for execution).
-func (p *Poller) detectSince(ctx context.Context, key api.PollKey) time.Time {
+func (p *Poller) detectSince(ctx context.Context, key subflux.PollKey) time.Time {
 	since := p.deps.PollCache.Get(ctx, key)
 	p.detectMu.Lock()
 	if h, ok := p.detectHigh[key]; ok && h.After(since) {
@@ -261,7 +261,7 @@ func (p *Poller) enqueue(b *sourceBatch) {
 // rewindDetection pulls the fetched-through cursor back to the durable
 // watermark so the next detection re-fetches from it (the retry transport
 // for transiently-failed entries, and the recovery path for dropped batches).
-func (p *Poller) rewindDetection(ctx context.Context, key api.PollKey) {
+func (p *Poller) rewindDetection(ctx context.Context, key subflux.PollKey) {
 	durable := p.deps.PollCache.Get(ctx, key)
 	p.detectMu.Lock()
 	p.detectHigh[key] = durable
@@ -390,7 +390,7 @@ func (p *Poller) getExcludeTagIDs(ctx context.Context, client tagResolver, cache
 // executor. Returns the number of imported-history entries observed (used by
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
-	since := p.detectSince(ctx, api.PollKeySonarr)
+	since := p.detectSince(ctx, subflux.PollKeySonarr)
 	entries, err := ls.Sonarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("sonarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
@@ -403,7 +403,7 @@ func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
 
 	slog.Info("sonarr poll: new events", "count", len(entries))
 	p.enqueue(&sourceBatch{
-		source: PollSourceSonarr, key: api.PollKeySonarr,
+		source: PollSourceSonarr, key: subflux.PollKeySonarr,
 		since: since, entries: entries,
 	})
 	return len(entries)
@@ -413,7 +413,7 @@ func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
 // executor. Returns the number of imported-history entries observed (used by
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
-	since := p.detectSince(ctx, api.PollKeyRadarr)
+	since := p.detectSince(ctx, subflux.PollKeyRadarr)
 	entries, err := ls.Radarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("radarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
@@ -426,7 +426,7 @@ func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
 
 	slog.Info("radarr poll: new events", "count", len(entries))
 	p.enqueue(&sourceBatch{
-		source: PollSourceRadarr, key: api.PollKeyRadarr,
+		source: PollSourceRadarr, key: subflux.PollKeyRadarr,
 		since: since, entries: entries,
 	})
 	return len(entries)
@@ -501,7 +501,7 @@ func (p *Poller) clearImportRetry(key string) {
 // cheap and bounded: re-processing an already-handled import finds its
 // targets covered and skips, and the hold lasts at most maxImportRetries
 // cycles. The cursor never moves backward past `since`.
-func (p *Poller) advanceWatermark(ctx context.Context, key api.PollKey, since, latest, oldestFailed time.Time) {
+func (p *Poller) advanceWatermark(ctx context.Context, key subflux.PollKey, since, latest, oldestFailed time.Time) {
 	target := latest
 	if !oldestFailed.IsZero() {
 		target = oldestFailed.Add(-time.Millisecond)

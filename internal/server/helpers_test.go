@@ -11,7 +11,6 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
@@ -21,6 +20,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -56,24 +56,24 @@ type qhMockStore struct {
 	stateErr   error
 	backoffErr error
 	locksErr   error
-	state      []api.StateEntry
-	backoff    []api.BackoffEntry
-	locks      []api.ManualLockEntry
+	state      []subflux.StateEntry
+	backoff    []subflux.BackoffEntry
+	locks      []subflux.ManualLockEntry
 	stateLimit int
 	downloads  int
 	attempts   int
 }
 
-func (m *qhMockStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
+func (m *qhMockStore) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	m.stateLimit = q.Limit
 	return m.state, m.stateErr
 }
 
-func (m *qhMockStore) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
+func (m *qhMockStore) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
 	return m.backoff, m.backoffErr
 }
 
-func (m *qhMockStore) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
+func (m *qhMockStore) GetManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	return m.locks, m.locksErr
 }
 
@@ -138,13 +138,13 @@ type stubProvider struct {
 	name string
 }
 
-func (p *stubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *stubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *stubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *stubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *stubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -221,7 +221,7 @@ func newTestServer(t *testing.T, db *qhMockStore) *Server {
 		loadConfig: func([]byte) (*config.Config, error) {
 			return nil, fmt.Errorf("not implemented in test")
 		},
-		schemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection {
+		schemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection {
 			return nil
 		},
 		// Tests exercise handlers directly (injecting users via context) or

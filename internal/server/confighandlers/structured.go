@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	yaml "go.yaml.in/yaml/v3"
 )
 
@@ -47,10 +47,10 @@ type StructuredConfig struct {
 // fullSchema resolves the complete schema (app sections + provider registry).
 // A nil registry (possible in tests and stripped-down assemblies) yields the
 // app sections with no provider entries rather than a panic.
-func (h *Handler) fullSchema() []api.SchemaSection {
-	var provs []api.ProviderSchema
+func (h *Handler) fullSchema() []subflux.SchemaSection {
+	var provs []subflux.ProviderSchema
 	if h.registry != nil {
-		provs = BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))
+		provs = BuildProviderSchemas(h.registry, string(subflux.ProviderNameSynthetic))
 	}
 	return h.schemaFunc(provs)
 }
@@ -63,13 +63,13 @@ func (h *Handler) fullSchema() []api.SchemaSection {
 func (h *Handler) HandleGetConfigStructured(w http.ResponseWriter, r *http.Request) {
 	data, err := atomicfile.ReadBounded(r.Context(), h.configPath(), maxBodySize)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", h.configPath())
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "read config", "path", h.configPath())
 		return
 	}
 
 	var root yaml.Node
 	if err := yaml.Unmarshal(data, &root); err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "parse config")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "parse config")
 		return
 	}
 	doc := documentMapping(&root)
@@ -95,12 +95,12 @@ func (h *Handler) HandleGetConfigStructured(w http.ResponseWriter, r *http.Reque
 		keyNode, valNode := doc.Content[i], doc.Content[i+1]
 		var v any
 		if err := valNode.Decode(&v); err != nil {
-			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "decode section", "section", keyNode.Value)
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "decode section", "section", keyNode.Value)
 			return
 		}
 		raw, err := json.Marshal(v)
 		if err != nil {
-			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "encode section", "section", keyNode.Value)
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "encode section", "section", keyNode.Value)
 			return
 		}
 		sections[keyNode.Value] = raw
@@ -115,22 +115,22 @@ func (h *Handler) HandleGetConfigStructured(w http.ResponseWriter, r *http.Reque
 func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to read body")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(body)) > maxBodySize {
 		slog.Warn("structured config request body too large", "size", len(body))
-		httpapi.PayloadTooLargeC(w, r, api.CodeConfigTooLarge, "request body too large")
+		httpapi.PayloadTooLargeC(w, r, subflux.CodeConfigTooLarge, "request body too large")
 		return
 	}
 
 	var sc StructuredConfig
 	if decErr := json.Unmarshal(body, &sc); decErr != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid JSON: "+decErr.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid JSON: "+decErr.Error())
 		return
 	}
 	if len(sc.Sections) == 0 {
-		httpapi.BadRequestC(w, r, api.CodeConfigInvalid, "no config sections provided")
+		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "no config sections provided")
 		return
 	}
 
@@ -145,10 +145,10 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 			// Not the client's fault: the payload relies on keep-semantics
 			// secrets and the server could not read its own existing config.
 			// Fail closed — no save, no activation; details go to the log.
-			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "secret merge")
 			return
 		}
-		httpapi.BadRequestC(w, r, api.CodeConfigInvalid, "invalid configuration: "+err.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
 		return
 	}
 	slog.Debug("structured config canonicalized", "bytes", len(data), "sections", len(sc.Sections))
@@ -333,17 +333,17 @@ func emptyYAMLDocument(root *yaml.Node) bool {
 func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byte) {
 	newCfg, err := h.loadConfig(data)
 	if err != nil {
-		httpapi.BadRequestC(w, r, api.CodeConfigInvalid, "invalid configuration: "+err.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeConfigInvalid, "invalid configuration: "+err.Error())
 		return
 	}
 
 	oldCfg := h.state().Cfg
 	if pingErr := h.pingArrIfChanged(r.Context(), "sonarr", newCfg.Sonarr(), oldCfg); pingErr != nil {
-		httpapi.BadRequestC(w, r, api.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
 		return
 	}
 	if pingErr := h.pingArrIfChanged(r.Context(), "radarr", newCfg.Radarr(), oldCfg); pingErr != nil {
-		httpapi.BadRequestC(w, r, api.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
 		return
 	}
 
@@ -356,7 +356,7 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 		slog.Error("hot reload failed, config not saved", "error", err)
 		h.alerts.RecordPersistent("config",
 			"Config rejected (hot reload failed): "+err.Error())
-		httpapi.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), api.CodeConfigReloadFailed)
+		httpapi.InternalErrorC(w, r, fmt.Errorf("reload failed: %w", err), subflux.CodeConfigReloadFailed)
 		return
 	}
 
@@ -372,17 +372,17 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 		// past the request pre-check) is the client's to fix: report it as
 		// the same 413/code the oversized-body pre-checks use, not a 500.
 		if errors.Is(err, atomicfile.ErrFileTooLarge) {
-			httpapi.PayloadTooLargeC(w, r, api.CodeConfigTooLarge,
+			httpapi.PayloadTooLargeC(w, r, subflux.CodeConfigTooLarge,
 				"merged config exceeds the maximum size; applied but not saved to disk (a restart will revert it)")
 			return
 		}
 		httpapi.InternalErrorC(w, r, fmt.Errorf("config applied but not persisted: %w", err),
-			api.CodeInternalError, "stage", "write config")
+			subflux.CodeInternalError, "stage", "write config")
 		return
 	}
 
 	slog.Info("config saved and hot-reloaded")
-	httpapi.WriteJSON(w, api.StatusResponse{Status: "saved and applied"})
+	httpapi.WriteJSON(w, subflux.StatusResponse{Status: "saved and applied"})
 }
 
 // --- schema-driven secret paths + yaml.Node plumbing ---
@@ -395,10 +395,10 @@ type secretPath []string
 // merge and redaction are structural consequences of `Secret: true`, so a
 // new secret field is covered the moment it is declared (no name list to
 // forget; see TestSecretPaths_cover_every_schema_secret).
-func secretPaths(schema []api.SchemaSection) []secretPath {
+func secretPaths(schema []subflux.SchemaSection) []secretPath {
 	var paths []secretPath
-	var fieldPaths func(prefix []string, fields []api.SchemaField)
-	fieldPaths = func(prefix []string, fields []api.SchemaField) {
+	var fieldPaths func(prefix []string, fields []subflux.SchemaField)
+	fieldPaths = func(prefix []string, fields []subflux.SchemaField) {
 		for i := range fields {
 			f := &fields[i]
 			p := append(append([]string{}, prefix...), f.Key)

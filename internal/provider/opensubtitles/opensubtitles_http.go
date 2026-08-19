@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/cplieger/runesafe/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // doPostDownload performs a rate-limited, authenticated POST to the default
@@ -103,7 +103,7 @@ func (p *Provider) doGet(ctx context.Context, path string, params url.Values) (i
 // invalidateTokenOn401 clears the cached token when the server returns 401,
 // so the next API call triggers a fresh login instead of repeating the failure.
 func (p *Provider) invalidateTokenOn401(err error) {
-	authErr, ok := errors.AsType[*api.AuthError](err)
+	authErr, ok := errors.AsType[*subflux.AuthError](err)
 	if !ok {
 		return
 	}
@@ -157,7 +157,7 @@ func (p *Provider) setHeaders(req *http.Request) {
 // with the quota reset (next UTC midnight) as fallback when no Retry-After
 // hint is present. Everything else defers to httpwire.CheckHTTPStatus, which
 // handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError for
-// other 4xx/5xx. 401s surface as *api.AuthError, which the call sites'
+// other 4xx/5xx. 401s surface as *subflux.AuthError, which the call sites'
 // invalidateTokenOn401 hook uses to force a fresh login.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusNotAcceptable {
@@ -165,7 +165,7 @@ func checkStatus(resp *http.Response) error {
 		if retryAfter == 0 {
 			retryAfter = untilNextUTCMidnight(time.Now())
 		}
-		return &api.RateLimitError{
+		return &subflux.RateLimitError{
 			Msg:        "download limit exceeded (406)",
 			RetryAfter: retryAfter,
 		}

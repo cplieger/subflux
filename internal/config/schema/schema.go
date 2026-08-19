@@ -3,7 +3,7 @@
 package schema
 
 import (
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Schema field type constants used across section builders.
@@ -32,8 +32,8 @@ const (
 // Sections returns the full configuration schema for the UI, in the order
 // config.example.yaml uses. providerSchemas is built from the provider
 // registry by the caller.
-func Sections(providerSchemas []api.ProviderSchema) []api.SchemaSection {
-	return []api.SchemaSection{
+func Sections(providerSchemas []subflux.ProviderSchema) []subflux.SchemaSection {
+	return []subflux.SchemaSection{
 		sonarrSection(),
 		radarrSection(),
 		mediaRootsSection(),

@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- fakes ---
@@ -176,7 +176,7 @@ func TestResolveQuery_movie_by_title(t *testing.T) {
 		t.Fatalf("ResolveQuery() = %+v, want one resolved item", res)
 	}
 	item := res.Items[0]
-	if item.MediaType != api.MediaTypeMovie || item.MediaID != 7 {
+	if item.MediaType != subflux.MediaTypeMovie || item.MediaID != 7 {
 		t.Errorf("item identity = (%s, %d), want (movie, 7)", item.MediaType, item.MediaID)
 	}
 	if item.SearchIDs.Imdb != "tt0137523" || item.SearchIDs.Tmdb != 550 {
@@ -318,7 +318,7 @@ func TestResolveQuery_series_expands_file_bearing_episodes(t *testing.T) {
 	}
 	for i := range res.Items {
 		item := &res.Items[i]
-		if item.MediaType != api.MediaTypeEpisode || item.MediaID != 11 {
+		if item.MediaType != subflux.MediaTypeEpisode || item.MediaID != 11 {
 			t.Errorf("item[%d] identity = (%s, %d), want (episode, 11)", i, item.MediaType, item.MediaID)
 		}
 		if item.SearchIDs.Tvdb != 81189 || item.SearchIDs.Imdb != "tt0903747" {
@@ -396,7 +396,7 @@ func TestResolveQuery_type_fallback_series_first(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode {
 		t.Fatalf("ResolveQuery() = %+v, want the series expansion to win", res)
 	}
 }
@@ -412,7 +412,7 @@ func TestResolveQuery_type_fallback_to_movie(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeMovie {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeMovie {
 		t.Fatalf("ResolveQuery() = %+v, want the movie arm to satisfy the fallback", res)
 	}
 }
@@ -471,7 +471,7 @@ func TestResolveQuery_season_zero_with_tmdb_stays_series_only(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode || res.Items[0].Season != 0 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode || res.Items[0].Season != 0 {
 		t.Fatalf("ResolveQuery(tmdb + season 0) = %+v, want the single specials episode", res)
 	}
 }
@@ -529,7 +529,7 @@ func TestResolveQuery_tmdb_outranks_conflicting_series_title(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeMovie || res.Items[0].MediaID != 7 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeMovie || res.Items[0].MediaID != 7 {
 		t.Fatalf("ResolveQuery(tmdb + series title) = %+v, want the tmdb-resolved movie, not the series", res)
 	}
 }
@@ -581,7 +581,7 @@ func TestResolveQuery_unmatched_tmdb_never_title_rescued(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery(unmatched tmdb + imdb) error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode || res.Items[0].MediaID != 11 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode || res.Items[0].MediaID != 11 {
 		t.Fatalf("ResolveQuery(unmatched tmdb + imdb) = %+v, want the imdb-matched series expansion", res)
 	}
 }

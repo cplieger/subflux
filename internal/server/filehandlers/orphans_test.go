@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // listEntries drives HandleListFiles and decodes the response.
@@ -71,7 +71,7 @@ func newOrphanFixture(t *testing.T) (h *Handler, storedPath, orphanPath string) 
 			t.Fatal(err)
 		}
 	}
-	store := &fakeFileStore{rows: []api.SubtitleEntry{{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}
@@ -91,7 +91,7 @@ func TestOrphanLifecycle_mintDeleteConsume(t *testing.T) {
 	if orphan.Name != filepath.Base(orphanPath) {
 		t.Errorf("orphan name = %q, want %q", orphan.Name, filepath.Base(orphanPath))
 	}
-	if orphan.Source != string(api.SourceExternal) {
+	if orphan.Source != string(subflux.SourceExternal) {
 		t.Errorf("orphan source = %q, want external", orphan.Source)
 	}
 	if len(orphan.OrphanHandle) != 32 {
@@ -192,7 +192,7 @@ func TestOrphanListing_skipsNonSubtitleAndKnown(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &fakeFileStore{rows: []api.SubtitleEntry{{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}

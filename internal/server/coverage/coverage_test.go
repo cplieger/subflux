@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // statusFor fetches the status for a media/lang/variant triple, failing the
@@ -27,7 +27,7 @@ func statusFor(t *testing.T, idx map[string]map[coverage.Key]*coverage.Status, m
 
 func TestIndexSubStatus_externalIsUsable(t *testing.T) {
 	t.Parallel()
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "external", Codec: "srt"},
 	}, nil)
 
@@ -44,7 +44,7 @@ func TestIndexSubStatus_externalIsUsable(t *testing.T) {
 // IgnoredOnly, never Usable.
 func TestIndexSubStatus_embeddedIgnoredCodecIsIgnoredOnly(t *testing.T) {
 	t.Parallel()
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "embedded", Codec: "hdmv_pgs_subtitle"},
 	}, map[string]bool{"hdmv_pgs_subtitle": true})
 
@@ -59,7 +59,7 @@ func TestIndexSubStatus_embeddedIgnoredCodecIsIgnoredOnly(t *testing.T) {
 
 func TestIndexSubStatus_embeddedNonIgnoredCodecIsUsable(t *testing.T) {
 	t.Parallel()
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "embedded", Codec: "subrip"},
 	}, map[string]bool{"hdmv_pgs_subtitle": true})
 
@@ -75,7 +75,7 @@ func TestIndexSubStatus_embeddedNonIgnoredCodecIsUsable(t *testing.T) {
 func TestIndexSubStatus_usableAfterIgnoredIsUsable(t *testing.T) {
 	t.Parallel()
 	// Ignored embedded row first, then a usable external row for the same key.
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "embedded", Codec: "pgs"},
 		{MediaID: "m1", Language: "en", Variant: "", Source: "external", Codec: "srt"},
 	}, map[string]bool{"pgs": true})
@@ -92,7 +92,7 @@ func TestIndexSubStatus_usableAfterIgnoredIsUsable(t *testing.T) {
 func TestIndexSubStatus_ignoredAfterUsableStaysUsable(t *testing.T) {
 	t.Parallel()
 	// Usable external row first, then an ignored embedded row for the same key.
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "external", Codec: "srt"},
 		{MediaID: "m1", Language: "en", Variant: "", Source: "embedded", Codec: "pgs"},
 	}, map[string]bool{"pgs": true})
@@ -108,7 +108,7 @@ func TestIndexSubStatus_ignoredAfterUsableStaysUsable(t *testing.T) {
 
 func TestIndexSubStatus_groupsByMediaAndKey(t *testing.T) {
 	t.Parallel()
-	idx := coverage.IndexSubStatus([]api.SubtitleEntry{
+	idx := coverage.IndexSubStatus([]subflux.SubtitleEntry{
 		{MediaID: "m1", Language: "en", Variant: "", Source: "external"},
 		{MediaID: "m1", Language: "fr", Variant: "forced", Source: "external"},
 		{MediaID: "m2", Language: "en", Variant: "", Source: "external"},
@@ -137,15 +137,15 @@ func TestIndexSubStatus_emptyInputReturnsEmpty(t *testing.T) {
 
 func TestResolveRuleName(t *testing.T) {
 	t.Parallel()
-	oneTarget := []api.SubtitleTarget{{Code: "en"}}
+	oneTarget := []subflux.SubtitleTarget{{Code: "en"}}
 	cases := []struct {
 		name      string
 		audioLang string
-		targets   []api.SubtitleTarget
+		targets   []subflux.SubtitleTarget
 		want      string
 	}{
 		{"nil_targets", "en", nil, "no targets"},
-		{"empty_targets", "en", []api.SubtitleTarget{}, "no targets"},
+		{"empty_targets", "en", []subflux.SubtitleTarget{}, "no targets"},
 		{"empty_audio_lang", "", oneTarget, "default"},
 		{"matches_audio_lang_en", "en", oneTarget, "en"},
 		{"matches_audio_lang_fra", "fra", oneTarget, "fra"},
@@ -198,7 +198,7 @@ func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.
 		{coverage.Key{Lang: "en", Variant: "standard"}: {IgnoredOnly: true}},
 		{}, // no en subtitle for this episode
 	}
-	got := coverage.CountEpisodesGrouped(episodes, []api.SubtitleTarget{{Code: "en"}}, 3)
+	got := coverage.CountEpisodesGrouped(episodes, []subflux.SubtitleTarget{{Code: "en"}}, 3)
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 1, Total: 3},
 	}
@@ -216,9 +216,9 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 		},
 		{coverage.Key{Lang: "en", Variant: "standard"}: {Usable: true}},
 	}
-	got := coverage.CountEpisodesGrouped(episodes, []api.SubtitleTarget{
+	got := coverage.CountEpisodesGrouped(episodes, []subflux.SubtitleTarget{
 		{Code: "en"},
-		{Code: "fr", Variant: api.VariantForced},
+		{Code: "fr", Variant: subflux.VariantForced},
 	}, 2)
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 2, HaveIgnored: 0, Total: 2},
@@ -231,7 +231,7 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 
 func TestCountEpisodeCoverageGrouped_noEpisodesKeepsTotal(t *testing.T) {
 	t.Parallel()
-	got := coverage.CountEpisodesGrouped(nil, []api.SubtitleTarget{{Code: "en"}}, 5)
+	got := coverage.CountEpisodesGrouped(nil, []subflux.SubtitleTarget{{Code: "en"}}, 5)
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 5},
 	}
@@ -255,7 +255,7 @@ func TestCountMovieCoverage_usableTarget(t *testing.T) {
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {Usable: true},
 	}
-	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(subs, []subflux.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 	}
@@ -269,7 +269,7 @@ func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(subs, []subflux.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
 	}
@@ -280,7 +280,7 @@ func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
 
 func TestCountMovieCoverage_missingTarget(t *testing.T) {
 	t.Parallel()
-	got := coverage.CountMovies(nil, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(nil, []subflux.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 1},
 	}
@@ -295,7 +295,7 @@ func TestCountMovieCoverage_multipleTargetsMixed(t *testing.T) {
 		{Lang: "en", Variant: "standard"}: {Usable: true},
 		{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}, {Code: "fr"}})
+	got := coverage.CountMovies(subs, []subflux.SubtitleTarget{{Code: "en"}, {Code: "fr"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 		{Language: "fr", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
@@ -318,38 +318,38 @@ func TestDeduplicateFileRows(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
-		in   []api.SubtitleEntry
-		want []api.SubtitleEntry
+		in   []subflux.SubtitleEntry
+		want []subflux.SubtitleEntry
 	}{
 		{
 			name: "removes_exact_duplicates",
-			in: []api.SubtitleEntry{
+			in: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 			},
-			want: []api.SubtitleEntry{
+			want: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 			},
 		},
 		{
 			name: "keeps_rows_differing_by_source",
-			in: []api.SubtitleEntry{
+			in: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "embedded"},
 			},
-			want: []api.SubtitleEntry{
+			want: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "embedded"},
 			},
 		},
 		{
 			name: "preserves_first_occurrence_order",
-			in: []api.SubtitleEntry{
+			in: []subflux.SubtitleEntry{
 				{MediaID: "m2", Language: "fr", Variant: "standard", Source: "external"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 				{MediaID: "m2", Language: "fr", Variant: "standard", Source: "external"},
 			},
-			want: []api.SubtitleEntry{
+			want: []subflux.SubtitleEntry{
 				{MediaID: "m2", Language: "fr", Variant: "standard", Source: "external"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external"},
 			},
@@ -358,11 +358,11 @@ func TestDeduplicateFileRows(t *testing.T) {
 			// Codec is not part of the dedup key: same (media,lang,variant,source)
 			// with differing codec collapses to the first row seen.
 			name: "differing_codec_collapses_to_first",
-			in: []api.SubtitleEntry{
+			in: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external", Codec: "first"},
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external", Codec: "second"},
 			},
-			want: []api.SubtitleEntry{
+			want: []subflux.SubtitleEntry{
 				{MediaID: "m1", Language: "en", Variant: "standard", Source: "external", Codec: "first"},
 			},
 		},

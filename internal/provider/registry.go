@@ -9,7 +9,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -32,8 +32,8 @@ var _ fmt.Stringer = RegistryErrorKind(0)
 
 // RegistryError is a typed error returned by LoadAll.
 type RegistryError struct {
-	Err      error          // underlying error for ErrProviderInit
-	Provider api.ProviderID // non-empty for ErrProviderInit
+	Err      error              // underlying error for ErrProviderInit
+	Provider subflux.ProviderID // non-empty for ErrProviderInit
 	Kind     RegistryErrorKind
 }
 
@@ -71,20 +71,20 @@ func (e *RegistryError) Unwrap() error { return e.Err }
 // where every other one has exactly one.
 type Provider interface {
 	// Name returns the provider identifier (e.g. "opensubtitles", "yifysubtitles").
-	Name() api.ProviderID
+	Name() subflux.ProviderID
 
 	// Search finds subtitles matching the request.
-	Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error)
+	Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error)
 
 	// Download fetches the subtitle content for the given search result.
 	//
 	// A subtitle the upstream no longer holds is reported as an error
-	// wrapping api.ErrSubtitleAbsent, never as a successful download of zero
+	// wrapping subflux.ErrSubtitleAbsent, never as a successful download of zero
 	// bytes: absence and a truncated or corrupt payload are different
 	// operator problems, and returning nil bytes with a nil error made them
 	// read the same. Implementations therefore never return (nil, nil) —
 	// every return either carries subtitle content or names why it does not.
-	Download(ctx context.Context, sub *api.Subtitle) ([]byte, error)
+	Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error)
 }
 
 // FactoryFunc creates a provider from config settings.
@@ -99,22 +99,22 @@ var _ = FactoryFunc(nil) // compile-time assertion: FactoryFunc is a valid type
 
 // Registry holds provider factories keyed by name.
 type Registry struct {
-	factories map[api.ProviderID]FactoryFunc
-	schemas   map[api.ProviderID][]api.ProviderSchemaField
-	labels    map[api.ProviderID]string
+	factories map[subflux.ProviderID]FactoryFunc
+	schemas   map[subflux.ProviderID][]subflux.ProviderSchemaField
+	labels    map[subflux.ProviderID]string
 }
 
 // NewRegistry creates an empty provider registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		factories: make(map[api.ProviderID]FactoryFunc),
-		schemas:   make(map[api.ProviderID][]api.ProviderSchemaField),
-		labels:    make(map[api.ProviderID]string),
+		factories: make(map[subflux.ProviderID]FactoryFunc),
+		schemas:   make(map[subflux.ProviderID][]subflux.ProviderSchemaField),
+		labels:    make(map[subflux.ProviderID]string),
 	}
 }
 
 // Register adds a provider factory to the registry.
-func (r *Registry) Register(name api.ProviderID, f FactoryFunc) {
+func (r *Registry) Register(name subflux.ProviderID, f FactoryFunc) {
 	if name == "" {
 		panic("provider: Register called with empty name")
 	}
@@ -126,18 +126,18 @@ func (r *Registry) Register(name api.ProviderID, f FactoryFunc) {
 }
 
 // RegisterSchema adds UI metadata for a provider.
-func (r *Registry) RegisterSchema(name api.ProviderID, label string, fields []api.ProviderSchemaField) {
+func (r *Registry) RegisterSchema(name subflux.ProviderID, label string, fields []subflux.ProviderSchemaField) {
 	r.labels[name] = label
 	r.schemas[name] = fields
 }
 
 // ProviderNames returns all registered provider names in sorted order.
-func (r *Registry) ProviderNames() []api.ProviderID {
+func (r *Registry) ProviderNames() []subflux.ProviderID {
 	return slices.Sorted(maps.Keys(r.factories))
 }
 
 // Schema returns the label and settings fields for a provider.
-func (r *Registry) Schema(name api.ProviderID) (string, []api.ProviderSchemaField) {
+func (r *Registry) Schema(name subflux.ProviderID) (string, []subflux.ProviderSchemaField) {
 	return r.labels[name], r.schemas[name]
 }
 
@@ -157,7 +157,7 @@ func (r *Registry) Schema(name api.ProviderID) (string, []api.ProviderSchemaFiel
 // acquisition providers is a valid "embedded detection and coverage only"
 // setup. The counts are WARN-logged so operators can still distinguish a
 // typo (unknown>0) from a deliberate all-disabled state.
-func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api.ProviderCfg) ([]Provider, error) {
+func (r *Registry) LoadAll(ctx context.Context, providers map[subflux.ProviderID]subflux.ProviderCfg) ([]Provider, error) {
 	toLoad, disabled, unknown := r.classifyProviders(providers)
 
 	result, errs := partitionResults(r.buildProviders(ctx, toLoad, providers))
@@ -190,13 +190,13 @@ func (r *Registry) LoadAll(ctx context.Context, providers map[api.ProviderID]api
 type loadResult struct {
 	provider Provider
 	err      error
-	name     api.ProviderID
+	name     subflux.ProviderID
 }
 
 // classifyProviders walks the configured providers in sorted order and splits
 // them into the names to load (enabled and registered) plus the counts of
 // disabled and unknown entries. Sorted iteration keeps logging deterministic.
-func (r *Registry) classifyProviders(providers map[api.ProviderID]api.ProviderCfg) (toLoad []api.ProviderID, disabled, unknown int) {
+func (r *Registry) classifyProviders(providers map[subflux.ProviderID]subflux.ProviderCfg) (toLoad []subflux.ProviderID, disabled, unknown int) {
 	for _, name := range slices.Sorted(maps.Keys(providers)) {
 		cfg := providers[name]
 		if !cfg.Enabled {
@@ -218,7 +218,7 @@ func (r *Registry) classifyProviders(providers map[api.ProviderID]api.ProviderCf
 // latency. It never returns an error: a per-provider failure (factory error or
 // an already-cancelled context) is recorded on that entry so sibling providers
 // still load, preserving partial success.
-func (r *Registry) buildProviders(ctx context.Context, toLoad []api.ProviderID, providers map[api.ProviderID]api.ProviderCfg) []loadResult {
+func (r *Registry) buildProviders(ctx context.Context, toLoad []subflux.ProviderID, providers map[subflux.ProviderID]subflux.ProviderCfg) []loadResult {
 	results := make([]loadResult, len(toLoad))
 	var g errgroup.Group
 	g.SetLimit(len(toLoad))

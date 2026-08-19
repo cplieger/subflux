@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -27,7 +27,7 @@ import (
 func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *LiveState, actID string) activity.Outcome {
 	start := time.Now()
 
-	var stats api.ScanStats
+	var stats subflux.ScanStats
 	searchCfg := ls.Cfg.Search()
 	scanDelay := searchCfg.ScanDelay
 
@@ -144,7 +144,7 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 // cancelled/shutdown when ended early).
 func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *LiveState,
 	queue []ScanItem, recentlyScanned map[string]bool,
-	stats *api.ScanStats, actID string, scanDelay time.Duration,
+	stats *subflux.ScanStats, actID string, scanDelay time.Duration,
 ) (resumed int, outcome activity.Outcome) {
 	tracker := newSeasonTracker(ls.ShowCounter, deps.ShowSkipCache, buildSeedDeps(deps, ls))
 	langs := ls.Cfg.LanguageCodes()
@@ -193,7 +193,7 @@ func processItems(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Liv
 // pacing delay on that.
 func scanQueueItem(ctx context.Context, deps *Deps, ls *LiveState, item ScanItem,
 	tracker *seasonTracker, langs []string,
-	skippedSeries map[string]struct{}, stats *api.ScanStats, actID string,
+	skippedSeries map[string]struct{}, stats *subflux.ScanStats, actID string,
 ) (queried bool) {
 	if item.Ep == nil {
 		return scanFullMovie(ctx, deps, ls, item.Movie, stats, actID)
@@ -215,7 +215,7 @@ func scanQueueItem(ctx context.Context, deps *Deps, ls *LiveState, item ScanItem
 func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 	series *arrapi.Series, ep *arrapi.Episode,
 	tracker *seasonTracker, langs []string,
-	skippedSeries map[string]struct{}, stats *api.ScanStats, actID string,
+	skippedSeries map[string]struct{}, stats *subflux.ScanStats, actID string,
 ) (trackerSkipped, queried bool) {
 	epCount := 0
 	if series.Statistics != nil {
@@ -265,18 +265,18 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 
 // recordEpisodeOutcomes records the per-language scan result for an episode's
 // season, over ONLY the languages whose group actually ran (Kind ==
-// api.LangSearched). A language skipped for this episode — covered on disk,
+// subflux.LangSearched). A language skipped for this episode — covered on disk,
 // manually locked, or not a target at all — or fully backed off is not
 // recorded, so it can never accrue a false no-result streak that
 // early-terminates the season for episodes that genuinely need it.
 func recordEpisodeOutcomes(ctx context.Context, tracker *seasonTracker,
 	series *arrapi.Series, season int,
-	outcomes []api.LangOutcome, seasonEpCount int,
+	outcomes []subflux.LangOutcome, seasonEpCount int,
 ) {
 	seasonIDPrefix := mediaid.SeasonPrefix(series.TvdbID, series.ImdbID, season)
 	for i := range outcomes {
 		o := &outcomes[i]
-		if o.Kind != api.LangSearched {
+		if o.Kind != subflux.LangSearched {
 			continue
 		}
 		kind := ScanNoResult
@@ -303,7 +303,7 @@ func inventorySkipped(ctx context.Context, deps *Deps, ls *LiveState,
 	req := EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
 	if changed := ls.Engine.InventoryCoverage(ctx, &req, ep.EpisodeFile.Path); changed {
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
-			MediaType: api.MediaTypeEpisode, MediaID: mediaid.Build(&req),
+			MediaType: subflux.MediaTypeEpisode, MediaID: mediaid.Build(&req),
 		})
 	}
 }
@@ -311,7 +311,7 @@ func inventorySkipped(ctx context.Context, deps *Deps, ls *LiveState,
 // scanFullMovie scans one movie within the full-scan loop, reporting whether
 // any provider was actually queried (the inter-item pacing signal).
 func scanFullMovie(ctx context.Context, deps *Deps, ls *LiveState,
-	m *arrapi.Movie, stats *api.ScanStats, actID string,
+	m *arrapi.Movie, stats *subflux.ScanStats, actID string,
 ) (queried bool) {
 	outcome, queried := ScanMovie(ctx, deps, ls, m)
 	switch outcome {

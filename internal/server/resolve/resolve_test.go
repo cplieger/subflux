@@ -7,18 +7,18 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // fakeStore returns a fixed row set for any media query.
 type fakeStore struct {
-	rows []api.SubtitleEntry
+	rows []subflux.SubtitleEntry
 	err  error
 }
 
-func (f *fakeStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (f *fakeStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return f.rows, f.err
 }
 
@@ -60,18 +60,18 @@ func newResolver(store *fakeStore, sonarr *fakeSonarr, radarr *fakeRadarr) *reso
 	return &resolve.Resolver{Store: store, State: func() *resolve.State { return st }}
 }
 
-func extRow(mediaID, lang, variant, path, videoPath string) api.SubtitleEntry {
-	return api.SubtitleEntry{
+func extRow(mediaID, lang, variant, path, videoPath string) subflux.SubtitleEntry {
+	return subflux.SubtitleEntry{
 		MediaID: mediaID, Language: lang, Variant: variant,
-		Source: string(api.SourceExternal), Path: path, VideoPath: videoPath,
+		Source: string(subflux.SourceExternal), Path: path, VideoPath: videoPath,
 		Ordinal: subtitlefile.ManualOrdinal(path),
 	}
 }
 
 func movieRef(lang, variant string, ordinal int) *resolve.FileRef {
 	return &resolve.FileRef{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1271",
-		Language: lang, Variant: variant, Source: string(api.SourceExternal), Ordinal: ordinal,
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1271",
+		Language: lang, Variant: variant, Source: string(subflux.SourceExternal), Ordinal: ordinal,
 	}
 }
 
@@ -80,13 +80,13 @@ func movieRef(lang, variant string, ordinal int) *resolve.FileRef {
 // ambiguity -> invariant error.
 func TestSubtitlePath_resolutionTable(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "/media/movie.mkv"),
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.1.srt", "/media/movie.mkv"),
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.2.srt", "/media/movie.mkv"),
 		extRow("tmdb-1271", "fr", "forced", "/media/movie.fr.forced.1.srt", "/media/movie.mkv"),
 		extRow("tmdb-1271", "de", "standard", "/media/movie.de.srt", "/media/movie.mkv"),
-		{MediaID: "tmdb-1271", Language: "en", Variant: "standard", Source: string(api.SourceEmbedded)},
+		{MediaID: "tmdb-1271", Language: "en", Variant: "standard", Source: string(subflux.SourceEmbedded)},
 	}
 	r := newResolver(&fakeStore{rows: rows}, nil, nil)
 	ctx := t.Context()
@@ -105,8 +105,8 @@ func TestSubtitlePath_resolutionTable(t *testing.T) {
 		{"missing ordinal", movieRef("fr", "standard", 7), "", resolve.ErrSubtitleNotFound},
 		{"missing language", movieRef("pt", "standard", 0), "", resolve.ErrSubtitleNotFound},
 		{"embedded not addressable", &resolve.FileRef{
-			MediaType: api.MediaTypeMovie, MediaID: "tmdb-1271",
-			Language: "en", Variant: "standard", Source: string(api.SourceEmbedded),
+			MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1271",
+			Language: "en", Variant: "standard", Source: string(subflux.SourceEmbedded),
 		}, "", resolve.ErrSubtitleNotFound},
 	}
 	for _, tc := range tests {
@@ -133,7 +133,7 @@ func TestSubtitlePath_resolutionTable(t *testing.T) {
 // by extension) is an internal invariant error, never a guess.
 func TestSubtitlePath_ambiguity(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", ""),
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.ass", ""),
 	}
@@ -148,7 +148,7 @@ func TestSubtitlePath_ambiguity(t *testing.T) {
 // containment check is a 500-class invariant error, not a 4xx sentinel.
 func TestSubtitlePath_containmentInvariant(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "")}
+	rows := []subflux.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "")}
 	st := &resolve.State{Cfg: denyValidator{}}
 	r := &resolve.Resolver{Store: &fakeStore{rows: rows}, State: func() *resolve.State { return st }}
 	_, err := r.SubtitlePath(t.Context(), movieRef("fr", "standard", 0))
@@ -168,7 +168,7 @@ func TestVideoPathForFile(t *testing.T) {
 
 	t.Run("row join", func(t *testing.T) {
 		t.Parallel()
-		rows := []api.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "/media/movie.mkv")}
+		rows := []subflux.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "/media/movie.mkv")}
 		r := newResolver(&fakeStore{rows: rows}, nil, nil)
 		got, err := r.VideoPathForFile(ctx, movieRef("fr", "standard", 0))
 		if err != nil || got != "/media/movie.mkv" {
@@ -178,7 +178,7 @@ func TestVideoPathForFile(t *testing.T) {
 
 	t.Run("sibling fallback", func(t *testing.T) {
 		t.Parallel()
-		rows := []api.SubtitleEntry{
+		rows := []subflux.SubtitleEntry{
 			extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", ""),
 			extRow("tmdb-1271", "de", "standard", "/media/movie.de.srt", "/media/movie.mkv"),
 		}
@@ -191,7 +191,7 @@ func TestVideoPathForFile(t *testing.T) {
 
 	t.Run("no video recorded", func(t *testing.T) {
 		t.Parallel()
-		rows := []api.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "")}
+		rows := []subflux.SubtitleEntry{extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", "")}
 		r := newResolver(&fakeStore{rows: rows}, nil, nil)
 		_, err := r.VideoPathForFile(ctx, movieRef("fr", "standard", 0))
 		if !errors.Is(err, resolve.ErrMediaNotFound) {
@@ -221,11 +221,11 @@ func TestVideoPath_mediaRef(t *testing.T) {
 		wantPath string
 		wantErr  error
 	}{
-		{"movie", &resolve.MediaRef{MediaType: api.MediaTypeMovie, MediaID: 42}, "/media/movies/Inception.mkv", nil},
-		{"episode", &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}, "/media/tv/S01E01.mkv", nil},
-		{"episode without file", &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 2}, "", resolve.ErrMediaNotFound},
-		{"episode unknown", &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 9, Episode: 9}, "", resolve.ErrMediaNotFound},
-		{"zero arr id", &resolve.MediaRef{MediaType: api.MediaTypeMovie}, "", resolve.ErrMediaNotFound},
+		{"movie", &resolve.MediaRef{MediaType: subflux.MediaTypeMovie, MediaID: 42}, "/media/movies/Inception.mkv", nil},
+		{"episode", &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}, "/media/tv/S01E01.mkv", nil},
+		{"episode without file", &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 2}, "", resolve.ErrMediaNotFound},
+		{"episode unknown", &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 9, Episode: 9}, "", resolve.ErrMediaNotFound},
+		{"zero arr id", &resolve.MediaRef{MediaType: subflux.MediaTypeMovie}, "", resolve.ErrMediaNotFound},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestVideoPath_mediaRef(t *testing.T) {
 	t.Run("arr not configured", func(t *testing.T) {
 		t.Parallel()
 		bare := newResolver(&fakeStore{}, nil, nil)
-		if _, err := bare.VideoPath(ctx, &resolve.MediaRef{MediaType: api.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
+		if _, err := bare.VideoPath(ctx, &resolve.MediaRef{MediaType: subflux.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
 			t.Fatalf("err = %v, want ErrMediaNotFound", err)
 		}
 	})
@@ -257,7 +257,7 @@ func TestVideoPath_mediaRef(t *testing.T) {
 	t.Run("movie without file", func(t *testing.T) {
 		t.Parallel()
 		r := newResolver(&fakeStore{}, nil, &fakeRadarr{movie: arrapi.Movie{ID: 42}})
-		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: api.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
+		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: subflux.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
 			t.Fatalf("err = %v, want ErrMediaNotFound", err)
 		}
 	})
@@ -265,7 +265,7 @@ func TestVideoPath_mediaRef(t *testing.T) {
 	t.Run("movie upstream error", func(t *testing.T) {
 		t.Parallel()
 		r := newResolver(&fakeStore{}, nil, &fakeRadarr{err: errors.New("radarr 500")})
-		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: api.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
+		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: subflux.MediaTypeMovie, MediaID: 42}); !errors.Is(err, resolve.ErrMediaNotFound) {
 			t.Fatalf("err = %v, want ErrMediaNotFound", err)
 		}
 	})
@@ -273,7 +273,7 @@ func TestVideoPath_mediaRef(t *testing.T) {
 	t.Run("episode upstream error", func(t *testing.T) {
 		t.Parallel()
 		r := newResolver(&fakeStore{}, &fakeSonarr{err: errors.New("sonarr 500")}, nil)
-		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}); !errors.Is(err, resolve.ErrMediaNotFound) {
+		if _, err := r.VideoPath(ctx, &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}); !errors.Is(err, resolve.ErrMediaNotFound) {
 			t.Fatalf("err = %v, want ErrMediaNotFound", err)
 		}
 	})
@@ -281,7 +281,7 @@ func TestVideoPath_mediaRef(t *testing.T) {
 	t.Run("episode sonarr not configured", func(t *testing.T) {
 		t.Parallel()
 		bare := newResolver(&fakeStore{}, nil, nil)
-		if _, err := bare.VideoPath(ctx, &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}); !errors.Is(err, resolve.ErrMediaNotFound) {
+		if _, err := bare.VideoPath(ctx, &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}); !errors.Is(err, resolve.ErrMediaNotFound) {
 			t.Fatalf("err = %v, want ErrMediaNotFound", err)
 		}
 	})
@@ -318,7 +318,7 @@ func singleSnapshotState(sonarr *fakeSonarr, radarr *fakeRadarr) (fn func() *res
 func TestResolver_singleStateSnapshot(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		extRow("tmdb-1271", "fr", "standard", "/media/movie.fr.srt", ""),
 		extRow("tmdb-1271", "de", "standard", "/media/movie.de.srt", "/media/movie.mkv"),
 	}
@@ -356,7 +356,7 @@ func TestResolver_singleStateSnapshot(t *testing.T) {
 			}},
 			resolve: func(t *testing.T, r *resolve.Resolver) {
 				t.Helper()
-				ref := &resolve.MediaRef{MediaType: api.MediaTypeMovie, MediaID: 42}
+				ref := &resolve.MediaRef{MediaType: subflux.MediaTypeMovie, MediaID: 42}
 				if _, err := r.VideoPath(ctx, ref); err != nil {
 					t.Fatalf("VideoPath() unexpected error: %v", err)
 				}
@@ -369,7 +369,7 @@ func TestResolver_singleStateSnapshot(t *testing.T) {
 			}},
 			resolve: func(t *testing.T, r *resolve.Resolver) {
 				t.Helper()
-				ref := &resolve.MediaRef{MediaType: api.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}
+				ref := &resolve.MediaRef{MediaType: subflux.MediaTypeEpisode, MediaID: 7, Season: 1, Episode: 1}
 				if _, err := r.VideoPath(ctx, ref); err != nil {
 					t.Fatalf("VideoPath() unexpected error: %v", err)
 				}
@@ -399,7 +399,7 @@ func TestFileRefFromQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ref.Variant != string(api.VariantStandard) || ref.Source != string(api.SourceExternal) || ref.Ordinal != 0 {
+	if ref.Variant != string(subflux.VariantStandard) || ref.Source != string(subflux.SourceExternal) || ref.Ordinal != 0 {
 		t.Errorf("defaults not applied: %+v", ref)
 	}
 

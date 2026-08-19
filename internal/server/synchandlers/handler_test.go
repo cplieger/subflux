@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -13,7 +13,7 @@ import (
 
 func TestShiftAndFilterCues_zero_shift_returns_original(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 2 * time.Second, Text: "Hello"},
 	}
 	got := ShiftAndFilterCues(cues, 0)
@@ -27,7 +27,7 @@ func TestShiftAndFilterCues_zero_shift_returns_original(t *testing.T) {
 
 func TestShiftAndFilterCues_positive_shift(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 3 * time.Second, Text: "A"},
 	}
 	got := ShiftAndFilterCues(cues, 500*time.Millisecond)
@@ -44,7 +44,7 @@ func TestShiftAndFilterCues_positive_shift(t *testing.T) {
 
 func TestShiftAndFilterCues_negative_shift_filters_ended_cues(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 2 * time.Second, Text: "Early"},
 		{Start: 5 * time.Second, End: 7 * time.Second, Text: "Late"},
 	}
@@ -62,7 +62,7 @@ func TestShiftAndFilterCues_negative_shift_filters_ended_cues(t *testing.T) {
 
 func TestShiftAndFilterCues_start_clamped_to_zero(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 5 * time.Second, Text: "Overlap"},
 	}
 	got := ShiftAndFilterCues(cues, -2*time.Second)
@@ -79,7 +79,7 @@ func TestShiftAndFilterCues_start_clamped_to_zero(t *testing.T) {
 
 func TestShiftAndFilterCues_all_filtered(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 2 * time.Second, Text: "A"},
 		{Start: 3 * time.Second, End: 4 * time.Second, Text: "B"},
 	}
@@ -99,7 +99,7 @@ func TestShiftAndFilterCues_nil_input(t *testing.T) {
 
 func TestShiftAndFilterCues_boundary_end_exactly_zero(t *testing.T) {
 	t.Parallel()
-	cues := []api.SubtitleCue{
+	cues := []subflux.SubtitleCue{
 		{Start: time.Second, End: 2 * time.Second, Text: "Exact"},
 	}
 
@@ -119,7 +119,7 @@ func TestShiftAndFilterCues_boundary_end_exactly_zero(t *testing.T) {
 
 func TestShiftAndFilterCues_empty_input(t *testing.T) {
 	t.Parallel()
-	got := ShiftAndFilterCues([]api.SubtitleCue{}, time.Second)
+	got := ShiftAndFilterCues([]subflux.SubtitleCue{}, time.Second)
 	if len(got) != 0 {
 		t.Errorf("ShiftAndFilterCues(empty, 1s) returned %d cues, want 0", len(got))
 	}
@@ -129,13 +129,13 @@ func TestShiftAndFilterCues_property_output_times_non_negative(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 20).Draw(t, "n")
-		cues := make([]api.SubtitleCue, n)
+		cues := make([]subflux.SubtitleCue, n)
 		var cursor int64
 		for i := range n {
 			gap := rapid.Int64Range(0, 30_000).Draw(t, fmt.Sprintf("gap_%d", i))
 			cursor += gap
 			durMs := rapid.Int64Range(1, 60_000).Draw(t, fmt.Sprintf("dur_%d", i))
-			cues[i] = api.SubtitleCue{
+			cues[i] = subflux.SubtitleCue{
 				Start: time.Duration(cursor) * time.Millisecond,
 				End:   time.Duration(cursor+durMs) * time.Millisecond,
 				Text:  fmt.Sprintf("cue %d", i),

@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestSchema_returns_all_sections(t *testing.T) {
@@ -36,7 +36,7 @@ func TestSchema_returns_all_sections(t *testing.T) {
 func TestSchema_embedded_subtitles_defaults_declared_once(t *testing.T) {
 	t.Parallel()
 	sections := Sections(nil)
-	var emb *api.SchemaSection
+	var emb *subflux.SchemaSection
 	for i := range sections {
 		if sections[i].Key == "embedded_subtitles" {
 			emb = &sections[i]
@@ -101,13 +101,13 @@ func TestSchema_sonarr_section_has_required_fields(t *testing.T) {
 
 func TestSchema_providers_section_passes_through(t *testing.T) {
 	t.Parallel()
-	providers := []api.ProviderSchema{
+	providers := []subflux.ProviderSchema{
 		{Name: "opensubtitles", Label: "OpenSubtitles"},
 		{Name: "yify", Label: "YIFY"},
 	}
 	sections := Sections(providers)
 
-	var provSection *api.SchemaSection
+	var provSection *subflux.SchemaSection
 	for i := range sections {
 		if sections[i].Key == "providers" {
 			provSection = &sections[i]

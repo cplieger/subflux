@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -72,21 +72,21 @@ func TestBuild(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  *api.SearchRequest
+		req  *subflux.SearchRequest
 		want string
 	}{
-		{name: "movie with tmdb ID", req: &api.SearchRequest{MediaType: "movie", TmdbID: 42}, want: "tmdb-42"},
-		{name: "movie with both IDs prefers tmdb", req: &api.SearchRequest{MediaType: "movie", ImdbID: "tt9999999", TmdbID: 42}, want: "tmdb-42"},
-		{name: "movie with imdb ID only", req: &api.SearchRequest{MediaType: "movie", ImdbID: "tt1234567"}, want: "tt1234567"},
-		{name: "movie with no IDs returns empty", req: &api.SearchRequest{MediaType: "movie"}, want: ""},
-		{name: "episode with tvdb ID", req: &api.SearchRequest{MediaType: "episode", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
-		{name: "episode with tvdb and imdb prefers tvdb", req: &api.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
-		{name: "episode with imdb only fallback", req: &api.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7}, want: "tt1234567-s03e07"},
-		{name: "episode with zero season and episode", req: &api.SearchRequest{MediaType: "episode", TvdbID: 1, Season: 0, Episode: 0}, want: "tvdb-1-s00e00"},
-		{name: "episode with large season and episode numbers", req: &api.SearchRequest{MediaType: "episode", TvdbID: 99999, Season: 99, Episode: 150}, want: "tvdb-99999-s99e150"},
-		{name: "episode with no IDs", req: &api.SearchRequest{MediaType: "episode", Season: 1, Episode: 1}, want: "s01e01"},
-		{name: "unknown media type falls through to episode path", req: &api.SearchRequest{MediaType: "special", TvdbID: 100, Season: 0, Episode: 1}, want: "tvdb-100-s00e01"},
-		{name: "movie with negative tmdb ID still used", req: &api.SearchRequest{MediaType: "movie", TmdbID: -1}, want: "tmdb--1"},
+		{name: "movie with tmdb ID", req: &subflux.SearchRequest{MediaType: "movie", TmdbID: 42}, want: "tmdb-42"},
+		{name: "movie with both IDs prefers tmdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt9999999", TmdbID: 42}, want: "tmdb-42"},
+		{name: "movie with imdb ID only", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt1234567"}, want: "tt1234567"},
+		{name: "movie with no IDs returns empty", req: &subflux.SearchRequest{MediaType: "movie"}, want: ""},
+		{name: "episode with tvdb ID", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
+		{name: "episode with tvdb and imdb prefers tvdb", req: &subflux.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", TvdbID: 81189, Season: 3, Episode: 7}, want: "tvdb-81189-s03e07"},
+		{name: "episode with imdb only fallback", req: &subflux.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7}, want: "tt1234567-s03e07"},
+		{name: "episode with zero season and episode", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: 1, Season: 0, Episode: 0}, want: "tvdb-1-s00e00"},
+		{name: "episode with large season and episode numbers", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: 99999, Season: 99, Episode: 150}, want: "tvdb-99999-s99e150"},
+		{name: "episode with no IDs", req: &subflux.SearchRequest{MediaType: "episode", Season: 1, Episode: 1}, want: "s01e01"},
+		{name: "unknown media type falls through to episode path", req: &subflux.SearchRequest{MediaType: "special", TvdbID: 100, Season: 0, Episode: 1}, want: "tvdb-100-s00e01"},
+		{name: "movie with negative tmdb ID still used", req: &subflux.SearchRequest{MediaType: "movie", TmdbID: -1}, want: "tmdb--1"},
 	}
 
 	for _, tt := range tests {
@@ -196,7 +196,7 @@ func TestBuildMediaID_movie_never_contains_season_episode_format(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			MediaType: "movie",
 			ImdbID:    rapid.StringMatching(`tt[0-9]{7}`).Draw(t, "imdb_id"),
 			TmdbID:    rapid.IntRange(1, 999999).Draw(t, "tmdb_id"),
@@ -219,7 +219,7 @@ func TestBuildMediaID_episode_always_contains_season_episode(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			MediaType: "episode",
 			TvdbID:    rapid.IntRange(1, 999999).Draw(t, "tvdb_id"),
 			Season:    rapid.IntRange(0, 99).Draw(t, "season"),
@@ -241,7 +241,7 @@ func TestBuildMediaID_movie_imdb_only_never_contains_season(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			MediaType: "movie",
 			ImdbID:    rapid.StringMatching(`tt[0-9]{7}`).Draw(t, "imdb_id"),
 			TmdbID:    0, // No TMDB ID, falls back to IMDB.
@@ -264,7 +264,7 @@ func TestBuildMediaID_episode_imdb_fallback_contains_season_episode(t *testing.T
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			MediaType: "episode",
 			ImdbID:    rapid.StringMatching(`tt[0-9]{7}`).Draw(t, "imdb_id"),
 			TvdbID:    0, // No TVDB ID, falls back to IMDB.
@@ -289,7 +289,7 @@ func TestBuildMediaID_episode_no_ids_still_has_season_episode(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			MediaType: "episode",
 			TvdbID:    0,
 			ImdbID:    "",
@@ -323,8 +323,8 @@ func TestBuildMediaID_nil_request_returns_empty(t *testing.T) {
 }
 
 func BenchmarkBuild(b *testing.B) {
-	req := &api.SearchRequest{
-		MediaType: api.MediaTypeEpisode,
+	req := &subflux.SearchRequest{
+		MediaType: subflux.MediaTypeEpisode,
 		TvdbID:    12345,
 		ImdbID:    "tt1234567",
 		Season:    3,

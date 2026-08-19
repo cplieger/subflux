@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func BenchmarkBuildMatches(b *testing.B) {
@@ -15,7 +15,7 @@ func BenchmarkBuildMatches(b *testing.B) {
 				ReleaseGroup: "GRP",
 			}
 		},
-		CompareSource: func(m *api.MatchSet, videoSrc, subSrc string) {
+		CompareSource: func(m *subflux.MatchSet, videoSrc, subSrc string) {
 			if videoSrc != "" && subSrc != "" && videoSrc == subSrc {
 				m.Source = true
 			}
@@ -23,17 +23,17 @@ func BenchmarkBuildMatches(b *testing.B) {
 		IsSeasonPack: func(string) bool { return false },
 	}
 
-	video := &api.VideoInfo{
-		MediaType:    api.MediaTypeEpisode,
+	video := &subflux.VideoInfo{
+		MediaType:    subflux.MediaTypeEpisode,
 		ReleaseGroup: "Show.S01E01.1080p.BluRay.x264-GRP",
 	}
 
-	makeSubs := func(n int) []*api.Subtitle {
-		subs := make([]*api.Subtitle, n)
+	makeSubs := func(n int) []*subflux.Subtitle {
+		subs := make([]*subflux.Subtitle, n)
 		for i := range subs {
-			subs[i] = &api.Subtitle{
+			subs[i] = &subflux.Subtitle{
 				ReleaseName: "Show.S01E01.1080p.BluRay.x264-GRP.srt",
-				MatchedBy:   api.MatchByHash,
+				MatchedBy:   subflux.MatchByHash,
 			}
 		}
 		return subs

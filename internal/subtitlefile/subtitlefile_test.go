@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -524,14 +524,14 @@ func TestVariantFromFlags(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		want   api.Variant
+		want   subflux.Variant
 		hi     bool
 		forced bool
 	}{
-		{name: "standard", hi: false, forced: false, want: api.DefaultVariant},
-		{name: "hi", hi: true, forced: false, want: api.VariantHI},
-		{name: "forced", hi: false, forced: true, want: api.VariantForced},
-		{name: "hi takes precedence over forced", hi: true, forced: true, want: api.VariantHI},
+		{name: "standard", hi: false, forced: false, want: subflux.DefaultVariant},
+		{name: "hi", hi: true, forced: false, want: subflux.VariantHI},
+		{name: "forced", hi: false, forced: true, want: subflux.VariantForced},
+		{name: "hi takes precedence over forced", hi: true, forced: true, want: subflux.VariantHI},
 	}
 
 	for _, tt := range tests {

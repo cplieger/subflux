@@ -32,7 +32,7 @@
 internal/apipaths/paths.gen.go:
 
 # --- Generated cross-language wire contract: ErrorCode catalog ---------------
-# internal/api/error_codes.go is the machine-readable error-code catalog. The
+# internal/subflux/error_codes.go is the machine-readable error-code catalog. The
 # defined type (not an alias) exists so wiregen discovers it as a TS string
 # union: every flagged constant's VALUE appears in the generated
 # wire/types.gen.ts `ErrorCode` union AND in the hand-written
@@ -43,7 +43,7 @@ internal/apipaths/paths.gen.go:
 # NOTE for maintainers: 23 catalog entries have no Go emitter at all, which
 # contradicts this file's own "3+ call sites" header rule. That is a pending
 # product decision (see the review report), not a licence to grow the catalog.
-internal/api/error_codes.go:
+internal/subflux/error_codes.go:
 
 # --- Interface members reached only through a narrow interface --------------
 # A consumer declares a narrow interface and is handed a value of a wider type,
@@ -54,7 +54,7 @@ internal/api/error_codes.go:
 #                   a CountCfg directly, so gopls sees test-only use.
 #
 # `method Ping` was removed rather than re-justified. It was listed because
-# api.SonarrClient and api.RadarrClient each DECLARED Ping while the connectivity
+# the two arr-client unions each DECLARED Ping while the connectivity
 # check dialled it through confighandlers' anonymous one-method interface, so the
 # two nine- and seven-method declarations looked unreferenced. Both are gone: the
 # ping surface is now confighandlers.ArrPinger, the check dials Ping through the
@@ -66,17 +66,17 @@ internal/api/error_codes.go:
 #
 # FIVE entries were removed here rather than re-justified, because the thing
 # that forced them is gone. MinScoreForTarget, ProvidersForTarget and
-# ProviderPriority were listed for `api.ConfigProvider -> search.SearchCfg`, and
-# PollInterval for a `var _ PollerCfg = api.ConfigProvider(nil)` assertion that
+# ProviderPriority were listed for `ConfigProvider -> search.SearchCfg`, and
+# PollInterval for a `var _ PollerCfg = ConfigProvider(nil)` assertion that
 # checked the wrong direction (that a 28-method interface still carried 5, true
-# of any superset). api.ConfigProvider is deleted: every consumer names the
+# of any superset). ConfigProvider is deleted: every consumer names the
 # config surface it calls, *config.Config is handed to those names directly, and
 # all four methods are now dialed through the interface that declares them.
 # Verified by re-running punused on internal/search, internal/server/polling and
 # internal/config — none of the four is reported any more.
 #
-# The two STORE members that used to sit here went the same way when api.Store
-# was deleted.
+# The two STORE members that used to sit here went the same way when the
+# whole-store interface was deleted.
 method EmbeddedPolicy
 
 # --- Concrete implementations reached only through their interface -----------
@@ -90,7 +90,7 @@ method EmbeddedPolicy
 #                              *config.Config by name at the composition root
 #                              (server_init.go, main.go's search.WithConfig).
 #                              Those typed parameters ARE the compile-time check
-#                              that used to be a `var _ api.ConfigProvider`
+#                              that used to be a `var _ ConfigProvider`
 #                              assertion in config_load.go: removing the method
 #                              breaks every one of the four assignments.
 #   (*Config).Validate         config_types.go var _ Validator. NOTE for
@@ -105,7 +105,7 @@ method EmbeddedPolicy
 #                              decision, not a licence to keep it.
 #
 # (*NopConfig).EmbeddedPolicy was removed: internal/testsupport/nopconfig.go is
-# deleted. It existed to satisfy api.ConfigProvider whole, and the seven
+# deleted. It existed to satisfy ConfigProvider whole, and the seven
 # packages that shared its 28 no-op methods now each carry a fixture sized to
 # the interface their own subject names.
 method (*Config).EmbeddedPolicy
@@ -151,9 +151,9 @@ method UpdatePasskeyAfterLogin
 # --- fmt.Stringer pinned by a compile-time assertion ------------------------
 # Each of these has an explicit `var _ fmt.Stringer = T(...)` next to it, so the
 # method cannot be deleted without breaking the build (verified for MatchMethod:
-# api/types_search.go:137). The assertion names the TYPE, so punused still sees
+# subflux/types_search.go:137). The assertion names the TYPE, so punused still sees
 # the method as unreferenced.
-#   MatchMethod        api/types_search.go:140
+#   MatchMethod        subflux/types_search.go:140
 #   RegistryErrorKind  provider/registry.go:32 (also rendered by
 #                      RegistryError.Error's "registry error: %s" fallback)
 #   SyncMethod         subsync/confidence.go:25
@@ -184,7 +184,7 @@ method (*Pattern).String
 # Satisfying `error` is what makes these types returnable, and errors.Is/As
 # reach Unwrap through an anonymous interface inside the stdlib. Verified by
 # renaming: provider/registry.go:255 appends &RegistryError{} to a []error.
-# api.RateLimitError is returned as an error from httpwire.go:72 and
+# subflux.RateLimitError is returned as an error from httpwire.go:72 and
 # betaseries.go:180; RegistryError.Unwrap is what lets registry_test.go:118's
 # errors.Is(err, cause) find the provider's own failure.
 # config's two structured validation errors are the same case: configFieldErr
@@ -240,7 +240,7 @@ constant NotifyInfo
 # Both fields are json-tagged and part of the generated TS contract, and NO Go
 # site populates either. They are whitelisted only to keep the gate at zero
 # while the removal decision is open; they are NOT healthy.
-#   ProviderTemplate (api/types.go:229) — `provider_template,omitempty` on
+#   ProviderTemplate (subflux/types.go:229) — `provider_template,omitempty` on
 #     SchemaSection. Never set, so never even serialized; the generated decoder
 #     treats it as optional and no TS module reads it.
 #   Variant (server/events/types.go:43) — `variant` on CoverageEvent, and
@@ -252,7 +252,7 @@ field ProviderTemplate
 field Variant is unused
 
 # --- ScorePreview fields populated by a struct conversion -------------------
-# queryhandlers/query.go:250 writes `api.ScorePreview(result)` — a whole-struct
+# queryhandlers/query.go:252 writes `subflux.ScorePreview(result)` — a whole-struct
 # conversion from the engine's score result. gopls attributes no per-field
 # reference to a conversion, so all three fields look unused while in fact each
 # is serialized on POST /api/score and REQUIRED by decodeScorePreview

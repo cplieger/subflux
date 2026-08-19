@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // normalizeSet collects the normalized labels a format table can produce, so a
@@ -81,10 +81,10 @@ func FuzzCompareSource(f *testing.F) {
 	f.Add("unknown", "unknown")
 
 	f.Fuzz(func(t *testing.T, a, b string) {
-		var m api.MatchSet
+		var m subflux.MatchSet
 		CompareSource(&m, a, b)
 		// Symmetry: CompareSource(a,b) agrees with CompareSource(b,a).
-		var m2 api.MatchSet
+		var m2 subflux.MatchSet
 		CompareSource(&m2, b, a)
 		if m.Source != m2.Source {
 			t.Fatalf("CompareSource not symmetric: (%q,%q)=%v vs (%q,%q)=%v", a, b, m.Source, b, a, m2.Source)

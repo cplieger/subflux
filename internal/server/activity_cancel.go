@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // handleCancelActivity handles POST /api/activity/{id}/cancel — the explicit
@@ -29,7 +29,7 @@ import (
 func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "activity id required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "activity id required")
 		return
 	}
 	user := authhandlers.UserFromContext(r.Context())
@@ -42,13 +42,13 @@ func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		slog.Info("activity cancel rejected: unknown id",
 			"activity_id", id, "user", username)
-		httpapi.NotFoundC(w, r, api.CodeNotFound, "activity not found")
+		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "activity not found")
 		return
 	}
 	if entry.RequiredRole == auth.RoleAdmin && !auth.HasRole(user, auth.RoleAdmin) {
 		slog.Info("activity cancel rejected: admin role required",
 			"activity_id", id, "user", username, "action", entry.Action)
-		httpapi.ForbiddenC(w, r, api.CodeAuthRoleRequired, "admin role required to cancel this scan")
+		httpapi.ForbiddenC(w, r, subflux.CodeAuthRoleRequired, "admin role required to cancel this scan")
 		return
 	}
 

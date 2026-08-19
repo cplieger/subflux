@@ -167,7 +167,7 @@ func (m *Mapper) getParsedMapping(ctx context.Context) (*animeList, error) {
 // Public raw-file fetch on raw.githubusercontent.com; any non-200 is a
 // fetch failure, not an auth/rate-limit signal, so we keep a plain error
 // here rather than calling httpwire.CheckHTTPStatus (which would map 403
-// to *api.AuthError, misleading for a public blob fetch).
+// to *subflux.AuthError, misleading for a public blob fetch).
 func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	slog.Debug("anidb: fetching anime-list.xml")
 

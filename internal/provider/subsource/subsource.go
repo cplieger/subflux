@@ -21,18 +21,18 @@ import (
 	"github.com/cplieger/jsonx"
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	providerName  = api.ProviderNameSubSource
+	providerName  = subflux.ProviderNameSubSource
 	baseURL       = "https://api.subsource.net/api/v1"
-	matchedByIMDB = api.MatchByIMDB
+	matchedByIMDB = subflux.MatchByIMDB
 	paramAPIKey   = "api_key"
 )
 
@@ -57,7 +57,7 @@ type Provider struct {
 }
 
 // Name returns the provider identifier for SubSource.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // langEntry pairs a requested ISO language code with its SubSource language name.
 type langEntry struct {
@@ -69,12 +69,12 @@ type langEntry struct {
 // that language or the error its query returned.
 type langResult struct {
 	err  error
-	subs []api.Subtitle
+	subs []subflux.Subtitle
 }
 
 // Search finds subtitles matching the request via IMDB ID lookup.
 // Tries alternative titles if the primary title is not found.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.ImdbID == "" {
 		slog.Debug("subsource: no IMDB ID, skipping")
 		return nil, nil
@@ -137,8 +137,8 @@ func collectLangs(languages []string) []langEntry {
 // aggregateLangResults flattens the per-language results. If every language
 // query failed, the last error is propagated so the caller can distinguish a
 // provider failure from a genuine no-results.
-func aggregateLangResults(perLang []langResult) ([]api.Subtitle, error) {
-	var results []api.Subtitle
+func aggregateLangResults(perLang []langResult) ([]subflux.Subtitle, error) {
+	var results []subflux.Subtitle
 	var lastErr error
 	var anySuccess bool
 	for _, lr := range perLang {
@@ -158,7 +158,7 @@ func aggregateLangResults(perLang []langResult) ([]api.Subtitle, error) {
 
 // Download fetches the subtitle content for the given search result.
 // SubSource returns archives; the subtitle file is extracted automatically.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("subsource: %w", err)
 	}
@@ -187,7 +187,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	// Use CheckHTTPStatus for unified typed error dispatch. This honors the
 	// Retry-After header on 429 (via httpwire.ParseRetryAfter) and returns
-	// *api.AuthError for 401/403 just like the search path.
+	// *subflux.AuthError for 401/403 just like the search path.
 	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
 		return nil, httpx.RedactSecret(statusErr, p.apiKey)
 	}
@@ -212,7 +212,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 // searchTitleWithAlternatives tries the primary title, then alternative titles.
 // Rate-limit and auth errors short-circuit the loop since they won't resolve
 // by trying a different title.
-func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *api.SearchRequest) (int, error) {
+func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	titleID, err := p.searchTitle(ctx, req)
 	if err != nil {
 		return 0, fmt.Errorf("subsource search title: %w", err)
@@ -256,10 +256,10 @@ func (p *Provider) searchTitleWithAlternatives(ctx context.Context, req *api.Sea
 // so the scan engine should see them immediately (to pause or re-auth) rather
 // than after the remaining alternatives are burned.
 func isFatalSearchError(err error) bool {
-	if _, isRL := errors.AsType[*api.RateLimitError](err); isRL {
+	if _, isRL := errors.AsType[*subflux.RateLimitError](err); isRL {
 		return true
 	}
-	if _, isAuth := errors.AsType[*api.AuthError](err); isAuth {
+	if _, isAuth := errors.AsType[*subflux.AuthError](err); isAuth {
 		return true
 	}
 	return false
@@ -296,7 +296,7 @@ type subtitleResponse struct {
 
 // searchTitle resolves the SubSource numeric title id for the request,
 // memoized per titleCacheKey.
-func (p *Provider) searchTitle(ctx context.Context, req *api.SearchRequest) (int, error) {
+func (p *Provider) searchTitle(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	cacheKey := titleCacheKey(req)
 	return p.titleCache.GetOrFetch(cacheKey, func() (int, error) {
 		return p.searchTitleUncached(ctx, req)
@@ -322,21 +322,21 @@ func (p *Provider) searchTitle(ctx context.Context, req *api.SearchRequest) (int
 // subtitle list, which is then scored against this video's release name and
 // written next to it. Ordinary ids and titles carry neither ':' nor '\', so the
 // key bytes are unchanged.
-func titleCacheKey(req *api.SearchRequest) string {
+func titleCacheKey(req *subflux.SearchRequest) string {
 	season := 0
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		season = req.Season
 	}
 	return keyenc.Join("title", req.ImdbID, strings.ToLower(req.Title), strconv.Itoa(season))
 }
 
-func (p *Provider) searchTitleUncached(ctx context.Context, req *api.SearchRequest) (int, error) {
+func (p *Provider) searchTitleUncached(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
 		paramAPIKey:  {p.apiKey},
 		"searchType": {string(matchedByIMDB)},
 		"imdb":       {req.ImdbID},
 	}
-	if req.MediaType == api.MediaTypeEpisode && req.Season > 0 {
+	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
 		params.Set("season", strconv.Itoa(req.Season))
 	}
 
@@ -355,13 +355,13 @@ func (p *Provider) searchTitleUncached(ctx context.Context, req *api.SearchReque
 	return matchTitle(data, req.Title, req.Year), nil
 }
 
-func (p *Provider) searchTitleByText(ctx context.Context, req *api.SearchRequest) (int, error) {
+func (p *Provider) searchTitleByText(ctx context.Context, req *subflux.SearchRequest) (int, error) {
 	params := url.Values{
 		paramAPIKey:  {p.apiKey},
 		"searchType": {"text"},
 		"q":          {strings.ToLower(req.Title)},
 	}
-	if req.MediaType == api.MediaTypeEpisode && req.Season > 0 {
+	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 {
 		params.Set("season", strconv.Itoa(req.Season))
 	}
 
@@ -413,14 +413,14 @@ func matchTitle(data []searchResult, title string, year int) int {
 	return 0
 }
 
-func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoLang string, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoLang string, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	params := url.Values{
 		paramAPIKey: {p.apiKey},
 		"language":  {strings.ToLower(ssLang)},
 		"limit":     {"100"},
 		"movieId":   {strconv.Itoa(titleID)},
 	}
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		params.Set("seasonNumber", strconv.Itoa(req.Season))
 		params.Set("episodeNumber", strconv.Itoa(req.Episode))
 	}
@@ -458,11 +458,11 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 	return buildSubtitles(result.Data, isoLang, req.Season, req.Episode), nil
 }
 
-// buildSubtitles converts raw API subtitle items into api.Subtitle values.
+// buildSubtitles converts raw API subtitle items into subflux.Subtitle values.
 // Filters out forced/foreign-parts subtitles, detects HI, and expands
 // multi-release entries into individual results. Pure function.
-func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) []api.Subtitle {
-	var subs []api.Subtitle
+func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) []subflux.Subtitle {
+	var subs []subflux.Subtitle
 	for _, item := range items {
 		// Skip forced subs unless explicitly requested.
 		if item.ForeignParts || classify.IsForced(item.Commentary) {
@@ -478,7 +478,7 @@ func buildSubtitles(items []subtitleItem, isoLang string, season, episode int) [
 			releases = []string{""}
 		}
 		for _, rel := range releases {
-			subs = append(subs, api.Subtitle{
+			subs = append(subs, subflux.Subtitle{
 				Provider:    providerName,
 				ID:          strconv.Itoa(item.SubtitleID),
 				Language:    isoLang,

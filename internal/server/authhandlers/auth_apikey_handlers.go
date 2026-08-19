@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/apikeys ---
@@ -19,7 +19,7 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.SecDB.ListAPIKeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("list api keys: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -51,14 +51,14 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len([]rune(req.Label)) > maxAPIKeyLabelLen {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "label too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "label too long")
 		return
 	}
 
 	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		slog.Error("generate api key: generate", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -74,14 +74,14 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.SecDB.CreateAPIKey(r.Context(), apiKey); err != nil {
 		slog.Error("generate api key: store", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: API key generated",
 		"username", user.Username, "label", req.Label, "ip", ClientIP(r))
 
-	httpapi.WriteJSON(w, api.KeyGenerated{
+	httpapi.WriteJSON(w, subflux.KeyGenerated{
 		ID:        apiKey.ID,
 		Key:       plaintext,
 		KeyPrefix: prefix,
@@ -107,7 +107,7 @@ func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.SecDB.DeleteAPIKey(r.Context(), auth.KeyRef{ID: keyID, UserID: user.ID}); err != nil {
 		slog.Error("revoke api key: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 

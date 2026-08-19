@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestCheckHTTPStatus(t *testing.T) {
@@ -43,14 +43,14 @@ func TestCheckHTTPStatus(t *testing.T) {
 			if err == nil {
 				t.Fatalf("CheckHTTPStatus(%d) = nil, want error", tt.statusCode)
 			}
-			var authErr *api.AuthError
-			var rateErr *api.RateLimitError
+			var authErr *subflux.AuthError
+			var rateErr *subflux.RateLimitError
 			var statusErr *HTTPStatusError
 			if tt.wantAuth && !errors.As(err, &authErr) {
-				t.Errorf("CheckHTTPStatus(%d) = %T, want *api.AuthError", tt.statusCode, err)
+				t.Errorf("CheckHTTPStatus(%d) = %T, want *subflux.AuthError", tt.statusCode, err)
 			}
 			if tt.wantRate && !errors.As(err, &rateErr) {
-				t.Errorf("CheckHTTPStatus(%d) = %T, want *api.RateLimitError", tt.statusCode, err)
+				t.Errorf("CheckHTTPStatus(%d) = %T, want *subflux.RateLimitError", tt.statusCode, err)
 			}
 			if tt.wantStatus && !errors.As(err, &statusErr) {
 				t.Errorf("CheckHTTPStatus(%d) = %T, want *HTTPStatusError", tt.statusCode, err)
@@ -65,9 +65,9 @@ func TestCheckHTTPStatus_429_parses_retry_after(t *testing.T) {
 	h.Set("Retry-After", "30")
 	resp := &http.Response{StatusCode: http.StatusTooManyRequests, Header: h}
 	err := CheckHTTPStatus(resp)
-	var rl *api.RateLimitError
+	var rl *subflux.RateLimitError
 	if !errors.As(err, &rl) {
-		t.Fatalf("expected *api.RateLimitError, got %T", err)
+		t.Fatalf("expected *subflux.RateLimitError, got %T", err)
 	}
 	if rl.RetryAfter != 30*time.Second {
 		t.Errorf("RetryAfter = %v, want 30s", rl.RetryAfter)
@@ -91,8 +91,8 @@ func TestIsTransient_api_errors(t *testing.T) {
 		want bool
 	}{
 		{name: "nil", err: nil, want: false},
-		{name: "api.AuthError not transient", err: &api.AuthError{Msg: "bad"}, want: false},
-		{name: "api.RateLimitError not transient", err: &api.RateLimitError{Msg: "slow"}, want: false},
+		{name: "subflux.AuthError not transient", err: &subflux.AuthError{Msg: "bad"}, want: false},
+		{name: "subflux.RateLimitError not transient", err: &subflux.RateLimitError{Msg: "slow"}, want: false},
 		{name: "httpx.HTTPStatusError 502 transient", err: &httpx.HTTPStatusError{Code: 502}, want: true},
 		{name: "httpx.HTTPStatusError 400 not transient", err: &httpx.HTTPStatusError{Code: 400}, want: false},
 		{name: "generic error not transient", err: errors.New("something"), want: false},
@@ -120,19 +120,19 @@ func TestIsTransient_suffixBypassFixed(t *testing.T) {
 	}
 }
 
-// TestRetryOnRateLimit_retriesAPIRateLimitError verifies the api.RateLimitError
+// TestRetryOnRateLimit_retriesAPIRateLimitError verifies the subflux.RateLimitError
 // -> httpx.RateLimitError bridge: that conversion is the only reason an
-// api.RateLimitError drives httpx's retry loop. Without the bridge the error
+// subflux.RateLimitError drives httpx's retry loop. Without the bridge the error
 // would be returned on the first attempt instead of retried.
 func TestRetryOnRateLimit_retriesAPIRateLimitError(t *testing.T) {
 	t.Parallel()
 	calls := 0
 	err := RetryOnRateLimit(t.Context(), 3, time.Millisecond, func() error {
 		calls++
-		return &api.RateLimitError{Msg: "429"}
+		return &subflux.RateLimitError{Msg: "429"}
 	})
 	if calls != 3 {
-		t.Errorf("fn called %d times, want 3 (api.RateLimitError must be bridged and retried up to maxAttempts)", calls)
+		t.Errorf("fn called %d times, want 3 (subflux.RateLimitError must be bridged and retried up to maxAttempts)", calls)
 	}
 	if err == nil || err.Error() != "429" {
 		t.Errorf("RetryOnRateLimit returned %v, want the rate-limit error after exhausting retries", err)

@@ -13,8 +13,8 @@ import (
 	"github.com/cplieger/auth/v4"
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	"github.com/cplieger/auth/v4/ratelimit"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -88,7 +88,7 @@ const (
 func decodeAuthBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	var v T
 	if err := webhttp.DecodeJSONInto(w, r, &v, maxAuthBodySize); err != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid request body")
 		return v, false
 	}
 	return v, true
@@ -133,9 +133,9 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 	if err != nil {
 		slog.Warn("login response: passkey count", "error", err)
 	}
-	httpapi.WriteJSON(w, api.LoginSuccess{
+	httpapi.WriteJSON(w, subflux.LoginSuccess{
 		Redirect: "/",
-		User: api.MeResponse{
+		User: subflux.MeResponse{
 			ID:          user.ID,
 			Username:    user.Username,
 			Role:        user.Role,
@@ -218,7 +218,7 @@ func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bo
 		wa = h.WebAuthnResolver()
 	}
 	if wa == nil {
-		httpapi.BadRequestC(w, nil, api.CodeBadRequest, "WebAuthn not configured")
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "WebAuthn not configured")
 		return nil, false
 	}
 	return wa, true
@@ -229,12 +229,12 @@ func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bo
 func (h *Handler) consumeWebAuthnSession(w http.ResponseWriter, r *http.Request) *webauthn.SessionData {
 	sessionToken := r.Header.Get(HeaderWebAuthnSession)
 	if sessionToken == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "missing session token")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing session token")
 		return nil
 	}
 	sessData := h.Ceremonies.ConsumeWebAuthnSession(sessionToken)
 	if sessData == nil {
-		httpapi.UnauthorizedC(w, r, api.CodeWebAuthnSessionInvalid, "invalid or expired session")
+		httpapi.UnauthorizedC(w, r, subflux.CodeWebAuthnSessionInvalid, "invalid or expired session")
 		return nil
 	}
 	return sessData
@@ -260,12 +260,12 @@ func extractPathSegment(path, prefix, suffix string) string {
 func parseIDFromPath(w http.ResponseWriter, path, prefix, label string) (int64, bool) {
 	idStr := extractPathSegment(path, prefix, "")
 	if idStr == "" {
-		httpapi.BadRequestC(w, nil, api.CodeBadRequest, "missing "+label)
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "missing "+label)
 		return 0, false
 	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		httpapi.BadRequestC(w, nil, api.CodeBadRequest, "invalid "+label)
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "invalid "+label)
 		return 0, false
 	}
 	return id, true

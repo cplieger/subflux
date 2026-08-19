@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
@@ -50,7 +50,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		name        string
 		radarr      ManualRadarrClient
 		sonarr      ManualSonarrClient
-		mediaType   api.MediaType
+		mediaType   subflux.MediaType
 		arrID       int
 		season      int
 		episode     int
@@ -60,14 +60,14 @@ func TestResolveMediaIDs(t *testing.T) {
 		{
 			name:        "movie resolved via radarr uses tmdb id for both",
 			radarr:      &fakeArr{movie: arrapi.Movie{TmdbID: 123}},
-			mediaType:   api.MediaTypeMovie,
+			mediaType:   subflux.MediaTypeMovie,
 			arrID:       5,
 			wantCover:   "tmdb-123",
 			wantHistory: "tmdb-123",
 		},
 		{
 			name:        "movie without radarr falls back to radarr-<id> history",
-			mediaType:   api.MediaTypeMovie,
+			mediaType:   subflux.MediaTypeMovie,
 			arrID:       5,
 			wantCover:   "",
 			wantHistory: "radarr-5",
@@ -75,7 +75,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		{
 			name:        "movie radarr error falls back to radarr-<id> history",
 			radarr:      &fakeArr{getErr: errors.New("radarr unreachable")},
-			mediaType:   api.MediaTypeMovie,
+			mediaType:   subflux.MediaTypeMovie,
 			arrID:       5,
 			wantCover:   "",
 			wantHistory: "radarr-5",
@@ -83,7 +83,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		{
 			name:        "episode resolved via sonarr uses tvdb id for both",
 			sonarr:      &fakeArr{series: arrapi.Series{TvdbID: 999}},
-			mediaType:   api.MediaTypeEpisode,
+			mediaType:   subflux.MediaTypeEpisode,
 			arrID:       7,
 			season:      1,
 			episode:     2,
@@ -92,7 +92,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		},
 		{
 			name:        "episode without sonarr falls back to zero-padded sonarr-<id> history",
-			mediaType:   api.MediaTypeEpisode,
+			mediaType:   subflux.MediaTypeEpisode,
 			arrID:       7,
 			season:      1,
 			episode:     2,
@@ -101,7 +101,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		},
 		{
 			name:        "episode without arr id uses build-media-id fallback",
-			mediaType:   api.MediaTypeEpisode,
+			mediaType:   subflux.MediaTypeEpisode,
 			arrID:       0,
 			wantCover:   "",
 			wantHistory: "s00e00",
@@ -128,41 +128,41 @@ func TestLookupMediaTitle(t *testing.T) {
 		name      string
 		radarr    ManualRadarrClient
 		sonarr    ManualSonarrClient
-		mediaType api.MediaType
+		mediaType subflux.MediaType
 		arrID     int
 		want      string
 	}{
 		{
 			name:      "movie title from radarr",
 			radarr:    &fakeArr{movie: arrapi.Movie{Title: "The Matrix"}},
-			mediaType: api.MediaTypeMovie,
+			mediaType: subflux.MediaTypeMovie,
 			arrID:     5,
 			want:      "The Matrix",
 		},
 		{
 			name:      "episode title from sonarr",
 			sonarr:    &fakeArr{series: arrapi.Series{Title: "Breaking Bad"}},
-			mediaType: api.MediaTypeEpisode,
+			mediaType: subflux.MediaTypeEpisode,
 			arrID:     7,
 			want:      "Breaking Bad",
 		},
 		{
 			name:      "zero arr id never consults the client",
 			radarr:    &fakeArr{movie: arrapi.Movie{Title: "Should Not Be Read"}},
-			mediaType: api.MediaTypeMovie,
+			mediaType: subflux.MediaTypeMovie,
 			arrID:     0,
 			want:      "",
 		},
 		{
 			name:      "movie with nil radarr returns empty",
-			mediaType: api.MediaTypeMovie,
+			mediaType: subflux.MediaTypeMovie,
 			arrID:     5,
 			want:      "",
 		},
 		{
 			name:      "movie radarr error returns empty",
 			radarr:    &fakeArr{getErr: errors.New("radarr unreachable")},
-			mediaType: api.MediaTypeMovie,
+			mediaType: subflux.MediaTypeMovie,
 			arrID:     5,
 			want:      "",
 		},
@@ -193,12 +193,12 @@ func (r *recordingActivity) Progress(id string, _, _ int, detail string) {
 // srtProvider serves a fixed valid SRT payload.
 type srtProvider struct{}
 
-func (srtProvider) Name() api.ProviderID { return "os" }
-func (srtProvider) Search(context.Context, *api.SearchRequest) ([]api.Subtitle, error) {
+func (srtProvider) Name() subflux.ProviderID { return "os" }
+func (srtProvider) Search(context.Context, *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (srtProvider) Download(context.Context, *api.Subtitle) ([]byte, error) {
+func (srtProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	return []byte("1\n00:00:01,000 --> 00:00:02,000\nHello there.\n\n"), nil
 }
 
@@ -233,7 +233,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 
 	req := &DownloadRequest{
 		Provider: "os", SubtitleID: "sub-1", Language: "en",
-		MediaType: api.MediaTypeMovie, ArrID: 42,
+		MediaType: subflux.MediaTypeMovie, ArrID: 42,
 	}
 	req.SetVideoPath(videoPath)
 
@@ -267,10 +267,10 @@ type ordinalStore struct {
 
 	onNext func(committedRows int)
 	mu     sync.Mutex
-	rows   []api.DownloadRecord
+	rows   []subflux.DownloadRecord
 }
 
-func (s *ordinalStore) NextManualNumber(_ context.Context, _ api.ManualLockKey) int {
+func (s *ordinalStore) NextManualNumber(_ context.Context, _ subflux.ManualLockKey) int {
 	s.mu.Lock()
 	maxOrdinal := 0
 	for i := range s.rows {
@@ -286,7 +286,7 @@ func (s *ordinalStore) NextManualNumber(_ context.Context, _ api.ManualLockKey) 
 	return maxOrdinal + 1
 }
 
-func (s *ordinalStore) SaveDownload(_ context.Context, rec *api.DownloadRecord) error {
+func (s *ordinalStore) SaveDownload(_ context.Context, rec *subflux.DownloadRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rows = append(s.rows, *rec)
@@ -294,10 +294,10 @@ func (s *ordinalStore) SaveDownload(_ context.Context, rec *api.DownloadRecord) 
 }
 
 // snapshot returns a copy of the recorded rows in save order.
-func (s *ordinalStore) snapshot() []api.DownloadRecord {
+func (s *ordinalStore) snapshot() []subflux.DownloadRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([]api.DownloadRecord, len(s.rows))
+	out := make([]subflux.DownloadRecord, len(s.rows))
 	copy(out, s.rows)
 	return out
 }
@@ -306,12 +306,12 @@ func (s *ordinalStore) snapshot() []api.DownloadRecord {
 // overwrite bugs are visible as a lost payload.
 type seqProvider struct{ calls atomic.Int32 }
 
-func (*seqProvider) Name() api.ProviderID { return "os" }
-func (*seqProvider) Search(context.Context, *api.SearchRequest) ([]api.Subtitle, error) {
+func (*seqProvider) Name() subflux.ProviderID { return "os" }
+func (*seqProvider) Search(context.Context, *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *seqProvider) Download(context.Context, *api.Subtitle) ([]byte, error) {
+func (p *seqProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
 	n := p.calls.Add(1)
 	return fmt.Appendf(nil, "1\n00:00:01,000 --> 00:00:02,000\nPayload %d.\n\n", n), nil
 }
@@ -347,7 +347,7 @@ func ordinalHarness(t *testing.T) (*SearchDeps, *LiveState, string) {
 func downloadReq(videoPath, subtitleID string, topPick bool) *DownloadRequest {
 	req := &DownloadRequest{
 		Provider: "os", SubtitleID: subtitleID, Language: "en",
-		MediaType: api.MediaTypeMovie, ArrID: 42, TopPick: topPick,
+		MediaType: subflux.MediaTypeMovie, ArrID: 42, TopPick: topPick,
 	}
 	req.SetVideoPath(videoPath)
 	return req

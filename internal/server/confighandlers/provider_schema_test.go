@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // These tests used to live in internal/server and exercise this function
-// through internal/api, which implemented no registry and consumed no schema.
+// through internal/subflux, which implemented no registry and consumed no schema.
 // The function moved to its one caller; the tests came with it.
 //
 // They drive a REAL provider.Registry rather than a two-method fake, because
@@ -20,7 +20,7 @@ import (
 // same shape for the /api/config/schema endpoint test.
 
 func registerStub(reg *provider.Registry, name string) {
-	reg.Register(api.ProviderID(name), func(_ context.Context, _ map[string]any) (provider.Provider, error) {
+	reg.Register(subflux.ProviderID(name), func(_ context.Context, _ map[string]any) (provider.Provider, error) {
 		return &schemaStubProvider{name: name}, nil
 	})
 }
@@ -38,7 +38,7 @@ func TestBuildProviderSchemas_with_providers(t *testing.T) {
 	reg := provider.NewRegistry()
 	registerStub(reg, "gestdown")
 	registerStub(reg, "opensubtitles")
-	reg.RegisterSchema("opensubtitles", "OpenSubtitles", []api.ProviderSchemaField{
+	reg.RegisterSchema("opensubtitles", "OpenSubtitles", []subflux.ProviderSchemaField{
 		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
 		{Key: "username", Label: "Username", Type: "text"},
 	})

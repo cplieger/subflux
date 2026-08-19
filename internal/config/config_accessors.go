@@ -6,14 +6,14 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ResolveTargetsWithFallback implements the full language resolution chain:
 // 1. Match originalLanguage against rules
 // 2. If no match, try each audio track language against rules
 // 3. If still no match, return default targets
-func (c *Config) ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget {
+func (c *Config) ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget {
 	// Priority 1: original language from arr API.
 	if originalLang != "" {
 		if targets := c.matchRule(originalLang); targets != nil {
@@ -73,18 +73,18 @@ func (c *Config) LanguageCodes() []string {
 }
 
 // ProvidersForTarget returns which providers to use for a subtitle target.
-func (c *Config) ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.ProviderID) []api.ProviderID {
+func (c *Config) ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []subflux.ProviderID) []subflux.ProviderID {
 	if len(t.Providers) > 0 {
 		slog.Debug("ProvidersForTarget: using include list",
 			"lang", t.Code, "providers", t.Providers)
 		return t.Providers
 	}
 	if len(t.Exclude) > 0 {
-		excludeSet := make(map[api.ProviderID]struct{}, len(t.Exclude))
+		excludeSet := make(map[subflux.ProviderID]struct{}, len(t.Exclude))
 		for _, e := range t.Exclude {
 			excludeSet[e] = struct{}{}
 		}
-		var filtered []api.ProviderID
+		var filtered []subflux.ProviderID
 		for _, p := range allProviders {
 			if _, excluded := excludeSet[p]; !excluded {
 				filtered = append(filtered, p)
@@ -103,7 +103,7 @@ func (c *Config) ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.Pr
 // falling back to the global min_score. The mediaType parameter is part of
 // search.SearchCfg's signature for future per-media-type score overrides;
 // currently unused.
-func (c *Config) MinScoreForTarget(t *api.SubtitleTarget, _ api.MediaType) int {
+func (c *Config) MinScoreForTarget(t *subflux.SubtitleTarget, _ subflux.MediaType) int {
 	if t.MinScore != nil {
 		return *t.MinScore
 	}
@@ -112,24 +112,24 @@ func (c *Config) MinScoreForTarget(t *api.SubtitleTarget, _ api.MediaType) int {
 
 // Sonarr returns the Sonarr connection config.
 // Returns empty config when disabled.
-func (c *Config) Sonarr() api.ArrConfig {
+func (c *Config) Sonarr() subflux.ArrConfig {
 	if !c.SonarrCfg.isEnabled() {
-		return api.ArrConfig{}
+		return subflux.ArrConfig{}
 	}
 	return arrConfig(c.SonarrCfg)
 }
 
 // Radarr returns the Radarr connection config.
 // Returns empty config when disabled.
-func (c *Config) Radarr() api.ArrConfig {
+func (c *Config) Radarr() subflux.ArrConfig {
 	if !c.RadarrCfg.isEnabled() {
-		return api.ArrConfig{}
+		return subflux.ArrConfig{}
 	}
 	return arrConfig(c.RadarrCfg)
 }
 
 // arrConfig builds an ArrConfig with bidirectional URL fallback.
-func arrConfig(y yamlArrConfig) api.ArrConfig {
+func arrConfig(y yamlArrConfig) subflux.ArrConfig {
 	url := y.URL
 	pub := y.PublicURL
 	if url == "" {
@@ -138,7 +138,7 @@ func arrConfig(y yamlArrConfig) api.ArrConfig {
 	if pub == "" {
 		pub = url
 	}
-	return api.ArrConfig{URL: url, APIKey: y.APIKey, PublicURL: pub}
+	return subflux.ArrConfig{URL: url, APIKey: y.APIKey, PublicURL: pub}
 }
 
 // ServerPort returns the fixed HTTP server port.
@@ -148,16 +148,16 @@ func (c *Config) ServerPort() int { return ServerPort }
 func (c *Config) PollInterval() time.Duration { return c.PollIntervalCfg.D }
 
 // LoggingLevel returns the configured log level.
-func (c *Config) LoggingLevel() api.LogLevel { return c.Logging.Level }
+func (c *Config) LoggingLevel() subflux.LogLevel { return c.Logging.Level }
 
 // LoggingFormat returns the configured log format.
-func (c *Config) LoggingFormat() api.LogFormat { return c.Logging.Format }
+func (c *Config) LoggingFormat() subflux.LogFormat { return c.Logging.Format }
 
 // LanguageRulesForUI returns the raw (unexpanded) language rules for the UI.
-func (c *Config) LanguageRulesForUI() api.LanguageRulesJSON {
-	result := api.LanguageRulesJSON{}
+func (c *Config) LanguageRulesForUI() subflux.LanguageRulesJSON {
+	result := subflux.LanguageRulesJSON{}
 	for _, rule := range c.Languages.Rules {
-		jr := api.AudioRuleJSON{Audio: rule.Audio}
+		jr := subflux.AudioRuleJSON{Audio: rule.Audio}
 		for i := range rule.Subtitles {
 			jr.Subtitles = append(jr.Subtitles, yamlTargetToJSON(&rule.Subtitles[i]))
 		}
@@ -169,8 +169,8 @@ func (c *Config) LanguageRulesForUI() api.LanguageRulesJSON {
 	return result
 }
 
-// yamlTargetToJSON converts a yamlSubtitleTarget to api.SubtitleTargJSON for the UI.
-func yamlTargetToJSON(t *yamlSubtitleTarget) api.SubtitleTargJSON {
+// yamlTargetToJSON converts a yamlSubtitleTarget to subflux.SubtitleTargJSON for the UI.
+func yamlTargetToJSON(t *yamlSubtitleTarget) subflux.SubtitleTargJSON {
 	providers := make([]string, 0, len(t.Providers))
 	for _, p := range t.Providers {
 		providers = append(providers, string(p))
@@ -179,7 +179,7 @@ func yamlTargetToJSON(t *yamlSubtitleTarget) api.SubtitleTargJSON {
 	for _, e := range t.Exclude {
 		exclude = append(exclude, string(e))
 	}
-	return api.SubtitleTargJSON{
+	return subflux.SubtitleTargJSON{
 		MinScore:  t.MinScore,
 		Code:      t.Code,
 		Variant:   t.Variant,
@@ -199,16 +199,16 @@ func yamlTargetToJSON(t *yamlSubtitleTarget) api.SubtitleTargJSON {
 // operator configured to skip, or stop searching media with no rule at all.
 // The shape to reach for if this ever needs revisiting is (targets, matched
 // bool), which states the same thing without leaning on nil.
-func nonNilTargets(targets []api.SubtitleTarget) []api.SubtitleTarget {
+func nonNilTargets(targets []subflux.SubtitleTarget) []subflux.SubtitleTarget {
 	if targets == nil {
-		return []api.SubtitleTarget{}
+		return []subflux.SubtitleTarget{}
 	}
 	return targets
 }
 
 // matchRule returns the subtitle targets for a matching audio language rule,
 // or nil if no rule matches. Does not fall back to defaults.
-func (c *Config) matchRule(audioLang string) []api.SubtitleTarget {
+func (c *Config) matchRule(audioLang string) []subflux.SubtitleTarget {
 	if c.cachedRuleTargets != nil {
 		targets, ok := c.cachedRuleTargets[audioLang]
 		if !ok {

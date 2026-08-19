@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -306,7 +306,7 @@ func TestBadRequestC_emits_typed_envelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/x", http.NoBody)
 	req = req.WithContext(webhttp.WithRequestID(req.Context(), "abc123"))
 
-	BadRequestC(rec, req, api.CodeBadRequest, "bad input")
+	BadRequestC(rec, req, subflux.CodeBadRequest, "bad input")
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
@@ -318,8 +318,8 @@ func TestBadRequestC_emits_typed_envelope(t *testing.T) {
 	if envelope.Error != "bad input" {
 		t.Errorf("error = %q, want %q", envelope.Error, "bad input")
 	}
-	if envelope.Code != webhttp.ErrorCode(api.CodeBadRequest) {
-		t.Errorf("code = %q, want %q", envelope.Code, api.CodeBadRequest)
+	if envelope.Code != webhttp.ErrorCode(subflux.CodeBadRequest) {
+		t.Errorf("code = %q, want %q", envelope.Code, subflux.CodeBadRequest)
 	}
 	if envelope.RequestID != "abc123" {
 		t.Errorf("request_id = %q, want %q", envelope.RequestID, "abc123")

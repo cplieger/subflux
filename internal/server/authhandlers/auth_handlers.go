@@ -8,8 +8,8 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- POST /api/auth/login ---
@@ -17,7 +17,7 @@ import (
 // HandleLogin handles POST /api/auth/login — authenticates with username and password.
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if cfg := h.Config(); cfg != nil && !cfg.BasicAuthEnabled() {
-		httpapi.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
+		httpapi.ForbiddenC(w, r, subflux.CodeForbidden, "password login is disabled")
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Audit(r, slog.LevelWarn, AuditLoginRateLimited, false, req.Username,
 			slog.Int("retry_after_seconds", int(retryAfter.Seconds())+1))
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		httpapi.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	dbCancel()
 	if err != nil {
 		slog.Error("login: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
-		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
-		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "invalid_password"))
-		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	h.RateLimiter.Reset(rlIP, rlUser)
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
@@ -127,11 +127,11 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	dbCancel()
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	httpapi.WriteJSON(w, api.SetupStatus{
+	httpapi.WriteJSON(w, subflux.SetupStatus{
 		SetupRequired: count == 0,
 		ConfigValid:   h.Configured(),
 	})
@@ -151,11 +151,11 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username required")
 		return
 	}
 	if len([]rune(req.Username)) > maxUsernameLen {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username too long")
 		return
 	}
 
@@ -172,12 +172,12 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 		CheckBreach: checkBreach,
 	}, h.HTTPClient)
 	if userMsg != "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, userMsg)
 		return
 	}
 	if err != nil {
 		slog.Error("setup: hash password", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -186,11 +186,11 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	count, err := h.Store.UserCount(ctx)
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if count > 0 {
-		httpapi.ConflictC(w, r, api.CodeSetupAlreadyComplete, "setup already completed")
+		httpapi.ConflictC(w, r, subflux.CodeSetupAlreadyComplete, "setup already completed")
 		return
 	}
 
@@ -206,7 +206,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.Store.CreateUser(ctx, user); err != nil {
 		slog.Error("setup: create user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -214,7 +214,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("setup: create session", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 	}
 }
 
@@ -238,7 +238,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		canLinkOIDC = false
 	}
 
-	httpapi.WriteJSON(w, api.MeResponse{
+	httpapi.WriteJSON(w, subflux.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // sampleRecords returns one fully-populated value of each core-domain record
@@ -17,9 +17,9 @@ func sampleRecords() []any {
 	return []any{
 		&attemptRec{LastTried: base, NextRetry: base.Add(time.Hour), Failures: 3},
 		&stateRec{
-			ID: 4242, MediaType: api.MediaTypeEpisode, MediaID: "tt0903747-s01e01",
-			Language: "fr", Variant: api.VariantStandard,
-			Provider:    api.ProviderNameOpenSubtitles,
+			ID: 4242, MediaType: subflux.MediaTypeEpisode, MediaID: "tt0903747-s01e01",
+			Language: "fr", Variant: subflux.VariantStandard,
+			Provider:    subflux.ProviderNameOpenSubtitles,
 			ReleaseName: "Show.S01E01.1080p.WEB-DL", Path: "/media/tv/Show/Show.S01E01.fr.srt",
 			Title: "Show", ImdbID: "tt0903747", ReleaseTag: "WEB-DL",
 			Score: 92, Season: 1, Episode: 1, Manual: true,

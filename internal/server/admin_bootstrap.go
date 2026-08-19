@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -32,7 +32,7 @@ func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
 	// (1 MiB) with an http.MaxBytesReader and, on any decode failure (including
 	// trailing data past the single JSON object), writes the 400 envelope
 	// {error,code:"bad_request",request_id} — byte-identical to the previous
-	// httpapi.BadRequestC(api.CodeBadRequest) since both route through
+	// httpapi.BadRequestC(subflux.CodeBadRequest) since both route through
 	// webhttp.WriteError.
 	if !webhttp.DecodeBody(w, r, &req, "invalid request body") {
 		return
@@ -44,13 +44,13 @@ func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
 	case "generate-api-key":
 		s.bootstrapGenerateAPIKey(w, r, req.Username, req.Label)
 	default:
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "unknown action: "+req.Action)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "unknown action: "+req.Action)
 	}
 }
 
 func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, username, password string) {
 	if username == "" || password == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username and password are required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username and password are required")
 		return
 	}
 
@@ -58,28 +58,28 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 	user, found, err := s.authStore.GetUserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: reset-password lookup", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if !found {
-		httpapi.NotFoundC(w, r, api.CodeNotFound, "user not found: "+username)
+		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "user not found: "+username)
 		return
 	}
 
 	if errLen := auth.ValidateSoloPasswordLength(password); errLen != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, errLen.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errLen.Error())
 		return
 	}
 	pctx := auth.PasswordContext{Username: username, ForbiddenWords: []string{"subflux"}}
 	if errCtx := auth.ValidatePasswordContext(password, pctx); errCtx != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, errCtx.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errCtx.Error())
 		return
 	}
 
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		slog.Error("admin bootstrap: hash password", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -87,7 +87,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 	user.UpdatedAt = time.Now()
 	if err := s.authStore.UpdateUser(ctx, user); err != nil {
 		slog.Error("admin bootstrap: update user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 
 func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request, username, label string) {
 	if username == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username is required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username is required")
 		return
 	}
 
@@ -109,18 +109,18 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	user, found, err := s.authStore.GetUserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: generate-api-key lookup", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if !found {
-		httpapi.NotFoundC(w, r, api.CodeNotFound, "user not found: "+username)
+		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "user not found: "+username)
 		return
 	}
 
 	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		slog.Error("admin bootstrap: generate api key", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	}
 	if err := s.authStore.CreateAPIKey(ctx, apiKey); err != nil {
 		slog.Error("admin bootstrap: store api key", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 

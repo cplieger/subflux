@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ScanItem holds either an episode or a movie for alphabetical scanning.
@@ -83,7 +83,7 @@ func ScanItemTitle(item ScanItem) string {
 }
 
 // SkipResumed checks if a scan item was already processed recently.
-func SkipResumed(item ScanItem, recent map[string]bool, stats *api.ScanStats) bool {
+func SkipResumed(item ScanItem, recent map[string]bool, stats *subflux.ScanStats) bool {
 	if recent == nil {
 		return false
 	}

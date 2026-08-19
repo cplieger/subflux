@@ -7,11 +7,11 @@ import (
 	"os"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // precheckImportPath verifies the imported video still exists on disk and that
@@ -68,7 +68,7 @@ func (p *Poller) processPollImport(
 
 	slog.Info("poll: import detected",
 		"media", result.Label, "path", path)
-	p.deps.Metrics.RecordImport(api.PollKey(result.Source))
+	p.deps.Metrics.RecordImport(subflux.PollKey(result.Source))
 
 	searchResult, searchErr := ls.Engine.SearchTargets(ctx, result.Req, path, result.Targets)
 	queried = searchResult.ProviderQueried()

@@ -3,7 +3,7 @@ package subdl
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -23,8 +23,8 @@ func TestFactory_with_api_key(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory() unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameSubDL {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameSubDL)
+	if p.Name() != subflux.ProviderNameSubDL {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameSubDL)
 	}
 }
 

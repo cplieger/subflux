@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/obs"
@@ -24,6 +23,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -62,13 +62,13 @@ type httpStubProvider struct {
 	name string
 }
 
-func (p *httpStubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *httpStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *httpStubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *httpStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -242,7 +242,7 @@ func TestHandleManualDownload_provider_not_found(t *testing.T) {
 // dlFailingProvider returns an error from Download.
 type dlFailingProvider struct{ httpStubProvider }
 
-func (p *dlFailingProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, errHTTPFake
 }
 
@@ -379,7 +379,7 @@ func TestHandleClearLock_success(t *testing.T) {
 // clearLockErrorStore is a minimal store whose ClearManualLock fails.
 type clearLockErrorStore struct{ testsupport.NopStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.ManualLockKey) error {
+func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
 	return errHTTPFake
 }
 
@@ -470,10 +470,10 @@ func TestHandleManualSearch_invalid_media_type_returns_400(t *testing.T) {
 type resultProvider struct {
 	httpStubProvider
 
-	results []api.Subtitle
+	results []subflux.Subtitle
 }
 
-func (p *resultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *resultProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return p.results, nil
 }
 
@@ -482,7 +482,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
 		[]provider.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
 					MatchedBy: "imdb", ID: "sub-1",
@@ -522,7 +522,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 // searchFailingProvider returns an error from Search.
 type searchFailingProvider struct{ httpStubProvider }
 
-func (p *searchFailingProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, errHTTPFake
 }
 
@@ -533,7 +533,7 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 			&searchFailingProvider{httpStubProvider{name: "bad"}},
 			&resultProvider{
 				httpStubProvider: httpStubProvider{name: "good"},
-				results: []api.Subtitle{
+				results: []subflux.Subtitle{
 					{
 						Provider: "good", Language: "fr", ReleaseName: "Movie-GRP",
 						MatchedBy: "imdb", ID: "sub-1",
@@ -565,13 +565,13 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 
 // downloadedRefsStore tracks DownloadedRefs calls and returns configured values.
 type downloadedRefsStore struct {
-	refs []api.DownloadedRef
+	refs []subflux.DownloadedRef
 	testsupport.NopStore
 
 	called bool
 }
 
-func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ api.MediaType, _, _ string) ([]api.DownloadedRef, error) {
+func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ subflux.MediaType, _, _ string) ([]subflux.DownloadedRef, error) {
 	m.called = true
 	return m.refs, nil
 }
@@ -579,7 +579,7 @@ func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ api.MediaType,
 func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 	t.Parallel()
 	db := &downloadedRefsStore{
-		refs: []api.DownloadedRef{
+		refs: []subflux.DownloadedRef{
 			{ReleaseName: "Movie.2024.BluRay-GRP", Provider: "os"},
 			// A second historical download — both should show as on-disk.
 			{ReleaseName: "Movie.2024.WEB-DL-OTHER", Provider: "subdl"},
@@ -588,7 +588,7 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 	h, _ := newHTTPHarness(db, fakeManualCfg{},
 		[]provider.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
 					MatchedBy: "imdb", ID: "sub-1",

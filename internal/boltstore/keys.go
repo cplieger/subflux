@@ -3,9 +3,9 @@ package boltstore
 import (
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/buckets"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Bucket names. bbolt is a single file of top-level buckets, each an ordered
@@ -77,7 +77,7 @@ var (
 // All four components are NUL-free text, so the key prefix-scans cleanly by
 // triplePrefix (all providers for a triple) and round-trips through
 // [kv.Split].
-func attemptKey(mt api.MediaType, mid, lang string, p api.ProviderID) []byte {
+func attemptKey(mt subflux.MediaType, mid, lang string, p subflux.ProviderID) []byte {
 	return kv.Join(string(mt), mid, lang, string(p))
 }
 
@@ -114,7 +114,7 @@ func parseStateKey(key []byte) (id int64, ok bool) {
 // dimension); for ix_state_quad it spans ALL variants of the language, which is
 // exactly what the language-scoped reads (DownloadedRefs, any-variant lock
 // checks) want.
-func triplePrefix(mt api.MediaType, mid, lang string) []byte {
+func triplePrefix(mt subflux.MediaType, mid, lang string) []byte {
 	return append(kv.Join(string(mt), mid, lang), kv.Sep)
 }
 
@@ -125,7 +125,7 @@ func triplePrefix(mt api.MediaType, mid, lang string) []byte {
 // It extends triplePrefix by the variant component, so a quad scan for
 // fr/standard never matches fr/forced rows, and triplePrefix remains a strict
 // prefix of every quad key (language-wide scans keep working).
-func quadPrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte {
+func quadPrefix(mt subflux.MediaType, mid, lang string, variant subflux.Variant) []byte {
 	return append(kv.Join(string(mt), mid, lang, string(variant)), kv.Sep)
 }
 
@@ -133,7 +133,7 @@ func quadPrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte 
 // exact-variant quadPrefix, or the all-variants triplePrefix when variant is
 // empty. It is the single place the "empty variant means every variant of the
 // language" convention of the lock-domain reads is implemented.
-func statePrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte {
+func statePrefix(mt subflux.MediaType, mid, lang string, variant subflux.Variant) []byte {
 	if variant == "" {
 		return triplePrefix(mt, mid, lang)
 	}
@@ -146,7 +146,7 @@ func statePrefix(mt api.MediaType, mid, lang string, variant api.Variant) []byte
 //
 // Used for all-rows-for-a-media-item scans. The trailing separator keeps mid
 // "tt1" from matching a key for mid "tt12".
-func mediaPrefix(mt api.MediaType, mid string) []byte {
+func mediaPrefix(mt subflux.MediaType, mid string) []byte {
 	return append(kv.Join(string(mt), mid), kv.Sep)
 }
 
@@ -158,7 +158,7 @@ func mediaPrefix(mt api.MediaType, mid string) []byte {
 // no media-id filter). A media-id PREFIX filter (e.g. "tvdb-111-") appends the
 // prefix bytes after this separator, which is why the boundary after the type
 // must already be sealed by the trailing 0x00.
-func typePrefix(mt api.MediaType) []byte {
+func typePrefix(mt subflux.MediaType) []byte {
 	return append([]byte(mt), kv.Sep)
 }
 
@@ -171,7 +171,7 @@ func typePrefix(mt api.MediaType) []byte {
 // lang and variant live in the key so per-media coverage counts come from a
 // key-only prefix walk. Filesystem paths are NUL-free, so the key round-trips
 // through [kv.Split].
-func subtitleFileKey(mt api.MediaType, mid, lang string, variant api.Variant, source api.SubtitleSource, path string) []byte {
+func subtitleFileKey(mt subflux.MediaType, mid, lang string, variant subflux.Variant, source subflux.SubtitleSource, path string) []byte {
 	return kv.Join(string(mt), mid, lang, string(variant), string(source), path)
 }
 
@@ -179,7 +179,7 @@ func subtitleFileKey(mt api.MediaType, mid, lang string, variant api.Variant, so
 
 // scanStateKey builds the scan_state primary key: mt 0x00 mid. One row per
 // (media_type, media_id).
-func scanStateKey(mt api.MediaType, mid string) []byte {
+func scanStateKey(mt subflux.MediaType, mid string) []byte {
 	return kv.Join(string(mt), mid)
 }
 
@@ -195,7 +195,7 @@ func syncOffsetKey(path string) []byte {
 
 // pollStateKey builds the poll_state primary key from the canonical PollKey
 // ("sonarr" / "radarr").
-func pollStateKey(k api.PollKey) []byte {
+func pollStateKey(k subflux.PollKey) []byte {
 	return []byte(k)
 }
 
@@ -205,7 +205,7 @@ func pollStateKey(k api.PollKey) []byte {
 // 0x00 be64(id). It shares quadPrefix / triplePrefix / mediaPrefix, so all rows
 // for a quad, a language, or a media item are a prefix scan; the trailing
 // be64(id) makes each entry unique and dereferences to the primary.
-func stateQuadKey(mt api.MediaType, mid, lang string, variant api.Variant, id int64) []byte {
+func stateQuadKey(mt subflux.MediaType, mid, lang string, variant subflux.Variant, id int64) []byte {
 	return append(quadPrefix(mt, mid, lang, variant), stateKey(id)...)
 }
 

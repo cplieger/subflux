@@ -1,4 +1,4 @@
-package api
+package subflux
 
 import (
 	"encoding/json"

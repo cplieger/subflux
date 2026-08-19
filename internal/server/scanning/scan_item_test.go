@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ExtractAltTitles returns the alternative titles that differ from the
@@ -30,7 +30,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 		series *arrapi.Series
 		ep     *arrapi.Episode
 		langs  []string
-		want   api.SearchRequest
+		want   subflux.SearchRequest
 	}{
 		{
 			name: "scene name and original language",
@@ -56,7 +56,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				},
 			},
 			langs: []string{"en", "fr"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:             "Breaking Bad",
 				AlternativeTitles: []string{"BrBa"},
 				EpisodeTitle:      "Pilot",
@@ -70,7 +70,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				TvdbID:            81189,
 				Languages:         []string{"en", "fr"},
 				ReleaseName:       "Breaking.Bad.S01E01.720p",
-				MediaType:         api.MediaTypeEpisode,
+				MediaType:         subflux.MediaTypeEpisode,
 				AudioLang:         "en",
 			},
 		},
@@ -92,7 +92,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				},
 			},
 			langs: []string{"en"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:        "Anime",
 				EpisodeTitle: "Ep1",
 				Year:         2010,
@@ -102,7 +102,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				TvdbID:       5,
 				Languages:    []string{"en"},
 				ReleaseName:  "/anime/ep.mkv",
-				MediaType:    api.MediaTypeEpisode,
+				MediaType:    subflux.MediaTypeEpisode,
 				AudioLang:    "ja",
 			},
 		},
@@ -120,7 +120,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				EpisodeNumber: 4,
 			},
 			langs: []string{"de"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:        "NoFile",
 				EpisodeTitle: "EpX",
 				Year:         2020,
@@ -129,7 +129,7 @@ func TestEpisodeSearchRequest(t *testing.T) {
 				ImdbID:       "tt2",
 				TvdbID:       7,
 				Languages:    []string{"de"},
-				MediaType:    api.MediaTypeEpisode,
+				MediaType:    subflux.MediaTypeEpisode,
 			},
 		},
 	}
@@ -154,7 +154,7 @@ func TestMovieSearchRequest(t *testing.T) {
 		name  string
 		movie *arrapi.Movie
 		langs []string
-		want  api.SearchRequest
+		want  subflux.SearchRequest
 	}{
 		{
 			name: "scene name and original language",
@@ -172,7 +172,7 @@ func TestMovieSearchRequest(t *testing.T) {
 				},
 			},
 			langs: []string{"en"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:             "Inception",
 				AlternativeTitles: []string{"Origin"},
 				Year:              2010,
@@ -180,7 +180,7 @@ func TestMovieSearchRequest(t *testing.T) {
 				TmdbID:            27205,
 				Languages:         []string{"en"},
 				ReleaseName:       "Inception.2010.1080p",
-				MediaType:         api.MediaTypeMovie,
+				MediaType:         subflux.MediaTypeMovie,
 				AudioLang:         "en",
 			},
 		},
@@ -197,14 +197,14 @@ func TestMovieSearchRequest(t *testing.T) {
 				},
 			},
 			langs: []string{"fr"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:       "Amelie",
 				Year:        2001,
 				ImdbID:      "tt3",
 				TmdbID:      194,
 				Languages:   []string{"fr"},
 				ReleaseName: "/movies/amelie.mkv",
-				MediaType:   api.MediaTypeMovie,
+				MediaType:   subflux.MediaTypeMovie,
 				AudioLang:   "fr",
 			},
 		},
@@ -217,13 +217,13 @@ func TestMovieSearchRequest(t *testing.T) {
 				TmdbID: 99,
 			},
 			langs: []string{"es"},
-			want: api.SearchRequest{
+			want: subflux.SearchRequest{
 				Title:     "NoFile",
 				Year:      2022,
 				ImdbID:    "tt4",
 				TmdbID:    99,
 				Languages: []string{"es"},
-				MediaType: api.MediaTypeMovie,
+				MediaType: subflux.MediaTypeMovie,
 			},
 		},
 	}

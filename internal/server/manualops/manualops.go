@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // MaxResults caps the number of results returned by manual search.
@@ -24,20 +24,20 @@ const MaxLangCodeLen = 20
 
 // SearchResult is a single result returned by the manual search API.
 type SearchResult struct {
-	Matches     map[string]int `json:"matches,omitempty"`
-	Provider    api.ProviderID `json:"provider"`
-	Language    string         `json:"language"`
-	ReleaseName string         `json:"release_name"`
-	MatchedBy   string         `json:"matched_by"`
-	SubtitleID  string         `json:"subtitle_id"`
+	Matches     map[string]int     `json:"matches,omitempty"`
+	Provider    subflux.ProviderID `json:"provider"`
+	Language    string             `json:"language"`
+	ReleaseName string             `json:"release_name"`
+	MatchedBy   string             `json:"matched_by"`
+	SubtitleID  string             `json:"subtitle_id"`
 	// Tier is the score's quality-tier label, computed server-side by the
 	// scorer (same table as /api/score): the remote CLI renders it and has
 	// no scorer of its own.
-	Tier       api.ScoreTier `json:"tier"`
-	Score      int           `json:"score"`
-	HearingImp bool          `json:"hearing_impaired"`
-	Forced     bool          `json:"forced"`
-	OnDisk     bool          `json:"on_disk"`
+	Tier       subflux.ScoreTier `json:"tier"`
+	Score      int               `json:"score"`
+	HearingImp bool              `json:"hearing_impaired"`
+	Forced     bool              `json:"forced"`
+	OnDisk     bool              `json:"on_disk"`
 }
 
 // WarnRecorder records an actionable warning for the UI's alert list.
@@ -57,10 +57,10 @@ type SearchDeps struct {
 // SearchStore is the two rows a manual search touches: what is already on disk
 // for the language (the popup's "downloaded" markers) and releasing a lock.
 // 2 of the 36 methods the store offers. The lock key's empty variant means
-// "all variants of the language" (see api.ManualLockKey).
+// "all variants of the language" (see subflux.ManualLockKey).
 type SearchStore interface {
-	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
+	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
+	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
 
 // ActivityTracker manages activity lifecycle. Progress doubles as the
@@ -101,8 +101,8 @@ type EventPublisher interface {
 // the query path's timeout controls are not the manual path's business.
 type manualEngine interface {
 	HashFile(ctx context.Context, path string) (hash string, size int64, err error)
-	ScoreSubtitles(req *api.SearchRequest, results []api.Subtitle) []api.ScoredResult
-	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant api.Variant) (synced []byte, offsetMs int64)
+	ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult
+	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant subflux.Variant) (synced []byte, offsetMs int64)
 }
 
 // tierLabeller maps a numeric score onto the tier label the manual-search
@@ -110,7 +110,7 @@ type manualEngine interface {
 // scored these candidates by the time they reach this package, so the manual
 // path never scores anything itself.
 type tierLabeller interface {
-	ScoreToTier(score int) api.ScoreTier
+	ScoreToTier(score int) subflux.ScoreTier
 }
 
 // pathValidator is the containment check a manual download runs before it
@@ -140,9 +140,9 @@ type LiveState struct {
 // isValidLockVariant accepts the canonical variants plus empty (empty means
 // "all variants" on clear-lock). Anything else is rejected so a typo never
 // silently no-ops against a variant that cannot exist.
-func isValidLockVariant(v api.Variant) bool {
+func isValidLockVariant(v subflux.Variant) bool {
 	switch v {
-	case "", api.VariantStandard, api.VariantHI, api.VariantForced:
+	case "", subflux.VariantStandard, subflux.VariantHI, subflux.VariantForced:
 		return true
 	default:
 		return false

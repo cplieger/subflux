@@ -6,9 +6,9 @@ import (
 	"net"
 	"slices"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -17,14 +17,14 @@ import (
 // a config: filtering and sorting is all it does, so the config was never an
 // input — it was a one-method anonymous interface wrapped around a map lookup,
 // and a fake existed in the tests solely to supply it.
-func enabledProviders(providers map[api.ProviderID]api.ProviderCfg) []api.ProviderID {
-	var names []api.ProviderID
+func enabledProviders(providers map[subflux.ProviderID]subflux.ProviderCfg) []subflux.ProviderID {
+	var names []subflux.ProviderID
 	for name, pcfg := range providers {
 		if pcfg.Enabled {
 			names = append(names, name)
 		}
 	}
-	slices.SortFunc(names, func(a, b api.ProviderID) int {
+	slices.SortFunc(names, func(a, b subflux.ProviderID) int {
 		if a < b {
 			return -1
 		}

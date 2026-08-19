@@ -34,7 +34,7 @@
 // (github.com/cplieger/webhttp): jsonHeaders/WriteJSON/WriteJSONStatus/Ok and
 // the writeError envelope delegate to webhttp's mechanism, so the wire shape is
 // defined once in the library and stays byte-identical across every consumer.
-// subflux keeps its ~70-code taxonomy (api.ErrorCode, which stays in the types
+// subflux keeps its ~70-code taxonomy (subflux.ErrorCode, which stays in the types
 // package because the wire generator discovers the enum there) and the
 // BadRequestC-style named helpers on top; they just delegate now.
 //
@@ -48,7 +48,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -109,7 +109,7 @@ func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
 // author-controlled or explicitly user-safe message. For wrapped internal
 // errors, use InternalErrorC(w, r, err, code), which logs the raw error and
 // returns a generic message.
-func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode, msg string) {
+func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code subflux.ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }
 
@@ -124,6 +124,6 @@ func Ok(w http.ResponseWriter) {
 // delegates to webhttp.WriteError, which builds the {error,code,request_id}
 // envelope and pulls the request id from r's context (nil-safe on r). The wire
 // shape is identical to the previous hand-built errorResponse.
-func writeError(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode, msg string) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, code subflux.ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }

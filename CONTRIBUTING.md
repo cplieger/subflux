@@ -66,7 +66,8 @@ The only files that import concrete implementations:
   codec-usability policy via the top-level `embedded_subtitles` config
   section.
 - `scorer/`: release scoring with configurable weights.
-- `boltstore/`: the bbolt store (implements `api.Store`); `store/kv` holds
+- `boltstore/`: the bbolt store (implements the narrow store interfaces its
+  consumers declare); `store/kv` holds
   the engine-agnostic key/codec helpers and `store/storetest` the contract
   suite. `authstore/` implements the auth store (durable bbolt + ephemeral
   in-memory).
@@ -81,7 +82,7 @@ The only files that import concrete implementations:
   `ParseAndValidate` pass plus help rendering).
 
 Dependencies flow one way: composition roots → `internal/server/` → domain
-packages → `internal/api/`. There are no reverse imports.
+packages → `internal/subflux/`. There are no reverse imports.
 
 ### Frontend (`internal/server/static-src/`)
 
@@ -100,7 +101,7 @@ concatenated via `MANIFEST` files by the same bundle command.
 These exist because breaking them caused real bugs, or because a test fails
 CI when they drift.
 
-- **Dependencies flow one way.** New code depends on `internal/api`
+- **Dependencies flow one way.** New code depends on `internal/subflux`
   interfaces, never sideways into another domain package's concretes.
 - **Providers are registry-driven.** No `init()`, no blank imports, no global
   state. A provider is one package plus one `providerEntries` row; the
@@ -121,7 +122,7 @@ CI when they drift.
   through `github.com/cplieger/atomicfile` (temp → fsync → rename); writes
   refuse symlink targets. Don't reach for `os.WriteFile`.
 - **External input is bounded.** Downloads, archive extraction, and parsing
-  paths cap sizes and validate content (`api.ValidateSubtitleData`, the
+  paths cap sizes and validate content (`subtitlefile.Validate`, the
   zip-bomb guards, `maxAlignSpans`/`maxAlignEvents` in subsync). Keep new
   input paths bounded the same way.
 - **Manual locks gate automation.** Every automated search checks
@@ -136,7 +137,7 @@ CI when they drift.
   unexported by design) and registered as a plain step callback. The
   irreplaceable set (users, passkeys, API keys, manual locks/history, sync
   offsets) must survive every migration path by construction.
-- **HTTP responses go through the `api` helpers.** Don't hand-craft JSON
+- **HTTP responses go through the `httpapi` helpers.** Don't hand-craft JSON
   error strings.
 - **Logs are UTC.** The `slogx` library forces every record's timestamp to
   UTC, so the container needs no `TZ` and the binary embeds no

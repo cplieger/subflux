@@ -19,7 +19,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // mediaPrefixRe validates media ID prefix parameters. Accepts:
@@ -41,18 +41,18 @@ func ValidPrefix(prefix string) bool {
 // Build creates a stable identifier for a media item from a search request.
 // Movies use TMDB ID (canonical for Radarr), episodes use TVDB ID (canonical for Sonarr).
 // IMDB is only used as a last resort fallback.
-func Build(req *api.SearchRequest) string {
+func Build(req *subflux.SearchRequest) string {
 	if req == nil {
 		return ""
 	}
 	switch req.MediaType {
-	case api.MediaTypeMovie:
+	case subflux.MediaTypeMovie:
 		return Movie(req.TmdbID, req.ImdbID)
-	case api.MediaTypeEpisode:
+	case subflux.MediaTypeEpisode:
 		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
 	default:
 		// Legacy fallthrough: treat unknown types as episodes so older
-		// scan state with missing api.MediaType still resolves.
+		// scan state with missing subflux.MediaType still resolves.
 		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
 	}
 }

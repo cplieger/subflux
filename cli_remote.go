@@ -18,9 +18,9 @@ import (
 
 	"github.com/cplieger/envx/v2"
 	"github.com/cplieger/runesafe/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/apipaths"
 	"github.com/cplieger/subflux/internal/cliparse"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // cliClient is the shared HTTP client for the quick remote commands. Its
@@ -327,8 +327,8 @@ func rawJSONFormat(p cliparse.Params) bool {
 // (media_type, media_id) identity (arr ID) plus the stable search IDs the
 // search leg forwards.
 type cliResolvedItem struct {
-	MediaType api.MediaType `json:"media_type"`
-	Title     string        `json:"title"`
+	MediaType subflux.MediaType `json:"media_type"`
+	Title     string            `json:"title"`
 	SearchIDs struct {
 		Imdb string `json:"imdb,omitempty"`
 		Tvdb int    `json:"tvdb,omitempty"`
@@ -343,10 +343,10 @@ type cliResolvedItem struct {
 // cliResolveCandidate mirrors one ambiguity candidate (year disambiguates
 // equal titles).
 type cliResolveCandidate struct {
-	Title     string        `json:"title"`
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   int           `json:"media_id"`
-	Year      int           `json:"year,omitempty"`
+	Title     string            `json:"title"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   int               `json:"media_id"`
+	Year      int               `json:"year,omitempty"`
 }
 
 // cliResolveResponse mirrors the resolve endpoint's typed response.
@@ -492,7 +492,7 @@ func titleWithYear(title string, year int) string {
 // itemLabel returns the human-readable heading for one resolved item,
 // matching the pre-remote CLI's labels.
 func itemLabel(item *cliResolvedItem) string {
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		return fmt.Sprintf("%s S%02dE%02d", item.Title, item.Season, item.Episode)
 	}
 	return fmt.Sprintf("%s (%d)", item.Title, item.Year)
@@ -510,7 +510,7 @@ func searchOneItem(rc *searchRunConfig, item *cliResolvedItem, lang string, down
 	// media_id (the arr ID) lets the server resolve the video path for
 	// hash-based search and release-name defaulting (S7: no client paths).
 	qv.Set(keyMediaID, strconv.Itoa(item.MediaID))
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		qv.Set(flagSeason, strconv.Itoa(item.Season))
 		qv.Set(flagEpisode, strconv.Itoa(item.Episode))
 	}
@@ -635,7 +635,7 @@ func downloadPick(rc *searchRunConfig, item *cliResolvedItem, results []cliSearc
 		"hearing_impaired": chosen.HearingImp,
 		"forced":           chosen.Forced,
 	}
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		payload[flagSeason] = item.Season
 		payload[flagEpisode] = item.Episode
 	}

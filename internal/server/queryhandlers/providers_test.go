@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // stubProvider implements provider.Provider for provider-listing tests.
@@ -18,13 +18,13 @@ type stubProvider struct {
 	name string
 }
 
-func (p *stubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *stubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *stubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *stubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *stubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -43,7 +43,7 @@ func newStateHandler(cfg *fakeQueryCfg, providers []provider.Provider) *Handler 
 func TestHandleProviders_returns_provider_info(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		providers: map[api.ProviderID]api.ProviderCfg{
+		providers: map[subflux.ProviderID]subflux.ProviderCfg{
 			"opensubtitles": {Enabled: true},
 			"yify":          {Enabled: false},
 		},
@@ -109,7 +109,7 @@ func TestHandleProviders_rejects_non_get(t *testing.T) {
 func TestHandleProviders_empty_config_returns_empty_array(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		providers: map[api.ProviderID]api.ProviderCfg{},
+		providers: map[subflux.ProviderID]subflux.ProviderCfg{},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -171,7 +171,7 @@ func TestHandleProviderTimeout_not_configured_returns_disabled(t *testing.T) {
 func TestHandleProviderTimeout_enabled_returns_providers(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		searchCfg: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
+		searchCfg: subflux.SearchConfig{ProviderTimeout: 2 * time.Hour},
 	}
 	h := newEngineHandler(cfg)
 
@@ -237,7 +237,7 @@ func TestHandleProviderTimeoutReset_not_configured_returns_disabled(t *testing.T
 func TestHandleProviderTimeoutReset_enabled_resets(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		searchCfg: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
+		searchCfg: subflux.SearchConfig{ProviderTimeout: 2 * time.Hour},
 	}
 	h := newEngineHandler(cfg)
 
@@ -264,7 +264,7 @@ func TestHandleProviderTimeoutReset_enabled_resets(t *testing.T) {
 func TestHandleSearchTargets_returns_targets(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		targets: []api.SubtitleTarget{
+		targets: []subflux.SubtitleTarget{
 			{Code: "fr"},
 			{Code: "en", Variant: "hi"},
 		},
@@ -313,7 +313,7 @@ func TestHandleSearchTargets_rejects_non_get(t *testing.T) {
 func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -344,7 +344,7 @@ func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 func TestHandleSearchTargets_empty_audio_langs_param(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -410,14 +410,14 @@ func TestHandleConfigParsed_returns_structured_config(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
 		languages: []string{"fr", "en"},
-		providers: map[api.ProviderID]api.ProviderCfg{
+		providers: map[subflux.ProviderID]subflux.ProviderCfg{
 			"os": {Enabled: true},
 		},
-		searchCfg: api.SearchConfig{
+		searchCfg: subflux.SearchConfig{
 			UpgradeEnabled: true, UpgradeWindowDays: 7,
 		},
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		sonarrCfg:   api.ArrConfig{URL: "http://sonarr:8989"},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		sonarrCfg:   subflux.ArrConfig{URL: "http://sonarr:8989"},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -456,7 +456,7 @@ func TestHandleConfigParsed_includes_ignored_codecs(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
 		languages: []string{"fr"},
-		embedded:  api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
+		embedded:  subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
 	}
 	h := newStateHandler(cfg, nil)
 

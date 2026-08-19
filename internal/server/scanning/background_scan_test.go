@@ -18,10 +18,10 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -47,7 +47,7 @@ type fakeEngine struct {
 	calls   int
 }
 
-func (e *fakeEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
+func (e *fakeEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
 	e.mu.Lock()
 	e.calls++
 	n := e.calls
@@ -58,7 +58,7 @@ func (e *fakeEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ st
 	if e.release != nil {
 		<-e.release
 	}
-	return api.SearchResult{}, nil
+	return subflux.SearchResult{}, nil
 }
 
 func (e *fakeEngine) callCount() int {
@@ -67,7 +67,7 @@ func (e *fakeEngine) callCount() int {
 	return e.calls
 }
 
-func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
+func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
 	return false
 }
 
@@ -261,7 +261,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 		name      string
 		invoke    func(rig *scanRig) (int, ScanAccepted)
 		wantKind  activity.ScanKind
-		wantMedia api.MediaType
+		wantMedia subflux.MediaType
 	}{
 		{
 			name: "series",
@@ -291,7 +291,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 					`{"media_type":"episode","media_id":42,"season":1,"episode":1}`)
 			},
 			wantKind:  activity.ScanKindItem,
-			wantMedia: api.MediaTypeEpisode,
+			wantMedia: subflux.MediaTypeEpisode,
 		},
 		{
 			name: "item movie",
@@ -300,7 +300,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 					`{"media_type":"movie","media_id":7}`)
 			},
 			wantKind:  activity.ScanKindItem,
-			wantMedia: api.MediaTypeMovie,
+			wantMedia: subflux.MediaTypeMovie,
 		},
 	}
 	for _, tc := range cases {
@@ -660,7 +660,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	}
 	queue := []ScanItem{movie(1, "A"), movie(2, "B"), movie(3, "C")}
 	stop := make(chan struct{})
-	var stats api.ScanStats
+	var stats subflux.ScanStats
 
 	type result struct {
 		resumed int
@@ -860,7 +860,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 	}
 	queue := []ScanItem{movie(1, "A"), movie(2, "B"), movie(3, "C")}
 	stop := make(chan struct{})
-	var stats api.ScanStats
+	var stats subflux.ScanStats
 
 	res := make(chan activity.Outcome, 1)
 	go func() {

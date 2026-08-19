@@ -6,8 +6,8 @@ import (
 	"net/url"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Request authentication is the library's auth.Authenticator, assembled in the
@@ -49,7 +49,7 @@ func UnauthorizedResponse(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
 		return
 	}
-	httpapi.UnauthorizedC(w, r, api.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
+	httpapi.UnauthorizedC(w, r, subflux.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
 }
 
 // SanitizeForwardedProto strips the X-Forwarded-Proto header from any request

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -168,19 +168,19 @@ func TestMigrate_copyStepIdentity(t *testing.T) {
 
 	// The swapped-in handle is live: reads see the old rows, writes stick, and
 	// a fresh insert allocates past the preserved sequence.
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after copy = (%v, %v), want locked", locked, err)
 	}
-	rec := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt9", Language: "en",
-		ProviderName: api.ProviderNameOpenSubtitles, Path: "/m/tt9.en.srt", Score: 10,
-		Meta: &api.DownloadMeta{Title: "T9", VideoPath: "/m/tt9.mkv"},
+	rec := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt9", Language: "en",
+		ProviderName: subflux.ProviderNameOpenSubtitles, Path: "/m/tt9.en.srt", Score: 10,
+		Meta: &subflux.DownloadMeta{Title: "T9", VideoPath: "/m/tt9.mkv"},
 	}
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after copy: %v", err)
 	}
-	entries, err := db.GetState(ctx, &api.StateQuery{})
+	entries, err := db.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState after copy: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestMigrate_copyStepTransform(t *testing.T) {
 	if got, err := db.GetSyncOffset(ctx, "/m/tt1.fr.srt"); err != nil || got != 0 {
 		t.Errorf("dropped offset = (%d, %v), want 0 (record dropped)", got, err)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after transform copy = (%v, %v), want locked", locked, err)
 	}
@@ -343,7 +343,7 @@ func TestMigrate_copyStepRenamesBucket(t *testing.T) {
 	if got := rawStampInOpenDB(t, db, metaKeyAuthSchemaVersion); string(got) != string(authStampBefore) {
 		t.Errorf("auth stamp changed across a rename copy step: %x -> %x", authStampBefore, got)
 	}
-	if locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard}); err != nil || !locked {
+	if locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard}); err != nil || !locked {
 		t.Errorf("IsManuallyLocked after rename copy = (%v, %v), want locked", locked, err)
 	}
 	if temps := copyTempFiles(t, path); len(temps) != 0 {

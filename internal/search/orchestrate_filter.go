@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Eligibility ---
@@ -14,8 +14,8 @@ import (
 // checkUpgradeEligibility determines if an existing subtitle is eligible for upgrade.
 // Returns (currentScore, true) if eligible, (0, false) if not.
 func (e *Engine) checkUpgradeEligibility(
-	ctx context.Context, existing *existingSubs, searchCfg *api.SearchConfig,
-	mediaType api.MediaType, mediaID, lang string, variant api.Variant, title string, cutoff time.Time,
+	ctx context.Context, existing *existingSubs, searchCfg *subflux.SearchConfig,
+	mediaType subflux.MediaType, mediaID, lang string, variant subflux.Variant, title string, cutoff time.Time,
 ) (int, bool) {
 	if !existing.hasSubtitle(lang, variant) {
 		return 0, false // No subtitle on disk; not an upgrade.
@@ -75,13 +75,13 @@ func logNoResults(state *targetState, scored []scoredSub,
 // --- Pipeline filtering ---
 
 // filterProviders returns the subset of engine providers allowed for the target.
-func (e *Engine) filterProviders(target *api.SubtitleTarget) []provider.Provider {
-	allNames := make([]api.ProviderID, len(e.providers))
+func (e *Engine) filterProviders(target *subflux.SubtitleTarget) []provider.Provider {
+	allNames := make([]subflux.ProviderID, len(e.providers))
 	for i, p := range e.providers {
 		allNames[i] = p.Name()
 	}
 	allowedNames := e.cfg.ProvidersForTarget(target, allNames)
-	allowedSet := make(map[api.ProviderID]struct{}, len(allowedNames))
+	allowedSet := make(map[subflux.ProviderID]struct{}, len(allowedNames))
 	for _, n := range allowedNames {
 		allowedSet[n] = struct{}{}
 	}
@@ -97,15 +97,15 @@ func (e *Engine) filterProviders(target *api.SubtitleTarget) []provider.Provider
 // recordProviderNoResults records adaptive backoff for each provider that
 // responded successfully but returned no usable results. Providers that
 // errored are NOT penalized (their failure is infrastructure, not content).
-func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType api.MediaType, mediaID, lang, title string, succeeded []api.ProviderID) {
+func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType subflux.MediaType, mediaID, lang, title string, succeeded []subflux.ProviderID) {
 	adaptive := e.cfg.Adaptive()
 	if !adaptive.Enabled {
 		return
 	}
-	var recorded []api.ProviderID
+	var recorded []subflux.ProviderID
 	for _, prov := range succeeded {
 		if err := e.store.RecordNoResult(ctx, mediaType, mediaID, lang, prov,
-			api.BackoffParams{
+			subflux.BackoffParams{
 				InitialDelay: adaptive.InitialDelay,
 				MaxDelay:     adaptive.MaxDelay,
 				Multiplier:   adaptive.BackoffMultiplier,
@@ -127,20 +127,20 @@ func (e *Engine) recordProviderNoResults(ctx context.Context, mediaType api.Medi
 // For "standard": non-HI, non-forced (with HI fallback if no regular found).
 // For "forced": only forced subs.
 // For "hi": only HI subs.
-func filterByVariant(results []api.Subtitle, variant api.Variant) (filtered []api.Subtitle, fallback bool) {
+func filterByVariant(results []subflux.Subtitle, variant subflux.Variant) (filtered []subflux.Subtitle, fallback bool) {
 	switch variant {
-	case api.VariantForced:
+	case subflux.VariantForced:
 		return forcedSubs(results), false
-	case api.VariantHI:
+	case subflux.VariantHI:
 		return hiOnlySubs(results), false
-	default: // api.VariantStandard, "", or unknown variant
+	default: // subflux.VariantStandard, "", or unknown variant
 		return standardSubs(results)
 	}
 }
 
 // forcedSubs returns only the forced subtitles from results.
-func forcedSubs(results []api.Subtitle) []api.Subtitle {
-	var filtered []api.Subtitle
+func forcedSubs(results []subflux.Subtitle) []subflux.Subtitle {
+	var filtered []subflux.Subtitle
 	for i := range results {
 		if results[i].Forced {
 			filtered = append(filtered, results[i])
@@ -150,8 +150,8 @@ func forcedSubs(results []api.Subtitle) []api.Subtitle {
 }
 
 // hiOnlySubs returns only the hearing-impaired, non-forced subtitles.
-func hiOnlySubs(results []api.Subtitle) []api.Subtitle {
-	var filtered []api.Subtitle
+func hiOnlySubs(results []subflux.Subtitle) []subflux.Subtitle {
+	var filtered []subflux.Subtitle
 	for i := range results {
 		if results[i].HearingImp && !results[i].Forced {
 			filtered = append(filtered, results[i])
@@ -163,8 +163,8 @@ func hiOnlySubs(results []api.Subtitle) []api.Subtitle {
 // standardSubs returns regular (non-HI, non-forced) subtitles, falling back to
 // HI subtitles when no regular subtitle is found. The returned bool reports
 // whether the HI fallback was used.
-func standardSubs(results []api.Subtitle) (filtered []api.Subtitle, fallback bool) {
-	var regular, hi []api.Subtitle
+func standardSubs(results []subflux.Subtitle) (filtered []subflux.Subtitle, fallback bool) {
+	var regular, hi []subflux.Subtitle
 	for i := range results {
 		if results[i].Forced {
 			continue

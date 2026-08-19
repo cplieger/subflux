@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Behavior-stability fixtures for the embedded-detector separation (R4.2):
@@ -21,12 +21,12 @@ import (
 // coverage-retention fixtures can assert whether the full-set replacement
 // ran for a video.
 type coverageRecordingStore struct {
-	lastFiles []api.SubtitleFile
+	lastFiles []subflux.SubtitleFile
 	mockStore
 	recordCalls int
 }
 
-func (s *coverageRecordingStore) RecordSubtitleFiles(_ context.Context, _ api.MediaType, _ string, files []api.SubtitleFile) (bool, error) {
+func (s *coverageRecordingStore) RecordSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string, files []subflux.SubtitleFile) (bool, error) {
 	s.recordCalls++
 	s.lastFiles = files
 	return true, nil
@@ -40,17 +40,17 @@ func TestSearchTargets_usable_embedded_track_suppresses_search(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &coverageRecordingStore{}
-	mc := &mockConfig{embedded: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
+	mc := &mockConfig{embedded: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
 	metrics := &mockMetrics{}
 	p := &mockProvider{
 		name:    "test",
-		results: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
+		results: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 	}
-	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "srt"}}}
-	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	detector := trackDetector{tracks: []subflux.EmbeddedTrack{{Lang: "fr", Codec: "srt"}}}
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, detector)
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -74,19 +74,19 @@ func TestSearchTargets_ignored_codec_triggers_search(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &coverageRecordingStore{}
-	mc := &mockConfig{embedded: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
+	mc := &mockConfig{embedded: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
 	metrics := &mockMetrics{}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name:    "test",
-		results: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
+		results: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 		data:    subData,
 	}
-	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "pgs"}}}
-	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	detector := trackDetector{tracks: []subflux.EmbeddedTrack{{Lang: "fr", Codec: "pgs"}}}
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, detector)
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestSearchTargets_ignored_codec_triggers_search(t *testing.T) {
 	// The pgs track stays visible in the recorded coverage inventory.
 	foundPGS := false
 	for _, f := range ms.lastFiles {
-		if f.Source == api.SourceEmbedded && f.Codec == "pgs" && f.Language == "fr" {
+		if f.Source == subflux.SourceEmbedded && f.Codec == "pgs" && f.Language == "fr" {
 			foundPGS = true
 		}
 	}
@@ -118,19 +118,19 @@ func TestSearchTargets_detector_error_fail_open_coverage_retained(t *testing.T) 
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &coverageRecordingStore{}
-	mc := &mockConfig{embedded: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
+	mc := &mockConfig{embedded: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}}
 	metrics := &mockMetrics{}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name:    "test",
-		results: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
+		results: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 		data:    subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{},
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{},
 		errDetector{err: errors.New("ffprobe exploded")})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -163,10 +163,10 @@ func TestInventoryCoverage_detector_error_skips_replacement(t *testing.T) {
 	ms := &coverageRecordingStore{}
 	mc := &mockConfig{}
 	metrics := &mockMetrics{}
-	e := newEngine(nil, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{},
+	e := newEngine(nil, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{},
 		errDetector{err: errors.New("ffprobe exploded")})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
 	changed := e.InventoryCoverage(t.Context(), req, videoPath)
 	if changed {
 		t.Error("InventoryCoverage() = true, want false on detector error")
@@ -186,7 +186,7 @@ func TestDetectExistingObserved_context_cancel_not_counted(t *testing.T) {
 	ms := &coverageRecordingStore{}
 	mc := &mockConfig{}
 	metrics := &mockMetrics{}
-	e := newEngine(nil, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{},
+	e := newEngine(nil, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{},
 		errDetector{err: context.Canceled})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -217,11 +217,11 @@ func TestSearchTargets_hi_fallback_edge_no_embedded_in_scoring(t *testing.T) {
 	// External providers return NO results.
 	p := &mockProvider{name: "test"}
 	// HI-only embedded track in a usable text codec.
-	detector := trackDetector{tracks: []api.EmbeddedTrack{{Lang: "fr", Codec: "srt", HearingImpaired: true}}}
-	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, detector)
+	detector := trackDetector{tracks: []subflux.EmbeddedTrack{{Lang: "fr", Codec: "srt", HearingImpaired: true}}}
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, detector)
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
-	result, err := e.SearchTargets(t.Context(), req, videoPath, []api.SubtitleTarget{{Code: "fr"}})
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath, []subflux.SubtitleTarget{{Code: "fr"}})
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
@@ -252,5 +252,5 @@ func TestNew_nil_detector_panics(t *testing.T) {
 		}
 	}()
 	New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
-		WithScorer(scorer.New(&api.DefaultScores)), WithSyncer(Syncer{}))
+		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}))
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/passkeys ---
@@ -23,7 +23,7 @@ func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("list passkeys: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -56,14 +56,14 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("signal data: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	webauthnUser, err := authwebauthn.NewUser(user, nil)
 	if err != nil {
 		slog.Error("webauthn info: nil user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	userID := Base64URLEncode(webauthnUser.WebAuthnID())
@@ -78,7 +78,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 		displayName = user.Username
 	}
 
-	httpapi.WriteJSON(w, api.SignalData{
+	httpapi.WriteJSON(w, subflux.SignalData{
 		RPID:          wa.Config.RPID,
 		UserID:        userID,
 		CredentialIDs: credIDs,
@@ -109,7 +109,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 	// (no password) cannot self-provision one; local accounts must prove their
 	// password.
 	if user.PasswordHash == "" {
-		httpapi.ForbiddenC(w, r, api.CodeForbidden, "this account is managed by your identity provider")
+		httpapi.ForbiddenC(w, r, subflux.CodeForbidden, "this account is managed by your identity provider")
 		return
 	}
 	req, ok := decodeAuthBody[struct {
@@ -124,12 +124,12 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		httpapi.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
 		return
 	}
 	if okPass, perr := auth.VerifyPassword(req.Password, user.PasswordHash); perr != nil || !okPass {
 		h.RateLimiter.Record(rlIP, rlUser)
-		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid password")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid password")
 		return
 	}
 	h.RateLimiter.Reset(rlIP, rlUser)
@@ -138,28 +138,28 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
 	if err != nil {
 		slog.Error("webauthn register: get passkeys", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	webauthnUser, err := authwebauthn.NewUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register: nil user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	creation, sessionData, err := authwebauthn.BeginRegistration(wa, webauthnUser)
 	if err != nil {
 		slog.Error("webauthn register: begin", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	token, err := GenerateCeremonyToken()
 	if err != nil {
 		slog.Error("webauthn register: generate token", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -168,7 +168,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		CreatedAt: time.Now(),
 	}) {
 		slog.Warn("webauthn register: ceremony session limit reached")
-		httpapi.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "too many pending ceremonies")
+		httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable, "too many pending ceremonies")
 		return
 	}
 
@@ -199,21 +199,21 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
 	if err != nil {
 		slog.Error("webauthn register finish: get passkeys", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	webauthnUser, err := authwebauthn.NewUser(user, creds)
 	if err != nil {
 		slog.Error("webauthn register finish: nil user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	credential, err := authwebauthn.FinishRegistration(wa, webauthnUser, sessData, r)
 	if err != nil {
 		slog.Warn("webauthn register finish: failed", "error", err)
-		httpapi.BadRequestC(w, r, api.CodeWebAuthnRegisterFailed, "registration failed")
+		httpapi.BadRequestC(w, r, subflux.CodeWebAuthnRegisterFailed, "registration failed")
 		return
 	}
 
@@ -227,14 +227,14 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	passkey.CreatedAt = time.Now()
 	if err := h.SecDB.CreatePasskey(ctx, passkey); err != nil {
 		slog.Error("webauthn register finish: store credential", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: passkey registered",
 		"username", user.Username, "name", friendlyName, "ip", ClientIP(r))
 
-	httpapi.WriteJSON(w, api.PasskeyRegistered{
+	httpapi.WriteJSON(w, subflux.PasskeyRegistered{
 		ID:        passkey.ID,
 		Name:      passkey.Name,
 		Transport: passkey.Transport,
@@ -277,13 +277,13 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 		OIDCLinked:   user.OIDCSub != "",
 	}
 	if !auth.CanDisableMethod(auth.MethodPasskey, remaining) {
-		httpapi.ConflictC(w, r, api.CodeConflict, "cannot remove last authentication method")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "cannot remove last authentication method")
 		return
 	}
 
 	if err := h.SecDB.DeletePasskey(ctx, auth.PasskeyRef{ID: passkeyID, UserID: user.ID}); err != nil {
 		slog.Error("delete passkey: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -314,18 +314,18 @@ func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Name == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "name required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "name required")
 		return
 	}
 
 	if len([]rune(req.Name)) > maxPasskeyNameLen {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "name too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "name too long")
 		return
 	}
 
 	if err := h.SecDB.RenamePasskey(r.Context(), auth.PasskeyRef{ID: passkeyID, UserID: user.ID}, req.Name); err != nil {
 		slog.Error("rename passkey: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 

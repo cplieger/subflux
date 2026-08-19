@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,7 +22,7 @@ func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // computeStateStats does the actual stats query work.
-func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
+func (h *Handler) computeStateStats(ctx context.Context) subflux.Stats {
 	downloads, dbAttempts, err := h.queryDB.Stats(ctx)
 	if err != nil {
 		slog.Warn("Stats query failed", "error", err)
@@ -51,7 +51,7 @@ func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
 		"total_series", len(allSeries), "total_movies", len(allMovies),
 		"missing_subs", missing, "total_subs", totalSubs)
 
-	return api.Stats{
+	return subflux.Stats{
 		Downloads:           downloads,
 		Attempts:            searches,
 		LastScan:            lastScan,

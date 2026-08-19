@@ -3,7 +3,7 @@ package manualops
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // fakeManualCfg is the config double for this package's tests. TEN methods out
@@ -25,30 +25,30 @@ var (
 	// is another package's interface, and a fixture that references it would
 	// stop recording what THIS package's tests depend on.
 	_ interface {
-		Scores() api.Scores
-		Search() api.SearchConfig
-		Adaptive() api.AdaptiveConfig
-		Sync() api.SyncConfig
-		PostProcess() api.PostProcessConfig
-		ProvidersForTarget(*api.SubtitleTarget, []api.ProviderID) []api.ProviderID
-		MinScoreForTarget(*api.SubtitleTarget, api.MediaType) int
-		ProviderPriority(api.ProviderID) int
-		EmbeddedPolicy() api.EmbeddedPolicy
+		Scores() subflux.Scores
+		Search() subflux.SearchConfig
+		Adaptive() subflux.AdaptiveConfig
+		Sync() subflux.SyncConfig
+		PostProcess() subflux.PostProcessConfig
+		ProvidersForTarget(*subflux.SubtitleTarget, []subflux.ProviderID) []subflux.ProviderID
+		MinScoreForTarget(*subflux.SubtitleTarget, subflux.MediaType) int
+		ProviderPriority(subflux.ProviderID) int
+		EmbeddedPolicy() subflux.EmbeddedPolicy
 	} = fakeManualCfg{}
 )
 
 func (fakeManualCfg) ValidatePath(context.Context, string) error { return nil }
 
-func (fakeManualCfg) Scores() api.Scores                 { return api.DefaultScores }
-func (fakeManualCfg) Search() api.SearchConfig           { return api.SearchConfig{} }
-func (fakeManualCfg) Adaptive() api.AdaptiveConfig       { return api.AdaptiveConfig{} }
-func (fakeManualCfg) Sync() api.SyncConfig               { return api.SyncConfig{SyncSubtitles: true} }
-func (fakeManualCfg) PostProcess() api.PostProcessConfig { return api.PostProcessConfig{} }
-func (fakeManualCfg) EmbeddedPolicy() api.EmbeddedPolicy { return api.EmbeddedPolicy{} }
+func (fakeManualCfg) Scores() subflux.Scores                 { return subflux.DefaultScores }
+func (fakeManualCfg) Search() subflux.SearchConfig           { return subflux.SearchConfig{} }
+func (fakeManualCfg) Adaptive() subflux.AdaptiveConfig       { return subflux.AdaptiveConfig{} }
+func (fakeManualCfg) Sync() subflux.SyncConfig               { return subflux.SyncConfig{SyncSubtitles: true} }
+func (fakeManualCfg) PostProcess() subflux.PostProcessConfig { return subflux.PostProcessConfig{} }
+func (fakeManualCfg) EmbeddedPolicy() subflux.EmbeddedPolicy { return subflux.EmbeddedPolicy{} }
 
-func (fakeManualCfg) ProvidersForTarget(_ *api.SubtitleTarget, all []api.ProviderID) []api.ProviderID {
+func (fakeManualCfg) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	return all
 }
 
-func (fakeManualCfg) MinScoreForTarget(*api.SubtitleTarget, api.MediaType) int { return 0 }
-func (fakeManualCfg) ProviderPriority(api.ProviderID) int                      { return 0 }
+func (fakeManualCfg) MinScoreForTarget(*subflux.SubtitleTarget, subflux.MediaType) int { return 0 }
+func (fakeManualCfg) ProviderPriority(subflux.ProviderID) int                          { return 0 }

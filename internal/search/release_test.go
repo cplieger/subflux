@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
 // noPriority is a no-op provider priority function for tests.
-func noPriority(_ api.ProviderID) int { return 99 }
+func noPriority(_ subflux.ProviderID) int { return 99 }
 
 func TestParseReleaseName(t *testing.T) {
 	t.Parallel()
@@ -150,11 +150,11 @@ func TestParseReleaseName(t *testing.T) {
 
 func TestBuildMatches_release_attribute_comparison(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GROUP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.2024.BluRay.1080p.x264-GROUP",
 	}
 
@@ -173,11 +173,11 @@ func TestBuildMatches_release_attribute_comparison(t *testing.T) {
 
 func TestBuildMatches_streaming_service_match(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.AMZN.WEB-DL.1080p.x264-GROUP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.2024.AMZN.WEB-DL.1080p.x264-GROUP",
 	}
 
@@ -193,11 +193,11 @@ func TestBuildMatches_streaming_service_match(t *testing.T) {
 
 func TestBuildMatches_different_releases_no_match(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GROUP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.2024.WEB-DL.720p.x265-OTHER",
 	}
 
@@ -216,8 +216,8 @@ func TestBuildMatches_different_releases_no_match(t *testing.T) {
 
 func TestBuildMatches_imdb_episode_sets_series_imdb(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{MediaType: "episode"}
-	sub := &api.Subtitle{MatchedBy: "imdb"}
+	video := &subflux.VideoInfo{MediaType: "episode"}
+	sub := &subflux.Subtitle{MatchedBy: "imdb"}
 	matches := buildMatches(video, sub)
 	if !matches.SeriesIMDB {
 		t.Error("buildMatches(imdb, episode): series_imdb_id not set")
@@ -229,8 +229,8 @@ func TestBuildMatches_imdb_episode_sets_series_imdb(t *testing.T) {
 
 func TestBuildMatches_imdb_movie_sets_imdb_id(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{MediaType: "movie"}
-	sub := &api.Subtitle{MatchedBy: "imdb"}
+	video := &subflux.VideoInfo{MediaType: "movie"}
+	sub := &subflux.Subtitle{MatchedBy: "imdb"}
 	matches := buildMatches(video, sub)
 	if !matches.IMDB {
 		t.Error("buildMatches(imdb, movie): imdb_id not set")
@@ -244,7 +244,7 @@ func TestBuildMatches_imdb_movie_sets_imdb_id(t *testing.T) {
 
 func Test_videoInfoFromRequest(t *testing.T) {
 	t.Parallel()
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "episode",
 		Title:       "Breaking Bad",
 		Year:        2008,
@@ -256,7 +256,7 @@ func Test_videoInfoFromRequest(t *testing.T) {
 
 	info := videoInfoFromRequest(req)
 
-	want := api.VideoInfo{
+	want := subflux.VideoInfo{
 		MediaType:    "episode",
 		ReleaseGroup: "Breaking.Bad.S01E01.1080p.BluRay.x264-GRP",
 	}
@@ -269,12 +269,12 @@ func Test_videoInfoFromRequest(t *testing.T) {
 
 func TestBuildMatches(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
 
-	matches := buildMatches(video, &api.Subtitle{
+	matches := buildMatches(video, &subflux.Subtitle{
 		ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP",
 		MatchedBy:   "imdb",
 	})
@@ -291,12 +291,12 @@ func TestBuildMatches(t *testing.T) {
 
 func TestScoreResults_sorted_descending(t *testing.T) {
 	t.Parallel()
-	sc := scorer.New(&api.DefaultScores)
-	video := &api.VideoInfo{
+	sc := scorer.New(&subflux.DefaultScores)
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
-	subs := []api.Subtitle{
+	subs := []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.WEB-DL.720p-OTHER", MatchedBy: "title"},
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "hash"},
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "imdb"},
@@ -318,19 +318,19 @@ func TestScoreResults_sorted_descending(t *testing.T) {
 
 func TestScoreResults_tiebreaker_by_provider_priority(t *testing.T) {
 	t.Parallel()
-	sc := scorer.New(&api.DefaultScores)
-	video := &api.VideoInfo{
+	sc := scorer.New(&subflux.DefaultScores)
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
 	// Two subs with identical release names and matched_by produce the same score.
 	// The tiebreaker should sort by provider priority (lower = more trusted).
-	subs := []api.Subtitle{
+	subs := []subflux.Subtitle{
 		{Provider: "yify", ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "imdb"},
 		{Provider: "os", ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "imdb"},
 	}
 
-	priority := func(prov api.ProviderID) int {
+	priority := func(prov subflux.ProviderID) int {
 		switch prov {
 		case "os":
 			return 1 // More trusted.
@@ -414,19 +414,19 @@ func TestParseReleaseName_empty_returns_zero(t *testing.T) {
 // Verifies that hash-matched subs get HashVerifiable=true and non-hash subs get false.
 func TestScoreResults_hash_flag_exact_values(t *testing.T) {
 	t.Parallel()
-	sc := scorer.New(&api.DefaultScores)
+	sc := scorer.New(&subflux.DefaultScores)
 	release := "Movie.2024.BluRay.1080p.x264-GRP"
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: release,
 	}
 
 	// Hash-matched subtitle should score strictly higher than title-matched
 	// with the same release name. The difference comes from HashVerifiable.
-	hashSubs := []api.Subtitle{
+	hashSubs := []subflux.Subtitle{
 		{ReleaseName: release, MatchedBy: "hash"},
 	}
-	titleSubs := []api.Subtitle{
+	titleSubs := []subflux.Subtitle{
 		{ReleaseName: release, MatchedBy: "title"},
 	}
 
@@ -452,15 +452,15 @@ func TestScoreResults_hash_flag_exact_values(t *testing.T) {
 // HashVerifiable should only be true when MatchedBy is "hash".
 func TestScoreResults_hash_verifiable_only_for_hash(t *testing.T) {
 	t.Parallel()
-	sc := scorer.New(&api.DefaultScores)
-	video := &api.VideoInfo{
+	sc := scorer.New(&subflux.DefaultScores)
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
 
 	// Two subs with identical release names but different MatchedBy.
 	// The hash-matched one should score higher due to HashVerifiable bonus.
-	subs := []api.Subtitle{
+	subs := []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "hash"},
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "imdb"},
 	}
@@ -483,16 +483,16 @@ func TestScoreResults_hash_verifiable_only_for_hash(t *testing.T) {
 // attribute score, since identity fields are no longer scored.
 func TestScoreResults_matched_by_does_not_affect_release_score(t *testing.T) {
 	t.Parallel()
-	sc := scorer.New(&api.DefaultScores)
-	video := &api.VideoInfo{
+	sc := scorer.New(&subflux.DefaultScores)
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
 
-	imdbSubs := []api.Subtitle{
+	imdbSubs := []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "imdb"},
 	}
-	titleSubs := []api.Subtitle{
+	titleSubs := []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "title"},
 	}
 
@@ -543,11 +543,11 @@ func TestParseReleaseName_group_regex_single_char_group(t *testing.T) {
 
 func TestBuildMatches_edition_match(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.Directors.Cut.BluRay.1080p.x264-GRP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.2024.Directors.Cut.BluRay.1080p.x264-GRP",
 	}
 
@@ -560,11 +560,11 @@ func TestBuildMatches_edition_match(t *testing.T) {
 
 func TestBuildMatches_hdr_match(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.2160p.BluRay.HDR10.x265-GRP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.2024.2160p.BluRay.HDR10.x265-GRP",
 	}
 
@@ -577,11 +577,11 @@ func TestBuildMatches_hdr_match(t *testing.T) {
 
 func TestBuildMatches_season_pack_episode(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "episode",
 		ReleaseGroup: "Show.S01E01.1080p.BluRay.x264-GRP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Show.S01.1080p.BluRay.x264-GRP",
 	}
 
@@ -594,11 +594,11 @@ func TestBuildMatches_season_pack_episode(t *testing.T) {
 
 func TestBuildMatches_season_pack_not_set_for_movie(t *testing.T) {
 	t.Parallel()
-	video := &api.VideoInfo{
+	video := &subflux.VideoInfo{
 		MediaType:    "movie",
 		ReleaseGroup: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
-	sub := &api.Subtitle{
+	sub := &subflux.Subtitle{
 		ReleaseName: "Movie.S01.BluRay.1080p.x264-GRP",
 	}
 
@@ -635,7 +635,7 @@ func TestCompareSource_same_family(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			matches := &api.MatchSet{}
+			matches := &subflux.MatchSet{}
 			release.CompareSource(matches, tt.a, tt.b)
 			got := matches.Source
 			if got != tt.wantSet {

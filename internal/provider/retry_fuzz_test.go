@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzWrapRetryAll exercises WrapRetryAll with varying provider counts and
@@ -23,7 +23,7 @@ func FuzzWrapRetryAll(f *testing.F) {
 
 		providers := make([]Provider, count)
 		for i := range count {
-			providers[i] = &fakeWrapProvider{name: api.ProviderID(string(rune('a' + i%26)))}
+			providers[i] = &fakeWrapProvider{name: subflux.ProviderID(string(rune('a' + i%26)))}
 		}
 
 		initBackoff := max(time.Duration(initBackoffNs), 0)
@@ -45,14 +45,14 @@ func FuzzWrapRetryAll(f *testing.F) {
 }
 
 type fakeWrapProvider struct {
-	name api.ProviderID
+	name subflux.ProviderID
 }
 
-func (f *fakeWrapProvider) Name() api.ProviderID { return f.name }
-func (f *fakeWrapProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (f *fakeWrapProvider) Name() subflux.ProviderID { return f.name }
+func (f *fakeWrapProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *fakeWrapProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (f *fakeWrapProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }

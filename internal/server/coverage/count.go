@@ -5,10 +5,10 @@ import (
 	"log/slog"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FileReader is the ONE thing the missing-count pass asks of the store: read
@@ -20,7 +20,7 @@ import (
 // is handed takes this as a parameter, and naming this type is what keeps that
 // signature from drifting into a wider one.
 type FileReader interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
+	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 
 // CountCfg is what the missing-count pass reads out of the configuration: the
@@ -33,8 +33,8 @@ type FileReader interface {
 // composition root binds and hands over takes this as its parameter, and naming
 // this type is what keeps that signature from drifting back to a wider one.
 type CountCfg interface {
-	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
-	EmbeddedPolicy() api.EmbeddedPolicy
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
+	EmbeddedPolicy() subflux.EmbeddedPolicy
 }
 
 // CountMissing returns the total number of missing subtitle targets across
@@ -57,7 +57,7 @@ func CountMissingSeries(ctx context.Context, cfg CountCfg, db FileReader, allSer
 	if len(allSeries) == 0 {
 		return 0
 	}
-	epFiles, err := db.GetSubtitleFiles(ctx, api.MediaTypeEpisode, "")
+	epFiles, err := db.GetSubtitleFiles(ctx, subflux.MediaTypeEpisode, "")
 	if err != nil {
 		slog.Warn("countMissingSeries: DB query failed", "error", err)
 		return 0
@@ -133,7 +133,7 @@ func countUsableSubs(pc prefixCounts, subs map[Key]*Status) {
 // missingForSeries returns the number of missing subtitle slots for one series:
 // for each target, the number of episodes lacking a usable subtitle. pc may be
 // nil when the series has no indexed subtitles.
-func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts) int {
+func missingForSeries(epCount int, targets []subflux.SubtitleTarget, pc prefixCounts) int {
 	var missing int
 	for _, t := range targets {
 		have := 0
@@ -152,7 +152,7 @@ func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMov
 	if len(allMovies) == 0 {
 		return 0
 	}
-	movieFiles, err := db.GetSubtitleFiles(ctx, api.MediaTypeMovie, "")
+	movieFiles, err := db.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "")
 	if err != nil {
 		slog.Warn("countMissingMovies: DB query failed", "error", err)
 		return 0

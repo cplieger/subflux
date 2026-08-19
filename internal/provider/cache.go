@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // CacheClearer is declared here, at the consumer, rather than in a shared
@@ -40,7 +40,7 @@ func ClearCaches(providers []Provider) {
 type ShowSubtitleCounter interface {
 	// CountShowSubtitles returns the total number of subtitles available for
 	// the queried show in the queried language.
-	CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error)
+	CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error)
 }
 
 // ResolveShowCounter finds the first provider implementing ShowSubtitleCounter.

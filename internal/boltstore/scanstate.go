@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -39,7 +39,7 @@ const scanTimeLayout = "2006-01-02 15:04:05"
 // now (UTC). Because scanned_at changes on every record, the putScanState
 // chokepoint deletes the stale ix_scan_at entry and adds the fresh one in the
 // same tx, so the recency index always reflects the latest scan.
-func (d *DB) RecordScanState(_ context.Context, rec *api.ScanRecord) error {
+func (d *DB) RecordScanState(_ context.Context, rec *subflux.ScanRecord) error {
 	sr := scanRec{
 		Title:     rec.Title,
 		AudioLang: rec.AudioLang,
@@ -62,10 +62,10 @@ func (d *DB) RecordScanState(_ context.Context, rec *api.ScanRecord) error {
 // media_id, matching the SQL ORDER BY for free. scanned_at is rendered with
 // scanTimeLayout to match the SQLite string shape. scan_state is a derived
 // bucket, so an undecodable value is skipped with a warning (Requirement 13.4).
-func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error) {
+func (d *DB) GetScanStates(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error) {
 	prefix := append(typePrefix(mediaType), mediaIDPrefix...)
 
-	var out []api.ScanStateRow
+	var out []subflux.ScanStateRow
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketScanState))
 		if b == nil {
@@ -85,7 +85,7 @@ func (d *DB) GetScanStates(_ context.Context, mediaType api.MediaType, mediaIDPr
 			if skip {
 				continue
 			}
-			out = append(out, api.ScanStateRow{
+			out = append(out, subflux.ScanStateRow{
 				MediaID:   parts[1],
 				Title:     sr.Title,
 				Season:    sr.Season,

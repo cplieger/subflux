@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // DownloadRetryAttempts is the maximum number of download attempts per provider.
@@ -52,14 +52,14 @@ func WrapRetry(p Provider, maxAttempts int, initBackoff time.Duration) Provider 
 	return rp
 }
 
-func (r *retryProvider) Name() api.ProviderID { return r.inner.Name() }
+func (r *retryProvider) Name() subflux.ProviderID { return r.inner.Name() }
 
 // Search delegates to the inner provider and clamps each result's
 // ReleaseName to release.MaxNameLen. Both composition roots wrap every
 // provider with WrapRetryAll, making this the provider boundary where the
 // release-parsing layer's documented input bound is enforced on untrusted
 // provider responses (release package doc, "Input bound").
-func (r *retryProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (r *retryProvider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	subs, err := r.inner.Search(ctx, req)
 	for i := range subs {
 		subs[i].ReleaseName = release.ClampName(subs[i].ReleaseName)
@@ -67,7 +67,7 @@ func (r *retryProvider) Search(ctx context.Context, req *api.SearchRequest) ([]a
 	return subs, err
 }
 
-func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (r *retryProvider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if r.maxAttempts <= 0 {
 		return r.inner.Download(ctx, sub)
 	}
@@ -118,7 +118,7 @@ type retryCounterProvider struct {
 }
 
 // CountShowSubtitles delegates to the inner provider without retry.
-func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error) {
+func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	return r.counter.CountShowSubtitles(ctx, q)
 }
 

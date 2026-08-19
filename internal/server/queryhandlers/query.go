@@ -8,16 +8,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // providerTimeoutResponse is an alias for the canonical wire type.
-type providerTimeoutResponse = api.ProvidersResponse
+type providerTimeoutResponse = subflux.ProvidersResponse
 
 // HandleState returns subtitle state with optional filters.
 // GET /api/state?type=episode&lang=fr&provider=opensubtitles&limit=50
@@ -47,16 +47,16 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	if len(searchParam) > 200 {
 		searchParam = searchParam[:200]
 	}
-	entries, err := h.queryDB.GetState(ctx, &api.StateQuery{
-		MediaType: api.MediaType(q.Get("type")),
+	entries, err := h.queryDB.GetState(ctx, &subflux.StateQuery{
+		MediaType: subflux.MediaType(q.Get("type")),
 		Language:  q.Get("lang"),
-		Provider:  api.ProviderID(q.Get("provider")),
+		Provider:  subflux.ProviderID(q.Get("provider")),
 		Search:    searchParam,
 		Limit:     limit,
 		Offset:    offset,
 	})
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "state")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "state")
 		return
 	}
 	slog.Debug("handleState", "results", len(entries),
@@ -75,7 +75,7 @@ func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	}
 	entries, err := h.queryDB.GetBackoffItems(ctx)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "backoff")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "backoff")
 		return
 	}
 	httpapi.WriteJSON(w, entries)
@@ -86,7 +86,7 @@ func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleBackoffByPrefix(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	handleTypePrefixQuery(w, r, "backoff prefix",
-		func(mt, p string) (any, error) { return h.queryDB.GetBackoffByPrefix(ctx, api.MediaType(mt), p) })
+		func(mt, p string) (any, error) { return h.queryDB.GetBackoffByPrefix(ctx, subflux.MediaType(mt), p) })
 }
 
 // HandleLocks returns all manually locked media+language pairs.
@@ -98,7 +98,7 @@ func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	}
 	entries, err := h.queryDB.GetManualLocks(ctx)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "locks")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "locks")
 		return
 	}
 	httpapi.WriteJSON(w, entries)
@@ -122,7 +122,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	cfgProviders := ls.Cfg.Providers()
 	out := make([]ProviderInfo, 0, len(cfgProviders))
 	for name, cfg := range cfgProviders {
-		if name == api.ProviderNameSynthetic {
+		if name == subflux.ProviderNameSynthetic {
 			continue
 		}
 		out = append(out, ProviderInfo{
@@ -145,19 +145,19 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 // keys); they are typed loosely here to keep this package decoupled from
 // the config internals.
 type ParsedConfig struct {
-	Adaptive       any                   `json:"adaptive"`
-	Search         any                   `json:"search"`
-	Providers      map[string]bool       `json:"providers"`
-	SonarrURL      string                `json:"sonarr_url,omitempty"`
-	RadarrURL      string                `json:"radarr_url,omitempty"`
-	LanguageRules  api.LanguageRulesJSON `json:"language_rules"`
-	IgnoredCodecs  []string              `json:"ignored_codecs,omitempty"`
-	Languages      []string              `json:"languages"`
-	Scores         api.Scores            `json:"scores"`
-	PostProcessing api.PostProcessConfig `json:"post_processing"`
-	Configured     bool                  `json:"configured"`
-	Sonarr         bool                  `json:"sonarr_configured"`
-	Radarr         bool                  `json:"radarr_configured"`
+	Adaptive       any                       `json:"adaptive"`
+	Search         any                       `json:"search"`
+	Providers      map[string]bool           `json:"providers"`
+	SonarrURL      string                    `json:"sonarr_url,omitempty"`
+	RadarrURL      string                    `json:"radarr_url,omitempty"`
+	LanguageRules  subflux.LanguageRulesJSON `json:"language_rules"`
+	IgnoredCodecs  []string                  `json:"ignored_codecs,omitempty"`
+	Languages      []string                  `json:"languages"`
+	Scores         subflux.Scores            `json:"scores"`
+	PostProcessing subflux.PostProcessConfig `json:"post_processing"`
+	Configured     bool                      `json:"configured"`
+	Sonarr         bool                      `json:"sonarr_configured"`
+	Radarr         bool                      `json:"radarr_configured"`
 }
 
 // HandleConfigParsed returns the config as structured JSON.
@@ -213,10 +213,10 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 	}
 	ls := h.state()
 	var req struct {
-		MediaType   api.MediaType `json:"media_type"`
-		ReleaseName string        `json:"release_name"`
-		SubRelease  string        `json:"sub_release"`
-		MatchedBy   string        `json:"matched_by"`
+		MediaType   subflux.MediaType `json:"media_type"`
+		ReleaseName string            `json:"release_name"`
+		SubRelease  string            `json:"sub_release"`
+		MatchedBy   string            `json:"matched_by"`
 	}
 	if !httpapi.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
@@ -230,17 +230,17 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		{"sub_release", req.SubRelease},
 	} {
 		if len(f.value) > release.MaxNameLen {
-			httpapi.BadRequestC(w, r, api.CodeBadRequest,
+			httpapi.BadRequestC(w, r, subflux.CodeBadRequest,
 				f.name+" exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
 			return
 		}
 	}
 	if req.MediaType == "" {
-		req.MediaType = api.MediaTypeEpisode
+		req.MediaType = subflux.MediaTypeEpisode
 	}
 
 	result := ls.Engine.SimulateScore(
-		req.MediaType, req.ReleaseName, req.SubRelease, api.MatchMethod(req.MatchedBy))
+		req.MediaType, req.ReleaseName, req.SubRelease, subflux.MatchMethod(req.MatchedBy))
 
 	slog.Debug("handleScore",
 		"media_type", req.MediaType,
@@ -249,7 +249,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		"matched_by", req.MatchedBy,
 		"score", result.Score, "score_no_hash", result.ScoreNoHash)
 
-	httpapi.WriteJSON(w, api.ScorePreview(result))
+	httpapi.WriteJSON(w, subflux.ScorePreview(result))
 }
 
 // HandleSearchTargets resolves subtitle targets for a media item
@@ -274,7 +274,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("handleSearchTargets",
 		"orig_lang", origLang, "audio_langs", audioLangs,
 		"targets", len(targets))
-	var out []api.SearchTarget
+	var out []subflux.SearchTarget
 	for _, t := range targets {
 		providers := make([]string, len(t.Providers))
 		for i, p := range t.Providers {
@@ -284,7 +284,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 		for i, e := range t.Exclude {
 			exclude[i] = string(e)
 		}
-		out = append(out, api.SearchTarget{
+		out = append(out, subflux.SearchTarget{
 			Code:      t.Code,
 			Variant:   string(t.EffectiveVariant()),
 			Providers: providers,
@@ -292,7 +292,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 			MinScore:  t.MinScore,
 		})
 	}
-	httpapi.WriteJSON(w, api.SearchTargets{
+	httpapi.WriteJSON(w, subflux.SearchTargets{
 		OrigLang:   origLang,
 		AudioLangs: audioLangs,
 		Targets:    out,
@@ -341,20 +341,20 @@ func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 	q := r.URL.Query()
 	mediaType := q.Get("type")
 	if mediaType == "" {
-		mediaType = string(api.MediaTypeEpisode)
+		mediaType = string(subflux.MediaTypeEpisode)
 	}
-	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+	if mediaType != string(subflux.MediaTypeEpisode) && mediaType != string(subflux.MediaTypeMovie) {
+		httpapi.BadRequestC(w, r, subflux.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
 	prefix := q.Get("prefix")
 	if prefix != "" && !mediaid.ValidPrefix(prefix) {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid prefix format")
 		return
 	}
 	result, err := queryFn(mediaType, prefix)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", label)
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", label)
 		return
 	}
 	slog.Debug(label+" query completed", "media_type", mediaType, "prefix", prefix)

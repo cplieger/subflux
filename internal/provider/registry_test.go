@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestRegister_and_LoadAll(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRegister_and_LoadAll(t *testing.T) {
 		return &fakeProvider{name: "test"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: true, Settings: map[string]any{"key": "val"}},
 	})
 	if err != nil {
@@ -47,7 +47,7 @@ func TestLoadAll_skips_disabled(t *testing.T) {
 		return &fakeProvider{name: "enabled"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"disabled": {Enabled: false},
 		"enabled":  {Enabled: true},
 	})
@@ -66,7 +66,7 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"unknown": {Enabled: true},
 	})
 	// Unknown provider is skipped with a warning; zero providers loading is
@@ -86,7 +86,7 @@ func TestLoadAll_unknown_provider_with_valid(t *testing.T) {
 		return &fakeProvider{name: "good"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"good":    {Enabled: true},
 		"unknown": {Enabled: true},
 	})
@@ -106,7 +106,7 @@ func TestLoadAll_factory_error(t *testing.T) {
 		return nil, cause
 	})
 
-	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"broken": {Enabled: true},
 	})
 	if err == nil {
@@ -130,7 +130,7 @@ func TestLoadAll_partial_success(t *testing.T) {
 		return nil, errors.New("init failed")
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"good":   {Enabled: true},
 		"broken": {Enabled: true},
 	})
@@ -152,7 +152,7 @@ func TestLoadAll_no_providers_loaded(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: false},
 	})
 	// All-disabled is a deliberate, valid state after the embedded-detector
@@ -169,7 +169,7 @@ func TestLoadAll_empty_config(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{})
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{})
 	if err != nil {
 		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
@@ -181,13 +181,13 @@ func TestLoadAll_empty_config(t *testing.T) {
 func TestLoadAll_deterministic_order(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
+	for _, name := range []subflux.ProviderID{"zeta", "alpha", "mid"} {
 		r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(name)}, nil
 		})
 	}
 
-	cfg := map[api.ProviderID]api.ProviderCfg{
+	cfg := map[subflux.ProviderID]subflux.ProviderCfg{
 		"zeta":  {Enabled: true},
 		"alpha": {Enabled: true},
 		"mid":   {Enabled: true},
@@ -248,7 +248,7 @@ func TestLoadAll_passes_settings_to_factory(t *testing.T) {
 	})
 
 	want := map[string]any{"user": "alice", "pass": "secret"}
-	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: true, Settings: want},
 	})
 	if err != nil {
@@ -275,7 +275,7 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 		return &fakeProvider{name: "second"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"dup": {Enabled: true},
 	})
 	if err != nil {
@@ -294,7 +294,7 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 func TestRegisterSchema_and_Schema(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	fields := []api.ProviderSchemaField{
+	fields := []subflux.ProviderSchemaField{
 		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
 		{Key: "enabled", Label: "Enabled", Type: "bool", Default: "true"},
 	}
@@ -328,7 +328,7 @@ func TestSchema_unknown_provider(t *testing.T) {
 func TestProviderNames_sorted(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
+	for _, name := range []subflux.ProviderID{"zeta", "alpha", "mid"} {
 		n := name
 		r.Register(n, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(n)}, nil
@@ -364,12 +364,12 @@ type fakeProvider struct {
 	name string
 }
 
-func (f *fakeProvider) Name() api.ProviderID { return api.ProviderID(f.name) }
+func (f *fakeProvider) Name() subflux.ProviderID { return subflux.ProviderID(f.name) }
 
-func (f *fakeProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (f *fakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *fakeProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (f *fakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }

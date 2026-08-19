@@ -6,9 +6,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- enabledProviders ---
@@ -18,22 +18,22 @@ func TestEnabledProviders(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		providers map[api.ProviderID]api.ProviderCfg
-		want      []api.ProviderID
+		providers map[subflux.ProviderID]subflux.ProviderCfg
+		want      []subflux.ProviderID
 	}{
-		{"all enabled", map[api.ProviderID]api.ProviderCfg{
+		{"all enabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"beta":  {Enabled: true},
 			"alpha": {Enabled: true},
-		}, []api.ProviderID{"alpha", "beta"}},
-		{"mixed enabled and disabled", map[api.ProviderID]api.ProviderCfg{
+		}, []subflux.ProviderID{"alpha", "beta"}},
+		{"mixed enabled and disabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"os":   {Enabled: true},
 			"yify": {Enabled: false},
 			"bs":   {Enabled: true},
-		}, []api.ProviderID{"bs", "os"}},
-		{"none enabled", map[api.ProviderID]api.ProviderCfg{
+		}, []subflux.ProviderID{"bs", "os"}},
+		{"none enabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"os": {Enabled: false},
 		}, nil},
-		{"empty providers", map[api.ProviderID]api.ProviderCfg{}, nil},
+		{"empty providers", map[subflux.ProviderID]subflux.ProviderCfg{}, nil},
 		{"nil providers", nil, nil},
 	}
 
@@ -111,7 +111,7 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 
 // The BuildProviderSchemas tests moved to
 // internal/server/confighandlers/provider_schema_test.go with the function
-// itself, which left internal/api because that package implements no registry
+// itself, which left internal/subflux because that package implements no registry
 // and consumes no schema.
 
 // --- provider.ClearCaches ---
@@ -152,13 +152,13 @@ func TestClearProviderCaches_nil_providers(t *testing.T) {
 
 func TestEnabledProviders_output_is_sorted(t *testing.T) {
 	t.Parallel()
-	got := enabledProviders(map[api.ProviderID]api.ProviderCfg{
+	got := enabledProviders(map[subflux.ProviderID]subflux.ProviderCfg{
 		"zulu":    {Enabled: true},
 		"alpha":   {Enabled: true},
 		"charlie": {Enabled: true},
 		"bravo":   {Enabled: false},
 	})
-	want := []api.ProviderID{"alpha", "charlie", "zulu"}
+	want := []subflux.ProviderID{"alpha", "charlie", "zulu"}
 	if len(got) != len(want) {
 		t.Fatalf("enabledProviders len = %d, want %d", len(got), len(want))
 	}

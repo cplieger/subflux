@@ -14,7 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -52,7 +52,7 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	}
 	if err := webhttp.DecodeJSONInto(w, r, dst, maxBytes); err != nil {
 		slog.Debug("decode request body failed", "path", r.URL.Path, "error", err)
-		BadRequestC(w, r, api.CodeBadRequest, "invalid json")
+		BadRequestC(w, r, subflux.CodeBadRequest, "invalid json")
 		return false
 	}
 	return true

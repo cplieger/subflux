@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/cplieger/metrics/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -137,7 +137,7 @@ func (m *Metrics) SetPollCursorsDirty(n int) {
 }
 
 // RecordSearch records a search attempt for a provider.
-func (m *Metrics) RecordSearch(provider api.ProviderID, dur time.Duration, err error) {
+func (m *Metrics) RecordSearch(provider subflux.ProviderID, dur time.Duration, err error) {
 	p := string(provider)
 	m.searches.Inc(p)
 	m.totalSearch.Add(1)
@@ -148,7 +148,7 @@ func (m *Metrics) RecordSearch(provider api.ProviderID, dur time.Duration, err e
 }
 
 // RecordDownload records a download attempt, routing to the success or error counter.
-func (m *Metrics) RecordDownload(provider api.ProviderID, err error) {
+func (m *Metrics) RecordDownload(provider subflux.ProviderID, err error) {
 	p := string(provider)
 	if err == nil {
 		m.downloads.Inc(p)
@@ -158,7 +158,7 @@ func (m *Metrics) RecordDownload(provider api.ProviderID, err error) {
 }
 
 // RecordImport records an import detected.
-func (m *Metrics) RecordImport(source api.PollKey) {
+func (m *Metrics) RecordImport(source subflux.PollKey) {
 	m.imports.Inc(string(source))
 }
 

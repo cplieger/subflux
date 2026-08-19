@@ -1,11 +1,11 @@
 package scoring
 
-import "github.com/cplieger/subflux/internal/api"
+import "github.com/cplieger/subflux/internal/subflux"
 
 // FilterByIdentity drops results that don't match the requested
 // season/episode or show title. Returns the kept results and the
 // number of dropped results so the caller can log as appropriate.
-func FilterByIdentity(results []api.Subtitle, req *api.SearchRequest) (kept []api.Subtitle, dropped int) {
+func FilterByIdentity(results []subflux.Subtitle, req *subflux.SearchRequest) (kept []subflux.Subtitle, dropped int) {
 	if req.Title == "" && req.Season == 0 && req.Episode == 0 {
 		return results, 0
 	}
@@ -24,13 +24,13 @@ func FilterByIdentity(results []api.Subtitle, req *api.SearchRequest) (kept []ap
 // IdentityOK reports whether a subtitle passes the identity check for the given
 // request. Hash-matched subtitles always pass. Subtitles with season/episode
 // metadata are validated against the request's expected episode and title.
-func IdentityOK(sub *api.Subtitle, req *api.SearchRequest) bool {
-	if sub.MatchedBy == api.MatchByHash {
+func IdentityOK(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
+	if sub.MatchedBy == subflux.MatchByHash {
 		return true
 	}
 
 	if sub.Season > 0 || sub.Episode > 0 {
-		if req.MediaType == api.MediaTypeMovie {
+		if req.MediaType == subflux.MediaTypeMovie {
 			return false
 		}
 		if !EpisodeNumberMatch(sub.Season, sub.Episode, req) {
@@ -42,7 +42,7 @@ func IdentityOK(sub *api.Subtitle, req *api.SearchRequest) bool {
 	return validateNoMetadata(sub, req)
 }
 
-func validateNoMetadata(sub *api.Subtitle, req *api.SearchRequest) bool {
+func validateNoMetadata(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
 	if sub.Title != "" && req.Title != "" &&
 		!AnyTitleMatches(req, sub.Title) {
 		return false
@@ -53,7 +53,7 @@ func validateNoMetadata(sub *api.Subtitle, req *api.SearchRequest) bool {
 		return false
 	}
 
-	if req.MediaType == api.MediaTypeEpisode && req.Season > 0 &&
+	if req.MediaType == subflux.MediaTypeEpisode && req.Season > 0 &&
 		sub.ReleaseName != "" {
 		if relSeason := ExtractReleaseSeason(sub.ReleaseName); relSeason > 0 {
 			if relSeason != req.Season {
@@ -68,8 +68,8 @@ func validateNoMetadata(sub *api.Subtitle, req *api.SearchRequest) bool {
 // IdentityTitleOK reports whether the subtitle's title metadata is consistent
 // with the search request. Subtitles matched by a stable ID (TVDB, IMDB, hash)
 // skip title validation; title-matched subtitles must pass AnyTitleMatches.
-func IdentityTitleOK(sub *api.Subtitle, req *api.SearchRequest) bool {
-	if sub.MatchedBy != "" && sub.MatchedBy != api.MatchByTitle {
+func IdentityTitleOK(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
+	if sub.MatchedBy != "" && sub.MatchedBy != subflux.MatchByTitle {
 		return true
 	}
 
@@ -80,7 +80,7 @@ func IdentityTitleOK(sub *api.Subtitle, req *api.SearchRequest) bool {
 		}
 	}
 
-	if sub.MatchedBy == api.MatchByTitle && sub.Title == "" &&
+	if sub.MatchedBy == subflux.MatchByTitle && sub.Title == "" &&
 		sub.ReleaseName != "" && req.Title != "" &&
 		!AnyReleaseNameMatches(req, sub.ReleaseName) {
 		return false

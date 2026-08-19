@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // PollSonarrClient is the Sonarr surface the history poller uses: import-event
@@ -37,7 +37,7 @@ type tagResolver interface {
 // else with the store; the poll watermark itself goes through PollCache, which
 // the server builds over the store on the poller's behalf.
 type PollerStore interface {
-	DeleteStateByPaths(ctx context.Context, paths []string) (api.CleanupResult, error)
+	DeleteStateByPaths(ctx context.Context, paths []string) (subflux.CleanupResult, error)
 }
 
 // pollerCfg is what a poll cycle reads out of the configuration: how often to
@@ -47,9 +47,9 @@ type PollerStore interface {
 // nothing about scoring, providers, auth or the server runtime.
 type pollerCfg interface {
 	PollInterval() time.Duration
-	Search() api.SearchConfig
+	Search() subflux.SearchConfig
 	ValidatePath(ctx context.Context, path string) error
-	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
 	LanguageCodes() []string
 }
 
@@ -64,9 +64,9 @@ const (
 
 // ImportResult holds the resolved search parameters for a single arr import event.
 type ImportResult struct {
-	Req       *api.SearchRequest
+	Req       *subflux.SearchRequest
 	Source    PollSource
 	Label     string
-	Targets   []api.SubtitleTarget
+	Targets   []subflux.SubtitleTarget
 	RefreshID int
 }

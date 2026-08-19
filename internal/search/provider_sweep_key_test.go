@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestBuildSearchKeyCannotBeForged pins the property buildSearchKey exists to
@@ -24,9 +24,9 @@ import (
 func TestBuildSearchKeyCannotBeForged(t *testing.T) {
 	providers := []provider.Provider{&mockProvider{name: "prov1"}}
 
-	req := func(mediaID string, langs []string, path, hash string) *api.SearchRequest {
-		return &api.SearchRequest{
-			MediaType: api.MediaTypeEpisode,
+	req := func(mediaID string, langs []string, path, hash string) *subflux.SearchRequest {
+		return &subflux.SearchRequest{
+			MediaType: subflux.MediaTypeEpisode,
 			ImdbID:    mediaID,
 			Languages: langs,
 			VideoPath: path,
@@ -34,7 +34,7 @@ func TestBuildSearchKeyCannotBeForged(t *testing.T) {
 		}
 	}
 
-	cases := map[string][2]*api.SearchRequest{
+	cases := map[string][2]*subflux.SearchRequest{
 		"separator moves from the language list into the video path": {
 			req("tt1", []string{"fr"}, "|x/a.mkv", "h"),
 			req("tt1", []string{"fr|"}, "x/a.mkv", "h"),
@@ -75,8 +75,8 @@ func TestBuildSearchKeyCannotBeForged(t *testing.T) {
 // sort that makes the key order-independent.
 func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
 	providers := []provider.Provider{&mockProvider{name: "b"}, &mockProvider{name: "a"}}
-	base := &api.SearchRequest{
-		MediaType: api.MediaTypeEpisode,
+	base := &subflux.SearchRequest{
+		MediaType: subflux.MediaTypeEpisode,
 		ImdbID:    "tt0903747",
 		Season:    1,
 		Episode:   2,
@@ -87,7 +87,7 @@ func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
 	got := buildSearchKey(base, providers)
 
 	want := keyenc.Join(
-		string(api.MediaTypeEpisode),
+		string(subflux.MediaTypeEpisode),
 		mediaid.Build(base),
 		"en:fr",
 		"/media/tv/show/s01e02.mkv",
@@ -118,8 +118,8 @@ func TestBuildSearchKeyIsBounded(t *testing.T) {
 	for i := range huge {
 		huge[i] = 'x'
 	}
-	key := buildSearchKey(&api.SearchRequest{
-		MediaType: api.MediaTypeEpisode,
+	key := buildSearchKey(&subflux.SearchRequest{
+		MediaType: subflux.MediaTypeEpisode,
 		ImdbID:    "tt1",
 		VideoPath: string(huge),
 	}, providers)

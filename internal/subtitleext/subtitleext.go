@@ -16,9 +16,8 @@
 //     or recognized must be deletable through the subtitle delete gate.
 //
 // Seed evidence (2026-07-18 inventory): the table is the union of the two
-// constants it replaced — the on-disk set (.srt .ass .ssa .sub, formerly
-// api.SubtitleExtsOnDisk) and the archive set (adds .vtt, formerly
-// archive.SubtitleExts). .idx/.smi/.sami/.txt are deliberately NOT seeded:
+// constants it replaced — the on-disk set (.srt .ass .ssa .sub) and the
+// archive set (adds .vtt). .idx/.smi/.sami/.txt are deliberately NOT seeded:
 // no writer produces them and no reader recognizes them; admission requires
 // positive inventory evidence, and .idx/.sub pairing would need explicit
 // two-file delete semantics first.

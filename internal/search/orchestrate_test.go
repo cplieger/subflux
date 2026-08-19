@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestProviderConcurrency(t *testing.T) {
@@ -14,7 +14,7 @@ func TestProviderConcurrency(t *testing.T) {
 		max  int
 		want int
 	}{
-		{"zero returns default", 0, api.DefaultProviderConcurrency},
+		{"zero returns default", 0, subflux.DefaultProviderConcurrency},
 		{"positive returns value", 8, 8},
 		{"one returns one", 1, 1},
 	}
@@ -22,7 +22,7 @@ func TestProviderConcurrency(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			cfg := &mockConfig{searchCfg: api.SearchConfig{MaxProviderConcurrency: tt.max}}
+			cfg := &mockConfig{searchCfg: subflux.SearchConfig{MaxProviderConcurrency: tt.max}}
 			e := &Engine{cfg: cfg}
 			got := e.providerConcurrency()
 			if got != tt.want {

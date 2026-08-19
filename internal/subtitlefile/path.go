@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ExtSRT is the extension every subflux writer emits. The capability-scoped
@@ -123,13 +123,13 @@ func ManualOrdinal(path string) int {
 // and Path were called 70 lines apart from the same two fields). The
 // Lang field is unused here — a variant does not depend on it — which is
 // harmless and keeps one type describing the whole segment.
-func VariantFromFlags(tags Tags) api.Variant {
+func VariantFromFlags(tags Tags) subflux.Variant {
 	switch {
 	case tags.HearingImpaired:
-		return api.VariantHI
+		return subflux.VariantHI
 	case tags.Forced:
-		return api.VariantForced
+		return subflux.VariantForced
 	default:
-		return api.DefaultVariant
+		return subflux.DefaultVariant
 	}
 }

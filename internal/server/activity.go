@@ -1,6 +1,6 @@
 package server
 
-import "github.com/cplieger/subflux/internal/api"
+import "github.com/cplieger/subflux/internal/subflux"
 
 // jsonKeyStatus is the JSON key for operation result status.
-const jsonKeyStatus = api.KeyStatus
+const jsonKeyStatus = subflux.KeyStatus

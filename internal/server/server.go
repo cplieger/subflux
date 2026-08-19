@@ -24,7 +24,6 @@ import (
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -42,6 +41,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
@@ -129,7 +129,8 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 // in a types package that implements none of it.
 //
 // It is composed by EMBEDDING, never by re-listing. That is the whole
-// difference from the 36-method api.Store this replaces: the width is derived
+// difference from the 36-method whole-store interface this replaces: the width
+// is derived
 // from what the consumers ask for, so adding a method to filehandlers.FileStore
 // widens this automatically and removing one narrows it. A hand-written list
 // can only drift, and drifted for 36 methods of which the widest consumer used
@@ -170,12 +171,12 @@ type Store interface {
 	// Read and write the history-poll watermark. Held by the server because
 	// polling reads it through the write-through PollCache the server builds,
 	// not directly.
-	GetPollTimestamp(ctx context.Context, key api.PollKey) (time.Time, error)
-	SetPollTimestamp(ctx context.Context, key api.PollKey, t time.Time) error
+	GetPollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
+	SetPollTimestamp(ctx context.Context, key subflux.PollKey, t time.Time) error
 
 	// Drop search_attempts rows for languages and providers a config edit
 	// removed. Called by activation, which is the server's own concern.
-	CleanupDrift(ctx context.Context, drift api.ConfigDrift) error
+	CleanupDrift(ctx context.Context, drift subflux.ConfigDrift) error
 }
 
 // New creates a Server with the given options. db and reg are required.

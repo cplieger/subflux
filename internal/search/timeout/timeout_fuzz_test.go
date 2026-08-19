@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzTrackerRecordFailure(f *testing.F) {
@@ -27,7 +27,7 @@ func FuzzTrackerRecordFailure(f *testing.F) {
 			Cooldown:  time.Hour,
 		})
 
-		prov := api.ProviderID(provName)
+		prov := subflux.ProviderID(provName)
 		var e error
 		if errMsg != "" {
 			e = errors.New(errMsg)

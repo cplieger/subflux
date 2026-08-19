@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Type aliases for test readability — these were previously in coverage_calc.go.
@@ -24,14 +24,14 @@ var (
 	extractSeriesPrefix = coverage.ExtractSeriesPrefix
 )
 
-func countEpisodeCoverageGrouped(episodes []map[coverage.Key]*coverage.Status, targets []api.SubtitleTarget, total int) []coverage.TargetCoverage {
+func countEpisodeCoverageGrouped(episodes []map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget, total int) []coverage.TargetCoverage {
 	return coverage.CountEpisodesGrouped(episodes, targets, total)
 }
 
-func countMovieCoverage(subs map[coverage.Key]*coverage.Status, targets []api.SubtitleTarget) []coverage.TargetCoverage {
+func countMovieCoverage(subs map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget) []coverage.TargetCoverage {
 	return coverage.CountMovies(subs, targets)
 }
 
-func deduplicateFileRows(rows []api.SubtitleEntry) []api.SubtitleEntry {
+func deduplicateFileRows(rows []subflux.SubtitleEntry) []subflux.SubtitleEntry {
 	return coverage.DeduplicateFileRows(rows)
 }

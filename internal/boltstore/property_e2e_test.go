@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -40,7 +40,7 @@ import (
 // pubTriple is a (media_type, media_id, language) triple drawn by the
 // public-method op driver.
 type pubTriple struct {
-	mt   api.MediaType
+	mt   subflux.MediaType
 	mid  string
 	lang string
 }
@@ -50,9 +50,9 @@ type pubTriple struct {
 // forced; the pool stays tiny so random sequences repeatedly hit the same
 // triples (upserts, manual stacking, deletes).
 var pubTriples = []pubTriple{
-	{api.MediaTypeMovie, "tt1", "en"},
-	{api.MediaTypeMovie, "tt1", "fr"},
-	{api.MediaTypeEpisode, "tt2", "en"},
+	{subflux.MediaTypeMovie, "tt1", "en"},
+	{subflux.MediaTypeMovie, "tt1", "fr"},
+	{subflux.MediaTypeEpisode, "tt2", "en"},
 }
 
 // pubVideos is the small video-path pool. A single video path backs rows across
@@ -62,17 +62,17 @@ var pubVideos = []string{"/m/a.mkv", "/m/b.mkv"}
 
 // pubScanMedia is the (media_type, media_id) pool for scan_state rows.
 var pubScanMedia = []struct {
-	mt  api.MediaType
+	mt  subflux.MediaType
 	mid string
 }{
-	{api.MediaTypeMovie, "tt1"},
-	{api.MediaTypeEpisode, "tt2"},
+	{subflux.MediaTypeMovie, "tt1"},
+	{subflux.MediaTypeEpisode, "tt2"},
 }
 
 // pubBackoffParams are fixed backoff parameters for RecordNoResult; the exact
 // next_retry does not matter to the index invariant, only that the row and its
 // due-index entry stay consistent.
-var pubBackoffParams = api.BackoffParams{
+var pubBackoffParams = subflux.BackoffParams{
 	InitialDelay: time.Minute,
 	MaxDelay:     time.Hour,
 	Multiplier:   2,
@@ -165,7 +165,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 		} else {
 			path = pubAutoPath(tr.mid, tr.lang)
 		}
-		rec := &api.DownloadRecord{
+		rec := &subflux.DownloadRecord{
 			MediaType:    tr.mt,
 			MediaID:      tr.mid,
 			Language:     tr.lang,
@@ -173,7 +173,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 			ReleaseName:  rapid.SampledFrom([]string{"", "Rel.A", "Rel.B"}).Draw(rt, "saveRelease"),
 			Path:         path,
 			Score:        rapid.IntRange(0, 100).Draw(rt, "saveScore"),
-			Meta: &api.DownloadMeta{
+			Meta: &subflux.DownloadMeta{
 				Title:     "T",
 				VideoPath: rapid.SampledFrom(pubVideos).Draw(rt, "saveVideo"),
 				Manual:    manual,
@@ -193,13 +193,13 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 	case "recordFiles":
 		m := rapid.SampledFrom(pubScanMedia).Draw(rt, "filesMedia")
 		k := rapid.IntRange(0, 3).Draw(rt, "fileCount")
-		var files []api.SubtitleFile
+		var files []subflux.SubtitleFile
 		for i := range k {
 			lang := rapid.SampledFrom([]string{"en", "fr"}).Draw(rt, "fileLang")
-			files = append(files, api.SubtitleFile{
+			files = append(files, subflux.SubtitleFile{
 				Language: lang,
-				Variant:  rapid.SampledFrom([]api.Variant{api.VariantStandard, api.VariantHI}).Draw(rt, "fileVariant"),
-				Source:   api.SourceExternal,
+				Variant:  rapid.SampledFrom([]subflux.Variant{subflux.VariantStandard, subflux.VariantHI}).Draw(rt, "fileVariant"),
+				Source:   subflux.SourceExternal,
 				Codec:    rapid.SampledFrom([]string{"subrip", "ass"}).Draw(rt, "fileCodec"),
 				Path:     fmt.Sprintf("/m/%s.%s.%d.srt", m.mid, lang, i),
 			})
@@ -210,7 +210,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 
 	case "recordScan":
 		m := rapid.SampledFrom(pubScanMedia).Draw(rt, "scanMedia")
-		if err := db.RecordScanState(ctx, &api.ScanRecord{
+		if err := db.RecordScanState(ctx, &subflux.ScanRecord{
 			MediaType: m.mt, MediaID: m.mid, Title: "t", AudioLang: "en",
 			Season:  rapid.IntRange(0, 3).Draw(rt, "scanSeason"),
 			Episode: rapid.IntRange(0, 12).Draw(rt, "scanEpisode"),
@@ -220,7 +220,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 
 	case "clearLock":
 		tr := rapid.SampledFrom(pubTriples).Draw(rt, "clearTriple")
-		if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: tr.mt, MediaID: tr.mid, Language: tr.lang, Variant: api.VariantStandard}); err != nil {
+		if err := db.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: tr.mt, MediaID: tr.mid, Language: tr.lang, Variant: subflux.VariantStandard}); err != nil {
 			rt.Fatalf("ClearManualLock: %v", err)
 		}
 

@@ -15,7 +15,7 @@
 // Adding a code: see the "Adding a new code" section in that doc.
 // Renaming a code: do NOT — clients consume these as a contract.
 
-package api
+package subflux
 
 // ErrorCode is the machine-readable code carried in the JSON error envelope.
 // A defined type (not an alias) so the wire generator discovers the catalog

@@ -1,7 +1,7 @@
 package scanning
 
 import (
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // The configuration surfaces this package consumes live here rather than beside
@@ -26,8 +26,8 @@ import (
 // answer the preflight. 2 of the 37 values the config offers — these handlers
 // resolve the arr item, decide the status code and hand off.
 type scanHandlerCfg interface {
-	Search() api.SearchConfig
-	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
+	Search() subflux.SearchConfig
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
 }
 
 // ScanCfg is what a scan pass reads: the preflight's two plus the configured
@@ -41,5 +41,5 @@ type scanHandlerCfg interface {
 type ScanCfg interface {
 	scanHandlerCfg
 	LanguageCodes() []string
-	Adaptive() api.AdaptiveConfig
+	Adaptive() subflux.AdaptiveConfig
 }

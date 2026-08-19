@@ -31,8 +31,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 const (
@@ -60,7 +60,7 @@ const (
 	valFalse       = "false"
 )
 
-const providerName = api.ProviderNameSynthetic
+const providerName = subflux.ProviderNameSynthetic
 
 // Factory creates a synthetic provider from config settings.
 func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
@@ -113,10 +113,10 @@ type syntheticProvider struct {
 	forced      bool
 }
 
-func (p *syntheticProvider) Name() api.ProviderID { return providerName }
+func (p *syntheticProvider) Name() subflux.ProviderID { return providerName }
 
 // Search returns results based on the configured mode.
-func (p *syntheticProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *syntheticProvider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if err := p.applyDelay(ctx); err != nil {
 		return nil, err
 	}
@@ -127,9 +127,9 @@ func (p *syntheticProvider) Search(ctx context.Context, req *api.SearchRequest) 
 	case modTimeout:
 		return nil, context.DeadlineExceeded
 	case modRateLimit:
-		return nil, &api.RateLimitError{Msg: "synthetic rate limit: " + p.effectiveErrMsg()}
+		return nil, &subflux.RateLimitError{Msg: "synthetic rate limit: " + p.effectiveErrMsg()}
 	case modAuthError:
-		return nil, &api.AuthError{Msg: "synthetic auth error: " + p.effectiveErrMsg()}
+		return nil, &subflux.AuthError{Msg: "synthetic auth error: " + p.effectiveErrMsg()}
 	case modEmpty:
 		return nil, nil
 	case "flaky":
@@ -155,7 +155,7 @@ func (p *syntheticProvider) Search(ctx context.Context, req *api.SearchRequest) 
 }
 
 // Download returns subtitle data or a configured error.
-func (p *syntheticProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *syntheticProvider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := p.applyDelay(ctx); err != nil {
 		return nil, err
 	}
@@ -196,20 +196,20 @@ func (p *syntheticProvider) matchesLanguage(lang string) bool {
 	return slices.Contains(p.languages, lang)
 }
 
-func (p *syntheticProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
-	var results []api.Subtitle
+func (p *syntheticProvider) generateResults(req *subflux.SearchRequest) []subflux.Subtitle {
+	var results []subflux.Subtitle
 	for _, lang := range req.Languages {
 		if !p.matchesLanguage(lang) {
 			continue
 		}
 		for i := range p.resultCount {
-			sub := api.Subtitle{
+			sub := subflux.Subtitle{
 				Provider:    providerName,
 				ID:          fmt.Sprintf("synthetic-%s-%d", lang, i),
 				Language:    lang,
 				ReleaseName: p.releaseNameFor(req, i),
 				DownloadURL: fmt.Sprintf("synthetic://download/%s/%d", lang, i),
-				MatchedBy:   api.MatchByTitle,
+				MatchedBy:   subflux.MatchByTitle,
 				Title:       req.Title,
 				Year:        req.Year,
 				Season:      req.Season,
@@ -218,7 +218,7 @@ func (p *syntheticProvider) generateResults(req *api.SearchRequest) []api.Subtit
 				Forced:      p.forced,
 			}
 			if p.includeHash && i == 0 {
-				sub.MatchedBy = api.MatchByHash
+				sub.MatchedBy = subflux.MatchByHash
 			}
 			results = append(results, sub)
 		}
@@ -226,19 +226,19 @@ func (p *syntheticProvider) generateResults(req *api.SearchRequest) []api.Subtit
 	return results
 }
 
-func (p *syntheticProvider) generateSeasonPackResults(req *api.SearchRequest) []api.Subtitle {
-	var results []api.Subtitle
+func (p *syntheticProvider) generateSeasonPackResults(req *subflux.SearchRequest) []subflux.Subtitle {
+	var results []subflux.Subtitle
 	for _, lang := range req.Languages {
 		if !p.matchesLanguage(lang) {
 			continue
 		}
-		sub := api.Subtitle{
+		sub := subflux.Subtitle{
 			Provider:    providerName,
 			ID:          fmt.Sprintf("synthetic-spack-%s", lang),
 			Language:    lang,
 			ReleaseName: fmt.Sprintf("%s.S%02d.Complete.1080p.WEB-DL", req.Title, req.Season),
 			DownloadURL: fmt.Sprintf("synthetic://download/spack/%s", lang),
-			MatchedBy:   api.MatchByTitle,
+			MatchedBy:   subflux.MatchByTitle,
 			Title:       req.Title,
 			Year:        req.Year,
 			Season:      req.Season,
@@ -248,7 +248,7 @@ func (p *syntheticProvider) generateSeasonPackResults(req *api.SearchRequest) []
 	return results
 }
 
-func (p *syntheticProvider) releaseNameFor(req *api.SearchRequest, idx int) string {
+func (p *syntheticProvider) releaseNameFor(req *subflux.SearchRequest, idx int) string {
 	groups := []string{"FLUX", "NTb", "SPARKS", "YTS", "RARBG"}
 	sources := []string{"BluRay", "WEB-DL", "HDTV", "WEBRip"}
 	codecs := []string{"x264", "x265", "AV1"}
@@ -257,7 +257,7 @@ func (p *syntheticProvider) releaseNameFor(req *api.SearchRequest, idx int) stri
 	source := sources[idx%len(sources)]
 	codec := codecs[idx%len(codecs)]
 
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		return fmt.Sprintf("%s.S%02dE%02d.1080p.%s.%s-%s",
 			strings.ReplaceAll(req.Title, " ", "."),
 			req.Season, req.Episode, source, codec, group)
@@ -287,8 +287,8 @@ Timestamp: %s
 }
 
 // Schema returns the UI schema fields for the synthetic provider settings page.
-func Schema() []api.ProviderSchemaField {
-	return []api.ProviderSchemaField{
+func Schema() []subflux.ProviderSchemaField {
+	return []subflux.ProviderSchemaField{
 		{
 			Key: keyMode, Label: "Mode", Type: fieldText,
 			Default: "static",

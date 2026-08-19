@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -39,17 +39,17 @@ import (
 func TestQuery_prefixCollision_BackedOffProviders(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
-	bp := api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
+	bp := subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
 
 	// Record a no-result for tt12 only — this puts a backed-off provider row
 	// under the (movie, "tt12", "en") triple.
-	if err := db.RecordNoResult(ctx, api.MediaTypeMovie, "tt12", "en", api.ProviderNameOpenSubtitles, bp); err != nil {
+	if err := db.RecordNoResult(ctx, subflux.MediaTypeMovie, "tt12", "en", subflux.ProviderNameOpenSubtitles, bp); err != nil {
 		t.Fatalf("RecordNoResult(tt12): %v", err)
 	}
 
 	// Query backed-off providers for tt1 — must be empty (tt12's row must NOT
 	// bleed into tt1's result).
-	got, err := db.BackedOffProviders(ctx, api.MediaTypeMovie, "tt1", "en", 0)
+	got, err := db.BackedOffProviders(ctx, subflux.MediaTypeMovie, "tt1", "en", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders(tt1): %v", err)
 	}
@@ -58,7 +58,7 @@ func TestQuery_prefixCollision_BackedOffProviders(t *testing.T) {
 	}
 
 	// Sanity: tt12 itself IS backed off.
-	got12, err := db.BackedOffProviders(ctx, api.MediaTypeMovie, "tt12", "en", 0)
+	got12, err := db.BackedOffProviders(ctx, subflux.MediaTypeMovie, "tt12", "en", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders(tt12): %v", err)
 	}
@@ -80,17 +80,17 @@ func TestQuery_prefixCollision_DownloadedRefs(t *testing.T) {
 	_ = os.WriteFile(video, []byte("v"), 0o644)
 
 	// Save a download for tt12 only.
-	if err := db.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt12", Language: "en",
-		ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Release.tt12",
+	if err := db.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt12", Language: "en",
+		ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "Release.tt12",
 		Path: filepath.Join(dir, "tt12.en.srt"), Score: 80,
-		Meta: &api.DownloadMeta{VideoPath: video, Title: "T12"},
+		Meta: &subflux.DownloadMeta{VideoPath: video, Title: "T12"},
 	}); err != nil {
 		t.Fatalf("SaveDownload(tt12): %v", err)
 	}
 
 	// Query refs for tt1 — must be empty.
-	refs, err := db.DownloadedRefs(ctx, api.MediaTypeMovie, "tt1", "en")
+	refs, err := db.DownloadedRefs(ctx, subflux.MediaTypeMovie, "tt1", "en")
 	if err != nil {
 		t.Fatalf("DownloadedRefs(tt1): %v", err)
 	}
@@ -99,7 +99,7 @@ func TestQuery_prefixCollision_DownloadedRefs(t *testing.T) {
 	}
 
 	// Sanity: tt12 itself returns the ref.
-	refs12, err := db.DownloadedRefs(ctx, api.MediaTypeMovie, "tt12", "en")
+	refs12, err := db.DownloadedRefs(ctx, subflux.MediaTypeMovie, "tt12", "en")
 	if err != nil {
 		t.Fatalf("DownloadedRefs(tt12): %v", err)
 	}
@@ -119,8 +119,8 @@ func TestQuery_ascendingNextRetry(t *testing.T) {
 	// Insert rows with decreasing next_retry to force reordering.
 	times := []time.Duration{5 * time.Hour, 3 * time.Hour, 1 * time.Hour, 4 * time.Hour, 2 * time.Hour}
 	for i, d := range times {
-		putAttemptRow(t, db, api.MediaTypeEpisode, fmt.Sprintf("ep%d", i), "en",
-			api.ProviderNameOpenSubtitles,
+		putAttemptRow(t, db, subflux.MediaTypeEpisode, fmt.Sprintf("ep%d", i), "en",
+			subflux.ProviderNameOpenSubtitles,
 			attemptRec{LastTried: base, NextRetry: base.Add(d), Failures: 1})
 	}
 
@@ -150,9 +150,9 @@ func TestQuery_RecentlyScanned_inclusiveCutoff(t *testing.T) {
 	cutoff := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 	justBefore := cutoff.Add(-1) // 1ns before the cutoff
 
-	setScannedAt(t, db, api.MediaTypeMovie, "included", "T1", "en", 0, 0, cutoff)
-	setScannedAt(t, db, api.MediaTypeMovie, "excluded", "T2", "en", 0, 0, justBefore)
-	setScannedAt(t, db, api.MediaTypeMovie, "also_included", "T3", "en", 0, 0, cutoff.Add(time.Hour))
+	setScannedAt(t, db, subflux.MediaTypeMovie, "included", "T1", "en", 0, 0, cutoff)
+	setScannedAt(t, db, subflux.MediaTypeMovie, "excluded", "T2", "en", 0, 0, justBefore)
+	setScannedAt(t, db, subflux.MediaTypeMovie, "also_included", "T3", "en", 0, 0, cutoff.Add(time.Hour))
 
 	got, err := db.RecentlyScanned(ctx, cutoff)
 	if err != nil {
@@ -194,7 +194,7 @@ func TestFaultInjection_updateAbortSeesNeither(t *testing.T) {
 		// Write a row at id=9999 directly.
 		rec := stateRec{
 			ID:            9999,
-			Provider:      api.ProviderNameOpenSubtitles,
+			Provider:      subflux.ProviderNameOpenSubtitles,
 			Score:         42,
 			Manual:        false,
 			VideoPath:     "/media/fault.mkv",
@@ -267,11 +267,11 @@ func TestReconcileConvergence(t *testing.T) {
 		}
 
 		// Save downloads: 4 auto rows across 2 videos.
-		for _, rec := range []*api.DownloadRecord{
-			dlRec(api.MediaTypeMovie, "m1", "en", api.ProviderNameOpenSubtitles, "R1", sub1a, video1, 80, false),
-			dlRec(api.MediaTypeMovie, "m1", "fr", api.ProviderNameGestdown, "R2", sub1b, video1, 70, false),
-			dlRec(api.MediaTypeMovie, "m2", "en", api.ProviderNameOpenSubtitles, "R3", sub2a, video2, 90, false),
-			dlRec(api.MediaTypeMovie, "m2", "fr", api.ProviderNameGestdown, "R4", sub2b, video2, 60, false),
+		for _, rec := range []*subflux.DownloadRecord{
+			dlRec(subflux.MediaTypeMovie, "m1", "en", subflux.ProviderNameOpenSubtitles, "R1", sub1a, video1, 80, false),
+			dlRec(subflux.MediaTypeMovie, "m1", "fr", subflux.ProviderNameGestdown, "R2", sub1b, video1, 70, false),
+			dlRec(subflux.MediaTypeMovie, "m2", "en", subflux.ProviderNameOpenSubtitles, "R3", sub2a, video2, 90, false),
+			dlRec(subflux.MediaTypeMovie, "m2", "fr", subflux.ProviderNameGestdown, "R4", sub2b, video2, 60, false),
 		} {
 			if err := db.SaveDownload(ctx, rec); err != nil {
 				t.Fatalf("SaveDownload: %v", err)
@@ -331,11 +331,11 @@ func TestReconcileConvergence(t *testing.T) {
 
 	// Compare final states: both scenarios must converge to the same state.
 	// We compare via GetState (all rows) since reconcile resets auto rows.
-	stateA, err := dbA.GetState(ctx, &api.StateQuery{})
+	stateA, err := dbA.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState(A): %v", err)
 	}
-	stateB, err := dbB.GetState(ctx, &api.StateQuery{})
+	stateB, err := dbB.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState(B): %v", err)
 	}
@@ -442,25 +442,25 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 
 	// Seed initial state so reconcile has something to work with.
 	triples := []struct {
-		mt    api.MediaType
+		mt    subflux.MediaType
 		mid   string
 		lang  string
 		video string
 	}{
-		{api.MediaTypeMovie, "m1", "en", videos[0]},
-		{api.MediaTypeMovie, "m1", "fr", videos[0]},
-		{api.MediaTypeMovie, "m2", "en", videos[1]},
+		{subflux.MediaTypeMovie, "m1", "en", videos[0]},
+		{subflux.MediaTypeMovie, "m1", "fr", videos[0]},
+		{subflux.MediaTypeMovie, "m2", "en", videos[1]},
 	}
 	for _, tr := range triples {
 		sub := filepath.Join(dir, fmt.Sprintf("%s.%s.srt", tr.mid, tr.lang))
 		subFilesMu.Lock()
 		subFiles[sub] = true
 		subFilesMu.Unlock()
-		if err := db.SaveDownload(ctx, &api.DownloadRecord{
+		if err := db.SaveDownload(ctx, &subflux.DownloadRecord{
 			MediaType: tr.mt, MediaID: tr.mid, Language: tr.lang,
-			ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "R",
+			ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "R",
 			Path: sub, Score: 50,
-			Meta: &api.DownloadMeta{VideoPath: tr.video, Title: "T"},
+			Meta: &subflux.DownloadMeta{VideoPath: tr.video, Title: "T"},
 		}); err != nil {
 			t.Fatalf("seed SaveDownload: %v", err)
 		}
@@ -485,11 +485,11 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 			subFilesMu.Lock()
 			subFiles[sub] = true
 			subFilesMu.Unlock()
-			_ = db.SaveDownload(ctx, &api.DownloadRecord{
+			_ = db.SaveDownload(ctx, &subflux.DownloadRecord{
 				MediaType: tr.mt, MediaID: tr.mid, Language: tr.lang,
-				ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: fmt.Sprintf("R%d", i),
+				ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: fmt.Sprintf("R%d", i),
 				Path: sub, Score: 50 + i%50,
-				Meta: &api.DownloadMeta{VideoPath: tr.video, Title: "T"},
+				Meta: &subflux.DownloadMeta{VideoPath: tr.video, Title: "T"},
 			})
 		}
 	})
@@ -526,7 +526,7 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 	}
 
 	// Final assertion: the store is still usable (no corruption).
-	_, err = db.GetState(ctx, &api.StateQuery{})
+	_, err = db.GetState(ctx, &subflux.StateQuery{})
 	if err != nil {
 		t.Fatalf("GetState after concurrent workload: %v", err)
 	}

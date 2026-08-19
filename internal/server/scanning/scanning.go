@@ -12,11 +12,11 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Deps holds the narrow dependencies the scan orchestration needs from
@@ -38,7 +38,7 @@ type Deps struct {
 // ScanStore is the narrow store interface for scan state tracking.
 type ScanStore interface {
 	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
-	RecordScanState(ctx context.Context, rec *api.ScanRecord) error
+	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
 	// Scan-cycle mark (duration-aware resume): set when a full scan begins,
 	// cleared on normal completion. A dangling mark at the next scan start
 	// means the previous cycle was interrupted; the resume cutoff extends
@@ -176,7 +176,7 @@ func buildSeedDeps(deps *Deps, ls *LiveState) seedDeps {
 	if !adaptive.Enabled || deps.Backoff == nil {
 		return seedDeps{}
 	}
-	enabled := make(map[api.ProviderID]struct{}, len(ls.Providers))
+	enabled := make(map[subflux.ProviderID]struct{}, len(ls.Providers))
 	for _, p := range ls.Providers {
 		enabled[p.Name()] = struct{}{}
 	}
@@ -198,13 +198,13 @@ func buildSeedDeps(deps *Deps, ls *LiveState) seedDeps {
 // straight through to this one, and naming this type is what keeps the two
 // declarations from drifting apart.
 type ScanEngine interface {
-	SearchTargets(ctx context.Context, req *api.SearchRequest, videoPath string, targets []api.SubtitleTarget) (api.SearchResult, error)
+	SearchTargets(ctx context.Context, req *subflux.SearchRequest, videoPath string, targets []subflux.SubtitleTarget) (subflux.SearchResult, error)
 	// InventoryCoverage records the on-disk/embedded inventory for an item
 	// WITHOUT any provider work, stamping its scan state as
 	// inventoried-not-searched. The skip paths (season early stop,
 	// show-level skip) call it so coverage stays truthful for items the
 	// scanner deliberately does not search.
-	InventoryCoverage(ctx context.Context, req *api.SearchRequest, videoPath string) (coverageChanged bool)
+	InventoryCoverage(ctx context.Context, req *subflux.SearchRequest, videoPath string) (coverageChanged bool)
 }
 
 // LiveState holds the runtime state needed for a scan pass.
@@ -217,13 +217,13 @@ type LiveState struct {
 	Providers   []provider.Provider
 }
 
-// ScanOutcome is a type alias for api.ScanOutcome.
-type ScanOutcome = api.ScanOutcome
+// ScanOutcome is a type alias for subflux.ScanOutcome.
+type ScanOutcome = subflux.ScanOutcome
 
 // Scan outcome constants re-exported from api for local use.
 const (
-	ScanFound     = api.ScanFound
-	ScanSkipped   = api.ScanSkipped
-	ScanNoResult  = api.ScanNoResult
-	ScanBackedOff = api.ScanBackedOff
+	ScanFound     = subflux.ScanFound
+	ScanSkipped   = subflux.ScanSkipped
+	ScanNoResult  = subflux.ScanNoResult
+	ScanBackedOff = subflux.ScanBackedOff
 )

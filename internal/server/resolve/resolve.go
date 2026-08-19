@@ -29,8 +29,8 @@ import (
 	"strconv"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
@@ -59,12 +59,12 @@ var (
 // MediaID is the store media identifier (e.g. "tmdb-1271",
 // "tvdb-121361-s01e05"), matching the /api/files wire fields.
 type FileRef struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   string        `json:"media_id"`
-	Language  string        `json:"language"`
-	Variant   string        `json:"variant"`
-	Source    string        `json:"source"`
-	Ordinal   int           `json:"ordinal,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   string            `json:"media_id"`
+	Language  string            `json:"language"`
+	Variant   string            `json:"variant"`
+	Source    string            `json:"source"`
+	Ordinal   int               `json:"ordinal,omitempty"`
 }
 
 // Validate checks the reference's field shape (not its existence). Only
@@ -77,7 +77,7 @@ func (ref *FileRef) Validate() error {
 	if ref.MediaID == "" || ref.Language == "" {
 		return errors.New("media_id and language are required")
 	}
-	if ref.Source != string(api.SourceExternal) {
+	if ref.Source != string(subflux.SourceExternal) {
 		return errors.New("source must be external (embedded tracks are not file-addressable)")
 	}
 	if ref.Ordinal < 0 {
@@ -92,10 +92,10 @@ func (ref *FileRef) Validate() error {
 // returns a stale store path. The json field names match the existing
 // download wire contract (media_id = arr ID).
 type MediaRef struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   int           `json:"media_id"`
-	Season    int           `json:"season,omitempty"`
-	Episode   int           `json:"episode,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   int               `json:"media_id"`
+	Season    int               `json:"season,omitempty"`
+	Episode   int               `json:"episode,omitempty"`
 }
 
 // Validate checks the reference's field shape (not its existence).
@@ -106,7 +106,7 @@ func (ref *MediaRef) Validate() error {
 	if ref.MediaID <= 0 {
 		return errors.New("media_id (arr id) is required")
 	}
-	if ref.MediaType == api.MediaTypeEpisode && (ref.Season < 0 || ref.Episode <= 0) {
+	if ref.MediaType == subflux.MediaTypeEpisode && (ref.Season < 0 || ref.Episode <= 0) {
 		return errors.New("season and episode are required for episodes")
 	}
 	return nil
@@ -115,7 +115,7 @@ func (ref *MediaRef) Validate() error {
 // FileStore is the store surface resolution needs: the per-media subtitle
 // rows (key-derived identity incl. path).
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
+	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 
 // pathValidator is the containment check run on every resolved path as
@@ -157,7 +157,7 @@ type Resolver struct {
 // State exactly once and threads the snapshot through, so a hot reload between
 // lookup and validation can never validate an old-generation path against
 // new-generation media roots.
-func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*api.SubtitleEntry, error) {
+func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*subflux.SubtitleEntry, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSubtitleNotFound, err)
 	}
@@ -165,7 +165,7 @@ func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*a
 	if err != nil {
 		return nil, fmt.Errorf("subtitle rows for %s/%s: %w", ref.MediaType, ref.MediaID, err)
 	}
-	var match *api.SubtitleEntry
+	var match *subflux.SubtitleEntry
 	for i := range rows {
 		row := &rows[i]
 		if row.MediaID != ref.MediaID ||
@@ -260,9 +260,9 @@ func (r *Resolver) VideoPath(ctx context.Context, ref *MediaRef) (string, error)
 // dispatcher over the media type.
 func arrVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error) {
 	switch ref.MediaType {
-	case api.MediaTypeMovie:
+	case subflux.MediaTypeMovie:
 		return movieVideoPath(ctx, st, ref)
-	case api.MediaTypeEpisode:
+	case subflux.MediaTypeEpisode:
 		return episodeVideoPath(ctx, st, ref)
 	default:
 		return "", fmt.Errorf("%w: unsupported media type %q", ErrMediaNotFound, ref.MediaType)
@@ -331,11 +331,11 @@ func validateResolved(ctx context.Context, st *State, path string) error {
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrMediaNotFound):
-		httpapi.NotFoundC(w, r, api.CodeMediaNotFound, "media not found")
+		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "media not found")
 	case errors.Is(err, ErrSubtitleNotFound):
-		httpapi.NotFoundC(w, r, api.CodeSubtitleNotFound, "subtitle not found")
+		httpapi.NotFoundC(w, r, subflux.CodeSubtitleNotFound, "subtitle not found")
 	default:
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reference resolution")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "reference resolution")
 	}
 }
 
@@ -345,17 +345,17 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 // Shape errors are returned for the handler's 400.
 func FileRefFromQuery(q url.Values) (*FileRef, error) {
 	ref := &FileRef{
-		MediaType: api.MediaType(q.Get("media_type")),
+		MediaType: subflux.MediaType(q.Get("media_type")),
 		MediaID:   q.Get("media_id"),
 		Language:  q.Get("language"),
 		Variant:   q.Get("variant"),
 		Source:    q.Get("source"),
 	}
 	if ref.Variant == "" {
-		ref.Variant = string(api.VariantStandard)
+		ref.Variant = string(subflux.VariantStandard)
 	}
 	if ref.Source == "" {
-		ref.Source = string(api.SourceExternal)
+		ref.Source = string(subflux.SourceExternal)
 	}
 	if o := q.Get("ordinal"); o != "" {
 		n, err := strconv.Atoi(o)
@@ -374,7 +374,7 @@ func FileRefFromQuery(q url.Values) (*FileRef, error) {
 // (media_type, media_id [arr id], season, episode). Shape errors are
 // returned for the handler's 400.
 func MediaRefFromQuery(q url.Values) (*MediaRef, error) {
-	ref := &MediaRef{MediaType: api.MediaType(q.Get("media_type"))}
+	ref := &MediaRef{MediaType: subflux.MediaType(q.Get("media_type"))}
 	var err error
 	if ref.MediaID, err = strconv.Atoi(q.Get("media_id")); err != nil {
 		return nil, errors.New("media_id (arr id) must be an integer")

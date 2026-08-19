@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // HTTP-surface tests for the S7 FileRef contract on the sync verbs: the
@@ -22,7 +22,7 @@ import (
 
 // syncFakeStore provides subtitle rows plus offset recording.
 type syncFakeStore struct {
-	rows      []api.SubtitleEntry
+	rows      []subflux.SubtitleEntry
 	offsets   map[string]int64
 	setPath   string
 	setOffset int64
@@ -30,7 +30,7 @@ type syncFakeStore struct {
 	setCalls  int
 }
 
-func (m *syncFakeStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *syncFakeStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.rows, nil
 }
 
@@ -50,16 +50,20 @@ func (m *syncFakeStore) SetSyncOffset(_ context.Context, path string, offsetMs i
 type fakeProc struct{}
 
 func (fakeProc) NormalizeEncoding(data []byte) []byte { return data }
-func (fakeProc) ParseSRT([]byte) ([]api.SubtitleCue, error) {
-	return []api.SubtitleCue{{Start: time.Second, End: 2 * time.Second, Text: "hi"}}, nil
+func (fakeProc) ParseSRT([]byte) ([]subflux.SubtitleCue, error) {
+	return []subflux.SubtitleCue{{Start: time.Second, End: 2 * time.Second, Text: "hi"}}, nil
 }
 
-func (fakeProc) WriteSRT([]api.SubtitleCue) ([]byte, error) {
+func (fakeProc) WriteSRT([]subflux.SubtitleCue) ([]byte, error) {
 	return []byte("1\n00:00:01,000 --> 00:00:02,000\nhi\n"), nil
 }
-func (fakeProc) ShiftCues(cues []api.SubtitleCue, _ time.Duration) []api.SubtitleCue { return cues }
-func (fakeProc) SyncFromAudio(context.Context, []byte, string, string) api.AudioSyncResult {
-	return api.AudioSyncResult{Applied: false, Method: "audio", Confidence: 0.1}
+
+func (fakeProc) ShiftCues(cues []subflux.SubtitleCue, _ time.Duration) []subflux.SubtitleCue {
+	return cues
+}
+
+func (fakeProc) SyncFromAudio(context.Context, []byte, string, string) subflux.AudioSyncResult {
+	return subflux.AudioSyncResult{Applied: false, Method: "audio", Confidence: 0.1}
 }
 
 func newSyncHarness(store *syncFakeStore) *Handler {
@@ -92,16 +96,16 @@ func TestHandleSyncOffset_resolvedRefKeysOffsetByPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := &syncFakeStore{
-		rows: []api.SubtitleEntry{{
+		rows: []subflux.SubtitleEntry{{
 			MediaID: "tmdb-1", Language: "en", Variant: "standard",
-			Source: string(api.SourceExternal), Path: subPath,
+			Source: string(subflux.SourceExternal), Path: subPath,
 		}},
 		offsets: map[string]int64{},
 	}
 	h := newSyncHarness(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/sync/offset", refBody(t, SyncOffsetRequest{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", OffsetMs: 250,
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", OffsetMs: 250,
 	}))
 	rec := httptest.NewRecorder()
 	h.HandleSyncOffset(rec, req)
@@ -123,7 +127,7 @@ func TestHandleSyncOffset_unresolvedRefReturns404(t *testing.T) {
 	h := newSyncHarness(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/sync/offset", refBody(t, SyncOffsetRequest{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", OffsetMs: 250,
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", OffsetMs: 250,
 	}))
 	rec := httptest.NewRecorder()
 	h.HandleSyncOffset(rec, req)
@@ -160,9 +164,9 @@ func TestHandleSyncAudio_assGateOnResolvedPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := &syncFakeStore{
-		rows: []api.SubtitleEntry{{
+		rows: []subflux.SubtitleEntry{{
 			MediaID: "tmdb-1", Language: "en", Variant: "standard",
-			Source: string(api.SourceExternal), Path: subPath, VideoPath: videoPath,
+			Source: string(subflux.SourceExternal), Path: subPath, VideoPath: videoPath,
 		}},
 		offsets: map[string]int64{},
 	}
@@ -170,7 +174,7 @@ func TestHandleSyncAudio_assGateOnResolvedPath(t *testing.T) {
 
 	// Non-dry-run apply on an ASS subtitle: refused with the format code.
 	req := httptest.NewRequest(http.MethodPost, "/api/sync/audio", refBody(t, SyncAudioRequest{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1", Language: "en",
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1", Language: "en",
 	}))
 	rec := httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)
@@ -183,7 +187,7 @@ func TestHandleSyncAudio_assGateOnResolvedPath(t *testing.T) {
 
 	// Dry-run is allowed (inspect-only).
 	req = httptest.NewRequest(http.MethodPost, "/api/sync/audio", refBody(t, SyncAudioRequest{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", DryRun: true,
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1", Language: "en", DryRun: true,
 	}))
 	rec = httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)
@@ -200,16 +204,16 @@ func TestHandleSyncAudio_noVideoRecordedReturns404(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := &syncFakeStore{
-		rows: []api.SubtitleEntry{{
+		rows: []subflux.SubtitleEntry{{
 			MediaID: "tmdb-1", Language: "en", Variant: "standard",
-			Source: string(api.SourceExternal), Path: subPath, // no VideoPath anywhere
+			Source: string(subflux.SourceExternal), Path: subPath, // no VideoPath anywhere
 		}},
 		offsets: map[string]int64{},
 	}
 	h := newSyncHarness(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/sync/audio", refBody(t, SyncAudioRequest{
-		MediaType: api.MediaTypeMovie, MediaID: "tmdb-1", Language: "en",
+		MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-1", Language: "en",
 	}))
 	rec := httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)

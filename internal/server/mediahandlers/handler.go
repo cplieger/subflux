@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -102,7 +102,7 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("media browser: failed to fetch series", "error", err)
-		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
+		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch series")
 		return
 	}
 	httpapi.WriteJSON(w, v)
@@ -157,7 +157,7 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("media browser: failed to fetch movies", "error", err)
-		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
+		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch movies")
 		return
 	}
 	httpapi.WriteJSON(w, v)
@@ -189,18 +189,18 @@ type SeasonGroup struct {
 func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "sonarr not configured")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "sonarr not configured")
 		return
 	}
 
 	idStr := extractPathSegment(r.URL.Path, "/api/media/series/", "/episodes")
 	if idStr == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "missing series id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing series id")
 		return
 	}
 	seriesID, err := strconv.Atoi(idStr)
 	if err != nil || seriesID <= 0 {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid series id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid series id")
 		return
 	}
 
@@ -208,7 +208,7 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("media browser: failed to fetch episodes",
 			"series_id", seriesID, "error", err)
-		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch episodes")
+		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch episodes")
 		return
 	}
 

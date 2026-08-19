@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // SearchFlowStore is the narrow store interface for search flow operations:
@@ -13,21 +13,21 @@ import (
 //
 //nolint:revive // name is established API; renaming would break consumers
 type SearchFlowStore interface {
-	RecordNoResult(ctx context.Context, mediaType api.MediaType, mediaID, language string, providerName api.ProviderID, bp api.BackoffParams) error
-	BackedOffProviders(ctx context.Context, mediaType api.MediaType, mediaID, language string, maxAttempts int) ([]api.ProviderID, error)
-	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
-	CurrentScore(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error)
-	IsManuallyLocked(ctx context.Context, key api.ManualLockKey) (bool, error)
+	RecordNoResult(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, providerName subflux.ProviderID, bp subflux.BackoffParams) error
+	BackedOffProviders(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, maxAttempts int) ([]subflux.ProviderID, error)
+	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
+	CurrentScore(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (score int, mediaImported time.Time, found bool, err error)
+	IsManuallyLocked(ctx context.Context, key subflux.ManualLockKey) (bool, error)
 }
 
 // CoverageRecorder is the narrow store interface for coverage tracking:
 // subtitle file recording, sync offsets, and scan state.
 // Consumed by SearchTargets and downloadAndSave.
 type CoverageRecorder interface {
-	RecordSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaID string, files []api.SubtitleFile) (bool, error)
-	UpsertSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID string, f *api.SubtitleFile) error
+	RecordSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaID string, files []subflux.SubtitleFile) (bool, error)
+	UpsertSubtitleFile(ctx context.Context, mediaType subflux.MediaType, mediaID string, f *subflux.SubtitleFile) error
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
-	RecordScanState(ctx context.Context, rec *api.ScanRecord) error
+	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
 }
 
 // SearchStore is the composite store interface consumed by the search engine.

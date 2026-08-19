@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // oldDownloadQuadKey is the NUL-joined form downloadQuadKey replaced, kept as
 // the collision oracle for the pairs below.
-func oldDownloadQuadKey(mt api.MediaType, mediaID, lang string, variant api.Variant) string {
+func oldDownloadQuadKey(mt subflux.MediaType, mediaID, lang string, variant subflux.Variant) string {
 	return strings.Join([]string{string(mt), mediaID, lang, string(variant)}, "\x00")
 }
 
@@ -37,16 +37,16 @@ func TestDownloadQuadKeyCannotBeForged(t *testing.T) {
 	type quad struct {
 		mediaID string
 		lang    string
-		mt      api.MediaType
-		variant api.Variant
+		mt      subflux.MediaType
+		variant subflux.Variant
 	}
 	key := func(q quad) string { return downloadQuadKey(q.mt, q.mediaID, q.lang, q.variant) }
 	oldKey := func(q quad) string { return oldDownloadQuadKey(q.mt, q.mediaID, q.lang, q.variant) }
 
 	nulCases := map[string][2]quad{
 		"control separator moves from the media id into the language": {
-			{mt: api.MediaTypeEpisode, mediaID: "tt1\x00fr", lang: "en", variant: api.VariantStandard},
-			{mt: api.MediaTypeEpisode, mediaID: "tt1", lang: "fr\x00en", variant: api.VariantStandard},
+			{mt: subflux.MediaTypeEpisode, mediaID: "tt1\x00fr", lang: "en", variant: subflux.VariantStandard},
+			{mt: subflux.MediaTypeEpisode, mediaID: "tt1", lang: "fr\x00en", variant: subflux.VariantStandard},
 		},
 	}
 	for name, pair := range nulCases {
@@ -63,12 +63,12 @@ func TestDownloadQuadKeyCannotBeForged(t *testing.T) {
 
 	sepCases := map[string][2]quad{
 		"colon moves from the media id into the language": {
-			{mt: api.MediaTypeEpisode, mediaID: "tt1:fr", lang: "en", variant: api.VariantStandard},
-			{mt: api.MediaTypeEpisode, mediaID: "tt1", lang: "fr:en", variant: api.VariantStandard},
+			{mt: subflux.MediaTypeEpisode, mediaID: "tt1:fr", lang: "en", variant: subflux.VariantStandard},
+			{mt: subflux.MediaTypeEpisode, mediaID: "tt1", lang: "fr:en", variant: subflux.VariantStandard},
 		},
 		"colon in the media id reaches the variant": {
-			{mt: api.MediaTypeMovie, mediaID: "tt1:en:forced", lang: "de", variant: api.VariantHI},
-			{mt: api.MediaTypeMovie, mediaID: "tt1", lang: "en:forced:de", variant: api.VariantHI},
+			{mt: subflux.MediaTypeMovie, mediaID: "tt1:en:forced", lang: "de", variant: subflux.VariantHI},
+			{mt: subflux.MediaTypeMovie, mediaID: "tt1", lang: "en:forced:de", variant: subflux.VariantHI},
 		},
 	}
 	for name, pair := range sepCases {
@@ -96,7 +96,7 @@ func TestDownloadQuadKeyCannotBeForged(t *testing.T) {
 func TestDownloadQuadKeyIsUnescapedForOrdinaryInput(t *testing.T) {
 	t.Parallel()
 
-	got := downloadQuadKey(api.MediaTypeEpisode, "tvdb-121361-s01e02", "fr", api.VariantForced)
+	got := downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-121361-s01e02", "fr", subflux.VariantForced)
 	if want := "episode:tvdb-121361-s01e02:fr:forced"; got != want {
 		t.Errorf("downloadQuadKey() = %q, want %q", got, want)
 	}
@@ -104,12 +104,12 @@ func TestDownloadQuadKeyIsUnescapedForOrdinaryInput(t *testing.T) {
 		t.Error("an ordinary quad key must not be reduced to a hashed identity")
 	}
 
-	base := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantStandard)
+	base := downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "fr", subflux.VariantStandard)
 	others := map[string]string{
-		"media type": downloadQuadKey(api.MediaTypeMovie, "tvdb-1-s01e02", "fr", api.VariantStandard),
-		"media id":   downloadQuadKey(api.MediaTypeEpisode, "tvdb-2-s01e02", "fr", api.VariantStandard),
-		"language":   downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "en", api.VariantStandard),
-		"variant":    downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantForced),
+		"media type": downloadQuadKey(subflux.MediaTypeMovie, "tvdb-1-s01e02", "fr", subflux.VariantStandard),
+		"media id":   downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-2-s01e02", "fr", subflux.VariantStandard),
+		"language":   downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "en", subflux.VariantStandard),
+		"variant":    downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "fr", subflux.VariantForced),
 	}
 	for field, other := range others {
 		if other == base {
@@ -125,8 +125,8 @@ func TestDownloadQuadGateSerializesOnlyTheSameQuad(t *testing.T) {
 	t.Parallel()
 
 	g := newQuadGate()
-	a := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantStandard)
-	b := downloadQuadKey(api.MediaTypeEpisode, "tvdb-1-s01e02", "fr", api.VariantForced)
+	a := downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "fr", subflux.VariantStandard)
+	b := downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "fr", subflux.VariantForced)
 
 	unlockA := g.lock(a)
 

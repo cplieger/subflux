@@ -3,8 +3,8 @@ package search
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -12,20 +12,20 @@ func TestFilterByIdentity(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		req     *api.SearchRequest
-		subs    []api.Subtitle
+		req     *subflux.SearchRequest
+		subs    []subflux.Subtitle
 		wantLen int
 	}{
 		{
 			name:    "movies_pass_through",
-			req:     &api.SearchRequest{MediaType: "movie", Season: 0, Episode: 0},
-			subs:    []api.Subtitle{{ReleaseName: "test"}},
+			req:     &subflux.SearchRequest{MediaType: "movie", Season: 0, Episode: 0},
+			subs:    []subflux.Subtitle{{ReleaseName: "test"}},
 			wantLen: 1,
 		},
 		{
 			name: "drops_wrong_season",
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 1},
-			subs: []api.Subtitle{
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 1},
+			subs: []subflux.Subtitle{
 				{ReleaseName: "correct", Season: 1, Episode: 1},
 				{ReleaseName: "wrong season", Season: 2, Episode: 1},
 			},
@@ -33,8 +33,8 @@ func TestFilterByIdentity(t *testing.T) {
 		},
 		{
 			name: "drops_wrong_episode",
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Test", Season: 3, Episode: 21},
-			subs: []api.Subtitle{
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Test", Season: 3, Episode: 21},
+			subs: []subflux.Subtitle{
 				{ReleaseName: "correct", Season: 3, Episode: 21},
 				{ReleaseName: "wrong ep", Season: 3, Episode: 22},
 				{ReleaseName: "wrong ep 101", Season: 3, Episode: 101},
@@ -43,20 +43,20 @@ func TestFilterByIdentity(t *testing.T) {
 		},
 		{
 			name:    "keeps_unknown_identity",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 5},
-			subs:    []api.Subtitle{{Season: 0, Episode: 0}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 5},
+			subs:    []subflux.Subtitle{{Season: 0, Episode: 0}},
 			wantLen: 1,
 		},
 		{
 			name:    "keeps_hash_match",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 1},
-			subs:    []api.Subtitle{{ReleaseName: "hash match", Season: 2, Episode: 5, MatchedBy: "hash"}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Test", Season: 1, Episode: 1},
+			subs:    []subflux.Subtitle{{ReleaseName: "hash match", Season: 2, Episode: 5, MatchedBy: "hash"}},
 			wantLen: 1,
 		},
 		{
 			name: "mixed",
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
-			subs: []api.Subtitle{
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
+			subs: []subflux.Subtitle{
 				{ReleaseName: "Dragon.Ball.S01E01.mkv", Season: 1, Episode: 1, Provider: "opensubtitles"},
 				{ReleaseName: "wrong ep from OS", Season: 1, Episode: 101, Provider: "opensubtitles"},
 				{ReleaseName: "Dragon.Ball.DAIMA.S01E01.mkv", Season: 0, Episode: 0, Provider: "animetosho"},
@@ -67,32 +67,32 @@ func TestFilterByIdentity(t *testing.T) {
 		},
 		{
 			name:    "no_season_episode_in_request",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Test", Season: 0, Episode: 0},
-			subs:    []api.Subtitle{{ReleaseName: "any", Season: 5, Episode: 10}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Test", Season: 0, Episode: 0},
+			subs:    []subflux.Subtitle{{ReleaseName: "any", Season: 5, Episode: 10}},
 			wantLen: 1,
 		},
 		{
 			name:    "drops_wrong_show_from_release_name",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
-			subs:    []api.Subtitle{{ReleaseName: "Dragon.Ball.DAIMA.S01E01.1080p.WEB-DL.mkv", Provider: "animetosho"}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
+			subs:    []subflux.Subtitle{{ReleaseName: "Dragon.Ball.DAIMA.S01E01.1080p.WEB-DL.mkv", Provider: "animetosho"}},
 			wantLen: 0,
 		},
 		{
 			name:    "keeps_correct_show_from_release_name",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
-			subs:    []api.Subtitle{{ReleaseName: "Dragon.Ball.S01E01.480p.DVD.mkv", Provider: "animetosho"}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
+			subs:    []subflux.Subtitle{{ReleaseName: "Dragon.Ball.S01E01.480p.DVD.mkv", Provider: "animetosho"}},
 			wantLen: 1,
 		},
 		{
 			name:    "drops_wrong_title_from_provider",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
-			subs:    []api.Subtitle{{Title: "Dragon Ball DAIMA", Season: 1, Episode: 1}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
+			subs:    []subflux.Subtitle{{Title: "Dragon Ball DAIMA", Season: 1, Episode: 1}},
 			wantLen: 0,
 		},
 		{
 			name:    "keeps_matching_title_from_provider",
-			req:     &api.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
-			subs:    []api.Subtitle{{Title: "Dragon Ball", Season: 1, Episode: 1}},
+			req:     &subflux.SearchRequest{MediaType: "episode", Title: "Dragon Ball", Season: 1, Episode: 1},
+			subs:    []subflux.Subtitle{{Title: "Dragon Ball", Season: 1, Episode: 1}},
 			wantLen: 1,
 		},
 	}
@@ -198,8 +198,8 @@ func TestIsSeasonPack(t *testing.T) {
 func TestMatchBreakdown_all_categories(t *testing.T) {
 	t.Parallel()
 
-	scores := &api.DefaultScores
-	matches := api.MatchSet{
+	scores := &subflux.DefaultScores
+	matches := subflux.MatchSet{
 		Hash: true, Source: true, ReleaseGroup: true,
 		StreamingService: true, VideoCodec: true, HDR: true,
 		Edition: true, SeasonPack: true,
@@ -223,8 +223,8 @@ func TestMatchBreakdown_all_categories(t *testing.T) {
 
 func TestMatchBreakdown_empty_matches(t *testing.T) {
 	t.Parallel()
-	scores := &api.DefaultScores
-	got := matchBreakdown(scores, api.MatchSet{})
+	scores := &subflux.DefaultScores
+	got := matchBreakdown(scores, subflux.MatchSet{})
 	if len(got) != 0 {
 		t.Errorf("matchBreakdown(empty) = %v, want empty map", got)
 	}
@@ -232,8 +232,8 @@ func TestMatchBreakdown_empty_matches(t *testing.T) {
 
 func TestMatchBreakdown_hash_only(t *testing.T) {
 	t.Parallel()
-	scores := &api.DefaultScores
-	matches := api.MatchSet{Hash: true}
+	scores := &subflux.DefaultScores
+	matches := subflux.MatchSet{Hash: true}
 	got := matchBreakdown(scores, matches)
 	if len(got) != 1 {
 		t.Errorf("matchBreakdown(hash only) has %d keys, want 1", len(got))
@@ -245,8 +245,8 @@ func TestMatchBreakdown_hash_only(t *testing.T) {
 
 func TestMatchBreakdown_false_match_excluded(t *testing.T) {
 	t.Parallel()
-	scores := &api.DefaultScores
-	matches := api.MatchSet{Source: true}
+	scores := &subflux.DefaultScores
+	matches := subflux.MatchSet{Source: true}
 	got := matchBreakdown(scores, matches)
 	if _, ok := got["release_group"]; ok {
 		t.Error("matchBreakdown() included false match for release_group")
@@ -262,14 +262,14 @@ func TestFilterByVariant(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string
-		variant      api.Variant
-		results      []api.Subtitle
+		variant      subflux.Variant
+		results      []subflux.Subtitle
 		wantLen      int
 		wantFallback bool
 	}{
 		{
 			name: "forced_keeps_only_forced",
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{Provider: "os", ReleaseName: "Regular", HearingImp: false, Forced: false},
 				{Provider: "os", ReleaseName: "HI-Sub", HearingImp: true, Forced: false},
 				{Provider: "os", ReleaseName: "Forced-Sub", Forced: true},
@@ -278,7 +278,7 @@ func TestFilterByVariant(t *testing.T) {
 		},
 		{
 			name: "forced_empty_when_none",
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{Provider: "os", ReleaseName: "Regular"},
 				{Provider: "os", ReleaseName: "HI-Sub", HearingImp: true},
 			},
@@ -286,7 +286,7 @@ func TestFilterByVariant(t *testing.T) {
 		},
 		{
 			name: "hi_keeps_only_hi",
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{Provider: "os", ReleaseName: "Regular"},
 				{Provider: "os", ReleaseName: "HI-Sub", HearingImp: true},
 				{Provider: "os", ReleaseName: "Forced-HI", HearingImp: true, Forced: true},
@@ -295,7 +295,7 @@ func TestFilterByVariant(t *testing.T) {
 		},
 		{
 			name: "hi_excludes_forced_hi",
-			results: []api.Subtitle{
+			results: []subflux.Subtitle{
 				{Provider: "os", ReleaseName: "Forced-HI", HearingImp: true, Forced: true},
 			},
 			variant: "hi", wantLen: 0, wantFallback: false,
@@ -320,7 +320,7 @@ func TestFilterByVariant(t *testing.T) {
 func TestEpisodeNumberMatch(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		req        *api.SearchRequest
+		req        *subflux.SearchRequest
 		name       string
 		subSeason  int
 		subEpisode int
@@ -328,37 +328,37 @@ func TestEpisodeNumberMatch(t *testing.T) {
 	}{
 		{
 			name: "scene_episode", subSeason: 2, subEpisode: 10,
-			req:  &api.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 2},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 2},
 			want: true,
 		},
 		{
 			name: "scene_no_match", subSeason: 3, subEpisode: 5,
-			req:  &api.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 2},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 2},
 			want: false,
 		},
 		{
 			name: "scene_episode_inherits_season", subSeason: 1, subEpisode: 10,
-			req:  &api.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 0},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5, SceneEpisode: 10, SceneSeason: 0},
 			want: true,
 		},
 		{
 			name: "absolute_episode", subSeason: 1, subEpisode: 50,
-			req:  &api.SearchRequest{Season: 1, Episode: 5, AbsoluteEpisode: 50, SceneSeason: 0},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5, AbsoluteEpisode: 50, SceneSeason: 0},
 			want: true,
 		},
 		{
 			name: "absolute_with_scene_season", subSeason: 3, subEpisode: 50,
-			req:  &api.SearchRequest{Season: 1, Episode: 5, AbsoluteEpisode: 50, SceneSeason: 3},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5, AbsoluteEpisode: 50, SceneSeason: 3},
 			want: true,
 		},
 		{
 			name: "no_match", subSeason: 2, subEpisode: 10,
-			req:  &api.SearchRequest{Season: 1, Episode: 5},
+			req:  &subflux.SearchRequest{Season: 1, Episode: 5},
 			want: false,
 		},
 		{
 			name: "sub_season_zero_matches_any", subSeason: 0, subEpisode: 7,
-			req:  &api.SearchRequest{Season: 3, Episode: 7},
+			req:  &subflux.SearchRequest{Season: 3, Episode: 7},
 			want: true,
 		},
 	}
@@ -376,45 +376,45 @@ func TestEpisodeNumberMatch(t *testing.T) {
 func TestIdentityOK(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		sub  *api.Subtitle
-		req  *api.SearchRequest
+		sub  *subflux.Subtitle
+		req  *subflux.SearchRequest
 		name string
 		want bool
 	}{
 		{
 			name: "movie_rejects_episode_subtitle",
-			sub:  &api.Subtitle{Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "movie", Title: "Test"},
+			sub:  &subflux.Subtitle{Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "movie", Title: "Test"},
 			want: false,
 		},
 		{
 			name: "release_season_mismatch_rejected",
-			sub:  &api.Subtitle{ReleaseName: "Show.S04E01.720p-GRP"},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Show", Season: 3, Episode: 8},
+			sub:  &subflux.Subtitle{ReleaseName: "Show.S04E01.720p-GRP"},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Show", Season: 3, Episode: 8},
 			want: false,
 		},
 		{
 			name: "release_season_match_accepted",
-			sub:  &api.Subtitle{ReleaseName: "Show.S03E08.720p-GRP"},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Show", Season: 3, Episode: 8},
+			sub:  &subflux.Subtitle{ReleaseName: "Show.S03E08.720p-GRP"},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Show", Season: 3, Episode: 8},
 			want: true,
 		},
 		{
 			name: "no_season_marker_passes",
-			sub:  &api.Subtitle{ReleaseName: "001 - Show Episode Title"},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "Show", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{ReleaseName: "001 - Show Episode Title"},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "Show", Season: 1, Episode: 1},
 			want: true,
 		},
 		{
 			name: "provider_title_mismatch_rejected",
-			sub:  &api.Subtitle{Title: "Wrong Show"},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show"},
+			sub:  &subflux.Subtitle{Title: "Wrong Show"},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show"},
 			want: false,
 		},
 		{
 			name: "provider_title_match_accepted",
-			sub:  &api.Subtitle{Title: "My Show"},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show"},
+			sub:  &subflux.Subtitle{Title: "My Show"},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show"},
 			want: true,
 		},
 	}
@@ -432,39 +432,39 @@ func TestIdentityOK(t *testing.T) {
 func TestIdentityTitleOK(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		sub  *api.Subtitle
-		req  *api.SearchRequest
+		sub  *subflux.Subtitle
+		req  *subflux.SearchRequest
 		name string
 		want bool
 	}{
 		{
 			name: "id_matched_bypasses_title_check",
-			sub:  &api.Subtitle{MatchedBy: "imdb", Title: "Completely Different Show", Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{MatchedBy: "imdb", Title: "Completely Different Show", Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
 			want: true,
 		},
 		{
 			name: "episode_title_mismatch_rejected",
-			sub:  &api.Subtitle{MatchedBy: "title", Title: "Wrong Episode Title", Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show", EpisodeTitle: "Correct Episode Title", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{MatchedBy: "title", Title: "Wrong Episode Title", Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show", EpisodeTitle: "Correct Episode Title", Season: 1, Episode: 1},
 			want: false,
 		},
 		{
 			name: "episode_title_matches_series_title",
-			sub:  &api.Subtitle{MatchedBy: "title", Title: "My Show", Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show", EpisodeTitle: "Pilot", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{MatchedBy: "title", Title: "My Show", Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show", EpisodeTitle: "Pilot", Season: 1, Episode: 1},
 			want: true,
 		},
 		{
 			name: "no_episode_title_validates_series",
-			sub:  &api.Subtitle{MatchedBy: "title", Title: "Wrong Show", Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{MatchedBy: "title", Title: "Wrong Show", Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
 			want: false,
 		},
 		{
 			name: "title_matched_no_title_validates_release",
-			sub:  &api.Subtitle{MatchedBy: "title", ReleaseName: "Wrong.Show.S01E01.720p-GRP", Season: 1, Episode: 1},
-			req:  &api.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
+			sub:  &subflux.Subtitle{MatchedBy: "title", ReleaseName: "Wrong.Show.S01E01.720p-GRP", Season: 1, Episode: 1},
+			req:  &subflux.SearchRequest{MediaType: "episode", Title: "My Show", Season: 1, Episode: 1},
 			want: false,
 		},
 	}
@@ -483,7 +483,7 @@ func TestIdentityTitleOK(t *testing.T) {
 
 func TestAnyTitleMatches_alternative_title(t *testing.T) {
 	t.Parallel()
-	req := &api.SearchRequest{Title: "Dragon Ball", AlternativeTitles: []string{"Dragonball", "DB"}}
+	req := &subflux.SearchRequest{Title: "Dragon Ball", AlternativeTitles: []string{"Dragonball", "DB"}}
 	if !anyTitleMatches(req, "Dragonball") {
 		t.Error("anyTitleMatches(Dragonball) = false, want true (alternative)")
 	}
@@ -494,7 +494,7 @@ func TestAnyTitleMatches_alternative_title(t *testing.T) {
 
 func TestAnyReleaseNameMatches_alternative_title(t *testing.T) {
 	t.Parallel()
-	req := &api.SearchRequest{Title: "Dragon Ball", AlternativeTitles: []string{"Dragonball"}}
+	req := &subflux.SearchRequest{Title: "Dragon Ball", AlternativeTitles: []string{"Dragonball"}}
 	if !anyReleaseNameMatches(req, "Dragonball.S01E01.720p-GRP") {
 		t.Error("anyReleaseNameMatches(alt title) = false, want true")
 	}

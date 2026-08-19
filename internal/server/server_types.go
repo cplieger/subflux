@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -26,6 +25,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/wiring"
 	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -44,7 +44,7 @@ import (
 // Composed by EMBEDDING, never by re-listing, so the width is derived: adding a
 // method to polling.PollSonarrClient widens this automatically and removing one
 // narrows it. The declaration these replace was a hand-written nine-method list
-// in internal/api, and the ten embedded surfaces below already summed to exactly
+// in internal/subflux, and the ten embedded surfaces below already summed to exactly
 // those nine — the list happened to be right, and nothing in the code would have
 // noticed if it had stopped being.
 //
@@ -201,7 +201,7 @@ type Server struct {
 	activity     *activity.Log
 	live         atomic.Pointer[liveState]
 	queryH       *queryhandlers.Handler
-	schemaFunc   api.SchemaFunc
+	schemaFunc   subflux.SchemaFunc
 	configH      *confighandlers.Handler
 	alerts       *activity.AlertLog
 	events       *events.EventBus
@@ -273,7 +273,7 @@ func WithConfig(cfg *config.Config) Option {
 func WithWire(w wiring.Func) Option { return func(s *Server) { s.wire = w } }
 
 // WithSchema sets the config schema function.
-func WithSchema(f api.SchemaFunc) Option { return func(s *Server) { s.schemaFunc = f } }
+func WithSchema(f subflux.SchemaFunc) Option { return func(s *Server) { s.schemaFunc = f } }
 
 // WithConfigLoader sets the config loader. Typed as the config handlers' own
 // func type rather than re-declared here: this package never calls it, it only

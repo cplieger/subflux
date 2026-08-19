@@ -9,8 +9,8 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Mock implementations ---
@@ -19,7 +19,9 @@ type mockMetrics struct {
 	imports []string
 }
 
-func (m *mockMetrics) RecordImport(source api.PollKey) { m.imports = append(m.imports, string(source)) }
+func (m *mockMetrics) RecordImport(source subflux.PollKey) {
+	m.imports = append(m.imports, string(source))
+}
 
 type mockEvents struct {
 	published []events.Event
@@ -45,9 +47,9 @@ type mockStore struct {
 	deletedPaths [][]string
 }
 
-func (m *mockStore) DeleteStateByPaths(_ context.Context, paths []string) (api.CleanupResult, error) {
+func (m *mockStore) DeleteStateByPaths(_ context.Context, paths []string) (subflux.CleanupResult, error) {
 	m.deletedPaths = append(m.deletedPaths, paths)
-	return api.CleanupResult{Paths: paths}, nil
+	return subflux.CleanupResult{Paths: paths}, nil
 }
 
 type mockHistoryPoller struct {
@@ -82,16 +84,16 @@ func (m *mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { retur
 func (m *mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
 
 type mockCfg struct {
-	targets   []api.SubtitleTarget
+	targets   []subflux.SubtitleTarget
 	langs     []string
 	interval  time.Duration
 	scanDelay time.Duration
 }
 
 func (m *mockCfg) PollInterval() time.Duration                    { return m.interval }
-func (m *mockCfg) Search() api.SearchConfig                       { return api.SearchConfig{ScanDelay: m.scanDelay} }
+func (m *mockCfg) Search() subflux.SearchConfig                   { return subflux.SearchConfig{ScanDelay: m.scanDelay} }
 func (m *mockCfg) ValidatePath(_ context.Context, _ string) error { return nil }
-func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
+func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []subflux.SubtitleTarget {
 	return m.targets
 }
 func (m *mockCfg) LanguageCodes() []string { return m.langs }
@@ -101,17 +103,17 @@ func (m *mockCfg) LanguageCodes() []string { return m.langs }
 // seven of them were unreachable from this package.
 type mockEngine struct {
 	err    error
-	result api.SearchResult
+	result subflux.SearchResult
 }
 
-func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
+func (m *mockEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
 	return m.result, m.err
 }
 
 func newTestPollCache() *PollCache {
 	return NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
 }
 
@@ -126,8 +128,8 @@ const ttlProbeDelay = 5 * time.Millisecond
 // test where store side effects are not asserted.
 type noopStore struct{}
 
-func (noopStore) DeleteStateByPaths(_ context.Context, paths []string) (api.CleanupResult, error) {
-	return api.CleanupResult{Paths: paths}, nil
+func (noopStore) DeleteStateByPaths(_ context.Context, paths []string) (subflux.CleanupResult, error) {
+	return subflux.CleanupResult{Paths: paths}, nil
 }
 
 // countingExcludeResolver embeds *mockHistoryPoller and counts ResolveExcludeTagIDs
@@ -467,11 +469,11 @@ func TestDetect_queue_full_defers_batch(t *testing.T) {
 
 	// Fill the queue with placeholder batches.
 	for range cap(p.work) {
-		p.work <- sourceBatch{source: PollSourceRadarr, key: api.PollKeyRadarr}
+		p.work <- sourceBatch{source: PollSourceRadarr, key: subflux.PollKeyRadarr}
 	}
-	before := p.detectSince(t.Context(), api.PollKeySonarr)
+	before := p.detectSince(t.Context(), subflux.PollKeySonarr)
 	p.detectSonarr(t.Context(), ls)
-	after := p.detectSince(t.Context(), api.PollKeySonarr)
+	after := p.detectSince(t.Context(), subflux.PollKeySonarr)
 	if !after.Equal(before) {
 		t.Errorf("detection cursor advanced %v -> %v despite deferred batch; deferred entries would be lost", before, after)
 	}

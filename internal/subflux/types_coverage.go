@@ -1,4 +1,4 @@
-package api
+package subflux
 
 // --- Coverage tracking types (subtitle files + scan state) ---
 

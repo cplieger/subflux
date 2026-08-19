@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -695,9 +695,9 @@ func TestArbitration_twoValueContract(t *testing.T) {
 	}
 
 	// Both consumer gates read the calibrated value untouched.
-	if float64(winner.Confidence) >= api.DefaultSyncMinConfidence {
+	if float64(winner.Confidence) >= subflux.DefaultSyncMinConfidence {
 		t.Errorf("reference gate: %f should be below sync_min_confidence %f",
-			float64(winner.Confidence), api.DefaultSyncMinConfidence)
+			float64(winner.Confidence), subflux.DefaultSyncMinConfidence)
 	}
 	if !winner.ShouldApply() {
 		t.Errorf("audio-fallback threshold: %f should pass ShouldApply (>= %f)",

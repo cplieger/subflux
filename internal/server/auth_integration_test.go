@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -161,15 +161,15 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 // noopMetrics implements Metrics for integration tests.
 type noopMetrics struct{}
 
-func (noopMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) {}
-func (noopMetrics) RecordHTTP(webhttp.RequestMetric)                        {}
-func (noopMetrics) RecordPanic()                                            {}
-func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
-func (noopMetrics) AdaptiveSkip()                                           {}
-func (noopMetrics) RecordEmbeddedDetectorError()                            {}
-func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
-func (noopMetrics) RecordImport(_ api.PollKey)                              {}
-func (noopMetrics) TotalSearches() int64                                    { return 0 }
+func (noopMetrics) RecordSearch(_ subflux.ProviderID, _ time.Duration, _ error) {}
+func (noopMetrics) RecordHTTP(webhttp.RequestMetric)                            {}
+func (noopMetrics) RecordPanic()                                                {}
+func (noopMetrics) RecordDownload(_ subflux.ProviderID, _ error)                {}
+func (noopMetrics) AdaptiveSkip()                                               {}
+func (noopMetrics) RecordEmbeddedDetectorError()                                {}
+func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                        {}
+func (noopMetrics) RecordImport(_ subflux.PollKey)                              {}
+func (noopMetrics) TotalSearches() int64                                        { return 0 }
 func (noopMetrics) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

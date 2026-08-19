@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // loadedConfig returns a Config that has been through Validate + buildCaches,
@@ -19,13 +19,13 @@ func loadedConfig(t *testing.T) *Config {
 		SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 		Languages: LanguageRules{
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{
-				{Code: "fr", Variants: []string{"forced"}, Providers: []api.ProviderID{"a"}, Exclude: []api.ProviderID{"b"}},
+				{Code: "fr", Variants: []string{"forced"}, Providers: []subflux.ProviderID{"a"}, Exclude: []subflux.ProviderID{"b"}},
 			}}},
 			Default: []yamlSubtitleTarget{
-				{Code: "en", Variants: []string{"hi"}, Providers: []api.ProviderID{"c"}, Exclude: []api.ProviderID{"d"}},
+				{Code: "en", Variants: []string{"hi"}, Providers: []subflux.ProviderID{"c"}, Exclude: []subflux.ProviderID{"d"}},
 			},
 		},
-		ProvidersCfg: map[api.ProviderID]yamlProviderCfg{
+		ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{
 			"test": {Enabled: true, Settings: map[string]any{"token": "live"}},
 		},
 		TrustedProxies:  []string{"10.0.0.0/8"},

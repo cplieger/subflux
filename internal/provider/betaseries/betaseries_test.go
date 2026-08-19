@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestBetaLangToISO(t *testing.T) {
@@ -69,8 +69,8 @@ func TestFactory(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
-			if p.Name() != api.ProviderNameBetaSeries {
-				t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameBetaSeries)
+			if p.Name() != subflux.ProviderNameBetaSeries {
+				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameBetaSeries)
 			}
 		})
 	}
@@ -121,8 +121,8 @@ func TestFilterSubtitleEntries(t *testing.T) {
 		if got[0].DownloadURL != "https://example.com/42.srt" {
 			t.Errorf("DownloadURL = %q, want %q", got[0].DownloadURL, "https://example.com/42.srt")
 		}
-		if got[0].MatchedBy != api.MatchByTVDB {
-			t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTVDB)
+		if got[0].MatchedBy != subflux.MatchByTVDB {
+			t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTVDB)
 		}
 		if got[0].Season != 1 {
 			t.Errorf("Season = %d, want 1", got[0].Season)
@@ -292,9 +292,9 @@ func TestClassifyBadRequest(t *testing.T) {
 					t.Fatal("classifyBadRequest() error = nil, want error")
 				}
 				if tt.wantErrType == "auth" {
-					var authErr *api.AuthError
+					var authErr *subflux.AuthError
 					if !errors.As(err, &authErr) {
-						t.Errorf("error type = %T, want *api.AuthError", err)
+						t.Errorf("error type = %T, want *subflux.AuthError", err)
 					}
 				}
 				if tt.wantErrMsg != "" && err.Error() != tt.wantErrMsg {
@@ -343,11 +343,11 @@ func TestDownloadAbsentUpstream(t *testing.T) {
 		client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}},
 		token:  "t",
 	}
-	sub := api.Subtitle{ID: "sub-1", DownloadURL: "https://api.betaseries.com/subtitles/sub-1"}
+	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: "https://api.betaseries.com/subtitles/sub-1"}
 
 	data, err := p.Download(t.Context(), &sub)
-	if !errors.Is(err, api.ErrSubtitleAbsent) {
-		t.Errorf("Download on 404 error = %v, want one wrapping api.ErrSubtitleAbsent", err)
+	if !errors.Is(err, subflux.ErrSubtitleAbsent) {
+		t.Errorf("Download on 404 error = %v, want one wrapping subflux.ErrSubtitleAbsent", err)
 	}
 	if data != nil {
 		t.Errorf("Download on 404 data = %q, want nil", data)

@@ -1,7 +1,7 @@
 package queryhandlers
 
 import (
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // fakeQueryCfg is the config double for this package's tests. Its width is the
@@ -17,17 +17,17 @@ import (
 // test set — a loaded config derives its targets from language rules, which
 // would move the assertion onto the resolver instead of the handler.
 type fakeQueryCfg struct {
-	providers   map[api.ProviderID]api.ProviderCfg
-	sonarrCfg   api.ArrConfig
-	radarrCfg   api.ArrConfig
-	langRules   api.LanguageRulesJSON
+	providers   map[subflux.ProviderID]subflux.ProviderCfg
+	sonarrCfg   subflux.ArrConfig
+	radarrCfg   subflux.ArrConfig
+	langRules   subflux.LanguageRulesJSON
 	languages   []string
-	targets     []api.SubtitleTarget
-	searchCfg   api.SearchConfig
-	adaptiveCfg api.AdaptiveConfig
-	syncCfg     api.SyncConfig
-	postProcess api.PostProcessConfig
-	embedded    api.EmbeddedPolicy
+	targets     []subflux.SubtitleTarget
+	searchCfg   subflux.SearchConfig
+	adaptiveCfg subflux.AdaptiveConfig
+	syncCfg     subflux.SyncConfig
+	postProcess subflux.PostProcessConfig
+	embedded    subflux.EmbeddedPolicy
 	minScore    int
 	priority    int
 }
@@ -37,46 +37,46 @@ type fakeQueryCfg struct {
 var (
 	_ queryCfg = (*fakeQueryCfg)(nil)
 	_ interface {
-		Scores() api.Scores
-		Search() api.SearchConfig
-		Adaptive() api.AdaptiveConfig
-		Sync() api.SyncConfig
-		PostProcess() api.PostProcessConfig
-		ProvidersForTarget(*api.SubtitleTarget, []api.ProviderID) []api.ProviderID
-		MinScoreForTarget(*api.SubtitleTarget, api.MediaType) int
-		ProviderPriority(api.ProviderID) int
-		EmbeddedPolicy() api.EmbeddedPolicy
+		Scores() subflux.Scores
+		Search() subflux.SearchConfig
+		Adaptive() subflux.AdaptiveConfig
+		Sync() subflux.SyncConfig
+		PostProcess() subflux.PostProcessConfig
+		ProvidersForTarget(*subflux.SubtitleTarget, []subflux.ProviderID) []subflux.ProviderID
+		MinScoreForTarget(*subflux.SubtitleTarget, subflux.MediaType) int
+		ProviderPriority(subflux.ProviderID) int
+		EmbeddedPolicy() subflux.EmbeddedPolicy
 	} = (*fakeQueryCfg)(nil)
 )
 
 // --- queryCfg ---
 
-func (c *fakeQueryCfg) Providers() map[api.ProviderID]api.ProviderCfg { return c.providers }
-func (c *fakeQueryCfg) LanguageCodes() []string                       { return c.languages }
-func (c *fakeQueryCfg) LanguageRulesForUI() api.LanguageRulesJSON     { return c.langRules }
+func (c *fakeQueryCfg) Providers() map[subflux.ProviderID]subflux.ProviderCfg { return c.providers }
+func (c *fakeQueryCfg) LanguageCodes() []string                               { return c.languages }
+func (c *fakeQueryCfg) LanguageRulesForUI() subflux.LanguageRulesJSON         { return c.langRules }
 
-func (c *fakeQueryCfg) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
+func (c *fakeQueryCfg) ResolveTargetsWithFallback(_ string, _ []string) []subflux.SubtitleTarget {
 	return c.targets
 }
 
-func (c *fakeQueryCfg) EmbeddedPolicy() api.EmbeddedPolicy { return c.embedded }
-func (c *fakeQueryCfg) Scores() api.Scores                 { return api.DefaultScores }
-func (c *fakeQueryCfg) Search() api.SearchConfig           { return c.searchCfg }
-func (c *fakeQueryCfg) Adaptive() api.AdaptiveConfig       { return c.adaptiveCfg }
-func (c *fakeQueryCfg) PostProcess() api.PostProcessConfig { return c.postProcess }
-func (c *fakeQueryCfg) Sonarr() api.ArrConfig              { return c.sonarrCfg }
-func (c *fakeQueryCfg) Radarr() api.ArrConfig              { return c.radarrCfg }
+func (c *fakeQueryCfg) EmbeddedPolicy() subflux.EmbeddedPolicy { return c.embedded }
+func (c *fakeQueryCfg) Scores() subflux.Scores                 { return subflux.DefaultScores }
+func (c *fakeQueryCfg) Search() subflux.SearchConfig           { return c.searchCfg }
+func (c *fakeQueryCfg) Adaptive() subflux.AdaptiveConfig       { return c.adaptiveCfg }
+func (c *fakeQueryCfg) PostProcess() subflux.PostProcessConfig { return c.postProcess }
+func (c *fakeQueryCfg) Sonarr() subflux.ArrConfig              { return c.sonarrCfg }
+func (c *fakeQueryCfg) Radarr() subflux.ArrConfig              { return c.radarrCfg }
 
 // --- the four search.SearchCfg adds ---
 
-func (c *fakeQueryCfg) Sync() api.SyncConfig { return c.syncCfg }
+func (c *fakeQueryCfg) Sync() subflux.SyncConfig { return c.syncCfg }
 
-func (c *fakeQueryCfg) ProvidersForTarget(_ *api.SubtitleTarget, all []api.ProviderID) []api.ProviderID {
+func (c *fakeQueryCfg) ProvidersForTarget(_ *subflux.SubtitleTarget, all []subflux.ProviderID) []subflux.ProviderID {
 	return all
 }
 
-func (c *fakeQueryCfg) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) int {
+func (c *fakeQueryCfg) MinScoreForTarget(_ *subflux.SubtitleTarget, _ subflux.MediaType) int {
 	return c.minScore
 }
 
-func (c *fakeQueryCfg) ProviderPriority(_ api.ProviderID) int { return c.priority }
+func (c *fakeQueryCfg) ProviderPriority(_ subflux.ProviderID) int { return c.priority }

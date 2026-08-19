@@ -16,7 +16,7 @@ import (
 // --- Types ---
 
 // Cue represents a single subtitle cue with timing and text content.
-// This is a local definition that mirrors api.SubtitleCue, decoupling
+// This is a local definition that mirrors subflux.SubtitleCue, decoupling
 // the subsync package from the application's domain types.
 type Cue struct {
 	Text  string

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestHandleSaveConfig_response_redacts_expanded_secret pins the HTTP
@@ -408,13 +408,13 @@ type schemaStubProvider struct {
 	name string
 }
 
-func (p *schemaStubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *schemaStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *schemaStubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *schemaStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -443,7 +443,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 	}
 
-	var sections []api.SchemaSection
+	var sections []subflux.SchemaSection
 	if err := json.NewDecoder(rec.Body).Decode(&sections); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

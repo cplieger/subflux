@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -24,7 +24,7 @@ func (m *fakeMetrics) TotalSearches() int64 { return m.searches }
 func TestHandleStateStats_returns_counts(t *testing.T) {
 	t.Parallel()
 	cfg := &fakeQueryCfg{
-		searchCfg: api.SearchConfig{ScanInterval: 30 * time.Minute},
+		searchCfg: subflux.SearchConfig{ScanInterval: 30 * time.Minute},
 	}
 	// CountMissing returns a sentinel so the response wiring (not the
 	// counting logic, which has its own tests in the server root) is

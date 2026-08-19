@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- lookupMediaTitle ---
@@ -43,7 +43,7 @@ func TestLookupMediaTitle(t *testing.T) {
 		radarr    RadarrClient
 		sonarr    SonarrClient
 		name      string
-		mediaType api.MediaType
+		mediaType subflux.MediaType
 		want      string
 		arrID     int
 	}{
@@ -153,7 +153,7 @@ func TestResolveMediaIDs(t *testing.T) {
 		radarr       RadarrClient
 		sonarr       SonarrClient
 		name         string
-		mediaType    api.MediaType
+		mediaType    subflux.MediaType
 		wantCoverage string
 		wantHistory  string
 		arrID        int

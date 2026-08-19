@@ -5,17 +5,17 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Engine is a configured scorer.
 type Engine struct {
-	scores api.Scores
+	scores subflux.Scores
 }
 
 // New creates a scorer engine with the given weights.
-func New(scores *api.Scores) *Engine {
+func New(scores *subflux.Scores) *Engine {
 	return &Engine{scores: *scores}
 }
 
@@ -25,7 +25,7 @@ func New(scores *api.Scores) *Engine {
 // Verifiable hash match returns the hash weight directly (typically 100).
 // Otherwise, only release attribute keys contribute to the score.
 // Non-verifiable hash adds the hash weight on top of release attributes.
-func (e *Engine) Score(sub api.SubtitleInfo, matches api.MatchSet) (score, scoreNoHash int) {
+func (e *Engine) Score(sub subflux.SubtitleInfo, matches subflux.MatchSet) (score, scoreNoHash int) {
 	if matches.Hash && sub.HashVerifiable {
 		slog.Debug("computed score", "score", e.scores.Hash, "hash_match", true)
 		return e.scores.Hash, 0
@@ -48,31 +48,31 @@ func (e *Engine) Score(sub api.SubtitleInfo, matches api.MatchSet) (score, score
 
 // tierThreshold pairs a minimum score with its tier label.
 type tierThreshold struct {
-	Tier api.ScoreTier
+	Tier subflux.ScoreTier
 	Min  int
 }
 
 // tierThresholds defines the score-to-tier mapping in descending order.
 var tierThresholds = []tierThreshold{
-	{Tier: api.TierExcellent, Min: 80},
-	{Tier: api.TierGood, Min: 50},
-	{Tier: api.TierAcceptable, Min: 20},
-	{Tier: api.TierMinimal, Min: 1},
+	{Tier: subflux.TierExcellent, Min: 80},
+	{Tier: subflux.TierGood, Min: 50},
+	{Tier: subflux.TierAcceptable, Min: 20},
+	{Tier: subflux.TierMinimal, Min: 1},
 }
 
 // ScoreToTier returns the named tier for a given score.
-func (e *Engine) ScoreToTier(score int) api.ScoreTier {
+func (e *Engine) ScoreToTier(score int) subflux.ScoreTier {
 	for _, t := range tierThresholds {
 		if score >= t.Min {
 			return t.Tier
 		}
 	}
-	return api.TierNone
+	return subflux.TierNone
 }
 
 // sumScores totals the weights for matched release attributes, driven by the
 // shared category table in internal/search/scoring.
-func sumScores(s *api.Scores, matches api.MatchSet) int {
+func sumScores(s *subflux.Scores, matches subflux.MatchSet) int {
 	total := 0
 	for _, c := range scoring.Categories {
 		if c.Match(matches) {

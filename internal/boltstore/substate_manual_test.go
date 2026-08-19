@@ -3,7 +3,7 @@ package boltstore
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -18,9 +18,9 @@ import (
 
 // saveManual appends a manual row for the default triple with the given path
 // and ordinal-bearing filename.
-func saveManual(t *testing.T, db *DB, provider api.ProviderID, release, path string, score int) {
+func saveManual(t *testing.T, db *DB, provider subflux.ProviderID, release, path string, score int) {
 	t.Helper()
-	rec := &api.DownloadRecord{
+	rec := &subflux.DownloadRecord{
 		MediaType:    testMT,
 		MediaID:      testMID,
 		Language:     testLang,
@@ -28,7 +28,7 @@ func saveManual(t *testing.T, db *DB, provider api.ProviderID, release, path str
 		ReleaseName:  release,
 		Path:         path,
 		Score:        score,
-		Meta:         &api.DownloadMeta{Title: "Test", VideoPath: "/media/test.mkv", Manual: true},
+		Meta:         &subflux.DownloadMeta{Title: "Test", VideoPath: "/media/test.mkv", Manual: true},
 	}
 	if err := db.SaveDownload(t.Context(), rec); err != nil {
 		t.Fatalf("SaveDownload(manual %s): %v", path, err)
@@ -42,7 +42,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (empty): %v", err)
 	}
@@ -54,7 +54,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	locked, err = db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	locked, err = db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (auto only): %v", err)
 	}
@@ -64,7 +64,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 
 	// A manual row locks it.
 	saveManual(t, db, testProv, "Manual.Release", "/media/test.fr.1.srt", 70)
-	locked, err = db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	locked, err = db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (manual): %v", err)
 	}
@@ -82,7 +82,7 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 	ctx := t.Context()
 
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
-	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
+	saveManual(t, db, subflux.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
 	before := readTripleRows(t, db, testMT, testMID, testLang)
 	if len(before) != 2 {
@@ -93,7 +93,7 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 		beforeIDs[r.ID] = r
 	}
 
-	if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil {
+	if err := db.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); err != nil {
 		t.Fatalf("ClearManualLock: %v", err)
 	}
 
@@ -124,14 +124,14 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 	}
 
 	// The lock is gone and the manual count is zero.
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked after clear: %v", err)
 	}
 	if locked {
 		t.Error("triple still locked after ClearManualLock")
 	}
-	count, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	count, err := db.ManualDownloadCount(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount after clear: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestClearManualLock_noManualRowsIsNoop(t *testing.T) {
 	}
 	before := readTripleRows(t, db, testMT, testMID, testLang)
 
-	if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil {
+	if err := db.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); err != nil {
 		t.Fatalf("ClearManualLock (no manual rows): %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestManualDownloadCount(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	if got, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil || got != 0 {
+	if got, err := db.ManualDownloadCount(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); err != nil || got != 0 {
 		t.Fatalf("empty count = (%d, %v), want (0, nil)", got, err)
 	}
 
@@ -188,9 +188,9 @@ func TestManualDownloadCount(t *testing.T) {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
-	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
+	saveManual(t, db, subflux.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
-	got, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	got, err := db.ManualDownloadCount(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}
@@ -211,9 +211,9 @@ func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
-	saveManual(t, db, api.ProviderNameSubDL, "Manual.Empty", "", 60)
+	saveManual(t, db, subflux.ProviderNameSubDL, "Manual.Empty", "", 60)
 
-	paths, err := db.ManualSubtitlePaths(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	paths, err := db.ManualSubtitlePaths(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualSubtitlePaths: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestNextManualNumber(t *testing.T) {
 	ctx := t.Context()
 
 	// Base case: no rows -> 1.
-	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 1 {
+	if got := db.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); got != 1 {
 		t.Errorf("NextManualNumber (empty) = %d, want 1", got)
 	}
 
@@ -240,7 +240,7 @@ func TestNextManualNumber(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 1 {
+	if got := db.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); got != 1 {
 		t.Errorf("NextManualNumber (plain auto only) = %d, want 1", got)
 	}
 
@@ -250,13 +250,13 @@ func TestNextManualNumber(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Top.Pick", "/media/test.fr.1.srt", 90)); err != nil {
 		t.Fatalf("top-pick SaveDownload: %v", err)
 	}
-	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 2 {
+	if got := db.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); got != 2 {
 		t.Errorf("NextManualNumber (top-pick auto at .1) = %d, want 2 (auto ordinal reserved)", got)
 	}
 
 	// A manual row at ordinal 3 continues the mixed sequence -> next is 4.
 	saveManual(t, db, testProv, "Manual.3", "/media/test.fr.3.srt", 72)
-	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 4 {
+	if got := db.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); got != 4 {
 		t.Errorf("NextManualNumber (auto .1 + manual .3) = %d, want 4 (max ordinal 3 + 1)", got)
 	}
 }
@@ -270,7 +270,7 @@ func TestNextManualNumber_variantPaths(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.hi", "/media/test.fr.hi.5.srt", 70)
 	saveManual(t, db, testProv, "Manual.forced", "/media/test.fr.forced.2.srt", 72)
 
-	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 6 {
+	if got := db.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard}); got != 6 {
 		t.Errorf("NextManualNumber (variant paths) = %d, want 6 (max ordinal 5 + 1)", got)
 	}
 }
@@ -284,7 +284,7 @@ func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 	ctx := t.Context()
 
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
-	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
+	saveManual(t, db, subflux.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
 	// Delete every primary subtitle_state row but leave ix_state_quad intact,
 	// so a method that dereferenced primaries would see nothing. The projection
@@ -308,14 +308,14 @@ func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 		t.Fatalf("clearing primaries: %v", err)
 	}
 
-	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
 	if !locked {
 		t.Error("IsManuallyLocked = false with primaries removed; it dereferenced primaries instead of the projection")
 	}
-	count, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
+	count, err := db.ManualDownloadCount(ctx, subflux.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}

@@ -4,13 +4,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/epmarker"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // AnyTitleMatches reports whether candidate matches the primary title or any
 // alternative title in the request after normalization.
-func AnyTitleMatches(req *api.SearchRequest, candidate string) bool {
+func AnyTitleMatches(req *subflux.SearchRequest, candidate string) bool {
 	if TitlesMatch(req.Title, candidate) {
 		return true
 	}
@@ -24,7 +24,7 @@ func AnyTitleMatches(req *api.SearchRequest, candidate string) bool {
 
 // AnyReleaseNameMatches reports whether releaseName contains any of the request's
 // titles (primary or alternatives) after stripping release group tags.
-func AnyReleaseNameMatches(req *api.SearchRequest, releaseName string) bool {
+func AnyReleaseNameMatches(req *subflux.SearchRequest, releaseName string) bool {
 	cleaned := groupTagRe.ReplaceAllString(releaseName, "")
 	normalizedCleaned := NormalizeTitle(cleaned)
 
@@ -41,7 +41,7 @@ func AnyReleaseNameMatches(req *api.SearchRequest, releaseName string) bool {
 
 // EpisodeNumberMatch reports whether the subtitle's season/episode pair matches
 // the request, including scene and absolute episode numbering alternatives.
-func EpisodeNumberMatch(subSeason, subEpisode int, req *api.SearchRequest) bool {
+func EpisodeNumberMatch(subSeason, subEpisode int, req *subflux.SearchRequest) bool {
 	if matchesPair(subSeason, subEpisode, req.Season, req.Episode) {
 		return true
 	}

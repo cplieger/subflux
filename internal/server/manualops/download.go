@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // DownloadRequest holds the parsed fields for a manual download. The video
@@ -13,11 +13,11 @@ import (
 // the wire carries no file path (S7). videoPath is the server-resolved
 // value, set by the handler after resolution, never decoded from JSON.
 type DownloadRequest struct {
-	Provider    api.ProviderID `json:"provider"`
-	SubtitleID  string         `json:"subtitle_id"`
-	Language    string         `json:"language"`
-	ReleaseName string         `json:"release_name,omitempty"`
-	MediaType   api.MediaType  `json:"media_type,omitempty"`
+	Provider    subflux.ProviderID `json:"provider"`
+	SubtitleID  string             `json:"subtitle_id"`
+	Language    string             `json:"language"`
+	ReleaseName string             `json:"release_name,omitempty"`
+	MediaType   subflux.MediaType  `json:"media_type,omitempty"`
 	videoPath   string
 	Score       int  `json:"score,omitempty"`
 	Season      int  `json:"season,omitempty"`
@@ -58,9 +58,9 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 		return ErrInvalidMediaType
 	}
 	if req.MediaType == "" {
-		req.MediaType = api.MediaTypeMovie
+		req.MediaType = subflux.MediaTypeMovie
 	}
-	if req.MediaType == api.MediaTypeEpisode && req.Episode <= 0 {
+	if req.MediaType == subflux.MediaTypeEpisode && req.Episode <= 0 {
 		return ErrMissingEpisode
 	}
 	return nil
@@ -73,8 +73,8 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 // legs cannot disagree about the read half.
 type DownloadStore interface {
 	SearchStore
-	NextManualNumber(ctx context.Context, key api.ManualLockKey) int
-	UpsertSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID string, sf *api.SubtitleFile) error
+	NextManualNumber(ctx context.Context, key subflux.ManualLockKey) int
+	UpsertSubtitleFile(ctx context.Context, mediaType subflux.MediaType, mediaID string, sf *subflux.SubtitleFile) error
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
-	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
+	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
 }

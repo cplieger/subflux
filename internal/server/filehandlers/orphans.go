@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
@@ -131,7 +131,7 @@ func (t *orphanTable) consume(handle string) (orphanEntry, redeemResult) {
 // against the requested media_id (arrFallbackDirs). A failed binding is a
 // client error returned for the handler's 4xx; walk and transient arr
 // failures degrade to the store-rows-only listing (logged, never fatal).
-func (h *Handler) appendOrphans(ctx context.Context, ls *LiveState, mediaType api.MediaType, mediaID string, arrID int, rows []api.SubtitleEntry, entries []FileEntry) ([]FileEntry, error) {
+func (h *Handler) appendOrphans(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, mediaID string, arrID int, rows []subflux.SubtitleEntry, entries []FileEntry) ([]FileEntry, error) {
 	known := make(map[string]bool, len(rows))
 	dirs := make(map[string]bool)
 	for i := range rows {
@@ -191,7 +191,7 @@ func (h *Handler) walkOrphanDir(ctx context.Context, ls *LiveState, mediaID, dir
 		}
 		entries = append(entries, FileEntry{
 			MediaID:      mediaID,
-			Source:       string(api.SourceExternal),
+			Source:       string(subflux.SourceExternal),
 			Name:         de.Name(),
 			OrphanHandle: handle,
 			Size:         fi.Size(),
@@ -221,11 +221,11 @@ var (
 func writeArrBindingError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errArrBindingMismatch):
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "arr_id does not correspond to media_id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "arr_id does not correspond to media_id")
 	case errors.Is(err, errArrItemNotFound):
-		httpapi.NotFoundC(w, r, api.CodeMediaNotFound, "arr_id addresses no known arr item")
+		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "arr_id addresses no known arr item")
 	default:
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan fallback")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "orphan fallback")
 	}
 }
 
@@ -236,14 +236,14 @@ func writeArrBindingError(w http.ResponseWriter, r *http.Request, err error) {
 // narrows the walk to that one episode file's directory. A transient arr
 // failure degrades to the store-rows-only listing (no dirs, nil error); an
 // unknown arr_id answers errArrItemNotFound.
-func arrFallbackDirs(ctx context.Context, ls *LiveState, mediaType api.MediaType, mediaID string, arrID int, dirs map[string]bool) error {
+func arrFallbackDirs(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, mediaID string, arrID int, dirs map[string]bool) error {
 	if arrID <= 0 {
 		return nil
 	}
 	switch mediaType {
-	case api.MediaTypeMovie:
+	case subflux.MediaTypeMovie:
 		return movieFallbackDirs(ctx, ls, mediaID, arrID, dirs)
-	case api.MediaTypeEpisode:
+	case subflux.MediaTypeEpisode:
 		return episodeFallbackDirs(ctx, ls, mediaID, arrID, dirs)
 	}
 	return nil
@@ -387,12 +387,12 @@ func (h *Handler) deleteOrphan(ctx context.Context, w http.ResponseWriter, r *ht
 	if err := ls.Cfg.ValidatePath(ctx, entry.path); err != nil {
 		slog.Error("orphan delete: recorded path failed containment validation (invariant breach)",
 			"error", err)
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan delete")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "orphan delete")
 		return
 	}
 	fi, err := os.Stat(entry.path)
 	if err != nil {
-		httpapi.NotFoundC(w, r, api.CodeSubtitleNotFound, "file no longer exists")
+		httpapi.NotFoundC(w, r, subflux.CodeSubtitleNotFound, "file no longer exists")
 		return
 	}
 	if fi.Size() != entry.size || !fi.ModTime().Equal(entry.mtime) {

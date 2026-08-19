@@ -1,4 +1,4 @@
-package api
+package subflux
 
 // --- Scorer types (canonical definitions) ---
 

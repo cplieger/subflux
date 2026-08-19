@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
@@ -20,25 +20,25 @@ func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
 
 	ms := &mockStoreWithSaveError{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -60,25 +60,25 @@ func TestSearchTargets_atomic_write_error_returns_empty(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -98,17 +98,17 @@ func TestSearchTargets_atomic_write_error_returns_empty(t *testing.T) {
 
 func TestSearchProvidersFiltered_embedded_provider_success(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: time.Hour}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
 	metrics := &mockMetrics{}
 	embProv := &mockProvider{
 		name: "embedded",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "embedded", ReleaseName: "embedded-track", Language: "en"},
 		},
 	}
-	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
 	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{embProv})
 
 	if len(outcome.results) != 1 {
@@ -124,15 +124,15 @@ func TestSearchProvidersFiltered_embedded_provider_success(t *testing.T) {
 
 func TestSearchProvidersFiltered_embedded_provider_error(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: time.Hour}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
 	metrics := &mockMetrics{}
 	embProv := &mockProvider{
 		name:      "embedded",
 		searchErr: errors.New("ffprobe not found"),
 	}
-	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{embProv}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"en"}}
 	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{embProv})
 
 	if len(outcome.results) != 0 {
@@ -158,26 +158,26 @@ func TestSearchTargets_binary_data_rejected(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	// RAR magic bytes — ValidateSubtitleData rejects this.
 	rarData := []byte("Rar!\x1a\x07\x00" + strings.Repeat("\x00", 100))
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: rarData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 		score: 30, mediaImported: time.Now(), found: true,
 	}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{
+		searchCfg: subflux.SearchConfig{
 			UpgradeEnabled: false,
 		},
 		minScore: 0,
@@ -216,20 +216,20 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nBetter\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie.2024.BluRay.x264-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:    "movie",
 		ImdbID:       "tt123",
 		ReleaseName:  "Movie.2024.BluRay.x264-GRP",
 		ForceUpgrade: true,
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -247,27 +247,27 @@ func TestSearchTargets_force_upgrade_skips_embedded_only(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{
+		searchCfg: subflux.SearchConfig{
 			UpgradeEnabled: false,
 		},
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:    "movie",
 		ImdbID:       "tt123",
 		ReleaseName:  "Movie-GRP",
 		ForceUpgrade: true,
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -287,13 +287,13 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
 				Language: "fr", HearingImp: true,
@@ -301,14 +301,14 @@ func TestSearchTargets_hi_variant_preserves_hi_flag(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr", Variant: "hi"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr", Variant: "hi"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -329,13 +329,13 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
 				Language: "fr", Forced: true,
@@ -343,14 +343,14 @@ func TestSearchTargets_forced_variant_downloads_forced(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr", Variant: "forced"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr", Variant: "forced"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -374,7 +374,7 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\n[door creaks] Hello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
 				Language: "fr", HearingImp: true,
@@ -382,15 +382,15 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
 	// Standard variant (default) — HI sub is the only option (fallback).
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -418,25 +418,25 @@ func TestSearchTargets_hash_match_skips_sync(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "hash", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -458,22 +458,22 @@ func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T)
 
 	backedStore := &mockStoreWithBackoff{
 		mockStore: mockStore{},
-		backedOff: []api.ProviderID{"prov1", "prov2"},
+		backedOff: []subflux.ProviderID{"prov1", "prov2"},
 	}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	metrics := &mockMetrics{}
 	p1 := &mockProvider{name: "prov1", results: nil}
 	p2 := &mockProvider{name: "prov2", results: nil}
-	e := newEngine([]provider.Provider{p1, p2}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p1, p2}, backedStore, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -491,7 +491,7 @@ func TestSearchTargets_all_providers_backed_off_returns_backed_off(t *testing.T)
 	if got := result.TargetsBackedOff(); got != 1 {
 		t.Errorf("SearchTargets().TargetsBackedOff() = %d, want 1", got)
 	}
-	if len(result.Langs) != 1 || result.Langs[0].Kind != api.LangBackedOff {
+	if len(result.Langs) != 1 || result.Langs[0].Kind != subflux.LangBackedOff {
 		t.Errorf("SearchTargets().Langs = %+v, want one backed_off entry", result.Langs)
 	}
 	// Adaptive skip should be recorded for each backed-off provider.
@@ -509,13 +509,13 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
 				Language: "fr", HearingImp: false, Forced: false,
@@ -528,15 +528,15 @@ func TestSearchTargets_multi_variant_same_language(t *testing.T) {
 		data: subData,
 	}
 	metrics := &mockMetrics{}
-	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
 	// Two targets for the same language: standard + forced.
-	targets := []api.SubtitleTarget{
+	targets := []subflux.SubtitleTarget{
 		{Code: "fr"},
 		{Code: "fr", Variant: "forced"},
 	}

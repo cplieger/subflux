@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // manualStore is the two rows manual search and download touch directly from
@@ -12,8 +12,8 @@ import (
 // manual lock. Two methods, and it is embedded in Store rather than asserted
 // against a wide type, so the composite carries them by construction.
 type manualStore interface {
-	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
+	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
+	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
 
 // manualLiveState converts the server's liveState to manualops.LiveState.
@@ -32,7 +32,7 @@ func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {
 
 // lookupMediaTitle wraps manualops.LookupMediaTitle, adapting from the
 // server's liveState to manualops.LiveState.
-func lookupMediaTitle(ctx context.Context, ls *liveState, mediaType api.MediaType, arrID int) string {
+func lookupMediaTitle(ctx context.Context, ls *liveState, mediaType subflux.MediaType, arrID int) string {
 	return manualops.LookupMediaTitle(ctx, &manualops.LiveState{
 		Cfg: ls.cfg, Engine: ls.engine, Sonarr: ls.sonarr, Radarr: ls.radarr, Providers: ls.providers,
 	}, mediaType, arrID)
@@ -53,7 +53,7 @@ func (s *Server) lookupEpisodeMediaID(ctx context.Context, ls *liveState, series
 // resolveMediaIDs wraps manualops.ResolveMediaIDs with the server's
 // manualLiveState adapter.
 func (s *Server) resolveMediaIDs(ctx context.Context, ls *liveState,
-	mediaType api.MediaType, arrID, season, episode int,
+	mediaType subflux.MediaType, arrID, season, episode int,
 ) (mediaID, title string) {
 	return manualops.ResolveMediaIDs(ctx, s.manualLiveState(ls), mediaType, arrID, season, episode)
 }

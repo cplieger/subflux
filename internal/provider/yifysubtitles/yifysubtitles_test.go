@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Factory ---
@@ -19,8 +19,8 @@ func TestFactory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameYifySubtitles {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameYifySubtitles)
+	if p.Name() != subflux.ProviderNameYifySubtitles {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameYifySubtitles)
 	}
 }
 
@@ -429,11 +429,11 @@ func TestDownloadAbsentUpstream(t *testing.T) {
 	t.Parallel()
 
 	p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}}}
-	sub := api.Subtitle{ID: "sub-1", DownloadURL: serverURL + "/subtitles/sub-1"}
+	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: serverURL + "/subtitles/sub-1"}
 
 	data, err := p.Download(t.Context(), &sub)
-	if !errors.Is(err, api.ErrSubtitleAbsent) {
-		t.Errorf("Download on 404 error = %v, want one wrapping api.ErrSubtitleAbsent", err)
+	if !errors.Is(err, subflux.ErrSubtitleAbsent) {
+		t.Errorf("Download on 404 error = %v, want one wrapping subflux.ErrSubtitleAbsent", err)
 	}
 	if data != nil {
 		t.Errorf("Download on 404 data = %q, want nil", data)

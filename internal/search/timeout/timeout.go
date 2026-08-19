@@ -7,15 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ProviderHealth abstracts provider timeout tracking.
 type ProviderHealth interface {
-	IsTimedOut(provider api.ProviderID) bool
-	RecordSuccess(provider api.ProviderID)
-	RecordFailure(provider api.ProviderID, err error)
-	Status() map[api.ProviderID]api.ProviderStatus
+	IsTimedOut(provider subflux.ProviderID) bool
+	RecordSuccess(provider subflux.ProviderID)
+	RecordFailure(provider subflux.ProviderID, err error)
+	Status() map[subflux.ProviderID]subflux.ProviderStatus
 	Reset()
 }
 
@@ -53,9 +53,9 @@ func New(cfg Config) ProviderHealth {
 		nowFn = time.Now
 	}
 	return &tracker{
-		failures:  make(map[api.ProviderID][]time.Time),
-		tripped:   make(map[api.ProviderID]time.Time),
-		lastError: make(map[api.ProviderID]string),
+		failures:  make(map[subflux.ProviderID][]time.Time),
+		tripped:   make(map[subflux.ProviderID]time.Time),
+		lastError: make(map[subflux.ProviderID]string),
 		threshold: cfg.Threshold,
 		window:    cfg.Window,
 		cooldown:  cfg.Cooldown,
@@ -65,9 +65,9 @@ func New(cfg Config) ProviderHealth {
 
 // tracker implements ProviderHealth with sliding-window failure detection.
 type tracker struct {
-	failures  map[api.ProviderID][]time.Time
-	tripped   map[api.ProviderID]time.Time
-	lastError map[api.ProviderID]string
+	failures  map[subflux.ProviderID][]time.Time
+	tripped   map[subflux.ProviderID]time.Time
+	lastError map[subflux.ProviderID]string
 	now       func() time.Time
 	mu        sync.Mutex
 	window    time.Duration
@@ -75,7 +75,7 @@ type tracker struct {
 	threshold int
 }
 
-func (it *tracker) IsTimedOut(provider api.ProviderID) bool {
+func (it *tracker) IsTimedOut(provider subflux.ProviderID) bool {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	trippedAt, ok := it.tripped[provider]
@@ -92,7 +92,7 @@ func (it *tracker) IsTimedOut(provider api.ProviderID) bool {
 	return true
 }
 
-func (it *tracker) RecordSuccess(provider api.ProviderID) {
+func (it *tracker) RecordSuccess(provider subflux.ProviderID) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	delete(it.failures, provider)
@@ -100,7 +100,7 @@ func (it *tracker) RecordSuccess(provider api.ProviderID) {
 	delete(it.lastError, provider)
 }
 
-func (it *tracker) RecordFailure(provider api.ProviderID, err error) {
+func (it *tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
@@ -159,16 +159,16 @@ func countAfter(times []time.Time, cutoff time.Time) int {
 	return count
 }
 
-func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
+func (it *tracker) Status() map[subflux.ProviderID]subflux.ProviderStatus {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
 	now := it.now()
 	cutoff := now.Add(-it.window)
-	out := make(map[api.ProviderID]api.ProviderStatus, len(it.failures)+len(it.tripped))
+	out := make(map[subflux.ProviderID]subflux.ProviderStatus, len(it.failures)+len(it.tripped))
 
 	for prov, times := range it.failures {
-		s := api.ProviderStatus{
+		s := subflux.ProviderStatus{
 			RecentFailures: countAfter(times, cutoff),
 			Threshold:      it.threshold,
 			LastError:      it.lastError[prov],
@@ -187,7 +187,7 @@ func (it *tracker) Status() map[api.ProviderID]api.ProviderStatus {
 			continue
 		}
 		if remaining := it.cooldown - now.Sub(trippedAt); remaining > 0 {
-			out[prov] = api.ProviderStatus{
+			out[prov] = subflux.ProviderStatus{
 				TimedOut:          true,
 				Threshold:         it.threshold,
 				CooldownRemaining: remaining,

@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzBuildMatches(f *testing.F) {
@@ -13,22 +13,22 @@ func FuzzBuildMatches(f *testing.F) {
 	f.Add("Anime.Episode.25", "[Sub] Anime.25.srt", "title", "episode")
 
 	f.Fuzz(func(t *testing.T, videoRelease, subRelease, matchedBy, mediaType string) {
-		mt := api.MediaType(mediaType)
-		if mt != api.MediaTypeEpisode && mt != api.MediaTypeMovie {
-			mt = api.MediaTypeMovie
+		mt := subflux.MediaType(mediaType)
+		if mt != subflux.MediaTypeEpisode && mt != subflux.MediaTypeMovie {
+			mt = subflux.MediaTypeMovie
 		}
-		mm := api.MatchMethod(matchedBy)
+		mm := subflux.MatchMethod(matchedBy)
 		switch mm {
-		case api.MatchByHash, api.MatchByIMDB, api.MatchByTitle, api.MatchByTVDB, api.MatchByTMDB:
+		case subflux.MatchByHash, subflux.MatchByIMDB, subflux.MatchByTitle, subflux.MatchByTVDB, subflux.MatchByTMDB:
 		default:
-			mm = api.MatchByTitle
+			mm = subflux.MatchByTitle
 		}
 
-		video := &api.VideoInfo{
+		video := &subflux.VideoInfo{
 			MediaType:    mt,
 			ReleaseGroup: videoRelease,
 		}
-		sub := &api.Subtitle{
+		sub := &subflux.Subtitle{
 			ReleaseName: subRelease,
 			MatchedBy:   mm,
 		}
@@ -41,7 +41,7 @@ func FuzzBuildMatches(f *testing.F) {
 					ReleaseGroup: s,
 				}
 			},
-			CompareSource: func(m *api.MatchSet, a, b string) {
+			CompareSource: func(m *subflux.MatchSet, a, b string) {
 				if a != "" && b != "" && a == b {
 					m.Source = true
 				}
@@ -55,7 +55,7 @@ func FuzzBuildMatches(f *testing.F) {
 		matches := BuildMatches(video, sub, deps)
 
 		// Invariant: if MatchedBy is hash, Hash must be set.
-		if mm == api.MatchByHash && !matches.Hash {
+		if mm == subflux.MatchByHash && !matches.Hash {
 			t.Fatal("MatchByHash should set Hash=true")
 		}
 	})
@@ -67,7 +67,7 @@ func FuzzMatchBreakdown(f *testing.F) {
 	f.Add(true, false, true, false, true, false, true, false)
 
 	f.Fuzz(func(t *testing.T, hash, src, rg, ss, vc, hdr, ed, sp bool) {
-		matches := api.MatchSet{
+		matches := subflux.MatchSet{
 			Hash:             hash,
 			Source:           src,
 			ReleaseGroup:     rg,
@@ -77,7 +77,7 @@ func FuzzMatchBreakdown(f *testing.F) {
 			Edition:          ed,
 			SeasonPack:       sp,
 		}
-		scores := &api.DefaultScores
+		scores := &subflux.DefaultScores
 		breakdown := MatchBreakdown(scores, matches)
 		// If hash is set, the breakdown must report the hash score.
 		if hash && breakdown["hash"] != scores.Hash {

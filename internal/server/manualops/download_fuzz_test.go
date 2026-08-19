@@ -3,7 +3,7 @@ package manualops
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzValidateDownloadRequest verifies that validation either returns an error
@@ -22,11 +22,11 @@ func FuzzValidateDownloadRequest(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, provider, subtitleID string, arrID int, language, mediaType string) {
 		req := &DownloadRequest{
-			Provider:   api.ProviderID(provider),
+			Provider:   subflux.ProviderID(provider),
 			SubtitleID: subtitleID,
 			ArrID:      arrID,
 			Language:   language,
-			MediaType:  api.MediaType(mediaType),
+			MediaType:  subflux.MediaType(mediaType),
 		}
 		err := ValidateDownloadRequest(req)
 		if err == nil && !req.MediaType.Valid() {

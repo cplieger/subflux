@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzShiftAndFilterCues verifies that shifting never produces a negative
@@ -51,7 +51,7 @@ func FuzzShiftAndFilterCues(f *testing.F) {
 			shiftMs = 3_600_000
 		}
 
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Duration(s1) * time.Millisecond, End: time.Duration(e1) * time.Millisecond, Text: "a"},
 			{Start: time.Duration(s2) * time.Millisecond, End: time.Duration(e2) * time.Millisecond, Text: "b"},
 		}

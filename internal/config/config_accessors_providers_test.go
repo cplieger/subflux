@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Accessors ---
@@ -116,13 +116,13 @@ func TestProviderPriority(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		providers map[api.ProviderID]yamlProviderCfg
-		query     api.ProviderID
+		providers map[subflux.ProviderID]yamlProviderCfg
+		query     subflux.ProviderID
 		want      int
 	}{
 		{
 			name: "configured_positive",
-			providers: map[api.ProviderID]yamlProviderCfg{
+			providers: map[subflux.ProviderID]yamlProviderCfg{
 				"opensubtitles": {Enabled: true, Priority: 1},
 				"yify":          {Enabled: true, Priority: 5},
 			},
@@ -131,7 +131,7 @@ func TestProviderPriority(t *testing.T) {
 		},
 		{
 			name: "configured_positive_second",
-			providers: map[api.ProviderID]yamlProviderCfg{
+			providers: map[subflux.ProviderID]yamlProviderCfg{
 				"opensubtitles": {Enabled: true, Priority: 1},
 				"yify":          {Enabled: true, Priority: 5},
 			},
@@ -140,7 +140,7 @@ func TestProviderPriority(t *testing.T) {
 		},
 		{
 			name: "zero_returns_default",
-			providers: map[api.ProviderID]yamlProviderCfg{
+			providers: map[subflux.ProviderID]yamlProviderCfg{
 				"opensubtitles": {Enabled: true, Priority: 0},
 			},
 			query: "opensubtitles",
@@ -148,7 +148,7 @@ func TestProviderPriority(t *testing.T) {
 		},
 		{
 			name: "unknown_provider_returns_default",
-			providers: map[api.ProviderID]yamlProviderCfg{
+			providers: map[subflux.ProviderID]yamlProviderCfg{
 				"opensubtitles": {Enabled: true, Priority: 1},
 			},
 			query: "nonexistent",
@@ -251,7 +251,7 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 		},
 		PollIntervalCfg: Duration{D: 30 * time.Second},
-		ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+		ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 		SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := validate(t.Context(), cfg); err != nil {
@@ -387,7 +387,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 				Languages: LanguageRules{
 					Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 				},
-				ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+				ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 				PollIntervalCfg: Duration{D: 30 * time.Second},
 				SearchCfg:       yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 			}
@@ -441,19 +441,19 @@ func TestSyncConfig_zero_confidence_uses_default(t *testing.T) {
 func TestProviderConfigs_uses_cache_when_present(t *testing.T) {
 	t.Parallel()
 	c := &Config{}
-	c.cachedProviders = map[api.ProviderID]api.ProviderCfg{
-		api.ProviderID("cached"): {Priority: 7, Enabled: true},
+	c.cachedProviders = map[subflux.ProviderID]subflux.ProviderCfg{
+		subflux.ProviderID("cached"): {Priority: 7, Enabled: true},
 	}
 	// A distinct fallback source makes cache-vs-fallback observable.
-	c.ProvidersCfg = map[api.ProviderID]yamlProviderCfg{
-		api.ProviderID("fallback"): {Enabled: true, Priority: 9},
+	c.ProvidersCfg = map[subflux.ProviderID]yamlProviderCfg{
+		subflux.ProviderID("fallback"): {Enabled: true, Priority: 9},
 	}
 
 	got := c.Providers()
-	if _, ok := got[api.ProviderID("cached")]; !ok {
+	if _, ok := got[subflux.ProviderID("cached")]; !ok {
 		t.Errorf("Providers() = %v, want the cached map (key \"cached\" present)", got)
 	}
-	if _, ok := got[api.ProviderID("fallback")]; ok {
+	if _, ok := got[subflux.ProviderID("fallback")]; ok {
 		t.Errorf("Providers() = %v, want the cached map, not the fallback built from Providers", got)
 	}
 }

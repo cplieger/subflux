@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Edition regex follows standard scene naming conventions.
@@ -100,7 +100,7 @@ var SourceFamily = map[string]string{
 }
 
 // CompareSource checks if two sources are in the same family.
-func CompareSource(matches *api.MatchSet, a, b string) {
+func CompareSource(matches *subflux.MatchSet, a, b string) {
 	if a == "" || b == "" {
 		return
 	}

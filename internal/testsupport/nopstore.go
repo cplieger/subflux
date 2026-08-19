@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // NopStore is the shared store fake: every method returns a zero value and
@@ -41,102 +41,102 @@ func (*NopStore) StoreFileStats() (fileBytes, freelistBytes int64) { return 0, 0
 // --- Backoff (search_attempts) ---
 
 // RecordNoResult records a provider returning no result for a media item, updating backoff state.
-func (*NopStore) RecordNoResult(context.Context, api.MediaType, string, string, api.ProviderID, api.BackoffParams) error {
+func (*NopStore) RecordNoResult(context.Context, subflux.MediaType, string, string, subflux.ProviderID, subflux.BackoffParams) error {
 	return nil
 }
 
 // BackedOffProviders returns providers currently in backoff for the given media item.
-func (*NopStore) BackedOffProviders(context.Context, api.MediaType, string, string, int) ([]api.ProviderID, error) {
+func (*NopStore) BackedOffProviders(context.Context, subflux.MediaType, string, string, int) ([]subflux.ProviderID, error) {
 	return nil, nil
 }
 
 // GetBackoffItems returns all items currently in adaptive search backoff.
-func (*NopStore) GetBackoffItems(context.Context) ([]api.BackoffEntry, error) { return nil, nil }
+func (*NopStore) GetBackoffItems(context.Context) ([]subflux.BackoffEntry, error) { return nil, nil }
 
 // GetBackoffByPrefix returns backoff entries matching the given media type and ID prefix.
-func (*NopStore) GetBackoffByPrefix(context.Context, api.MediaType, string) ([]api.BackoffEntry, error) {
+func (*NopStore) GetBackoffByPrefix(context.Context, subflux.MediaType, string) ([]subflux.BackoffEntry, error) {
 	return nil, nil
 }
 
 // --- State (downloads + history) ---
 
 // SaveDownload records or updates a subtitle download record.
-func (*NopStore) SaveDownload(context.Context, *api.DownloadRecord) error { return nil }
+func (*NopStore) SaveDownload(context.Context, *subflux.DownloadRecord) error { return nil }
 
 // DownloadedRefs returns the previously downloaded subtitle references for a media item.
-func (*NopStore) DownloadedRefs(context.Context, api.MediaType, string, string) ([]api.DownloadedRef, error) {
+func (*NopStore) DownloadedRefs(context.Context, subflux.MediaType, string, string) ([]subflux.DownloadedRef, error) {
 	return nil, nil
 }
 
 // CurrentScore returns the current subtitle score for a media item and language.
-func (*NopStore) CurrentScore(context.Context, api.MediaType, string, string, api.Variant) (score int, at time.Time, found bool, _ error) {
+func (*NopStore) CurrentScore(context.Context, subflux.MediaType, string, string, subflux.Variant) (score int, at time.Time, found bool, _ error) {
 	return 0, time.Time{}, false, nil
 }
 
 // GetState returns download state entries matching the query.
-func (*NopStore) GetState(context.Context, *api.StateQuery) ([]api.StateEntry, error) {
+func (*NopStore) GetState(context.Context, *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	return nil, nil
 }
 
 // HistoryMediaIDs returns distinct media IDs with download history for the given type and language.
-func (*NopStore) HistoryMediaIDs(context.Context, api.MediaType, string) ([]string, error) {
+func (*NopStore) HistoryMediaIDs(context.Context, subflux.MediaType, string) ([]string, error) {
 	return nil, nil
 }
 
 // --- Manual locks ---
 
 // IsManuallyLocked reports whether the key's quad has a manual download lock.
-func (*NopStore) IsManuallyLocked(context.Context, api.ManualLockKey) (bool, error) {
+func (*NopStore) IsManuallyLocked(context.Context, subflux.ManualLockKey) (bool, error) {
 	return false, nil
 }
 
 // ClearManualLock removes the manual download lock on the key's quad.
-func (*NopStore) ClearManualLock(context.Context, api.ManualLockKey) error {
+func (*NopStore) ClearManualLock(context.Context, subflux.ManualLockKey) error {
 	return nil
 }
 
 // ManualSubtitlePaths returns paths of manually downloaded subtitle files on the key's quad.
-func (*NopStore) ManualSubtitlePaths(context.Context, api.ManualLockKey) ([]string, error) {
+func (*NopStore) ManualSubtitlePaths(context.Context, subflux.ManualLockKey) ([]string, error) {
 	return nil, nil
 }
 
 // NextManualNumber returns the next sequential number for a manual subtitle file.
-func (*NopStore) NextManualNumber(context.Context, api.ManualLockKey) int {
+func (*NopStore) NextManualNumber(context.Context, subflux.ManualLockKey) int {
 	return 1
 }
 
 // GetManualLocks returns all active manual download locks.
-func (*NopStore) GetManualLocks(context.Context) ([]api.ManualLockEntry, error) { return nil, nil }
+func (*NopStore) GetManualLocks(context.Context) ([]subflux.ManualLockEntry, error) { return nil, nil }
 
 // --- Coverage (subtitle_files + scan_state) ---
 
 // RecordSubtitleFiles records the full set of subtitle files for a media item.
-func (*NopStore) RecordSubtitleFiles(context.Context, api.MediaType, string, []api.SubtitleFile) (bool, error) {
+func (*NopStore) RecordSubtitleFiles(context.Context, subflux.MediaType, string, []subflux.SubtitleFile) (bool, error) {
 	return false, nil
 }
 
 // UpsertSubtitleFile inserts or updates a single subtitle file record.
-func (*NopStore) UpsertSubtitleFile(context.Context, api.MediaType, string, *api.SubtitleFile) error {
+func (*NopStore) UpsertSubtitleFile(context.Context, subflux.MediaType, string, *subflux.SubtitleFile) error {
 	return nil
 }
 
 // GetSubtitleFiles returns subtitle file records for a media item.
-func (*NopStore) GetSubtitleFiles(context.Context, api.MediaType, string) ([]api.SubtitleEntry, error) {
+func (*NopStore) GetSubtitleFiles(context.Context, subflux.MediaType, string) ([]subflux.SubtitleEntry, error) {
 	return nil, nil
 }
 
 // DeleteSubtitleFile removes a subtitle file record for a media item.
-func (*NopStore) DeleteSubtitleFile(context.Context, api.MediaType, string, string, api.Variant, api.SubtitleSource, string) error {
+func (*NopStore) DeleteSubtitleFile(context.Context, subflux.MediaType, string, string, subflux.Variant, subflux.SubtitleSource, string) error {
 	return nil
 }
 
 // RecordScanState records the scan timestamp and metadata for a media item.
-func (*NopStore) RecordScanState(context.Context, *api.ScanRecord) error {
+func (*NopStore) RecordScanState(context.Context, *subflux.ScanRecord) error {
 	return nil
 }
 
 // GetScanStates returns scan state records for a media item prefix.
-func (*NopStore) GetScanStates(context.Context, api.MediaType, string) ([]api.ScanStateRow, error) {
+func (*NopStore) GetScanStates(context.Context, subflux.MediaType, string) ([]subflux.ScanStateRow, error) {
 	return nil, nil
 }
 
@@ -171,12 +171,12 @@ func (*NopStore) GetSyncOffset(context.Context, string) (int64, error) { return 
 // --- Poll timestamps ---
 
 // GetPollTimestamp returns the last poll timestamp for the given poll key.
-func (*NopStore) GetPollTimestamp(context.Context, api.PollKey) (time.Time, error) {
+func (*NopStore) GetPollTimestamp(context.Context, subflux.PollKey) (time.Time, error) {
 	return time.Time{}, nil
 }
 
 // SetPollTimestamp stores the poll timestamp for the given poll key.
-func (*NopStore) SetPollTimestamp(context.Context, api.PollKey, time.Time) error { return nil }
+func (*NopStore) SetPollTimestamp(context.Context, subflux.PollKey, time.Time) error { return nil }
 
 // --- Maintenance ---
 
@@ -184,15 +184,15 @@ func (*NopStore) SetPollTimestamp(context.Context, api.PollKey, time.Time) error
 func (*NopStore) Stats(context.Context) (downloads, backoffs int, _ error) { return 0, 0, nil }
 
 // DeleteStateByPaths removes all state records associated with the given video paths.
-func (*NopStore) DeleteStateByPaths(context.Context, []string) (api.CleanupResult, error) {
-	return api.CleanupResult{}, nil
+func (*NopStore) DeleteStateByPaths(context.Context, []string) (subflux.CleanupResult, error) {
+	return subflux.CleanupResult{}, nil
 }
 
 // CleanupDrift removes search_attempts entries for providers/languages that are
 // no longer in the active configuration.
-func (*NopStore) CleanupDrift(context.Context, api.ConfigDrift) error { return nil }
+func (*NopStore) CleanupDrift(context.Context, subflux.ConfigDrift) error { return nil }
 
 // ReconcileState performs the three-way filesystem reconciliation pass.
-func (*NopStore) ReconcileState(context.Context) (api.ReconcileResult, error) {
-	return api.ReconcileResult{}, nil
+func (*NopStore) ReconcileState(context.Context) (subflux.ReconcileResult, error) {
+	return subflux.ReconcileResult{}, nil
 }

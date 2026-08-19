@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // These tests used to live in internal/server and reach this logic through
@@ -22,15 +22,15 @@ import (
 // interface, of which this suite exercised one.
 type countMissingStore struct {
 	err          error
-	episodeFiles []api.SubtitleEntry
-	movieFiles   []api.SubtitleEntry
+	episodeFiles []subflux.SubtitleEntry
+	movieFiles   []subflux.SubtitleEntry
 }
 
-func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	if mediaType == api.MediaTypeEpisode {
+	if mediaType == subflux.MediaTypeEpisode {
 		return m.episodeFiles, nil
 	}
 	return m.movieFiles, nil
@@ -40,16 +40,16 @@ func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.Me
 // targets the count is measured against, plus the embedded-codec policy the
 // row index is filtered by. 2 of the 37 values a *config.Config offers.
 type countMissingConfig struct {
-	targets []api.SubtitleTarget
+	targets []subflux.SubtitleTarget
 }
 
-func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
+func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []subflux.SubtitleTarget {
 	return m.targets
 }
 
 // EmbeddedPolicy answers the zero policy: no codec is ignored, so every
 // indexed track counts and the suite's arithmetic is over targets alone.
-func (m *countMissingConfig) EmbeddedPolicy() api.EmbeddedPolicy { return api.EmbeddedPolicy{} }
+func (m *countMissingConfig) EmbeddedPolicy() subflux.EmbeddedPolicy { return subflux.EmbeddedPolicy{} }
 
 var errMock = errors.New("mock store failure")
 
@@ -82,7 +82,7 @@ func TestCountMissingSeries_empty_series(t *testing.T) {
 func TestCountMissingSeries_series_with_zero_episodes(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
 	series := []arrapi.Series{
@@ -98,7 +98,7 @@ func TestCountMissingSeries_series_with_zero_episodes(t *testing.T) {
 func TestCountMissingSeries_series_with_nil_statistics(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
 	series := []arrapi.Series{
@@ -114,10 +114,10 @@ func TestCountMissingSeries_series_with_nil_statistics(t *testing.T) {
 func TestCountMissingSeries_all_episodes_covered(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e03", Language: "fr", Variant: "standard"},
@@ -136,10 +136,10 @@ func TestCountMissingSeries_all_episodes_covered(t *testing.T) {
 func TestCountMissingSeries_some_episodes_missing(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -157,13 +157,13 @@ func TestCountMissingSeries_some_episodes_missing(t *testing.T) {
 func TestCountMissingSeries_multiple_targets(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{
+		targets: []subflux.SubtitleTarget{
 			{Code: "fr"},
 			{Code: "en"},
 		},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard"},
 			{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard"},
 		},
@@ -198,10 +198,10 @@ func TestCountMissingSeries_no_targets(t *testing.T) {
 func TestCountMissingSeries_different_series_isolated(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-100-s01e01", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -221,10 +221,10 @@ func TestCountMissingSeries_different_series_isolated(t *testing.T) {
 func TestCountMissingSeries_variant_matching(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "en", Variant: "hi"}},
+		targets: []subflux.SubtitleTarget{{Code: "en", Variant: "hi"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			// Has standard variant, not hi.
 			{MediaID: "tvdb-81189-s01e01", Language: "en", Variant: "standard"},
 		},
@@ -256,7 +256,7 @@ func TestCountMissingMovies_empty_movies(t *testing.T) {
 func TestCountMissingMovies_movie_without_file(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
 	movies := []arrapi.Movie{
@@ -272,10 +272,10 @@ func TestCountMissingMovies_movie_without_file(t *testing.T) {
 func TestCountMissingMovies_movie_fully_covered(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -292,7 +292,7 @@ func TestCountMissingMovies_movie_fully_covered(t *testing.T) {
 func TestCountMissingMovies_movie_missing_subtitle(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
 	movies := []arrapi.Movie{
@@ -308,13 +308,13 @@ func TestCountMissingMovies_movie_missing_subtitle(t *testing.T) {
 func TestCountMissingMovies_multiple_targets(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{
+		targets: []subflux.SubtitleTarget{
 			{Code: "fr"},
 			{Code: "en"},
 		},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -332,10 +332,10 @@ func TestCountMissingMovies_multiple_targets(t *testing.T) {
 func TestCountMissingMovies_variant_matching(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "en", Variant: "hi"}},
+		targets: []subflux.SubtitleTarget{{Code: "en", Variant: "hi"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "en", Variant: "standard"},
 		},
 	}
@@ -369,10 +369,10 @@ func TestCountMissingMovies_no_targets(t *testing.T) {
 func TestCountMissingMovies_multiple_movies(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-100", Language: "fr", Variant: "standard"},
 		},
 	}
@@ -393,7 +393,7 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 func TestCountMissingSeries_db_error_returns_zero(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{err: errMock}
 	series := []arrapi.Series{
@@ -409,7 +409,7 @@ func TestCountMissingSeries_db_error_returns_zero(t *testing.T) {
 func TestCountMissingMovies_db_error_returns_zero(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{err: errMock}
 	movies := []arrapi.Movie{
@@ -427,10 +427,10 @@ func TestCountMissingMovies_db_error_returns_zero(t *testing.T) {
 func TestCountMissingSeries_ignored_codec_counts_as_missing(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			// Only an ignored-codec embedded sub exists.
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 		},
@@ -449,10 +449,10 @@ func TestCountMissingSeries_ignored_codec_counts_as_missing(t *testing.T) {
 func TestCountMissingSeries_usable_sub_not_missing(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
 	}
@@ -469,10 +469,10 @@ func TestCountMissingSeries_usable_sub_not_missing(t *testing.T) {
 func TestCountMissingMovies_ignored_codec_counts_as_missing(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "embedded", Codec: "vobsub"},
 		},
 	}
@@ -490,10 +490,10 @@ func TestCountMissingMovies_ignored_codec_counts_as_missing(t *testing.T) {
 func TestCountMissingMovies_usable_overrides_ignored(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		movieFiles: []api.SubtitleEntry{
+		movieFiles: []subflux.SubtitleEntry{
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 			{MediaID: "tmdb-1271", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		},
@@ -512,7 +512,7 @@ func TestCountMissingMovies_usable_overrides_ignored(t *testing.T) {
 func TestCountMissingMovies_empty_media_id_skipped(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{}
 	// Movie with TmdbID=0 and no ImdbID produces empty mediaID.
@@ -530,13 +530,13 @@ func TestCountMissingMovies_empty_media_id_skipped(t *testing.T) {
 func TestCountMissing_sums_series_and_movies(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	db := &countMissingStore{
-		episodeFiles: []api.SubtitleEntry{
+		episodeFiles: []subflux.SubtitleEntry{
 			{MediaID: "tvdb-100-s01e01", Language: "fr", Variant: "standard"},
 		},
-		movieFiles: []api.SubtitleEntry{},
+		movieFiles: []subflux.SubtitleEntry{},
 	}
 	series := []arrapi.Series{
 		{TvdbID: 100, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 2}},

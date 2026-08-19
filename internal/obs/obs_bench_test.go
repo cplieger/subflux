@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func BenchmarkRecordSearch(b *testing.B) {
 	m := New()
 
-	prePopulated := []api.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
+	prePopulated := []subflux.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
 	for _, p := range prePopulated {
 		m.RecordSearch(p, time.Millisecond, nil)
 	}
@@ -34,7 +34,7 @@ func BenchmarkRecordSearch(b *testing.B) {
 			i := 0
 			for pb.Next() {
 				i++
-				m.RecordSearch(api.ProviderID(fmt.Sprintf("bench-%d", i)), time.Millisecond, nil)
+				m.RecordSearch(subflux.ProviderID(fmt.Sprintf("bench-%d", i)), time.Millisecond, nil)
 			}
 		})
 	})
@@ -43,7 +43,7 @@ func BenchmarkRecordSearch(b *testing.B) {
 func BenchmarkHandler(b *testing.B) {
 	m := New()
 
-	providers := []api.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
+	providers := []subflux.ProviderID{"opensubtitles", "yify", "betaseries", "hdbits", "anidb"}
 	for _, p := range providers {
 		for range 100 {
 			m.RecordSearch(p, 150*time.Millisecond, nil)
@@ -80,9 +80,9 @@ func BenchmarkRender(b *testing.B) {
 	for _, nProviders := range []int{1, 5, 20} {
 		b.Run(fmt.Sprintf("providers_%d", nProviders), func(b *testing.B) {
 			m := New()
-			providers := make([]api.ProviderID, nProviders)
+			providers := make([]subflux.ProviderID, nProviders)
 			for i := range providers {
-				providers[i] = api.ProviderID(fmt.Sprintf("provider-%d", i))
+				providers[i] = subflux.ProviderID(fmt.Sprintf("provider-%d", i))
 			}
 			for _, p := range providers {
 				for range 10 {

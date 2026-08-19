@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // validateSearch checks search settings for consistency.
@@ -19,7 +19,7 @@ func validateSearch(s *yamlSearchConfig) error {
 		{"search.scan_interval", s.ScanInterval.D, defaults.MinScanInterval, false},
 	}))
 	if s.DownloadMaxAttempts <= 0 {
-		s.DownloadMaxAttempts = api.DefaultDownloadMaxAttempts
+		s.DownloadMaxAttempts = subflux.DefaultDownloadMaxAttempts
 	}
 	if s.UpgradeEnabled && s.UpgradeWindowDays <= 0 {
 		ve.Add(&FieldDependencyError{

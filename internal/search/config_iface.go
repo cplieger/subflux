@@ -1,6 +1,6 @@
 package search
 
-import "github.com/cplieger/subflux/internal/api"
+import "github.com/cplieger/subflux/internal/subflux"
 
 // SearchCfg is what the scan engine reads out of the configuration: the scoring
 // weights and floors it ranks candidates by, the provider allow-list and
@@ -14,25 +14,25 @@ import "github.com/cplieger/subflux/internal/api"
 type SearchCfg interface {
 	// Scores returns the scoring weights. Must return non-zero values;
 	// zero scores disable all attribute matching.
-	Scores() api.Scores
+	Scores() subflux.Scores
 	// Search returns the top-level search configuration (concurrency, etc.).
-	Search() api.SearchConfig
+	Search() subflux.SearchConfig
 	// Adaptive returns the adaptive search configuration.
-	Adaptive() api.AdaptiveConfig
+	Adaptive() subflux.AdaptiveConfig
 	// Sync returns subtitle sync/timing configuration.
-	Sync() api.SyncConfig
+	Sync() subflux.SyncConfig
 	// PostProcess returns post-processing settings.
-	PostProcess() api.PostProcessConfig
+	PostProcess() subflux.PostProcessConfig
 	// ProvidersForTarget returns provider names allowed for this target.
 	// Empty slice means no providers will be searched for this target.
-	ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.ProviderID) []api.ProviderID
+	ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []subflux.ProviderID) []subflux.ProviderID
 	// MinScoreForTarget returns the minimum acceptable score for a target.
 	// Returns 0 to accept any score.
-	MinScoreForTarget(t *api.SubtitleTarget, mediaType api.MediaType) int
+	MinScoreForTarget(t *subflux.SubtitleTarget, mediaType subflux.MediaType) int
 	// ProviderPriority returns the priority of a provider by name.
 	// Returns 0 for unknown providers (lowest priority = tried last in tiebreakers).
-	ProviderPriority(name api.ProviderID) int
+	ProviderPriority(name subflux.ProviderID) int
 	// EmbeddedPolicy returns the typed embedded subtitle codec policy
 	// (top-level embedded_subtitles config section).
-	EmbeddedPolicy() api.EmbeddedPolicy
+	EmbeddedPolicy() subflux.EmbeddedPolicy
 }

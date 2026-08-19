@@ -16,9 +16,9 @@ import (
 
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 const sourceSeriessub = "seriessub"
@@ -26,7 +26,7 @@ const sourceSeriessub = "seriessub"
 const baseURL = "https://api.betaseries.com/"
 
 const (
-	providerName = api.ProviderNameBetaSeries
+	providerName = subflux.ProviderNameBetaSeries
 )
 
 // Factory creates a BetaSeries provider from settings.
@@ -48,12 +48,12 @@ type Provider struct {
 }
 
 // Name returns the provider identifier for BetaSeries.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // Search queries BetaSeries for TV episode subtitles using the TVDB ID.
 // Only episode requests are handled; movies are skipped.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
-	if req.MediaType != api.MediaTypeEpisode {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	if req.MediaType != subflux.MediaTypeEpisode {
 		slog.Debug("betaseries: not an episode, skipping",
 			"media_type", req.MediaType)
 		return nil, nil
@@ -108,7 +108,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 // Download fetches the subtitle content for the given search result.
 // Archives are extracted automatically via provider.ExtractAndValidate.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate download URL to prevent SSRF via malicious API responses.
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("betaseries: %w", err)
@@ -127,7 +127,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("betaseries: %w: %s", api.ErrSubtitleAbsent, sub.ID)
+		return nil, fmt.Errorf("betaseries: %w: %s", subflux.ErrSubtitleAbsent, sub.ID)
 	}
 	if err2 := httpwire.CheckHTTPStatus(resp); err2 != nil {
 		return nil, err2
@@ -173,7 +173,7 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		resp.Body.Close()
-		return nil, &api.RateLimitError{
+		return nil, &subflux.RateLimitError{
 			Msg:        "rate limited (429)",
 			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
@@ -204,7 +204,7 @@ func classifyBadRequest(body []byte) (io.ReadCloser, error) {
 			slog.Debug("betaseries: series not found (4001)")
 			return io.NopCloser(strings.NewReader(`{"episodes":[]}`)), nil
 		case 1001:
-			return nil, &api.AuthError{Msg: "invalid API key (1001)"}
+			return nil, &subflux.AuthError{Msg: "invalid API key (1001)"}
 		}
 	}
 	return nil, fmt.Errorf("HTTP %d", http.StatusBadRequest)
@@ -213,8 +213,8 @@ func classifyBadRequest(body []byte) (io.ReadCloser, error) {
 // filterSubtitleEntries converts raw BetaSeries subtitle entries into Subtitle
 // values. Filters by requested languages (mapping BetaSeries vo/vf codes to
 // ISO 639-1) and skips the sourceSeriessub source (dead links). Pure function.
-func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, episode int) []api.Subtitle {
-	var results []api.Subtitle
+func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, episode int) []subflux.Subtitle {
+	var results []subflux.Subtitle
 	for _, sub := range entries {
 		lang := betaLangToISO(sub.Language)
 		if lang == "" || !slices.Contains(languages, lang) {
@@ -225,13 +225,13 @@ func filterSubtitleEntries(entries []subtitleEntry, languages []string, season, 
 			continue
 		}
 
-		results = append(results, api.Subtitle{
+		results = append(results, subflux.Subtitle{
 			Provider:    providerName,
 			ID:          strconv.Itoa(sub.ID),
 			Language:    lang,
 			ReleaseName: sub.File,
 			DownloadURL: sub.URL,
-			MatchedBy:   api.MatchByTVDB,
+			MatchedBy:   subflux.MatchByTVDB,
 			Season:      season,
 			Episode:     episode,
 		})

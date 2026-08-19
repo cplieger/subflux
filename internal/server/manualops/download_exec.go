@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
@@ -28,7 +28,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	prov provider.Provider, req *DownloadRequest, actID string,
 ) bool {
 	// Download the subtitle.
-	sub := api.Subtitle{
+	sub := subflux.Subtitle{
 		Provider:    req.Provider,
 		ID:          req.SubtitleID,
 		DownloadURL: req.SubtitleID,
@@ -124,14 +124,14 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 // history-recording failure warns and keeps the saved file, matching the
 // previous non-fatal behavior.
 func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore,
-	req *DownloadRequest, historyMediaID, title string, variant api.Variant, data []byte,
+	req *DownloadRequest, historyMediaID, title string, variant subflux.Variant, data []byte,
 ) (subPath string, ok bool) {
 	unlock := downloadPathGate.lock(downloadQuadKey(req.MediaType, historyMediaID, req.Language, variant))
 	defer unlock()
 
 	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
 	// independent sequences, matching the variant-aware manual file naming.
-	n := db.NextManualNumber(ctx, api.ManualLockKey{
+	n := db.NextManualNumber(ctx, subflux.ManualLockKey{
 		MediaType: req.MediaType, MediaID: historyMediaID,
 		Language: req.Language, Variant: variant,
 	})
@@ -159,14 +159,14 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	// Record in history. A top pick records as auto (manual=false) but
 	// still occupies a numbered path, which is why ordinal discovery scans
 	// every row's path regardless of the Manual flag.
-	meta := &api.DownloadMeta{
+	meta := &subflux.DownloadMeta{
 		Manual:    !req.TopPick,
 		VideoPath: req.VideoPath(),
 		Season:    req.Season,
 		Episode:   req.Episode,
 		Title:     title,
 	}
-	if err := db.SaveDownload(ctx, &api.DownloadRecord{
+	if err := db.SaveDownload(ctx, &subflux.DownloadRecord{
 		MediaType:    req.MediaType,
 		MediaID:      historyMediaID,
 		Language:     req.Language,
@@ -186,24 +186,24 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 // ResolveMediaIDs determines the coverage and history media IDs for a manual
 // download.
 func ResolveMediaIDs(ctx context.Context, ls *LiveState,
-	mediaType api.MediaType, arrID, season, episode int,
+	mediaType subflux.MediaType, arrID, season, episode int,
 ) (coverageID, historyID string) {
-	if mediaType == api.MediaTypeMovie && arrID > 0 {
+	if mediaType == subflux.MediaTypeMovie && arrID > 0 {
 		coverageID = LookupMovieMediaID(ctx, ls, arrID)
-	} else if mediaType == api.MediaTypeEpisode && arrID > 0 {
+	} else if mediaType == subflux.MediaTypeEpisode && arrID > 0 {
 		coverageID = LookupEpisodeMediaID(ctx, ls, arrID, season, episode)
 	}
 
 	historyID = coverageID
 	if historyID == "" && arrID > 0 {
-		if mediaType == api.MediaTypeMovie {
+		if mediaType == subflux.MediaTypeMovie {
 			historyID = fmt.Sprintf("radarr-%d", arrID)
 		} else {
 			historyID = fmt.Sprintf("sonarr-%d-s%02de%02d", arrID, season, episode)
 		}
 	}
 	if historyID == "" {
-		historyID = mediaid.Build(&api.SearchRequest{MediaType: mediaType})
+		historyID = mediaid.Build(&subflux.SearchRequest{MediaType: mediaType})
 		slog.Debug("manual download: using fallback media ID",
 			"media_type", mediaType, "arr_id", arrID, "history_id", historyID)
 	}
@@ -237,15 +237,15 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 }
 
 // LookupMediaTitle resolves the title for a media item from the arr client.
-func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaType, arrID int) string {
+func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, arrID int) string {
 	if arrID <= 0 {
 		return ""
 	}
-	if mediaType == api.MediaTypeMovie && ls.Radarr != nil {
+	if mediaType == subflux.MediaTypeMovie && ls.Radarr != nil {
 		if m, err := ls.Radarr.GetMovieByID(ctx, arrID); err == nil {
 			return m.Title
 		}
-	} else if mediaType == api.MediaTypeEpisode && ls.Sonarr != nil {
+	} else if mediaType == subflux.MediaTypeEpisode && ls.Sonarr != nil {
 		if ser, err := ls.Sonarr.GetSeriesByID(ctx, arrID); err == nil {
 			return ser.Title
 		}
@@ -256,25 +256,25 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaTyp
 // PostDownloadUpdate updates coverage DB and refreshes the arr after a
 // successful manual download.
 func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
-	req *DownloadRequest, mediaType api.MediaType, coverageMediaID, subPath string, variant api.Variant,
+	req *DownloadRequest, mediaType subflux.MediaType, coverageMediaID, subPath string, variant subflux.Variant,
 ) {
 	if coverageMediaID != "" {
-		if err := db.UpsertSubtitleFile(ctx, mediaType, coverageMediaID, &api.SubtitleFile{
+		if err := db.UpsertSubtitleFile(ctx, mediaType, coverageMediaID, &subflux.SubtitleFile{
 			Language: req.Language,
 			Variant:  variant,
-			Source:   api.SourceExternal,
+			Source:   subflux.SourceExternal,
 			Path:     subPath,
 		}); err != nil {
 			slog.Warn("failed to upsert subtitle file", "error", err)
 		}
 	}
 
-	if mediaType == api.MediaTypeMovie && req.ArrID > 0 && ls.Radarr != nil {
+	if mediaType == subflux.MediaTypeMovie && req.ArrID > 0 && ls.Radarr != nil {
 		if err := ls.Radarr.RescanMovie(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh movie in radarr",
 				"movie_id", req.ArrID, "error", err)
 		}
-	} else if mediaType == api.MediaTypeEpisode && req.ArrID > 0 && ls.Sonarr != nil {
+	} else if mediaType == subflux.MediaTypeEpisode && req.ArrID > 0 && ls.Sonarr != nil {
 		if err := ls.Sonarr.RescanSeries(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh series in sonarr",
 				"series_id", req.ArrID, "error", err)

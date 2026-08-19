@@ -11,11 +11,11 @@ import (
 	"github.com/cplieger/auth/v4"
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -62,7 +62,7 @@ type activationCandidate struct {
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
 	providers []provider.Provider
-	drift     api.ConfigDrift
+	drift     subflux.ConfigDrift
 	// webauthnDegraded records the cold-boot degrade path so finalize keeps
 	// the persistent alert instead of dismissing it.
 	webauthnDegraded bool

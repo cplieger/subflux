@@ -17,17 +17,17 @@ import (
 
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	providerName = api.ProviderNameGestdown
+	providerName = subflux.ProviderNameGestdown
 	baseURL      = "https://api.gestdown.info"
 )
 
@@ -35,7 +35,7 @@ const (
 type Provider struct {
 	client    *http.Client
 	showCache *cache.Cache[[]showResult]
-	subCache  *cache.Cache[[]api.Subtitle]
+	subCache  *cache.Cache[[]subflux.Subtitle]
 }
 
 // Factory creates a Gestdown provider. No configuration is required.
@@ -43,12 +43,12 @@ func Factory(_ context.Context, _ map[string]any) (provider.Provider, error) {
 	return &Provider{
 		client:    provider.NewHTTPClient(provider.HTTPTimeoutStandard),
 		showCache: cache.New[[]showResult](cache.DefaultTTL),
-		subCache:  cache.New[[]api.Subtitle](cache.DefaultTTL),
+		subCache:  cache.New[[]subflux.Subtitle](cache.DefaultTTL),
 	}, nil
 }
 
 // Name returns the provider identifier for Gestdown.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
 // gestdown's custom rate-limit signal (Addic7ed throttle) with Retry-After
@@ -58,7 +58,7 @@ func (p *Provider) Name() api.ProviderID { return providerName }
 // for other 4xx/5xx.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusLocked {
-		return &api.RateLimitError{
+		return &subflux.RateLimitError{
 			Msg:        "HTTP 423: rate limited",
 			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
@@ -77,13 +77,13 @@ type langEntry struct {
 // found for that language or the error that ended its show loop.
 type langResult struct {
 	err  error
-	subs []api.Subtitle
+	subs []subflux.Subtitle
 }
 
 // Search finds subtitles for TV episodes via TVDB ID lookup.
 // Gestdown only supports TV shows; movies are skipped.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
-	if req.MediaType != api.MediaTypeEpisode || req.TvdbID == 0 {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	if req.MediaType != subflux.MediaTypeEpisode || req.TvdbID == 0 {
 		slog.Debug("gestdown: not an episode or no TVDB ID, skipping")
 		return nil, nil
 	}
@@ -133,7 +133,7 @@ func collectLangs(languages []string) []langEntry {
 
 // searchShowsForLang searches one language across the candidate shows,
 // stopping at the first show that yields subtitles (or the first error).
-func (p *Provider) searchShowsForLang(ctx context.Context, shows []showResult, req *api.SearchRequest, gestLang, isoLang string) langResult {
+func (p *Provider) searchShowsForLang(ctx context.Context, shows []showResult, req *subflux.SearchRequest, gestLang, isoLang string) langResult {
 	var lr langResult
 	for _, show := range shows {
 		if show.ID == "" {
@@ -156,8 +156,8 @@ func (p *Provider) searchShowsForLang(ctx context.Context, shows []showResult, r
 // aggregateResults flattens the per-language results. If every attempted
 // language failed, the combined error is returned so the caller can
 // distinguish a provider outage from a genuine no-results.
-func aggregateResults(perLang []langResult, req *api.SearchRequest) ([]api.Subtitle, error) {
-	var results []api.Subtitle
+func aggregateResults(perLang []langResult, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	var results []subflux.Subtitle
 	attempted, failed := 0, 0
 	for _, lr := range perLang {
 		attempted++
@@ -180,7 +180,7 @@ func aggregateResults(perLang []langResult, req *api.SearchRequest) ([]api.Subti
 }
 
 // Download fetches the subtitle content for the given search result.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if err := ssrf.ValidateURL(sub.DownloadURL); err != nil {
 		return nil, fmt.Errorf("gestdown: %w", err)
 	}
@@ -296,10 +296,10 @@ func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResu
 
 // searchSeasonCached fetches one season's subtitles for one language, memoized
 // per seasonCacheKey, then narrows the result to the requested episode.
-func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]api.Subtitle, error) {
+func (p *Provider) searchSeasonCached(ctx context.Context, showID string, season, episode int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
 	cacheKey := seasonCacheKey(showID, season, gestLang)
 
-	allSubs, err := p.subCache.GetOrFetch(cacheKey, func() ([]api.Subtitle, error) {
+	allSubs, err := p.subCache.GetOrFetch(cacheKey, func() ([]subflux.Subtitle, error) {
 		return p.searchSeasonRetry(ctx, showID, season, gestLang, isoLang)
 	})
 	if err != nil {
@@ -327,8 +327,8 @@ func seasonCacheKey(showID string, season int, gestLang string) string {
 }
 
 // filterByEpisode returns only subtitles matching the given episode number.
-func filterByEpisode(subs []api.Subtitle, episode int) []api.Subtitle {
-	var results []api.Subtitle
+func filterByEpisode(subs []subflux.Subtitle, episode int) []subflux.Subtitle {
+	var results []subflux.Subtitle
 	for i := range subs {
 		if subs[i].Episode == episode {
 			results = append(results, subs[i])
@@ -337,8 +337,8 @@ func filterByEpisode(subs []api.Subtitle, episode int) []api.Subtitle {
 	return results
 }
 
-func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]api.Subtitle, error) {
-	var subs []api.Subtitle
+func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
+	var subs []subflux.Subtitle
 	err := httpwire.RetryOnRateLimit(ctx, 3, 5*time.Minute, func() error {
 		var searchErr error
 		subs, searchErr = p.searchSeason(ctx, showID, season, gestLang, isoLang)
@@ -350,7 +350,7 @@ func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season 
 	return subs, nil
 }
 
-func (p *Provider) searchSeason(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]api.Subtitle, error) {
+func (p *Provider) searchSeason(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]subflux.Subtitle, error) {
 	u := fmt.Sprintf("%s/shows/%s/%d/%s", baseURL, url.PathEscape(showID), season, gestLang)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
@@ -378,38 +378,38 @@ func (p *Provider) searchSeason(ctx context.Context, showID string, season int, 
 	return buildSubtitles(result.Episodes, season, isoLang), nil
 }
 
-// convertSubtitle converts a raw subtitleResult into an api.Subtitle.
+// convertSubtitle converts a raw subtitleResult into an subflux.Subtitle.
 // Returns ok=false if the subtitle should be skipped (incomplete or invalid URI).
-func convertSubtitle(s subtitleResult, episode, season int, isoLang string) (api.Subtitle, bool) {
+func convertSubtitle(s subtitleResult, episode, season int, isoLang string) (subflux.Subtitle, bool) {
 	if !s.Completed {
-		return api.Subtitle{}, false
+		return subflux.Subtitle{}, false
 	}
 	if !strings.HasPrefix(s.DownloadURI, "/") {
 		slog.Warn("gestdown: unexpected download URI",
 			"uri", s.DownloadURI, "subtitle_id", s.SubtitleID)
-		return api.Subtitle{}, false
+		return subflux.Subtitle{}, false
 	}
 	releases := strings.Split(s.Version, ",")
 	for i := range releases {
 		releases[i] = strings.TrimSpace(releases[i])
 	}
-	return api.Subtitle{
+	return subflux.Subtitle{
 		Provider:    providerName,
 		ID:          s.SubtitleID,
 		Language:    isoLang,
 		ReleaseName: strings.Join(releases, " "),
 		DownloadURL: baseURL + s.DownloadURI,
 		HearingImp:  s.HearingImp,
-		MatchedBy:   api.MatchByTVDB,
+		MatchedBy:   subflux.MatchByTVDB,
 		Episode:     episode,
 		Season:      season,
 	}, true
 }
 
-// buildSubtitles converts raw season API response into api.Subtitle slice.
+// buildSubtitles converts raw season API response into subflux.Subtitle slice.
 // Filters incomplete subtitles and validates download URI prefix.
-func buildSubtitles(episodes []seasonEpisode, season int, isoLang string) []api.Subtitle {
-	var subs []api.Subtitle
+func buildSubtitles(episodes []seasonEpisode, season int, isoLang string) []subflux.Subtitle {
+	var subs []subflux.Subtitle
 	for _, ep := range episodes {
 		for _, s := range ep.Subtitles {
 			if sub, ok := convertSubtitle(s, ep.Number, season, isoLang); ok {

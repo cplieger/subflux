@@ -8,13 +8,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/search/timeout"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
@@ -25,8 +25,8 @@ import (
 //
 //nolint:revive // name is established API; renaming would break consumers
 type SearchMetrics interface {
-	RecordSearch(provider api.ProviderID, dur time.Duration, err error)
-	RecordDownload(provider api.ProviderID, err error)
+	RecordSearch(provider subflux.ProviderID, dur time.Duration, err error)
+	RecordDownload(provider subflux.ProviderID, err error)
 	AdaptiveSkip()
 	// RecordEmbeddedDetectorError counts a failed embedded track probe
 	// (subflux_embedded_detector_errors_total). Context cancellation is
@@ -49,7 +49,7 @@ type SubtitleSyncer interface {
 	Sync(ctx context.Context, data []byte, videoPath, lang string) (synced []byte, offsetMs int64)
 
 	// PostProcess applies encoding normalization, HI removal, tag stripping, etc.
-	PostProcess(data []byte, pp api.PostProcessConfig) []byte
+	PostProcess(data []byte, pp subflux.PostProcessConfig) []byte
 }
 
 // syncSkipThreshold computes the minimum subtitle score at which timing sync
@@ -58,7 +58,7 @@ type SubtitleSyncer interface {
 // The -1 accounts for partial source matches (e.g. WEB-DL vs WEB) which
 // score Source-1. At this threshold the subtitle is close enough that sync
 // could introduce drift rather than fix it.
-func syncSkipThreshold(scores api.Scores) int {
+func syncSkipThreshold(scores subflux.Scores) int {
 	return scores.Source + scores.ReleaseGroup - 1
 }
 
@@ -71,11 +71,11 @@ type Scorer interface {
 	// Score computes a quality score for a subtitle match set. Returns the
 	// full score (including the hash bonus) and the release-attribute-only
 	// score. A verifiable hash match short-circuits to the hash weight alone.
-	Score(sub api.SubtitleInfo, matches api.MatchSet) (score, scoreNoHash int)
+	Score(sub subflux.SubtitleInfo, matches subflux.MatchSet) (score, scoreNoHash int)
 	// ScoreToTier maps a numeric score to a human-readable tier label via one
 	// global threshold table: excellent >= 80, good >= 50, acceptable >= 20,
 	// minimal >= 1, else none. Thresholds do not vary by media type.
-	ScoreToTier(score int) api.ScoreTier
+	ScoreToTier(score int) subflux.ScoreTier
 }
 
 // Engine coordinates subtitle searches.
@@ -92,7 +92,7 @@ type Engine struct {
 	syncExec        syncing.SyncExec
 	searchGroup     singleflight.Group
 	hashGroup       singleflight.Group
-	providersByName map[api.ProviderID]provider.Provider
+	providersByName map[subflux.ProviderID]provider.Provider
 	providers       []provider.Provider
 }
 
@@ -129,11 +129,11 @@ func WithTimeout(h timeout.ProviderHealth) Option { return func(e *Engine) { e.t
 // noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}
 
-func (noopHealth) IsTimedOut(api.ProviderID) bool                { return false }
-func (noopHealth) RecordSuccess(api.ProviderID)                  {}
-func (noopHealth) RecordFailure(api.ProviderID, error)           {}
-func (noopHealth) Status() map[api.ProviderID]api.ProviderStatus { return nil }
-func (noopHealth) Reset()                                        {}
+func (noopHealth) IsTimedOut(subflux.ProviderID) bool                    { return false }
+func (noopHealth) RecordSuccess(subflux.ProviderID)                      {}
+func (noopHealth) RecordFailure(subflux.ProviderID, error)               {}
+func (noopHealth) Status() map[subflux.ProviderID]subflux.ProviderStatus { return nil }
+func (noopHealth) Reset()                                                {}
 
 // atomicWriter is the default FileWriter that delegates to atomicfile.WriteFile.
 // WithMaxBytes mirrors the read bound on the data it persists: downloaded
@@ -156,7 +156,7 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 		o(e)
 	}
 	// Build O(1) lookup map for downloadFromProvider.
-	e.providersByName = make(map[api.ProviderID]provider.Provider, len(providers))
+	e.providersByName = make(map[subflux.ProviderID]provider.Provider, len(providers))
 	for _, p := range providers {
 		e.providersByName[p.Name()] = p
 	}
@@ -193,14 +193,14 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 }
 
 // ScoreSubtitles scores and ranks subtitles for a search request.
-func (e *Engine) ScoreSubtitles(req *api.SearchRequest, results []api.Subtitle) []api.ScoredResult {
+func (e *Engine) ScoreSubtitles(req *subflux.SearchRequest, results []subflux.Subtitle) []subflux.ScoredResult {
 	results, _ = scoring.FilterByIdentity(results, req)
 	video := videoInfoFromRequest(req)
 	scores := e.cfg.Scores()
 	scored := scoreResults(e.scorer, &video, results, e.cfg.ProviderPriority)
-	out := make([]api.ScoredResult, len(scored))
+	out := make([]subflux.ScoredResult, len(scored))
 	for i := range scored {
-		out[i] = api.ScoredResult{
+		out[i] = subflux.ScoredResult{
 			Sub:     scored[i].sub,
 			Score:   scored[i].score,
 			Matches: matchBreakdown(&scores, scored[i].matches),
@@ -235,7 +235,7 @@ func (e *Engine) HashFile(ctx context.Context, path string) (hash string, size i
 
 // ProviderTimeouts returns a snapshot of all provider timeout states.
 // Returns (status, true) if timeouts are enabled, (nil, false) otherwise.
-func (e *Engine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
+func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStatus, bool) {
 	s := e.timeout.Status()
 	if s == nil {
 		return nil, false
@@ -249,19 +249,19 @@ func (e *Engine) ResetTimeouts() {
 }
 
 // SimulateScore simulates scoring a subtitle against a video using release names.
-func (e *Engine) SimulateScore(mediaType api.MediaType, videoRelease, subRelease string, matchedBy api.MatchMethod) api.ScoreResult {
-	video := videoInfoFromRequest(&api.SearchRequest{
+func (e *Engine) SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult {
+	video := videoInfoFromRequest(&subflux.SearchRequest{
 		MediaType:   mediaType,
 		ReleaseName: videoRelease,
 	})
-	matches := buildMatches(&video, &api.Subtitle{
+	matches := buildMatches(&video, &subflux.Subtitle{
 		ReleaseName: subRelease,
 		MatchedBy:   matchedBy,
 	})
-	score, scoreNoHash := e.scorer.Score(api.SubtitleInfo{
-		HashVerifiable: matchedBy == api.MatchByHash,
+	score, scoreNoHash := e.scorer.Score(subflux.SubtitleInfo{
+		HashVerifiable: matchedBy == subflux.MatchByHash,
 	}, matches)
-	return api.ScoreResult{
+	return subflux.ScoreResult{
 		Score:       score,
 		ScoreNoHash: scoreNoHash,
 		Tier:        e.scorer.ScoreToTier(score),
@@ -269,8 +269,8 @@ func (e *Engine) SimulateScore(mediaType api.MediaType, videoRelease, subRelease
 }
 
 // groupTargetsByLang groups targets by language code, preserving insertion order.
-func groupTargetsByLang(targets []api.SubtitleTarget) (groups map[string][]api.SubtitleTarget, order []string) {
-	groups = make(map[string][]api.SubtitleTarget)
+func groupTargetsByLang(targets []subflux.SubtitleTarget) (groups map[string][]subflux.SubtitleTarget, order []string) {
+	groups = make(map[string][]subflux.SubtitleTarget)
 	for _, t := range targets {
 		if _, ok := groups[t.Code]; !ok {
 			order = append(order, t.Code)
@@ -339,7 +339,7 @@ func boundLogPath(p string) string {
 // which is correct however the search itself ends. The scanned_at stamp is
 // the post-work half (stampScanState) — splitting the two is what keeps the
 // resume stamp honest (P5). No-op (returns false) for unidentified media.
-func (e *Engine) recordCoverageInventory(ctx context.Context, mediaType api.MediaType,
+func (e *Engine) recordCoverageInventory(ctx context.Context, mediaType subflux.MediaType,
 	mediaID string, existing existingSubs,
 ) bool {
 	if mediaID == "" {
@@ -361,13 +361,13 @@ func (e *Engine) recordCoverageInventory(ctx context.Context, mediaType api.Medi
 // work. searched=false records an inventory-only visit (scan skip paths that
 // refreshed coverage without querying providers). No-op for unidentified
 // media.
-func (e *Engine) stampScanState(ctx context.Context, mediaType api.MediaType,
-	mediaID string, req *api.SearchRequest, searched bool,
+func (e *Engine) stampScanState(ctx context.Context, mediaType subflux.MediaType,
+	mediaID string, req *subflux.SearchRequest, searched bool,
 ) {
 	if mediaID == "" {
 		return
 	}
-	if err := e.store.RecordScanState(ctx, &api.ScanRecord{
+	if err := e.store.RecordScanState(ctx, &subflux.ScanRecord{
 		MediaType: mediaType,
 		MediaID:   mediaID,
 		Title:     req.Title,
@@ -387,7 +387,7 @@ func (e *Engine) stampScanState(ctx context.Context, mediaType api.MediaType,
 // work. Scan skip paths (season early stop, show-level skip) call this so
 // coverage badges stay truthful for items the scanner deliberately does not
 // search: "skip" means skip PROVIDER work, not local bookkeeping.
-func (e *Engine) InventoryCoverage(ctx context.Context, req *api.SearchRequest, videoPath string) bool {
+func (e *Engine) InventoryCoverage(ctx context.Context, req *subflux.SearchRequest, videoPath string) bool {
 	mediaType := req.MediaType
 	mediaID := mediaid.Build(req)
 	if mediaID == "" {
@@ -411,16 +411,16 @@ func (e *Engine) InventoryCoverage(ctx context.Context, req *api.SearchRequest, 
 }
 
 // gateKey builds the mediaGate key for a media item.
-func gateKey(mediaType api.MediaType, mediaID string) string {
+func gateKey(mediaType subflux.MediaType, mediaID string) string {
 	return string(mediaType) + "\x00" + mediaID
 }
 
 // SearchTargets searches for subtitles using resolved SubtitleTargets.
 // Always searches for regular (non-HI, non-forced) subs, with HI as fallback.
 // Respects per-target provider filtering and min scores.
-func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
-	videoPath string, targets []api.SubtitleTarget,
-) (api.SearchResult, error) {
+func (e *Engine) SearchTargets(ctx context.Context, req *subflux.SearchRequest,
+	videoPath string, targets []subflux.SubtitleTarget,
+) (subflux.SearchResult, error) {
 	slog.Debug("SearchTargets entry",
 		"media", req.MediaLabel(), "media_type", req.MediaType,
 		"imdb", req.ImdbID, "targets", len(targets),
@@ -453,7 +453,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 
 	existing, probeOK := e.detectExistingObserved(ctx, videoPath)
 
-	var result api.SearchResult
+	var result subflux.SearchResult
 
 	// Record the discovered subtitle files for coverage tracking (pre-work:
 	// the inventory is valid however the search ends; see P5 split note on
@@ -480,8 +480,8 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 	// Process language groups concurrently. Each group already uses errgroup
 	// internally for provider concurrency, and singleflight deduplicates
 	// identical provider queries across languages. Each group produces one
-	// typed api.LangOutcome; the tracker and stats consume those directly.
-	result.Langs = make([]api.LangOutcome, len(langOrder))
+	// typed subflux.LangOutcome; the tracker and stats consume those directly.
+	result.Langs = make([]subflux.LangOutcome, len(langOrder))
 
 	g := new(errgroup.Group)
 	g.SetLimit(4) // Cap concurrent language groups.

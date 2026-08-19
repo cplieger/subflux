@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitleext"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
@@ -113,14 +113,14 @@ func scanExternalSubs(videoPath string, result *existingSubs) {
 
 // existingToSubtitleFiles converts detected subtitles into the flat
 // SubtitleFile records stored in the DB for coverage tracking.
-func existingToSubtitleFiles(existing existingSubs) []api.SubtitleFile {
+func existingToSubtitleFiles(existing existingSubs) []subflux.SubtitleFile {
 	type embKey struct {
 		lang    string
-		variant api.Variant
+		variant subflux.Variant
 		codec   string
 	}
 	seenEmb := make(map[embKey]bool)
-	out := make([]api.SubtitleFile, 0,
+	out := make([]subflux.SubtitleFile, 0,
 		len(existing.Embedded)+len(existing.External))
 	for _, emb := range existing.Embedded {
 		k := embKey{emb.Lang, subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: emb.HI, Forced: emb.Forced}), emb.Codec}
@@ -128,15 +128,15 @@ func existingToSubtitleFiles(existing existingSubs) []api.SubtitleFile {
 			continue
 		}
 		seenEmb[k] = true
-		out = append(out, api.SubtitleFile{
+		out = append(out, subflux.SubtitleFile{
 			Language: k.lang,
 			Variant:  k.variant,
-			Source:   api.SourceEmbedded,
+			Source:   subflux.SourceEmbedded,
 			Codec:    emb.Codec,
 		})
 	}
 	for _, ext := range existing.External {
-		out = append(out, api.SubtitleFile{
+		out = append(out, subflux.SubtitleFile{
 			Language: ext.Lang,
 			Variant:  subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: ext.HI, Forced: ext.Forced}),
 			Source:   sourceExternal,

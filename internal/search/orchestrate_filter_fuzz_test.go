@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzFilterByVariantSubset verifies that filterByVariant output is always
@@ -15,14 +15,14 @@ func FuzzFilterByVariantSubset(f *testing.F) {
 	f.Add(false, false, false, false, "")
 
 	f.Fuzz(func(t *testing.T, hi1, forced1, hi2, forced2 bool, variant string) {
-		input := []api.Subtitle{
+		input := []subflux.Subtitle{
 			{ID: "1", HearingImp: hi1, Forced: forced1},
 			{ID: "2", HearingImp: hi2, Forced: forced2},
 		}
 
-		v := api.Variant(variant)
-		if v != api.VariantForced && v != api.VariantHI && v != api.VariantStandard {
-			v = api.VariantStandard
+		v := subflux.Variant(variant)
+		if v != subflux.VariantForced && v != subflux.VariantHI && v != subflux.VariantStandard {
+			v = subflux.VariantStandard
 		}
 
 		filtered, _ := filterByVariant(input, v)
@@ -47,18 +47,18 @@ func FuzzFilterByVariant(f *testing.F) {
 	f.Add("unknown", true, true, true, false, false, false)
 
 	f.Fuzz(func(t *testing.T, variant string, hi1, forced1, hi2, forced2, hi3, forced3 bool) {
-		results := []api.Subtitle{
+		results := []subflux.Subtitle{
 			{HearingImp: hi1, Forced: forced1, ReleaseName: "sub1"},
 			{HearingImp: hi2, Forced: forced2, ReleaseName: "sub2"},
 			{HearingImp: hi3, Forced: forced3, ReleaseName: "sub3"},
 		}
 
-		v := api.Variant(variant)
+		v := subflux.Variant(variant)
 		filtered, fallback := filterByVariant(results, v)
 
 		// Invariant: filtered results should respect variant constraints.
 		switch v {
-		case api.VariantForced:
+		case subflux.VariantForced:
 			for _, s := range filtered {
 				if !s.Forced {
 					t.Fatal("VariantForced filter returned non-forced subtitle")
@@ -67,7 +67,7 @@ func FuzzFilterByVariant(f *testing.F) {
 			if fallback {
 				t.Fatal("VariantForced should never use fallback")
 			}
-		case api.VariantHI:
+		case subflux.VariantHI:
 			for _, s := range filtered {
 				if !s.HearingImp {
 					t.Fatal("VariantHI filter returned non-HI subtitle")
@@ -102,9 +102,9 @@ func FuzzFilterByScore(f *testing.F) {
 			return
 		}
 		scored := []scoredSub{
-			{sub: api.Subtitle{ID: "1"}, score: s1},
-			{sub: api.Subtitle{ID: "2"}, score: s2},
-			{sub: api.Subtitle{ID: "3"}, score: s3},
+			{sub: subflux.Subtitle{ID: "1"}, score: s1},
+			{sub: subflux.Subtitle{ID: "2"}, score: s2},
+			{sub: subflux.Subtitle{ID: "3"}, score: s3},
 		}
 		result := filterByScore(scored, minScore)
 		// Invariant: all results must be >= minScore.

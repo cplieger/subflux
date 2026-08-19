@@ -8,44 +8,44 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 var errMock = errors.New("mock error")
 
 // mockQueryStore implements QueryStore for testing. It records the last
-// *api.StateQuery passed to GetState so tests can assert the limit/offset
+// *subflux.StateQuery passed to GetState so tests can assert the limit/offset
 // guards HandleState applies before querying, and the last type/prefix
 // passed to GetBackoffByPrefix.
 type mockQueryStore struct {
 	err            error
-	lastState      *api.StateQuery
-	lastPrefixType api.MediaType
+	lastState      *subflux.StateQuery
+	lastPrefixType subflux.MediaType
 	lastPrefix     string
-	stateEntries   []api.StateEntry
-	backoffItems   []api.BackoffEntry
-	manualLocks    []api.ManualLockEntry
+	stateEntries   []subflux.StateEntry
+	backoffItems   []subflux.BackoffEntry
+	manualLocks    []subflux.ManualLockEntry
 	downloads      int
 	attempts       int
 }
 
-func (m *mockQueryStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
+func (m *mockQueryStore) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	cp := *q
 	m.lastState = &cp
 	return m.stateEntries, m.err
 }
 
-func (m *mockQueryStore) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
+func (m *mockQueryStore) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
 	return m.backoffItems, m.err
 }
 
-func (m *mockQueryStore) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, prefix string) ([]api.BackoffEntry, error) {
+func (m *mockQueryStore) GetBackoffByPrefix(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.BackoffEntry, error) {
 	m.lastPrefixType = mediaType
 	m.lastPrefix = prefix
 	return m.backoffItems, m.err
 }
 
-func (m *mockQueryStore) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
+func (m *mockQueryStore) GetManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	return m.manualLocks, m.err
 }
 
@@ -59,7 +59,7 @@ func TestHandleState(t *testing.T) {
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
 		h := New(Deps{
-			QueryDB: &mockQueryStore{stateEntries: []api.StateEntry{{
+			QueryDB: &mockQueryStore{stateEntries: []subflux.StateEntry{{
 				ID: 1, MediaType: "movie", MediaID: "tt123",
 				Language: "fr", Provider: "os", Score: 200,
 			}}},
@@ -73,7 +73,7 @@ func TestHandleState(t *testing.T) {
 		if ct := w.Header().Get("Content-Type"); ct != "application/json" {
 			t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 		}
-		var entries []api.StateEntry
+		var entries []subflux.StateEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -218,7 +218,7 @@ func TestHandleBackoff(t *testing.T) {
 
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
-		h := New(Deps{QueryDB: &mockQueryStore{backoffItems: []api.BackoffEntry{
+		h := New(Deps{QueryDB: &mockQueryStore{backoffItems: []subflux.BackoffEntry{
 			{MediaType: "movie", MediaID: "tt123", Language: "fr", Failures: 3},
 		}}})
 		req := httptest.NewRequest(http.MethodGet, "/api/backoff", nil)
@@ -227,7 +227,7 @@ func TestHandleBackoff(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
 		}
-		var entries []api.BackoffEntry
+		var entries []subflux.BackoffEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -264,9 +264,9 @@ func TestHandleLocks(t *testing.T) {
 
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
-		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []api.ManualLockEntry{
+		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []subflux.ManualLockEntry{
 			{
-				ManualLockKey: api.ManualLockKey{
+				ManualLockKey: subflux.ManualLockKey{
 					MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr",
 				},
 				Count: 2,
@@ -278,7 +278,7 @@ func TestHandleLocks(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
 		}
-		var entries []api.ManualLockEntry
+		var entries []subflux.ManualLockEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}

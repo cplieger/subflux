@@ -7,19 +7,19 @@ import (
 	"context"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // QueryStore is the read-only introspection surface behind /api/state,
 // /api/backoff and /api/locks: 5 of the 36 methods the store offers, all of
 // them reads. Nothing on this path writes, which is why no write appears here.
 type QueryStore interface {
-	GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error)
-	GetBackoffItems(ctx context.Context) ([]api.BackoffEntry, error)
-	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
-	GetManualLocks(ctx context.Context) ([]api.ManualLockEntry, error)
+	GetState(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
+	GetBackoffItems(ctx context.Context) ([]subflux.BackoffEntry, error)
+	GetBackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
+	GetManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 
@@ -52,8 +52,8 @@ type MetricsReader interface {
 // clear it. Three of the engine's eight methods — these handlers never search,
 // never download and never post-process, so the other five stay out of reach.
 type queryEngine interface {
-	SimulateScore(mediaType api.MediaType, videoRelease, subRelease string, matchedBy api.MatchMethod) api.ScoreResult
-	ProviderTimeouts() (status map[api.ProviderID]api.ProviderStatus, enabled bool)
+	SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult
+	ProviderTimeouts() (status map[subflux.ProviderID]subflux.ProviderStatus, enabled bool)
 	ResetTimeouts()
 }
 
@@ -70,17 +70,17 @@ type queryEngine interface {
 // and a consumer surface that borrows another package's interface stops
 // recording its own dependency.
 type queryCfg interface {
-	Providers() map[api.ProviderID]api.ProviderCfg
+	Providers() map[subflux.ProviderID]subflux.ProviderCfg
 	LanguageCodes() []string
-	LanguageRulesForUI() api.LanguageRulesJSON
-	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
-	EmbeddedPolicy() api.EmbeddedPolicy
-	Scores() api.Scores
-	Search() api.SearchConfig
-	Adaptive() api.AdaptiveConfig
-	PostProcess() api.PostProcessConfig
-	Sonarr() api.ArrConfig
-	Radarr() api.ArrConfig
+	LanguageRulesForUI() subflux.LanguageRulesJSON
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
+	EmbeddedPolicy() subflux.EmbeddedPolicy
+	Scores() subflux.Scores
+	Search() subflux.SearchConfig
+	Adaptive() subflux.AdaptiveConfig
+	PostProcess() subflux.PostProcessConfig
+	Sonarr() subflux.ArrConfig
+	Radarr() subflux.ArrConfig
 }
 
 // LiveState holds the hot-reloadable runtime state needed by query handlers.

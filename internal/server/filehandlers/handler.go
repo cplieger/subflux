@@ -19,12 +19,12 @@ import (
 	"strconv"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
@@ -32,11 +32,11 @@ import (
 // the one row, release a manual lock the deletion emptied, and answer the
 // media-ID listing. 5 of the 36 methods the store offers.
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
-	DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant, source api.SubtitleSource, path string) error
-	ManualSubtitlePaths(ctx context.Context, key api.ManualLockKey) ([]string, error)
-	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
-	HistoryMediaIDs(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error)
+	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	DeleteSubtitleFile(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant, source subflux.SubtitleSource, path string) error
+	ManualSubtitlePaths(ctx context.Context, key subflux.ManualLockKey) ([]string, error)
+	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
+	HistoryMediaIDs(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]string, error)
 }
 
 // Deps holds the dependencies for file handlers.
@@ -128,39 +128,39 @@ type FileEntry struct {
 func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
 	mediaType := r.URL.Query().Get("media_type")
 	mediaID := r.URL.Query().Get("media_id")
 	if mediaType == "" || mediaID == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type and media_id required")
 		return
 	}
-	if !api.MediaType(mediaType).Valid() {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+	if !subflux.MediaType(mediaType).Valid() {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 	arrID := 0 // absent disables the arr fallback
 	if raw := r.URL.Query().Get("arr_id"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n <= 0 {
-			httpapi.BadRequestC(w, r, api.CodeBadRequest, "arr_id must be a positive integer")
+			httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "arr_id must be a positive integer")
 			return
 		}
 		arrID = n
 	}
 
-	rows, err := h.deps.Store.GetSubtitleFiles(ctx, api.MediaType(mediaType), mediaID)
+	rows, err := h.deps.Store.GetSubtitleFiles(ctx, subflux.MediaType(mediaType), mediaID)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "list files")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "list files")
 		return
 	}
 
 	ls := h.deps.StateFunc()
 	entries := storeEntries(ctx, ls, rows)
-	entries, err = h.appendOrphans(ctx, ls, api.MediaType(mediaType), mediaID, arrID, rows, entries)
+	entries, err = h.appendOrphans(ctx, ls, subflux.MediaType(mediaType), mediaID, arrID, rows, entries)
 	if err != nil {
 		writeArrBindingError(w, r, err)
 		return
@@ -171,7 +171,7 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 
 // storeEntries maps the store rows onto listing FileEntries, statting each
 // contained on-disk path for its size.
-func storeEntries(ctx context.Context, ls *LiveState, rows []api.SubtitleEntry) []FileEntry {
+func storeEntries(ctx context.Context, ls *LiveState, rows []subflux.SubtitleEntry) []FileEntry {
 	entries := make([]FileEntry, 0, len(rows))
 	for i := range rows {
 		row := &rows[i]
@@ -202,13 +202,13 @@ func storeEntries(ctx context.Context, ls *LiveState, rows []api.SubtitleEntry) 
 // FileRef fields addressing one stored subtitle file, or a server-minted
 // orphan handle from the listing (mutually exclusive; orphan_handle wins).
 type DeleteFileRequest struct {
-	MediaType    api.MediaType `json:"media_type,omitempty"`
-	MediaID      string        `json:"media_id,omitempty"`
-	Language     string        `json:"language,omitempty"`
-	Variant      string        `json:"variant,omitempty"`
-	Source       string        `json:"source,omitempty"`
-	OrphanHandle string        `json:"orphan_handle,omitempty"`
-	Ordinal      int           `json:"ordinal,omitempty"`
+	MediaType    subflux.MediaType `json:"media_type,omitempty"`
+	MediaID      string            `json:"media_id,omitempty"`
+	Language     string            `json:"language,omitempty"`
+	Variant      string            `json:"variant,omitempty"`
+	Source       string            `json:"source,omitempty"`
+	OrphanHandle string            `json:"orphan_handle,omitempty"`
+	Ordinal      int               `json:"ordinal,omitempty"`
 }
 
 // HandleDeleteFile deletes a single external subtitle file addressed by
@@ -217,7 +217,7 @@ type DeleteFileRequest struct {
 func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodDelete {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -232,18 +232,18 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
 		return
 	}
 	if !req.MediaType.Valid() {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 	if req.Variant == "" {
-		req.Variant = string(api.VariantStandard)
+		req.Variant = string(subflux.VariantStandard)
 	}
 	if req.Source == "" {
-		req.Source = string(api.SourceExternal)
+		req.Source = string(subflux.SourceExternal)
 	}
 
 	ref := resolve.FileRef{
@@ -267,11 +267,11 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	slog.Info("subtitle file deleted", "path", path)
 
 	if err := h.deps.Store.DeleteSubtitleFile(ctx,
-		ref.MediaType, ref.MediaID, ref.Language, api.Variant(ref.Variant), api.SourceExternal, path); err != nil {
+		ref.MediaType, ref.MediaID, ref.Language, subflux.Variant(ref.Variant), subflux.SourceExternal, path); err != nil {
 		slog.Warn("delete file: db cleanup failed", "error", err)
 	}
 
-	h.maybeRevertManualLock(ctx, ref.MediaType, ref.MediaID, ref.Language, api.Variant(ref.Variant))
+	h.maybeRevertManualLock(ctx, ref.MediaType, ref.MediaID, ref.Language, subflux.Variant(ref.Variant))
 
 	h.deps.Events.Publish(events.Event{
 		Type: events.CoverageUpdate,
@@ -295,13 +295,13 @@ func (h *Handler) removeSubtitleFile(ctx context.Context, w http.ResponseWriter,
 		switch {
 		case errors.Is(err, errSubtitleExtensionNotAllowed):
 			slog.Warn("delete file: extension refused by subtitle delete gate", "path", path, "error", err)
-			httpapi.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+			httpapi.ConflictC(w, r, subflux.CodeSubtitleExtensionNotAllowed,
 				"stored path does not carry a deletable subtitle extension")
 		case errors.Is(err, config.ErrPathNotAllowed):
 			slog.Warn("delete file: path rejected", "path", path, "error", err)
-			httpapi.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid path")
+			httpapi.ForbiddenC(w, r, subflux.CodePathNotAllowed, "invalid path")
 		default:
-			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "delete file", "path", path)
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "delete file", "path", path)
 		}
 		return false
 	}
@@ -313,8 +313,8 @@ func (h *Handler) removeSubtitleFile(ctx context.Context, w http.ResponseWriter,
 // store-ID semantics of the listing (exact ID, or a "tvdb-<id>-" series
 // prefix covering every episode).
 type BulkDeleteRequest struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   string        `json:"media_id"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   string            `json:"media_id"`
 }
 
 // HandleBulkDeleteFiles deletes all external subtitle files for a media item.
@@ -322,7 +322,7 @@ type BulkDeleteRequest struct {
 func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodDelete {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -331,11 +331,11 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if req.MediaType == "" || req.MediaID == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type and media_id required")
 		return
 	}
 	if !req.MediaType.Valid() {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := h.deps.Store.GetSubtitleFiles(ctx, req.MediaType, req.MediaID)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "bulk delete: db fetch")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "bulk delete: db fetch")
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	if path, refused := refusedBulkPath(rows); refused {
 		slog.Warn("bulk delete: extension refused by subtitle delete gate, refusing whole bulk",
 			"path", path)
-		httpapi.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+		httpapi.ConflictC(w, r, subflux.CodeSubtitleExtensionNotAllowed,
 			"a stored path does not carry a deletable subtitle extension")
 		return
 	}
@@ -364,7 +364,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	for i := range rows {
 		row := &rows[i]
 		if h.deleteExternalFile(ctx, ls.Cfg, req.MediaType, row) {
-			affected[lockQuad{mediaID: row.MediaID, language: row.Language, variant: api.Variant(row.Variant)}] = true
+			affected[lockQuad{mediaID: row.MediaID, language: row.Language, variant: subflux.Variant(row.Variant)}] = true
 			deleted++
 		}
 	}
@@ -394,10 +394,10 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 // extension lacks the delete capability in the subtitle-extension authority
 // (the S16 bulk preflight). Embedded rows and rows without a path are not
 // deletion targets and pass through.
-func refusedBulkPath(rows []api.SubtitleEntry) (string, bool) {
+func refusedBulkPath(rows []subflux.SubtitleEntry) (string, bool) {
 	for i := range rows {
 		row := &rows[i]
-		if row.Source == string(api.SourceEmbedded) || row.Path == "" {
+		if row.Source == string(subflux.SourceEmbedded) || row.Path == "" {
 			continue
 		}
 		if !subtitleext.Delete(row.Path) {
@@ -412,26 +412,26 @@ func refusedBulkPath(rows []api.SubtitleEntry) (string, bool) {
 func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	mediaType := r.URL.Query().Get("type")
 	prefix := r.URL.Query().Get("prefix")
 	if mediaType == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "type required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "type required")
 		return
 	}
-	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+	if mediaType != string(subflux.MediaTypeEpisode) && mediaType != string(subflux.MediaTypeMovie) {
+		httpapi.BadRequestC(w, r, subflux.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
 	if prefix != "" && !mediaid.ValidPrefix(prefix) {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid prefix format")
 		return
 	}
-	ids, err := h.deps.Store.HistoryMediaIDs(ctx, api.MediaType(mediaType), prefix)
+	ids, err := h.deps.Store.HistoryMediaIDs(ctx, subflux.MediaType(mediaType), prefix)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "history ids")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "history ids")
 		return
 	}
 	if ids == nil {
@@ -445,8 +445,8 @@ func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 // targeted row's extension and answers 409 before any mutation, so the
 // in-sweep refusal branch here is defense-in-depth: a refused extension is
 // still loud (WARN log naming the gate) and the row is left untouched.
-func (h *Handler) deleteExternalFile(ctx context.Context, cfg pathGuard, mediaType api.MediaType, row *api.SubtitleEntry) bool {
-	if row.Source == string(api.SourceEmbedded) || row.Path == "" {
+func (h *Handler) deleteExternalFile(ctx context.Context, cfg pathGuard, mediaType subflux.MediaType, row *subflux.SubtitleEntry) bool {
+	if row.Source == string(subflux.SourceEmbedded) || row.Path == "" {
 		return false
 	}
 	if err := removeSubtitleUnderRoot(ctx, cfg, row.Path); err != nil {
@@ -462,7 +462,7 @@ func (h *Handler) deleteExternalFile(ctx context.Context, cfg pathGuard, mediaTy
 	slog.Info("subtitle file deleted (bulk)", "path", row.Path)
 	if err := h.deps.Store.DeleteSubtitleFile(ctx,
 		mediaType, row.MediaID, row.Language,
-		api.Variant(row.Variant), api.SourceExternal, row.Path); err != nil {
+		subflux.Variant(row.Variant), subflux.SourceExternal, row.Path); err != nil {
 		slog.Warn("bulk delete: db cleanup failed", "error", err)
 	}
 	return true
@@ -474,14 +474,14 @@ func (h *Handler) deleteExternalFile(ctx context.Context, cfg pathGuard, mediaTy
 type lockQuad struct {
 	mediaID  string
 	language string
-	variant  api.Variant
+	variant  subflux.Variant
 }
 
 // maybeRevertManualLock checks if there are any remaining manual subtitle
 // files on disk for a media+language+variant quad. If none remain, clears
 // that quad's manual lock (sibling variants keep theirs).
-func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) {
-	key := api.ManualLockKey{
+func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) {
+	key := subflux.ManualLockKey{
 		MediaType: mediaType, MediaID: mediaID, Language: language, Variant: variant,
 	}
 	paths, err := h.deps.Store.ManualSubtitlePaths(ctx, key)

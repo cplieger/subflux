@@ -3,8 +3,8 @@ package boltstore
 import (
 	"fmt"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -135,7 +135,7 @@ const stateProjectionMinLen = 1 + 8 // manual byte + be64 score
 
 // encodeStateProjection serialises the ix_state_quad projected value from a
 // subtitle_state record's (manual, score, provider).
-func encodeStateProjection(manual bool, score int, provider api.ProviderID) []byte {
+func encodeStateProjection(manual bool, score int, provider subflux.ProviderID) []byte {
 	buf := make([]byte, 0, stateProjectionMinLen+len(provider))
 	var m byte
 	if manual {
@@ -150,14 +150,14 @@ func encodeStateProjection(manual bool, score int, provider api.ProviderID) []by
 // decodeStateProjection parses an ix_state_quad projected value back into its
 // (manual, score, provider) fields. ok is false for a value shorter than the
 // fixed manual+score prefix.
-func decodeStateProjection(b []byte) (manual bool, score int, provider api.ProviderID, ok bool) {
+func decodeStateProjection(b []byte) (manual bool, score int, provider subflux.ProviderID, ok bool) {
 	if len(b) < stateProjectionMinLen {
 		return false, 0, "", false
 	}
 	manual = b[0] == 1
 	v, _ := kv.DecodeBe64(b[1:stateProjectionMinLen])
 	score = int(int64(v)) //nolint:gosec // G115: inverse of encodeStateProjection
-	provider = api.ProviderID(b[stateProjectionMinLen:])
+	provider = subflux.ProviderID(b[stateProjectionMinLen:])
 	return manual, score, provider, true
 }
 
@@ -250,14 +250,14 @@ func deleteState(tx *bolt.Tx, id int64) (existed bool, err error) {
 // hot read (BackedOffProviders) is a primary prefix scan, and the rare
 // GetBackoffItems listing sorts the (small, bounded-by-active-backoff)
 // bucket in memory.
-func putAttempt(tx *bolt.Tx, mt api.MediaType, mid, lang string, p api.ProviderID, rec *attemptRec) error {
+func putAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.ProviderID, rec *attemptRec) error {
 	return kv.PutIndexed(tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p), rec,
 		nil, attemptCounters())
 }
 
 // deleteAttempt removes a search_attempts row and decrements the attempts
 // counter, all in tx. Idempotent on an absent key.
-func deleteAttempt(tx *bolt.Tx, mt api.MediaType, mid, lang string, p api.ProviderID) (existed bool, err error) {
+func deleteAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.ProviderID) (existed bool, err error) {
 	return kv.DeleteIndexed[attemptRec](tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p),
 		nil, attemptCounters())
 }
@@ -266,7 +266,7 @@ func deleteAttempt(tx *bolt.Tx, mt api.MediaType, mid, lang string, p api.Provid
 // ix_scan_at index, all in tx. scan_state has no maintained counter.
 // ix_scan_at keys are ever-increasing timestamps (tail appends), so it gets
 // the raised FillPercent; the text-keyed scan_state primary keeps the default.
-func putScanState(tx *bolt.Tx, mt api.MediaType, mid string, rec *scanRec) error {
+func putScanState(tx *bolt.Tx, mt subflux.MediaType, mid string, rec *scanRec) error {
 	setAppendFill(tx, bucketIxScanAt)
 	return kv.PutIndexed(tx, bucketScanState, scanStateKey(mt, mid), rec,
 		scanIndexes(), nil)
@@ -274,7 +274,7 @@ func putScanState(tx *bolt.Tx, mt api.MediaType, mid string, rec *scanRec) error
 
 // deleteScanState removes a scan_state row and its ix_scan_at entry, all in tx.
 // Idempotent on an absent key. Used by reconcile/orphan cleanup (task 6).
-func deleteScanState(tx *bolt.Tx, mt api.MediaType, mid string) (existed bool, err error) {
+func deleteScanState(tx *bolt.Tx, mt subflux.MediaType, mid string) (existed bool, err error) {
 	return kv.DeleteIndexed[scanRec](tx, bucketScanState, scanStateKey(mt, mid),
 		scanIndexes(), nil)
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -41,14 +41,14 @@ func TestNew_UnconfiguredMode_NoPanic(t *testing.T) {
 	}
 }
 
-// nopProviderRegistry is a minimal api.ProviderRegistry that returns
+// nopProviderRegistry is a minimal confighandlers.SchemaRegistry that returns
 // empty values; sufficient for unconfigured-mode startup.
 type nopProviderRegistry struct{}
 
-func (nopProviderRegistry) LoadAll(_ context.Context, _ map[api.ProviderID]api.ProviderCfg) ([]provider.Provider, error) {
+func (nopProviderRegistry) LoadAll(_ context.Context, _ map[subflux.ProviderID]subflux.ProviderCfg) ([]provider.Provider, error) {
 	return nil, nil
 }
-func (nopProviderRegistry) ProviderNames() []api.ProviderID { return nil }
-func (nopProviderRegistry) Schema(_ api.ProviderID) (string, []api.ProviderSchemaField) {
+func (nopProviderRegistry) ProviderNames() []subflux.ProviderID { return nil }
+func (nopProviderRegistry) Schema(_ subflux.ProviderID) (string, []subflux.ProviderSchemaField) {
 	return "", nil
 }

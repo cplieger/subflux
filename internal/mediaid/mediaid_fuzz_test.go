@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzEpisode(f *testing.F) {
@@ -75,8 +75,8 @@ func FuzzBuild(f *testing.F) {
 	f.Add("", 0, 0, "", 0, 0)
 
 	f.Fuzz(func(t *testing.T, mediaType string, tmdbID, tvdbID int, imdbID string, season, episode int) {
-		req := &api.SearchRequest{
-			MediaType: api.MediaType(mediaType),
+		req := &subflux.SearchRequest{
+			MediaType: subflux.MediaType(mediaType),
 			TmdbID:    tmdbID,
 			TvdbID:    tvdbID,
 			ImdbID:    imdbID,
@@ -86,12 +86,12 @@ func FuzzBuild(f *testing.F) {
 		result := Build(req)
 
 		// The dispatcher must agree with the individual builder for each type.
-		switch api.MediaType(mediaType) {
-		case api.MediaTypeMovie:
+		switch subflux.MediaType(mediaType) {
+		case subflux.MediaTypeMovie:
 			if want := Movie(tmdbID, imdbID); result != want {
 				t.Errorf("Build movie: got %q, want %q", result, want)
 			}
-		case api.MediaTypeEpisode:
+		case subflux.MediaTypeEpisode:
 			if want := Episode(tvdbID, imdbID, season, episode); result != want {
 				t.Errorf("Build episode: got %q, want %q", result, want)
 			}
@@ -111,7 +111,7 @@ func FuzzBuild(f *testing.F) {
 		// fallback. The verbatim fallback can be arbitrary input that happens
 		// to look like an episode suffix (the corpus carries "-s0e0"), so only
 		// the constructed form is held to the no-episode-marker invariant.
-		if api.MediaType(mediaType) == api.MediaTypeMovie && result != "" && result != imdbID {
+		if subflux.MediaType(mediaType) == subflux.MediaTypeMovie && result != "" && result != imdbID {
 			if episodeIDSuffixRe.MatchString(result) {
 				t.Errorf("constructed movie ID %q contains episode marker", result)
 			}

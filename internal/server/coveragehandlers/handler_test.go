@@ -9,22 +9,22 @@ import (
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // mockCoverageStore implements CoverageStore for testing.
 type mockCoverageStore struct {
 	err           error
-	subtitleFiles []api.SubtitleEntry
-	scanStates    []api.ScanStateRow
+	subtitleFiles []subflux.SubtitleEntry
+	scanStates    []subflux.ScanStateRow
 }
 
-func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.subtitleFiles, m.err
 }
 
-func (m *mockCoverageStore) GetScanStates(_ context.Context, _ api.MediaType, _ string) ([]api.ScanStateRow, error) {
+func (m *mockCoverageStore) GetScanStates(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
 	return m.scanStates, m.err
 }
 
@@ -105,11 +105,11 @@ var errMock = errors.New("mock error")
 // trackingCoverageStore records the params passed to GetScanStates.
 type trackingCoverageStore struct {
 	mockCoverageStore
-	lastType   api.MediaType
+	lastType   subflux.MediaType
 	lastPrefix string
 }
 
-func (m *trackingCoverageStore) GetScanStates(_ context.Context, mediaType api.MediaType, prefix string) ([]api.ScanStateRow, error) {
+func (m *trackingCoverageStore) GetScanStates(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.ScanStateRow, error) {
 	m.lastType = mediaType
 	m.lastPrefix = prefix
 	return m.scanStates, m.err
@@ -342,16 +342,16 @@ func coverageSeriesFixture() []arrapi.Series {
 
 func TestHandleCoverageSeries_returns_series_with_coverage(t *testing.T) {
 	t.Parallel()
-	store := &mockCoverageStore{subtitleFiles: []api.SubtitleEntry{
+	store := &mockCoverageStore{subtitleFiles: []subflux.SubtitleEntry{
 		{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 	}}
 	cfg := &fakeCoverageCfg{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 		// The typed embedded policy (embedded_subtitles section) is the
 		// server-side source for have_ignored badges: this pins the handler
 		// consumer of the ONE policy resolver, not only the engine.
-		embedded: api.EmbeddedPolicy{IgnorePGS: true},
+		embedded: subflux.EmbeddedPolicy{IgnorePGS: true},
 	}
 	h := newCoverageHandler(store, cfg, &covSonarrFake{series: coverageSeriesFixture()}, nil)
 
@@ -427,7 +427,7 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 // coverage fetch surfaces the store error as a 500 (vs the arr 502).
 type seriesDBErrorStore struct{ mockCoverageStore }
 
-func (m *seriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *seriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return nil, errMock
 }
 
@@ -474,7 +474,7 @@ func TestHandleCoverageSeries_no_targets_sets_rule_no_targets(t *testing.T) {
 func TestHandleCoverageSeries_no_original_language_uses_default_rule(t *testing.T) {
 	t.Parallel()
 	h := newCoverageHandler(&mockCoverageStore{},
-		&fakeCoverageCfg{targets: []api.SubtitleTarget{{Code: "fr"}}},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
 		&covSonarrFake{series: []arrapi.Series{{
 			ID:         1,
 			Title:      "No Lang Show",
@@ -532,11 +532,11 @@ func coverageMoviesFixture() []arrapi.Movie {
 
 func TestHandleCoverageMovies_returns_movies_with_coverage(t *testing.T) {
 	t.Parallel()
-	store := &mockCoverageStore{subtitleFiles: []api.SubtitleEntry{
+	store := &mockCoverageStore{subtitleFiles: []subflux.SubtitleEntry{
 		{MediaID: "tmdb-12345", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 	}}
 	cfg := &fakeCoverageCfg{
-		targets: []api.SubtitleTarget{{Code: "fr"}},
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newCoverageHandler(store, cfg, nil, &covRadarrFake{movies: coverageMoviesFixture()})
 
@@ -620,7 +620,7 @@ func TestHandleCoverageMovies_db_error_returns_500(t *testing.T) {
 func TestHandleCoverageMovies_nil_movie_file_omits_path(t *testing.T) {
 	t.Parallel()
 	h := newCoverageHandler(&mockCoverageStore{},
-		&fakeCoverageCfg{targets: []api.SubtitleTarget{{Code: "fr"}}},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
 		nil, &covRadarrFake{movies: []arrapi.Movie{{
 			ID:      1,
 			Title:   "Nil File Movie",

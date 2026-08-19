@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/users ---
@@ -17,7 +17,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.AdminDB.ListUsers(r.Context())
 	if err != nil {
 		slog.Error("list users: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -53,18 +53,18 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username required")
 		return
 	}
 	if len([]rune(req.Username)) > maxUsernameLen {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username too long")
 		return
 	}
 	if req.Role == "" {
 		req.Role = auth.RoleUser
 	}
 	if req.Role != auth.RoleAdmin && req.Role != auth.RoleUser {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "role must be admin or user")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "role must be admin or user")
 		return
 	}
 
@@ -80,12 +80,12 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		CheckBreach: checkBreach,
 	}, h.HTTPClient)
 	if userMsg != "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, userMsg)
 		return
 	}
 	if err != nil {
 		slog.Error("create user: hash password", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -102,14 +102,14 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.AdminDB.CreateUser(r.Context(), newUser); err != nil {
 		slog.Error("create user: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("admin: user created",
 		"admin", admin.Username, "new_user", req.Username, "role", req.Role)
 
-	httpapi.WriteJSON(w, api.AdminUserCreatedResponse{
+	httpapi.WriteJSON(w, subflux.AdminUserCreatedResponse{
 		ID:       newUser.ID,
 		Username: newUser.Username,
 		Email:    newUser.Email,
@@ -131,24 +131,24 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// Cannot delete self.
 	if userID == admin.ID {
-		httpapi.ConflictC(w, r, api.CodeConflict, "cannot delete your own account")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "cannot delete your own account")
 		return
 	}
 
 	users, listErr := h.AdminDB.ListUsers(r.Context())
 	if listErr != nil {
 		slog.Error("delete user: list users", "error", listErr)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if msg := lastAdminDeletionBlock(users, userID); msg != "" {
-		httpapi.ConflictC(w, r, api.CodeConflict, msg)
+		httpapi.ConflictC(w, r, subflux.CodeConflict, msg)
 		return
 	}
 
 	if err := h.AdminDB.DeleteUser(r.Context(), userID); err != nil {
 		slog.Error("delete user: db error", "error", err)
-		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 

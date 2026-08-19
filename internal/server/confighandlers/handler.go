@@ -15,9 +15,9 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/pathinside/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ConfigLoader parses and validates config YAML into a candidate config. It is
@@ -61,7 +61,7 @@ type Deps struct {
 	Registry      SchemaRegistry
 	Alerts        AlertLog
 	LoadConfig    ConfigLoader
-	SchemaFunc    api.SchemaFunc
+	SchemaFunc    subflux.SchemaFunc
 	NewSonarr     func(baseURL, apiKey string) (ArrPinger, error)
 	NewRadarr     func(baseURL, apiKey string) (ArrPinger, error)
 	HotReload     func(ctx context.Context, cfg *config.Config) error
@@ -81,8 +81,8 @@ type Deps struct {
 // config and carrying a config are different jobs, and only the first one
 // belongs here.
 type arrEndpoints interface {
-	Sonarr() api.ArrConfig
-	Radarr() api.ArrConfig
+	Sonarr() subflux.ArrConfig
+	Radarr() subflux.ArrConfig
 }
 
 // StateView provides the live state needed by config handlers.
@@ -95,7 +95,7 @@ type Handler struct {
 	registry      SchemaRegistry
 	alerts        AlertLog
 	loadConfig    ConfigLoader
-	schemaFunc    api.SchemaFunc
+	schemaFunc    subflux.SchemaFunc
 	newSonarr     func(baseURL, apiKey string) (ArrPinger, error)
 	newRadarr     func(baseURL, apiKey string) (ArrPinger, error)
 	hotReload     func(ctx context.Context, cfg *config.Config) error
@@ -145,7 +145,7 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	configPath := h.configPath()
 	data, err := atomicfile.ReadBounded(r.Context(), configPath, maxBodySize)
 	if err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", configPath)
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "read config", "path", configPath)
 		return
 	}
 	data = RedactSecrets(data)
@@ -159,12 +159,12 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to read body")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(data)) > maxBodySize {
 		slog.Warn("config request body too large", "size", len(data))
-		httpapi.PayloadTooLargeC(w, r, api.CodeConfigTooLarge, "request body too large")
+		httpapi.PayloadTooLargeC(w, r, subflux.CodeConfigTooLarge, "request body too large")
 		return
 	}
 
@@ -181,7 +181,7 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		// Not the client's fault: the payload relies on keep-semantics
 		// secrets and the server could not read its own existing config.
 		// Fail closed — no save, no activation; details go to the log.
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "secret merge")
 		return
 	}
 
@@ -199,29 +199,29 @@ func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
 	defer h.saveMu.Unlock()
 
 	if h.configured() {
-		httpapi.ConflictC(w, r, api.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
 		return
 	}
 	if len(h.defaultConfig) == 0 {
-		httpapi.InternalErrorC(w, r, errors.New("no default config available"), api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, errors.New("no default config available"), subflux.CodeInternalError)
 		return
 	}
 
 	configPath := h.configPath()
 	if err := atomicWriteConfig(r.Context(), configPath, h.defaultConfig); err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reset config")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "reset config")
 		return
 	}
 
 	slog.Info("config reset to default example")
-	httpapi.WriteJSON(w, map[string]string{api.KeyStatus: "config reset to defaults"})
+	httpapi.WriteJSON(w, map[string]string{subflux.KeyStatus: "config reset to defaults"})
 }
 
 // HandleValidatePath checks whether a filesystem path exists inside the container.
 // POST /api/config/validate-path  body: {"path": "/media"}
 func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -282,10 +282,10 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 // HandleConfigSchema returns the full configuration schema for the UI.
 func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
-	httpapi.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
+	httpapi.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(subflux.ProviderNameSynthetic))))
 }
 
 // --- Internal helpers ---
@@ -293,13 +293,13 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 // pingArrIfChanged pings an arr instance only when its URL or API key
 // differs from the current live config.
 func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
-	newArr api.ArrConfig, oldCfg arrEndpoints,
+	newArr subflux.ArrConfig, oldCfg arrEndpoints,
 ) error {
 	if newArr.URL == "" {
 		return nil
 	}
 	if oldCfg != nil {
-		var old api.ArrConfig
+		var old subflux.ArrConfig
 		if name == "sonarr" {
 			old = oldCfg.Sonarr()
 		} else {

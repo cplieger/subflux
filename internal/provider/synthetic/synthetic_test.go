@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestFactory_defaults(t *testing.T) {
@@ -24,7 +24,7 @@ func TestFactory_defaults(t *testing.T) {
 func TestSearch_static_returns_results(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"result_count": "5"})
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		Title:     "Test Movie",
 		Year:      2024,
 		MediaType: "movie",
@@ -97,7 +97,7 @@ func TestSearch_modes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			p, _ := Factory(t.Context(), tc.config)
-			req := &api.SearchRequest{
+			req := &subflux.SearchRequest{
 				Title:     "Breaking Bad",
 				Year:      2008,
 				Season:    1,
@@ -117,12 +117,12 @@ func TestSearch_modes(t *testing.T) {
 				if tc.errType != "" {
 					switch tc.errType {
 					case "auth":
-						var authErr *api.AuthError
+						var authErr *subflux.AuthError
 						if !errors.As(err, &authErr) {
 							t.Errorf("expected AuthError, got %T", err)
 						}
 					case "rate_limit":
-						var rlErr *api.RateLimitError
+						var rlErr *subflux.RateLimitError
 						if !errors.As(err, &rlErr) {
 							t.Errorf("expected RateLimitError, got %T", err)
 						}
@@ -148,7 +148,7 @@ func TestSearch_modes(t *testing.T) {
 func TestSearch_language_filter(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"languages": "fr,de"})
-	subs, err := p.Search(t.Context(), &api.SearchRequest{
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
 		Languages: []string{"en", "fr", "de"},
 	})
 	if err != nil {
@@ -164,7 +164,7 @@ func TestSearch_language_filter(t *testing.T) {
 func TestSearch_hash_match(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"include_hash": true})
-	subs, err := p.Search(t.Context(), &api.SearchRequest{
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
 		Languages: []string{"en"},
@@ -183,7 +183,7 @@ func TestSearch_hash_match(t *testing.T) {
 func TestDownload_returns_srt(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	data, err := p.Download(t.Context(), &api.Subtitle{
+	data, err := p.Download(t.Context(), &subflux.Subtitle{
 		Language:    "en",
 		ReleaseName: "Test.2024.1080p.WEB-DL",
 	})
@@ -198,7 +198,7 @@ func TestDownload_returns_srt(t *testing.T) {
 func TestDownload_error(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"download_error": "disk full"})
-	_, err := p.Download(t.Context(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -210,7 +210,7 @@ func TestDownload_error(t *testing.T) {
 func TestSearch_episode_release_name(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"result_count": "1"})
-	subs, err := p.Search(t.Context(), &api.SearchRequest{
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
 		Title:     "Breaking Bad",
 		Year:      2008,
 		Season:    1,
@@ -234,7 +234,7 @@ func TestSearch_slow_mode_respects_context_cancellation(t *testing.T) {
 	p, _ := Factory(t.Context(), map[string]any{"mode": "slow"})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := p.Search(ctx, &api.SearchRequest{
+	_, err := p.Search(ctx, &subflux.SearchRequest{
 		Languages: []string{"en"},
 	})
 	if err == nil {
@@ -249,7 +249,7 @@ func TestDownload_custom_content(t *testing.T) {
 	t.Parallel()
 	content := "1\n00:00:01,000 --> 00:00:02,000\nCustom\n"
 	p, _ := Factory(t.Context(), map[string]any{"subtitle_content": content})
-	data, err := p.Download(t.Context(), &api.Subtitle{
+	data, err := p.Download(t.Context(), &subflux.Subtitle{
 		Language:    "en",
 		ReleaseName: "Test",
 	})
@@ -287,7 +287,7 @@ func TestFactory_invalid_numeric_settings_use_defaults(t *testing.T) {
 func TestSearch_season_pack_multiple_languages(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"mode": "season_pack"})
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		Title:     "Test Show",
 		Season:    2,
 		MediaType: "episode",
@@ -309,7 +309,7 @@ func TestSearch_season_pack_multiple_languages(t *testing.T) {
 func TestSearch_season_pack_language_filter(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"mode": "season_pack", "languages": "fr"})
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		Title:     "Test Show",
 		Season:    1,
 		MediaType: "episode",
@@ -353,7 +353,7 @@ func TestFactory_negative_delay_ignored(t *testing.T) {
 func TestFactory_zero_result_count(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"result_count": "0"})
-	subs, err := p.(*syntheticProvider).Search(t.Context(), &api.SearchRequest{
+	subs, err := p.(*syntheticProvider).Search(t.Context(), &subflux.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
 		Languages: []string{"en"},
@@ -373,7 +373,7 @@ func TestSearch_hi_and_forced_flags(t *testing.T) {
 		"forced":           true,
 		"result_count":     "1",
 	})
-	subs, err := p.Search(t.Context(), &api.SearchRequest{
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
 		Languages: []string{"en"},
@@ -395,7 +395,7 @@ func TestSearch_hi_and_forced_flags(t *testing.T) {
 func TestSearch_result_count(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"result_count": "3"})
-	subs, err := p.Search(t.Context(), &api.SearchRequest{
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
 		Languages: []string{"en"},
@@ -445,8 +445,8 @@ func TestSearch_slow_mode_timer_outlasts_short_context(t *testing.T) {
 	p := &syntheticProvider{mode: "slow", resultCount: 1}
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
-	req := &api.SearchRequest{
-		MediaType: api.MediaTypeMovie,
+	req := &subflux.SearchRequest{
+		MediaType: subflux.MediaTypeMovie,
 		Title:     "X",
 		Year:      2020,
 		Languages: []string{"en"},

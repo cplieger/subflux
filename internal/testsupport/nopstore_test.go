@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
@@ -16,6 +15,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestNopStoreContract verifies that NopStore satisfies the same basic
@@ -28,8 +28,8 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("RecordNoResult_does_not_error", func(t *testing.T) {
 		t.Parallel()
-		err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tmdb-1", "eng", "os",
-			api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2})
+		err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, "tmdb-1", "eng", "os",
+			subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2})
 		if err != nil {
 			t.Fatalf("RecordNoResult: %v", err)
 		}
@@ -37,7 +37,7 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("BackedOffProviders_returns_nil_no_error", func(t *testing.T) {
 		t.Parallel()
-		got, err := s.BackedOffProviders(ctx, api.MediaTypeMovie, "tmdb-2", "eng", 5)
+		got, err := s.BackedOffProviders(ctx, subflux.MediaTypeMovie, "tmdb-2", "eng", 5)
 		if err != nil {
 			t.Fatalf("BackedOffProviders: %v", err)
 		}
@@ -48,8 +48,8 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("SaveDownload_does_not_error", func(t *testing.T) {
 		t.Parallel()
-		err := s.SaveDownload(ctx, &api.DownloadRecord{
-			MediaType: api.MediaTypeMovie, MediaID: "tmdb-3",
+		err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+			MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-3",
 			Language: "eng", ProviderName: "os", ReleaseName: "R",
 			Path: "/sub.srt", Score: 80,
 		})
@@ -71,7 +71,7 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("GetState_returns_nil_no_error", func(t *testing.T) {
 		t.Parallel()
-		got, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie, Language: "eng", Limit: 50})
+		got, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie, Language: "eng", Limit: 50})
 		if err != nil {
 			t.Fatalf("GetState: %v", err)
 		}
@@ -82,7 +82,7 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("IsManuallyLocked_returns_false_no_error", func(t *testing.T) {
 		t.Parallel()
-		locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tmdb-4", Language: "eng", Variant: api.VariantStandard})
+		locked, err := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tmdb-4", Language: "eng", Variant: subflux.VariantStandard})
 		if err != nil {
 			t.Fatalf("IsManuallyLocked: %v", err)
 		}
@@ -93,7 +93,7 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("SetPollTimestamp_does_not_error", func(t *testing.T) {
 		t.Parallel()
-		err := s.SetPollTimestamp(ctx, api.PollKeySonarr, time.Now())
+		err := s.SetPollTimestamp(ctx, subflux.PollKeySonarr, time.Now())
 		if err != nil {
 			t.Fatalf("SetPollTimestamp: %v", err)
 		}
@@ -117,8 +117,8 @@ func TestNopStoreContract(t *testing.T) {
 // the build graph to hold one assertion — a _test.go file's imports are
 // test-only, so the check costs nothing.
 //
-// This is what replaced `var _ api.Store = (*NopStore)(nil)`. The old
-// assertion pinned the fake to a hand-written 36-method list; this one pins it
+// This is what replaced the single whole-store assertion. The old one pinned
+// the fake to a hand-written 36-method interface; this one pins it
 // to what consumers actually ask for, so a package that adds a method to its
 // own interface breaks HERE with one readable error instead of at each of the
 // dozen sites that install the fake. server.Store is deliberately absent: it

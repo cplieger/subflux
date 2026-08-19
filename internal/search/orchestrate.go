@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // searchLangGroup searches providers once for a language and processes
@@ -21,14 +21,14 @@ import (
 // standard + fr forced). Each target's results are filtered by variant,
 // scored, and downloaded independently. Returns the typed per-language
 // outcome consumed by the season tracker and scan stats.
-func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
-	targets []api.SubtitleTarget, videoPath string, mediaType api.MediaType, mediaID string,
-	existing *existingSubs, searchCfg *api.SearchConfig,
+func (e *Engine) searchLangGroup(ctx context.Context, req *subflux.SearchRequest,
+	targets []subflux.SubtitleTarget, videoPath string, mediaType subflux.MediaType, mediaID string,
+	existing *existingSubs, searchCfg *subflux.SearchConfig,
 	upgradeCutoff time.Time,
-) api.LangOutcome {
+) subflux.LangOutcome {
 	lang := targets[0].Code
 	label := req.MediaLabel()
-	out := api.LangOutcome{Lang: lang}
+	out := subflux.LangOutcome{Lang: lang}
 
 	// Manual locks are checked per target (per variant) inside
 	// buildTargetStates: a locked variant is excluded while its siblings keep
@@ -36,7 +36,7 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 	states, anyNeedsSearch := e.buildTargetStates(ctx, req, targets, existing,
 		searchCfg, mediaType, mediaID, lang, label, upgradeCutoff)
 	if !anyNeedsSearch {
-		out.Kind = api.LangSkipped
+		out.Kind = subflux.LangSkipped
 		out.Skipped = len(targets)
 		return out
 	}
@@ -52,10 +52,10 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 		// kind, NOT "searched" — counting it as searched fed synthetic
 		// no-result evidence into the season tracker and overstated the scan
 		// summary every cycle a 7-day backoff overlapped a 24h scan.
-		out.Kind = api.LangBackedOff
+		out.Kind = subflux.LangBackedOff
 		return out
 	}
-	out.Kind = api.LangSearched
+	out.Kind = subflux.LangSearched
 
 	// Single provider query for this language.
 	langReq := *req
@@ -117,9 +117,9 @@ func (e *Engine) searchLangGroup(ctx context.Context, req *api.SearchRequest,
 // saved path (empty if no suitable subtitle was found) and whether this
 // variant hit a genuine no-result (non-upgrade, providers answered, nothing
 // usable) — the caller records adaptive backoff once per language group.
-func (e *Engine) processTargetVariant(ctx context.Context, req *api.SearchRequest,
+func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRequest,
 	state *targetState, outcome *searchOutcome,
-	videoPath string, mediaType api.MediaType, mediaID, lang, label string,
+	videoPath string, mediaType subflux.MediaType, mediaID, lang, label string,
 ) (path string, noResult bool) {
 	// Filter by variant.
 	filtered, variantFallback := filterByVariant(

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -366,7 +366,7 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 			name:       "RecordSearch_distinct_providers",
 			goroutines: 100,
 			action: func(m *Metrics, i int) {
-				m.RecordSearch(api.ProviderID(fmt.Sprintf("provider-%d", i)), 10*time.Millisecond, nil)
+				m.RecordSearch(subflux.ProviderID(fmt.Sprintf("provider-%d", i)), 10*time.Millisecond, nil)
 			},
 			assert: func(t *testing.T, m *Metrics, n int) {
 				if got := m.TotalSearches(); got != int64(n) {
@@ -389,7 +389,7 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 		{
 			name:       "RecordImport_distinct_sources",
 			goroutines: 50,
-			action:     func(m *Metrics, i int) { m.RecordImport(api.PollKey(fmt.Sprintf("source-%d", i))) },
+			action:     func(m *Metrics, i int) { m.RecordImport(subflux.PollKey(fmt.Sprintf("source-%d", i))) },
 			assert: func(t *testing.T, m *Metrics, n int) {
 				body := renderMetrics(t, m)
 				count := strings.Count(body, "subflux_imports_detected_total{source=")
@@ -402,7 +402,7 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 			name:       "RecordDownload_distinct_providers",
 			goroutines: 100,
 			action: func(m *Metrics, i int) {
-				provider := api.ProviderID(fmt.Sprintf("provider-%d", i))
+				provider := subflux.ProviderID(fmt.Sprintf("provider-%d", i))
 				if i%2 == 0 {
 					m.RecordDownload(provider, nil)
 				} else {
@@ -537,13 +537,13 @@ func TestMetrics_counter_monotonicity_property(t *testing.T) {
 				if hasErr {
 					err = errors.New("fail")
 				}
-				m.RecordSearch(api.ProviderID(prov), 10*time.Millisecond, err)
+				m.RecordSearch(subflux.ProviderID(prov), 10*time.Millisecond, err)
 				totalSearches++
 			case 1:
 				if hasErr {
-					m.RecordDownload(api.ProviderID(prov), errors.New("fail"))
+					m.RecordDownload(subflux.ProviderID(prov), errors.New("fail"))
 				} else {
-					m.RecordDownload(api.ProviderID(prov), nil)
+					m.RecordDownload(subflux.ProviderID(prov), nil)
 				}
 			case 2:
 				m.RecordScan(10, 2, time.Second)
@@ -571,7 +571,7 @@ func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 	for i := range uniqueProviders {
 		go func() {
 			<-gate
-			m.RecordSearch(api.ProviderID(fmt.Sprintf("provider_%d", i)), 10*time.Millisecond, nil)
+			m.RecordSearch(subflux.ProviderID(fmt.Sprintf("provider_%d", i)), 10*time.Millisecond, nil)
 			wg.Done()
 		}()
 	}

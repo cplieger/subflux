@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestSyncOffset_setThenGetRoundTrip asserts a set offset is returned exactly by
@@ -87,7 +87,7 @@ func TestPollTimestamp_setThenGetRoundTrip(t *testing.T) {
 	ctx := t.Context()
 
 	want := time.Date(2024, 3, 9, 12, 34, 56, 123456789, time.UTC)
-	for _, key := range []api.PollKey{api.PollKeySonarr, api.PollKeyRadarr} {
+	for _, key := range []subflux.PollKey{subflux.PollKeySonarr, subflux.PollKeyRadarr} {
 		if err := db.SetPollTimestamp(ctx, key, want); err != nil {
 			t.Fatalf("SetPollTimestamp(%q): %v", key, err)
 		}
@@ -109,18 +109,18 @@ func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 
 	sonarrAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	radarrAt := time.Date(2024, 6, 15, 9, 30, 0, 0, time.UTC)
-	if err := db.SetPollTimestamp(ctx, api.PollKeySonarr, sonarrAt); err != nil {
+	if err := db.SetPollTimestamp(ctx, subflux.PollKeySonarr, sonarrAt); err != nil {
 		t.Fatalf("SetPollTimestamp(sonarr): %v", err)
 	}
-	if err := db.SetPollTimestamp(ctx, api.PollKeyRadarr, radarrAt); err != nil {
+	if err := db.SetPollTimestamp(ctx, subflux.PollKeyRadarr, radarrAt); err != nil {
 		t.Fatalf("SetPollTimestamp(radarr): %v", err)
 	}
 
-	gotS, err := db.GetPollTimestamp(ctx, api.PollKeySonarr)
+	gotS, err := db.GetPollTimestamp(ctx, subflux.PollKeySonarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp(sonarr): %v", err)
 	}
-	gotR, err := db.GetPollTimestamp(ctx, api.PollKeyRadarr)
+	gotR, err := db.GetPollTimestamp(ctx, subflux.PollKeyRadarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp(radarr): %v", err)
 	}
@@ -137,7 +137,7 @@ func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 func TestPollTimestamp_getAbsentReturnsZeroTime(t *testing.T) {
 	db, _ := openTemp(t)
 
-	got, err := db.GetPollTimestamp(t.Context(), api.PollKeySonarr)
+	got, err := db.GetPollTimestamp(t.Context(), subflux.PollKeySonarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp(absent): %v", err)
 	}
@@ -153,10 +153,10 @@ func TestPollTimestamp_invalidKeyRejected(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	if err := db.SetPollTimestamp(ctx, api.PollKey("Sonarr"), time.Now()); err == nil {
+	if err := db.SetPollTimestamp(ctx, subflux.PollKey("Sonarr"), time.Now()); err == nil {
 		t.Error("SetPollTimestamp(invalid key): error = nil, want rejection")
 	}
-	if _, err := db.GetPollTimestamp(ctx, api.PollKey("sonar")); err == nil {
+	if _, err := db.GetPollTimestamp(ctx, subflux.PollKey("sonar")); err == nil {
 		t.Error("GetPollTimestamp(invalid key): error = nil, want rejection")
 	}
 }

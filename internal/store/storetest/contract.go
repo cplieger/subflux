@@ -1,5 +1,5 @@
 // Package storetest provides a shared, engine-agnostic behavioral contract
-// suite for the core subtitle store. It depends ONLY on internal/api, so it
+// suite for the core subtitle store. It depends ONLY on internal/subflux, so it
 // pins behaviour at the store's own contract rather than at one engine's
 // internals (Requirement 14.1). boltstore.DB is the only engine today.
 //
@@ -48,13 +48,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 const (
 	langEng = "eng"
 	langFra = "fra"
-	provOS  = api.ProviderID("opensubtitles")
+	provOS  = subflux.ProviderID("opensubtitles")
 
 	codecSubrip = "subrip"
 
@@ -87,29 +87,29 @@ type TB interface {
 // is declared here because this package IS its only consumer.
 type Store interface {
 	// Adaptive backoff.
-	RecordNoResult(ctx context.Context, mediaType api.MediaType, mediaID, language string, providerName api.ProviderID, bp api.BackoffParams) error
-	BackedOffProviders(ctx context.Context, mediaType api.MediaType, mediaID, language string, maxAttempts int) ([]api.ProviderID, error)
-	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
+	RecordNoResult(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, providerName subflux.ProviderID, bp subflux.BackoffParams) error
+	BackedOffProviders(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, maxAttempts int) ([]subflux.ProviderID, error)
+	GetBackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
 
 	// Download records and history.
-	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
-	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	CurrentScore(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error)
-	GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error)
+	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
+	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
+	CurrentScore(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (score int, mediaImported time.Time, found bool, err error)
+	GetState(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
 
 	// Manual locks and ordinals.
-	IsManuallyLocked(ctx context.Context, key api.ManualLockKey) (bool, error)
-	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
-	ManualDownloadCount(ctx context.Context, key api.ManualLockKey) (int, error)
-	ManualSubtitlePaths(ctx context.Context, key api.ManualLockKey) ([]string, error)
-	NextManualNumber(ctx context.Context, key api.ManualLockKey) int
-	GetManualLocks(ctx context.Context) ([]api.ManualLockEntry, error)
+	IsManuallyLocked(ctx context.Context, key subflux.ManualLockKey) (bool, error)
+	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
+	ManualDownloadCount(ctx context.Context, key subflux.ManualLockKey) (int, error)
+	ManualSubtitlePaths(ctx context.Context, key subflux.ManualLockKey) ([]string, error)
+	NextManualNumber(ctx context.Context, key subflux.ManualLockKey) int
+	GetManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
 
 	// Coverage: subtitle files and scan state.
-	RecordSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaID string, files []api.SubtitleFile) (bool, error)
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
-	RecordScanState(ctx context.Context, rec *api.ScanRecord) error
-	GetScanStates(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error)
+	RecordSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaID string, files []subflux.SubtitleFile) (bool, error)
+	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
+	GetScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
 	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
 	TotalSubtitleFiles(ctx context.Context) (int, error)
 
@@ -118,14 +118,14 @@ type Store interface {
 	GetSyncOffset(ctx context.Context, path string) (int64, error)
 
 	// Poll watermark.
-	GetPollTimestamp(ctx context.Context, key api.PollKey) (time.Time, error)
-	SetPollTimestamp(ctx context.Context, key api.PollKey, t time.Time) error
+	GetPollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
+	SetPollTimestamp(ctx context.Context, key subflux.PollKey, t time.Time) error
 
 	// Maintenance.
 	Stats(ctx context.Context) (downloads, attempts int, err error)
-	DeleteStateByPaths(ctx context.Context, paths []string) (api.CleanupResult, error)
-	CleanupDrift(ctx context.Context, drift api.ConfigDrift) error
-	ReconcileState(ctx context.Context) (api.ReconcileResult, error)
+	DeleteStateByPaths(ctx context.Context, paths []string) (subflux.CleanupResult, error)
+	CleanupDrift(ctx context.Context, drift subflux.ConfigDrift) error
+	ReconcileState(ctx context.Context) (subflux.ReconcileResult, error)
 }
 
 // Suite runs the engine-agnostic behavioral contract against any Store
@@ -229,8 +229,8 @@ func Suite(t *testing.T, newStore func(t *testing.T) Store) {
 // initial delay guarantees a freshly recorded attempt's next_retry is in the
 // future, so a recorded provider is observably backed off regardless of the
 // max-attempts threshold.
-func defaultBackoff() api.BackoffParams {
-	return api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
+func defaultBackoff() subflux.BackoffParams {
+	return subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
 }
 
 // writeFile creates a real file so ReconcileState's os.Stat oracle classifies
@@ -246,7 +246,7 @@ func writeFile(t *testing.T, path string) {
 // mustSaveDownload saves rec via s.SaveDownload or fails the test, labelling the
 // failure with name so a fatal during a multi-step reconcile setup identifies
 // which save failed. It uses context.Background() (every caller's ctx).
-func mustSaveDownload(t *testing.T, s Store, name string, rec *api.DownloadRecord) {
+func mustSaveDownload(t *testing.T, s Store, name string, rec *subflux.DownloadRecord) {
 	t.Helper()
 	if err := s.SaveDownload(context.Background(), rec); err != nil {
 		t.Fatalf("SaveDownload(%s): %v", name, err)
@@ -260,7 +260,7 @@ func testBackoffEligibility(t *testing.T, s Store) {
 	ctx := context.Background()
 
 	// No row recorded yet: the provider is immediately eligible.
-	backed, err := s.BackedOffProviders(ctx, api.MediaTypeMovie, "tt-bo-1", langEng, 5)
+	backed, err := s.BackedOffProviders(ctx, subflux.MediaTypeMovie, "tt-bo-1", langEng, 5)
 	if err != nil {
 		t.Fatalf("BackedOffProviders (fresh): %v", err)
 	}
@@ -268,14 +268,14 @@ func testBackoffEligibility(t *testing.T, s Store) {
 		t.Fatalf("BackedOffProviders (fresh) = %v, want empty (no row means eligible)", backed)
 	}
 
-	if rerr := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-bo-1", langEng, provOS, defaultBackoff()); rerr != nil {
+	if rerr := s.RecordNoResult(ctx, subflux.MediaTypeMovie, "tt-bo-1", langEng, provOS, defaultBackoff()); rerr != nil {
 		t.Fatalf("RecordNoResult: %v", rerr)
 	}
 
 	// next_retry is in the future, so the provider is backed off under the
 	// threshold path (maxAttempts=5) and the retry-only path (maxAttempts=0).
 	for _, maxAttempts := range []int{5, 0} {
-		backed, err = s.BackedOffProviders(ctx, api.MediaTypeMovie, "tt-bo-1", langEng, maxAttempts)
+		backed, err = s.BackedOffProviders(ctx, subflux.MediaTypeMovie, "tt-bo-1", langEng, maxAttempts)
 		if err != nil {
 			t.Fatalf("BackedOffProviders(max=%d): %v", maxAttempts, err)
 		}
@@ -285,12 +285,12 @@ func testBackoffEligibility(t *testing.T, s Store) {
 	}
 
 	// A different, unrecorded provider for the same triple stays eligible.
-	if got := containsProvider(backed, api.ProviderID("other")); got {
+	if got := containsProvider(backed, subflux.ProviderID("other")); got {
 		t.Fatalf("unrecorded provider reported backed off: %v", backed)
 	}
 }
 
-func containsProvider(list []api.ProviderID, p api.ProviderID) bool {
+func containsProvider(list []subflux.ProviderID, p subflux.ProviderID) bool {
 	return slices.Contains(list, p)
 }
 
@@ -299,8 +299,8 @@ func containsProvider(list []api.ProviderID, p api.ProviderID) bool {
 func testSaveAutoRoundtrip(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
-	rec := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-rt-1",
+	rec := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt-rt-1",
 		Language: langEng, ProviderName: provOS,
 		ReleaseName: "Movie.2024.eng.srt", Score: 85,
 		Path: "/media/rt/movie.eng.srt",
@@ -309,7 +309,7 @@ func testSaveAutoRoundtrip(t *testing.T, s Store) {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
-	score, _, found, err := s.CurrentScore(ctx, api.MediaTypeMovie, "tt-rt-1", langEng, api.VariantStandard)
+	score, _, found, err := s.CurrentScore(ctx, subflux.MediaTypeMovie, "tt-rt-1", langEng, subflux.VariantStandard)
 	if err != nil {
 		t.Fatalf("CurrentScore: %v", err)
 	}
@@ -317,7 +317,7 @@ func testSaveAutoRoundtrip(t *testing.T, s Store) {
 		t.Fatalf("CurrentScore = (score=%d, found=%v), want (85, true)", score, found)
 	}
 
-	refs, err := s.DownloadedRefs(ctx, api.MediaTypeMovie, "tt-rt-1", langEng)
+	refs, err := s.DownloadedRefs(ctx, subflux.MediaTypeMovie, "tt-rt-1", langEng)
 	if err != nil {
 		t.Fatalf("DownloadedRefs: %v", err)
 	}
@@ -329,7 +329,7 @@ func testSaveAutoRoundtrip(t *testing.T, s Store) {
 	}
 
 	// An auto-only triple is not manually locked.
-	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt-rt-1", Language: langEng, Variant: ""})
+	locked, err := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt-rt-1", Language: langEng, Variant: ""})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -345,27 +345,27 @@ func testAutoUpsertPreservesImported(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tt-up-1"
-	first := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
+	first := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "First", Score: 50, Path: "/m/up.eng.srt",
 	}
 	if err := s.SaveDownload(ctx, first); err != nil {
 		t.Fatalf("SaveDownload(first): %v", err)
 	}
-	_, imported1, found1, err := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langEng, api.VariantStandard)
+	_, imported1, found1, err := s.CurrentScore(ctx, subflux.MediaTypeMovie, mid, langEng, subflux.VariantStandard)
 	if err != nil || !found1 {
 		t.Fatalf("CurrentScore(first) = found=%v err=%v, want found", found1, err)
 	}
 
-	second := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
+	second := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Second", Score: 90, Path: "/m/up.eng.srt",
 	}
 	if serr := s.SaveDownload(ctx, second); serr != nil {
 		t.Fatalf("SaveDownload(second): %v", serr)
 	}
 
-	score2, imported2, found2, err := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langEng, api.VariantStandard)
+	score2, imported2, found2, err := s.CurrentScore(ctx, subflux.MediaTypeMovie, mid, langEng, subflux.VariantStandard)
 	if err != nil || !found2 {
 		t.Fatalf("CurrentScore(second) = found=%v err=%v, want found", found2, err)
 	}
@@ -377,7 +377,7 @@ func testAutoUpsertPreservesImported(t *testing.T, s Store) {
 	}
 
 	// The upgrade is in place: still exactly one row for the triple.
-	entries, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
@@ -393,7 +393,7 @@ func testSaveClearsBackoff(t *testing.T, s Store) {
 	ctx := context.Background()
 	mid := "tt-cb-1"
 
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 	_, attempts, err := s.Stats(ctx)
@@ -404,8 +404,8 @@ func testSaveClearsBackoff(t *testing.T, s Store) {
 		t.Fatalf("attempts before save = %d, want 1", attempts)
 	}
 
-	if serr := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
+	if serr := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Got.It", Score: 70, Path: "/m/cb.eng.srt",
 	}); serr != nil {
 		t.Fatalf("SaveDownload: %v", serr)
@@ -434,16 +434,16 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 	ctx := context.Background()
 	mid := "tt-cl-1"
 
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Manual.Pick", Score: 100,
 		Path: "/m/cl.fr.1.srt",
-		Meta: &api.DownloadMeta{Manual: true},
+		Meta: &subflux.DownloadMeta{Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(manual): %v", err)
 	}
 
-	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard})
+	locked, err := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (before clear): %v", err)
 	}
@@ -451,7 +451,7 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 		t.Fatalf("IsManuallyLocked before clear = false, want true (manual row present)")
 	}
 
-	before, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	before, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState (before clear): %v", err)
 	}
@@ -459,11 +459,11 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 		t.Fatalf("GetState before clear = %d rows, want 1", len(before))
 	}
 
-	if cerr := s.ClearManualLock(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard}); cerr != nil {
+	if cerr := s.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: subflux.VariantStandard}); cerr != nil {
 		t.Fatalf("ClearManualLock: %v", cerr)
 	}
 
-	locked, err = s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard})
+	locked, err = s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (after clear): %v", err)
 	}
@@ -472,7 +472,7 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 	}
 
 	// Non-destructive: the row is preserved (now auto) and still visible.
-	after, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	after, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState (after clear): %v", err)
 	}
@@ -482,7 +482,7 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 		t.Errorf("row after clear Manual = true, want false (flipped to auto)")
 	}
 
-	refs, err := s.DownloadedRefs(ctx, api.MediaTypeMovie, mid, langEng)
+	refs, err := s.DownloadedRefs(ctx, subflux.MediaTypeMovie, mid, langEng)
 	if err != nil {
 		t.Fatalf("DownloadedRefs (after clear): %v", err)
 	}
@@ -498,19 +498,19 @@ func testManualOrdinals(t *testing.T, s Store) {
 	ctx := context.Background()
 	mid := "tt-mo-1"
 
-	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 1 {
+	if n := s.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard}); n != 1 {
 		t.Fatalf("NextManualNumber (empty) = %d, want 1", n)
 	}
 
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra,
 		ProviderName: provOS, ReleaseName: "M1", Score: 100,
-		Path: "/m/movie.fra.1.srt", Meta: &api.DownloadMeta{Manual: true},
+		Path: "/m/movie.fra.1.srt", Meta: &subflux.DownloadMeta{Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(manual 1): %v", err)
 	}
 
-	count, err := s.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard})
+	count, err := s.ManualDownloadCount(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}
@@ -518,7 +518,7 @@ func testManualOrdinals(t *testing.T, s Store) {
 		t.Fatalf("ManualDownloadCount = %d, want 1", count)
 	}
 
-	paths, err := s.ManualSubtitlePaths(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard})
+	paths, err := s.ManualSubtitlePaths(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualSubtitlePaths: %v", err)
 	}
@@ -530,7 +530,7 @@ func testManualOrdinals(t *testing.T, s Store) {
 	// from the path), so a second manual download lands at .2. The manual
 	// filename embeds the triple's language token (movie.<lang>.N.srt), which
 	// the engine relies on to locate the ordinal.
-	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 2 {
+	if n := s.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard}); n != 2 {
 		t.Fatalf("NextManualNumber (after .1) = %d, want 2", n)
 	}
 
@@ -539,7 +539,7 @@ func testManualOrdinals(t *testing.T, s Store) {
 		t.Fatalf("GetManualLocks: %v", err)
 	}
 	if len(locks) != 1 || locks[0].MediaID != mid || locks[0].Language != langFra ||
-		locks[0].Variant != api.VariantStandard || locks[0].Count != 1 {
+		locks[0].Variant != subflux.VariantStandard || locks[0].Count != 1 {
 		t.Fatalf("GetManualLocks = %+v, want one entry {%s, %s, standard, count=1}", locks, mid, langFra)
 	}
 }
@@ -565,34 +565,34 @@ func assertVariantRowIndependence(t *testing.T, s Store, mid string) {
 	ctx := context.Background()
 
 	// One auto row per variant: same language, different variants.
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra,
-		Variant: api.VariantStandard, ProviderName: provOS,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra,
+		Variant: subflux.VariantStandard, ProviderName: provOS,
 		ReleaseName: "Std", Score: 85, Path: "/m/var.fra.srt",
 	}); err != nil {
 		t.Fatalf("SaveDownload(standard): %v", err)
 	}
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra,
-		Variant: api.VariantForced, ProviderName: provOS,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra,
+		Variant: subflux.VariantForced, ProviderName: provOS,
 		ReleaseName: "Frc", Score: 60, Path: "/m/var.fra.forced.srt",
 	}); err != nil {
 		t.Fatalf("SaveDownload(forced): %v", err)
 	}
 
 	// Two distinct rows: the forced save must not overwrite the standard row.
-	entries, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
 	if len(entries) != 2 {
 		t.Fatalf("GetState = %d rows after standard+forced saves, want 2 (independent quads)", len(entries))
 	}
-	variants := map[api.Variant]bool{}
+	variants := map[subflux.Variant]bool{}
 	for i := range entries {
 		variants[entries[i].Variant] = true
 	}
-	if !variants[api.VariantStandard] || !variants[api.VariantForced] {
+	if !variants[subflux.VariantStandard] || !variants[subflux.VariantForced] {
 		t.Fatalf("GetState variants = %v, want standard and forced exposed", variants)
 	}
 
@@ -606,13 +606,13 @@ func assertVariantScores(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
-	if score, _, found, serr := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); serr != nil || !found || score != 85 {
+	if score, _, found, serr := s.CurrentScore(ctx, subflux.MediaTypeMovie, mid, langFra, subflux.VariantStandard); serr != nil || !found || score != 85 {
 		t.Fatalf("CurrentScore(standard) = (%d, %v, %v), want (85, true, nil)", score, found, serr)
 	}
-	if score, _, found, serr := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langFra, api.VariantForced); serr != nil || !found || score != 60 {
+	if score, _, found, serr := s.CurrentScore(ctx, subflux.MediaTypeMovie, mid, langFra, subflux.VariantForced); serr != nil || !found || score != 60 {
 		t.Fatalf("CurrentScore(forced) = (%d, %v, %v), want (60, true, nil)", score, found, serr)
 	}
-	if _, _, found, serr := s.CurrentScore(ctx, api.MediaTypeMovie, mid, langFra, api.VariantHI); serr != nil || found {
+	if _, _, found, serr := s.CurrentScore(ctx, subflux.MediaTypeMovie, mid, langFra, subflux.VariantHI); serr != nil || found {
 		t.Fatalf("CurrentScore(hi) found = %v (err %v), want false (no hi row)", found, serr)
 	}
 }
@@ -624,29 +624,29 @@ func assertVariantLockScoping(t *testing.T, s Store, mid string) {
 	ctx := context.Background()
 
 	// A manual forced download locks ONLY the forced quad.
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra,
-		Variant: api.VariantForced, ProviderName: provOS,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra,
+		Variant: subflux.VariantForced, ProviderName: provOS,
 		ReleaseName: "Frc.Manual", Score: 100, Path: "/m/var.fra.forced.1.srt",
-		Meta: &api.DownloadMeta{Manual: true},
+		Meta: &subflux.DownloadMeta{Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(manual forced): %v", err)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantForced}); lerr != nil || !locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantForced}); lerr != nil || !locked {
 		t.Fatalf("IsManuallyLocked(forced) = (%v, %v), want (true, nil)", locked, lerr)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); lerr != nil || locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard}); lerr != nil || locked {
 		t.Fatalf("IsManuallyLocked(standard) = (%v, %v), want (false, nil): forced lock must not leak", locked, lerr)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || !locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || !locked {
 		t.Fatalf("IsManuallyLocked(any) = (%v, %v), want (true, nil)", locked, lerr)
 	}
 
 	// Manual ordinals advance per quad.
-	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantForced}); n != 2 {
+	if n := s.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantForced}); n != 2 {
 		t.Fatalf("NextManualNumber(forced) = %d, want 2 (one forced manual at .1)", n)
 	}
-	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 1 {
+	if n := s.NextManualNumber(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: subflux.VariantStandard}); n != 1 {
 		t.Fatalf("NextManualNumber(standard) = %d, want 1 (forced ordinal must not leak)", n)
 	}
 }
@@ -661,15 +661,15 @@ func assertVariantLockListAndClear(t *testing.T, s Store, mid string) {
 	if err != nil {
 		t.Fatalf("GetManualLocks: %v", err)
 	}
-	if len(locks) != 1 || locks[0].Variant != api.VariantForced || locks[0].Count != 1 {
+	if len(locks) != 1 || locks[0].Variant != subflux.VariantForced || locks[0].Count != 1 {
 		t.Fatalf("GetManualLocks = %+v, want one forced entry with count=1", locks)
 	}
 
 	// ClearManualLock("") clears every variant's lock for the language.
-	if err := s.ClearManualLock(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); err != nil {
+	if err := s.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); err != nil {
 		t.Fatalf("ClearManualLock(all variants): %v", err)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || locked {
 		t.Fatalf("IsManuallyLocked(any) after clear-all = (%v, %v), want (false, nil)", locked, lerr)
 	}
 }
@@ -681,7 +681,7 @@ func testPollTimestamp(t *testing.T, s Store) {
 	ctx := context.Background()
 
 	// Absent key: zero time, no error.
-	got, err := s.GetPollTimestamp(ctx, api.PollKeyRadarr)
+	got, err := s.GetPollTimestamp(ctx, subflux.PollKeyRadarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp (absent): %v", err)
 	}
@@ -690,10 +690,10 @@ func testPollTimestamp(t *testing.T, s Store) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	if serr := s.SetPollTimestamp(ctx, api.PollKeySonarr, now); serr != nil {
+	if serr := s.SetPollTimestamp(ctx, subflux.PollKeySonarr, now); serr != nil {
 		t.Fatalf("SetPollTimestamp: %v", serr)
 	}
-	got, err = s.GetPollTimestamp(ctx, api.PollKeySonarr)
+	got, err = s.GetPollTimestamp(ctx, subflux.PollKeySonarr)
 	if err != nil {
 		t.Fatalf("GetPollTimestamp: %v", err)
 	}
@@ -712,8 +712,8 @@ func testSyncOffset(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	const path = "/media/show/episode.eng.srt"
-	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeEpisode, "tvdb-so-1", []api.SubtitleFile{
-		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: path, Codec: codecSubrip},
+	if _, err := s.RecordSubtitleFiles(ctx, subflux.MediaTypeEpisode, "tvdb-so-1", []subflux.SubtitleFile{
+		{Language: langEng, Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Path: path, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
@@ -735,11 +735,11 @@ func testSyncOffset(t *testing.T, s Store) {
 func testCoverageFiles(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
-	files := []api.SubtitleFile{
-		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: "/m/cov.eng.srt", Codec: codecSubrip},
+	files := []subflux.SubtitleFile{
+		{Language: langEng, Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Path: "/m/cov.eng.srt", Codec: codecSubrip},
 	}
 
-	changed, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-cov-1", files)
+	changed, err := s.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-cov-1", files)
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles (first): %v", err)
 	}
@@ -747,7 +747,7 @@ func testCoverageFiles(t *testing.T, s Store) {
 		t.Fatalf("RecordSubtitleFiles (first) changed = false, want true")
 	}
 
-	got, err := s.GetSubtitleFiles(ctx, api.MediaTypeMovie, "tt-cov-1")
+	got, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-cov-1")
 	if err != nil {
 		t.Fatalf("GetSubtitleFiles: %v", err)
 	}
@@ -764,7 +764,7 @@ func testCoverageFiles(t *testing.T, s Store) {
 	}
 
 	// Re-recording the identical set is a no-op: nothing changed.
-	changed, err = s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-cov-1", files)
+	changed, err = s.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-cov-1", files)
 	if err != nil {
 		t.Fatalf("RecordSubtitleFiles (second): %v", err)
 	}
@@ -781,14 +781,14 @@ func testScanState(t *testing.T, s Store) {
 	mid := "tvdb-ss-1-s01e01"
 
 	before := time.Now().Add(-time.Hour)
-	if err := s.RecordScanState(ctx, &api.ScanRecord{
-		MediaType: api.MediaTypeEpisode, MediaID: mid,
+	if err := s.RecordScanState(ctx, &subflux.ScanRecord{
+		MediaType: subflux.MediaTypeEpisode, MediaID: mid,
 		Title: "ScanShow", AudioLang: langEng, Season: 1, Episode: 1,
 	}); err != nil {
 		t.Fatalf("RecordScanState: %v", err)
 	}
 
-	states, err := s.GetScanStates(ctx, api.MediaTypeEpisode, "tvdb-ss-1")
+	states, err := s.GetScanStates(ctx, subflux.MediaTypeEpisode, "tvdb-ss-1")
 	if err != nil {
 		t.Fatalf("GetScanStates: %v", err)
 	}
@@ -818,12 +818,12 @@ func testScanState(t *testing.T, s Store) {
 // saveAuto is a small helper for the query case: it persists one auto download
 // row for a distinct triple with the given title/provider, so GetState filters
 // have material to match.
-func saveAuto(t *testing.T, s Store, mt api.MediaType, mid, lang string, prov api.ProviderID, title string, score int) {
+func saveAuto(t *testing.T, s Store, mt subflux.MediaType, mid, lang string, prov subflux.ProviderID, title string, score int) {
 	t.Helper()
-	if err := s.SaveDownload(context.Background(), &api.DownloadRecord{
+	if err := s.SaveDownload(context.Background(), &subflux.DownloadRecord{
 		MediaType: mt, MediaID: mid, Language: lang, ProviderName: prov,
 		ReleaseName: title + ".rel", Score: score, Path: "/m/" + mid + "." + lang + ".srt",
-		Meta: &api.DownloadMeta{Title: title},
+		Meta: &subflux.DownloadMeta{Title: title},
 	}); err != nil {
 		t.Fatalf("SaveDownload(%s/%s): %v", mid, lang, err)
 	}
@@ -837,12 +837,12 @@ func testGetStateQuery(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 
-	saveAuto(t, s, api.MediaTypeMovie, "ttq1", langEng, provOS, "Alpha", 10)
-	saveAuto(t, s, api.MediaTypeMovie, "ttq2", langEng, provOS, "Beta", 20)
-	saveAuto(t, s, api.MediaTypeMovie, "ttq3", langFra, provOS, "Gamma", 30)
-	saveAuto(t, s, api.MediaTypeEpisode, "ttq4", langEng, api.ProviderID("subdl"), "Delta", 40)
+	saveAuto(t, s, subflux.MediaTypeMovie, "ttq1", langEng, provOS, "Alpha", 10)
+	saveAuto(t, s, subflux.MediaTypeMovie, "ttq2", langEng, provOS, "Beta", 20)
+	saveAuto(t, s, subflux.MediaTypeMovie, "ttq3", langFra, provOS, "Gamma", 30)
+	saveAuto(t, s, subflux.MediaTypeEpisode, "ttq4", langEng, subflux.ProviderID("subdl"), "Delta", 40)
 
-	assertCount := func(name string, q *api.StateQuery, want int) []api.StateEntry {
+	assertCount := func(name string, q *subflux.StateQuery, want int) []subflux.StateEntry {
 		entries, err := s.GetState(ctx, q)
 		if err != nil {
 			t.Fatalf("GetState(%s): %v", name, err)
@@ -853,22 +853,22 @@ func testGetStateQuery(t *testing.T, s Store) {
 		return entries
 	}
 
-	assertCount("all", &api.StateQuery{}, 4)
-	assertCount("type=movie", &api.StateQuery{MediaType: api.MediaTypeMovie}, 3)
-	assertCount("type=movie,lang=eng", &api.StateQuery{MediaType: api.MediaTypeMovie, Language: langEng}, 2)
-	assertCount("provider=subdl", &api.StateQuery{Provider: api.ProviderID("subdl")}, 1)
+	assertCount("all", &subflux.StateQuery{}, 4)
+	assertCount("type=movie", &subflux.StateQuery{MediaType: subflux.MediaTypeMovie}, 3)
+	assertCount("type=movie,lang=eng", &subflux.StateQuery{MediaType: subflux.MediaTypeMovie, Language: langEng}, 2)
+	assertCount("provider=subdl", &subflux.StateQuery{Provider: subflux.ProviderID("subdl")}, 1)
 
 	// Case-insensitive contains search on title.
-	search := assertCount("search=alp", &api.StateQuery{Search: "alp"}, 1)
+	search := assertCount("search=alp", &subflux.StateQuery{Search: "alp"}, 1)
 	if search[0].MediaID != "ttq1" {
 		t.Fatalf("GetState(search=alp)[0].MediaID = %q, want ttq1", search[0].MediaID)
 	}
 
 	// Pagination: two disjoint pages of 2 cover all 4 distinct rows.
-	page1 := assertCount("limit=2,offset=0", &api.StateQuery{Limit: 2, Offset: 0}, 2)
-	page2 := assertCount("limit=2,offset=2", &api.StateQuery{Limit: 2, Offset: 2}, 2)
+	page1 := assertCount("limit=2,offset=0", &subflux.StateQuery{Limit: 2, Offset: 0}, 2)
+	page2 := assertCount("limit=2,offset=2", &subflux.StateQuery{Limit: 2, Offset: 2}, 2)
 	seen := map[string]bool{}
-	union := append(append([]api.StateEntry{}, page1...), page2...)
+	union := append(append([]subflux.StateEntry{}, page1...), page2...)
 	for i := range union {
 		e := &union[i]
 		if seen[e.MediaID] {
@@ -892,25 +892,25 @@ func testDeleteStateByPaths(t *testing.T, s Store) {
 	const mid = "tt-del-1"
 	const subPath = "/media/del/movie.eng.srt"
 
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng,
 		ProviderName: provOS, ReleaseName: "Movie-GRP", Score: 80,
 		Path: subPath,
-		Meta: &api.DownloadMeta{VideoPath: video},
+		Meta: &subflux.DownloadMeta{VideoPath: video},
 	}); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
-	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, mid, []api.SubtitleFile{
-		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: subPath, Codec: codecSubrip},
+	if _, err := s.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, mid, []subflux.SubtitleFile{
+		{Language: langEng, Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Path: subPath, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
-	if err := s.RecordScanState(ctx, &api.ScanRecord{
-		MediaType: api.MediaTypeMovie, MediaID: mid, Title: "Movie", AudioLang: langEng,
+	if err := s.RecordScanState(ctx, &subflux.ScanRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: mid, Title: "Movie", AudioLang: langEng,
 	}); err != nil {
 		t.Fatalf("RecordScanState: %v", err)
 	}
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -933,14 +933,14 @@ func testDeleteStateByPaths(t *testing.T, s Store) {
 		t.Fatalf("attempts after delete = %d, want 0 (triple backoff cleared)", attempts)
 	}
 
-	covg, err := s.GetSubtitleFiles(ctx, api.MediaTypeMovie, mid)
+	covg, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
 		t.Fatalf("GetSubtitleFiles: %v", err)
 	}
 	if len(covg) != 0 {
 		t.Fatalf("GetSubtitleFiles after delete = %d, want 0 (orphan coverage cleaned)", len(covg))
 	}
-	scans, err := s.GetScanStates(ctx, api.MediaTypeMovie, mid)
+	scans, err := s.GetScanStates(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
 		t.Fatalf("GetScanStates: %v", err)
 	}
@@ -957,13 +957,13 @@ func testCleanupDriftRemoved(t *testing.T, s Store) {
 	const mid = "tt-drift-1"
 
 	// Two languages (eng, fra) and two providers (os, subdl) under one media id.
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult(eng,os): %v", err)
 	}
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langFra, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult(fra,os): %v", err)
 	}
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langEng, api.ProviderID("subdl"), defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langEng, subflux.ProviderID("subdl"), defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult(eng,subdl): %v", err)
 	}
 	if _, attempts, _ := s.Stats(ctx); attempts != 3 {
@@ -971,10 +971,10 @@ func testCleanupDriftRemoved(t *testing.T, s Store) {
 	}
 
 	// Remove language fra: only the (eng-or-fra)=fra rows go.
-	if err := s.CleanupDrift(ctx, api.ConfigDrift{RemovedLanguages: []string{langFra}}); err != nil {
+	if err := s.CleanupDrift(ctx, subflux.ConfigDrift{RemovedLanguages: []string{langFra}}); err != nil {
 		t.Fatalf("CleanupDrift(removed lang fra): %v", err)
 	}
-	remaining, err := s.GetBackoffByPrefix(ctx, api.MediaTypeMovie, mid)
+	remaining, err := s.GetBackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
 		t.Fatalf("GetBackoffByPrefix: %v", err)
 	}
@@ -988,10 +988,10 @@ func testCleanupDriftRemoved(t *testing.T, s Store) {
 	}
 
 	// Remove provider subdl: the (eng,subdl) row goes, leaving (eng,os).
-	if cerr := s.CleanupDrift(ctx, api.ConfigDrift{RemovedProviders: []api.ProviderID{api.ProviderID("subdl")}}); cerr != nil {
+	if cerr := s.CleanupDrift(ctx, subflux.ConfigDrift{RemovedProviders: []subflux.ProviderID{subflux.ProviderID("subdl")}}); cerr != nil {
 		t.Fatalf("CleanupDrift(removed provider subdl): %v", cerr)
 	}
-	remaining, err = s.GetBackoffByPrefix(ctx, api.MediaTypeMovie, mid)
+	remaining, err = s.GetBackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
 		t.Fatalf("GetBackoffByPrefix: %v", err)
 	}
@@ -1010,7 +1010,7 @@ func testCleanupDriftAdaptiveDisabled(t *testing.T, s Store) {
 	ctx := context.Background()
 
 	for _, mid := range []string{"tt-ad-1", "tt-ad-2"} {
-		if err := s.RecordNoResult(ctx, api.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
+		if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, mid, langEng, provOS, defaultBackoff()); err != nil {
 			t.Fatalf("RecordNoResult(%s): %v", mid, err)
 		}
 	}
@@ -1018,7 +1018,7 @@ func testCleanupDriftAdaptiveDisabled(t *testing.T, s Store) {
 		t.Fatalf("attempts before drift = %d, want 2", attempts)
 	}
 
-	if err := s.CleanupDrift(ctx, api.ConfigDrift{AdaptiveDisabled: true}); err != nil {
+	if err := s.CleanupDrift(ctx, subflux.ConfigDrift{AdaptiveDisabled: true}); err != nil {
 		t.Fatalf("CleanupDrift(adaptive disabled): %v", err)
 	}
 	if _, attempts, err := s.Stats(ctx); err != nil {
@@ -1042,31 +1042,31 @@ func testReconcileVideoGone(t *testing.T, s Store) {
 	okSub := filepath.Join(dir, "ok.eng.srt")
 	writeFile(t, okVideo)
 	writeFile(t, okSub)
-	mustSaveDownload(t, s, "ok", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-ok", Language: langEng,
+	mustSaveDownload(t, s, "ok", &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt-ok", Language: langEng,
 		ProviderName: provOS, ReleaseName: "OK", Score: 100, Path: okSub,
-		Meta: &api.DownloadMeta{VideoPath: okVideo},
+		Meta: &subflux.DownloadMeta{VideoPath: okVideo},
 	})
 
 	// Gone item: neither video nor subtitle exists on disk.
 	goneVideo := filepath.Join(dir, "gone.mkv")
 	goneSub := filepath.Join(dir, "gone.eng.srt")
-	mustSaveDownload(t, s, "gone", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-gone", Language: langEng,
+	mustSaveDownload(t, s, "gone", &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt-gone", Language: langEng,
 		ProviderName: provOS, ReleaseName: "Gone", Score: 100, Path: goneSub,
-		Meta: &api.DownloadMeta{VideoPath: goneVideo},
+		Meta: &subflux.DownloadMeta{VideoPath: goneVideo},
 	})
-	if _, err := s.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt-gone", []api.SubtitleFile{
-		{Language: langEng, Variant: api.VariantStandard, Source: api.SourceExternal, Path: goneSub, Codec: codecSubrip},
+	if _, err := s.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-gone", []subflux.SubtitleFile{
+		{Language: langEng, Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Path: goneSub, Codec: codecSubrip},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles(gone): %v", err)
 	}
-	if err := s.RecordScanState(ctx, &api.ScanRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-gone", Title: "Gone", AudioLang: langEng,
+	if err := s.RecordScanState(ctx, &subflux.ScanRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt-gone", Title: "Gone", AudioLang: langEng,
 	}); err != nil {
 		t.Fatalf("RecordScanState(gone): %v", err)
 	}
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-gone", langEng, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, "tt-gone", langEng, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult(gone): %v", err)
 	}
 
@@ -1096,14 +1096,14 @@ func testReconcileVideoGone(t *testing.T, s Store) {
 	// The gone media's orphaned coverage and scan_state are cleaned; the
 	// present media keeps no coverage rows of its own (none recorded) — assert
 	// the gone media specifically.
-	goneScans, err := s.GetScanStates(ctx, api.MediaTypeMovie, "tt-gone")
+	goneScans, err := s.GetScanStates(ctx, subflux.MediaTypeMovie, "tt-gone")
 	if err != nil {
 		t.Fatalf("GetScanStates(gone): %v", err)
 	}
 	if len(goneScans) != 0 {
 		t.Fatalf("GetScanStates(gone) = %d, want 0 (orphaned scan_state cleaned)", len(goneScans))
 	}
-	goneFiles, err := s.GetSubtitleFiles(ctx, api.MediaTypeMovie, "tt-gone")
+	goneFiles, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-gone")
 	if err != nil {
 		t.Fatalf("GetSubtitleFiles(gone): %v", err)
 	}
@@ -1131,22 +1131,22 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 
 	// Two manual rows for the same triple: one present, one gone. Both manual so
 	// deleting the gone one still leaves a manual lock behind.
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Present", Score: 100, Path: presentSub,
-		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
+		Meta: &subflux.DownloadMeta{VideoPath: video, Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(present): %v", err)
 	}
-	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
+	if err := s.SaveDownload(ctx, &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Missing", Score: 80, Path: missingSub,
-		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
+		Meta: &subflux.DownloadMeta{VideoPath: video, Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(missing): %v", err)
 	}
 	// Backoff recorded AFTER the saves (SaveDownload clears triple backoff).
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, midSiblingPresent, langFra, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, midSiblingPresent, langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -1174,7 +1174,7 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 		t.Fatalf("attempts after reconcile = %d, want 1 (backoff preserved, not cleared)", attempts)
 	}
 
-	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra, Variant: api.VariantStandard})
+	locked, err := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -1182,7 +1182,7 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = false, want true (lock preserved)")
 	}
 
-	entries, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
@@ -1205,17 +1205,17 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 	autoSub := filepath.Join(dir, "movie.fr.srt")     // never created
 	manualSub := filepath.Join(dir, "movie.fr.1.srt") // never created
 
-	mustSaveDownload(t, s, "auto", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
+	mustSaveDownload(t, s, "auto", &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Auto", Score: 100, Path: autoSub,
-		Meta: &api.DownloadMeta{VideoPath: video},
+		Meta: &subflux.DownloadMeta{VideoPath: video},
 	})
-	mustSaveDownload(t, s, "manual", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
+	mustSaveDownload(t, s, "manual", &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Manual", Score: 200, Path: manualSub,
-		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
+		Meta: &subflux.DownloadMeta{VideoPath: video, Manual: true},
 	})
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, midAllSubsGone, langFra, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, subflux.MediaTypeMovie, midAllSubsGone, langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -1243,7 +1243,7 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 
 	// The manual lock is gone (manual row deleted) and the surviving auto row is
 	// reset for re-search.
-	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra, Variant: api.VariantStandard})
+	locked, err := s.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra, Variant: subflux.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -1251,7 +1251,7 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = true, want false (manual row deleted)")
 	}
 
-	entries, err := s.GetState(ctx, &api.StateQuery{MediaType: api.MediaTypeMovie})
+	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}

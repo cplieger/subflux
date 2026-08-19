@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // oldShowSkipCacheKey is the `imdbID + "-" + lang` form showSkipCacheKey
@@ -22,19 +22,19 @@ type exactShowCounter struct {
 	calls  int
 }
 
-func (c *exactShowCounter) CountShowSubtitles(_ context.Context, q api.ShowSubtitleQuery) (int, error) {
+func (c *exactShowCounter) CountShowSubtitles(_ context.Context, q subflux.ShowSubtitleQuery) (int, error) {
 	imdbID, lang := q.ImdbID, q.Language
 	c.calls++
 	return c.counts[[2]string{imdbID, lang}], nil
 }
 
-func (c *exactShowCounter) Name() api.ProviderID { return "opensubtitles" }
+func (c *exactShowCounter) Name() subflux.ProviderID { return "opensubtitles" }
 
-func (c *exactShowCounter) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (c *exactShowCounter) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (c *exactShowCounter) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (c *exactShowCounter) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 

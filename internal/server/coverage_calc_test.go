@@ -3,8 +3,8 @@ package server
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -19,7 +19,7 @@ func TestIndexSubStatus(t *testing.T) {
 		checkKey     covKey
 		name         string
 		checkMediaID string
-		files        []api.SubtitleEntry
+		files        []subflux.SubtitleEntry
 		wantMediaIDs int
 		wantUsable   bool
 		wantIgnored  bool
@@ -32,7 +32,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "external_sub_is_usable",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
 			ignored:      nil,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -42,7 +42,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_ignored_codec",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -52,7 +52,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_non_ignored_codec",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -62,7 +62,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "usable_overrides_ignored",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 			},
@@ -75,7 +75,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "ignored_does_not_override_usable",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 			},
@@ -88,7 +88,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "multiple_media_ids",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep2", Language: "en", Variant: "hi", Source: "embedded", Codec: "pgs"},
 			},
@@ -142,7 +142,7 @@ func TestIndexSubStatus(t *testing.T) {
 
 func TestResolveRuleName_with_audio_lang(t *testing.T) {
 	t.Parallel()
-	got := resolveRuleName("en", []api.SubtitleTarget{{Code: "fr"}})
+	got := resolveRuleName("en", []subflux.SubtitleTarget{{Code: "fr"}})
 	if got != "en" {
 		t.Errorf("resolveRuleName(en, targets) = %q, want %q", got, "en")
 	}
@@ -150,7 +150,7 @@ func TestResolveRuleName_with_audio_lang(t *testing.T) {
 
 func TestResolveRuleName_empty_lang_returns_default(t *testing.T) {
 	t.Parallel()
-	got := resolveRuleName("", []api.SubtitleTarget{{Code: "fr"}})
+	got := resolveRuleName("", []subflux.SubtitleTarget{{Code: "fr"}})
 	if got != ruleDefault {
 		t.Errorf("resolveRuleName('', targets) = %q, want %q", got, ruleDefault)
 	}
@@ -168,7 +168,7 @@ func TestResolveRuleName_no_targets_returns_no_targets(t *testing.T) {
 
 func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/a.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/b.srt"},
 		{MediaID: "ep1", Language: "en", Variant: "hi", Source: "embedded"},
@@ -181,7 +181,7 @@ func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded"},
 		{MediaID: "ep1", Language: "en", Variant: "standard", Source: "external"},
@@ -195,7 +195,7 @@ func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 
 func TestDeduplicateFileRows_empty_input(t *testing.T) {
 	t.Parallel()
-	got := deduplicateFileRows([]api.SubtitleEntry{})
+	got := deduplicateFileRows([]subflux.SubtitleEntry{})
 	if len(got) != 0 {
 		t.Errorf("deduplicateFileRows(empty) returned %d rows, want 0", len(got))
 	}
@@ -203,7 +203,7 @@ func TestDeduplicateFileRows_empty_input(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_order(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/first.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/second.srt"},
 	}
@@ -268,7 +268,7 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 
 func TestCountEpisodeCoverageGrouped_empty_episodes(t *testing.T) {
 	t.Parallel()
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	got := countEpisodeCoverageGrouped(nil, targets, 10)
 	if len(got) != 1 {
 		t.Fatalf("countEpisodeCoverageGrouped(nil, 1 target, 10) len = %d, want 1", len(got))
@@ -286,7 +286,7 @@ func TestCountEpisodeCoverageGrouped_counts_usable_and_ignored(t *testing.T) {
 		{covKey{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true}},
 		{covKey{Lang: "en", Variant: "standard"}: {Usable: true}},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	got := countEpisodeCoverageGrouped(episodes, targets, 5)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1", len(got))
@@ -310,7 +310,7 @@ func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
 			covKey{Lang: "en", Variant: "forced"}:   {Usable: true},
 		},
 	}
-	targets := []api.SubtitleTarget{
+	targets := []subflux.SubtitleTarget{
 		{Code: "fr"},
 		{Code: "en", Variant: "forced"},
 	}
@@ -341,7 +341,7 @@ func TestCountEpisodeCoverageGrouped_no_targets(t *testing.T) {
 
 func TestCountMovieCoverage_nil_subs(t *testing.T) {
 	t.Parallel()
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	got := countMovieCoverage(nil, targets)
 	if len(got) != 1 {
 		t.Fatalf("countMovieCoverage(nil) len = %d, want 1", len(got))
@@ -357,7 +357,7 @@ func TestCountMovieCoverage_usable_sub(t *testing.T) {
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	got := countMovieCoverage(subs, targets)
 	if got[0].Have != 1 {
 		t.Errorf("countMovieCoverage(usable) Have = %d, want 1", got[0].Have)
@@ -372,7 +372,7 @@ func TestCountMovieCoverage_ignored_only(t *testing.T) {
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	got := countMovieCoverage(subs, targets)
 	if got[0].Have != 0 {
 		t.Errorf("countMovieCoverage(ignored) Have = %d, want 0", got[0].Have)
@@ -388,7 +388,7 @@ func TestCountMovieCoverage_multiple_targets(t *testing.T) {
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 		{Lang: "en", Variant: "forced"}:   {IgnoredOnly: true},
 	}
-	targets := []api.SubtitleTarget{
+	targets := []subflux.SubtitleTarget{
 		{Code: "fr"},
 		{Code: "en", Variant: "forced"},
 		{Code: "de"},

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Header Setting ---
@@ -103,15 +103,15 @@ func TestCheckStatus(t *testing.T) {
 				}
 				switch tt.wantType {
 				case "auth":
-					var authErr *api.AuthError
+					var authErr *subflux.AuthError
 					if !errors.As(err, &authErr) {
-						t.Errorf("checkStatus(%d) error type = %T, want *api.AuthError",
+						t.Errorf("checkStatus(%d) error type = %T, want *subflux.AuthError",
 							tt.statusCode, err)
 					}
 				case "ratelimit":
-					var rlErr *api.RateLimitError
+					var rlErr *subflux.RateLimitError
 					if !errors.As(err, &rlErr) {
-						t.Errorf("checkStatus(%d) error type = %T, want *api.RateLimitError",
+						t.Errorf("checkStatus(%d) error type = %T, want *subflux.RateLimitError",
 							tt.statusCode, err)
 					}
 				}
@@ -134,9 +134,9 @@ func TestCheckStatus_parses_retry_after_seconds_on_429(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *api.RateLimitError
+	var rl *subflux.RateLimitError
 	if !errors.As(err, &rl) {
-		t.Fatalf("checkStatus() error type = %T, want *api.RateLimitError", err)
+		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 42*time.Second {
 		t.Errorf("RetryAfter = %v, want 42s", rl.RetryAfter)
@@ -152,9 +152,9 @@ func TestCheckStatus_missing_retry_after_on_429_is_zero(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *api.RateLimitError
+	var rl *subflux.RateLimitError
 	if !errors.As(err, &rl) {
-		t.Fatalf("checkStatus() error type = %T, want *api.RateLimitError", err)
+		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 0 {
 		t.Errorf("RetryAfter = %v, want 0 (no header)", rl.RetryAfter)
@@ -170,9 +170,9 @@ func TestCheckStatus_406_defaults_to_next_utc_midnight(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *api.RateLimitError
+	var rl *subflux.RateLimitError
 	if !errors.As(err, &rl) {
-		t.Fatalf("checkStatus() error type = %T, want *api.RateLimitError", err)
+		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	// Daily quota window is always ≤24h and >0s.
 	if rl.RetryAfter <= 0 || rl.RetryAfter > 24*time.Hour {
@@ -190,9 +190,9 @@ func TestCheckStatus_406_respects_retry_after_header_when_present(t *testing.T) 
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *api.RateLimitError
+	var rl *subflux.RateLimitError
 	if !errors.As(err, &rl) {
-		t.Fatalf("checkStatus() error type = %T, want *api.RateLimitError", err)
+		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 7*time.Second {
 		t.Errorf("RetryAfter = %v, want 7s", rl.RetryAfter)
@@ -261,10 +261,10 @@ func TestInvalidateTokenOn401(t *testing.T) {
 		err          error
 		wantToken    string
 	}{
-		{name: "clears token on auth error", initialToken: "my-token", err: &api.AuthError{Msg: "401"}, wantToken: ""},
+		{name: "clears token on auth error", initialToken: "my-token", err: &subflux.AuthError{Msg: "401"}, wantToken: ""},
 		{name: "preserves token on other error", initialToken: "my-token", err: errors.New("some other error"), wantToken: "my-token"},
-		{name: "idempotent when token empty", initialToken: "", err: &api.AuthError{Msg: "401"}, wantToken: ""},
-		{name: "wrapped auth error", initialToken: "my-token", err: fmt.Errorf("request failed: %w", &api.AuthError{Msg: "401"}), wantToken: ""},
+		{name: "idempotent when token empty", initialToken: "", err: &subflux.AuthError{Msg: "401"}, wantToken: ""},
+		{name: "wrapped auth error", initialToken: "my-token", err: fmt.Errorf("request failed: %w", &subflux.AuthError{Msg: "401"}), wantToken: ""},
 	}
 
 	for _, tt := range tests {

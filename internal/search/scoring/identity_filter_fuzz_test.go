@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzFilterByIdentity exercises the identity filter's title-matching,
@@ -32,12 +32,12 @@ func FuzzFilterByIdentity(f *testing.F) {
 			return
 		}
 
-		mt := api.MediaType(mediaType)
-		if mt != api.MediaTypeEpisode && mt != api.MediaTypeMovie {
-			mt = api.MediaTypeEpisode
+		mt := subflux.MediaType(mediaType)
+		if mt != subflux.MediaTypeEpisode && mt != subflux.MediaTypeMovie {
+			mt = subflux.MediaTypeEpisode
 		}
 
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			Title:           reqTitle,
 			Season:          season,
 			Episode:         episode,
@@ -46,14 +46,14 @@ func FuzzFilterByIdentity(f *testing.F) {
 			MediaType:       mt,
 		}
 
-		sub := api.Subtitle{
+		sub := subflux.Subtitle{
 			Title:       subTitle,
 			ReleaseName: releaseName,
 			Season:      season,
 			Episode:     episode,
 		}
 
-		results := []api.Subtitle{sub}
+		results := []subflux.Subtitle{sub}
 
 		// Should not panic.
 		_, _ = FilterByIdentity(results, req)

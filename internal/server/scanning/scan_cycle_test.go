@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // These tests pin the P5 duration-aware resume cutoff: a dangling cycle mark
@@ -25,7 +25,7 @@ func (f *fakeScanStore) RecentlyScanned(_ context.Context, cutoff time.Time) (ma
 	return f.recent, nil
 }
 
-func (f *fakeScanStore) RecordScanState(context.Context, *api.ScanRecord) error { return nil }
+func (f *fakeScanStore) RecordScanState(context.Context, *subflux.ScanRecord) error { return nil }
 
 func (f *fakeScanStore) ScanCycleStart(context.Context) (time.Time, error) { return f.mark, nil }
 

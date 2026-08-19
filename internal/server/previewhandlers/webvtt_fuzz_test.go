@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // The three targets below moved here from internal/server/synchandlers, which
@@ -48,7 +48,7 @@ func FuzzSrtToWebVTT(f *testing.F) {
 	f.Add("arrow --> in text", int64(0), int64(500), "", int64(500), int64(900))
 
 	f.Fuzz(func(t *testing.T, text1 string, s1, e1 int64, text2 string, s2, e2 int64) {
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Text: text1, Start: time.Duration(s1) * time.Millisecond, End: time.Duration(e1) * time.Millisecond},
 			{Text: text2, Start: time.Duration(s2) * time.Millisecond, End: time.Duration(e2) * time.Millisecond},
 		}
@@ -85,7 +85,7 @@ func FuzzFindDialogueDenseStart(f *testing.F) {
 			return v
 		}
 		s1, s2, s3, s4 = clamp(s1), clamp(s2), clamp(s3), clamp(s4)
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Text: "a", Start: time.Duration(s1) * time.Millisecond, End: time.Duration(s1+500) * time.Millisecond},
 			{Text: "bb", Start: time.Duration(s2) * time.Millisecond, End: time.Duration(s2+500) * time.Millisecond},
 			{Text: "ccc", Start: time.Duration(s3) * time.Millisecond, End: time.Duration(s3+500) * time.Millisecond},

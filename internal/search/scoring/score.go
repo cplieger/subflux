@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ReleaseInfo holds metadata extracted from a release/scene name.
@@ -22,20 +22,20 @@ type ReleaseInfo struct {
 // MatchDeps provides release-parsing dependencies to BuildMatches.
 type MatchDeps struct {
 	ParseRelease  func(string) ReleaseInfo
-	CompareSource func(*api.MatchSet, string, string)
+	CompareSource func(*subflux.MatchSet, string, string)
 	IsSeasonPack  func(string) bool
 }
 
 // BuildMatches compares video and subtitle release attributes, returning
 // a set of matched attribute keys used by the scorer.
-func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.MatchSet {
-	var matches api.MatchSet
+func BuildMatches(video *subflux.VideoInfo, sub *subflux.Subtitle, deps MatchDeps) subflux.MatchSet {
+	var matches subflux.MatchSet
 
-	if sub.MatchedBy == api.MatchByHash {
+	if sub.MatchedBy == subflux.MatchByHash {
 		matches.Hash = true
 	}
-	if sub.MatchedBy == api.MatchByIMDB {
-		if video.MediaType == api.MediaTypeEpisode {
+	if sub.MatchedBy == subflux.MatchByIMDB {
+		if video.MediaType == subflux.MediaTypeEpisode {
 			matches.SeriesIMDB = true
 		} else {
 			matches.IMDB = true
@@ -56,7 +56,7 @@ func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.M
 	}
 	deps.CompareSource(&matches, videoRelease.Source, subRelease.Source)
 
-	if video.MediaType == api.MediaTypeEpisode && deps.IsSeasonPack(sub.ReleaseName) {
+	if video.MediaType == subflux.MediaTypeEpisode && deps.IsSeasonPack(sub.ReleaseName) {
 		matches.SeasonPack = true
 	}
 
@@ -75,16 +75,16 @@ func BuildMatches(video *api.VideoInfo, sub *api.Subtitle, deps MatchDeps) api.M
 }
 
 // Category is one row of the canonical scoring-category table: the
-// breakdown key, the weight accessor into api.Scores, the match-bit getter
-// and setter on api.MatchSet, and — for categories matched by simple
+// breakdown key, the weight accessor into subflux.Scores, the match-bit getter
+// and setter on subflux.MatchSet, and — for categories matched by simple
 // case-insensitive equality of parsed release attributes — the ReleaseInfo
 // extractor that drives BuildMatches. Categories with bespoke match logic
 // (source-family comparison, season-pack detection) leave Extract nil and
 // are handled explicitly in BuildMatches.
 type Category struct {
-	Weight   func(*api.Scores) int
-	Match    func(api.MatchSet) bool
-	SetMatch func(*api.MatchSet)
+	Weight   func(*subflux.Scores) int
+	Match    func(subflux.MatchSet) bool
+	SetMatch func(*subflux.MatchSet)
 	Extract  func(ReleaseInfo) string
 	Key      string
 }
@@ -93,64 +93,64 @@ type Category struct {
 // shared by the match builder (BuildMatches), the score breakdown
 // (MatchBreakdown), and the scorer (internal/scorer). Hash and identity
 // (IMDB) matching are handled separately by each consumer. Adding a scoring
-// category is a one-entry change here, plus the api.Scores/api.MatchSet
+// category is a one-entry change here, plus the subflux.Scores/subflux.MatchSet
 // fields it references.
 var Categories = []Category{
 	{
 		Key:      "source",
-		Weight:   func(s *api.Scores) int { return s.Source },
-		Match:    func(m api.MatchSet) bool { return m.Source },
-		SetMatch: func(m *api.MatchSet) { m.Source = true },
+		Weight:   func(s *subflux.Scores) int { return s.Source },
+		Match:    func(m subflux.MatchSet) bool { return m.Source },
+		SetMatch: func(m *subflux.MatchSet) { m.Source = true },
 		// Matched by MatchDeps.CompareSource (source-family logic), not by
 		// generic attribute equality; Extract stays nil.
 	},
 	{
 		Key:      "release_group",
-		Weight:   func(s *api.Scores) int { return s.ReleaseGroup },
-		Match:    func(m api.MatchSet) bool { return m.ReleaseGroup },
-		SetMatch: func(m *api.MatchSet) { m.ReleaseGroup = true },
+		Weight:   func(s *subflux.Scores) int { return s.ReleaseGroup },
+		Match:    func(m subflux.MatchSet) bool { return m.ReleaseGroup },
+		SetMatch: func(m *subflux.MatchSet) { m.ReleaseGroup = true },
 		Extract:  func(r ReleaseInfo) string { return r.ReleaseGroup },
 	},
 	{
 		Key:      "streaming_service",
-		Weight:   func(s *api.Scores) int { return s.StreamingService },
-		Match:    func(m api.MatchSet) bool { return m.StreamingService },
-		SetMatch: func(m *api.MatchSet) { m.StreamingService = true },
+		Weight:   func(s *subflux.Scores) int { return s.StreamingService },
+		Match:    func(m subflux.MatchSet) bool { return m.StreamingService },
+		SetMatch: func(m *subflux.MatchSet) { m.StreamingService = true },
 		Extract:  func(r ReleaseInfo) string { return r.StreamingService },
 	},
 	{
 		Key:      "video_codec",
-		Weight:   func(s *api.Scores) int { return s.VideoCodec },
-		Match:    func(m api.MatchSet) bool { return m.VideoCodec },
-		SetMatch: func(m *api.MatchSet) { m.VideoCodec = true },
+		Weight:   func(s *subflux.Scores) int { return s.VideoCodec },
+		Match:    func(m subflux.MatchSet) bool { return m.VideoCodec },
+		SetMatch: func(m *subflux.MatchSet) { m.VideoCodec = true },
 		Extract:  func(r ReleaseInfo) string { return r.VideoCodec },
 	},
 	{
 		Key:      "hdr",
-		Weight:   func(s *api.Scores) int { return s.HDR },
-		Match:    func(m api.MatchSet) bool { return m.HDR },
-		SetMatch: func(m *api.MatchSet) { m.HDR = true },
+		Weight:   func(s *subflux.Scores) int { return s.HDR },
+		Match:    func(m subflux.MatchSet) bool { return m.HDR },
+		SetMatch: func(m *subflux.MatchSet) { m.HDR = true },
 		Extract:  func(r ReleaseInfo) string { return r.HDR },
 	},
 	{
 		Key:      "edition",
-		Weight:   func(s *api.Scores) int { return s.Edition },
-		Match:    func(m api.MatchSet) bool { return m.Edition },
-		SetMatch: func(m *api.MatchSet) { m.Edition = true },
+		Weight:   func(s *subflux.Scores) int { return s.Edition },
+		Match:    func(m subflux.MatchSet) bool { return m.Edition },
+		SetMatch: func(m *subflux.MatchSet) { m.Edition = true },
 		Extract:  func(r ReleaseInfo) string { return r.Edition },
 	},
 	{
 		Key:      "season_pack",
-		Weight:   func(s *api.Scores) int { return s.SeasonPack },
-		Match:    func(m api.MatchSet) bool { return m.SeasonPack },
-		SetMatch: func(m *api.MatchSet) { m.SeasonPack = true },
+		Weight:   func(s *subflux.Scores) int { return s.SeasonPack },
+		Match:    func(m subflux.MatchSet) bool { return m.SeasonPack },
+		SetMatch: func(m *subflux.MatchSet) { m.SeasonPack = true },
 		// Matched by MatchDeps.IsSeasonPack on episodes, not by generic
 		// attribute equality; Extract stays nil.
 	},
 }
 
 // MatchBreakdown returns the per-category score contributions for a match set.
-func MatchBreakdown(scores *api.Scores, matches api.MatchSet) map[string]int {
+func MatchBreakdown(scores *subflux.Scores, matches subflux.MatchSet) map[string]int {
 	out := make(map[string]int)
 	if matches.Hash {
 		out["hash"] = scores.Hash

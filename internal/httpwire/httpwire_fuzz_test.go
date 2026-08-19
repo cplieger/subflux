@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzIsTransient exercises IsTransient with synthesized errors across the
@@ -28,9 +28,9 @@ func FuzzIsTransient(f *testing.F) {
 
 		switch {
 		case isAuth:
-			err = &api.AuthError{Msg: "test auth"}
+			err = &subflux.AuthError{Msg: "test auth"}
 		case isRateLimit:
-			err = &api.RateLimitError{Msg: "test rate"}
+			err = &subflux.RateLimitError{Msg: "test rate"}
 		case code > 0:
 			err = &httpx.HTTPStatusError{Code: code}
 		default:
@@ -106,19 +106,19 @@ func FuzzCheckHTTPStatus(f *testing.F) {
 			t.Fatalf("CheckHTTPStatus(%d) = nil, want error", code)
 		}
 
-		// Invariant 3: 401/403 return *api.AuthError.
+		// Invariant 3: 401/403 return *subflux.AuthError.
 		if code == 401 || code == 403 {
-			var authErr *api.AuthError
+			var authErr *subflux.AuthError
 			if !errors.As(err, &authErr) {
-				t.Fatalf("CheckHTTPStatus(%d) = %T, want *api.AuthError", code, err)
+				t.Fatalf("CheckHTTPStatus(%d) = %T, want *subflux.AuthError", code, err)
 			}
 		}
 
-		// Invariant 4: 429 returns *api.RateLimitError.
+		// Invariant 4: 429 returns *subflux.RateLimitError.
 		if code == 429 {
-			var rlErr *api.RateLimitError
+			var rlErr *subflux.RateLimitError
 			if !errors.As(err, &rlErr) {
-				t.Fatalf("CheckHTTPStatus(%d) = %T, want *api.RateLimitError", code, err)
+				t.Fatalf("CheckHTTPStatus(%d) = %T, want *subflux.RateLimitError", code, err)
 			}
 		}
 	})

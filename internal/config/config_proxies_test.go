@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestParseTrustedProxies(t *testing.T) {
@@ -97,7 +97,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
 			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 		}

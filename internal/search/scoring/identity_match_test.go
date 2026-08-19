@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- matchesPair (season/episode wildcard + equality) ---
@@ -70,49 +70,49 @@ func TestEpisodeNumberMatch(t *testing.T) {
 		name       string
 		subSeason  int
 		subEpisode int
-		req        api.SearchRequest
+		req        subflux.SearchRequest
 		want       bool
 	}{
 		{
 			name:       "scene episode matches when aired differs",
 			subSeason:  1,
 			subEpisode: 5,
-			req:        api.SearchRequest{Season: 1, Episode: 99, SceneSeason: 1, SceneEpisode: 5},
+			req:        subflux.SearchRequest{Season: 1, Episode: 99, SceneSeason: 1, SceneEpisode: 5},
 			want:       true,
 		},
 		{
 			name:       "scene branch skipped when scene episode zero",
 			subSeason:  1,
 			subEpisode: 5,
-			req:        api.SearchRequest{Season: 1, Episode: 99, SceneSeason: 1, SceneEpisode: 0},
+			req:        subflux.SearchRequest{Season: 1, Episode: 99, SceneSeason: 1, SceneEpisode: 0},
 			want:       false,
 		},
 		{
 			name:       "scene season falls back to aired season on mismatch",
 			subSeason:  3,
 			subEpisode: 5,
-			req:        api.SearchRequest{Season: 2, Episode: 9, SceneSeason: 0, SceneEpisode: 5},
+			req:        subflux.SearchRequest{Season: 2, Episode: 9, SceneSeason: 0, SceneEpisode: 5},
 			want:       false,
 		},
 		{
 			name:       "absolute episode matches when aired differs",
 			subSeason:  1,
 			subEpisode: 10,
-			req:        api.SearchRequest{Season: 1, Episode: 99, AbsoluteEpisode: 10},
+			req:        subflux.SearchRequest{Season: 1, Episode: 99, AbsoluteEpisode: 10},
 			want:       true,
 		},
 		{
 			name:       "absolute branch skipped when absolute episode zero",
 			subSeason:  1,
 			subEpisode: 10,
-			req:        api.SearchRequest{Season: 1, Episode: 99, AbsoluteEpisode: 0},
+			req:        subflux.SearchRequest{Season: 1, Episode: 99, AbsoluteEpisode: 0},
 			want:       false,
 		},
 		{
 			name:       "absolute season falls back to one on mismatch",
 			subSeason:  2,
 			subEpisode: 100,
-			req:        api.SearchRequest{Season: 2, Episode: 9, AbsoluteEpisode: 100},
+			req:        subflux.SearchRequest{Season: 2, Episode: 9, AbsoluteEpisode: 100},
 			want:       false,
 		},
 	}
@@ -198,7 +198,7 @@ func TestReleaseNameMatchesTitle(t *testing.T) {
 			// Observed through the production entry point: with no
 			// alternative titles, AnyReleaseNameMatches is exactly the
 			// single-title match this table pins.
-			req := &api.SearchRequest{Title: tc.reqTitle}
+			req := &subflux.SearchRequest{Title: tc.reqTitle}
 			if got := AnyReleaseNameMatches(req, tc.release); got != tc.want {
 				t.Errorf("AnyReleaseNameMatches({Title: %q}, %q) = %v, want %v",
 					tc.reqTitle, tc.release, got, tc.want)

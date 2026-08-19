@@ -7,16 +7,16 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/search/scoring"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // scoredSub pairs a subtitle with its computed score and match breakdown.
 type scoredSub struct {
-	sub     api.Subtitle
+	sub     subflux.Subtitle
 	score   int
-	matches api.MatchSet
+	matches subflux.MatchSet
 }
 
 // defaultMatchDeps is the singleton MatchDeps wired to this package's release parsing.
@@ -39,12 +39,12 @@ var defaultMatchDeps = scoring.MatchDeps{
 
 // scoreResults scores each subtitle against the video and returns them
 // sorted by descending score, with provider priority as tiebreaker.
-func scoreResults(sc Scorer, video *api.VideoInfo, subs []api.Subtitle, provPriority func(api.ProviderID) int) []scoredSub {
+func scoreResults(sc Scorer, video *subflux.VideoInfo, subs []subflux.Subtitle, provPriority func(subflux.ProviderID) int) []scoredSub {
 	scored := make([]scoredSub, len(subs))
 	for i := range subs {
 		matches := scoring.BuildMatches(video, &subs[i], defaultMatchDeps)
-		score, _ := sc.Score(api.SubtitleInfo{
-			HashVerifiable: subs[i].MatchedBy == api.MatchByHash,
+		score, _ := sc.Score(subflux.SubtitleInfo{
+			HashVerifiable: subs[i].MatchedBy == subflux.MatchByHash,
 		}, matches)
 		scored[i] = scoredSub{sub: subs[i], score: score, matches: matches}
 	}
@@ -60,18 +60,18 @@ func scoreResults(sc Scorer, video *api.VideoInfo, subs []api.Subtitle, provPrio
 
 // buildMatches compares video and subtitle release attributes, returning
 // a set of matched attribute keys used by the scorer.
-func buildMatches(video *api.VideoInfo, sub *api.Subtitle) api.MatchSet {
+func buildMatches(video *subflux.VideoInfo, sub *subflux.Subtitle) subflux.MatchSet {
 	return scoring.BuildMatches(video, sub, defaultMatchDeps)
 }
 
 // matchBreakdown returns the per-category score contributions for a match set.
-func matchBreakdown(scores *api.Scores, matches api.MatchSet) map[string]int {
+func matchBreakdown(scores *subflux.Scores, matches subflux.MatchSet) map[string]int {
 	return scoring.MatchBreakdown(scores, matches)
 }
 
 // videoInfoFromRequest extracts the video metadata needed for scoring.
-func videoInfoFromRequest(req *api.SearchRequest) api.VideoInfo {
-	return api.VideoInfo{
+func videoInfoFromRequest(req *subflux.SearchRequest) subflux.VideoInfo {
+	return subflux.VideoInfo{
 		MediaType:    req.MediaType,
 		ReleaseGroup: req.ReleaseName,
 	}

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzExtractSeriesPrefix asserts the full postcondition: a non-empty result is
@@ -47,7 +47,7 @@ func FuzzResolveRuleName(f *testing.F) {
 		if r := ResolveRuleName(audioLang, nil); r != RuleNoTargets {
 			t.Errorf("ResolveRuleName(%q, nil) = %q, want %q", audioLang, r, RuleNoTargets)
 		}
-		targets := []api.SubtitleTarget{{Code: "en"}}
+		targets := []subflux.SubtitleTarget{{Code: "en"}}
 		got := ResolveRuleName(audioLang, targets)
 		switch {
 		case audioLang == "" && got != RuleDefault:
@@ -64,7 +64,7 @@ func FuzzDeduplicateFileRows(f *testing.F) {
 	f.Add("mid1", "eng", "normal", "opensubtitles", "mid2", "fra", "", "manual")
 
 	f.Fuzz(func(t *testing.T, mid1, lang1, var1, src1, mid2, lang2, var2, src2 string) {
-		rows := []api.SubtitleEntry{
+		rows := []subflux.SubtitleEntry{
 			{MediaID: mid1, Language: lang1, Variant: var1, Source: src1},
 			{MediaID: mid2, Language: lang2, Variant: var2, Source: src2},
 			{MediaID: mid1, Language: lang1, Variant: var1, Source: src1},
@@ -100,7 +100,7 @@ func FuzzIndexSubStatus(f *testing.F) {
 	f.Add("a", "en", "", "external", "srt", "a", "en", "", "embedded", "subrip")
 
 	f.Fuzz(func(t *testing.T, mid1, lang1, var1, src1, codec1, mid2, lang2, var2, src2, codec2 string) {
-		rows := []api.SubtitleEntry{
+		rows := []subflux.SubtitleEntry{
 			{MediaID: mid1, Language: lang1, Variant: var1, Source: src1, Codec: codec1},
 			{MediaID: mid2, Language: lang2, Variant: var2, Source: src2, Codec: codec2},
 		}

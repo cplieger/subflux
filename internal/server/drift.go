@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // driftState is the drift-relevant projection of one config: the values whose
@@ -11,7 +11,7 @@ type driftState struct {
 	// Languages are the configured subtitle language codes.
 	Languages []string
 	// Providers are the enabled provider IDs.
-	Providers []api.ProviderID
+	Providers []subflux.ProviderID
 	// AdaptiveEnabled reports whether adaptive search backoff is on.
 	AdaptiveEnabled bool
 }
@@ -23,7 +23,7 @@ type driftState struct {
 // languages and providers as the departing ones, and the cleanup that follows
 // clears the search attempts of everything the operator just configured while
 // leaving the removed entries' attempts behind. Nothing downstream can detect
-// that inversion — both shapes are well-formed api.ConfigDrift values.
+// that inversion — both shapes are well-formed subflux.ConfigDrift values.
 type driftInputs struct {
 	// Old is the state of the config being replaced.
 	Old driftState
@@ -34,8 +34,8 @@ type driftInputs struct {
 // detectDrift compares the old and new config state to determine what DB
 // cleanup is needed. Duplicate entries in the old state are deduplicated;
 // each removed item appears at most once in the result.
-func detectDrift(in *driftInputs) api.ConfigDrift {
-	return api.ConfigDrift{
+func detectDrift(in *driftInputs) subflux.ConfigDrift {
+	return subflux.ConfigDrift{
 		RemovedLanguages: removedItems(in.Old.Languages, in.New.Languages),
 		RemovedProviders: removedProviderItems(in.Old.Providers, in.New.Providers),
 		AdaptiveDisabled: in.Old.AdaptiveEnabled && !in.New.AdaptiveEnabled,
@@ -55,13 +55,13 @@ func removedItems(old, current []string) []string {
 }
 
 // removedProviderItems returns provider IDs in old that are not in current, deduplicated.
-func removedProviderItems(old, current []api.ProviderID) []api.ProviderID {
-	currentSet := make(map[api.ProviderID]struct{}, len(current))
+func removedProviderItems(old, current []subflux.ProviderID) []subflux.ProviderID {
+	currentSet := make(map[subflux.ProviderID]struct{}, len(current))
 	for _, item := range current {
 		currentSet[item] = struct{}{}
 	}
-	seen := make(map[api.ProviderID]struct{}, len(old))
-	var removed []api.ProviderID
+	seen := make(map[subflux.ProviderID]struct{}, len(old))
+	var removed []subflux.ProviderID
 	for _, item := range old {
 		if _, ok := seen[item]; ok {
 			continue

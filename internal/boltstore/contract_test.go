@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/storetest"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -44,7 +44,7 @@ type destructiveClearStore struct {
 // ClearManualLock destructively deletes the manual rows for the quad. A
 // conforming implementation flips manual=false and preserves the rows; this
 // removes them, so AssertClearManualLockNonDestructive must report a failure.
-func (s destructiveClearStore) ClearManualLock(_ context.Context, key api.ManualLockKey) error {
+func (s destructiveClearStore) ClearManualLock(_ context.Context, key subflux.ManualLockKey) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {

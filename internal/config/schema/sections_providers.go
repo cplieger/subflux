@@ -3,14 +3,14 @@ package schema
 import (
 	"strconv"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-func searchSection() api.SchemaSection {
-	return api.SchemaSection{
+func searchSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "search", Title: "Search", Type: fieldFields,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "scan_interval", Label: "Scan Interval", Type: fieldDuration,
 				Default:     formatDuration(defaults.DefaultScanInterval),
@@ -64,11 +64,11 @@ func searchSection() api.SchemaSection {
 	}
 }
 
-func adaptiveSection() api.SchemaSection {
-	return api.SchemaSection{
+func adaptiveSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "adaptive", Title: "Adaptive Backoff", Type: fieldFields,
 		EnableKey: keyEnabled,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "initial_delay", Label: "Initial Delay", Type: fieldDuration,
 				Default:     formatDuration(defaults.DefaultAdaptiveInitDelay),
@@ -99,10 +99,10 @@ func adaptiveSection() api.SchemaSection {
 	}
 }
 
-func postProcessSection() api.SchemaSection {
-	return api.SchemaSection{
+func postProcessSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "post_processing", Title: "Post-Processing", Type: fieldFields,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "sync_subtitles", Label: "Sync Subtitles", Type: fieldBool,
 				Default: defaultTrue,
@@ -151,12 +151,12 @@ func postProcessSection() api.SchemaSection {
 	}
 }
 
-func scoringSection() api.SchemaSection {
-	d := api.DefaultScores
-	return api.SchemaSection{
+func scoringSection() subflux.SchemaSection {
+	d := subflux.DefaultScores
+	return subflux.SchemaSection{
 		Key: "scoring", Title: "Scoring", Type: fieldFields,
 		Help: "Weights control how subtitles are ranked. Hash match scores 100 automatically.",
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "hash", Label: "Hash", Type: fieldNumber, Default: strconv.Itoa(d.Hash),
 				Help: "File hash match (authoritative, bypasses other weights)",

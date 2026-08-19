@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -34,12 +34,12 @@ func genComponent(rt *rapid.T, label string) string {
 // that includes shared prefixes and the empty string.
 func TestProp_keyEncodeParse(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		mt := api.MediaType(rapid.SampledFrom([]string{"movie", "episode"}).Draw(rt, "mt"))
+		mt := subflux.MediaType(rapid.SampledFrom([]string{"movie", "episode"}).Draw(rt, "mt"))
 		mid := genComponent(rt, "mid")
 		lang := genComponent(rt, "lang")
-		provider := api.ProviderID(genComponent(rt, "provider"))
-		variant := api.Variant(rapid.SampledFrom([]string{"standard", "hi", "forced"}).Draw(rt, "variant"))
-		source := api.SubtitleSource(rapid.SampledFrom([]string{"external", "embedded"}).Draw(rt, "source"))
+		provider := subflux.ProviderID(genComponent(rt, "provider"))
+		variant := subflux.Variant(rapid.SampledFrom([]string{"standard", "hi", "forced"}).Draw(rt, "variant"))
+		source := subflux.SubtitleSource(rapid.SampledFrom([]string{"external", "embedded"}).Draw(rt, "source"))
 		path := genComponent(rt, "path")
 		id := rapid.Int64Range(1, 1<<55).Draw(rt, "id")
 
@@ -180,11 +180,11 @@ func TestProp_codecRoundTrip(t *testing.T) {
 		case 1:
 			rec := stateRec{
 				ID:            rapid.Int64Range(1, 1<<55).Draw(rt, "id"),
-				MediaType:     api.MediaType(genComponent(rt, "mt")),
+				MediaType:     subflux.MediaType(genComponent(rt, "mt")),
 				MediaID:       genComponent(rt, "mid"),
 				Language:      genComponent(rt, "lang"),
-				Variant:       api.Variant(genComponent(rt, "variant")),
-				Provider:      api.ProviderID(genComponent(rt, "provider")),
+				Variant:       subflux.Variant(genComponent(rt, "variant")),
+				Provider:      subflux.ProviderID(genComponent(rt, "provider")),
 				ReleaseName:   genComponent(rt, "release"),
 				Path:          genComponent(rt, "path"),
 				Title:         genComponent(rt, "title"),

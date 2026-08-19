@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // StartupDelay is the delay before the first scan after startup.
@@ -28,7 +28,7 @@ const AuthCleanupInterval = 15 * time.Minute
 // aggregate counts it logs afterwards. Two of the 36 methods the store offers,
 // which is why this is declared here and not taken as a wide type.
 type Store interface {
-	ReconcileState(ctx context.Context) (api.ReconcileResult, error)
+	ReconcileState(ctx context.Context) (subflux.ReconcileResult, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 

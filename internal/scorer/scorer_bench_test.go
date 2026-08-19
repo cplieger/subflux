@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func BenchmarkScore(b *testing.B) {
-	engine := New(&api.DefaultScores)
+	engine := New(&subflux.DefaultScores)
 
 	cases := []struct {
 		name    string
-		matches api.MatchSet
-		sub     api.SubtitleInfo
+		matches subflux.MatchSet
+		sub     subflux.SubtitleInfo
 	}{
-		{"no_match", api.MatchSet{}, api.SubtitleInfo{}},
-		{"source_only", api.MatchSet{Source: true}, api.SubtitleInfo{}},
-		{"full_release", api.MatchSet{
+		{"no_match", subflux.MatchSet{}, subflux.SubtitleInfo{}},
+		{"source_only", subflux.MatchSet{Source: true}, subflux.SubtitleInfo{}},
+		{"full_release", subflux.MatchSet{
 			Source: true, ReleaseGroup: true,
 			VideoCodec: true, StreamingService: true,
 			Edition: true, HDR: true,
-		}, api.SubtitleInfo{}},
-		{"hash_verifiable", api.MatchSet{Hash: true}, api.SubtitleInfo{HashVerifiable: true}},
+		}, subflux.SubtitleInfo{}},
+		{"hash_verifiable", subflux.MatchSet{Hash: true}, subflux.SubtitleInfo{HashVerifiable: true}},
 	}
 
 	for _, tc := range cases {
@@ -36,9 +36,9 @@ func BenchmarkScore(b *testing.B) {
 }
 
 func BenchmarkScoreParallel(b *testing.B) {
-	engine := New(&api.DefaultScores)
-	matches := api.MatchSet{Source: true, ReleaseGroup: true, VideoCodec: true}
-	sub := api.SubtitleInfo{}
+	engine := New(&subflux.DefaultScores)
+	matches := subflux.MatchSet{Source: true, ReleaseGroup: true, VideoCodec: true}
+	sub := subflux.SubtitleInfo{}
 
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
@@ -49,11 +49,11 @@ func BenchmarkScoreParallel(b *testing.B) {
 }
 
 func BenchmarkScoreBatch(b *testing.B) {
-	engine := New(&api.DefaultScores)
+	engine := New(&subflux.DefaultScores)
 
 	for _, n := range []int{10, 50, 100} {
-		subs := make([]api.SubtitleInfo, n)
-		matchSets := make([]api.MatchSet, n)
+		subs := make([]subflux.SubtitleInfo, n)
+		matchSets := make([]subflux.MatchSet, n)
 		for i := range n {
 			if i%3 == 0 {
 				matchSets[i].Source = true

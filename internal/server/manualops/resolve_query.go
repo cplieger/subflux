@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // resolveTimeout caps a resolve pass (full library listing + episode
@@ -47,7 +47,7 @@ const (
 
 // mediaTypeSeries labels series-level ambiguity candidates. The wire enum
 // for MediaType includes "series" alongside movie/episode.
-const mediaTypeSeries = api.MediaType("series")
+const mediaTypeSeries = subflux.MediaType("series")
 
 // errResolveConflict marks contradictory identifiers (an ID resolving to
 // item A while the title resolves to item B). Answered as 400 with the
@@ -79,22 +79,22 @@ type ResolveSearchIDs struct {
 // (Sonarr series ID / Radarr movie ID) — the same identity the search and
 // download endpoints consume.
 type ResolvedItem struct {
-	MediaType api.MediaType    `json:"media_type"`
-	Title     string           `json:"title"`
-	SearchIDs ResolveSearchIDs `json:"search_ids"`
-	MediaID   int              `json:"media_id"`
-	Year      int              `json:"year,omitempty"`
-	Season    int              `json:"season,omitempty"`
-	Episode   int              `json:"episode,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	Title     string            `json:"title"`
+	SearchIDs ResolveSearchIDs  `json:"search_ids"`
+	MediaID   int               `json:"media_id"`
+	Year      int               `json:"year,omitempty"`
+	Season    int               `json:"season,omitempty"`
+	Episode   int               `json:"episode,omitempty"`
 }
 
 // ResolveCandidate is one ambiguity candidate; Year disambiguates equal
 // titles.
 type ResolveCandidate struct {
-	MediaType api.MediaType `json:"media_type"`
-	Title     string        `json:"title"`
-	MediaID   int           `json:"media_id"`
-	Year      int           `json:"year,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	Title     string            `json:"title"`
+	MediaID   int               `json:"media_id"`
+	Year      int               `json:"year,omitempty"`
 }
 
 // ResolveResponse is the typed result of GET /api/search/resolve. Exactly
@@ -169,12 +169,12 @@ func parseNarrowingParam(q url.Values, name string) (val *int, errMsg string) {
 // HandleSearchResolve handles GET /api/search/resolve.
 func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	params, errMsg := parseResolveParams(r.URL.Query())
 	if errMsg != "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, errMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsg)
 		return
 	}
 
@@ -188,7 +188,7 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		slog.Error("search resolve failed", "error", err,
 			"title", params.Title, "imdb", params.Imdb, "tmdb", params.Tmdb, "type", params.Type)
-		httpapi.BadGatewayC(w, r, api.CodeArrUnreachable, "media resolution failed: "+err.Error())
+		httpapi.BadGatewayC(w, r, subflux.CodeArrUnreachable, "media resolution failed: "+err.Error())
 	default:
 		httpapi.WriteJSON(w, resp)
 	}
@@ -382,7 +382,7 @@ func expandSeries(ctx context.Context, sonarr ResolveSonarrClient, s *armCandida
 			continue
 		}
 		items = append(items, ResolvedItem{
-			MediaType: api.MediaTypeEpisode,
+			MediaType: subflux.MediaTypeEpisode,
 			MediaID:   s.id,
 			Title:     s.title,
 			Year:      s.year,
@@ -431,7 +431,7 @@ func resolveMovieArm(ctx context.Context, radarr ResolveRadarrClient, p *Resolve
 		return ResolveResponse{
 			Resolved: true,
 			Items: []ResolvedItem{{
-				MediaType: api.MediaTypeMovie,
+				MediaType: subflux.MediaTypeMovie,
 				MediaID:   m.id,
 				Title:     m.title,
 				Year:      m.year,
@@ -439,7 +439,7 @@ func resolveMovieArm(ctx context.Context, radarr ResolveRadarrClient, p *Resolve
 			}},
 		}, nil
 	default:
-		return ambiguous(matched, api.MediaTypeMovie), nil
+		return ambiguous(matched, subflux.MediaTypeMovie), nil
 	}
 }
 
@@ -547,7 +547,7 @@ func unionByID(sets ...[]armCandidate) []armCandidate {
 
 // ambiguous builds the typed ambiguity result: resolved=false plus the
 // candidate list (year included so equal titles are tellable apart).
-func ambiguous(matched []armCandidate, mt api.MediaType) ResolveResponse {
+func ambiguous(matched []armCandidate, mt subflux.MediaType) ResolveResponse {
 	out := make([]ResolveCandidate, len(matched))
 	for i := range matched {
 		out[i] = ResolveCandidate{

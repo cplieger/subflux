@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 var errMock = errors.New("mock error")
@@ -25,31 +25,31 @@ type fakeFileStore struct {
 	histErr     error
 	deletedPath string
 	histPrefix  string
-	rows        []api.SubtitleEntry
+	rows        []subflux.SubtitleEntry
 	histIDs     []string
-	variant     api.Variant
-	histType    api.MediaType
+	variant     subflux.Variant
+	histType    subflux.MediaType
 }
 
-func (m *fakeFileStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *fakeFileStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.rows, m.getErr
 }
 
-func (m *fakeFileStore) DeleteSubtitleFile(_ context.Context, _ api.MediaType, _, _ string, variant api.Variant, _ api.SubtitleSource, path string) error {
+func (m *fakeFileStore) DeleteSubtitleFile(_ context.Context, _ subflux.MediaType, _, _ string, variant subflux.Variant, _ subflux.SubtitleSource, path string) error {
 	m.variant = variant
 	m.deletedPath = path
 	return nil
 }
 
-func (m *fakeFileStore) ManualSubtitlePaths(_ context.Context, _ api.ManualLockKey) ([]string, error) {
+func (m *fakeFileStore) ManualSubtitlePaths(_ context.Context, _ subflux.ManualLockKey) ([]string, error) {
 	return nil, nil
 }
 
-func (m *fakeFileStore) ClearManualLock(_ context.Context, _ api.ManualLockKey) error {
+func (m *fakeFileStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
 	return nil
 }
 
-func (m *fakeFileStore) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, prefix string) ([]string, error) {
+func (m *fakeFileStore) HistoryMediaIDs(_ context.Context, mediaType subflux.MediaType, prefix string) ([]string, error) {
 	m.histType = mediaType
 	m.histPrefix = prefix
 	return m.histIDs, m.histErr
@@ -72,7 +72,7 @@ func newFileHandler(store FileStore, cfg *fakePathGuard) *Handler {
 // deleteBody builds the FileRef JSON body for DELETE /api/files.
 func deleteBody(mediaType, mediaID, language, variant string, ordinal int) string {
 	b, _ := json.Marshal(DeleteFileRequest{
-		MediaType: api.MediaType(mediaType), MediaID: mediaID,
+		MediaType: subflux.MediaType(mediaType), MediaID: mediaID,
 		Language: language, Variant: variant, Ordinal: ordinal,
 	})
 	return string(b)
@@ -244,7 +244,7 @@ func TestHandleListFiles(t *testing.T) {
 
 	t.Run("returns_file_entries", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{rows: []api.SubtitleEntry{
+		h := newFileHandler(&fakeFileStore{rows: []subflux.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",
@@ -326,7 +326,7 @@ func TestHandleListFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		h := newFileHandler(&fakeFileStore{rows: []api.SubtitleEntry{
+		h := newFileHandler(&fakeFileStore{rows: []subflux.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",
@@ -408,7 +408,7 @@ func TestHandleDeleteFile(t *testing.T) {
 		// The store resolves the FileRef, but the resolved path fails the
 		// containment check: with server-derived paths that is an internal
 		// invariant breach (500), never a client-attributable 4xx.
-		store := &fakeFileStore{rows: []api.SubtitleEntry{{
+		store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 			MediaID:  "tmdb-123",
 			Language: "en",
 			Variant:  "standard",
@@ -430,7 +430,7 @@ func TestHandleDeleteFile(t *testing.T) {
 
 	t.Run("default_variant_is_standard", func(t *testing.T) {
 		t.Parallel()
-		store := &fakeFileStore{rows: []api.SubtitleEntry{{
+		store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 			MediaID:  "tmdb-123",
 			Language: "en",
 			Variant:  "standard",
@@ -455,7 +455,7 @@ func TestHandleDeleteFile(t *testing.T) {
 
 	t.Run("explicit_variant_passed_through", func(t *testing.T) {
 		t.Parallel()
-		store := &fakeFileStore{rows: []api.SubtitleEntry{{
+		store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 			MediaID:  "tmdb-123",
 			Language: "en",
 			Variant:  "forced",
@@ -489,19 +489,19 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 
 	tests := []struct {
 		// rows returns the store rows given an on-disk victim path.
-		rows func(victim string) []api.SubtitleEntry
+		rows func(victim string) []subflux.SubtitleEntry
 		name string
 		body func() string
 	}{
 		{
 			name: "no rows for media",
-			rows: func(string) []api.SubtitleEntry { return nil },
+			rows: func(string) []subflux.SubtitleEntry { return nil },
 			body: func() string { return deleteBody("movie", "tmdb-123", "en", "", 0) },
 		},
 		{
 			name: "different variant",
-			rows: func(victim string) []api.SubtitleEntry {
-				return []api.SubtitleEntry{{
+			rows: func(victim string) []subflux.SubtitleEntry {
+				return []subflux.SubtitleEntry{{
 					MediaID: "tmdb-123", Language: "en", Variant: "forced",
 					Source: "external", Path: victim,
 				}}
@@ -510,8 +510,8 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 		},
 		{
 			name: "different language",
-			rows: func(victim string) []api.SubtitleEntry {
-				return []api.SubtitleEntry{{
+			rows: func(victim string) []subflux.SubtitleEntry {
+				return []subflux.SubtitleEntry{{
 					MediaID: "tmdb-123", Language: "fr", Variant: "standard",
 					Source: "external", Path: victim,
 				}}
@@ -520,8 +520,8 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 		},
 		{
 			name: "different media id",
-			rows: func(victim string) []api.SubtitleEntry {
-				return []api.SubtitleEntry{{
+			rows: func(victim string) []subflux.SubtitleEntry {
+				return []subflux.SubtitleEntry{{
 					MediaID: "tmdb-999", Language: "en", Variant: "standard",
 					Source: "external", Path: victim,
 				}}
@@ -530,8 +530,8 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 		},
 		{
 			name: "wrong ordinal",
-			rows: func(victim string) []api.SubtitleEntry {
-				return []api.SubtitleEntry{{
+			rows: func(victim string) []subflux.SubtitleEntry {
+				return []subflux.SubtitleEntry{{
 					MediaID: "tmdb-123", Language: "en", Variant: "standard",
 					Source: "external", Path: victim,
 				}}
@@ -540,8 +540,8 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 		},
 		{
 			name: "embedded rows are not addressable",
-			rows: func(victim string) []api.SubtitleEntry {
-				return []api.SubtitleEntry{{
+			rows: func(victim string) []subflux.SubtitleEntry {
+				return []subflux.SubtitleEntry{{
 					MediaID: "tmdb-123", Language: "en", Variant: "standard",
 					Source: "embedded", Path: victim,
 				}}
@@ -594,7 +594,7 @@ func TestHandleDeleteFile_resolved_ref_deletes(t *testing.T) {
 			t.Fatalf("WriteFile() unexpected error: %v", err)
 		}
 	}
-	store := &fakeFileStore{rows: []api.SubtitleEntry{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{
 		{
 			MediaID: "tmdb-123", Language: "en", Variant: "standard",
 			Source: "external", Path: autoPath, Ordinal: 0,
@@ -636,7 +636,7 @@ func TestHandleDeleteFile_extension_refused_returns_409(t *testing.T) {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
 	// A (hypothetically corrupted) store row pointing at a video file.
-	store := &fakeFileStore{rows: []api.SubtitleEntry{{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: victim,
 	}}}
@@ -772,7 +772,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("deletes_external_skips_embedded", func(t *testing.T) {
 		t.Parallel()
-		store := &fakeFileStore{rows: []api.SubtitleEntry{
+		store := &fakeFileStore{rows: []subflux.SubtitleEntry{
 			{
 				MediaID:  "tmdb-123",
 				Language: "en",
@@ -824,7 +824,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 				t.Fatalf("WriteFile() unexpected error: %v", err)
 			}
 		}
-		store := &fakeFileStore{rows: []api.SubtitleEntry{
+		store := &fakeFileStore{rows: []subflux.SubtitleEntry{
 			{
 				MediaID: "tmdb-123", Language: "en", Variant: "standard",
 				Source: "external", Path: allowed,
@@ -892,11 +892,11 @@ func TestDeleteExternalFile(t *testing.T) {
 	t.Run("skips_embedded_source", func(t *testing.T) {
 		t.Parallel()
 		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
-		row := &api.SubtitleEntry{
+		row := &subflux.SubtitleEntry{
 			Source: "embedded",
 			Path:   "/media/movie.srt",
 		}
-		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, subflux.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(embedded) = true, want false")
 		}
@@ -905,11 +905,11 @@ func TestDeleteExternalFile(t *testing.T) {
 	t.Run("skips_empty_path", func(t *testing.T) {
 		t.Parallel()
 		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
-		row := &api.SubtitleEntry{
+		row := &subflux.SubtitleEntry{
 			Source: "external",
 			Path:   "",
 		}
-		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, subflux.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(empty path) = true, want false")
 		}
@@ -918,12 +918,12 @@ func TestDeleteExternalFile(t *testing.T) {
 	t.Run("skips_invalid_path", func(t *testing.T) {
 		t.Parallel()
 		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
-		row := &api.SubtitleEntry{
+		row := &subflux.SubtitleEntry{
 			Source: "external",
 			Path:   "/etc/passwd",
 		}
 		got := h.deleteExternalFile(t.Context(),
-			&fakePathGuard{pathErr: config.ErrPathNotAllowed}, api.MediaTypeMovie, row)
+			&fakePathGuard{pathErr: config.ErrPathNotAllowed}, subflux.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(invalid path) = true, want false")
 		}
@@ -933,14 +933,14 @@ func TestDeleteExternalFile(t *testing.T) {
 		t.Parallel()
 		store := &fakeFileStore{}
 		h := newFileHandler(store, &fakePathGuard{})
-		row := &api.SubtitleEntry{
+		row := &subflux.SubtitleEntry{
 			MediaID:  "tmdb-123",
 			Language: "en",
 			Variant:  "standard",
 			Source:   "external",
 			Path:     "/nonexistent/movie.en.srt",
 		}
-		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, subflux.MediaTypeMovie, row)
 		if !got {
 			t.Error("deleteExternalFile(nonexistent file) = false, want true")
 		}

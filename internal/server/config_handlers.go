@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Constants and utilities ---
@@ -39,18 +39,18 @@ func (s *Server) handleGetAlerts(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleDismissAlert(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "id parameter required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "id parameter required")
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid id")
 		return
 	}
 	if s.alerts.Dismiss(id) {
 		httpapi.WriteJSON(w, map[string]string{jsonKeyStatus: "dismissed"})
 	} else {
-		httpapi.NotFoundC(w, r, api.CodeNotFound, "alert not found")
+		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "alert not found")
 	}
 }
 
@@ -95,7 +95,7 @@ func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleDismissActivity(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "id required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "id required")
 		return
 	}
 	if s.activity.Cancel(id) {

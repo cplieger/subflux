@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/cplieger/envx/yamlenv/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ParseDuration extends time.ParseDuration with D, M, and Y suffixes.
@@ -82,7 +82,7 @@ var ErrConfigTooLarge = errors.New("config too large")
 var ErrVariantConflict = errors.New("cannot set both variant and variants")
 
 // maxConfigSize references the shared file-size cap from api.
-const maxConfigSize = api.MaxSafeFileBytes
+const maxConfigSize = subflux.MaxSafeFileBytes
 
 // newWithDefaults returns a Config pre-populated with default values.
 // YAML unmarshalling overlays user values on top of these defaults.
@@ -98,7 +98,7 @@ func newWithDefaults() *Config {
 			UpgradeWindowDays:   defaults.DefaultUpgradeWindowDays,
 			MaxSSEClients:       defaults.DefaultMaxSSEClients,
 			ExcludeArrTags:      []string{defaultExcludeTag},
-			DownloadMaxAttempts: api.DefaultDownloadMaxAttempts,
+			DownloadMaxAttempts: subflux.DefaultDownloadMaxAttempts,
 		},
 		AdaptiveCfg: yamlAdaptiveConfig{
 			Enabled:           true,
@@ -294,14 +294,14 @@ func (c *Config) buildCaches(ctx context.Context) {
 	c.cachedLangCodes = computeLangCodes(c.Languages.Rules, c.Languages.Default)
 
 	// Pre-compute provider configs map.
-	pc := make(map[api.ProviderID]api.ProviderCfg, len(c.ProvidersCfg))
+	pc := make(map[subflux.ProviderID]subflux.ProviderCfg, len(c.ProvidersCfg))
 	for k, v := range c.ProvidersCfg {
-		pc[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
+		pc[k] = subflux.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
 	}
 	c.cachedProviders = pc
 
 	// Pre-compute rule targets to avoid per-call allocations in matchRule.
-	c.cachedRuleTargets = make(map[string][]api.SubtitleTarget, len(c.Languages.Rules))
+	c.cachedRuleTargets = make(map[string][]subflux.SubtitleTarget, len(c.Languages.Rules))
 	for _, rule := range c.Languages.Rules {
 		c.cachedRuleTargets[rule.Audio] = targetsToAPI(rule.Subtitles)
 	}

@@ -14,8 +14,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
 
@@ -37,7 +37,7 @@ type Detector struct{}
 // Errors (ffprobe failure, corrupt file, timeout) are returned to the
 // caller, which owns logging/metrics/fail-open policy; "error" stays
 // distinguishable from "no tracks" (nil, nil).
-func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]api.EmbeddedTrack, error) {
+func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]subflux.EmbeddedTrack, error) {
 	tracks, err := allTracks(ctx, videoPath)
 	if err != nil {
 		return nil, err
@@ -45,9 +45,9 @@ func (Detector) DetectTracks(ctx context.Context, videoPath string) ([]api.Embed
 	if len(tracks) == 0 {
 		return nil, nil
 	}
-	result := make([]api.EmbeddedTrack, len(tracks))
+	result := make([]subflux.EmbeddedTrack, len(tracks))
 	for i, st := range tracks {
-		result[i] = api.EmbeddedTrack{
+		result[i] = subflux.EmbeddedTrack{
 			Index:           st.index,
 			Codec:           st.codec,
 			Lang:            st.lang,

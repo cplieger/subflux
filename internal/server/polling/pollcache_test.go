@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestPollCache_Get_calls_readFn_on_miss(t *testing.T) {
@@ -18,13 +18,13 @@ func TestPollCache_Get_calls_readFn_on_miss(t *testing.T) {
 	var calls atomic.Int32
 	expected := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	pc := NewPollCache(
-		func(_ context.Context, key api.PollKey) (time.Time, error) {
+		func(_ context.Context, key subflux.PollKey) (time.Time, error) {
 			calls.Add(1)
 			return expected, nil
 		},
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
-	got := pc.Get(t.Context(), api.PollKey("sonarr"))
+	got := pc.Get(t.Context(), subflux.PollKey("sonarr"))
 	if !got.Equal(expected) {
 		t.Errorf("Get() = %v, want %v", got, expected)
 	}
@@ -37,15 +37,15 @@ func TestPollCache_Get_returns_cached_after_Set(t *testing.T) {
 	t.Parallel()
 	var readCalls atomic.Int32
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) {
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) {
 			readCalls.Add(1)
 			return time.Time{}, nil
 		},
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
 	now := time.Now()
-	pc.Set(t.Context(), api.PollKey("radarr"), now)
-	got := pc.Get(t.Context(), api.PollKey("radarr"))
+	pc.Set(t.Context(), subflux.PollKey("radarr"), now)
+	got := pc.Get(t.Context(), subflux.PollKey("radarr"))
 	if !got.Equal(now) {
 		t.Errorf("Get() after Set = %v, want %v", got, now)
 	}
@@ -57,16 +57,16 @@ func TestPollCache_Get_returns_cached_after_Set(t *testing.T) {
 func TestPollCache_Set_with_failing_setFn_still_caches(t *testing.T) {
 	t.Parallel()
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) {
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) {
 			return time.Time{}, errors.New("should not be called")
 		},
-		func(_ context.Context, _ api.PollKey, _ time.Time) error {
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error {
 			return errors.New("db write failed")
 		},
 	)
 	now := time.Now()
-	pc.Set(t.Context(), api.PollKey("key"), now)
-	got := pc.Get(t.Context(), api.PollKey("key"))
+	pc.Set(t.Context(), subflux.PollKey("key"), now)
+	got := pc.Get(t.Context(), subflux.PollKey("key"))
 	if !got.Equal(now) {
 		t.Errorf("Get() after failed Set = %v, want %v", got, now)
 	}
@@ -75,18 +75,18 @@ func TestPollCache_Set_with_failing_setFn_still_caches(t *testing.T) {
 func TestPollCache_concurrent(t *testing.T) {
 	t.Parallel()
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) {
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) {
 			return time.Now(), nil
 		},
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
 	var wg sync.WaitGroup
 	for i := range 100 {
 		wg.Go(func() {
 			if i%2 == 0 {
-				pc.Set(t.Context(), api.PollKey("k"), time.Now())
+				pc.Set(t.Context(), subflux.PollKey("k"), time.Now())
 			} else {
-				pc.Get(t.Context(), api.PollKey("k"))
+				pc.Get(t.Context(), subflux.PollKey("k"))
 			}
 		})
 	}
@@ -102,14 +102,14 @@ const dirtyWarnMsg = "PollCache: durable cursor write failed; in-memory position
 func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
 	sink := capture.Default(t)
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return errors.New("db boom") },
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return errors.New("db boom") },
 	)
-	pc.Set(t.Context(), api.PollKeySonarr, time.Now())
+	pc.Set(t.Context(), subflux.PollKeySonarr, time.Now())
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) == 0 {
 		t.Errorf("Set with failing setFn: want the dirty-cursor WARN")
 	}
-	if pc.dirtySince(api.PollKeySonarr).IsZero() {
+	if pc.dirtySince(subflux.PollKeySonarr).IsZero() {
 		t.Errorf("cursor not marked dirty after a failed persist")
 	}
 }
@@ -118,14 +118,14 @@ func TestPollCacheSet_warns_when_setFn_errors(t *testing.T) {
 func TestPollCacheSet_silent_when_setFn_ok(t *testing.T) {
 	sink := capture.Default(t)
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
-	pc.Set(t.Context(), api.PollKeySonarr, time.Now())
+	pc.Set(t.Context(), subflux.PollKeySonarr, time.Now())
 	if sink.CountLevel(slog.LevelWarn, dirtyWarnMsg) > 0 {
 		t.Errorf("Set with ok setFn: unexpected dirty-cursor WARN")
 	}
-	if !pc.dirtySince(api.PollKeySonarr).IsZero() {
+	if !pc.dirtySince(subflux.PollKeySonarr).IsZero() {
 		t.Errorf("cursor marked dirty after a successful persist")
 	}
 }
@@ -140,8 +140,8 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 	var gaugeVals []int
 
 	pc := NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
-		func(_ context.Context, _ api.PollKey, t time.Time) error {
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ subflux.PollKey, t time.Time) error {
 			if failing.Load() {
 				return errors.New("disk full")
 			}
@@ -153,18 +153,18 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 
 	first := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
 	second := first.Add(time.Minute)
-	pc.Set(t.Context(), api.PollKeySonarr, first)  // fails -> dirty
-	pc.Set(t.Context(), api.PollKeySonarr, second) // fails -> still dirty, memory advanced
+	pc.Set(t.Context(), subflux.PollKeySonarr, first)  // fails -> dirty
+	pc.Set(t.Context(), subflux.PollKeySonarr, second) // fails -> still dirty, memory advanced
 
 	// While dirty, retries against a still-failing store keep it dirty.
 	pc.RetryDirty(t.Context())
-	if pc.dirtySince(api.PollKeySonarr).IsZero() {
+	if pc.dirtySince(subflux.PollKeySonarr).IsZero() {
 		t.Fatalf("cursor cleared while the store is still failing")
 	}
 
 	failing.Store(false)
 	pc.RetryDirty(t.Context())
-	if !pc.dirtySince(api.PollKeySonarr).IsZero() {
+	if !pc.dirtySince(subflux.PollKeySonarr).IsZero() {
 		t.Errorf("cursor still dirty after the store healed")
 	}
 	if len(persisted) != 1 || !persisted[0].Equal(second) {
@@ -177,7 +177,7 @@ func TestPollCacheRetryDirty_heals_and_persists_latest(t *testing.T) {
 		t.Errorf("gauge transitions = %v, want final 0", gaugeVals)
 	}
 	// Memory still serves the advanced position throughout.
-	if got := pc.Get(t.Context(), api.PollKeySonarr); !got.Equal(second) {
+	if got := pc.Get(t.Context(), subflux.PollKeySonarr); !got.Equal(second) {
 		t.Errorf("Get = %v, want in-memory %v", got, second)
 	}
 }

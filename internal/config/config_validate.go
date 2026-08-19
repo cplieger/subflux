@@ -12,8 +12,8 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/pathinside/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Sentinel errors for the most common config validation failures.
@@ -86,7 +86,7 @@ func configFieldErr(field, msg string) error {
 }
 
 // hasEnabledProvider reports whether at least one provider is enabled.
-func hasEnabledProvider(providers map[api.ProviderID]yamlProviderCfg) bool {
+func hasEnabledProvider(providers map[subflux.ProviderID]yamlProviderCfg) bool {
 	for _, p := range providers {
 		if p.Enabled {
 			return true
@@ -178,7 +178,7 @@ func validate(ctx context.Context, cfg *Config) error {
 
 // legacyEmbeddedProvider is the retired provider ID of the pre-separation
 // fake embedded provider, kept only to detect legacy config shapes.
-const legacyEmbeddedProvider = api.ProviderID("embedded")
+const legacyEmbeddedProvider = subflux.ProviderID("embedded")
 
 // validateEmbeddedCutover rejects the legacy embedded-provider config shapes
 // with a targeted error naming the move (alpha hard cutover, R3.2/R3.3):
@@ -277,7 +277,7 @@ func validateBackup(c *yamlBackupConfig) error {
 }
 
 // validateScoring checks custom scoring weights against the documented
-// invariants (api.Scores / api.DefaultScores in types_scoring.go): every
+// invariants (subflux.Scores / subflux.DefaultScores in types_scoring.go): every
 // weight must be non-negative, and the hash weight — which the scorer
 // returns directly for a verified hash match, bypassing attribute
 // scoring — must not be outranked by any attribute-only match. The
@@ -287,7 +287,7 @@ func validateBackup(c *yamlBackupConfig) error {
 // validation requires hash >= sum, the minimal relation that preserves
 // the documented "hash match is authoritative" ordering. A nil weights
 // block means the defaults are in use and is always valid.
-func validateScoring(w *api.Scores) error {
+func validateScoring(w *subflux.Scores) error {
 	if w == nil {
 		return nil
 	}

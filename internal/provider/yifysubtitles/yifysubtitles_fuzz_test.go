@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzParseRow(f *testing.F) {
@@ -38,8 +38,8 @@ func FuzzParseRow(f *testing.F) {
 		if sub.ID != sub.DownloadURL {
 			t.Errorf("parseRow ID = %q, want it to equal DownloadURL %q", sub.ID, sub.DownloadURL)
 		}
-		if sub.MatchedBy != api.MatchByIMDB {
-			t.Errorf("parseRow MatchedBy = %q, want %q", sub.MatchedBy, api.MatchByIMDB)
+		if sub.MatchedBy != subflux.MatchByIMDB {
+			t.Errorf("parseRow MatchedBy = %q, want %q", sub.MatchedBy, subflux.MatchByIMDB)
 		}
 	})
 }

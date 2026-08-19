@@ -6,7 +6,6 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
@@ -18,6 +17,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // newResolver builds the S7 typed-reference resolver over the store and the
@@ -48,10 +48,10 @@ func (s *Server) newResolver() *resolve.Resolver {
 // Called from New() after options are applied and live state is initialized.
 func (s *Server) initHandlers() {
 	s.pollCache = polling.NewPollCache(
-		func(ctx context.Context, key api.PollKey) (time.Time, error) {
+		func(ctx context.Context, key subflux.PollKey) (time.Time, error) {
 			return s.db.GetPollTimestamp(ctx, key)
 		},
-		func(ctx context.Context, key api.PollKey, t time.Time) error {
+		func(ctx context.Context, key subflux.PollKey, t time.Time) error {
 			err := s.db.SetPollTimestamp(ctx, key, t)
 			// The poll heartbeat writes every cycle, making it the earliest
 			// detector of a disk-full store between daily reconciles; classify

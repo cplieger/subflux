@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Target state building ---
@@ -41,20 +41,20 @@ func (o providerOutcome) String() string {
 // providerResult records the outcome of a single provider search.
 type providerResult struct {
 	err     error
-	name    api.ProviderID
+	name    subflux.ProviderID
 	outcome providerOutcome
 }
 
 // searchOutcome aggregates results from all providers for a single language query.
 type searchOutcome struct {
-	results   []api.Subtitle
+	results   []subflux.Subtitle
 	providers []providerResult
 }
 
 // attempted returns the number of providers the sweep actually queried
 // (success or error). Providers skipped by the health timeout never issued
 // a request, so they don't count: inter-item scan pacing keys on this via
-// api.LangOutcome.Queried.
+// subflux.LangOutcome.Queried.
 func (o *searchOutcome) attempted() int {
 	n := 0
 	for _, p := range o.providers {
@@ -66,8 +66,8 @@ func (o *searchOutcome) attempted() int {
 }
 
 // succeeded returns the names of providers that returned results without error.
-func (o *searchOutcome) succeeded() []api.ProviderID {
-	var names []api.ProviderID
+func (o *searchOutcome) succeeded() []subflux.ProviderID {
+	var names []subflux.ProviderID
 	for _, p := range o.providers {
 		if p.outcome == providerSuccess {
 			names = append(names, p.name)
@@ -77,8 +77,8 @@ func (o *searchOutcome) succeeded() []api.ProviderID {
 }
 
 // timedOut returns the names of providers that timed out.
-func (o searchOutcome) timedOut() []api.ProviderID {
-	var names []api.ProviderID
+func (o searchOutcome) timedOut() []subflux.ProviderID {
+	var names []subflux.ProviderID
 	for _, p := range o.providers {
 		if p.outcome == providerTimeout {
 			names = append(names, p.name)
@@ -88,8 +88,8 @@ func (o searchOutcome) timedOut() []api.ProviderID {
 }
 
 // errored returns the names of providers that returned errors.
-func (o searchOutcome) errored() []api.ProviderID {
-	var names []api.ProviderID
+func (o searchOutcome) errored() []subflux.ProviderID {
+	var names []subflux.ProviderID
 	for _, p := range o.providers {
 		if p.outcome == providerError {
 			names = append(names, p.name)
@@ -100,9 +100,9 @@ func (o searchOutcome) errored() []api.ProviderID {
 
 // targetState holds the computed search state for a single subtitle target.
 type targetState struct {
-	target       *api.SubtitleTarget
-	allowedProvs map[api.ProviderID]struct{}
-	variant      api.Variant
+	target       *subflux.SubtitleTarget
+	allowedProvs map[subflux.ProviderID]struct{}
+	variant      subflux.Variant
 	currentScore int
 	needsSearch  bool
 	isUpgrade    bool
@@ -113,8 +113,8 @@ type targetState struct {
 // download blocks only the forced target while standard/hi automation
 // continues. A store error fails CLOSED (treated as locked and skipped), the
 // same conservative stance the store itself takes.
-func (e *Engine) targetLocked(ctx context.Context, mediaType api.MediaType, mediaID, title, lang string, variant api.Variant) bool {
-	locked, err := e.store.IsManuallyLocked(ctx, api.ManualLockKey{
+func (e *Engine) targetLocked(ctx context.Context, mediaType subflux.MediaType, mediaID, title, lang string, variant subflux.Variant) bool {
+	locked, err := e.store.IsManuallyLocked(ctx, subflux.ManualLockKey{
 		MediaType: mediaType, MediaID: mediaID, Language: lang, Variant: variant,
 	})
 	if err != nil {
@@ -131,9 +131,9 @@ func (e *Engine) targetLocked(ctx context.Context, mediaType api.MediaType, medi
 
 // buildTargetStates computes the search state for each target in a language group.
 // Returns the states and whether any target needs searching.
-func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
-	targets []api.SubtitleTarget, existing *existingSubs,
-	searchCfg *api.SearchConfig, mediaType api.MediaType, mediaID, lang, label string,
+func (e *Engine) buildTargetStates(ctx context.Context, req *subflux.SearchRequest,
+	targets []subflux.SubtitleTarget, existing *existingSubs,
+	searchCfg *subflux.SearchConfig, mediaType subflux.MediaType, mediaID, lang, label string,
 	upgradeCutoff time.Time,
 ) ([]targetState, bool) {
 	states := make([]targetState, len(targets))
@@ -146,7 +146,7 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 
 		// Build allowed providers for this target.
 		provs := e.filterProviders(t)
-		allowed := make(map[api.ProviderID]struct{}, len(provs))
+		allowed := make(map[subflux.ProviderID]struct{}, len(provs))
 		for _, p := range provs {
 			allowed[p.Name()] = struct{}{}
 		}
@@ -174,9 +174,9 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *api.SearchRequest,
 
 // decideTargetAction determines whether a target needs searching and whether
 // it's an upgrade. This is a pure decision function extracted for testability.
-func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *api.SearchConfig,
-	e *Engine, mediaType api.MediaType, mediaID, lang string,
-	variant api.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool,
+func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *subflux.SearchConfig,
+	e *Engine, mediaType subflux.MediaType, mediaID, lang string,
+	variant subflux.Variant, label string, upgradeCutoff time.Time, forceUpgrade bool,
 ) (needsSearch, isUpgrade bool, currentScore int) {
 	if !existing.hasSubtitle(lang, variant) {
 		return true, false, 0
@@ -204,7 +204,7 @@ func decideTargetAction(ctx context.Context, existing *existingSubs, searchCfg *
 
 // filterBackedOff removes providers that are currently in adaptive backoff
 // for the given media+language combination.
-func (e *Engine) filterBackedOff(ctx context.Context, mediaType api.MediaType, mediaID, lang string, providers []provider.Provider) []provider.Provider {
+func (e *Engine) filterBackedOff(ctx context.Context, mediaType subflux.MediaType, mediaID, lang string, providers []provider.Provider) []provider.Provider {
 	adaptive := e.cfg.Adaptive()
 	if !adaptive.Enabled {
 		return providers
@@ -218,7 +218,7 @@ func (e *Engine) filterBackedOff(ctx context.Context, mediaType api.MediaType, m
 	if len(backedOff) == 0 {
 		return providers
 	}
-	backedOffSet := make(map[api.ProviderID]struct{}, len(backedOff))
+	backedOffSet := make(map[subflux.ProviderID]struct{}, len(backedOff))
 	for _, name := range backedOff {
 		backedOffSet[name] = struct{}{}
 	}

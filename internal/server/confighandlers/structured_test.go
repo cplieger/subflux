@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Abort vs report in this file: a save's status is a value mismatch and
@@ -25,14 +25,14 @@ import (
 
 // structuredTestSchema is a compact stand-in for the real schema: one plain
 // section with a secret, one providers section with a secret setting.
-func structuredTestSchema() []api.SchemaSection {
-	return []api.SchemaSection{
-		{Key: "sonarr", Type: "fields", Fields: []api.SchemaField{
+func structuredTestSchema() []subflux.SchemaSection {
+	return []subflux.SchemaSection{
+		{Key: "sonarr", Type: "fields", Fields: []subflux.SchemaField{
 			{Key: "url"},
 			{Key: "api_key", Secret: true},
 		}},
-		{Key: "providers", Type: "providers", Providers: []api.ProviderSchema{
-			{Name: "opensubtitles", Settings: []api.SchemaField{
+		{Key: "providers", Type: "providers", Providers: []subflux.ProviderSchema{
+			{Name: "opensubtitles", Settings: []subflux.SchemaField{
 				{Key: "username"},
 				{Key: "password", Secret: true},
 			}},
@@ -67,7 +67,7 @@ func newStructuredHandlerAt(t *testing.T, cfgPath string,
 		hotReload = func(context.Context, *config.Config) error { return nil }
 	}
 	return New(&Deps{
-		SchemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection { return structuredTestSchema() },
+		SchemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection { return structuredTestSchema() },
 		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
@@ -140,9 +140,9 @@ languages:
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
 	}
-	if !strings.Contains(rec.Body.String(), string(api.CodeConfigTooLarge)) {
+	if !strings.Contains(rec.Body.String(), string(subflux.CodeConfigTooLarge)) {
 		t.Errorf("applyConfig(over-cap payload) body = %q, want error code %q",
-			rec.Body, api.CodeConfigTooLarge)
+			rec.Body, subflux.CodeConfigTooLarge)
 	}
 	if _, err := os.Stat(cfgPath); err == nil {
 		t.Error("over-cap payload landed on disk, want no file")
@@ -164,8 +164,8 @@ languages:
 // does not understand.
 func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 	t.Parallel()
-	full := schema.Sections([]api.ProviderSchema{{
-		Name: "probe", Settings: []api.SchemaField{
+	full := schema.Sections([]subflux.ProviderSchema{{
+		Name: "probe", Settings: []subflux.SchemaField{
 			{Key: "api_key", Secret: true},
 			{Key: "password", Secret: true},
 		},
@@ -173,8 +173,8 @@ func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 
 	// Count Secret:true declarations by direct walk (the test's own oracle).
 	var wantCount int
-	var countFields func(fields []api.SchemaField)
-	countFields = func(fields []api.SchemaField) {
+	var countFields func(fields []subflux.SchemaField)
+	countFields = func(fields []subflux.SchemaField) {
 		for _, f := range fields {
 			if f.Secret {
 				wantCount++

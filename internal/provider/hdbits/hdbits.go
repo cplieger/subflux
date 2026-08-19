@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitleext"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
@@ -53,7 +53,7 @@ var defaultHDBitsConfig = hdbitsConfig{
 	MaxTorrentsPerSearch:     50,
 }
 
-const providerName = api.ProviderNameHDBits
+const providerName = subflux.ProviderNameHDBits
 
 // hdbAcceptedExts lists filename extensions accepted as subtitle content
 // (direct files, from the extension authority's archiveInput view) or
@@ -111,11 +111,11 @@ var _ provider.CacheClearer = (*Provider)(nil)
 // --- Provider API (Name, Search, Download) ---
 
 // Name returns the provider identifier for HDBits.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles for the given request by resolving torrent IDs via the
 // HDBits API and inspecting each torrent's subtitle metadata.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits searching",
 		"media_type", req.MediaType, "title", req.Title,
 		"season", req.Season, "episode", req.Episode,
@@ -136,7 +136,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 	var (
 		mu      sync.Mutex
-		results []api.Subtitle
+		results []subflux.Subtitle
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -176,7 +176,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 // Download fetches the subtitle content for the given search result.
 // Season pack archives are cached per subtitle ID and reused across
 // episodes; the target episode is extracted by S##E## filename match.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate ID is numeric to prevent path injection.
 	if _, err := strconv.Atoi(sub.ID); err != nil {
 		return nil, fmt.Errorf("invalid subtitle ID %q: %w", sub.ID, err)
@@ -209,8 +209,8 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 // buildLookup constructs the HDBits API search parameters and cache key
 // from the search request. Returns nil params when the request lacks the
 // required ID for the media type.
-func (p *Provider) buildLookup(req *api.SearchRequest) (params map[string]any, cacheKey string) {
-	if req.MediaType == api.MediaTypeEpisode {
+func (p *Provider) buildLookup(req *subflux.SearchRequest) (params map[string]any, cacheKey string) {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		if req.TvdbID <= 0 {
 			return nil, ""
 		}
@@ -376,7 +376,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 
 // getSubtitles fetches subtitle metadata for a single torrent and filters
 // by language and content type (excludes commentary/extras).
-func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits fetching subtitles for torrent", "torrent_id", torrentID)
 
 	params := map[string]any{

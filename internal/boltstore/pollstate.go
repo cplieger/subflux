@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -34,7 +34,7 @@ const pollTimeLayout = time.RFC3339Nano
 // rejected (mirrors the old store's key.Valid guard), and a stored value that
 // cannot be parsed as RFC3339Nano is surfaced as an error rather than silently
 // treated as the zero time.
-func (d *DB) GetPollTimestamp(_ context.Context, key api.PollKey) (time.Time, error) {
+func (d *DB) GetPollTimestamp(_ context.Context, key subflux.PollKey) (time.Time, error) {
 	if !key.Valid() {
 		return time.Time{}, fmt.Errorf("get poll timestamp: invalid key %q", key)
 	}
@@ -67,7 +67,7 @@ func (d *DB) GetPollTimestamp(_ context.Context, key api.PollKey) (time.Time, er
 // store's key.Valid guard), preventing a typo from silently creating a new
 // cursor row and forcing a full history re-fetch. A later set overwrites the
 // prior cursor.
-func (d *DB) SetPollTimestamp(_ context.Context, key api.PollKey, t time.Time) error {
+func (d *DB) SetPollTimestamp(_ context.Context, key subflux.PollKey, t time.Time) error {
 	if !key.Valid() {
 		return fmt.Errorf("set poll timestamp: invalid key %q", key)
 	}

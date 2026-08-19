@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // UserAgent is the default User-Agent header sent by all providers.
@@ -65,8 +65,8 @@ func ParseRetryAfter(resp *http.Response) time.Duration {
 
 // CheckHTTPStatus maps HTTP error status codes to typed errors.
 // Returns nil for 2xx/3xx. Bridges httpx error types to api.* types
-// so callers can continue using errors.As with *api.AuthError and
-// *api.RateLimitError.
+// so callers can continue using errors.As with *subflux.AuthError and
+// *subflux.RateLimitError.
 func CheckHTTPStatus(resp *http.Response) error {
 	err := httpx.CheckHTTPStatus(resp)
 	if err == nil {
@@ -74,27 +74,27 @@ func CheckHTTPStatus(resp *http.Response) error {
 	}
 	var hAuth *httpx.AuthError
 	if errors.As(err, &hAuth) {
-		return &api.AuthError{Msg: hAuth.Msg}
+		return &subflux.AuthError{Msg: hAuth.Msg}
 	}
 	var hRL *httpx.RateLimitError
 	if errors.As(err, &hRL) {
-		return &api.RateLimitError{Msg: hRL.Msg, RetryAfter: hRL.RetryAfter}
+		return &subflux.RateLimitError{Msg: hRL.Msg, RetryAfter: hRL.RetryAfter}
 	}
 	return err
 }
 
 // IsTransient returns true for errors likely caused by temporary server
-// or network issues worth retrying. Bridges api.AuthError and
-// api.RateLimitError exclusion with httpx.IsTransient for network checks.
+// or network issues worth retrying. Bridges subflux.AuthError and
+// subflux.RateLimitError exclusion with httpx.IsTransient for network checks.
 func IsTransient(err error) bool {
 	if err == nil {
 		return false
 	}
-	var authErr *api.AuthError
+	var authErr *subflux.AuthError
 	if errors.As(err, &authErr) {
 		return false
 	}
-	var rlErr *api.RateLimitError
+	var rlErr *subflux.RateLimitError
 	if errors.As(err, &rlErr) {
 		return false
 	}
@@ -107,7 +107,7 @@ func LimitedBody(resp *http.Response) io.ReadCloser {
 }
 
 // RetryOnRateLimit retries fn up to maxAttempts times when it returns a
-// *api.RateLimitError. Bridges the api.RateLimitError type to
+// *subflux.RateLimitError. Bridges the subflux.RateLimitError type to
 // httpx.RateLimitError and runs httpx's rate-limit-only retry mode (httpx's
 // Do + WithRateLimitOnly, which absorbed the v2 RetryOnRateLimit helper):
 // only rate limits are retried — waiting min(hint, maxWait) — and every
@@ -119,7 +119,7 @@ func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duratio
 		if err == nil {
 			return struct{}{}, nil
 		}
-		var rl *api.RateLimitError
+		var rl *subflux.RateLimitError
 		if errors.As(err, &rl) {
 			return struct{}{}, &httpx.RateLimitError{Msg: rl.Msg, RetryAfter: rl.RetryAfter}
 		}

@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // HandlerDeps holds the dependencies for the manual search/download HTTP
@@ -53,7 +53,7 @@ func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: cal
 // HandleManualSearch handles GET /api/search?imdb=tt1234567&lang=fr&type=movie
 func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -61,12 +61,12 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	req, lang, mediaType, arrID := ParseSearchQuery(r)
 
 	if !IsValidLangCode(lang) {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}
 
 	if !mediaType.Valid() {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	// request must never be silently truncated: reject oversized names
 	// loudly at the HTTP boundary instead.
 	if len(req.ReleaseName) > release.MaxNameLen {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest,
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest,
 			"release exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
 		return
 	}
@@ -115,7 +115,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 // resolveSearchVideo resolves the arr-known video path for a manual search's
 // hash computation. Returns "" when no arr reference was supplied or the
 // item cannot be resolved (logged at debug; the search proceeds hash-less).
-func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType api.MediaType, arrID, season, episode int) string {
+func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType subflux.MediaType, arrID, season, episode int) string {
 	if arrID <= 0 {
 		return ""
 	}
@@ -134,42 +134,42 @@ func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType api.MediaTyp
 func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodPost {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
 	// The request body IS the lock key: its four json names (media_type,
-	// media_id, language, variant) are the wire shape, and api.ManualLockKey
+	// media_id, language, variant) are the wire shape, and subflux.ManualLockKey
 	// carries exactly those.
-	var key api.ManualLockKey
+	var key subflux.ManualLockKey
 	if !h.deps.DecodeJSON(w, r, &key, 0) {
 		return
 	}
 
 	if key.MediaType == "" || key.MediaID == "" || key.Language == "" {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language are required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type, media_id, and language are required")
 		return
 	}
 
 	if !IsValidLangCode(key.Language) {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}
 
 	if !key.MediaType.Valid() {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
 	// Variant is optional: empty clears the locks of every variant of the
 	// language; a specific variant clears only that quad's lock.
 	if !isValidLockVariant(key.Variant) {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
 		return
 	}
 
 	if err := h.deps.DBFunc().ClearManualLock(ctx, key); err != nil {
-		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "clear manual lock",
 			"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
 			"variant", key.Variant)
 		return
@@ -189,7 +189,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 // HandleManualDownload handles POST /api/search/download.
 func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := ValidateDownloadRequest(&req); err != nil {
-		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, err.Error())
 		return
 	}
 
@@ -214,7 +214,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if prov == nil {
-		httpapi.BadRequestC(w, r, api.CodeSearchProviderDisabled, "provider not found")
+		httpapi.BadRequestC(w, r, subflux.CodeSearchProviderDisabled, "provider not found")
 		return
 	}
 
