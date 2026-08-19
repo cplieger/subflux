@@ -203,7 +203,7 @@ providers:
 	if cfg.SonarrCfg.APIKey != evil {
 		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.SonarrCfg.APIKey, evil)
 	}
-	if p := cfg.Providers["os"]; !p.Enabled {
+	if p := cfg.ProvidersCfg["os"]; !p.Enabled {
 		t.Error("providers.os.enabled flipped to false: the expanded value rewrote document structure")
 	}
 }

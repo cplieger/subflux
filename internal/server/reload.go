@@ -26,11 +26,11 @@ func driftState(cfg api.ConfigProvider) api.DriftState {
 // enabledProviders returns the sorted names of enabled providers in a config,
 // used by activation's drift detection.
 func enabledProviders(cfg interface {
-	ProviderConfigs() map[api.ProviderID]api.ProviderCfg
+	Providers() map[api.ProviderID]api.ProviderCfg
 },
 ) []api.ProviderID {
 	var names []api.ProviderID
-	for name, pcfg := range cfg.ProviderConfigs() {
+	for name, pcfg := range cfg.Providers() {
 		if pcfg.Enabled {
 			names = append(names, name)
 		}
@@ -109,7 +109,7 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 	defer s.reloadMu.Unlock()
 
 	slog.Debug("hot reload: activating candidate config",
-		"providers", len(newCfg.ProviderConfigs()),
+		"providers", len(newCfg.Providers()),
 		"sonarr", newCfg.Sonarr().URL != "",
 		"radarr", newCfg.Radarr().URL != "")
 

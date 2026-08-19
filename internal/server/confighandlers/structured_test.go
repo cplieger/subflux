@@ -228,7 +228,7 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	if got := cfg.Sonarr().APIKey; got != "k1" {
 		t.Errorf("round-tripped sonarr api_key = %q, want k1", got)
 	}
-	pc := cfg.ProviderConfigs()["opensubtitles"]
+	pc := cfg.Providers()["opensubtitles"]
 	if !pc.Enabled || pc.Settings["password"] != "p" {
 		t.Errorf("round-tripped provider config = %+v, want enabled with password p", pc)
 	}
@@ -421,7 +421,7 @@ providers:
 	if got, want := cfg.Sonarr(), orig.Sonarr(); got != want {
 		t.Errorf("sonarr config drifted: got %+v, want %+v", got, want)
 	}
-	gotPC, wantPC := cfg.ProviderConfigs()["opensubtitles"], orig.ProviderConfigs()["opensubtitles"]
+	gotPC, wantPC := cfg.Providers()["opensubtitles"], orig.Providers()["opensubtitles"]
 	if gotPC.Enabled != wantPC.Enabled || gotPC.Settings["password"] != wantPC.Settings["password"] {
 		t.Errorf("provider config drifted: got %+v, want %+v", gotPC, wantPC)
 	}
@@ -694,7 +694,7 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("saved config does not load: %v\n%s", err, saved)
 			}
-			if got := cfg.ProviderConfigs()["opensubtitles"].Settings["password"]; got != "" {
+			if got := cfg.Providers()["opensubtitles"].Settings["password"]; got != "" {
 				t.Errorf("password = %v, want empty (nothing to keep in an empty baseline)", got)
 			}
 		})

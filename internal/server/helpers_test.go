@@ -108,7 +108,7 @@ func (m *qhMockConfig) Adaptive() api.AdaptiveConfig                            
 func (m *qhMockConfig) Search() api.SearchConfig                                     { return m.searchCfg }
 func (m *qhMockConfig) Sonarr() api.ArrConfig                                        { return m.sonarrCfg }
 func (m *qhMockConfig) Radarr() api.ArrConfig                                        { return m.radarrCfg }
-func (m *qhMockConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg          { return m.providers }
+func (m *qhMockConfig) Providers() map[api.ProviderID]api.ProviderCfg                { return m.providers }
 func (m *qhMockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
 func (m *qhMockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
 func (m *qhMockConfig) ServerPort() int                                              { return 8374 }

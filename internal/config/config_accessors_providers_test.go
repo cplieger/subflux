@@ -66,15 +66,15 @@ func TestAccessors_return_configured_values(t *testing.T) {
 		}
 	})
 
-	t.Run("ProviderConfigs", func(t *testing.T) {
+	t.Run("Providers", func(t *testing.T) {
 		t.Parallel()
-		got := cfg.ProviderConfigs()
+		got := cfg.Providers()
 		p, ok := got["opensubtitles"]
 		if !ok {
-			t.Fatal("ProviderConfigs() missing opensubtitles")
+			t.Fatal("Providers() missing opensubtitles")
 		}
 		if !p.Enabled {
-			t.Error("ProviderConfigs()[opensubtitles].Enabled = false, want true")
+			t.Error("Providers()[opensubtitles].Enabled = false, want true")
 		}
 	})
 
@@ -165,7 +165,7 @@ func TestProviderPriority(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			cfg := &Config{Providers: tt.providers}
+			cfg := &Config{ProvidersCfg: tt.providers}
 			got := cfg.ProviderPriority(tt.query)
 			if got != tt.want {
 				t.Errorf("ProviderPriority(%q) = %d, want %d", tt.query, got, tt.want)
@@ -251,7 +251,7 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 		},
 		PollIntervalCfg: Duration{D: 30 * time.Second},
-		Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+		ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 		SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := validate(t.Context(), cfg); err != nil {
@@ -387,7 +387,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 				Languages: LanguageRules{
 					Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 				},
-				Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+				ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 				PollIntervalCfg: Duration{D: 30 * time.Second},
 				SearchCfg:       yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 			}
@@ -436,24 +436,24 @@ func TestSyncConfig_zero_confidence_uses_default(t *testing.T) {
 	}
 }
 
-// --- ProviderConfigs cache ---
+// --- Providers cache ---
 
 func TestProviderConfigs_uses_cache_when_present(t *testing.T) {
 	t.Parallel()
 	c := &Config{}
-	c.cachedProviderConfigs = map[api.ProviderID]api.ProviderCfg{
+	c.cachedProviders = map[api.ProviderID]api.ProviderCfg{
 		api.ProviderID("cached"): {Priority: 7, Enabled: true},
 	}
 	// A distinct fallback source makes cache-vs-fallback observable.
-	c.Providers = map[api.ProviderID]yamlProviderCfg{
+	c.ProvidersCfg = map[api.ProviderID]yamlProviderCfg{
 		api.ProviderID("fallback"): {Enabled: true, Priority: 9},
 	}
 
-	got := c.ProviderConfigs()
+	got := c.Providers()
 	if _, ok := got[api.ProviderID("cached")]; !ok {
-		t.Errorf("ProviderConfigs() = %v, want the cached map (key \"cached\" present)", got)
+		t.Errorf("Providers() = %v, want the cached map (key \"cached\" present)", got)
 	}
 	if _, ok := got[api.ProviderID("fallback")]; ok {
-		t.Errorf("ProviderConfigs() = %v, want the cached map, not the fallback built from Providers", got)
+		t.Errorf("Providers() = %v, want the cached map, not the fallback built from Providers", got)
 	}
 }

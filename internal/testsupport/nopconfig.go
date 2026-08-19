@@ -63,8 +63,8 @@ func (n *NopConfig) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) in
 // ProviderPriority returns the configured provider priority value.
 func (n *NopConfig) ProviderPriority(_ api.ProviderID) int { return n.ProviderPrio }
 
-// ProviderConfigs returns the configured provider configuration map.
-func (n *NopConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg { return n.ProviderCfgs }
+// Providers returns the configured provider configuration map.
+func (n *NopConfig) Providers() map[api.ProviderID]api.ProviderCfg { return n.ProviderCfgs }
 
 // EmbeddedPolicy returns the configured embedded subtitle codec policy.
 func (n *NopConfig) EmbeddedPolicy() api.EmbeddedPolicy { return n.Embedded }

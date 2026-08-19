@@ -22,7 +22,7 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
 			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 		}
@@ -39,21 +39,21 @@ func TestValidate(t *testing.T) {
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "sonarr missing api_key", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "radarr missing api_key", cfg: &Config{
 			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "radarr"},
 		{name: "both arr missing api_key", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
@@ -61,7 +61,7 @@ func TestValidate(t *testing.T) {
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "sonarr only passes", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
@@ -69,7 +69,7 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "radarr only passes", cfg: &Config{
@@ -78,7 +78,7 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "both arr passes", cfg: &Config{
@@ -88,21 +88,21 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 
 		// language rules
 		{name: "no default fails", cfg: &Config{
 			SonarrCfg:       yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "rules without default fails", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty audio in rule", cfg: &Config{
@@ -111,7 +111,7 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in rule", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
@@ -119,21 +119,21 @@ func TestValidate(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: ""}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in default", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: ""}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "default rules only passes", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "duplicate audio rule", cfg: &Config{
@@ -145,7 +145,7 @@ func TestValidate(t *testing.T) {
 				},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "duplicate"},
 
 		// providers
@@ -154,14 +154,14 @@ func TestValidate(t *testing.T) {
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: false}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: false}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty providers map", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[api.ProviderID]yamlProviderCfg{},
 		}, wantErr: true, errContains: ""},
 	}
 
@@ -525,7 +525,7 @@ func TestValidateScoring(t *testing.T) {
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			ProvidersCfg:    map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
 			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 			Scoring:         ScoringConfig{Weights: w},

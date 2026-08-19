@@ -515,7 +515,7 @@ func newConfigLoader() api.ConfigLoader {
 // reloads, so replacing the config never doubles the alignment concurrency.
 func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Func {
 	return func(ctx context.Context, cfg api.ConfigProvider, db api.Store, m search.SearchMetrics) (api.SearchEngine, api.Scorer, []api.Provider, error) {
-		providers, err := reg.LoadAll(ctx, cfg.ProviderConfigs())
+		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err
 		}

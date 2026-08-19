@@ -38,7 +38,7 @@ type ArrConfigProvider interface {
 
 // ProviderConfigProvider provides provider settings.
 type ProviderConfigProvider interface {
-	ProviderConfigs() map[ProviderID]ProviderCfg
+	Providers() map[ProviderID]ProviderCfg
 	ProviderPriority(name ProviderID) int
 }
 

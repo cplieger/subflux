@@ -58,17 +58,17 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 // Config is the top-level configuration.
 type Config struct {
 	// ruleIndex maps audio language code to its index in Languages.Rules for O(1) lookup.
-	ruleIndex map[string]int
-	Providers map[api.ProviderID]yamlProviderCfg `yaml:"providers"`
-	Scoring   ScoringConfig                      `yaml:"scoring"`
+	ruleIndex    map[string]int
+	ProvidersCfg map[api.ProviderID]yamlProviderCfg `yaml:"providers"`
+	Scoring      ScoringConfig                      `yaml:"scoring"`
 	// cachedRuleTargets maps audio language to pre-computed []api.SubtitleTarget.
 	cachedRuleTargets map[string][]api.SubtitleTarget
-	// cachedProviderConfigs is the pre-computed result of ProviderConfigs().
-	cachedProviderConfigs map[api.ProviderID]api.ProviderCfg
-	SonarrCfg             yamlArrConfig `yaml:"sonarr"`
-	RadarrCfg             yamlArrConfig `yaml:"radarr"`
-	Logging               LoggingConfig `yaml:"logging"`
-	Languages             LanguageRules `yaml:"languages"`
+	// cachedProviders is the pre-computed result of Providers().
+	cachedProviders map[api.ProviderID]api.ProviderCfg
+	SonarrCfg       yamlArrConfig `yaml:"sonarr"`
+	RadarrCfg       yamlArrConfig `yaml:"radarr"`
+	Logging         LoggingConfig `yaml:"logging"`
+	Languages       LanguageRules `yaml:"languages"`
 	// cachedLangCodes is the pre-computed result of LanguageCodes().
 	cachedLangCodes []string
 	MediaRootDirs   []string `yaml:"media_roots"`

@@ -164,7 +164,7 @@ func Load(ctx context.Context, path string) (*Config, error) {
 		"path", path,
 		"sonarr", cfg.Sonarr().URL != "",
 		"radarr", cfg.Radarr().URL != "",
-		"providers", len(cfg.Providers),
+		"providers", len(cfg.ProvidersCfg),
 		"rules", len(cfg.Languages.Rules))
 
 	return cfg, nil
@@ -297,11 +297,11 @@ func (c *Config) buildCaches(ctx context.Context) {
 	c.cachedLangCodes = computeLangCodes(c.Languages.Rules, c.Languages.Default)
 
 	// Pre-compute provider configs map.
-	pc := make(map[api.ProviderID]api.ProviderCfg, len(c.Providers))
-	for k, v := range c.Providers {
+	pc := make(map[api.ProviderID]api.ProviderCfg, len(c.ProvidersCfg))
+	for k, v := range c.ProvidersCfg {
 		pc[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
 	}
-	c.cachedProviderConfigs = pc
+	c.cachedProviders = pc
 
 	// Pre-compute rule targets to avoid per-call allocations in matchRule.
 	c.cachedRuleTargets = make(map[string][]api.SubtitleTarget, len(c.Languages.Rules))

@@ -50,12 +50,12 @@ func TestEnabledProviders(t *testing.T) {
 	}
 }
 
-// epMock satisfies the interface{ ProviderConfigs() map[api.ProviderID]api.ProviderCfg }.
+// epMock satisfies the interface{ Providers() map[api.ProviderID]api.ProviderCfg }.
 type epMock struct {
 	providers map[api.ProviderID]api.ProviderCfg
 }
 
-func (m *epMock) ProviderConfigs() map[api.ProviderID]api.ProviderCfg { return m.providers }
+func (m *epMock) Providers() map[api.ProviderID]api.ProviderCfg { return m.providers }
 
 // --- requireConfigured middleware ---
 

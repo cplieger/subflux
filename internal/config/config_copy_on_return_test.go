@@ -25,7 +25,7 @@ func loadedConfig(t *testing.T) *Config {
 				{Code: "en", Variants: []string{"hi"}, Providers: []api.ProviderID{"c"}, Exclude: []api.ProviderID{"d"}},
 			},
 		},
-		Providers: map[api.ProviderID]yamlProviderCfg{
+		ProvidersCfg: map[api.ProviderID]yamlProviderCfg{
 			"test": {Enabled: true, Settings: map[string]any{"token": "live"}},
 		},
 		TrustedProxies:  []string{"10.0.0.0/8"},
@@ -46,11 +46,11 @@ func TestProviderConfigsCopiesInnerSettings(t *testing.T) {
 	t.Parallel()
 
 	cfg := loadedConfig(t)
-	got := cfg.ProviderConfigs()
+	got := cfg.Providers()
 	got["test"].Settings["token"] = "tampered"
 	delete(got, "test")
 
-	after := cfg.ProviderConfigs()
+	after := cfg.Providers()
 	if _, ok := after["test"]; !ok {
 		t.Error("deleting from the returned map removed the provider from the config")
 	}

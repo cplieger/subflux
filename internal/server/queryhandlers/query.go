@@ -117,7 +117,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ls := h.state()
-	cfgProviders := ls.Cfg.ProviderConfigs()
+	cfgProviders := ls.Cfg.Providers()
 	out := make([]ProviderInfo, 0, len(cfgProviders))
 	for name, cfg := range cfgProviders {
 		if name == api.ProviderNameSynthetic {
@@ -174,7 +174,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 	}
 	ls := h.state()
 	provMap := make(map[string]bool)
-	for name, cfg := range ls.Cfg.ProviderConfigs() {
+	for name, cfg := range ls.Cfg.Providers() {
 		provMap[string(name)] = cfg.Enabled
 	}
 

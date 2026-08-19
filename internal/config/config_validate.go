@@ -129,7 +129,7 @@ func validate(ctx context.Context, cfg *Config) error {
 	// guard was dead code while the fake embedded provider was force-enabled
 	// pre-validation, and enforcing it after the detector separation would
 	// suddenly reject embedded-only setups.
-	if !hasEnabledProvider(cfg.Providers) {
+	if !hasEnabledProvider(cfg.ProvidersCfg) {
 		slog.Warn("no acquisition providers enabled; embedded detection and coverage only")
 	}
 	ve.Add(validateDurationConstraints([]durationConstraint{
@@ -190,7 +190,7 @@ const legacyEmbeddedProvider = api.ProviderID("embedded")
 // so erroring is both safer and simpler than rewriting user config.
 func validateEmbeddedCutover(cfg *Config) error {
 	var ve ValidationErrors
-	if _, ok := cfg.Providers[legacyEmbeddedProvider]; ok {
+	if _, ok := cfg.ProvidersCfg[legacyEmbeddedProvider]; ok {
 		ve.Add(ErrEmbeddedProviderRemoved)
 	}
 	checkTargets := func(context string, targets []yamlSubtitleTarget) {

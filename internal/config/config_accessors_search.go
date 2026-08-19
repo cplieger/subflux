@@ -70,18 +70,25 @@ func (c *Config) EmbeddedPolicy() api.EmbeddedPolicy {
 	}
 }
 
-// ProviderConfigs returns the provider configuration map. The map, and every
+// Providers returns the resolved provider configuration map. The map, and every
 // Settings map inside it, is a copy: a caller that adds a provider or edits a
 // setting is editing its own copy, not the live configuration every subsequent
 // scan reads. The copy is deep because a shallow one would change nothing —
 // the aliasing that matters is the inner Settings map, which both the cached
 // and the recomputed path used to hand out directly.
-func (c *Config) ProviderConfigs() map[api.ProviderID]api.ProviderCfg {
-	src := c.cachedProviderConfigs
+//
+// Named Providers, not ProviderConfigs: the raw YAML field beside it is
+// ProvidersCfg, which is the same split SonarrCfg/Sonarr() and RadarrCfg/
+// Radarr() already use in this package — the Cfg suffix marks the unparsed
+// decode target, and the bare name is the resolved answer callers want. The
+// two also differ in TYPE (yamlProviderCfg vs api.ProviderCfg), so the field
+// was the one claiming a name it could not honour.
+func (c *Config) Providers() map[api.ProviderID]api.ProviderCfg {
+	src := c.cachedProviders
 	if src == nil {
 		// Fallback for configs not loaded via LoadFromBytes (e.g. tests).
-		src = make(map[api.ProviderID]api.ProviderCfg, len(c.Providers))
-		for k, v := range c.Providers {
+		src = make(map[api.ProviderID]api.ProviderCfg, len(c.ProvidersCfg))
+		for k, v := range c.ProvidersCfg {
 			src[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
 		}
 	}
@@ -96,7 +103,7 @@ func (c *Config) ProviderConfigs() map[api.ProviderID]api.ProviderCfg {
 // ProviderPriority returns the priority for a provider (lower = higher trust).
 // Returns api.DefaultProviderPriority for unconfigured or zero-priority providers.
 func (c *Config) ProviderPriority(name api.ProviderID) int {
-	if p, ok := c.Providers[name]; ok && p.Priority > 0 {
+	if p, ok := c.ProvidersCfg[name]; ok && p.Priority > 0 {
 		return p.Priority
 	}
 	return api.DefaultProviderPriority
