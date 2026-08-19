@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -312,6 +313,35 @@ func TestRegisterSchema_and_Schema(t *testing.T) {
 	}
 }
 
+// The registry is built once at boot and read by the settings-UI handler on
+// every request, so a caller that sorts or rewrites the returned fields in
+// place would be rewriting what every later request renders. One level of clone
+// is the whole copy: ProviderSchemaField holds five strings and a bool and no
+// reference type.
+func TestSchema_copies_fields_on_return(t *testing.T) {
+	t.Parallel()
+	r := NewRegistry()
+	r.RegisterSchema("test", "Test Provider", []subflux.ProviderSchemaField{
+		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
+		{Key: "enabled", Label: "Enabled", Type: "bool", Default: "true"},
+	})
+
+	_, got := r.Schema("test")
+	if len(got) != 2 {
+		t.Fatalf("Schema(\"test\") returned %d fields, want 2", len(got))
+	}
+	got[0] = subflux.ProviderSchemaField{Key: "tampered", Secret: false}
+	got[1].Label = "tampered"
+
+	_, after := r.Schema("test")
+	if after[0].Key != "api_key" || !after[0].Secret {
+		t.Errorf("field[0] = %+v, want api_key/secret (caller edited the live schema)", after[0])
+	}
+	if after[1].Label != "Enabled" {
+		t.Errorf("field[1].Label = %q, want %q (caller edited the live schema)", after[1].Label, "Enabled")
+	}
+}
+
 func TestSchema_unknown_provider(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
@@ -372,4 +402,23 @@ func (f *fakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]su
 
 func (f *fakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
+}
+
+// Mechanical pin for the C14 deletion. The two things removed were a
+// declaration and a comment, so neither the compiler nor a linter can hold
+// them: `var _ = FactoryFunc(nil)` asserted nothing (a declared type is always
+// a valid type) and the doc above it described a `providerFactories` symbol
+// that has never existed in this package. A doc comment naming a symbol the
+// package does not declare is the defect; only a source scan sees it.
+func TestRegistrySource_noVacuousAssertionOrOrphanedDoc(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("registry.go")
+	if err != nil {
+		t.Fatalf("read registry.go: %v", err)
+	}
+	for _, dead := range []string{"providerFactories", "var _ = FactoryFunc("} {
+		if strings.Contains(string(src), dead) {
+			t.Errorf("registry.go still contains %q", dead)
+		}
+	}
 }

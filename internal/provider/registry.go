@@ -92,11 +92,6 @@ type Provider interface {
 // (e.g. credential validation, API pings) and respects shutdown signals.
 type FactoryFunc func(ctx context.Context, settings map[string]any) (Provider, error)
 
-// providerFactories is the declarative registration table. Populated via
-// Register; iterated by LoadAll. Keyed by provider name.
-// Exported as a type alias for documentation; the actual map lives on Registry.
-var _ = FactoryFunc(nil) // compile-time assertion: FactoryFunc is a valid type
-
 // Registry holds provider factories keyed by name.
 type Registry struct {
 	factories map[subflux.ProviderID]FactoryFunc
@@ -137,8 +132,14 @@ func (r *Registry) ProviderNames() []subflux.ProviderID {
 }
 
 // Schema returns the label and settings fields for a provider.
+//
+// The fields are cloned: the registry is built once at boot and read by the
+// settings-UI handler on every request, so a caller sorting or rewriting the
+// returned slice in place would be editing what every later request renders.
+// One level of clone is the whole copy — ProviderSchemaField holds five strings
+// and a bool and no reference type, so the elements share nothing further.
 func (r *Registry) Schema(name subflux.ProviderID) (string, []subflux.ProviderSchemaField) {
-	return r.labels[name], r.schemas[name]
+	return r.labels[name], slices.Clone(r.schemas[name])
 }
 
 // LoadAll creates all enabled providers from config.
