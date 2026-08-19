@@ -83,9 +83,14 @@ var (
 
 // HandlerState holds the runtime state needed by scan HTTP handlers.
 // Provided by the server on each request via the StateFunc callback.
+//
+// There is deliberately no engine here. These handlers do preflight (resolve
+// the arr item, validate, decide the status code) and then hand off; the scan
+// itself reads the engine from LiveState, which StateFunc returns alongside
+// this from the SAME generation. An Engine field existed here and no handler
+// ever read it.
 type HandlerState struct {
 	Cfg    api.ConfigProvider
-	Engine api.SearchEngine
 	Sonarr ScanHandlerSonarr // nil when sonarr not configured
 	Radarr ScanHandlerRadarr // nil when radarr not configured
 }

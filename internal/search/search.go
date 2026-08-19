@@ -60,9 +60,6 @@ func syncSkipThreshold(scores api.Scores) int {
 	return scores.Source + scores.ReleaseGroup - 1
 }
 
-// Compile-time check: *Engine implements api.SearchEngine.
-var _ api.SearchEngine = (*Engine)(nil)
-
 // Engine coordinates subtitle searches.
 type Engine struct {
 	store           SearchStore

@@ -35,7 +35,7 @@ func tempVideo(t *testing.T) string {
 
 // importPoller builds a Poller (with mock deps) and a LiveState wired to the
 // given search engine, for processPollImport tests.
-func importPoller(engine api.SearchEngine) (*Poller, *LiveState) {
+func importPoller(engine importSearcher) (*Poller, *LiveState) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	return &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}, ls

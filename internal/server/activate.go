@@ -12,6 +12,7 @@ import (
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -51,7 +52,7 @@ func (m activationMode) String() string {
 // prepare phase. Nothing in it is externally visible until publish stores it
 // in the live snapshot.
 type activationCandidate struct {
-	engine    api.SearchEngine
+	engine    *search.Engine
 	scorer    api.Scorer
 	sonarr    api.SonarrClient
 	radarr    api.RadarrClient

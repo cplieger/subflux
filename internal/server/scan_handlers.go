@@ -19,7 +19,6 @@ func (s *Server) initScanHandler() *scanning.Handler {
 			ls := s.state()
 			return &scanning.HandlerState{
 				Cfg:    ls.cfg,
-				Engine: ls.engine,
 				Sonarr: ls.sonarr,
 				Radarr: ls.radarr,
 			}, s.scanLiveState(ls)

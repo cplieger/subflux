@@ -28,12 +28,19 @@ import (
 // Func creates the search engine, scorer, and loaded providers from config.
 // Called during Start and hot reload. The context allows cancellation of
 // provider initialization (e.g. network calls during provider setup).
+//
+// The engine is returned CONCRETE. This is the composition root's signature,
+// and a root is the one place that is entitled to know the implementation: the
+// consumers it feeds each declare the two or three engine methods they call
+// (scanning.ScanEngine, and the unexported ones in polling, manualops and
+// queryhandlers), so widening it back into a single eight-method interface here
+// would only re-create the hub those declarations replaced.
 type Func func(
 	ctx context.Context,
 	cfg api.ConfigProvider,
 	db api.Store,
 	m search.SearchMetrics,
-) (api.SearchEngine, api.Scorer, []api.Provider, error)
+) (*search.Engine, api.Scorer, []api.Provider, error)
 
 // Compile-time assertion: embedded.Detector satisfies
 // search.TrackDetector. This lives here (rather than in embedded/ or

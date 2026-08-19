@@ -194,10 +194,29 @@ func buildSeedDeps(deps *Deps, ls *LiveState) seedDeps {
 	}
 }
 
+// ScanEngine is the two things a scan asks of the search engine: search a
+// media item's language targets, or record what is already on disk without
+// touching a provider. Two of the eight methods the engine offers — score
+// simulation, provider-timeout state and post-download processing belong to
+// the manual and query paths, and a scan pass has no business reaching them.
+//
+// Exported because the scheduler names it: its LiveState carries the engine
+// straight through to this one, and naming this type is what keeps the two
+// declarations from drifting apart.
+type ScanEngine interface {
+	SearchTargets(ctx context.Context, req *api.SearchRequest, videoPath string, targets []api.SubtitleTarget) (api.SearchResult, error)
+	// InventoryCoverage records the on-disk/embedded inventory for an item
+	// WITHOUT any provider work, stamping its scan state as
+	// inventoried-not-searched. The skip paths (season early stop,
+	// show-level skip) call it so coverage stays truthful for items the
+	// scanner deliberately does not search.
+	InventoryCoverage(ctx context.Context, req *api.SearchRequest, videoPath string) (coverageChanged bool)
+}
+
 // LiveState holds the runtime state needed for a scan pass.
 type LiveState struct {
 	Cfg         api.ConfigProvider
-	Engine      api.SearchEngine
+	Engine      ScanEngine
 	Sonarr      ScanSonarrClient
 	Radarr      ScanRadarrClient
 	ShowCounter api.ShowSubtitleCounter

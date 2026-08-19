@@ -73,9 +73,13 @@ type Deps struct {
 }
 
 // LiveState holds the live state needed by the scheduler.
+//
+// Engine is typed as scanning's own interface for the same reason Deps.ScanDB
+// is: the scheduler never calls it, it only carries it into scanning.LiveState,
+// and a second declaration of the same two methods here could only drift.
 type LiveState struct {
 	Cfg       api.ConfigProvider
-	Engine    api.SearchEngine
+	Engine    scanning.ScanEngine
 	Sonarr    api.SonarrClient
 	Radarr    api.RadarrClient
 	Providers []api.Provider

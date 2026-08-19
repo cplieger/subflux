@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -243,10 +242,6 @@ func TestHandleScore_matched_by_affects_score(t *testing.T) {
 			"identity fields no longer scored", imdbScore, titleScore)
 	}
 }
-
-// Compile-time guard: the real engine used by these tests must satisfy the
-// api.SearchEngine surface the LiveState carries in production.
-var _ api.SearchEngine = (*search.Engine)(nil)
 
 // Both release-name-bearing score fields are direct user input into the
 // release parser: exactly MaxNameLen bytes passes, one byte more answers a

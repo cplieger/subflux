@@ -44,10 +44,20 @@ type MetricsReader interface {
 	TotalSearches() int64
 }
 
+// queryEngine is the read-and-reset surface the introspection endpoints use:
+// simulate a score for POST /api/score, report provider-timeout state, and
+// clear it. Three of the engine's eight methods — these handlers never search,
+// never download and never post-process, so the other five stay out of reach.
+type queryEngine interface {
+	SimulateScore(mediaType api.MediaType, videoRelease, subRelease string, matchedBy api.MatchMethod) api.ScoreResult
+	ProviderTimeouts() (status map[api.ProviderID]api.ProviderStatus, enabled bool)
+	ResetTimeouts()
+}
+
 // LiveState holds the hot-reloadable runtime state needed by query handlers.
 type LiveState struct {
 	Cfg       api.ConfigProvider
-	Engine    api.SearchEngine
+	Engine    queryEngine
 	Sonarr    StatsSonarrClient
 	Radarr    StatsRadarrClient
 	Providers []api.Provider

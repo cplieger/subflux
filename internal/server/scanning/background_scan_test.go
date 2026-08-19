@@ -32,10 +32,14 @@ import (
 
 // --- fakes ---
 
-// fakeEngine is a controllable api.SearchEngine: SearchTargets counts calls
+// fakeEngine is a controllable ScanEngine: SearchTargets counts calls
 // and, when the gate channels are set, signals each call's ordinal on
 // `started` and blocks until `release` yields — letting tests stop a scan
 // while an item is provably IN FLIGHT.
+//
+// Two methods, because ScanEngine declares two. It used to carry all eight of
+// the old composite's methods; the six it never needed (score simulation,
+// timeout state, post-processing, hashing) went with the composite.
 type fakeEngine struct {
 	started chan int
 	release chan struct{}
@@ -66,28 +70,6 @@ func (e *fakeEngine) callCount() int {
 func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
 	return false
 }
-
-func (e *fakeEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
-	return nil, false
-}
-func (e *fakeEngine) ResetTimeouts() {}
-func (e *fakeEngine) SimulateScore(_ api.MediaType, _, _ string, _ api.MatchMethod) api.ScoreResult {
-	return api.ScoreResult{}
-}
-
-func (e *fakeEngine) ScoreSubtitles(_ *api.SearchRequest, _ []api.Subtitle) []api.ScoredResult {
-	return nil
-}
-
-func (e *fakeEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ api.Variant) ([]byte, int64) {
-	return data, 0
-}
-
-func (e *fakeEngine) HashFile(_ context.Context, _ string) (string, int64, error) {
-	return "", 0, nil
-}
-
-var _ api.SearchEngine = (*fakeEngine)(nil)
 
 // recEvents records the scan SSE publications.
 type scanEvt struct {
@@ -215,7 +197,7 @@ func newScanRig(t *testing.T) *scanRig {
 	cfg := &testsupport.NopConfig{}
 	rig.h = NewHandler(HandlerDeps{
 		StateFunc: func() (*HandlerState, *LiveState) {
-			st := &HandlerState{Cfg: cfg, Engine: rig.engine}
+			st := &HandlerState{Cfg: cfg}
 			if rig.sonarr != nil {
 				st.Sonarr = rig.sonarr
 			}
@@ -1004,7 +986,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	bg := &sync.WaitGroup{}
 
 	var mu sync.Mutex
-	curState := &HandlerState{Cfg: cfg, Engine: engineA, Sonarr: sonarrA}
+	curState := &HandlerState{Cfg: cfg, Sonarr: sonarrA}
 	curLS := &LiveState{Cfg: cfg, Engine: engineA}
 	var stateCalls, depsCalls int
 	callCount := func() int {
@@ -1061,7 +1043,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 
 	// Hot reload while the operation is queued: swap every generation callback.
 	mu.Lock()
-	curState = &HandlerState{Cfg: cfg, Engine: engineB, Sonarr: sonarrB}
+	curState = &HandlerState{Cfg: cfg, Sonarr: sonarrB}
 	curLS = &LiveState{Cfg: cfg, Engine: engineB}
 	mu.Unlock()
 

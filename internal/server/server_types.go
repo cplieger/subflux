@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -35,7 +36,7 @@ import (
 // from the CURRENT config instead of a boot-time copy.
 type liveState struct {
 	cfg       api.ConfigProvider
-	engine    api.SearchEngine
+	engine    *search.Engine
 	scorer    api.Scorer
 	sonarr    api.SonarrClient
 	radarr    api.RadarrClient

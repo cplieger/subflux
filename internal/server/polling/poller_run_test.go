@@ -96,6 +96,9 @@ func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []api.Subtitl
 }
 func (m *mockCfg) LanguageCodes() []string { return m.langs }
 
+// mockEngine is the poller's engine: one method, because importSearcher
+// declares one. It used to carry all eight of the old composite's methods and
+// seven of them were unreachable from this package.
 type mockEngine struct {
 	err    error
 	result api.SearchResult
@@ -103,30 +106,6 @@ type mockEngine struct {
 
 func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
 	return m.result, m.err
-}
-
-func (m *mockEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
-	return false
-}
-
-func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
-	return nil, false
-}
-func (m *mockEngine) ResetTimeouts() {}
-func (m *mockEngine) SimulateScore(_ api.MediaType, _, _ string, _ api.MatchMethod) api.ScoreResult {
-	return api.ScoreResult{}
-}
-
-func (m *mockEngine) ScoreSubtitles(_ *api.SearchRequest, _ []api.Subtitle) []api.ScoredResult {
-	return nil
-}
-
-func (m *mockEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ api.Variant) ([]byte, int64) {
-	return data, 0
-}
-
-func (m *mockEngine) HashFile(_ context.Context, _ string) (string, int64, error) {
-	return "", 0, nil
 }
 
 func newTestPollCache() *PollCache {

@@ -48,10 +48,18 @@ type Deps struct {
 	StatsCache StatsCacheInvalidator
 }
 
+// importSearcher is the one thing the poller asks of the search engine: search
+// the language targets of an item an arr just imported. One of the engine's
+// eight methods — an import is a search and nothing else, so the poller never
+// sees score simulation, timeout state, or post-download processing.
+type importSearcher interface {
+	SearchTargets(ctx context.Context, req *api.SearchRequest, videoPath string, targets []api.SubtitleTarget) (api.SearchResult, error)
+}
+
 // LiveState holds the hot-reloadable runtime state the poller reads each cycle.
 type LiveState struct {
 	Cfg    PollerCfg
-	Engine api.SearchEngine
+	Engine importSearcher
 	Sonarr PollSonarrClient
 	Radarr PollRadarrClient
 }

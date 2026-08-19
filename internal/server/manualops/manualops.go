@@ -99,13 +99,24 @@ type EventPublisher interface {
 	PublishCoverageUpdate(ev *events.CoverageEvent)
 }
 
+// manualEngine is what a manual search and download ask of the search engine:
+// hash the video so providers can match it exactly, score the candidates the
+// user is about to choose from, and post-process the bytes that come back.
+// Three of the engine's eight methods — the automated scan's SearchTargets and
+// the query path's timeout controls are not the manual path's business.
+type manualEngine interface {
+	HashFile(ctx context.Context, path string) (hash string, size int64, err error)
+	ScoreSubtitles(req *api.SearchRequest, results []api.Subtitle) []api.ScoredResult
+	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant api.Variant) (synced []byte, offsetMs int64)
+}
+
 // LiveState holds the runtime state needed for a manual search pass.
 // Sonarr/Radarr are the narrow by-ID surfaces manual downloads use;
 // SonarrLib/RadarrLib are the library-listing surfaces the resolve
 // endpoint uses (all nil when the corresponding arr is not configured).
 type LiveState struct {
 	Cfg       api.ConfigProvider
-	Engine    api.SearchEngine
+	Engine    manualEngine
 	Scorer    api.Scorer
 	Sonarr    ManualSonarrClient
 	Radarr    ManualRadarrClient
