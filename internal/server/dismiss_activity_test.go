@@ -10,7 +10,7 @@ import (
 
 func TestHandleDismissActivity_missing_id_returns_400(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity", http.NoBody)
@@ -25,7 +25,7 @@ func TestHandleDismissActivity_missing_id_returns_400(t *testing.T) {
 
 func TestHandleDismissActivity_cancels_queued_entry(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	id := s.activity.Start("Scan", "queued scan", "manual")
 	s.activity.SetQueued(id, true)
@@ -47,7 +47,7 @@ func TestHandleDismissActivity_cancels_queued_entry(t *testing.T) {
 
 func TestHandleDismissActivity_dismisses_completed_entry(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	id := s.activity.Start("Scan", "done scan", "manual")
 	s.activity.End(id)
@@ -69,7 +69,7 @@ func TestHandleDismissActivity_dismisses_completed_entry(t *testing.T) {
 
 func TestHandleDismissActivity_nonexistent_id_returns_204(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id=nonexistent", http.NoBody)

@@ -40,21 +40,13 @@ func TestEnabledProviders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mock := &epMock{providers: tt.providers}
-			got := enabledProviders(mock)
+			got := enabledProviders(tt.providers)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("enabledProviders() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
-
-// epMock satisfies the interface{ Providers() map[api.ProviderID]api.ProviderCfg }.
-type epMock struct {
-	providers map[api.ProviderID]api.ProviderCfg
-}
-
-func (m *epMock) Providers() map[api.ProviderID]api.ProviderCfg { return m.providers }
 
 // --- requireConfigured middleware ---
 
@@ -160,13 +152,12 @@ func TestClearProviderCaches_nil_providers(t *testing.T) {
 
 func TestEnabledProviders_output_is_sorted(t *testing.T) {
 	t.Parallel()
-	cfg := &epMock{providers: map[api.ProviderID]api.ProviderCfg{
+	got := enabledProviders(map[api.ProviderID]api.ProviderCfg{
 		"zulu":    {Enabled: true},
 		"alpha":   {Enabled: true},
 		"charlie": {Enabled: true},
 		"bravo":   {Enabled: false},
-	}}
-	got := enabledProviders(cfg)
+	})
 	want := []api.ProviderID{"alpha", "charlie", "zulu"}
 	if len(got) != len(want) {
 		t.Fatalf("enabledProviders len = %d, want %d", len(got), len(want))

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
@@ -26,38 +28,46 @@ import (
 
 // --- Fixtures ---
 
-// activationTestConfig is a qhMockConfig with the auth/logging knobs the
-// activation path consults made settable.
-type activationTestConfig struct {
-	qhMockConfig
-
-	rpID      string
-	logLevel  api.LogLevel
-	logFormat api.LogFormat
-	oidcCfg   auth.OIDCConfig
-	oidcOn    bool
+// activationCfg builds the REAL config the activation path consumes, varying
+// only the sections these tests drive. It replaces the hand-written
+// api.ConfigProvider fake that used to sit here: the snapshot holds
+// *config.Config, so the fixture is a config, and the knobs are YAML.
+//
+// The base document (testConfig) always configures sonarr and never radarr,
+// which is what the snapshot assertions below key on.
+type activationCfg struct {
+	radarrURL  string
+	rpID       string
+	oidcIssuer string
+	logLevel   string
+	logFormat  string
 }
 
-var _ api.ConfigProvider = (*activationTestConfig)(nil)
-
-func (c *activationTestConfig) WebAuthnRPID() string { return c.rpID }
-func (c *activationTestConfig) OIDCEnabled() bool    { return c.oidcOn }
-func (c *activationTestConfig) OIDC() auth.OIDCConfig {
-	return c.oidcCfg
-}
-
-func (c *activationTestConfig) LoggingLevel() api.LogLevel {
-	if c.logLevel == "" {
-		return "info"
+// build renders the options into YAML sections and loads them.
+func (o activationCfg) build(t *testing.T) *config.Config {
+	t.Helper()
+	var extra []string
+	if o.radarrURL != "" {
+		extra = append(extra, "radarr:\n  url: "+strconv.Quote(o.radarrURL)+"\n  api_key: \"k\"")
 	}
-	return c.logLevel
-}
-
-func (c *activationTestConfig) LoggingFormat() api.LogFormat {
-	if c.logFormat == "" {
-		return "json"
+	auth := ""
+	if o.rpID != "" {
+		auth += "  webauthn_rp_id: " + strconv.Quote(o.rpID) + "\n"
 	}
-	return c.logFormat
+	if o.oidcIssuer != "" {
+		auth += "  oidc_enabled: true\n  oidc:\n" +
+			"    issuer_url: " + strconv.Quote(o.oidcIssuer) + "\n" +
+			"    client_id: \"subflux\"\n" +
+			"    redirect_uri: \"https://subflux.example.com/api/auth/oidc/callback\"\n"
+	}
+	if auth != "" {
+		extra = append(extra, "auth:\n"+auth)
+	}
+	if o.logLevel != "" || o.logFormat != "" {
+		extra = append(extra, "logging:\n  level: "+strconv.Quote(o.logLevel)+
+			"\n  format: "+strconv.Quote(o.logFormat))
+	}
+	return testConfig(t, extra...)
 }
 
 // closableArrClient counts Close calls so tests can assert activation
@@ -71,7 +81,7 @@ type closableArrClient struct {
 func (c *closableArrClient) Close() { c.closed++ }
 
 // okWire is a wiring.Func that always succeeds with one stub provider.
-func okWire(_ context.Context, _ api.ConfigProvider, _ search.SearchStore, _ search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+func okWire(_ context.Context, _ *config.Config, _ search.SearchStore, _ search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
 	return nil, nil, []api.Provider{&stubProvider{name: "mock"}}, nil
 }
 
@@ -118,12 +128,7 @@ func hasAlertSource(s *Server, source string) bool {
 func TestActivate_fresh_publishes_full_snapshot(t *testing.T) {
 	t.Parallel()
 	s, _ := newActivationTestServer(t)
-	cfg := &activationTestConfig{
-		qhMockConfig: qhMockConfig{
-			sonarrCfg: api.ArrConfig{URL: "http://sonarr:8989", APIKey: "k"},
-		},
-		rpID: "subflux.example.com",
-	}
+	cfg := activationCfg{rpID: "subflux.example.com"}.build(t)
 
 	if err := s.activate(t.Context(), cfg, activateHot); err != nil {
 		t.Fatalf("activate() error = %v, want nil", err)
@@ -159,17 +164,12 @@ func TestActivate_reactivate_swaps_and_closes_old_arr_clients(t *testing.T) {
 	oldSonarr := &closableArrClient{}
 	oldRadarr := &closableArrClient{}
 	s.live.Store(&liveState{
-		cfg:    &activationTestConfig{},
+		cfg:    activationCfg{}.build(t),
 		sonarr: oldSonarr,
 		radarr: oldRadarr,
 	})
 
-	cfg := &activationTestConfig{
-		qhMockConfig: qhMockConfig{
-			sonarrCfg: api.ArrConfig{URL: "http://sonarr:8989", APIKey: "k"},
-			radarrCfg: api.ArrConfig{URL: "http://radarr:7878", APIKey: "k"},
-		},
-	}
+	cfg := activationCfg{radarrURL: "http://radarr:7878"}.build(t)
 	if err := s.activate(t.Context(), cfg, activateHot); err != nil {
 		t.Fatalf("activate() error = %v, want nil", err)
 	}
@@ -189,13 +189,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 	s, _ := newActivationTestServer(t)
 
 	// Enable both capabilities.
-	on := &activationTestConfig{
-		rpID:   "subflux.example.com",
-		oidcOn: true,
-		oidcCfg: auth.OIDCConfig{
-			IssuerURL: "https://idp.example.com", ClientID: "id", RedirectURI: "https://x/cb",
-		},
-	}
+	on := activationCfg{rpID: "subflux.example.com", oidcIssuer: "https://idp.example.com"}.build(t)
 	if err := s.activate(t.Context(), on, activateHot); err != nil {
 		t.Fatalf("activate(on) error = %v", err)
 	}
@@ -208,7 +202,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 	}
 
 	// Disable both: the snapshot must drop them immediately.
-	off := &activationTestConfig{}
+	off := activationCfg{}.build(t)
 	if err := s.activate(t.Context(), off, activateHot); err != nil {
 		t.Fatalf("activate(off) error = %v", err)
 	}
@@ -220,12 +214,7 @@ func TestActivate_auth_edit_swaps_webauthn_and_oidc_slot(t *testing.T) {
 	}
 
 	// Re-enable with a different issuer: a FRESH slot, never slotA reused.
-	on2 := &activationTestConfig{
-		oidcOn: true,
-		oidcCfg: auth.OIDCConfig{
-			IssuerURL: "https://other.example.com", ClientID: "id", RedirectURI: "https://x/cb",
-		},
-	}
+	on2 := activationCfg{oidcIssuer: "https://other.example.com"}.build(t)
 	if err := s.activate(t.Context(), on2, activateHot); err != nil {
 		t.Fatalf("activate(on2) error = %v", err)
 	}
@@ -240,7 +229,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 	var calls []string
 	s.logSetup = func(level, format string) { calls = append(calls, level+"/"+format) }
 
-	first := &activationTestConfig{}
+	first := activationCfg{}.build(t)
 	if err := s.activate(t.Context(), first, activateHot); err != nil {
 		t.Fatalf("activate(first) error = %v", err)
 	}
@@ -249,7 +238,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 	}
 
 	// Identical logging section: no re-setup.
-	same := &activationTestConfig{}
+	same := activationCfg{}.build(t)
 	if err := s.activate(t.Context(), same, activateHot); err != nil {
 		t.Fatalf("activate(same) error = %v", err)
 	}
@@ -258,7 +247,7 @@ func TestActivate_logging_change_reruns_log_setup(t *testing.T) {
 	}
 
 	// Changed level: re-setup with the new values.
-	changed := &activationTestConfig{logLevel: "debug", logFormat: "text"}
+	changed := activationCfg{logLevel: "debug", logFormat: "text"}.build(t)
 	if err := s.activate(t.Context(), changed, activateHot); err != nil {
 		t.Fatalf("activate(changed) error = %v", err)
 	}
@@ -272,12 +261,12 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 	tests := []struct {
 		breakServer func(s *Server)
 		name        string
-		cfg         activationTestConfig
+		cfg         activationCfg
 	}{
 		{
 			name: "wire failure",
 			breakServer: func(s *Server) {
-				s.wire = func(context.Context, api.ConfigProvider, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+				s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
 					return nil, nil, nil, errMock
 				}
 			},
@@ -287,18 +276,15 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 			breakServer: func(s *Server) {
 				s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return nil, errMock }
 			},
-			cfg: activationTestConfig{qhMockConfig: qhMockConfig{
-				sonarrCfg: api.ArrConfig{URL: "http://sonarr:8989", APIKey: "k"},
-			}},
+			// The base document already configures sonarr; the broken
+			// factory is what fails the candidate.
 		},
 		{
 			name: "radarr construction failure",
 			breakServer: func(s *Server) {
 				s.newRadarr = func(_, _ string) (api.RadarrClient, error) { return nil, errMock }
 			},
-			cfg: activationTestConfig{qhMockConfig: qhMockConfig{
-				radarrCfg: api.ArrConfig{URL: "http://radarr:7878", APIKey: "k"},
-			}},
+			cfg: activationCfg{radarrURL: "http://radarr:7878"},
 		},
 	}
 	for _, tt := range tests {
@@ -307,15 +293,14 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 			s, launches := newActivationTestServer(t)
 
 			// Establish a good live snapshot first.
-			good := &activationTestConfig{}
+			good := activationCfg{}.build(t)
 			if err := s.activate(t.Context(), good, activateHot); err != nil {
 				t.Fatalf("activate(good) error = %v", err)
 			}
 			before := s.state()
 
 			tt.breakServer(s)
-			cfg := tt.cfg
-			if err := s.activate(t.Context(), &cfg, activateHot); err == nil {
+			if err := s.activate(t.Context(), tt.cfg.build(t), activateHot); err == nil {
 				t.Fatal("activate() error = nil, want prepare-phase rejection")
 			}
 
@@ -337,7 +322,7 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 func TestWorkerLatch_cold_configured_boot_launches_exactly_once(t *testing.T) {
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
-	cfg := &activationTestConfig{}
+	cfg := activationCfg{}.build(t)
 	s.live.Store(&liveState{cfg: cfg})
 	s.configured.Store(true) // WithConfig semantics: configured at construction
 
@@ -356,7 +341,7 @@ func TestWorkerLatch_unconfigured_boot_then_n_saves_launches_once(t *testing.T) 
 	s, launches := newActivationTestServer(t)
 
 	for i := range 3 {
-		cfg := &activationTestConfig{}
+		cfg := activationCfg{}.build(t)
 		if err := s.hotReload(t.Context(), cfg); err != nil {
 			t.Fatalf("hotReload #%d error = %v", i+1, err)
 		}
@@ -370,10 +355,10 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	s.wire = func(context.Context, api.ConfigProvider, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+	s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
 		return nil, nil, nil, errMock
 	}
-	if err := s.hotReload(t.Context(), &activationTestConfig{}); err == nil {
+	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err == nil {
 		t.Fatal("hotReload with failing wire: error = nil, want error")
 	}
 	if *launches != 0 {
@@ -381,7 +366,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	}
 
 	s.wire = okWire
-	if err := s.hotReload(t.Context(), &activationTestConfig{}); err != nil {
+	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err != nil {
 		t.Fatalf("hotReload after fixing wire: error = %v", err)
 	}
 	if *launches != 1 {
@@ -393,7 +378,7 @@ func TestWorkerLatch_repeated_identical_put_launches_once(t *testing.T) {
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	cfg := &activationTestConfig{}
+	cfg := activationCfg{}.build(t)
 	for i := range 2 {
 		if err := s.hotReload(t.Context(), cfg); err != nil {
 			t.Fatalf("hotReload (identical PUT) #%d error = %v", i+1, err)
@@ -414,13 +399,13 @@ func TestActivate_webauthn_failure_is_fatal_on_hot_save(t *testing.T) {
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	good := &activationTestConfig{}
+	good := activationCfg{}.build(t)
 	if err := s.activate(t.Context(), good, activateHot); err != nil {
 		t.Fatalf("activate(good) error = %v", err)
 	}
 	before := s.state()
 
-	bad := &activationTestConfig{rpID: badRPID}
+	bad := activationCfg{rpID: badRPID}.build(t)
 	err := s.activate(t.Context(), bad, activateHot)
 	if err == nil {
 		t.Fatal("hot activation with a bad RP ID: error = nil, want rejection")
@@ -439,7 +424,7 @@ func TestActivate_webauthn_failure_is_fatal_on_hot_save(t *testing.T) {
 func TestActivate_webauthn_failure_degrades_on_cold_boot(t *testing.T) {
 	t.Parallel()
 	s, _ := newActivationTestServer(t)
-	cfg := &activationTestConfig{rpID: badRPID}
+	cfg := activationCfg{rpID: badRPID}.build(t)
 	s.live.Store(&liveState{cfg: cfg})
 
 	if err := s.activate(t.Context(), cfg, activateCold); err != nil {
@@ -456,7 +441,7 @@ func TestActivate_webauthn_failure_degrades_on_cold_boot(t *testing.T) {
 	}
 
 	// A later save that fixes the RP ID clears the alert.
-	fixed := &activationTestConfig{rpID: "subflux.example.com"}
+	fixed := activationCfg{rpID: "subflux.example.com"}.build(t)
 	if err := s.activate(t.Context(), fixed, activateHot); err != nil {
 		t.Fatalf("activate(fixed) error = %v", err)
 	}
@@ -530,16 +515,8 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 		OIDCResolver: s.getOIDC,
 	}
 
-	oidcCfg := func(issuer string) auth.OIDCConfig {
-		return auth.OIDCConfig{
-			IssuerURL:   issuer,
-			ClientID:    "subflux",
-			RedirectURI: "https://subflux.example.com/api/auth/oidc/callback",
-		}
-	}
-
 	// Activate with issuer A and complete a SUCCESSFUL discovery.
-	cfgA := &activationTestConfig{oidcOn: true, oidcCfg: oidcCfg(issuerA.URL)}
+	cfgA := activationCfg{oidcIssuer: issuerA.URL}.build(t)
 	if err := s.activate(t.Context(), cfgA, activateHot); err != nil {
 		t.Fatalf("activate(issuer A) error = %v", err)
 	}
@@ -548,7 +525,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 	}
 
 	// Edit the issuer. The forever-cached-provider bug served issuer A here.
-	cfgB := &activationTestConfig{oidcOn: true, oidcCfg: oidcCfg(issuerB.URL)}
+	cfgB := activationCfg{oidcIssuer: issuerB.URL}.build(t)
 	if err := s.activate(t.Context(), cfgB, activateHot); err != nil {
 		t.Fatalf("activate(issuer B) error = %v", err)
 	}
@@ -558,7 +535,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 	}
 
 	// Disabling OIDC publishes a nil slot: the endpoint reports unconfigured.
-	cfgOff := &activationTestConfig{}
+	cfgOff := activationCfg{}.build(t)
 	if err := s.activate(t.Context(), cfgOff, activateHot); err != nil {
 		t.Fatalf("activate(oidc off) error = %v", err)
 	}
@@ -606,7 +583,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	}
 
 	// Hot-edit the RP ID to rp-b.example.com.
-	cfgB := &activationTestConfig{rpID: "rp-b.example.com"}
+	cfgB := activationCfg{rpID: "rp-b.example.com"}.build(t)
 	if err := s.activate(t.Context(), cfgB, activateHot); err != nil {
 		t.Fatalf("activate(rp-b) error = %v", err)
 	}
@@ -691,7 +668,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 // is cancelled the moment the workers are running (all four exit immediately).
 func TestStartWorkers_defaults_to_real_launcher(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

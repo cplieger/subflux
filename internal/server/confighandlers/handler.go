@@ -16,7 +16,18 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 )
+
+// ConfigLoader parses and validates config YAML into a candidate config. It is
+// declared here because this package is the only caller: HandleSaveConfig and
+// the structured save load a candidate, then hand it to HotReload whole.
+//
+// The candidate is CONCRETE. These handlers read nothing out of it — they parse
+// it and pass it on — so the width an interface would state is zero, and a
+// zero-method interface is `any` with a name. The composition root supplies
+// config.LoadFromBytes; the server carries the func and never calls it.
+type ConfigLoader func(data []byte) (*config.Config, error)
 
 // AlertLog is the narrow interface for alert operations.
 type AlertLog interface {
@@ -33,11 +44,11 @@ type PathValidationResponse struct {
 type Deps struct {
 	Registry      SchemaRegistry
 	Alerts        AlertLog
-	LoadConfig    api.ConfigLoader
+	LoadConfig    ConfigLoader
 	SchemaFunc    api.SchemaFunc
 	NewSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
 	NewRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
-	HotReload     func(ctx context.Context, cfg api.ConfigProvider) error
+	HotReload     func(ctx context.Context, cfg *config.Config) error
 	State         func() StateView
 	ConfigPath    func() string
 	Configured    func() bool
@@ -46,12 +57,13 @@ type Deps struct {
 
 // arrEndpoints is what the config handlers read out of the LIVE configuration:
 // the two arr connection blocks, compared against the incoming ones so an
-// unchanged arr is never pinged. 2 of the 28 values the config offers.
+// unchanged arr is never pinged. 2 of the 37 values a *config.Config offers.
 //
 // The candidate config these handlers load and activate is NOT this type: it
-// arrives from LoadConfig and leaves through HotReload whole, because the
-// composition root is what consumes it. Reading two values out of a config and
-// carrying a config are different jobs, and only the first one belongs here.
+// arrives from LoadConfig and leaves through HotReload whole and concrete,
+// because the composition root is what consumes it. Reading two values out of a
+// config and carrying a config are different jobs, and only the first one
+// belongs here.
 type arrEndpoints interface {
 	Sonarr() api.ArrConfig
 	Radarr() api.ArrConfig
@@ -66,11 +78,11 @@ type StateView struct {
 type Handler struct {
 	registry      SchemaRegistry
 	alerts        AlertLog
-	loadConfig    api.ConfigLoader
+	loadConfig    ConfigLoader
 	schemaFunc    api.SchemaFunc
 	newSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
 	newRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
-	hotReload     func(ctx context.Context, cfg api.ConfigProvider) error
+	hotReload     func(ctx context.Context, cfg *config.Config) error
 	state         func() StateView
 	configured    func() bool
 	configPath    func() string

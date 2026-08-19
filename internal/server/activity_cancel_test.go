@@ -45,7 +45,7 @@ func startScanEntry(s *Server, source activity.ActivitySource, scope activity.Sc
 
 func TestHandleCancelActivity_unknown_id_404(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	rec := cancelReq(t, s, "does-not-exist", plainUser())
 	if rec.Code != http.StatusNotFound {
@@ -55,7 +55,7 @@ func TestHandleCancelActivity_unknown_id_404(t *testing.T) {
 
 func TestHandleCancelActivity_per_item_scan_any_user_204(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	// Started implicitly by "someone else": per-item scans are stoppable by
 	// ANY configured user (single-household policy) — there is no ownership
 	// check, only the role gate.
@@ -83,7 +83,7 @@ func TestHandleCancelActivity_full_scan_role_matrix(t *testing.T) {
 	for _, source := range sources {
 		t.Run(string(source), func(t *testing.T) {
 			t.Parallel()
-			s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+			s := newTestServer(t, &qhMockStore{})
 			id, stopped := startScanEntry(s, source,
 				activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
 
@@ -110,7 +110,7 @@ func TestHandleCancelActivity_full_scan_role_matrix(t *testing.T) {
 
 func TestHandleCancelActivity_admin_can_stop_per_item_scan(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	id, stopped := startScanEntry(s, activity.SourceManual,
 		activity.ScanScope{Kind: activity.ScanKindMovie, MediaID: 7}, auth.RoleUser)
 
@@ -128,7 +128,7 @@ func TestHandleCancelActivity_not_cancellable_409(t *testing.T) {
 
 	t.Run("completed scan", func(t *testing.T) {
 		t.Parallel()
-		s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+		s := newTestServer(t, &qhMockStore{})
 		id, _ := s.activity.StartScan("Scan", "d", activity.SourceManual,
 			activity.ScanScope{Kind: activity.ScanKindSeries, MediaID: 1}, auth.RoleUser)
 		s.activity.End(id) // terminal: its registration is gone
@@ -141,7 +141,7 @@ func TestHandleCancelActivity_not_cancellable_409(t *testing.T) {
 
 	t.Run("non-scan activity", func(t *testing.T) {
 		t.Parallel()
-		s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+		s := newTestServer(t, &qhMockStore{})
 		// A running manual download has no stop registration: dismissal and
 		// cancellation must not conflate.
 		id := s.activity.Start("Manual Download", "d", activity.SourceManual)
@@ -155,7 +155,7 @@ func TestHandleCancelActivity_not_cancellable_409(t *testing.T) {
 
 func TestHandleCancelActivity_missing_id_400(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(api.NewUserContext(t.Context(), plainUser()),
 		http.MethodPost, "/api/activity//cancel", http.NoBody)
@@ -170,7 +170,7 @@ func TestHandleCancelActivity_missing_id_400(t *testing.T) {
 // RUNNING (non-queued) scan neither stops nor removes it.
 func TestDismissActivity_never_stops_running_scans(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	id, stopped := startScanEntry(s, activity.SourceManual,
 		activity.ScanScope{Kind: activity.ScanKindSeries, MediaID: 42}, auth.RoleUser)
 

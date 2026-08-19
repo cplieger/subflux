@@ -2,16 +2,17 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"syscall"
+	"strconv"
+	"strings"
+	"testing"
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -80,59 +81,58 @@ func (m *qhMockStore) Stats(_ context.Context) (int, int, error) {
 	return m.downloads, m.attempts, nil
 }
 
-type qhMockConfig struct {
-	providers   map[api.ProviderID]api.ProviderCfg
-	sonarrCfg   api.ArrConfig
-	radarrCfg   api.ArrConfig
-	languages   []string
-	targets     []api.SubtitleTarget
-	searchCfg   api.SearchConfig
-	adaptiveCfg api.AdaptiveConfig
-	embedded    api.EmbeddedPolicy
+// --- Config fixture ---
+
+// testConfigYAML is the minimal valid document every server test starts from:
+// one arr, one language rule, one enabled provider. Tests append their own
+// sections through testConfig's extra argument.
+const testConfigYAML = `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "test"
+languages:
+  rules:
+    - audio: en
+      subtitles:
+        - code: fr
+  default:
+    - code: en
+providers:
+  opensubtitles:
+    enabled: true
+    settings:
+      api_key: "test"
+`
+
+// testConfig builds a REAL *config.Config through the production loader, with
+// media_roots pointed at a scratch directory so the containment accessors
+// (ValidatePath, RemoveUnderRoot) answer against something the test owns.
+// extra is appended YAML for whatever section the individual test needs.
+//
+// It replaces the 28-method hand-written fake this file used to carry. The
+// server's live snapshot holds the concrete *config.Config, so a fake would
+// have to BE one; and the loader is what makes a config's accessors agree with
+// each other — targets derived from the rules, caches built, roots opened —
+// which a fake with independent per-method returns could always contradict.
+// Every knob the fake exposed as a struct field is a YAML key here.
+func testConfig(t *testing.T, extra ...string) *config.Config {
+	t.Helper()
+	return testConfigInRoot(t, t.TempDir(), extra...)
 }
 
-func (m *qhMockConfig) Scores() api.Scores { return api.DefaultScores }
-
-func (m *qhMockConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
-	return m.targets
-}
-
-func (m *qhMockConfig) LanguageCodes() []string { return m.languages }
-
-func (m *qhMockConfig) ProvidersForTarget(_ *api.SubtitleTarget, all []api.ProviderID) []api.ProviderID {
-	return all
-}
-
-func (m *qhMockConfig) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) int { return 0 }
-func (m *qhMockConfig) Adaptive() api.AdaptiveConfig                                 { return m.adaptiveCfg }
-func (m *qhMockConfig) Search() api.SearchConfig                                     { return m.searchCfg }
-func (m *qhMockConfig) Sonarr() api.ArrConfig                                        { return m.sonarrCfg }
-func (m *qhMockConfig) Radarr() api.ArrConfig                                        { return m.radarrCfg }
-func (m *qhMockConfig) Providers() map[api.ProviderID]api.ProviderCfg                { return m.providers }
-func (m *qhMockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
-func (m *qhMockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
-func (m *qhMockConfig) ServerPort() int                                              { return 8374 }
-func (m *qhMockConfig) PollInterval() time.Duration                                  { return 30 * time.Second }
-func (m *qhMockConfig) LoggingLevel() api.LogLevel                                   { return "info" }
-func (m *qhMockConfig) LoggingFormat() api.LogFormat                                 { return "json" }
-func (m *qhMockConfig) ValidatePath(_ context.Context, _ string) error               { return nil }
-func (m *qhMockConfig) RemoveUnderRoot(_ context.Context, path string) error {
-	err := os.Remove(path)
-	if err != nil && !os.IsNotExist(err) && !errors.Is(err, syscall.ENOTDIR) {
-		return err
+// testConfigInRoot is testConfig with an explicit media root, for tests that
+// must place a file under it and then drive a handler over that path.
+func testConfigInRoot(t *testing.T, root string, extra ...string) *config.Config {
+	t.Helper()
+	doc := testConfigYAML + "media_roots:\n  - " + strconv.Quote(root) + "\n" +
+		strings.Join(extra, "\n")
+	cfg, err := config.LoadFromBytes(t.Context(), []byte(doc))
+	if err != nil {
+		t.Fatalf("config.LoadFromBytes() unexpected error: %v\n%s", err, doc)
 	}
-	return nil
+	t.Cleanup(func() { _ = cfg.Close() })
+	return cfg
 }
-func (m *qhMockConfig) PostProcess() api.PostProcessConfig        { return api.PostProcessConfig{} }
-func (m *qhMockConfig) Sync() api.SyncConfig                      { return api.SyncConfig{SyncSubtitles: true} }
-func (m *qhMockConfig) LanguageRulesForUI() api.LanguageRulesJSON { return api.LanguageRulesJSON{} }
-func (m *qhMockConfig) BasicAuthEnabled() bool                    { return true }
-func (m *qhMockConfig) OIDCEnabled() bool                         { return false }
-func (m *qhMockConfig) OIDC() auth.OIDCConfig                     { return auth.OIDCConfig{} }
-func (m *qhMockConfig) SessionIdleTimeout() time.Duration         { return 24 * time.Hour }
-func (m *qhMockConfig) SessionAbsoluteTimeout() time.Duration     { return 7 * 24 * time.Hour }
-func (m *qhMockConfig) CheckBreachedPasswords() bool              { return false }
-func (m *qhMockConfig) WebAuthnRPID() string                      { return "" }
 
 // stubProvider implements api.Provider for test setup.
 type stubProvider struct {
@@ -197,7 +197,9 @@ func (dummyArrClient) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
 
 // newTestServer creates a minimal Server for handler testing.
 // Uses a real search.Engine for accurate score simulation.
-func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
+func newTestServer(t *testing.T, db *qhMockStore) *Server {
+	t.Helper()
+	cfg := testConfig(t)
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -217,7 +219,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		events:   events.New(0),
 		// context.Background(): no *testing.T in scope, and this is the server's own long-lived context rather than a per-test one.
 		lifetime: context.Background(),
-		loadConfig: func(data []byte) (api.ConfigProvider, error) {
+		loadConfig: func([]byte) (*config.Config, error) {
 			return nil, fmt.Errorf("not implemented in test")
 		},
 		schemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection {

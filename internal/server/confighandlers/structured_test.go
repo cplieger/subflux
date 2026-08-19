@@ -60,15 +60,15 @@ func newStructuredHandler(t *testing.T, existingYAML string) (*Handler, string) 
 // failure tests) and an optional hot-reload hook for tests that must observe
 // whether activation happened. A nil hook succeeds silently.
 func newStructuredHandlerAt(t *testing.T, cfgPath string,
-	hotReload func(context.Context, api.ConfigProvider) error,
+	hotReload func(context.Context, *config.Config) error,
 ) *Handler {
 	t.Helper()
 	if hotReload == nil {
-		hotReload = func(context.Context, api.ConfigProvider) error { return nil }
+		hotReload = func(context.Context, *config.Config) error { return nil }
 	}
 	return New(&Deps{
 		SchemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection { return structuredTestSchema() },
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
 		HotReload:  hotReload,
@@ -558,7 +558,7 @@ func TestStructuredSave_baseline_read_error_fails_closed(t *testing.T) {
 	t.Parallel()
 	reloadCalled := false
 	h := newStructuredHandlerAt(t, t.TempDir(), // a directory: open succeeds, read fails
-		func(context.Context, api.ConfigProvider) error { reloadCalled = true; return nil })
+		func(context.Context, *config.Config) error { reloadCalled = true; return nil })
 
 	rec := doStructuredSave(t, h, keepSecretsPayloadEmptyScalar)
 	if rec.Code != http.StatusInternalServerError {
@@ -601,7 +601,7 @@ func TestStructuredSave_malformed_baseline_fails_closed(t *testing.T) {
 			}
 			reloadCalled := false
 			h := newStructuredHandlerAt(t, cfgPath,
-				func(context.Context, api.ConfigProvider) error { reloadCalled = true; return nil })
+				func(context.Context, *config.Config) error { reloadCalled = true; return nil })
 
 			rec := doStructuredSave(t, h, tt.payload)
 			if rec.Code != http.StatusInternalServerError {
@@ -635,7 +635,7 @@ func TestStructuredSave_baseline_failure_with_explicit_secrets_saves(t *testing.
 	}
 	reloads := 0
 	h := newStructuredHandlerAt(t, cfgPath,
-		func(context.Context, api.ConfigProvider) error { reloads++; return nil })
+		func(context.Context, *config.Config) error { reloads++; return nil })
 
 	rec := doStructuredSave(t, h, explicitSecretsPayload)
 	if rec.Code != http.StatusOK {

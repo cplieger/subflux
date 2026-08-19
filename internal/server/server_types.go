@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -35,8 +36,23 @@ import (
 // (cold boot and hot reload share the swap; see activate.go). WebAuthn and
 // the OIDC slot ride the snapshot so auth capabilities resolve per request
 // from the CURRENT config instead of a boot-time copy.
+//
+// cfg is the CONCRETE *config.Config, and that is the deliberate shape rather
+// than the absence of one. This package is the composition root for the
+// configuration: it reads 22 of the type's 37 exported methods itself, and it
+// hands the same value to fourteen subpackages whose own narrow interfaces
+// need 13 more. A server-owned interface here would therefore have to declare
+// 35 of 37 — everything except Close and Validate, which only main.go and
+// config's own validator call. An "interface" that reproduces its single
+// implementation minus two methods is that type with two methods missing, and
+// it bought exactly one thing: six sites in this package type-asserting back
+// to *config.Config to reach the nine methods it could not name.
+//
+// A nil cfg means unconfigured mode. With a concrete pointer that test is
+// honest: an interface field holding a typed-nil *config.Config passed
+// `!= nil` and then panicked on the first call.
 type liveState struct {
-	cfg       api.ConfigProvider
+	cfg       *config.Config
 	engine    *search.Engine
 	scorer    *scorer.Engine
 	sonarr    api.SonarrClient
@@ -111,7 +127,7 @@ type Server struct {
 	registry     confighandlers.SchemaRegistry
 	manualH      *manualops.Handler
 	previewH     *previewhandlers.Handler
-	loadConfig   api.ConfigLoader
+	loadConfig   confighandlers.ConfigLoader
 	newSonarr    func(baseURL, apiKey string) (api.SonarrClient, error)
 	newRadarr    func(baseURL, apiKey string) (api.RadarrClient, error)
 	wire         wiring.Func
@@ -178,7 +194,7 @@ type Option func(*Server)
 // WithConfig sets the initial configuration. Config-only by design: arr
 // clients (and every other config-derived capability) are constructed by
 // activation in both boot modes, never handed in from outside.
-func WithConfig(cfg api.ConfigProvider) Option {
+func WithConfig(cfg *config.Config) Option {
 	return func(s *Server) {
 		ls := &liveState{cfg: cfg}
 		s.live.Store(ls)
@@ -192,8 +208,12 @@ func WithWire(w wiring.Func) Option { return func(s *Server) { s.wire = w } }
 // WithSchema sets the config schema function.
 func WithSchema(f api.SchemaFunc) Option { return func(s *Server) { s.schemaFunc = f } }
 
-// WithConfigLoader sets the config loader.
-func WithConfigLoader(l api.ConfigLoader) Option { return func(s *Server) { s.loadConfig = l } }
+// WithConfigLoader sets the config loader. Typed as the config handlers' own
+// func type rather than re-declared here: this package never calls it, it only
+// carries the value from the composition root to confighandlers, which does.
+func WithConfigLoader(l confighandlers.ConfigLoader) Option {
+	return func(s *Server) { s.loadConfig = l }
+}
 
 // WithSubtitleProc sets the subtitle processor.
 // WithSubtitleProc injects the SRT processor. Typed as the sync handlers' own

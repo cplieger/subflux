@@ -15,22 +15,22 @@ import (
 // driftState projects the drift-relevant values out of a config, so the two
 // sides of a comparison are built by one function and cannot disagree on which
 // value goes where.
-func driftState(cfg api.ConfigProvider) api.DriftState {
+func driftState(cfg *config.Config) api.DriftState {
 	return api.DriftState{
 		Languages:       cfg.LanguageCodes(),
-		Providers:       enabledProviders(cfg),
+		Providers:       enabledProviders(cfg.Providers()),
 		AdaptiveEnabled: cfg.Adaptive().Enabled,
 	}
 }
 
-// enabledProviders returns the sorted names of enabled providers in a config,
-// used by activation's drift detection.
-func enabledProviders(cfg interface {
-	Providers() map[api.ProviderID]api.ProviderCfg
-},
-) []api.ProviderID {
+// enabledProviders returns the sorted names of the enabled providers in a
+// provider map, used by activation's drift detection. It takes the MAP and not
+// a config: filtering and sorting is all it does, so the config was never an
+// input — it was a one-method anonymous interface wrapped around a map lookup,
+// and a fake existed in the tests solely to supply it.
+func enabledProviders(providers map[api.ProviderID]api.ProviderCfg) []api.ProviderID {
 	var names []api.ProviderID
-	for name, pcfg := range cfg.Providers() {
+	for name, pcfg := range providers {
 		if pcfg.Enabled {
 			names = append(names, name)
 		}
@@ -53,17 +53,15 @@ func enabledProviders(cfg interface {
 // restart. Called by buildHandler once the inner chain exists and by
 // activation's finalize phase on every reload; before buildHandler has
 // assembled the chain it is a no-op (activation at cold boot runs first).
-// A nil or non-*config.Config live config yields a nil policy: the inactive
+// An absent live config (unconfigured mode) yields a nil policy: the inactive
 // pass-through default (any Host accepted).
 func (s *Server) applyHostAllowlist() {
 	if s.hostGateInner == nil {
 		return // cold-boot activation before buildHandler; it re-applies
 	}
 	var policy *webhttp.HostPolicy
-	if ls := s.state(); ls != nil {
-		if cfg, ok := ls.cfg.(*config.Config); ok {
-			policy = cfg.HostAllowlist()
-		}
+	if ls := s.state(); ls != nil && ls.cfg != nil {
+		policy = ls.cfg.HostAllowlist()
 	}
 	if !policy.Active() {
 		slog.Warn("allowed_hosts not configured: any Host header is accepted, leaving DNS rebinding open; " +
@@ -78,12 +76,12 @@ func (s *Server) applyHostAllowlist() {
 // client-IP site — audit log, login rate limiter, session IPAddress, admin
 // bootstrap, and the access log — resolves the real client behind a reverse
 // proxy. Called at serve start and by activation's finalize phase so the set
-// re-parses and takes effect without a restart. A nil or non-*config.Config
-// live config yields an empty set: the trust-nothing default (socket peer,
-// XFF ignored).
+// re-parses and takes effect without a restart. An absent live config
+// (unconfigured mode) yields an empty set: the trust-nothing default (socket
+// peer, XFF ignored).
 func (s *Server) applyTrustedProxies() {
 	var nets []*net.IPNet
-	if cfg, ok := s.state().cfg.(*config.Config); ok {
+	if cfg := s.state().cfg; cfg != nil {
 		nets = cfg.TrustedProxyNets()
 	}
 	authhandlers.SetTrustedProxies(nets)
@@ -104,7 +102,7 @@ func (s *Server) applyTrustedProxies() {
 // write), so activation order always matches persist order. Both are needed:
 // reloadMu alone allowed two saves to interleave publish-A, publish-B,
 // write-B, write-A. Lock order is always saveMu → reloadMu.
-func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error {
+func (s *Server) hotReload(ctx context.Context, newCfg *config.Config) error {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
 

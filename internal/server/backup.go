@@ -31,7 +31,7 @@ func (s *Server) runBackup(ctx context.Context) {
 // backupFrequency returns the configured interval, clamped to the minimum, or
 // the default when unset/unconfigured.
 func (s *Server) backupFrequency() time.Duration {
-	if cfg, ok := s.state().cfg.(*config.Config); ok {
+	if cfg := s.state().cfg; cfg != nil {
 		if f := cfg.BackupFrequency(); f >= defaults.MinBackupFrequency {
 			return f
 		}
@@ -41,8 +41,8 @@ func (s *Server) backupFrequency() time.Duration {
 
 // runOneBackup writes a single timestamped snapshot, then prunes old ones.
 func (s *Server) runOneBackup(ctx context.Context) {
-	cfg, ok := s.state().cfg.(*config.Config)
-	if !ok || !cfg.BackupEnabled() {
+	cfg := s.state().cfg
+	if cfg == nil || !cfg.BackupEnabled() {
 		return
 	}
 	dir := cfg.BackupPath()

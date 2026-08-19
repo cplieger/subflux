@@ -12,6 +12,7 @@ import (
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -82,7 +83,7 @@ type activationCandidate struct {
 // memory ahead of disk (the config-save handler documents that case).
 // Repeated activation of an identical config is harmless: the worker latch
 // absorbs duplicates and the snapshot swap is idempotent in effect.
-func (s *Server) activate(ctx context.Context, newCfg api.ConfigProvider, mode activationMode) error {
+func (s *Server) activate(ctx context.Context, newCfg *config.Config, mode activationMode) error {
 	oldState := s.state()
 
 	cand, err := s.prepare(ctx, newCfg, oldState.cfg, mode)
@@ -109,7 +110,7 @@ func (s *Server) activate(ctx context.Context, newCfg api.ConfigProvider, mode a
 // prepare builds the full activation candidate. Fallible; performs no
 // externally visible mutation, so a failure rejects the candidate config
 // while the previous snapshot keeps serving.
-func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider, mode activationMode) (*activationCandidate, error) {
+func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mode activationMode) (*activationCandidate, error) {
 	cand := &activationCandidate{}
 
 	// Detect config drift against the outgoing config before anything is
@@ -164,7 +165,7 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 // An empty RP ID means WebAuthn is not configured (nil, no error, no alert).
 // Construction failure is FATAL on a hot save and DEGRADED (warn + nil +
 // persistent alert) on cold boot.
-func (s *Server) buildWebAuthn(cfg api.ConfigProvider, mode activationMode) (wa *webauthn.WebAuthn, degraded bool, err error) {
+func (s *Server) buildWebAuthn(cfg *config.Config, mode activationMode) (wa *webauthn.WebAuthn, degraded bool, err error) {
 	rpID := cfg.WebAuthnRPID()
 	if rpID == "" {
 		return nil, false, nil
@@ -189,7 +190,7 @@ func (s *Server) buildWebAuthn(cfg api.ConfigProvider, mode activationMode) (wa 
 
 // finalize applies the non-failing, best-effort committed effects after the
 // snapshot is published. Nothing here may fail the activation.
-func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.ConfigProvider, cand *activationCandidate, mode activationMode) {
+func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *config.Config, cand *activationCandidate, mode activationMode) {
 	// Re-run the process-global logging setup when the logging section
 	// changed (R1.5). Uniform handler re-setup; cold boot re-applies the
 	// same values main already installed, which is a no-op by comparison.
@@ -267,7 +268,7 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.C
 
 // applyLogging re-runs the injected process-global logging setup when the
 // logging section differs between the outgoing and incoming configs (R1.5).
-func (s *Server) applyLogging(oldCfg, newCfg api.ConfigProvider) {
+func (s *Server) applyLogging(oldCfg, newCfg *config.Config) {
 	if s.logSetup == nil {
 		return
 	}
@@ -366,7 +367,7 @@ type oidcSlot struct {
 
 // newOIDCSlot builds the slot for a config, or nil when OIDC is disabled
 // (publishing a nil slot is how "disable OIDC" takes effect immediately).
-func newOIDCSlot(cfg api.ConfigProvider) *oidcSlot {
+func newOIDCSlot(cfg *config.Config) *oidcSlot {
 	if !cfg.OIDCEnabled() {
 		return nil
 	}

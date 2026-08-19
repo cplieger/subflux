@@ -29,7 +29,7 @@ func TestHandleSaveConfig_response_redacts_expanded_secret(t *testing.T) {
 	t.Setenv("SUBFLUX_TEST_SECRET", secret)
 
 	h := New(&Deps{
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
 		// Nonexistent path: a true empty baseline, MergeSecrets leaves the body as-is.
@@ -83,7 +83,7 @@ func writeTestFile(path, content string) error {
 // and validates bodies with the real config loader (as main.go wires it).
 func newPathHandler(configPath string) *Handler {
 	return New(&Deps{
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			// context.Background(): no *testing.T in scope in this helper.
 			return config.LoadFromBytes(context.Background(), data)
 		},

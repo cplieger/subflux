@@ -37,7 +37,8 @@ func testAdminServer(t *testing.T) *Server {
 		activity: activity.New(10),
 		alerts:   activity.NewAlertLog(10),
 	}
-	s.live.Store(&liveState{cfg: &authTestConfig{}})
+	// Breach checking off: this fixture has no HTTPClient (see testAuthServer).
+	s.live.Store(&liveState{cfg: testConfig(t, "auth:\n  check_breached_passwords: false")})
 	s.authH = &authhandlers.Handler{
 		Store:      authDB,
 		AdminDB:    authDB,

@@ -70,7 +70,12 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 	}
-	s.live.Store(&liveState{cfg: &authTestConfig{}})
+	// check_breached_passwords: OFF. The 28-method fake this replaced returned
+	// false from CheckBreachedPasswords while the real config DEFAULTS IT ON,
+	// so these tests have never run the production default — and turning it on
+	// here would send every password in the suite to HIBP over the network.
+	// The fixture now says so instead of a fake answering quietly.
+	s.live.Store(&liveState{cfg: testConfig(t, "auth:\n  check_breached_passwords: false")})
 	s.authH = &authhandlers.Handler{
 		Store:       authDB,
 		AdminDB:     authDB,
@@ -87,25 +92,6 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	})
 	return s, authDB
 }
-
-// authTestConfig implements api.ConfigProvider for auth tests.
-type authTestConfig struct {
-	qhMockConfig
-
-	breachedCheck bool
-}
-
-func (c *authTestConfig) CheckBreachedPasswords() bool { return c.breachedCheck }
-func (c *authTestConfig) OIDCEnabled() bool            { return false }
-func (c *authTestConfig) BasicAuthEnabled() bool       { return true }
-func (c *authTestConfig) SessionIdleTimeout() time.Duration {
-	return 24 * time.Hour
-}
-
-func (c *authTestConfig) SessionAbsoluteTimeout() time.Duration {
-	return 7 * 24 * time.Hour
-}
-func (c *authTestConfig) WebAuthnRPID() string { return "" }
 
 // createTestUser creates a user in the DB with the given username and password.
 func createTestUser(t *testing.T, db *authstore.Store, username, password string) *auth.User {

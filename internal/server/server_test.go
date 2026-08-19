@@ -30,7 +30,7 @@ func securityChain(h http.Handler) http.Handler {
 
 func TestHandleHealth_returns_ok(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	s.ready.Set(true)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -58,7 +58,7 @@ func TestHandleHealth_returns_ok(t *testing.T) {
 
 func TestHandleHealth_not_ready(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/health", http.NoBody)
@@ -85,7 +85,7 @@ func TestHandleHealth_not_ready(t *testing.T) {
 
 func TestHandleScan_rejects_non_post(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
@@ -202,7 +202,7 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
 	}
-	ls := &liveState{cfg: &qhMockConfig{}}
+	ls := &liveState{cfg: testConfig(t)}
 	s.live.Store(ls)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -253,7 +253,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 
 	// Simulate a running full scan: the guard flag plus the active
 	// full-scan entry PrepareFullScan leaves while a scan runs.
@@ -304,7 +304,7 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 	s.scanning.Store(true)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -332,7 +332,7 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
@@ -36,9 +37,17 @@ import (
 // (scanning.ScanEngine, and the unexported ones in polling, manualops and
 // queryhandlers), so widening it back into a single eight-method interface here
 // would only re-create the hub those declarations replaced.
+//
+// The config is taken CONCRETE for the mirror-image reason. Both ends of this
+// signature are composition roots — main.go supplies the func, internal/server
+// holds the live *config.Config and calls it — so neither end has anything to
+// hide from the other. What the wiring reads (Providers, Scores, Sync) plus what
+// it hands to search.WithConfig (SearchCfg's 9) is 12 of the type's 37 methods,
+// but a wiring-owned interface stating those 12 would be a THIRD name for a
+// surface search already declares and config already implements.
 type Func func(
 	ctx context.Context,
-	cfg api.ConfigProvider,
+	cfg *config.Config,
 	db search.SearchStore,
 	m search.SearchMetrics,
 ) (*search.Engine, *scorer.Engine, []api.Provider, error)

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 )
 
@@ -45,7 +44,7 @@ func TestSaveTransaction_concurrent_saves_keep_live_and_disk_in_sync(t *testing.
 		release     = make(chan struct{})
 		releaseOnce sync.Once
 	)
-	hotReload := func(_ context.Context, cfg api.ConfigProvider) error {
+	hotReload := func(_ context.Context, cfg *config.Config) error {
 		mu.Lock()
 		liveURL = cfg.Sonarr().URL
 		calls++

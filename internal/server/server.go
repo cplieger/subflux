@@ -216,10 +216,11 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 
 // authBypass reports whether auth.disable_auth is currently set. It reads the
 // live config so toggling disable_auth via hot-reload takes effect without a
-// restart (the Authenticator calls it per request).
+// restart (the Authenticator calls it per request). Unconfigured mode has no
+// config and therefore no bypass.
 func (s *Server) authBypass() bool {
-	cfg, ok := s.state().cfg.(*config.Config)
-	return ok && cfg.AuthDisabled()
+	cfg := s.state().cfg
+	return cfg != nil && cfg.AuthDisabled()
 }
 
 // sessionActivityThrottle is the minimum interval between session-activity
@@ -333,7 +334,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 
 	addr := fmt.Sprintf(":%d", ls.cfg.ServerPort())
 
-	if cfg, ok := s.state().cfg.(*config.Config); ok && cfg.AuthDisabled() {
+	if cfg := s.state().cfg; cfg != nil && cfg.AuthDisabled() {
 		slog.Warn("AUTHENTICATION DISABLED via auth.disable_auth config; all requests treated as admin")
 		s.alerts.RecordPersistent("security",
 			"Authentication is DISABLED (auth.disable_auth): all requests are treated as admin. Remove this setting to restore login.")

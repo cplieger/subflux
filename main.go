@@ -35,6 +35,7 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/subflux/internal/wiring"
 	"github.com/cplieger/webhttp/v2"
@@ -44,15 +45,13 @@ import (
 // join where neither side imports the other, so the assertion is the only place
 // the check can be made and a failure names the pair.
 //
-// *boltstore.DB and *scorer.Engine are deliberately absent: both are handed
-// straight to a typed parameter (server.New(db server.Store, ...) and the
-// wiring.Func return), so the call site already type-checks the surface each
-// consumer requires. storetest.Store checks the store's remainder from
-// boltstore's own contract test.
-var (
-	_ server.AuthStore   = (*authstore.Store)(nil)
-	_ api.ConfigProvider = (*config.Config)(nil)
-)
+// *boltstore.DB, *scorer.Engine and *config.Config are deliberately absent: all
+// three are handed straight to a typed parameter (server.New(db server.Store,
+// ...), the wiring.Func return, and server.WithConfig(*config.Config)), so the
+// call site already type-checks the surface each consumer requires.
+// storetest.Store checks the store's remainder from boltstore's own contract
+// test.
+var _ server.AuthStore = (*authstore.Store)(nil)
 
 //go:embed config.example.yaml
 var defaultConfig []byte
@@ -507,8 +506,8 @@ func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
 }
 
 // newConfigLoader returns a ConfigLoader that parses and validates config YAML.
-func newConfigLoader() api.ConfigLoader {
-	return func(data []byte) (api.ConfigProvider, error) {
+func newConfigLoader() confighandlers.ConfigLoader {
+	return func(data []byte) (*config.Config, error) {
 		return config.LoadFromBytes(context.Background(), data)
 	}
 }
@@ -520,7 +519,7 @@ func newConfigLoader() api.ConfigLoader {
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
 func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg api.ConfigProvider, db search.SearchStore, m search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
+	return func(ctx context.Context, cfg *config.Config, db search.SearchStore, m search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
 		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err

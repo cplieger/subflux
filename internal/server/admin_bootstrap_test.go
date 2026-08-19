@@ -35,7 +35,7 @@ import (
 // catch-all serves HTML.
 func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 
