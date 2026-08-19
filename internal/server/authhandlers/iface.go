@@ -10,8 +10,8 @@ import (
 // Handler.Store: the session, user, and passkey-inspection surface the
 // self-service account flows (login, logout, me, password change, OIDC
 // link/unlink) reach for. It is wider than the three role interfaces below
-// because those flows span all three domains; it is still only the twelve
-// methods they call.
+// because those flows span all three domains; it is still only the methods
+// those flows call.
 type AccountStore interface {
 	CreateSession(ctx context.Context, sess *auth.Session) error
 	GetSessionByHash(ctx context.Context, tokenHash string) (sess *auth.Session, found bool, err error)

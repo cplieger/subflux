@@ -364,7 +364,6 @@ func BenchmarkCache_GetOrFetch(b *testing.B) {
 
 func TestCache_GetOrFetchCtx(t *testing.T) {
 	t.Parallel()
-	c := New[string](time.Hour)
 
 	t.Run("basic fetch", func(t *testing.T) {
 		t.Parallel()
@@ -444,7 +443,6 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 	// Verify caller's own context cancellation returns ctx.Err().
 	t.Run("caller context respected", func(t *testing.T) {
 		t.Parallel()
-		_ = c
 		c := New[string](time.Hour)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // pre-cancel

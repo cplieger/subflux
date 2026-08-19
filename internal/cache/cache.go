@@ -36,6 +36,17 @@ func (tg *typedGroup[T]) DoChan(key string, fn func() (T, error)) <-chan singlef
 // Cache is a generic TTL cache for provider lookups. Thread-safe.
 // Used to avoid redundant API calls when scanning multiple episodes
 // of the same series (e.g. title ID lookups, torrent ID lookups).
+//
+// The zero value is NOT usable: always construct with New. Two things are
+// missing from it, and only the first is a crash. The entries map is nil, so
+// Set (and every path through it, GetOrFetch and GetOrFetchCtx) panics on the
+// write; Get and Clear happen to tolerate a nil map, which is what makes the
+// zero value look serviceable until the first store. The ttl is also 0, so
+// even with a map every entry would expire the instant it was written. A zero
+// ttl is meaningful on its own — New(0) is a legal call that yields exactly
+// that expire-immediately cache — so it is not reinterpreted here as a default
+// or as "never expires", and the zero value cannot be rescued by giving it a
+// second meaning.
 type Cache[T any] struct {
 	group   typedGroup[T]
 	entries map[string]entry[T]
