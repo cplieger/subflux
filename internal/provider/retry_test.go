@@ -295,7 +295,7 @@ func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	counter, ok := p.(api.ShowSubtitleCounter)
+	counter, ok := p.(ShowSubtitleCounter)
 	if !ok {
 		t.Fatal("wrapped provider does not implement ShowSubtitleCounter")
 	}
@@ -316,7 +316,7 @@ func TestWrapRetry_plain_provider_no_counter(t *testing.T) {
 	inner := &retryFakeProvider{name: "hdbits"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	if _, ok := p.(api.ShowSubtitleCounter); ok {
+	if _, ok := p.(ShowSubtitleCounter); ok {
 		t.Error("plain provider should not implement ShowSubtitleCounter")
 	}
 }

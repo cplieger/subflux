@@ -28,8 +28,16 @@ type seasonKey struct {
 	Season int
 }
 
+// showCounter is the show-level pre-check: one count per show+language, used to
+// decide whether an entire series is worth scanning. ONE method, and it is
+// redeclared here rather than imported from the provider package because one
+// method is cheaper to restate than to couple to.
+type showCounter interface {
+	CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error)
+}
+
 type seasonTracker struct {
-	counter api.ShowSubtitleCounter
+	counter showCounter
 	cache   *showskip.Cache
 	seasons map[seasonKey]*seasonState
 	seed    seedDeps
@@ -59,7 +67,7 @@ type seedDeps struct {
 	MaxAttempts int
 }
 
-func newSeasonTracker(counter api.ShowSubtitleCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
+func newSeasonTracker(counter showCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
 	if seed.Now == nil {
 		seed.Now = time.Now
 	}

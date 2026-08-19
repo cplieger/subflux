@@ -90,7 +90,7 @@ func TryComputeHash(ctx context.Context, ls *LiveState, req *api.SearchRequest, 
 // BuildSearchResults converts scored results to API response format. sc
 // supplies the server-computed tier label per score (a nil scorer — only
 // possible before the first successful wire — leaves tiers empty).
-func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef, sc api.Scorer) []SearchResult {
+func BuildSearchResults(scored []api.ScoredResult, refs []api.DownloadedRef, sc tierLabeller) []SearchResult {
 	if len(scored) > MaxResults {
 		scored = scored[:MaxResults]
 	}

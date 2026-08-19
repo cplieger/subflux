@@ -46,9 +46,6 @@ const (
 
 // --- Factory and Provider ---
 
-// Compile-time assertion: *Provider satisfies api.ShowSubtitleCounter.
-var _ api.ShowSubtitleCounter = (*Provider)(nil)
-
 // Compile-time assertion that Provider implements api.Provider.
 var _ api.Provider = (*Provider)(nil)
 
@@ -199,7 +196,7 @@ func mergeNumberingResults(perScheme []numberingResult) ([]api.Subtitle, error) 
 // show (by IMDB ID) in a single language, without specifying season/episode.
 // This enables show-level pre-checks: if a show has very few subtitles
 // relative to its episode count, the caller can skip the entire series.
-// Implements api.ShowSubtitleCounter.
+// Implements the optional show-level count provider.ResolveShowCounter finds.
 func (p *Provider) CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error) {
 	imdbID, lang := q.ImdbID, q.Language
 	sanitized := classify.SanitizeImdbID(imdbID)

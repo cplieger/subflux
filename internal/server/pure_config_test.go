@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -118,64 +117,10 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 // moved to internal/server/confighandlers/handler_test.go with the rest of
 // the config HTTP surface.
 
-// --- buildProviderSchemas ---
-
-func TestBuildProviderSchemas_empty_registry(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	schemas := api.BuildProviderSchemas(reg)
-	if len(schemas) != 0 {
-		t.Errorf("BuildProviderSchemas(empty) = %d schemas, want 0", len(schemas))
-	}
-}
-
-func TestBuildProviderSchemas_with_providers(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "gestdown"}, nil
-	})
-	reg.Register("opensubtitles", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "opensubtitles"}, nil
-	})
-	reg.RegisterSchema("opensubtitles", "OpenSubtitles", []api.ProviderSchemaField{
-		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
-		{Key: "username", Label: "Username", Type: "text"},
-	})
-	// gestdown has no schema registered; label should fall back to name.
-
-	schemas := api.BuildProviderSchemas(reg)
-
-	if len(schemas) != 2 {
-		t.Fatalf("BuildProviderSchemas() = %d schemas, want 2", len(schemas))
-	}
-
-	// Schemas should be in sorted order (from ProviderNames).
-	if schemas[0].Name != "gestdown" {
-		t.Errorf("schemas[0].Name = %q, want %q", schemas[0].Name, "gestdown")
-	}
-	if schemas[1].Name != "opensubtitles" {
-		t.Errorf("schemas[1].Name = %q, want %q", schemas[1].Name, "opensubtitles")
-	}
-
-	// gestdown: label falls back to name.
-	if schemas[0].Label != "gestdown" {
-		t.Errorf("gestdown.Label = %q, want %q (fallback to name)", schemas[0].Label, "gestdown")
-	}
-
-	if schemas[1].Label != "OpenSubtitles" {
-		t.Errorf("opensubtitles.Label = %q, want %q", schemas[1].Label, "OpenSubtitles")
-	}
-	if len(schemas[1].Settings) != 2 {
-		t.Fatalf("opensubtitles.Settings = %d fields, want 2", len(schemas[1].Settings))
-	}
-	if schemas[1].Settings[0].Key != "api_key" {
-		t.Errorf("settings[0].Key = %q, want %q", schemas[1].Settings[0].Key, "api_key")
-	}
-	if !schemas[1].Settings[0].Secret {
-		t.Error("settings[0].Secret = false, want true")
-	}
-}
+// The BuildProviderSchemas tests moved to
+// internal/server/confighandlers/provider_schema_test.go with the function
+// itself, which left internal/api because that package implements no registry
+// and consumes no schema.
 
 // --- provider.ClearCaches ---
 
@@ -211,29 +156,6 @@ func TestClearProviderCaches_nil_providers(t *testing.T) {
 	t.Parallel()
 	// Should not panic with nil slice.
 	provider.ClearCaches(nil)
-}
-
-func TestBuildProviderSchemas_excludes_mock_provider(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	reg.Register("mock", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "mock"}, nil
-	})
-	reg.RegisterSchema("mock", "Mock Provider", nil)
-	reg.Register("opensubtitles", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "opensubtitles"}, nil
-	})
-	reg.RegisterSchema("opensubtitles", "OpenSubtitles", nil)
-
-	schemas := api.BuildProviderSchemas(reg, "mock")
-	for _, s := range schemas {
-		if s.Name == "mock" {
-			t.Error("BuildProviderSchemas should exclude 'mock' provider")
-		}
-	}
-	if len(schemas) != 1 {
-		t.Errorf("BuildProviderSchemas len = %d, want 1 (mock excluded)", len(schemas))
-	}
 }
 
 func TestEnabledProviders_output_is_sorted(t *testing.T) {

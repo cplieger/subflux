@@ -39,7 +39,7 @@ var defaultMatchDeps = scoring.MatchDeps{
 
 // scoreResults scores each subtitle against the video and returns them
 // sorted by descending score, with provider priority as tiebreaker.
-func scoreResults(sc api.Scorer, video *api.VideoInfo, subs []api.Subtitle, provPriority func(api.ProviderID) int) []scoredSub {
+func scoreResults(sc Scorer, video *api.VideoInfo, subs []api.Subtitle, provPriority func(api.ProviderID) int) []scoredSub {
 	scored := make([]scoredSub, len(subs))
 	for i := range subs {
 		matches := scoring.BuildMatches(video, &subs[i], defaultMatchDeps)

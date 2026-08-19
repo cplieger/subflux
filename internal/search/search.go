@@ -60,12 +60,28 @@ func syncSkipThreshold(scores api.Scores) int {
 	return scores.Source + scores.ReleaseGroup - 1
 }
 
+// Scorer turns a subtitle's release-attribute match set into a quality score.
+// Both methods, because the engine uses both: it scores every candidate and
+// labels the winner's tier. Declared here because this is the package that does
+// the scoring work; the manual path takes only the labelling half at its own
+// site.
+type Scorer interface {
+	// Score computes a quality score for a subtitle match set. Returns the
+	// full score (including the hash bonus) and the release-attribute-only
+	// score. A verifiable hash match short-circuits to the hash weight alone.
+	Score(sub api.SubtitleInfo, matches api.MatchSet) (score, scoreNoHash int)
+	// ScoreToTier maps a numeric score to a human-readable tier label via one
+	// global threshold table: excellent >= 80, good >= 50, acceptable >= 20,
+	// minimal >= 1, else none. Thresholds do not vary by media type.
+	ScoreToTier(score int) api.ScoreTier
+}
+
 // Engine coordinates subtitle searches.
 type Engine struct {
 	store           SearchStore
 	cfg             SearchCfg
 	metrics         SearchMetrics
-	scorer          api.Scorer
+	scorer          Scorer
 	syncer          SubtitleSyncer
 	tracks          TrackDetector
 	fileWriter      FileWriter
@@ -91,7 +107,7 @@ func WithConfig(c SearchCfg) Option { return func(e *Engine) { e.cfg = c } }
 func WithMetrics(m SearchMetrics) Option { return func(e *Engine) { e.metrics = m } }
 
 // WithScorer sets the subtitle scorer.
-func WithScorer(s api.Scorer) Option { return func(e *Engine) { e.scorer = s } }
+func WithScorer(s Scorer) Option { return func(e *Engine) { e.scorer = s } }
 
 // WithSyncer sets the subtitle syncer.
 func WithSyncer(s SubtitleSyncer) Option { return func(e *Engine) { e.syncer = s } }

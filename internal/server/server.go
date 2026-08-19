@@ -29,6 +29,7 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/events"
@@ -178,7 +179,7 @@ type Store interface {
 }
 
 // New creates a Server with the given options. db and reg are required.
-func New(db Store, reg api.ProviderRegistry, opts ...Option) *Server {
+func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	s := &Server{
 		db: db,
 		stores: storeFacade{

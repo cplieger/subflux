@@ -161,7 +161,7 @@ func (m *mockFilterConfig) ProvidersForTarget(target *api.SubtitleTarget, all []
 
 // newEngine is a test helper that mirrors the old 7-parameter New signature.
 func newEngine(providers []api.Provider, db SearchStore, cfg SearchCfg,
-	m SearchMetrics, sc api.Scorer, syncer SubtitleSyncer, tracks TrackDetector,
+	m SearchMetrics, sc Scorer, syncer SubtitleSyncer, tracks TrackDetector,
 ) *Engine {
 	return New(providers, WithStore(db), WithConfig(cfg),
 		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks))

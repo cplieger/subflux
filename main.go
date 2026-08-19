@@ -44,14 +44,14 @@ import (
 // join where neither side imports the other, so the assertion is the only place
 // the check can be made and a failure names the pair.
 //
-// *boltstore.DB is deliberately absent: newServer hands it straight to
-// server.New(db server.Store, ...), so the call site already type-checks the
-// whole surface the server requires, and storetest.Store checks the rest from
+// *boltstore.DB and *scorer.Engine are deliberately absent: both are handed
+// straight to a typed parameter (server.New(db server.Store, ...) and the
+// wiring.Func return), so the call site already type-checks the surface each
+// consumer requires. storetest.Store checks the store's remainder from
 // boltstore's own contract test.
 var (
 	_ server.AuthStore   = (*authstore.Store)(nil)
 	_ api.ConfigProvider = (*config.Config)(nil)
-	_ api.Scorer         = (*scorer.Engine)(nil)
 )
 
 //go:embed config.example.yaml
@@ -470,7 +470,7 @@ func ensureConfigFile(path string, def []byte) error {
 // server assemblies (configured cold boot and unconfigured mode); the callers
 // append only their mode-specific option (WithConfig / WithPort). One builder
 // means the two assemblies cannot drift apart again.
-func serverOptions(reg api.ProviderRegistry, syncExec syncing.SyncExec) []server.Option {
+func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.Option {
 	return []server.Option{
 		server.WithDefaultConfig(defaultConfig),
 		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
@@ -519,8 +519,8 @@ func newConfigLoader() api.ConfigLoader {
 // carries the process-isolation executor (P13) into every engine the wire
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
-func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg api.ConfigProvider, db search.SearchStore, m search.SearchMetrics) (*search.Engine, api.Scorer, []api.Provider, error) {
+func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func {
+	return func(ctx context.Context, cfg api.ConfigProvider, db search.SearchStore, m search.SearchMetrics) (*search.Engine, *scorer.Engine, []api.Provider, error) {
 		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err

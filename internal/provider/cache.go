@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"context"
+
 	"github.com/cplieger/subflux/internal/api"
 )
 
@@ -30,11 +32,22 @@ func ClearCaches(providers []api.Provider) {
 	}
 }
 
+// ShowSubtitleCounter is the optional show-level count a provider may support:
+// how many subtitles exist for a show+language without naming an episode. ONE
+// method, and it is declared here rather than beside Provider because it is not
+// part of the provider contract — only OpenSubtitles implements it, and the
+// registry discovers that by type assertion.
+type ShowSubtitleCounter interface {
+	// CountShowSubtitles returns the total number of subtitles available for
+	// the queried show in the queried language.
+	CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error)
+}
+
 // ResolveShowCounter finds the first provider implementing ShowSubtitleCounter.
 // Called at the composition root to inject the resolved counter into LiveState.
-func ResolveShowCounter(providers []api.Provider) api.ShowSubtitleCounter {
+func ResolveShowCounter(providers []api.Provider) ShowSubtitleCounter {
 	for _, p := range providers {
-		if c, ok := p.(api.ShowSubtitleCounter); ok {
+		if c, ok := p.(ShowSubtitleCounter); ok {
 			return c
 		}
 	}

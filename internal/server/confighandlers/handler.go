@@ -31,7 +31,7 @@ type PathValidationResponse struct {
 
 // Deps holds all dependencies for the config handler family.
 type Deps struct {
-	Registry      api.ProviderRegistry
+	Registry      SchemaRegistry
 	Alerts        AlertLog
 	LoadConfig    api.ConfigLoader
 	SchemaFunc    api.SchemaFunc
@@ -51,7 +51,7 @@ type StateView struct {
 
 // Handler holds all dependencies for the config handler family.
 type Handler struct {
-	registry      api.ProviderRegistry
+	registry      SchemaRegistry
 	alerts        AlertLog
 	loadConfig    api.ConfigLoader
 	schemaFunc    api.SchemaFunc
@@ -244,7 +244,7 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
-	api.WriteJSON(w, h.schemaFunc(api.BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
+	api.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
 }
 
 // --- Internal helpers ---

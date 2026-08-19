@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -37,7 +38,7 @@ import (
 type liveState struct {
 	cfg       api.ConfigProvider
 	engine    *search.Engine
-	scorer    api.Scorer
+	scorer    *scorer.Engine
 	sonarr    api.SonarrClient
 	radarr    api.RadarrClient
 	webauthn  *webauthn.WebAuthn
@@ -105,9 +106,9 @@ type Server struct {
 	pollDeps
 	previewDeps
 	db           Store
-	subtitleProc api.SubtitleProcessor
+	subtitleProc synchandlers.SubtitleProcessor
 	metrics      Metrics
-	registry     api.ProviderRegistry
+	registry     confighandlers.SchemaRegistry
 	manualH      *manualops.Handler
 	previewH     *previewhandlers.Handler
 	loadConfig   api.ConfigLoader
@@ -195,7 +196,13 @@ func WithSchema(f api.SchemaFunc) Option { return func(s *Server) { s.schemaFunc
 func WithConfigLoader(l api.ConfigLoader) Option { return func(s *Server) { s.loadConfig = l } }
 
 // WithSubtitleProc sets the subtitle processor.
-func WithSubtitleProc(p api.SubtitleProcessor) Option { return func(s *Server) { s.subtitleProc = p } }
+// WithSubtitleProc injects the SRT processor. Typed as the sync handlers' own
+// interface rather than re-declared here: the server calls none of its methods,
+// it only carries the value to synchandlers and previewhandlers, and
+// previewhandlers takes a narrower view of the same value.
+func WithSubtitleProc(p synchandlers.SubtitleProcessor) Option {
+	return func(s *Server) { s.subtitleProc = p }
+}
 
 // WithMetrics sets the metrics recorder.
 func WithMetrics(m Metrics) Option { return func(s *Server) { s.metrics = m } }

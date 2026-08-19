@@ -111,6 +111,14 @@ type manualEngine interface {
 	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant api.Variant) (synced []byte, offsetMs int64)
 }
 
+// tierLabeller maps a numeric score onto the tier label the manual-search
+// popup renders. ONE of the scorer's two methods: the engine has already
+// scored these candidates by the time they reach this package, so the manual
+// path never scores anything itself.
+type tierLabeller interface {
+	ScoreToTier(score int) api.ScoreTier
+}
+
 // LiveState holds the runtime state needed for a manual search pass.
 // Sonarr/Radarr are the narrow by-ID surfaces manual downloads use;
 // SonarrLib/RadarrLib are the library-listing surfaces the resolve
@@ -118,7 +126,7 @@ type manualEngine interface {
 type LiveState struct {
 	Cfg       api.ConfigProvider
 	Engine    manualEngine
-	Scorer    api.Scorer
+	Scorer    tierLabeller
 	Sonarr    ManualSonarrClient
 	Radarr    ManualRadarrClient
 	SonarrLib ResolveSonarrClient

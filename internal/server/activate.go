@@ -12,6 +12,7 @@ import (
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -53,7 +54,7 @@ func (m activationMode) String() string {
 // in the live snapshot.
 type activationCandidate struct {
 	engine    *search.Engine
-	scorer    api.Scorer
+	scorer    *scorer.Engine
 	sonarr    api.SonarrClient
 	radarr    api.RadarrClient
 	webauthn  *webauthn.WebAuthn

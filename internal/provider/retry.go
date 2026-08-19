@@ -46,7 +46,7 @@ func WrapRetryAll(providers []api.Provider, maxAttempts int, initBackoff time.Du
 // preserves that interface.
 func WrapRetry(p api.Provider, maxAttempts int, initBackoff time.Duration) api.Provider {
 	rp := &retryProvider{inner: p, maxAttempts: maxAttempts, initBackoff: initBackoff}
-	if c, ok := p.(api.ShowSubtitleCounter); ok {
+	if c, ok := p.(ShowSubtitleCounter); ok {
 		return &retryCounterProvider{retryProvider: rp, counter: c}
 	}
 	return rp
@@ -114,7 +114,7 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 type retryCounterProvider struct {
 	*retryProvider
 
-	counter api.ShowSubtitleCounter
+	counter ShowSubtitleCounter
 }
 
 // CountShowSubtitles delegates to the inner provider without retry.

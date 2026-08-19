@@ -56,9 +56,6 @@ type FactoryFunc func(ctx context.Context, settings map[string]any) (api.Provide
 // Exported as a type alias for documentation; the actual map lives on Registry.
 var _ = FactoryFunc(nil) // compile-time assertion: FactoryFunc is a valid type
 
-// Compile-time assertion: *Registry satisfies api.ProviderRegistry.
-var _ api.ProviderRegistry = (*Registry)(nil)
-
 // Registry holds provider factories keyed by name.
 type Registry struct {
 	factories map[api.ProviderID]FactoryFunc

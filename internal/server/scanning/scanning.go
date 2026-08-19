@@ -219,7 +219,7 @@ type LiveState struct {
 	Engine      ScanEngine
 	Sonarr      ScanSonarrClient
 	Radarr      ScanRadarrClient
-	ShowCounter api.ShowSubtitleCounter
+	ShowCounter showCounter
 	Providers   []api.Provider
 }
 

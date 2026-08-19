@@ -9,9 +9,6 @@ import (
 	"github.com/cplieger/subflux/internal/search/scoring"
 )
 
-// Compile-time interface assertion.
-var _ api.Scorer = (*Engine)(nil)
-
 // Engine is a configured scorer.
 type Engine struct {
 	scores api.Scores

@@ -25,13 +25,28 @@ type SyncStore interface {
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 }
 
+// SubtitleProcessor is the SRT surface the sync verbs drive: decode to UTF-8,
+// parse to cues, shift and re-serialize, and run audio-based alignment. All
+// four of the processor's methods, because applying an offset is exactly
+// parse-shift-write and the audio path adds the fourth.
+//
+// Exported because the server names it: WithSubtitleProc carries the processor
+// from the composition root to here, and naming this type is what stops a
+// second declaration from drifting.
+type SubtitleProcessor interface {
+	NormalizeEncoding(data []byte) []byte
+	ParseSRT(data []byte) ([]api.SubtitleCue, error)
+	WriteSRT(cues []api.SubtitleCue) ([]byte, error)
+	SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) api.AudioSyncResult
+}
+
 // Deps holds all dependencies for the sync handler family. Resolve is the
 // S7 typed-reference resolver: sync verbs address the subtitle by FileRef
 // and the server resolves both the subtitle path (store row) and the video
 // path (same media) — no client-supplied paths.
 type Deps struct {
 	Store        SyncStore
-	SubtitleProc api.SubtitleProcessor
+	SubtitleProc SubtitleProcessor
 	Activity     *activity.Log
 	Resolve      *resolve.Resolver
 }
@@ -39,7 +54,7 @@ type Deps struct {
 // Handler holds all dependencies for the sync handler family.
 type Handler struct {
 	store        SyncStore
-	subtitleProc api.SubtitleProcessor
+	subtitleProc SubtitleProcessor
 	activity     *activity.Log
 	resolve      *resolve.Resolver
 }

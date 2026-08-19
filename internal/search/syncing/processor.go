@@ -9,7 +9,7 @@ import (
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
-// SubtitleProcessor implements api.SubtitleProcessor directly using subsync,
+// SubtitleProcessor implements the SRT surface synchandlers declares, using subsync,
 // without an intermediate backend interface. The lightweight operations
 // (parse/write/shift/normalize) always run in-process; the heavy audio sync
 // routes through the configured SyncExec.
@@ -25,7 +25,6 @@ func NewSubtitleProcessorWithExec(exec SyncExec) SubtitleProcessor {
 }
 
 // Compile-time check.
-var _ api.SubtitleProcessor = SubtitleProcessor{}
 
 // apiCuesFromSubsync converts []subsync.Cue to []api.SubtitleCue via
 // explicit field-by-field copy.

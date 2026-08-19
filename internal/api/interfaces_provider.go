@@ -40,16 +40,6 @@ type Provider interface {
 	Download(ctx context.Context, sub *Subtitle) ([]byte, error)
 }
 
-// ShowSubtitleCounter can count total subtitles for a show+language without
-// specifying season/episode. Used for show-level pre-checks: if a show has
-// very few subtitles relative to its episode count, skip the entire series.
-// Only providers with show-level query support implement this (OpenSubtitles).
-type ShowSubtitleCounter interface {
-	// CountShowSubtitles returns the total number of subtitles available for
-	// the queried show in the queried language.
-	CountShowSubtitles(ctx context.Context, q ShowSubtitleQuery) (int, error)
-}
-
 // ShowSubtitleQuery names the two values a show-level count is taken over.
 // They are both free-form strings that no call site can tell apart by shape,
 // so they are named rather than positional: a transposed pair would query a
@@ -61,34 +51,6 @@ type ShowSubtitleQuery struct {
 	ImdbID string
 	// Language is the subtitle language, in subflux's internal code space.
 	Language string
-}
-
-// --- Provider Registry ---
-
-// ProviderRegistry manages provider factories and schema metadata.
-type ProviderRegistry interface {
-	// LoadAll instantiates providers from the given config map, skipping
-	// unconfigured entries. Returns an error if a configured provider fails.
-	LoadAll(ctx context.Context, configs map[ProviderID]ProviderCfg) ([]Provider, error)
-	// ProviderNames returns all registered provider names in priority order.
-	ProviderNames() []ProviderID
-	// Schema returns the UI label and settings fields for a named provider.
-	Schema(name ProviderID) (label string, fields []ProviderSchemaField)
-}
-
-// --- Scoring ---
-
-// Scorer turns a subtitle's release-attribute match set into a quality score.
-type Scorer interface {
-	// Score computes a quality score for a subtitle match set. Returns the
-	// full score (including the hash bonus) and the release-attribute-only
-	// score. A verifiable hash match short-circuits to the hash weight alone.
-	Score(sub SubtitleInfo, matches MatchSet) (score, scoreNoHash int)
-	// ScoreToTier maps a numeric score to a human-readable tier label via
-	// one global threshold table: excellent >= 80, good >= 50,
-	// acceptable >= 20, minimal >= 1, else none. Thresholds do not vary by
-	// media type.
-	ScoreToTier(score int) ScoreTier
 }
 
 // --- Arr clients ---
@@ -155,17 +117,4 @@ type AudioSyncResult struct {
 	Offset     int64   // milliseconds
 	Confidence float64 // 0.0 to 1.0
 	Applied    bool    // true if sync was applied and should be saved
-}
-
-// SubtitleProcessor provides low-level SRT manipulation operations.
-// Used by sync handlers to avoid importing the subsync package directly.
-type SubtitleProcessor interface {
-	// NormalizeEncoding converts subtitle data to UTF-8 from detected encoding.
-	NormalizeEncoding(data []byte) []byte
-	// ParseSRT parses SRT subtitle data into individual cues.
-	ParseSRT(data []byte) ([]SubtitleCue, error)
-	// WriteSRT serializes cues back to SRT format.
-	WriteSRT(cues []SubtitleCue) ([]byte, error)
-	// SyncFromAudio runs audio-based sync on subtitle data against the video.
-	SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) AudioSyncResult
 }
