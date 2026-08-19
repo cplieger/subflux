@@ -206,8 +206,24 @@ type ConfigProvider interface {
 
 // --- Search & Scoring ---
 
-// SubtitleSearcher orchestrates subtitle search across providers.
-type SubtitleSearcher interface {
+// SearchEngine is the whole search surface: the scan itself, score simulation
+// for the UI and CLI, provider-timeout state, and post-download processing.
+// Eight methods, and like Store and ConfigProvider it is for composition roots
+// — main's wiring, the server's engine field, and the handler LiveStates.
+//
+// It composed four sub-interfaces (SubtitleSearcher, ScoreSimulator,
+// ProviderTimeoutManager, SubtitlePostProcessor) and no consumer took any of
+// them, so they are gone. Note what the four names claimed: a searcher, a
+// simulator, a timeout manager and a post-processor, as if four collaborators
+// stood behind them. One type implements all eight methods (*search.Engine),
+// every consumer is handed that one type, and the four-way split described a
+// structure the app does not have.
+//
+// Four consumers do take a real subset and each declares it: scanning,
+// polling, manualops and queryhandlers name what they call. Follow those.
+type SearchEngine interface {
+	// --- The scan ---
+
 	SearchTargets(ctx context.Context, req *SearchRequest, videoPath string, targets []SubtitleTarget) (SearchResult, error)
 	// InventoryCoverage records the on-disk/embedded subtitle inventory for a
 	// media item WITHOUT any provider work, stamping its scan state as
@@ -215,30 +231,19 @@ type SubtitleSearcher interface {
 	// show-level skip) so coverage stays truthful for items the scanner
 	// deliberately does not search.
 	InventoryCoverage(ctx context.Context, req *SearchRequest, videoPath string) (coverageChanged bool)
-}
 
-// ScoreSimulator provides subtitle scoring capabilities.
-type ScoreSimulator interface {
+	// --- Score simulation (POST /api/score and the CLI's score command) ---
+
 	SimulateScore(mediaType MediaType, videoRelease, subRelease string, matchedBy MatchMethod) ScoreResult
 	ScoreSubtitles(req *SearchRequest, results []Subtitle) []ScoredResult
-}
 
-// ProviderTimeoutManager manages provider timeout state.
-type ProviderTimeoutManager interface {
+	// --- Provider timeout state ---
+
 	ProviderTimeouts() (status map[ProviderID]ProviderStatus, enabled bool)
 	ResetTimeouts()
-}
 
-// SubtitlePostProcessor handles post-download subtitle processing.
-type SubtitlePostProcessor interface {
+	// --- Post-download processing ---
+
 	SyncAndPostProcess(ctx context.Context, data []byte, videoPath, lang string, variant Variant) (synced []byte, offsetMs int64)
 	HashFile(ctx context.Context, path string) (hash string, size int64, err error)
-}
-
-// SearchEngine composes all search sub-interfaces for composition roots.
-type SearchEngine interface {
-	SubtitleSearcher
-	ScoreSimulator
-	ProviderTimeoutManager
-	SubtitlePostProcessor
 }

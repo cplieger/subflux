@@ -366,8 +366,8 @@ func (e *Engine) stampScanState(ctx context.Context, mediaType api.MediaType,
 	}
 }
 
-// InventoryCoverage implements the local-only half of api.SubtitleSearcher:
-// it refreshes the on-disk/embedded subtitle inventory for a media item and
+// InventoryCoverage is the local-only half of the scan: it refreshes the
+// on-disk/embedded subtitle inventory for a media item and
 // stamps its scan state as inventoried-not-searched, with zero provider
 // work. Scan skip paths (season early stop, show-level skip) call this so
 // coverage badges stay truthful for items the scanner deliberately does not
