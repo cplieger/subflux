@@ -1,7 +1,7 @@
 package coverage_test
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/server/coverage"
@@ -202,7 +202,7 @@ func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 1, Total: 3},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountEpisodesGrouped = %+v, want %+v", got, want)
 	}
 }
@@ -224,7 +224,7 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 		{Language: "en", Variant: "standard", Have: 2, HaveIgnored: 0, Total: 2},
 		{Language: "fr", Variant: "forced", Have: 1, HaveIgnored: 0, Total: 2},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountEpisodesGrouped = %+v, want %+v", got, want)
 	}
 }
@@ -235,7 +235,7 @@ func TestCountEpisodeCoverageGrouped_noEpisodesKeepsTotal(t *testing.T) {
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 5},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountEpisodesGrouped(no episodes) = %+v, want %+v", got, want)
 	}
 }
@@ -259,7 +259,7 @@ func TestCountMovieCoverage_usableTarget(t *testing.T) {
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountMovies(usable) = %+v, want %+v", got, want)
 	}
 }
@@ -273,7 +273,7 @@ func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountMovies(ignored only) = %+v, want %+v", got, want)
 	}
 }
@@ -284,7 +284,7 @@ func TestCountMovieCoverage_missingTarget(t *testing.T) {
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 1},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountMovies(missing) = %+v, want %+v", got, want)
 	}
 }
@@ -300,7 +300,7 @@ func TestCountMovieCoverage_multipleTargetsMixed(t *testing.T) {
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 		{Language: "fr", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("CountMovies(mixed) = %+v, want %+v", got, want)
 	}
 }
@@ -370,7 +370,7 @@ func TestDeduplicateFileRows(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			if got := coverage.DeduplicateFileRows(c.in); !reflect.DeepEqual(got, c.want) {
+			if got := coverage.DeduplicateFileRows(c.in); !slices.Equal(got, c.want) {
 				t.Errorf("DeduplicateFileRows() = %+v, want %+v", got, c.want)
 			}
 		})

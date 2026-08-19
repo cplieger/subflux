@@ -1,7 +1,7 @@
 package coverage
 
 import (
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -85,7 +85,7 @@ func FuzzDeduplicateFileRows(f *testing.F) {
 		}
 
 		// Idempotence: deduplicating an already-deduplicated slice is a no-op.
-		if again := DeduplicateFileRows(result); !reflect.DeepEqual(again, result) {
+		if again := DeduplicateFileRows(result); !slices.Equal(again, result) {
 			t.Errorf("dedup not idempotent: %+v != %+v", again, result)
 		}
 	})
