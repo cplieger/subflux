@@ -3,7 +3,7 @@ module github.com/cplieger/subflux
 go 1.26.7
 
 require (
-	github.com/cplieger/arrapi v1.8.9
+	github.com/cplieger/arrapi v1.8.10
 	github.com/cplieger/atomicfile/v2 v2.9.2
 	github.com/cplieger/auth/v3 v3.0.2
 	github.com/cplieger/health v1.5.2
@@ -45,7 +45,7 @@ require golang.org/x/text v0.41.0 // indirect
 
 require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
-	github.com/cplieger/envx v1.6.3
+	github.com/cplieger/envx v1.6.4
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect

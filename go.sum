@@ -1,13 +1,13 @@
 github.com/coreos/go-oidc/v3 v3.20.0 h1:EtE0WIBHk03N+DqGkY4+UONzzZHk7amKt6IyNd7OsZE=
 github.com/coreos/go-oidc/v3 v3.20.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
-github.com/cplieger/arrapi v1.8.9 h1:+V7962/RT4TGFPSK0Ce/3df6lcexNHMKhYL7U72biag=
-github.com/cplieger/arrapi v1.8.9/go.mod h1:6yJ4HQqIzBrYHSjf6i1nzuhN7ahIgATwwKT++U22lkI=
+github.com/cplieger/arrapi v1.8.10 h1:5zO69uLeks7qzV+69K7kzDE2+C4GNxFHtERgyVLHEm0=
+github.com/cplieger/arrapi v1.8.10/go.mod h1:ENE5hBRkBSaQj3/WVehbqJavdl0joz2Hel23zbkFDdc=
 github.com/cplieger/atomicfile/v2 v2.9.2 h1:dhqgSyfDullfiQ7pzBMnri/cqEn5um7jcVr1MlB2Avk=
 github.com/cplieger/atomicfile/v2 v2.9.2/go.mod h1:MOwvjQY3zwkRnm4L8WDplg7MqHM6KxWCAWPqxjWaIN4=
 github.com/cplieger/auth/v3 v3.0.2 h1:khhK5S6Wq4kSjW3o8uRyuWHm5kZ+Aaw2H5JdNru52Hs=
 github.com/cplieger/auth/v3 v3.0.2/go.mod h1:6ZATY+FP7gyPFPj3ZtAKyn1ZSuDZuREVcVjN/5+kWPM=
-github.com/cplieger/envx v1.6.3 h1:3he+iy29bHR+54SuzYvf/Jr0o09MR2G7aVQrGcW78Yw=
-github.com/cplieger/envx v1.6.3/go.mod h1:YnYflcMoRRc46M01qds5OoA8Y5o7cGSNBqqOvFOLlwo=
+github.com/cplieger/envx v1.6.4 h1:hDftMDkAb/8pBNWuPY2gME3fQGkxFyp0Kr4WmYzdUuU=
+github.com/cplieger/envx v1.6.4/go.mod h1:2iEIeIpxXH5p4pf2+LXMLFGjg+Pq6R78RHH0rSpVUMw=
 github.com/cplieger/envx/yamlenv v1.2.3 h1:cU/DWjqWnluTCSls+qadcpb1tuo2zS1YDKLIwvAB5cI=
 github.com/cplieger/envx/yamlenv v1.2.3/go.mod h1:BZhjmGpeC0+aV5iXXMrdGgM1l0flmv79BYAAsL4mAGE=
 github.com/cplieger/health v1.5.2 h1:EJcp1u5Me5ARd028gbchruhQqYEASMYuxB2cIrEB048=
