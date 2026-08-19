@@ -191,7 +191,7 @@ func TestExtractSeriesPrefix(t *testing.T) {
 
 // --- CountEpisodesGrouped ---
 
-func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.T) {
+func TestCountEpisodesGrouped_countsUsableAndIgnoredPerTarget(t *testing.T) {
 	t.Parallel()
 	episodes := []map[coverage.Key]*coverage.Status{
 		{coverage.Key{Lang: "en", Variant: "standard"}: {Usable: true}},
@@ -207,7 +207,7 @@ func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
+func TestCountEpisodesGrouped_multipleTargets(t *testing.T) {
 	t.Parallel()
 	episodes := []map[coverage.Key]*coverage.Status{
 		{
@@ -229,7 +229,7 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_noEpisodesKeepsTotal(t *testing.T) {
+func TestCountEpisodesGrouped_noEpisodesKeepsTotal(t *testing.T) {
 	t.Parallel()
 	got := coverage.CountEpisodesGrouped(nil, []subflux.SubtitleTarget{{Code: "en"}}, 5)
 	want := []coverage.TargetCoverage{
@@ -240,7 +240,7 @@ func TestCountEpisodeCoverageGrouped_noEpisodesKeepsTotal(t *testing.T) {
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_emptyTargets(t *testing.T) {
+func TestCountEpisodesGrouped_emptyTargets(t *testing.T) {
 	t.Parallel()
 	got := coverage.CountEpisodesGrouped(nil, nil, 3)
 	if len(got) != 0 {
@@ -250,7 +250,7 @@ func TestCountEpisodeCoverageGrouped_emptyTargets(t *testing.T) {
 
 // --- CountMovies ---
 
-func TestCountMovieCoverage_usableTarget(t *testing.T) {
+func TestCountMovies_usableTarget(t *testing.T) {
 	t.Parallel()
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {Usable: true},
@@ -264,7 +264,7 @@ func TestCountMovieCoverage_usableTarget(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
+func TestCountMovies_ignoredOnlyTarget(t *testing.T) {
 	t.Parallel()
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {IgnoredOnly: true},
@@ -278,7 +278,7 @@ func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_missingTarget(t *testing.T) {
+func TestCountMovies_missingTarget(t *testing.T) {
 	t.Parallel()
 	got := coverage.CountMovies(nil, []subflux.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
@@ -289,7 +289,7 @@ func TestCountMovieCoverage_missingTarget(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_multipleTargetsMixed(t *testing.T) {
+func TestCountMovies_multipleTargetsMixed(t *testing.T) {
 	t.Parallel()
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {Usable: true},
@@ -305,7 +305,7 @@ func TestCountMovieCoverage_multipleTargetsMixed(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_emptyTargets(t *testing.T) {
+func TestCountMovies_emptyTargets(t *testing.T) {
 	t.Parallel()
 	if got := coverage.CountMovies(nil, nil); len(got) != 0 {
 		t.Errorf("CountMovies(no targets) len = %d, want 0", len(got))

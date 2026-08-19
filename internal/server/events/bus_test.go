@@ -112,7 +112,7 @@ func TestWireFormat(t *testing.T) {
 	}
 }
 
-func TestHandleEventsClientCap(t *testing.T) {
+func TestHandleClientCap(t *testing.T) {
 	bus := New(1)
 	st := startStream(t, bus)
 	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
@@ -150,7 +150,7 @@ func TestShutdownDrainsAndRefuses(t *testing.T) {
 	nilBus.SetMaxClients(5) // must not panic
 }
 
-func TestHandleEventsHeaders(t *testing.T) {
+func TestHandleHeaders(t *testing.T) {
 	bus := New(0)
 	st := startStream(t, bus)
 	if ct := st.header.Get("Content-Type"); ct != "text/event-stream" {

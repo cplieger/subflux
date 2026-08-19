@@ -17,7 +17,7 @@ func TestAccessors_return_configured_values(t *testing.T) {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 
-	t.Run("SonarrConfig", func(t *testing.T) {
+	t.Run("Sonarr", func(t *testing.T) {
 		t.Parallel()
 		got := cfg.Sonarr()
 		if got.URL != "http://sonarr:8989" {
@@ -28,7 +28,7 @@ func TestAccessors_return_configured_values(t *testing.T) {
 		}
 	})
 
-	t.Run("RadarrConfig_empty", func(t *testing.T) {
+	t.Run("Radarr_empty", func(t *testing.T) {
 		t.Parallel()
 		got := cfg.Radarr()
 		if got.URL != "" {
@@ -295,9 +295,9 @@ func TestPostProcessConfig_returns_configured_values(t *testing.T) {
 	}
 }
 
-// --- SonarrConfig/RadarrConfig disabled branch ---
+// --- Sonarr/Radarr disabled branch ---
 
-func TestSonarrConfig_disabled_returns_empty(t *testing.T) {
+func TestSonarr_disabled_returns_empty(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		SonarrCfg: yamlArrConfig{
@@ -316,7 +316,7 @@ func TestSonarrConfig_disabled_returns_empty(t *testing.T) {
 	}
 }
 
-func TestRadarrConfig_disabled_returns_empty(t *testing.T) {
+func TestRadarr_disabled_returns_empty(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		RadarrCfg: yamlArrConfig{
@@ -438,7 +438,7 @@ func TestSyncConfig_zero_confidence_uses_default(t *testing.T) {
 
 // --- Providers cache ---
 
-func TestProviderConfigs_uses_cache_when_present(t *testing.T) {
+func TestProviders_uses_cache_when_present(t *testing.T) {
 	t.Parallel()
 	c := &Config{}
 	c.cachedProviders = map[subflux.ProviderID]subflux.ProviderCfg{

@@ -48,11 +48,11 @@ func makeMinimalZipSRT() []byte {
 	return buf.Bytes()
 }
 
-// FuzzHasArchiveSignature checks the reported signature against the known
+// FuzzHasSignature checks the reported signature against the known
 // archive magic bytes in both directions (an oracle property): data beginning
 // with the ZIP (PK\x03\x04) or RAR (Rar!\x1a\x07) magic must be reported true,
 // and anything reported true must begin with one of those magic sequences.
-func FuzzHasArchiveSignature(f *testing.F) {
+func FuzzHasSignature(f *testing.F) {
 	f.Add([]byte{})
 	f.Add([]byte("PK\x03\x04some zip content"))
 	f.Add([]byte("Rar!\x1a\x07\x00"))

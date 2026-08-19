@@ -125,7 +125,7 @@ type mockCacheClearer struct {
 
 func (m *mockCacheClearer) ClearCache() { m.cleared = true }
 
-func TestClearProviderCaches_calls_cache_clearers(t *testing.T) {
+func TestClearCaches_calls_cache_clearers(t *testing.T) {
 	t.Parallel()
 	cc := &mockCacheClearer{stubProvider: stubProvider{name: "hdbits"}}
 	plain := &stubProvider{name: "os"}
@@ -137,14 +137,14 @@ func TestClearProviderCaches_calls_cache_clearers(t *testing.T) {
 	}
 }
 
-func TestClearProviderCaches_no_clearers(t *testing.T) {
+func TestClearCaches_no_clearers(t *testing.T) {
 	t.Parallel()
 	plain := &stubProvider{name: "os"}
 	// Should not panic with no cacheClearer providers.
 	provider.ClearCaches([]provider.Provider{plain})
 }
 
-func TestClearProviderCaches_nil_providers(t *testing.T) {
+func TestClearCaches_nil_providers(t *testing.T) {
 	t.Parallel()
 	// Should not panic with nil slice.
 	provider.ClearCaches(nil)

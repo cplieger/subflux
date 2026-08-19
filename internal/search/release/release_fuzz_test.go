@@ -17,7 +17,7 @@ func normalizeSet(formats []Format) map[string]bool {
 	return m
 }
 
-func FuzzParseReleaseName(f *testing.F) {
+func FuzzParseName(f *testing.F) {
 	f.Add("Show.S01E05.720p.WEB-DL.DDP5.1.H.264-GROUP")
 	f.Add("Movie.2024.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.7.1-RELEASE")
 	f.Add("[SubGroup] Anime Title - 25 [1080p][HEVC]")
@@ -50,7 +50,7 @@ func FuzzParseReleaseName(f *testing.F) {
 	})
 }
 
-func FuzzParseReleaseGroup(f *testing.F) {
+func FuzzParseGroup(f *testing.F) {
 	f.Add("Movie.2024.BluRay.x264-GRP")
 	f.Add("[SubGroup] Anime - 01")
 	f.Add("Show.S01E01.720p.WEB-DL.DDP5.1.H.264-NTb")

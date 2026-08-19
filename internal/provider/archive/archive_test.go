@@ -75,7 +75,7 @@ func TestLooksLikeSubtitle_high_non_text_ratio_returns_false(t *testing.T) {
 	}
 }
 
-func TestHasArchiveSignature(t *testing.T) {
+func TestHasSignature(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte

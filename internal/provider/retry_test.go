@@ -433,7 +433,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
 			ctx := b.Context()
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, _ = rp.Download(ctx, sub)
 			}
 		})
@@ -442,7 +442,7 @@ func BenchmarkRetryProvider(b *testing.B) {
 			ctx := b.Context()
 			req := &subflux.SearchRequest{Title: "test"}
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, _ = rp.Search(ctx, req)
 			}
 		})

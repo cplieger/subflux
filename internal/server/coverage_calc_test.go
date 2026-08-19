@@ -264,22 +264,22 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 	})
 }
 
-// --- countEpisodeCoverageGrouped ---
+// --- countEpisodesGrouped ---
 
-func TestCountEpisodeCoverageGrouped_empty_episodes(t *testing.T) {
+func TestCountEpisodesGrouped_empty_episodes(t *testing.T) {
 	t.Parallel()
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
-	got := countEpisodeCoverageGrouped(nil, targets, 10)
+	got := countEpisodesGrouped(nil, targets, 10)
 	if len(got) != 1 {
-		t.Fatalf("countEpisodeCoverageGrouped(nil, 1 target, 10) len = %d, want 1", len(got))
+		t.Fatalf("countEpisodesGrouped(nil, 1 target, 10) len = %d, want 1", len(got))
 	}
 	if got[0].Have != 0 || got[0].HaveIgnored != 0 || got[0].Total != 10 {
-		t.Errorf("countEpisodeCoverageGrouped(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 10}",
+		t.Errorf("countEpisodesGrouped(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 10}",
 			got[0].Have, got[0].HaveIgnored, got[0].Total)
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_counts_usable_and_ignored(t *testing.T) {
+func TestCountEpisodesGrouped_counts_usable_and_ignored(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{covKey{Lang: "fr", Variant: "standard"}: {Usable: true}},
@@ -287,22 +287,22 @@ func TestCountEpisodeCoverageGrouped_counts_usable_and_ignored(t *testing.T) {
 		{covKey{Lang: "en", Variant: "standard"}: {Usable: true}},
 	}
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
-	got := countEpisodeCoverageGrouped(episodes, targets, 5)
+	got := countEpisodesGrouped(episodes, targets, 5)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1", len(got))
 	}
 	if got[0].Have != 1 {
-		t.Errorf("countEpisodeCoverageGrouped Have = %d, want 1", got[0].Have)
+		t.Errorf("countEpisodesGrouped Have = %d, want 1", got[0].Have)
 	}
 	if got[0].HaveIgnored != 1 {
-		t.Errorf("countEpisodeCoverageGrouped HaveIgnored = %d, want 1", got[0].HaveIgnored)
+		t.Errorf("countEpisodesGrouped HaveIgnored = %d, want 1", got[0].HaveIgnored)
 	}
 	if got[0].Total != 5 {
-		t.Errorf("countEpisodeCoverageGrouped Total = %d, want 5", got[0].Total)
+		t.Errorf("countEpisodesGrouped Total = %d, want 5", got[0].Total)
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
+func TestCountEpisodesGrouped_multiple_targets(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{
@@ -314,7 +314,7 @@ func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
 		{Code: "fr"},
 		{Code: "en", Variant: "forced"},
 	}
-	got := countEpisodeCoverageGrouped(episodes, targets, 3)
+	got := countEpisodesGrouped(episodes, targets, 3)
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
@@ -326,63 +326,63 @@ func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_no_targets(t *testing.T) {
+func TestCountEpisodesGrouped_no_targets(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{covKey{Lang: "fr", Variant: "standard"}: {Usable: true}},
 	}
-	got := countEpisodeCoverageGrouped(episodes, nil, 5)
+	got := countEpisodesGrouped(episodes, nil, 5)
 	if len(got) != 0 {
-		t.Errorf("countEpisodeCoverageGrouped(no targets) len = %d, want 0", len(got))
+		t.Errorf("countEpisodesGrouped(no targets) len = %d, want 0", len(got))
 	}
 }
 
-// --- countMovieCoverage ---
+// --- countMovies ---
 
-func TestCountMovieCoverage_nil_subs(t *testing.T) {
+func TestCountMovies_nil_subs(t *testing.T) {
 	t.Parallel()
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(nil, targets)
+	got := countMovies(nil, targets)
 	if len(got) != 1 {
-		t.Fatalf("countMovieCoverage(nil) len = %d, want 1", len(got))
+		t.Fatalf("countMovies(nil) len = %d, want 1", len(got))
 	}
 	if got[0].Have != 0 || got[0].HaveIgnored != 0 || got[0].Total != 1 {
-		t.Errorf("countMovieCoverage(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 1}",
+		t.Errorf("countMovies(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 1}",
 			got[0].Have, got[0].HaveIgnored, got[0].Total)
 	}
 }
 
-func TestCountMovieCoverage_usable_sub(t *testing.T) {
+func TestCountMovies_usable_sub(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 	}
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(subs, targets)
+	got := countMovies(subs, targets)
 	if got[0].Have != 1 {
-		t.Errorf("countMovieCoverage(usable) Have = %d, want 1", got[0].Have)
+		t.Errorf("countMovies(usable) Have = %d, want 1", got[0].Have)
 	}
 	if got[0].HaveIgnored != 0 {
-		t.Errorf("countMovieCoverage(usable) HaveIgnored = %d, want 0", got[0].HaveIgnored)
+		t.Errorf("countMovies(usable) HaveIgnored = %d, want 0", got[0].HaveIgnored)
 	}
 }
 
-func TestCountMovieCoverage_ignored_only(t *testing.T) {
+func TestCountMovies_ignored_only(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true},
 	}
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(subs, targets)
+	got := countMovies(subs, targets)
 	if got[0].Have != 0 {
-		t.Errorf("countMovieCoverage(ignored) Have = %d, want 0", got[0].Have)
+		t.Errorf("countMovies(ignored) Have = %d, want 0", got[0].Have)
 	}
 	if got[0].HaveIgnored != 1 {
-		t.Errorf("countMovieCoverage(ignored) HaveIgnored = %d, want 1", got[0].HaveIgnored)
+		t.Errorf("countMovies(ignored) HaveIgnored = %d, want 1", got[0].HaveIgnored)
 	}
 }
 
-func TestCountMovieCoverage_multiple_targets(t *testing.T) {
+func TestCountMovies_multiple_targets(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
@@ -393,9 +393,9 @@ func TestCountMovieCoverage_multiple_targets(t *testing.T) {
 		{Code: "en", Variant: "forced"},
 		{Code: "de"},
 	}
-	got := countMovieCoverage(subs, targets)
+	got := countMovies(subs, targets)
 	if len(got) != 3 {
-		t.Fatalf("countMovieCoverage len = %d, want 3", len(got))
+		t.Fatalf("countMovies len = %d, want 3", len(got))
 	}
 	if got[0].Have != 1 || got[0].HaveIgnored != 0 {
 		t.Errorf("target fr = {Have:%d, HaveIgnored:%d}, want {1, 0}", got[0].Have, got[0].HaveIgnored)
@@ -408,13 +408,13 @@ func TestCountMovieCoverage_multiple_targets(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_no_targets(t *testing.T) {
+func TestCountMovies_no_targets(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 	}
-	got := countMovieCoverage(subs, nil)
+	got := countMovies(subs, nil)
 	if len(got) != 0 {
-		t.Errorf("countMovieCoverage(no targets) len = %d, want 0", len(got))
+		t.Errorf("countMovies(no targets) len = %d, want 0", len(got))
 	}
 }

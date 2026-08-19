@@ -13,7 +13,7 @@ import (
 // noPriority is a no-op provider priority function for tests.
 func noPriority(_ subflux.ProviderID) int { return 99 }
 
-func TestParseReleaseName(t *testing.T) {
+func TestParseName(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -363,7 +363,7 @@ func TestScoreResults_tiebreaker_by_provider_priority(t *testing.T) {
 
 // --- Property-based tests ---
 
-func TestParseReleaseName_never_panics(t *testing.T) {
+func TestParseName_never_panics(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		name := rapid.String().Draw(t, "name")
@@ -371,7 +371,7 @@ func TestParseReleaseName_never_panics(t *testing.T) {
 	})
 }
 
-func TestParseReleaseName_scene_names_never_panic(t *testing.T) {
+func TestParseName_scene_names_never_panic(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate strings that look like scene release names.
@@ -391,9 +391,9 @@ func TestParseReleaseName_scene_names_never_panic(t *testing.T) {
 	})
 }
 
-// TestParseReleaseName_empty_returns_zero verifies the zero-value invariant:
+// TestParseName_empty_returns_zero verifies the zero-value invariant:
 // an empty input always produces a zero-value release.Info.
-func TestParseReleaseName_empty_returns_zero(t *testing.T) {
+func TestParseName_empty_returns_zero(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate whitespace-only strings (empty, spaces, tabs).
@@ -513,13 +513,12 @@ func TestScoreResults_matched_by_does_not_affect_release_score(t *testing.T) {
 	}
 }
 
-// Kills CONDITIONALS_BOUNDARY in parseReleaseGroup (len(m) > 1 → >= 1).
-// groupRe.FindStringSubmatch returns nil (no match) or [full, group] (len=2).
-// The boundary change from > 1 to >= 1 would try to access m[1] when len(m)==1,
-// but FindStringSubmatch never returns len==1 for this regex (it always has
-// the capture group or returns nil). This is an equivalent mutant.
-// However, we can still verify the behavior is correct at the boundary.
-func TestParseReleaseName_group_regex_no_match_returns_empty(t *testing.T) {
+// The release-group regex either matches with its capture group or does not
+// match at all, so ParseName can never observe a submatch slice holding only
+// the full match. These two cases pin the behaviour at that boundary: no
+// dash-group pattern yields an empty group, and a single-character group is
+// still extracted.
+func TestParseName_group_regex_no_match_returns_empty(t *testing.T) {
 	t.Parallel()
 	// Input with no dash-group pattern.
 	info := release.ParseName("Movie 2024 BluRay 1080p")
@@ -529,7 +528,7 @@ func TestParseReleaseName_group_regex_no_match_returns_empty(t *testing.T) {
 	}
 }
 
-func TestParseReleaseName_group_regex_single_char_group(t *testing.T) {
+func TestParseName_group_regex_single_char_group(t *testing.T) {
 	t.Parallel()
 	// Single character group name.
 	info := release.ParseName("Movie.2024.BluRay-X")
@@ -646,12 +645,12 @@ func TestCompareSource_same_family(t *testing.T) {
 	}
 }
 
-// --- parseReleaseGroup bracket format ---
+// --- ParseName release-group extraction ---
 
-func TestParseReleaseGroup_bracket_at_end(t *testing.T) {
+func TestParseName_group_bracket_at_end(t *testing.T) {
 	t.Parallel()
 	// The bracket format [Group] at end of release name exercises the m[3] path
-	// in parseReleaseGroup (the second alternative in sonarrReleaseGroupRegex).
+	// in ParseName (the second alternative in sonarrReleaseGroupRegex).
 	// The regex requires a separator (-._ or space) before the opening bracket.
 	tests := []struct {
 		name  string
@@ -675,7 +674,7 @@ func TestParseReleaseGroup_bracket_at_end(t *testing.T) {
 	}
 }
 
-func TestParseReleaseGroup_anime_format(t *testing.T) {
+func TestParseName_group_anime_format(t *testing.T) {
 	t.Parallel()
 	// Anime format: [SubGroup] at start.
 	info := release.ParseName("[SubTeam] Anime Title - 01 (1080p)")
@@ -685,7 +684,7 @@ func TestParseReleaseGroup_anime_format(t *testing.T) {
 	}
 }
 
-func TestParseReleaseGroup_file_extension_stripped(t *testing.T) {
+func TestParseName_group_file_extension_stripped(t *testing.T) {
 	t.Parallel()
 	// File extension should be stripped before group extraction.
 	info := release.ParseName("Movie.2024.BluRay-GRP.mkv")

@@ -373,7 +373,7 @@ func BenchmarkResolveTargetsWithFallback(b *testing.B) {
 			cfg := makeConfig(nRules)
 			audioLangs := []string{"lang0", "lang1"}
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				cfg.ResolveTargetsWithFallback("lang0", audioLangs)
 			}
 		})

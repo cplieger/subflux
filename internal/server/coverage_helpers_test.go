@@ -24,11 +24,11 @@ var (
 	extractSeriesPrefix = coverage.ExtractSeriesPrefix
 )
 
-func countEpisodeCoverageGrouped(episodes []map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget, total int) []coverage.TargetCoverage {
+func countEpisodesGrouped(episodes []map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget, total int) []coverage.TargetCoverage {
 	return coverage.CountEpisodesGrouped(episodes, targets, total)
 }
 
-func countMovieCoverage(subs map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget) []coverage.TargetCoverage {
+func countMovies(subs map[coverage.Key]*coverage.Status, targets []subflux.SubtitleTarget) []coverage.TargetCoverage {
 	return coverage.CountMovies(subs, targets)
 }
 

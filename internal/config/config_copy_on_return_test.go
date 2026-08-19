@@ -42,7 +42,7 @@ func loadedConfig(t *testing.T) *Config {
 // The provider map's VALUES hold a settings map, so a shallow copy of the
 // outer map would leave the aliasing that matters untouched: a caller editing
 // a setting would be editing what every subsequent scan reads.
-func TestProviderConfigsCopiesInnerSettings(t *testing.T) {
+func TestProvidersCopiesInnerSettings(t *testing.T) {
 	t.Parallel()
 
 	cfg := loadedConfig(t)

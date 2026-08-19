@@ -8,20 +8,20 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-func TestParseReleaseName_empty_returns_zero_info(t *testing.T) {
+func TestParseName_empty_returns_zero_info(t *testing.T) {
 	t.Parallel()
 	if got := ParseName(""); got != (Info{}) {
 		t.Errorf("ParseName(%q) = %#v, want zero Info{}", "", got)
 	}
 }
 
-// TestParseReleaseName_clamps_oversized_input pins the parser's own
+// TestParseName_clamps_oversized_input pins the parser's own
 // MaxNameLen defense-in-depth clamp (the provider boundary's ClampName is
 // the primary enforcement): a 1 MiB input must parse in bounded time and
 // be treated as its MaxNameLen-byte prefix. The recognizable metadata sits
 // entirely BEYOND the bound, so any leak of post-bound bytes into the
 // result is visible.
-func TestParseReleaseName_clamps_oversized_input(t *testing.T) {
+func TestParseName_clamps_oversized_input(t *testing.T) {
 	t.Parallel()
 	head := strings.Repeat("A.", MaxNameLen/2) // exactly MaxNameLen bytes of neutral filler
 	marker := ".The.Matrix.1999.1080p.BluRay.x264-GRP"
@@ -48,7 +48,7 @@ func TestParseReleaseName_clamps_oversized_input(t *testing.T) {
 	}
 }
 
-func TestParseReleaseName(t *testing.T) {
+func TestParseName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -94,7 +94,7 @@ func TestParseReleaseName(t *testing.T) {
 	}
 }
 
-func TestParseReleaseGroup(t *testing.T) {
+func TestParseGroup(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
