@@ -124,7 +124,7 @@ func (s *Server) initHandlers() {
 			return pls
 		},
 		ReadBounded: atomicfile.ReadBounded,
-		ServerCtx:   func() context.Context { return s.ctx },
+		ServerCtx:   func() context.Context { return s.lifetime },
 	})
 
 	s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
@@ -163,7 +163,7 @@ func (s *Server) initHandlers() {
 				Radarr: ls.radarr,
 			}
 		},
-		ServerCtx: func() context.Context { return s.ctx },
+		ServerCtx: func() context.Context { return s.lifetime },
 	})
 
 	s.syncH = synchandlers.New(synchandlers.Deps{
@@ -193,7 +193,7 @@ func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handle
 			}
 		},
 		BGTracker:  &s.bgWg,
-		ServerCtx:  func() context.Context { return s.ctx },
+		ServerCtx:  func() context.Context { return s.lifetime },
 		Resolve:    resolver,
 		DecodeJSON: decodeJSONBodyAny,
 	})

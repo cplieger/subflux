@@ -282,7 +282,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	actID, run := scheduler.PrepareFullScan(s.schedulerDeps(), activity.SourceManual)
 	s.bgWg.Go(func() {
 		defer s.scanning.Store(false)
-		run(s.ctx)
+		run(s.lifetime)
 	})
 	api.WriteJSONStatus(w, http.StatusAccepted,
 		scanning.ScanAccepted{ActivityID: actID, Status: "scan started"})

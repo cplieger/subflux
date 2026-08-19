@@ -253,7 +253,7 @@ func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 // falls back to settings mode instead of refusing to serve, so a config that
 // boots today keeps booting.
 func (s *Server) Start(ctx context.Context, onReady func()) {
-	s.ctx = ctx
+	s.lifetime = ctx
 	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 	ls := s.state()
 
@@ -284,7 +284,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 
 // StartUnconfigured starts the HTTP server without a valid config.
 func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
-	s.ctx = ctx
+	s.lifetime = ctx
 	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 
 	slog.Warn("starting in unconfigured mode; " +
@@ -311,7 +311,7 @@ func (s *Server) getOIDC() *authoidc.Provider {
 	if slot == nil {
 		return nil
 	}
-	return slot.get(s.ctx)
+	return slot.get(s.lifetime)
 }
 
 // state returns the current live state snapshot.

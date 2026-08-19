@@ -93,7 +93,7 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 			return &closableArrClient{}, nil
 		},
 		launchWorkers: func() { launches++ },
-		ctx:           t.Context(),
+		lifetime:      t.Context(),
 	}
 	s.live.Store(&liveState{})
 	return s, &launches
@@ -587,7 +587,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return dummyArrClient{}, nil }
 	s.newRadarr = func(_, _ string) (api.RadarrClient, error) { return dummyArrClient{}, nil }
 	s.launchWorkers = func() {}
-	s.ctx = t.Context()
+	s.lifetime = t.Context()
 	s.authH.WebAuthnResolver = func() *webauthn.WebAuthn { return s.state().webauthn }
 
 	user := createTestUser(t, authDB, "alice", "correct horse battery staple")

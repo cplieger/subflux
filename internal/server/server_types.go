@@ -92,9 +92,11 @@ type previewDeps struct {
 // Server is the main application server.
 type Server struct {
 	stores storeFacade
-	// ctx is the process-scoped lifetime, written once by Start or
+	// lifetime is the process-scoped context, written once by Start or
 	// StartUnconfigured from the context the process hands the server and
-	// never derived from an *http.Request.
+	// never derived from an *http.Request. The name says which context it is:
+	// it lives as long as the process, so nothing read from it is cancelled by
+	// a client hanging up.
 	//
 	// It is read only by the three server-scoped uses the concurrency audit
 	// ratified: the S12 full-scan launcher (a client disconnect must never
@@ -103,7 +105,7 @@ type Server struct {
 	// handler families declare for work that outlives a request, and the lazy
 	// OIDC discovery every request shares. The background worker set no
 	// longer reads it: it is handed the context at start (awaitWorkerLaunch).
-	ctx context.Context
+	lifetime context.Context
 	pollDeps
 	previewDeps
 	db           api.Store

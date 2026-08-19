@@ -216,7 +216,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 		alerts:   activity.NewAlertLog(100),
 		events:   events.New(0),
 		// context.Background(): no *testing.T in scope, and this is the server's own long-lived context rather than a per-test one.
-		ctx: context.Background(),
+		lifetime: context.Background(),
 		loadConfig: func(data []byte) (api.ConfigProvider, error) {
 			return nil, fmt.Errorf("not implemented in test")
 		},

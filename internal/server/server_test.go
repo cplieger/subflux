@@ -200,7 +200,7 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
 	ls := &liveState{cfg: &qhMockConfig{}}
 	s.live.Store(ls)
@@ -251,7 +251,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 
@@ -302,7 +302,7 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 	s.scanning.Store(true)
@@ -330,7 +330,7 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 		metrics:  metrics.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
 	s.live.Store(&liveState{cfg: &qhMockConfig{}})
 

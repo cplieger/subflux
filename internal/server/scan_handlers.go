@@ -25,7 +25,7 @@ func (s *Server) initScanHandler() *scanning.Handler {
 				Radarr: ls.radarr,
 			}, s.scanLiveState(ls)
 		},
-		CtxFunc:         func() context.Context { return s.ctx },
+		CtxFunc:         func() context.Context { return s.lifetime },
 		ScanDeps:        s.scanDeps,
 		Activity:        &serveradapter.ActivityAdapter{A: s.activity},
 		Stops:           &s.stops,
