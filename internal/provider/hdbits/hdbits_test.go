@@ -14,7 +14,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/provider/dlcache"
 	"pgregory.net/rapid"
 )
 
@@ -393,7 +392,7 @@ func TestClearCache_empties_both_caches(t *testing.T) {
 	t.Parallel()
 	p := &Provider{
 		torrentCache: cache.New[[]int](1 * time.Hour),
-		dlCache:      dlcache.New(100, 2<<20),
+		dlCache:      newDownloadCache(100, 2<<20),
 	}
 	p.dlCache.Put("1", []byte{0x50, 0x4b}, nil)
 	p.torrentCache.Set("key", []int{1, 2})
@@ -782,7 +781,7 @@ func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, errors.New("dial tcp: i/o timeout")
 		})},
-		dlCache: dlcache.New(10, 1<<20),
+		dlCache: newDownloadCache(10, 1<<20),
 	}
 
 	_, err := p.Download(t.Context(), &api.Subtitle{ID: "123"})

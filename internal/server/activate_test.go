@@ -15,7 +15,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -82,7 +82,7 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 	launches := 0
 	s = &Server{
 		db:      &qhMockStore{},
-		metrics: metrics.New(),
+		metrics: obs.New(),
 		events:  events.New(0),
 		alerts:  activity.NewAlertLog(100),
 		wire:    okWire,
@@ -581,7 +581,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s, authDB := testAuthServer(t)
 	// Graft the activation deps onto the auth fixture.
 	s.db = &qhMockStore{}
-	s.metrics = metrics.New()
+	s.metrics = obs.New()
 	s.events = events.New(0)
 	s.wire = okWire
 	s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return dummyArrClient{}, nil }

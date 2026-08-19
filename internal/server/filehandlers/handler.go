@@ -5,7 +5,7 @@
 // media_id, language, variant, source, ordinal) plus display metadata;
 // deletion accepts that FileRef (or a server-minted orphan handle) and
 // resolves the path from the store. S16: every disk delete routes through
-// the subtitle-scoped gate (subtitlepath.RemoveUnderRoot), which refuses
+// the subtitle-scoped gate (removeSubtitleUnderRoot), which refuses
 // non-subtitle extensions loudly with 409 subtitle_extension_not_allowed.
 package filehandlers
 
@@ -24,7 +24,6 @@ import (
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/server/subtitlepath"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
@@ -286,9 +285,9 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 // containment failure answers 403. Returns true when the file is gone.
 func (h *Handler) removeSubtitleFile(ctx context.Context, w http.ResponseWriter, r *http.Request, path string) bool {
 	ls := h.deps.StateFunc()
-	if err := subtitlepath.RemoveUnderRoot(ctx, ls.Cfg, path); err != nil {
+	if err := removeSubtitleUnderRoot(ctx, ls.Cfg, path); err != nil {
 		switch {
-		case errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed):
+		case errors.Is(err, errSubtitleExtensionNotAllowed):
 			slog.Warn("delete file: extension refused by subtitle delete gate", "path", path, "error", err)
 			api.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
 				"stored path does not carry a deletable subtitle extension")
@@ -444,8 +443,8 @@ func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider
 	if row.Source == string(api.SourceEmbedded) || row.Path == "" {
 		return false
 	}
-	if err := subtitlepath.RemoveUnderRoot(ctx, cfg, row.Path); err != nil {
-		if errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed) {
+	if err := removeSubtitleUnderRoot(ctx, cfg, row.Path); err != nil {
+		if errors.Is(err, errSubtitleExtensionNotAllowed) {
 			slog.Warn("bulk delete: extension refused by subtitle delete gate",
 				"path", row.Path, "error", err)
 		} else {

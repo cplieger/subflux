@@ -13,7 +13,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -202,7 +202,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
 		search.WithStore(db), search.WithConfig(cfg),
-		search.WithMetrics(metrics.New()), search.WithScorer(sc),
+		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
 		search.WithTracks(embedded.Detector{}))
 	s := &Server{
@@ -211,7 +211,7 @@ func newTestServer(db *qhMockStore, cfg *qhMockConfig) *Server {
 			query: db,
 			sync:  db,
 		},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		events:   events.New(0),

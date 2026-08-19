@@ -1,4 +1,4 @@
-package dlcache
+package hdbits
 
 import "testing"
 
@@ -6,7 +6,7 @@ import "testing"
 // limit is stored, one byte over is rejected.
 func TestPut_itemSizeBoundary(t *testing.T) {
 	t.Parallel()
-	dc := New(8, 10) // maxItemSize 10 bytes
+	dc := newDownloadCache(8, 10) // maxItemSize 10 bytes
 
 	atLimit := []byte("0123456789") // exactly 10 bytes
 	if ok := dc.Put("at", atLimit, nil); !ok {
@@ -29,7 +29,7 @@ func TestPut_itemSizeBoundary(t *testing.T) {
 // cache evicts the least-recently-used entry and stores the new one.
 func TestPut_evictsOldestWhenFull(t *testing.T) {
 	t.Parallel()
-	dc := New(2, 1024)
+	dc := newDownloadCache(2, 1024)
 	if ok := dc.Put("a", []byte("A"), nil); !ok {
 		t.Fatal("Put(\"a\") = false, want true")
 	}
@@ -52,7 +52,7 @@ func TestPut_evictsOldestWhenFull(t *testing.T) {
 // maxEntries 0 the cache can store nothing (eviction cannot make room).
 func TestPut_zeroMaxEntriesRejects(t *testing.T) {
 	t.Parallel()
-	dc := New(0, 1024)
+	dc := newDownloadCache(0, 1024)
 	if ok := dc.Put("k", []byte("v"), nil); ok {
 		t.Fatal("Put on maxEntries=0 cache = true, want false (cannot store)")
 	}
@@ -65,7 +65,7 @@ func TestPut_zeroMaxEntriesRejects(t *testing.T) {
 // success but does not overwrite the stored data.
 func TestPut_existingKeyKeepsOriginalData(t *testing.T) {
 	t.Parallel()
-	dc := New(4, 1024)
+	dc := newDownloadCache(4, 1024)
 	dc.Put("k", []byte("first"), nil)
 	if ok := dc.Put("k", []byte("second"), nil); !ok {
 		t.Fatal("re-Put of existing key = false, want true")
@@ -80,7 +80,7 @@ func TestPut_existingKeyKeepsOriginalData(t *testing.T) {
 // that updates an entry's recency on read.
 func TestGet_refreshesRecencyForLRU(t *testing.T) {
 	t.Parallel()
-	dc := New(2, 1024)
+	dc := newDownloadCache(2, 1024)
 	dc.Put("a", []byte("A"), nil)
 	dc.Put("b", []byte("B"), nil)
 
@@ -106,7 +106,7 @@ func TestGet_refreshesRecencyForLRU(t *testing.T) {
 // rejected for exceeding maxItemSize.
 func TestPut_onSaturatedWhenItemTooBig(t *testing.T) {
 	t.Parallel()
-	dc := New(4, 5) // maxItemSize 5 bytes
+	dc := newDownloadCache(4, 5) // maxItemSize 5 bytes
 	calls := 0
 	ok := dc.Put("big", []byte("123456"), func() { calls++ }) // 6 bytes
 	if ok {
@@ -121,7 +121,7 @@ func TestPut_onSaturatedWhenItemTooBig(t *testing.T) {
 // once between Clear calls, then re-armed by Clear.
 func TestPut_onSaturatedFiresOncePerClearCycle(t *testing.T) {
 	t.Parallel()
-	dc := New(0, 1024) // maxEntries 0: every Put saturates (no room)
+	dc := newDownloadCache(0, 1024) // maxEntries 0: every Put saturates (no room)
 	calls := 0
 	cb := func() { calls++ }
 

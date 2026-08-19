@@ -22,7 +22,6 @@ import (
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/provider/dlcache"
 	"github.com/cplieger/subflux/internal/subtitleext"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
@@ -85,7 +84,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 		passkey:      ps.Passkey,
 		cfg:          defaultHDBitsConfig,
 		torrentCache: cache.New[[]int](1 * time.Hour),
-		dlCache:      dlcache.New(defaultHDBitsConfig.MaxCacheEntries, defaultHDBitsConfig.MaxCacheItemSize),
+		dlCache:      newDownloadCache(defaultHDBitsConfig.MaxCacheEntries, defaultHDBitsConfig.MaxCacheItemSize),
 	}, nil
 }
 
@@ -97,7 +96,7 @@ type Provider struct {
 	dlSfg        singleflight.Group
 	client       *http.Client
 	torrentCache *cache.Cache[[]int]
-	dlCache      *dlcache.DownloadCache
+	dlCache      *downloadCache
 	username     string
 	passkey      string
 	cfg          hdbitsConfig

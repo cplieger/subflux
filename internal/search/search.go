@@ -19,7 +19,7 @@ import (
 
 // SearchMetrics is the narrow observability interface consumed by the search
 // engine. Only the 4 methods actually called are required; the concrete
-// *metrics.Metrics satisfies this via structural typing.
+// *obs.Metrics satisfies this via structural typing.
 //
 //nolint:revive // name is established API; renaming would break consumers
 type SearchMetrics interface {

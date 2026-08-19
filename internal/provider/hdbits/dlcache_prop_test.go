@@ -1,4 +1,4 @@
-package dlcache
+package hdbits
 
 import (
 	"strconv"
@@ -14,7 +14,7 @@ func TestPut_neverExceedsMaxEntries(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(rt *rapid.T) {
 		maxEntries := rapid.IntRange(1, 8).Draw(rt, "maxEntries")
-		dc := New(maxEntries, 1<<20)
+		dc := newDownloadCache(maxEntries, 1<<20)
 
 		ops := rapid.IntRange(0, 50).Draw(rt, "ops")
 		for range ops {

@@ -1,6 +1,4 @@
-// Package dlcache provides a generic LRU download-data cache with heap-based
-// eviction. Reusable by any provider that caches season-pack or download data.
-package dlcache
+package hdbits
 
 import (
 	"container/heap"
@@ -8,10 +6,16 @@ import (
 	"time"
 )
 
-// DownloadCache is a thread-safe LRU cache for download data (e.g. season
+// This file holds hdbits' LRU download-data cache with heap-based eviction:
+// the season-pack and download payloads Download serves from memory instead
+// of refetching. It was a generic package reusable by any provider until the
+// one-importer boundary was rolled up — a download cache used by exactly one
+// provider is that provider's cache.
+
+// downloadCache is a thread-safe LRU cache for download data (e.g. season
 // pack zip/rar contents). Evicts least-recently-used entries when the
 // entry count exceeds maxEntries.
-type DownloadCache struct {
+type downloadCache struct {
 	cache     map[string]*entry
 	h         entryHeap
 	mu        sync.Mutex
@@ -21,9 +25,9 @@ type DownloadCache struct {
 	maxItemSize int64
 }
 
-// New creates a DownloadCache with the given limits.
-func New(maxEntries int, maxItemSize int64) *DownloadCache {
-	return &DownloadCache{
+// newDownloadCache creates a downloadCache with the given limits.
+func newDownloadCache(maxEntries int, maxItemSize int64) *downloadCache {
+	return &downloadCache{
 		cache:       make(map[string]*entry),
 		maxEntries:  maxEntries,
 		maxItemSize: maxItemSize,
@@ -31,7 +35,7 @@ func New(maxEntries int, maxItemSize int64) *DownloadCache {
 }
 
 // Get retrieves cached data by key. Returns nil, false on miss.
-func (dc *DownloadCache) Get(key string) ([]byte, bool) {
+func (dc *downloadCache) Get(key string) ([]byte, bool) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	e, ok := dc.cache[key]
@@ -47,7 +51,7 @@ func (dc *DownloadCache) Get(key string) ([]byte, bool) {
 // exceeds maxItemSize or the cache is full and cannot evict. The onSaturated
 // callback is called at most once per Clear cycle when the cache refuses
 // to store an entry.
-func (dc *DownloadCache) Put(key string, data []byte, onSaturated func()) bool {
+func (dc *downloadCache) Put(key string, data []byte, onSaturated func()) bool {
 	if int64(len(data)) > dc.maxItemSize {
 		if onSaturated != nil {
 			dc.saturated.Do(onSaturated)
@@ -75,7 +79,7 @@ func (dc *DownloadCache) Put(key string, data []byte, onSaturated func()) bool {
 }
 
 // Clear removes all cached data and resets the saturation guard.
-func (dc *DownloadCache) Clear() {
+func (dc *downloadCache) Clear() {
 	dc.mu.Lock()
 	dc.cache = make(map[string]*entry)
 	dc.h = nil
@@ -84,7 +88,7 @@ func (dc *DownloadCache) Clear() {
 }
 
 // evictOldest removes the least-recently-used entry. Caller must hold dc.mu.
-func (dc *DownloadCache) evictOldest() {
+func (dc *downloadCache) evictOldest() {
 	if len(dc.h) == 0 {
 		return
 	}

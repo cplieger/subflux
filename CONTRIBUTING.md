@@ -40,7 +40,7 @@ The only files that import concrete implementations:
 - `providers.go`: table-driven provider registration (`providerEntries`
   drives both `Register` and `RegisterSchema`).
 - `internal/wiring/`: composition-root types connecting concrete
-  implementations across api/metrics/search/provider.
+  implementations across api/obs/search/provider.
 - `cmd/wire-codegen/`: build-time-only driver over the
   [`wiregen`](https://github.com/cplieger/wiregen) library; not a server
   runtime dependency.
@@ -60,8 +60,7 @@ The only files that import concrete implementations:
   GMM port).
 - `provider/`: shared provider primitives (registry, retry wrapper, the
   SSRF-hardened HTTP client) plus one subdirectory per provider
-  implementation, and support packages `archive`, `classify`, `dlcache`,
-  `anidb`.
+  implementation, and support packages `archive`, `classify`, `anidb`.
 - `embedded/`: the ffprobe-backed embedded subtitle track detector (local
   media inspection, deliberately not a provider); the search engine owns the
   codec-usability policy via the top-level `embedded_subtitles` config
@@ -76,7 +75,7 @@ The only files that import concrete implementations:
 - `server/`: HTTP routing, SSE, middleware, and the embedded UI, split into
   focused subpackages (`authhandlers`, `confighandlers`, `synchandlers`,
   `manualops`, `scanning`, `scheduler`, `polling`, `events`, `coverage`, …).
-- `arrsvc/`, `metrics/`, `cache/`, `httputil/`, `cliparse/`,
+- `arrsvc/`, `obs/`, `cache/`, `httputil/`, `cliparse/`,
   `testsupport/`: focused helpers and thin wrappers over the shared
   `cplieger/*` libraries (`cliparse/` is the CLI grammar: one
   `ParseAndValidate` pass plus help rendering).

@@ -188,10 +188,10 @@ method (*flexInt).UnmarshalJSON
 method (*FlexInt).UnmarshalJSON
 
 # --- container/heap interface -----------------------------------------------
-# dlcache passes &dc.h to heap.Fix/Push/Pop (dlcache.go:42,73,91), which
-# requires the full heap.Interface method set. Verified: renaming Len alone
-# breaks all three call sites at compile time. Push/Pop are called by the heap
-# package, never directly.
+# hdbits' download cache passes &dc.h to heap.Fix/Push/Pop
+# (hdbits/dlcache.go:46,77,95), which requires the full heap.Interface method
+# set. Verified: renaming Len alone breaks all three call sites at compile
+# time. Push/Pop are called by the heap package, never directly.
 method (entryHeap).Len
 method (entryHeap).Less
 method (entryHeap).Swap

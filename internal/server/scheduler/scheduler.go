@@ -34,7 +34,7 @@ type Store interface {
 var _ Store = api.Store(nil)
 
 // ReconcileMetrics is the narrow observability interface for reconcile passes.
-// The concrete *metrics.Metrics satisfies this via structural typing.
+// The concrete *obs.Metrics satisfies this via structural typing.
 type ReconcileMetrics interface {
 	RecordReconcile(deleted int, reset int64, dur time.Duration)
 }

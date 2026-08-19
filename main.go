@@ -28,7 +28,7 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/embedded"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -472,7 +472,7 @@ func serverOptions(reg api.ProviderRegistry, syncExec syncing.SyncExec) []server
 		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
 		server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec)),
-		server.WithMetrics(metrics.New()),
+		server.WithMetrics(obs.New()),
 		server.WithLogSetup(setupLogging),
 	}
 }

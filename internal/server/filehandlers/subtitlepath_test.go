@@ -1,11 +1,9 @@
-package subtitlepath_test
+package filehandlers
 
 import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/cplieger/subflux/internal/server/subtitlepath"
 )
 
 // recordingRemover records the paths delegated to the containment delete.
@@ -19,7 +17,7 @@ func (r *recordingRemover) RemoveUnderRoot(_ context.Context, path string) error
 	return r.err
 }
 
-func TestRemoveUnderRoot(t *testing.T) {
+func TestRemoveSubtitleUnderRoot(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -38,10 +36,10 @@ func TestRemoveUnderRoot(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			rem := &recordingRemover{}
-			err := subtitlepath.RemoveUnderRoot(t.Context(), rem, tc.path)
+			err := removeSubtitleUnderRoot(t.Context(), rem, tc.path)
 			if tc.wantRefused {
-				if !errors.Is(err, subtitlepath.ErrSubtitleExtensionNotAllowed) {
-					t.Fatalf("want ErrSubtitleExtensionNotAllowed, got %v", err)
+				if !errors.Is(err, errSubtitleExtensionNotAllowed) {
+					t.Fatalf("want errSubtitleExtensionNotAllowed, got %v", err)
 				}
 				if len(rem.paths) != 0 {
 					t.Fatalf("refused path must never reach the containment delete, got %v", rem.paths)
@@ -58,13 +56,13 @@ func TestRemoveUnderRoot(t *testing.T) {
 	}
 }
 
-// TestRemoveUnderRootPropagatesContainmentError verifies the wrapper does not
-// swallow the generic containment delete's error.
-func TestRemoveUnderRootPropagatesContainmentError(t *testing.T) {
+// TestRemoveSubtitleUnderRootPropagatesContainmentError verifies the wrapper
+// does not swallow the generic containment delete's error.
+func TestRemoveSubtitleUnderRootPropagatesContainmentError(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("containment failure")
 	rem := &recordingRemover{err: sentinel}
-	err := subtitlepath.RemoveUnderRoot(t.Context(), rem, "/media/movie.srt")
+	err := removeSubtitleUnderRoot(t.Context(), rem, "/media/movie.srt")
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("want containment error propagated, got %v", err)
 	}

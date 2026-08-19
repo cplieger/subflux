@@ -11,7 +11,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
@@ -197,7 +197,7 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 	// scope, stop registered before the response.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
@@ -248,7 +248,7 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 	// with a SourceScheduled entry.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
@@ -299,7 +299,7 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 	// is the honest answer, and the handler must not steal the flag.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
@@ -327,7 +327,7 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 	t.Parallel()
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
 		lifetime: t.Context(),
@@ -365,7 +365,7 @@ func TestBuildHandler_preserves_streaming_writer(t *testing.T) {
 	for _, path := range []string{"/api/events", "/api/preview/video"} {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
-			s := &Server{metrics: metrics.New()}
+			s := &Server{metrics: obs.New()}
 			ch := make(chan probe, 1)
 
 			mux := http.NewServeMux()

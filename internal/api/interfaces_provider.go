@@ -15,7 +15,7 @@ import (
 // Note: MetricsRecorder uses consumer-side placement (Go idiom): narrow
 // interfaces are defined at each consumer site (search.SearchMetrics,
 // scanning.ScanMetrics, polling.PollerMetrics, queryhandlers.MetricsReader,
-// server.ServerMetrics). The concrete *metrics.Metrics satisfies all via
+// server.ServerMetrics). The concrete *obs.Metrics satisfies all via
 // structural typing.
 // WireFunc lives in internal/wiring/ as wiring.Func.
 

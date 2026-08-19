@@ -1,4 +1,4 @@
-package dlcache
+package hdbits
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ func FuzzDownloadCache_PutGet(f *testing.F) {
 	f.Add("same", []byte("v1"), "same", []byte("v2"))
 
 	f.Fuzz(func(t *testing.T, k1 string, v1 []byte, k2 string, v2 []byte) {
-		dc := New(4, 1024)
+		dc := newDownloadCache(4, 1024)
 
 		// Put first entry.
 		ok1 := dc.Put(k1, v1, nil)

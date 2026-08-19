@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 )
 
 // hostGateYAML is a minimal valid config; extra holds appended YAML sections
@@ -45,7 +45,7 @@ providers:
 // the gate without rebuilding the chain.
 func TestBuildHandler_host_allowlist_gate(t *testing.T) {
 	t.Parallel()
-	s := &Server{metrics: metrics.New()}
+	s := &Server{metrics: obs.New()}
 	s.live.Store(&liveState{cfg: hostGateConfig(t, "allowed_hosts:\n  - subflux.example.com\n")})
 
 	mux := http.NewServeMux()

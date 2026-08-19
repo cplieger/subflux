@@ -14,7 +14,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -217,7 +217,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
 		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
-		search.WithMetrics(metrics.New()), search.WithScorer(sc),
+		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
 		search.WithTracks(embedded.Detector{}))
 
@@ -329,7 +329,7 @@ func ordinalHarness(t *testing.T) (*SearchDeps, *LiveState, string) {
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
 		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
-		search.WithMetrics(metrics.New()), search.WithScorer(sc),
+		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
 		search.WithTracks(embedded.Detector{}))
 	deps := &SearchDeps{

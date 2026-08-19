@@ -13,7 +13,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -69,7 +69,7 @@ func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := testAdminServer(t)
-	s.metrics = metrics.New() // AdminHandler's recover hook records panics
+	s.metrics = obs.New() // AdminHandler's recover hook records panics
 
 	hash, err := auth.HashPassword("old-password-123456")
 	if err != nil {
