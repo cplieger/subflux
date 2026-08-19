@@ -108,6 +108,13 @@ method (*Store).GetPasskeyByCredentialID
 method (*Store).UpdatePasskeyAfterLogin
 method (*Store).GetAPIKeyByHash
 
+# The same library callback seen from the CONSUMER side: authhandlers.AccountStore
+# declares UpdatePasskeyAfterLogin (iface.go:30) because auth's CompleteLogin
+# performs that credential-custody write through the store it is handed. Nothing
+# in subflux calls it directly, and dropping it from the interface would silently
+# stop the sign-count and flag persistence a passkey replay check depends on.
+method UpdatePasskeyAfterLogin
+
 # --- fmt.Stringer pinned by a compile-time assertion ------------------------
 # Each of these has an explicit `var _ fmt.Stringer = T(...)` next to it, so the
 # method cannot be deleted without breaking the build (verified for MatchMethod:
@@ -147,9 +154,17 @@ method (*Pattern).String
 # api.RateLimitError is returned as an error from httputil.go:72 and
 # betaseries.go:180; RegistryError.Unwrap is what lets registry_test.go:118's
 # errors.Is(err, cause) find the provider's own failure.
+# config's two structured validation errors are the same case: configFieldErr
+# returns *ValidationError as an `error` (config_validate.go:84) and
+# config_validate_search.go:25,:54 plus config_validate.go:142 hand
+# *FieldDependencyError to ve.Add and to fmt.Errorf's %w, so the message is
+# rendered through the error interface on the startup log and the config
+# response body. Deleting either Error breaks the build at those returns.
 method (*RateLimitError).Error
 method (*RegistryError).Error
 method (*RegistryError).Unwrap
+method (*ValidationError).Error
+method (*FieldDependencyError).Error
 
 # --- Decoders dispatched by reflection --------------------------------------
 # encoding/json and go.yaml.in/yaml call these through their Unmarshaler
