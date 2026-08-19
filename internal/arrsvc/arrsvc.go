@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
 )
 
 // Retry policy preserving subflux's prior arr-client behavior: 3 total attempts
@@ -36,13 +35,6 @@ type Sonarr struct {
 type Radarr struct {
 	*arrapi.Radarr
 }
-
-// Compile-time role conformance: the composed clients satisfy the subflux
-// consumer interfaces.
-var (
-	_ api.SonarrClient = (*Sonarr)(nil)
-	_ api.RadarrClient = (*Radarr)(nil)
-)
 
 // APIKey is arrapi's credential type, re-exported so callers convert with
 // arrsvc.APIKey(...) instead of importing arrapi for one cast. An alias, not a

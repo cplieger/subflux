@@ -40,14 +40,29 @@ type PathValidationResponse struct {
 	Valid bool   `json:"valid"`
 }
 
+// ArrPinger is the only thing this package asks of an arr client: can it be
+// reached. A config save pings Sonarr or Radarr before activating a changed
+// endpoint, so a bad URL or key is reported on the save rather than discovered
+// by the next scan. ONE method, against the 19 exported methods
+// *arrsvc.Sonarr offers and the 16 on *arrsvc.Radarr — nothing here reads a
+// series, a movie or a history event.
+//
+// Exported because the composition root embeds it: server.SonarrClient and
+// server.RadarrClient are unions of their consumers' surfaces, and Ping is the
+// one method of theirs that no scan, poll or handler path calls, so without a
+// name here that union would have to re-list it.
+type ArrPinger interface {
+	Ping(ctx context.Context) error
+}
+
 // Deps holds all dependencies for the config handler family.
 type Deps struct {
 	Registry      SchemaRegistry
 	Alerts        AlertLog
 	LoadConfig    ConfigLoader
 	SchemaFunc    api.SchemaFunc
-	NewSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
-	NewRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
+	NewSonarr     func(baseURL, apiKey string) (ArrPinger, error)
+	NewRadarr     func(baseURL, apiKey string) (ArrPinger, error)
 	HotReload     func(ctx context.Context, cfg *config.Config) error
 	State         func() StateView
 	ConfigPath    func() string
@@ -80,8 +95,8 @@ type Handler struct {
 	alerts        AlertLog
 	loadConfig    ConfigLoader
 	schemaFunc    api.SchemaFunc
-	newSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
-	newRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
+	newSonarr     func(baseURL, apiKey string) (ArrPinger, error)
+	newRadarr     func(baseURL, apiKey string) (ArrPinger, error)
 	hotReload     func(ctx context.Context, cfg *config.Config) error
 	state         func() StateView
 	configured    func() bool
@@ -306,10 +321,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 
 // newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a
 // connectivity check. Both role clients expose Ping.
-func (h *Handler) newArrPinger(name, baseURL, apiKey string) (interface {
-	Ping(context.Context) error
-}, error,
-) {
+func (h *Handler) newArrPinger(name, baseURL, apiKey string) (ArrPinger, error) {
 	if name == "sonarr" {
 		return h.newSonarr(baseURL, apiKey)
 	}

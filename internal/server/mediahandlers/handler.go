@@ -26,13 +26,6 @@ type MediaRadarrClient interface {
 	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the media
-// browser surfaces.
-var (
-	_ MediaSonarrClient = api.SonarrClient(nil)
-	_ MediaRadarrClient = api.RadarrClient(nil)
-)
-
 // Deps holds the dependencies for media handlers.
 type Deps struct {
 	StateFunc func() *LiveState

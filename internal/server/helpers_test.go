@@ -148,15 +148,15 @@ func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, err
 	return nil, nil
 }
 
-// dummyArrClient is a non-nil fake satisfying BOTH api.SonarrClient and
-// api.RadarrClient, for tests that need sonarr/radarr != nil to reach deeper
+// dummyArrClient is a non-nil fake satisfying BOTH SonarrClient and
+// RadarrClient, for tests that need sonarr/radarr != nil to reach deeper
 // handler branches. All methods return empty results; role-specific fakes
 // embed it and override the methods they exercise.
 type dummyArrClient struct{}
 
 var (
-	_ api.SonarrClient = dummyArrClient{}
-	_ api.RadarrClient = dummyArrClient{}
+	_ SonarrClient = dummyArrClient{}
+	_ RadarrClient = dummyArrClient{}
 )
 
 func (dummyArrClient) Ping(context.Context) error                         { return nil }

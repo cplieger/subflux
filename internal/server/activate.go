@@ -57,8 +57,8 @@ func (m activationMode) String() string {
 type activationCandidate struct {
 	engine    *search.Engine
 	scorer    *scorer.Engine
-	sonarr    api.SonarrClient
-	radarr    api.RadarrClient
+	sonarr    SonarrClient
+	radarr    RadarrClient
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
 	providers []provider.Provider

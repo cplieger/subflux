@@ -40,8 +40,8 @@ func TestLookupMediaTitle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr    api.RadarrClient
-		sonarr    api.SonarrClient
+		radarr    RadarrClient
+		sonarr    SonarrClient
 		name      string
 		mediaType api.MediaType
 		want      string
@@ -80,7 +80,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr api.RadarrClient
+		radarr RadarrClient
 		name   string
 		want   string
 		arrID  int
@@ -115,7 +115,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		sonarr  api.SonarrClient
+		sonarr  SonarrClient
 		name    string
 		want    string
 		series  int
@@ -150,8 +150,8 @@ func TestResolveMediaIDs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr       api.RadarrClient
-		sonarr       api.SonarrClient
+		radarr       RadarrClient
+		sonarr       SonarrClient
 		name         string
 		mediaType    api.MediaType
 		wantCoverage string

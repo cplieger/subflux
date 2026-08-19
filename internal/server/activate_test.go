@@ -15,7 +15,6 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
@@ -97,10 +96,10 @@ func newActivationTestServer(t *testing.T) (s *Server, workerLaunches *int) {
 		events:  events.New(0),
 		alerts:  activity.NewAlertLog(100),
 		wire:    okWire,
-		newSonarr: func(_, _ string) (api.SonarrClient, error) {
+		newSonarr: func(_, _ string) (SonarrClient, error) {
 			return &closableArrClient{}, nil
 		},
-		newRadarr: func(_, _ string) (api.RadarrClient, error) {
+		newRadarr: func(_, _ string) (RadarrClient, error) {
 			return &closableArrClient{}, nil
 		},
 		launchWorkers: func() { launches++ },
@@ -274,7 +273,7 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 		{
 			name: "sonarr construction failure",
 			breakServer: func(s *Server) {
-				s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return nil, errMock }
+				s.newSonarr = func(_, _ string) (SonarrClient, error) { return nil, errMock }
 			},
 			// The base document already configures sonarr; the broken
 			// factory is what fails the candidate.
@@ -282,7 +281,7 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 		{
 			name: "radarr construction failure",
 			breakServer: func(s *Server) {
-				s.newRadarr = func(_, _ string) (api.RadarrClient, error) { return nil, errMock }
+				s.newRadarr = func(_, _ string) (RadarrClient, error) { return nil, errMock }
 			},
 			cfg: activationCfg{radarrURL: "http://radarr:7878"},
 		},
@@ -562,8 +561,8 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s.metrics = obs.New()
 	s.events = events.New(0)
 	s.wire = okWire
-	s.newSonarr = func(_, _ string) (api.SonarrClient, error) { return dummyArrClient{}, nil }
-	s.newRadarr = func(_, _ string) (api.RadarrClient, error) { return dummyArrClient{}, nil }
+	s.newSonarr = func(_, _ string) (SonarrClient, error) { return dummyArrClient{}, nil }
+	s.newRadarr = func(_, _ string) (RadarrClient, error) { return dummyArrClient{}, nil }
 	s.launchWorkers = func() {}
 	s.lifetime = t.Context()
 	s.authH.WebAuthnResolver = func() *webauthn.WebAuthn { return s.state().webauthn }

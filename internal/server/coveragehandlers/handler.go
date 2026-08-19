@@ -48,13 +48,6 @@ type tagResolver interface {
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the coverage
-// surfaces.
-var (
-	_ CoverageSonarrClient = api.SonarrClient(nil)
-	_ CoverageRadarrClient = api.RadarrClient(nil)
-)
-
 // Deps holds the dependencies for coverage handlers.
 type Deps struct {
 	Store     CoverageStore

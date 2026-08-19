@@ -59,14 +59,6 @@ type FileRadarrClient interface {
 	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
-// Compile-time assertions: the live arr client interfaces carry the orphan
-// fallback surface, so server_init's interface-to-interface assignment into
-// LiveState stays valid.
-var (
-	_ FileSonarrClient = api.SonarrClient(nil)
-	_ FileRadarrClient = api.RadarrClient(nil)
-)
-
 // pathGuard is the media-path half of the configuration, and the only half
 // these handlers read: validate a path against the configured media roots
 // before answering with it, and delete under those roots through the same

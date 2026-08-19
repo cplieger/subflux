@@ -22,6 +22,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/polling"
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/showskip"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
@@ -32,6 +33,71 @@ import (
 )
 
 // --- Types ---
+
+// SonarrClient and RadarrClient are the arr surfaces New requires: the union of
+// the narrow interfaces their consumers declare, the same shape and the same
+// reason as Store and AuthStore in server.go. This is the ONE site that fans a
+// single concrete arr client out to every handler family, the scan and poll
+// subsystems, the scheduler and the reference resolver, so the union belongs
+// here rather than in a types package that implements none of it.
+//
+// Composed by EMBEDDING, never by re-listing, so the width is derived: adding a
+// method to polling.PollSonarrClient widens this automatically and removing one
+// narrows it. The declaration these replace was a hand-written nine-method list
+// in internal/api, and the ten embedded surfaces below already summed to exactly
+// those nine — the list happened to be right, and nothing in the code would have
+// noticed if it had stopped being.
+//
+// The width, measured: 9 of *arrsvc.Sonarr's 19 exported methods and 7 of
+// *arrsvc.Radarr's 16, so unlike liveState.cfg below these ARE narrowing. No
+// single consumer reads more than 5 of the 9 or 4 of the 7 — the poller, which
+// is the only one that both polls history and looks items up by ID.
+//
+// An interface rather than the concrete *arrsvc.Sonarr, which is the opposite
+// call from cfg, and the difference is what the type is: the arr client is this
+// process's only network boundary to Sonarr and Radarr, and this field is the
+// one seam where it enters. internal/server's own suite drives handler behaviour
+// through it with in-process fakes; a concrete HTTP client here would turn every
+// one of those into a test that needs a fake server speaking arrapi's JSON.
+// *config.Config, by contrast, is data a test can just build.
+//
+// Exported because package main's arr factories name it in their return type,
+// which is the same reason scanning.ScanCfg is exported for the scheduler.
+type SonarrClient interface {
+	coveragehandlers.CoverageSonarrClient
+	filehandlers.FileSonarrClient
+	manualops.ManualSonarrClient
+	manualops.ResolveSonarrClient
+	mediahandlers.MediaSonarrClient
+	polling.PollSonarrClient
+	queryhandlers.StatsSonarrClient
+	resolve.SonarrEpisodes
+	scanning.ScanHandlerSonarr
+	scanning.ScanSonarrClient
+
+	// The connectivity check a config save runs before activating a changed
+	// arr. confighandlers declares it as its own one-method surface, which is
+	// why it is embedded here rather than listed: Ping is the only method of
+	// these nine that no scan, poll or handler path calls.
+	confighandlers.ArrPinger
+}
+
+// RadarrClient is SonarrClient's movie-side twin; see that doc for the width
+// and the placement. Seven methods, from the same ten consumers plus the ping.
+type RadarrClient interface {
+	coveragehandlers.CoverageRadarrClient
+	filehandlers.FileRadarrClient
+	manualops.ManualRadarrClient
+	manualops.ResolveRadarrClient
+	mediahandlers.MediaRadarrClient
+	polling.PollRadarrClient
+	queryhandlers.StatsRadarrClient
+	resolve.RadarrMovie
+	scanning.ScanHandlerRadarr
+	scanning.ScanRadarrClient
+
+	confighandlers.ArrPinger
+}
 
 // liveState holds all fields that are atomically swapped during activation
 // (cold boot and hot reload share the swap; see activate.go). WebAuthn and
@@ -56,8 +122,8 @@ type liveState struct {
 	cfg       *config.Config
 	engine    *search.Engine
 	scorer    *scorer.Engine
-	sonarr    api.SonarrClient
-	radarr    api.RadarrClient
+	sonarr    SonarrClient
+	radarr    RadarrClient
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
 	providers []provider.Provider
@@ -129,8 +195,8 @@ type Server struct {
 	manualH      *manualops.Handler
 	previewH     *previewhandlers.Handler
 	loadConfig   confighandlers.ConfigLoader
-	newSonarr    func(baseURL, apiKey string) (api.SonarrClient, error)
-	newRadarr    func(baseURL, apiKey string) (api.RadarrClient, error)
+	newSonarr    func(baseURL, apiKey string) (SonarrClient, error)
+	newRadarr    func(baseURL, apiKey string) (RadarrClient, error)
 	wire         wiring.Func
 	activity     *activity.Log
 	live         atomic.Pointer[liveState]
@@ -234,8 +300,8 @@ func WithPort(port int) Option { return func(s *Server) { s.serverPort = port } 
 // WithArrClientFactories sets the factories for creating Sonarr and Radarr API
 // clients, used by hot reload and config-save connectivity checks.
 func WithArrClientFactories(
-	newSonarr func(baseURL, apiKey string) (api.SonarrClient, error),
-	newRadarr func(baseURL, apiKey string) (api.RadarrClient, error),
+	newSonarr func(baseURL, apiKey string) (SonarrClient, error),
+	newRadarr func(baseURL, apiKey string) (RadarrClient, error),
 ) Option {
 	return func(s *Server) {
 		s.newSonarr = newSonarr

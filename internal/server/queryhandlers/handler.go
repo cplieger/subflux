@@ -33,13 +33,6 @@ type StatsRadarrClient interface {
 	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the stats
-// surfaces.
-var (
-	_ StatsSonarrClient = api.SonarrClient(nil)
-	_ StatsRadarrClient = api.RadarrClient(nil)
-)
-
 // StatsStore is the two aggregate reads the stats endpoint reports: how many
 // subtitle files are tracked, and when the last scan finished. 2 of the twelve
 // methods the coverage surface offers — /api/state/stats renders a summary, so

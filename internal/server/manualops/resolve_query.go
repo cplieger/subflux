@@ -65,13 +65,6 @@ type ResolveRadarrClient interface {
 	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the
-// resolve surfaces.
-var (
-	_ ResolveSonarrClient = api.SonarrClient(nil)
-	_ ResolveRadarrClient = api.RadarrClient(nil)
-)
-
 // ResolveSearchIDs carries the stable identifiers of a resolved item for
 // the follow-up search call.
 type ResolveSearchIDs struct {

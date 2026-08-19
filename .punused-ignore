@@ -48,14 +48,21 @@ internal/api/error_codes.go:
 # --- Interface members reached only through a narrow interface --------------
 # A consumer declares a narrow interface and is handed a value of a wider type,
 # so gopls attributes the call to the narrow member and the declaration on the
-# other side looks unused. Two entries are left, and each names its dialer:
+# other side looks unused. ONE entry is left, and it names its dialer:
 #   EmbeddedPolicy  coverage.CountCfg declares it (count.go) and the bound
 #                   missing-count closure dials it, but only the tests construct
 #                   a CountCfg directly, so gopls sees test-only use.
-#   Ping (SonarrClient + RadarrClient)
-#                   confighandlers' newArrPinger returns an anonymous
-#                   interface{ Ping(context.Context) error }, which is what the
-#                   connectivity check dials.
+#
+# `method Ping` was removed rather than re-justified. It was listed because
+# api.SonarrClient and api.RadarrClient each DECLARED Ping while the connectivity
+# check dialled it through confighandlers' anonymous one-method interface, so the
+# two nine- and seven-method declarations looked unreferenced. Both are gone: the
+# ping surface is now confighandlers.ArrPinger, the check dials Ping through the
+# interface that declares it, and the composition root's server.SonarrClient /
+# server.RadarrClient embed ArrPinger instead of re-listing Ping. Verified by
+# re-running punused over internal/server (which cascades into every handler
+# subpackage), internal/server/confighandlers and internal/arrsvc — Ping is
+# reported nowhere.
 #
 # FIVE entries were removed here rather than re-justified, because the thing
 # that forced them is gone. MinScoreForTarget, ProvidersForTarget and
@@ -71,7 +78,6 @@ internal/api/error_codes.go:
 # The two STORE members that used to sit here went the same way when api.Store
 # was deleted.
 method EmbeddedPolicy
-method Ping
 
 # --- Concrete implementations reached only through their interface -----------
 # The mirror image of the block above: production dials these through an

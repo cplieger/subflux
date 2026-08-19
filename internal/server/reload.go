@@ -115,9 +115,12 @@ func (s *Server) hotReload(ctx context.Context, newCfg *config.Config) error {
 }
 
 // closeArrClient closes an outgoing arr client replaced by activation, when
-// the concrete type exposes Close (the api.SonarrClient / api.RadarrClient
-// interfaces deliberately don't; test doubles have no resources to release).
-// A nil interface value is a no-op.
+// the concrete type exposes Close. SonarrClient and RadarrClient do not declare
+// it, and that is derived rather than chosen: both are the union of what their
+// consumers ask for, and no handler, scan or poll path shuts an arr client down
+// — activation does, which is here. Close is one of the ten exported methods
+// *arrsvc.Sonarr has beyond the nine in the union. A nil interface value is a
+// no-op, so an unconfigured arr and a test double both fall through.
 func closeArrClient(c any) {
 	if closer, ok := c.(interface{ Close() }); ok {
 		closer.Close()

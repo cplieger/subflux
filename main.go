@@ -20,7 +20,6 @@ import (
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
@@ -484,8 +483,8 @@ func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.O
 
 // newSonarrFactory returns a function that creates Sonarr API clients, used by
 // the server for hot reload and config-save connectivity checks.
-func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
-	return func(baseURL, apiKey string) (api.SonarrClient, error) {
+func newSonarrFactory() func(baseURL, apiKey string) (server.SonarrClient, error) {
+	return func(baseURL, apiKey string) (server.SonarrClient, error) {
 		c, err := arrsvc.NewSonarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err
@@ -495,8 +494,8 @@ func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
 }
 
 // newRadarrFactory returns a function that creates Radarr API clients.
-func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
-	return func(baseURL, apiKey string) (api.RadarrClient, error) {
+func newRadarrFactory() func(baseURL, apiKey string) (server.RadarrClient, error) {
+	return func(baseURL, apiKey string) (server.RadarrClient, error) {
 		c, err := arrsvc.NewRadarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err

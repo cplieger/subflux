@@ -74,13 +74,6 @@ type ScanHandlerRadarr interface {
 	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the handler
-// surfaces.
-var (
-	_ ScanHandlerSonarr = api.SonarrClient(nil)
-	_ ScanHandlerRadarr = api.RadarrClient(nil)
-)
-
 // HandlerState holds the runtime state needed by scan HTTP handlers.
 // Provided by the server on each request via the StateFunc callback.
 //

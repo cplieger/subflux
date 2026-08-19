@@ -74,20 +74,18 @@ func newStructuredHandlerAt(t *testing.T, cfgPath string,
 		HotReload:  hotReload,
 		State:      func() StateView { return StateView{} },
 		ConfigPath: func() string { return cfgPath },
-		NewSonarr:  func(_, _ string) (api.SonarrClient, error) { return pingOKSonarr{}, nil },
-		NewRadarr:  func(_, _ string) (api.RadarrClient, error) { return pingOKRadarr{}, nil },
+		NewSonarr:  func(_, _ string) (ArrPinger, error) { return pingOK{}, nil },
+		NewRadarr:  func(_, _ string) (ArrPinger, error) { return pingOK{}, nil },
 	})
 }
 
-// pingOKSonarr / pingOKRadarr satisfy the arr client interfaces for the
-// connectivity check only; any other method panics via the embedded nil.
-type pingOKSonarr struct{ api.SonarrClient }
+// pingOK is the whole arr surface this package's tests need, because ArrPinger
+// is the whole arr surface this package has. It replaces two fakes that each
+// embedded a nine- and seven-method interface to panic on the eight and six
+// methods no config save ever called.
+type pingOK struct{}
 
-func (pingOKSonarr) Ping(context.Context) error { return nil }
-
-type pingOKRadarr struct{ api.RadarrClient }
-
-func (pingOKRadarr) Ping(context.Context) error { return nil }
+func (pingOK) Ping(context.Context) error { return nil }
 
 func doStructuredSave(t *testing.T, h *Handler, payload string) *httptest.ResponseRecorder {
 	t.Helper()

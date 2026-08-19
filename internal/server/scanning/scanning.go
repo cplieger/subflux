@@ -167,13 +167,6 @@ type ScanRadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the scan
-// surfaces.
-var (
-	_ ScanSonarrClient = api.SonarrClient(nil)
-	_ ScanRadarrClient = api.RadarrClient(nil)
-)
-
 // buildSeedDeps assembles the season tracker's earlyStop seeding inputs from
 // the live scan state: the store's backoff reader, the enabled provider set,
 // and the adaptive ceiling. Seeding is disabled (nil Backoff) when adaptive

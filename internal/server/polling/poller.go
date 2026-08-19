@@ -32,13 +32,6 @@ type tagResolver interface {
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the poller
-// surfaces.
-var (
-	_ PollSonarrClient = api.SonarrClient(nil)
-	_ PollRadarrClient = api.RadarrClient(nil)
-)
-
 // PollerStore is ONE of the 36 methods the store offers. An import cleans up
 // the rows of a video that disappeared between poll cycles and does nothing
 // else with the store; the poll watermark itself goes through PollCache, which

@@ -87,13 +87,6 @@ type ManualRadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the manual
-// surfaces.
-var (
-	_ ManualSonarrClient = api.SonarrClient(nil)
-	_ ManualRadarrClient = api.RadarrClient(nil)
-)
-
 // EventPublisher publishes events to SSE clients.
 // *events.EventBus satisfies it structurally.
 type EventPublisher interface {

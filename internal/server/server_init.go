@@ -85,9 +85,18 @@ func (s *Server) initHandlers() {
 		DefaultConfig: s.defaultConfig,
 		Registry:      s.registry,
 		Alerts:        s.alerts,
-		NewSonarr:     s.newSonarr,
-		NewRadarr:     s.newRadarr,
-		HotReload:     s.hotReload,
+		// The config handlers only ping, so their factory types return
+		// confighandlers.ArrPinger. Go has no return-type covariance for func
+		// values, so narrowing the server's own factory to what that consumer
+		// asked for is a wrap, done here because adapting is what a composition
+		// root is for.
+		NewSonarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
+			return s.newSonarr(baseURL, apiKey)
+		},
+		NewRadarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
+			return s.newRadarr(baseURL, apiKey)
+		},
+		HotReload: s.hotReload,
 		State: func() confighandlers.StateView {
 			ls := s.state()
 			return confighandlers.StateView{Cfg: ls.cfg}
