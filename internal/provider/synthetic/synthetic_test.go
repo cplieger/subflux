@@ -1,4 +1,4 @@
-package mock
+package synthetic
 
 import (
 	"context"
@@ -16,8 +16,8 @@ func TestFactory_defaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Name() != "mock" {
-		t.Errorf("Name() = %q, want mock", p.Name())
+	if p.Name() != "synthetic" {
+		t.Errorf("Name() = %q, want synthetic", p.Name())
 	}
 }
 
@@ -41,8 +41,8 @@ func TestSearch_static_returns_results(t *testing.T) {
 		if s.Language != "en" {
 			t.Errorf("language = %q, want en", s.Language)
 		}
-		if s.Provider != "mock" {
-			t.Errorf("provider = %q, want mock", s.Provider)
+		if s.Provider != "synthetic" {
+			t.Errorf("provider = %q, want synthetic", s.Provider)
 		}
 	}
 }
@@ -190,8 +190,8 @@ func TestDownload_returns_srt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "Mock subtitle") {
-		t.Error("download data missing mock marker")
+	if !strings.Contains(string(data), "Synthetic subtitle") {
+		t.Error("download data missing synthetic marker")
 	}
 }
 
@@ -272,15 +272,15 @@ func TestFactory_invalid_numeric_settings_use_defaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mock := p.(*mockProvider)
-	if mock.delay != 0 {
-		t.Errorf("delay = %v, want 0 (default)", mock.delay)
+	sp := p.(*syntheticProvider)
+	if sp.delay != 0 {
+		t.Errorf("delay = %v, want 0 (default)", sp.delay)
 	}
-	if mock.resultCount != 3 {
-		t.Errorf("resultCount = %d, want 3 (default)", mock.resultCount)
+	if sp.resultCount != 3 {
+		t.Errorf("resultCount = %d, want 3 (default)", sp.resultCount)
 	}
-	if mock.flakyRate != 0.5 {
-		t.Errorf("flakyRate = %f, want 0.5 (default)", mock.flakyRate)
+	if sp.flakyRate != 0.5 {
+		t.Errorf("flakyRate = %f, want 0.5 (default)", sp.flakyRate)
 	}
 }
 
@@ -335,25 +335,25 @@ func TestFactory_delay_setting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mock := p.(*mockProvider)
-	if mock.delay != 100*time.Millisecond {
-		t.Errorf("delay = %v, want 100ms", mock.delay)
+	sp := p.(*syntheticProvider)
+	if sp.delay != 100*time.Millisecond {
+		t.Errorf("delay = %v, want 100ms", sp.delay)
 	}
 }
 
 func TestFactory_negative_delay_ignored(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"delay_ms": "-5"})
-	mock := p.(*mockProvider)
-	if mock.delay != 0 {
-		t.Errorf("delay = %v, want 0 (negative ignored)", mock.delay)
+	sp := p.(*syntheticProvider)
+	if sp.delay != 0 {
+		t.Errorf("delay = %v, want 0 (negative ignored)", sp.delay)
 	}
 }
 
 func TestFactory_zero_result_count(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), map[string]any{"result_count": "0"})
-	subs, err := p.(*mockProvider).Search(t.Context(), &api.SearchRequest{
+	subs, err := p.(*syntheticProvider).Search(t.Context(), &api.SearchRequest{
 		Title:     "Test",
 		MediaType: "movie",
 		Languages: []string{"en"},
@@ -410,7 +410,7 @@ func TestSearch_result_count(t *testing.T) {
 
 func TestApplyDelay_context_cancelled(t *testing.T) {
 	t.Parallel()
-	p := &mockProvider{delay: 5 * time.Second}
+	p := &syntheticProvider{delay: 5 * time.Second}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	err := p.applyDelay(ctx)
@@ -442,7 +442,7 @@ func TestSchema_returns_all_fields(t *testing.T) {
 
 func TestSearch_slow_mode_timer_outlasts_short_context(t *testing.T) {
 	t.Parallel()
-	p := &mockProvider{mode: "slow", resultCount: 1}
+	p := &syntheticProvider{mode: "slow", resultCount: 1}
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 	req := &api.SearchRequest{

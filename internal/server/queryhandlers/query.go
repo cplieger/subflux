@@ -120,7 +120,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	cfgProviders := ls.Cfg.ProviderConfigs()
 	out := make([]ProviderInfo, 0, len(cfgProviders))
 	for name, cfg := range cfgProviders {
-		if name == api.ProviderNameMock {
+		if name == api.ProviderNameSynthetic {
 			continue
 		}
 		out = append(out, ProviderInfo{

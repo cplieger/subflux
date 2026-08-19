@@ -286,10 +286,10 @@ Tests live beside the code they cover:
   `fast-check` for property tests, happy-dom for DOM-dependent tests.
 - Run `go test -race ./...` on changes to concurrent code (the engine,
   scheduler, polling, SSE events, store).
-- The **mock provider** (`internal/provider/mock/`) generates realistic
-  results with configurable failure modes (errors, timeouts, rate limits,
-  flakiness, season packs) and no network calls; use it to exercise engine
-  behavior without real provider accounts.
+- The **synthetic provider** (`internal/provider/synthetic/`) generates
+  realistic results with configurable failure modes (errors, timeouts, rate
+  limits, flakiness, season packs) and no network calls; use it to exercise
+  engine behavior without real provider accounts.
 
 Add or update tests with every behavior change, and make sure the relevant
 checks above pass before opening a PR.
@@ -300,7 +300,7 @@ The Go suite under `tests/functional/` (package `functional`, build tag
 `functional`, so regular `./...` runs skip it) drives a live instance over
 the HTTP API: 26 sections covering config, providers, coverage, search
 resolution, scoring, scans, sync, manual downloads, hot reload, and the
-mock provider's failure modes. It needs a reachable subflux with auth
+synthetic provider's failure modes. It needs a reachable subflux with auth
 disabled (the suite sends no credentials), and reachable Sonarr/Radarr for
 the arr-dependent sections. It saves and restores the config around the
 run.

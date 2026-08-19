@@ -11,10 +11,10 @@ import (
 	"github.com/cplieger/subflux/internal/provider/betaseries"
 	"github.com/cplieger/subflux/internal/provider/gestdown"
 	"github.com/cplieger/subflux/internal/provider/hdbits"
-	"github.com/cplieger/subflux/internal/provider/mock"
 	"github.com/cplieger/subflux/internal/provider/opensubtitles"
 	"github.com/cplieger/subflux/internal/provider/subdl"
 	"github.com/cplieger/subflux/internal/provider/subsource"
+	"github.com/cplieger/subflux/internal/provider/synthetic"
 	"github.com/cplieger/subflux/internal/provider/yifysubtitles"
 )
 
@@ -144,7 +144,7 @@ var providerEntries = []providerEntry{
 		fields: nil,
 	},
 	{
-		name: api.ProviderNameMock, label: "Mock (Testing)", factory: mock.Factory,
-		fields: mock.Schema(),
+		name: api.ProviderNameSynthetic, label: "Synthetic (Testing)", factory: synthetic.Factory,
+		fields: synthetic.Schema(),
 	},
 }

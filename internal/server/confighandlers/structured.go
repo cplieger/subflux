@@ -49,7 +49,7 @@ type StructuredConfig struct {
 func (h *Handler) fullSchema() []api.SchemaSection {
 	var provs []api.ProviderSchema
 	if h.registry != nil {
-		provs = api.BuildProviderSchemas(h.registry, string(api.ProviderNameMock))
+		provs = api.BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))
 	}
 	return h.schemaFunc(provs)
 }

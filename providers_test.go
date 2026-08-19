@@ -19,10 +19,10 @@ func TestNewProviderRegistry_registers_all_providers(t *testing.T) {
 		"betaseries",
 		"gestdown",
 		"hdbits",
-		"mock",
 		"opensubtitles",
 		"subdl",
 		"subsource",
+		"synthetic",
 		"yifysubtitles",
 	}
 
@@ -63,7 +63,7 @@ func TestNewProviderRegistry_schema_labels(t *testing.T) {
 		{"opensubtitles", "OpenSubtitles"},
 		{"betaseries", "BetaSeries"},
 		{"gestdown", "Gestdown"},
-		{"mock", "Mock (Testing)"},
+		{"synthetic", "Synthetic (Testing)"},
 		{"subsource", "SubSource"},
 		{"subdl", "SubDL"},
 		{"animetosho", "AnimeTosho"},

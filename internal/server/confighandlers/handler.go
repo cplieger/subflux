@@ -245,7 +245,7 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
-	api.WriteJSON(w, h.schemaFunc(api.BuildProviderSchemas(h.registry, string(api.ProviderNameMock))))
+	api.WriteJSON(w, h.schemaFunc(api.BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
 }
 
 // --- Internal helpers ---

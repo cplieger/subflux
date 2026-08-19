@@ -1,5 +1,7 @@
-// Package mock provides a configurable mock subtitle provider for functional
-// testing. It registers as a normal provider ("mock") and its behavior is
+// Package synthetic provides a subtitle provider that answers from generated
+// data instead of an upstream service. It is a real, operator-selectable
+// provider registered as "synthetic", not a test double: it takes no injected
+// behaviour and nothing substitutes it for another provider. Its behaviour is
 // controlled entirely through config settings:
 //
 //   - mode: "static" (default), "error", "timeout", "rate_limit", "auth_error",
@@ -15,9 +17,11 @@
 //   - download_error: if set, Download returns this error instead of data
 //   - subtitle_content: custom SRT content for downloads (default: generated)
 //
-// The mock provider is only registered when the "mock" provider is enabled
-// in config. It never makes network calls.
-package mock
+// It is disabled by default, kept out of the settings UI's provider list, and
+// never makes network calls — its purpose is to exercise the search, download,
+// error and timeout paths against predictable results, on a dev box or in the
+// functional suite, without asking a real upstream for traffic.
+package synthetic
 
 import (
 	"context"
@@ -56,13 +60,13 @@ const (
 	valFalse       = "false"
 )
 
-const providerName = api.ProviderNameMock
+const providerName = api.ProviderNameSynthetic
 
-// Factory creates a mock provider from config settings.
+// Factory creates a synthetic provider from config settings.
 func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 	ps := provider.FromMap(settings)
-	_ = ps // mock uses only provider-specific keys from Custom
-	p := &mockProvider{
+	_ = ps // synthetic uses only provider-specific keys from Custom
+	p := &syntheticProvider{
 		mode:        provider.SettingString(settings, provider.KeyMode),
 		errMsg:      provider.SettingString(settings, provider.KeyErrorMessage),
 		dlError:     provider.SettingString(settings, provider.KeyDownloadError),
@@ -95,10 +99,10 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 }
 
 // Compile-time interface assertion.
-var _ api.Provider = (*mockProvider)(nil)
+var _ api.Provider = (*syntheticProvider)(nil)
 
-// mockProvider is a configurable mock subtitle provider.
-type mockProvider struct {
+// syntheticProvider answers searches and downloads from generated data.
+type syntheticProvider struct {
 	mode        string
 	errMsg      string
 	dlError     string
@@ -112,28 +116,28 @@ type mockProvider struct {
 	forced      bool
 }
 
-func (p *mockProvider) Name() api.ProviderID { return providerName }
+func (p *syntheticProvider) Name() api.ProviderID { return providerName }
 
 // Search returns results based on the configured mode.
-func (p *mockProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *syntheticProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
 	if err := p.applyDelay(ctx); err != nil {
 		return nil, err
 	}
 
 	switch p.mode {
 	case modError:
-		return nil, fmt.Errorf("mock provider error: %s", p.effectiveErrMsg())
+		return nil, fmt.Errorf("synthetic provider error: %s", p.effectiveErrMsg())
 	case modTimeout:
 		return nil, context.DeadlineExceeded
 	case modRateLimit:
-		return nil, &api.RateLimitError{Msg: "mock rate limit: " + p.effectiveErrMsg()}
+		return nil, &api.RateLimitError{Msg: "synthetic rate limit: " + p.effectiveErrMsg()}
 	case modAuthError:
-		return nil, &api.AuthError{Msg: "mock auth error: " + p.effectiveErrMsg()}
+		return nil, &api.AuthError{Msg: "synthetic auth error: " + p.effectiveErrMsg()}
 	case modEmpty:
 		return nil, nil
 	case "flaky":
-		if rand.Float64() < p.flakyRate { //nolint:gosec // G404: test mock, not crypto
-			return nil, fmt.Errorf("mock flaky error: %s", p.effectiveErrMsg())
+		if rand.Float64() < p.flakyRate { //nolint:gosec // G404: generated fixture data, not crypto
+			return nil, fmt.Errorf("synthetic flaky error: %s", p.effectiveErrMsg())
 		}
 		return p.generateResults(req), nil
 	case "slow":
@@ -154,12 +158,12 @@ func (p *mockProvider) Search(ctx context.Context, req *api.SearchRequest) ([]ap
 }
 
 // Download returns subtitle data or a configured error.
-func (p *mockProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *syntheticProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
 	if err := p.applyDelay(ctx); err != nil {
 		return nil, err
 	}
 	if p.dlError != "" {
-		return nil, fmt.Errorf("mock download error: %s", p.dlError)
+		return nil, fmt.Errorf("synthetic download error: %s", p.dlError)
 	}
 	if p.srtContent != "" {
 		return []byte(p.srtContent), nil
@@ -167,14 +171,14 @@ func (p *mockProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte,
 	return []byte(generateSRT(sub.Language, sub.ReleaseName)), nil
 }
 
-func (p *mockProvider) effectiveErrMsg() string {
+func (p *syntheticProvider) effectiveErrMsg() string {
 	if p.errMsg != "" {
 		return p.errMsg
 	}
 	return "simulated failure"
 }
 
-func (p *mockProvider) applyDelay(ctx context.Context) error {
+func (p *syntheticProvider) applyDelay(ctx context.Context) error {
 	if p.delay <= 0 {
 		return nil
 	}
@@ -188,14 +192,14 @@ func (p *mockProvider) applyDelay(ctx context.Context) error {
 	}
 }
 
-func (p *mockProvider) matchesLanguage(lang string) bool {
+func (p *syntheticProvider) matchesLanguage(lang string) bool {
 	if len(p.languages) == 0 {
 		return true
 	}
 	return slices.Contains(p.languages, lang)
 }
 
-func (p *mockProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
+func (p *syntheticProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
 	var results []api.Subtitle
 	for _, lang := range req.Languages {
 		if !p.matchesLanguage(lang) {
@@ -204,10 +208,10 @@ func (p *mockProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
 		for i := range p.resultCount {
 			sub := api.Subtitle{
 				Provider:    providerName,
-				ID:          fmt.Sprintf("mock-%s-%d", lang, i),
+				ID:          fmt.Sprintf("synthetic-%s-%d", lang, i),
 				Language:    lang,
 				ReleaseName: p.releaseNameFor(req, i),
-				DownloadURL: fmt.Sprintf("mock://download/%s/%d", lang, i),
+				DownloadURL: fmt.Sprintf("synthetic://download/%s/%d", lang, i),
 				MatchedBy:   api.MatchByTitle,
 				Title:       req.Title,
 				Year:        req.Year,
@@ -225,7 +229,7 @@ func (p *mockProvider) generateResults(req *api.SearchRequest) []api.Subtitle {
 	return results
 }
 
-func (p *mockProvider) generateSeasonPackResults(req *api.SearchRequest) []api.Subtitle {
+func (p *syntheticProvider) generateSeasonPackResults(req *api.SearchRequest) []api.Subtitle {
 	var results []api.Subtitle
 	for _, lang := range req.Languages {
 		if !p.matchesLanguage(lang) {
@@ -233,10 +237,10 @@ func (p *mockProvider) generateSeasonPackResults(req *api.SearchRequest) []api.S
 		}
 		sub := api.Subtitle{
 			Provider:    providerName,
-			ID:          fmt.Sprintf("mock-spack-%s", lang),
+			ID:          fmt.Sprintf("synthetic-spack-%s", lang),
 			Language:    lang,
 			ReleaseName: fmt.Sprintf("%s.S%02d.Complete.1080p.WEB-DL", req.Title, req.Season),
-			DownloadURL: fmt.Sprintf("mock://download/spack/%s", lang),
+			DownloadURL: fmt.Sprintf("synthetic://download/spack/%s", lang),
 			MatchedBy:   api.MatchByTitle,
 			Title:       req.Title,
 			Year:        req.Year,
@@ -247,7 +251,7 @@ func (p *mockProvider) generateSeasonPackResults(req *api.SearchRequest) []api.S
 	return results
 }
 
-func (p *mockProvider) releaseNameFor(req *api.SearchRequest, idx int) string {
+func (p *syntheticProvider) releaseNameFor(req *api.SearchRequest, idx int) string {
 	groups := []string{"FLUX", "NTb", "SPARKS", "YTS", "RARBG"}
 	sources := []string{"BluRay", "WEB-DL", "HDTV", "WEBRip"}
 	codecs := []string{"x264", "x265", "AV1"}
@@ -270,13 +274,13 @@ func (p *mockProvider) releaseNameFor(req *api.SearchRequest, idx int) string {
 func generateSRT(lang, release string) string {
 	return fmt.Sprintf(`1
 00:00:01,000 --> 00:00:04,000
-[Mock subtitle - %s]
-Provider: mock | Release: %s
+[Synthetic subtitle - %s]
+Provider: synthetic | Release: %s
 
 2
 00:00:05,000 --> 00:00:08,000
 This is a test subtitle generated
-by the mock provider for functional testing.
+by the synthetic provider for functional testing.
 
 3
 00:00:10,000 --> 00:00:15,000
@@ -285,7 +289,7 @@ Timestamp: %s
 `, lang, release, lang, time.Now().UTC().Format(time.RFC3339))
 }
 
-// Schema returns the UI schema fields for the mock provider settings page.
+// Schema returns the UI schema fields for the synthetic provider settings page.
 func Schema() []api.ProviderSchemaField {
 	return []api.ProviderSchemaField{
 		{

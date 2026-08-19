@@ -45,7 +45,7 @@ func (p ProviderID) String() string { return string(p) }
 // Provider name constants (canonical SSOT). All packages MUST reference these
 // instead of declaring local string literals.
 const (
-	ProviderNameMock          ProviderID = "mock"
+	ProviderNameSynthetic     ProviderID = "synthetic"
 	ProviderNameHDBits        ProviderID = "hdbits"
 	ProviderNameOpenSubtitles ProviderID = "opensubtitles"
 	ProviderNameSubSource     ProviderID = "subsource"

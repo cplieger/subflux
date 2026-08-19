@@ -334,11 +334,11 @@ func (s *suite) arrKey(section string) string {
 	return ""
 }
 
-// mockConfigTemplate is the byte-for-byte YAML template from run.sh's
-// apply_mock_config. Slots: sonarr key, radarr key, lang rules (inside the
-// languages: block), mock mode, mock extra (indented under providers:),
+// syntheticConfigTemplate is the byte-for-byte YAML template from run.sh's
+// apply_synthetic_config. Slots: sonarr key, radarr key, lang rules (inside the
+// languages: block), synthetic mode, synthetic extra (indented under providers:),
 // top-level extra (appended last, no trailing newline after it).
-const mockConfigTemplate = `sonarr:
+const syntheticConfigTemplate = `sonarr:
   enabled: true
   url: "http://sonarr:8989"
   api_key: "%s"
@@ -358,7 +358,7 @@ embedded_subtitles:
   ignore_pgs: true
   ignore_vobsub: true
 providers:
-  mock:
+  synthetic:
     enabled: true
     priority: 1
     settings:
@@ -390,14 +390,14 @@ logging:
   format: json
 %s`
 
-// applyMockConfig mirrors `apply_mock_config MODE [MOCK_EXTRA] [TOP_EXTRA]
+// applySyntheticConfig mirrors `apply_synthetic_config MODE [MOCK_EXTRA] [TOP_EXTRA]
 // [LANG_RULES]`. langRules is emitted inside the languages: block; a
 // top-level languages: key in topExtra would be a duplicate mapping key the
 // YAML parser rejects. auth.disable_auth is pinned so hot-reloading this
 // config never re-enables auth mid-suite.
-func (s *suite) applyMockConfig(mode, mockExtra, topExtra, langRules string) {
-	cfg := fmt.Sprintf(mockConfigTemplate,
-		s.arrKey("sonarr"), s.arrKey("radarr"), langRules, mode, mockExtra, topExtra)
+func (s *suite) applySyntheticConfig(mode, syntheticExtra, topExtra, langRules string) {
+	cfg := fmt.Sprintf(syntheticConfigTemplate,
+		s.arrKey("sonarr"), s.arrKey("radarr"), langRules, mode, syntheticExtra, topExtra)
 	s.apiPut("/api/config", cfg)
 	time.Sleep(time.Second)
 }
@@ -423,7 +423,7 @@ var sections = []section{
 	{"search_resolve", (*suite).sectionSearchResolve},
 	{"scoring", (*suite).sectionScoring},
 	{"backoff", (*suite).sectionBackoff},
-	{"mock_provider", (*suite).sectionMockProvider},
+	{"synthetic_provider", (*suite).sectionSyntheticProvider},
 	{"provider_errors", (*suite).sectionProviderErrors},
 	{"config_validation", (*suite).sectionConfigValidation},
 	{"post_processing", (*suite).sectionPostProcessing},

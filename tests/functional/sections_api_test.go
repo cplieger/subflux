@@ -202,10 +202,10 @@ func (s *suite) sectionProviders() {
 	s.log("=== Providers ===")
 
 	// Deterministic list content: enable one credential-free real provider
-	// (gestdown) alongside mock. The visible list must then be EXACTLY that
-	// provider — mock is hidden test infrastructure, and embedded is no
+	// (gestdown) alongside synthetic. The visible list must then be EXACTLY that
+	// provider — synthetic is hidden test infrastructure, and embedded is no
 	// longer an acquisition provider (detector separation).
-	s.applyMockConfig("static", `  gestdown:
+	s.applySyntheticConfig("static", `  gestdown:
     enabled: true
     priority: 2`, "", "")
 
@@ -219,20 +219,20 @@ func (s *suite) sectionProviders() {
 		s.fail("Gestdown missing from provider list")
 	}
 
-	// Mock is internal test infrastructure: functional when enabled, but
+	// Synthetic is internal test infrastructure: functional when enabled, but
 	// deliberately hidden from the settings schema and the provider list.
 	schemaProvs := s.apiGet("/api/config/schema")
-	hasMock := schemaProviderCount(schemaProvs, "mock")
-	if n, ok := shellInt(hasMock); ok && n == 0 {
-		s.pass("Mock hidden from schema")
+	hasSynthetic := schemaProviderCount(schemaProvs, "synthetic")
+	if n, ok := shellInt(hasSynthetic); ok && n == 0 {
+		s.pass("Synthetic hidden from schema")
 	} else {
-		s.fail("Mock leaked into schema")
+		s.fail("Synthetic leaked into schema")
 	}
-	hasMock = countFieldEq(provs, "name", "mock")
-	if n, ok := shellInt(hasMock); ok && n == 0 {
-		s.pass("Mock hidden from provider list")
+	hasSynthetic = countFieldEq(provs, "name", "synthetic")
+	if n, ok := shellInt(hasSynthetic); ok && n == 0 {
+		s.pass("Synthetic hidden from provider list")
 	} else {
-		s.fail("Mock leaked into provider list")
+		s.fail("Synthetic leaked into provider list")
 	}
 
 	// Embedded is not an acquisition provider (detector separation): absent

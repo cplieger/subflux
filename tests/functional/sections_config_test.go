@@ -23,7 +23,7 @@ func (s *suite) sectionConfigValidation() {
   default:
     - code: en
 providers:
-  mock:
+  synthetic:
     enabled: true
     priority: 1
 media_roots:
@@ -60,7 +60,7 @@ media_roots:
   - /media
 poll_interval: 30s
 providers:
-  mock:
+  synthetic:
     enabled: true
     priority: 1
 search:
@@ -127,7 +127,7 @@ func (s *suite) sectionPostProcessing() {
   normalize_endings: true
   clean_whitespace: true
   remove_empty: true`, c[0], c[1], c[2], c[3])
-		s.applyMockConfig("static", "", topExtra, "")
+		s.applySyntheticConfig("static", "", topExtra, "")
 		if s.lastStatus == "200" {
 			s.pass(fmt.Sprintf("PP: hi=%s tags=%s sync=%s audio=%s", c[0], c[1], c[2], c[3]))
 		} else {
@@ -141,7 +141,7 @@ func (s *suite) sectionPostProcessing() {
 func (s *suite) sectionLanguageRules() {
 	s.log("=== Language Rule Combinations ===")
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: en
       subtitles:
         - code: fr`)
@@ -154,7 +154,7 @@ func (s *suite) sectionLanguageRules() {
 		s.fail("Lang: 0 targets")
 	}
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: en
       subtitles:
         - code: fr
@@ -163,7 +163,7 @@ func (s *suite) sectionLanguageRules() {
 	s.apiGet("/api/search/targets?orig_lang=en&audio_langs=en")
 	s.assertStatus("200", "Lang: en -> fr,de,es")
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: fr
       subtitles:
         - code: en
@@ -171,7 +171,7 @@ func (s *suite) sectionLanguageRules() {
 	s.apiGet("/api/search/targets?orig_lang=fr&audio_langs=fr")
 	s.assertStatus("200", "Lang: fr -> en std+forced")
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: en
       subtitles:
         - code: en
@@ -179,15 +179,15 @@ func (s *suite) sectionLanguageRules() {
 	s.apiGet("/api/search/targets?orig_lang=en&audio_langs=en")
 	s.assertStatus("200", "Lang: en -> en HI")
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: ja
       subtitles:
         - code: en
-          providers: [mock]`)
+          providers: [synthetic]`)
 	s.apiGet("/api/search/targets?orig_lang=ja&audio_langs=ja")
 	s.assertStatus("200", "Lang: provider filter")
 
-	s.applyMockConfig("static", "", "", `  rules:
+	s.applySyntheticConfig("static", "", "", `  rules:
     - audio: en
       subtitles:
         - code: fr
@@ -265,7 +265,7 @@ embedded_subtitles:
   ignore_vobsub: %s
   ignore_ass: %s
 providers:
-  mock:
+  synthetic:
     enabled: true
     priority: 1
 search:
@@ -303,7 +303,7 @@ providers:
   embedded:
     settings:
       ignore_pgs: true
-  mock:
+  synthetic:
     enabled: true
     priority: 1
 auth:
@@ -367,7 +367,7 @@ embedded_subtitles:
   ignore_pgs: true
   ignore_vobsub: true
 providers:
-  mock:
+  synthetic:
     enabled: true
     priority: 1
 search:
