@@ -212,7 +212,7 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 		t.Fatalf("write fake video: %v", err)
 	}
 
-	cfg := &testsupport.NopConfig{}
+	cfg := fakeManualCfg{}
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -324,7 +324,7 @@ func ordinalHarness(t *testing.T) (*SearchDeps, *LiveState, string) {
 	if err := os.WriteFile(videoPath, []byte("fake video"), 0o600); err != nil {
 		t.Fatalf("write fake video: %v", err)
 	}
-	cfg := &testsupport.NopConfig{}
+	cfg := fakeManualCfg{}
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,

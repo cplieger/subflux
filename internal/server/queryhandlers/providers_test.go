@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // stubProvider implements api.Provider for provider-listing tests.
@@ -30,7 +29,7 @@ func (p *stubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, err
 
 // newStateHandler builds a Handler whose LiveState carries the given config
 // and providers, with Configured reporting true.
-func newStateHandler(cfg *testsupport.NopConfig, providers []api.Provider) *Handler {
+func newStateHandler(cfg *fakeQueryCfg, providers []api.Provider) *Handler {
 	return New(Deps{
 		QueryDB: &mockQueryStore{},
 		State: func() *LiveState {
@@ -42,8 +41,8 @@ func newStateHandler(cfg *testsupport.NopConfig, providers []api.Provider) *Hand
 
 func TestHandleProviders_returns_provider_info(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		ProviderCfgs: map[api.ProviderID]api.ProviderCfg{
+	cfg := &fakeQueryCfg{
+		providers: map[api.ProviderID]api.ProviderCfg{
 			"opensubtitles": {Enabled: true},
 			"yify":          {Enabled: false},
 		},
@@ -94,7 +93,7 @@ func TestHandleProviders_returns_provider_info(t *testing.T) {
 
 func TestHandleProviders_rejects_non_get(t *testing.T) {
 	t.Parallel()
-	h := newStateHandler(&testsupport.NopConfig{}, nil)
+	h := newStateHandler(&fakeQueryCfg{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/providers", nil)
 	rec := httptest.NewRecorder()
@@ -108,8 +107,8 @@ func TestHandleProviders_rejects_non_get(t *testing.T) {
 
 func TestHandleProviders_empty_config_returns_empty_array(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		ProviderCfgs: map[api.ProviderID]api.ProviderCfg{},
+	cfg := &fakeQueryCfg{
+		providers: map[api.ProviderID]api.ProviderCfg{},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -132,7 +131,7 @@ func TestHandleProviders_empty_config_returns_empty_array(t *testing.T) {
 
 func TestHandleProviderTimeout_rejects_non_get(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/providers/timeout", nil)
 	rec := httptest.NewRecorder()
@@ -148,7 +147,7 @@ func TestHandleProviderTimeout_not_configured_returns_disabled(t *testing.T) {
 	t.Parallel()
 	// No ProviderTimeout in the search config: the engine's timeout
 	// tracker is disabled and the handler reports enabled=false.
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/providers/timeout", nil)
 	rec := httptest.NewRecorder()
@@ -170,8 +169,8 @@ func TestHandleProviderTimeout_not_configured_returns_disabled(t *testing.T) {
 
 func TestHandleProviderTimeout_enabled_returns_providers(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		SearchConfig: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
+	cfg := &fakeQueryCfg{
+		searchCfg: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
 	}
 	h := newEngineHandler(cfg)
 
@@ -200,7 +199,7 @@ func TestHandleProviderTimeout_enabled_returns_providers(t *testing.T) {
 
 func TestHandleProviderTimeoutReset_rejects_non_post(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/providers/timeout/reset", nil)
 	rec := httptest.NewRecorder()
@@ -214,7 +213,7 @@ func TestHandleProviderTimeoutReset_rejects_non_post(t *testing.T) {
 
 func TestHandleProviderTimeoutReset_not_configured_returns_disabled(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/providers/timeout/reset", nil)
 	rec := httptest.NewRecorder()
@@ -236,8 +235,8 @@ func TestHandleProviderTimeoutReset_not_configured_returns_disabled(t *testing.T
 
 func TestHandleProviderTimeoutReset_enabled_resets(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		SearchConfig: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
+	cfg := &fakeQueryCfg{
+		searchCfg: api.SearchConfig{ProviderTimeout: 2 * time.Hour},
 	}
 	h := newEngineHandler(cfg)
 
@@ -263,8 +262,8 @@ func TestHandleProviderTimeoutReset_enabled_resets(t *testing.T) {
 
 func TestHandleSearchTargets_returns_targets(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		Targets: []api.SubtitleTarget{
+	cfg := &fakeQueryCfg{
+		targets: []api.SubtitleTarget{
 			{Code: "fr"},
 			{Code: "en", Variant: "hi"},
 		},
@@ -298,7 +297,7 @@ func TestHandleSearchTargets_returns_targets(t *testing.T) {
 
 func TestHandleSearchTargets_rejects_non_get(t *testing.T) {
 	t.Parallel()
-	h := newStateHandler(&testsupport.NopConfig{}, nil)
+	h := newStateHandler(&fakeQueryCfg{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/search/targets", nil)
 	rec := httptest.NewRecorder()
@@ -312,8 +311,8 @@ func TestHandleSearchTargets_rejects_non_get(t *testing.T) {
 
 func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		Targets: []api.SubtitleTarget{{Code: "fr"}},
+	cfg := &fakeQueryCfg{
+		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -343,8 +342,8 @@ func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 
 func TestHandleSearchTargets_empty_audio_langs_param(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		Targets: []api.SubtitleTarget{{Code: "fr"}},
+	cfg := &fakeQueryCfg{
+		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -370,7 +369,7 @@ func TestHandleSearchTargets_empty_audio_langs_param(t *testing.T) {
 
 func TestHandleSearchTargets_no_targets_returns_empty(t *testing.T) {
 	t.Parallel()
-	h := newStateHandler(&testsupport.NopConfig{}, nil) // No targets configured.
+	h := newStateHandler(&fakeQueryCfg{}, nil) // No targets configured.
 
 	req := httptest.NewRequest(http.MethodGet, "/api/search/targets?orig_lang=en", nil)
 	rec := httptest.NewRecorder()
@@ -394,7 +393,7 @@ func TestHandleSearchTargets_no_targets_returns_empty(t *testing.T) {
 
 func TestHandleConfigParsed_rejects_non_get(t *testing.T) {
 	t.Parallel()
-	h := newStateHandler(&testsupport.NopConfig{}, nil)
+	h := newStateHandler(&fakeQueryCfg{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/config/parsed", nil)
 	rec := httptest.NewRecorder()
@@ -408,16 +407,16 @@ func TestHandleConfigParsed_rejects_non_get(t *testing.T) {
 
 func TestHandleConfigParsed_returns_structured_config(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		Languages: []string{"fr", "en"},
-		ProviderCfgs: map[api.ProviderID]api.ProviderCfg{
+	cfg := &fakeQueryCfg{
+		languages: []string{"fr", "en"},
+		providers: map[api.ProviderID]api.ProviderCfg{
 			"os": {Enabled: true},
 		},
-		SearchConfig: api.SearchConfig{
+		searchCfg: api.SearchConfig{
 			UpgradeEnabled: true, UpgradeWindowDays: 7,
 		},
-		AdaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		SonarrCfg:   api.ArrConfig{URL: "http://sonarr:8989"},
+		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
+		sonarrCfg:   api.ArrConfig{URL: "http://sonarr:8989"},
 	}
 	h := newStateHandler(cfg, nil)
 
@@ -454,9 +453,9 @@ func TestHandleConfigParsed_returns_structured_config(t *testing.T) {
 
 func TestHandleConfigParsed_includes_ignored_codecs(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		Languages: []string{"fr"},
-		Embedded:  api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
+	cfg := &fakeQueryCfg{
+		languages: []string{"fr"},
+		embedded:  api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
 	}
 	h := newStateHandler(cfg, nil)
 

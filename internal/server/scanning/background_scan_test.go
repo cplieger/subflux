@@ -21,7 +21,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -194,7 +193,7 @@ func newScanRig(t *testing.T) *scanRig {
 		sonarr: &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Test Show"}, episodes: epsWithFiles(1)},
 		radarr: &fakeRadarr{movie: arrapi.Movie{ID: 7, Title: "Test Movie", Year: 2020, MovieFile: &arrapi.MovieFile{Path: "/media/m.mkv"}}},
 	}
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	rig.h = NewHandler(HandlerDeps{
 		StateFunc: func() (*HandlerState, *LiveState) {
 			st := &HandlerState{Cfg: cfg}
@@ -652,7 +651,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	engine := &fakeEngine{started: make(chan int), release: make(chan struct{})}
 	ev := &recEvents{}
 	log := activity.New(10)
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
@@ -705,7 +704,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		db := &fakeScanStore{}
 		log := activity.New(10)
 		deps := newDeps(db, &recEvents{}, log)
-		ls := &LiveState{Cfg: &testsupport.NopConfig{}, Engine: &fakeEngine{}}
+		ls := &LiveState{Cfg: &fakeScanCfg{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
 		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID)
@@ -722,7 +721,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		db := &fakeScanStore{}
 		log := activity.New(10)
 		deps := newDeps(db, &recEvents{}, log)
-		ls := &LiveState{Cfg: &testsupport.NopConfig{}, Engine: &fakeEngine{}}
+		ls := &LiveState{Cfg: &fakeScanCfg{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -852,7 +851,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 	engine := &fakeEngine{started: make(chan int), release: make(chan struct{})}
 	ev := &recEvents{}
 	log := activity.New(10)
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
@@ -970,7 +969,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	engineA := &fakeEngine{}
 	engineB := &fakeEngine{}
 	sonarrA := &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Gen A Show"}, episodes: epsWithFiles(2)}

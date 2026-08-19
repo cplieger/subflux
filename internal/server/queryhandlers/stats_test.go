@@ -23,8 +23,8 @@ func (m *fakeMetrics) TotalSearches() int64 { return m.searches }
 
 func TestHandleStateStats_returns_counts(t *testing.T) {
 	t.Parallel()
-	cfg := &testsupport.NopConfig{
-		SearchConfig: api.SearchConfig{ScanInterval: 30 * time.Minute},
+	cfg := &fakeQueryCfg{
+		searchCfg: api.SearchConfig{ScanInterval: 30 * time.Minute},
 	}
 	// CountMissing returns a sentinel so the response wiring (not the
 	// counting logic, which has its own tests in the server root) is
@@ -85,7 +85,7 @@ func TestHandleStateStats_rejects_non_get(t *testing.T) {
 		QueryDB: &mockQueryStore{},
 		CovDB:   &testsupport.NopStore{},
 		Metrics: &fakeMetrics{},
-		State:   func() *LiveState { return &LiveState{Cfg: &testsupport.NopConfig{}} },
+		State:   func() *LiveState { return &LiveState{Cfg: &fakeQueryCfg{}} },
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/state/stats", nil)

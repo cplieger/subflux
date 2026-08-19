@@ -155,7 +155,7 @@ func prepDeps(log *activity.Log, stops *activity.StopRegistry, bus *events.Event
 		Alerts:   activity.NewAlertLog(10),
 		Stops:    stops,
 		StateFunc: func() *scheduler.LiveState {
-			return &scheduler.LiveState{Cfg: &testsupport.NopConfig{}}
+			return &scheduler.LiveState{Cfg: &fakeScanCfg{}}
 		},
 		ScanningFlag:        &flag,
 		DeleteSubtitleFiles: func([]string, string) {},

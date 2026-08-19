@@ -17,9 +17,6 @@ import (
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
-// Compile-time assertion: *Config satisfies api.ConfigProvider.
-var _ api.ConfigProvider = (*Config)(nil)
-
 // ParseDuration extends time.ParseDuration with D, M, and Y suffixes.
 func ParseDuration(s string) (time.Duration, error) {
 	if s == "" {

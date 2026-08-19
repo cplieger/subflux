@@ -22,7 +22,7 @@ import (
 // engine wired to cfg, so score-simulation and provider-timeout tests
 // exercise the actual scoring/timeout pipeline rather than a canned fake
 // (mirrors the production wiring).
-func newEngineHandler(cfg *testsupport.NopConfig) *Handler {
+func newEngineHandler(cfg *fakeQueryCfg) *Handler {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -43,7 +43,7 @@ func newEngineHandler(cfg *testsupport.NopConfig) *Handler {
 
 func TestHandleScore_returns_score_result(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	body := `{"media_type":"movie","release_name":"Movie.2024.1080p.WEB-DL-GRP","sub_release":"Movie.2024.1080p.WEB-DL-GRP","matched_by":"imdb"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader(body))
@@ -72,7 +72,7 @@ func TestHandleScore_returns_score_result(t *testing.T) {
 
 func TestHandleScore_rejects_non_post(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/score", nil)
 	rec := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestHandleScore_rejects_non_post(t *testing.T) {
 
 func TestHandleScore_invalid_json_returns_400(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader("not json"))
 	rec := httptest.NewRecorder()
@@ -107,7 +107,7 @@ func TestHandleScore_media_type_variations(t *testing.T) {
 
 	t.Run("empty defaults to episode", func(t *testing.T) {
 		t.Parallel()
-		h := newEngineHandler(&testsupport.NopConfig{})
+		h := newEngineHandler(&fakeQueryCfg{})
 
 		body := `{"release_name":"Test","sub_release":"Test","matched_by":"title"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader(body))
@@ -133,7 +133,7 @@ func TestHandleScore_media_type_variations(t *testing.T) {
 
 	t.Run("explicit movie vs episode same release", func(t *testing.T) {
 		t.Parallel()
-		h := newEngineHandler(&testsupport.NopConfig{})
+		h := newEngineHandler(&fakeQueryCfg{})
 
 		// Same release for both; identity fields no longer scored,
 		// so release attribute scores should be equal.
@@ -179,7 +179,7 @@ func TestHandleScore_media_type_variations(t *testing.T) {
 
 func TestHandleScore_release_attributes_scored(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	release := "Movie.2024.BluRay.1080p.x264-GRP"
 	body := `{"media_type":"movie","release_name":"` + release + `","sub_release":"` + release + `","matched_by":"imdb"}`
@@ -207,7 +207,7 @@ func TestHandleScore_release_attributes_scored(t *testing.T) {
 // matches score identically (identity fields are no longer scored).
 func TestHandleScore_matched_by_affects_score(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	release := "Movie.2024.BluRay.1080p.x264-GRP"
 
@@ -248,7 +248,7 @@ func TestHandleScore_matched_by_affects_score(t *testing.T) {
 // loud 400 (never a silent truncation), independently per field.
 func TestHandleScore_release_name_length_boundary(t *testing.T) {
 	t.Parallel()
-	h := newEngineHandler(&testsupport.NopConfig{})
+	h := newEngineHandler(&fakeQueryCfg{})
 
 	send := func(t *testing.T, releaseName, subRelease string) int {
 		t.Helper()

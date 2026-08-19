@@ -16,7 +16,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // listEntries drives HandleListFiles and decodes the response.
@@ -76,7 +75,7 @@ func newOrphanFixture(t *testing.T) (h *Handler, storedPath, orphanPath string) 
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}
-	return newFileHandler(store, &testsupport.NopConfig{}), storedPath, orphanPath
+	return newFileHandler(store, &fakePathGuard{}), storedPath, orphanPath
 }
 
 // TestOrphanLifecycle_mintDeleteConsume covers the design's handle
@@ -197,7 +196,7 @@ func TestOrphanListing_skipsNonSubtitleAndKnown(t *testing.T) {
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}
-	h := newFileHandler(store, &testsupport.NopConfig{})
+	h := newFileHandler(store, &fakePathGuard{})
 
 	entries := listEntries(t, h, "media_type=movie&media_id=tmdb-123")
 	orphan := orphanOf(t, entries)
@@ -258,7 +257,7 @@ func (f *fakeRadarrArr) GetMovieByID(context.Context, int) (arrapi.Movie, error)
 // newFileHandlerArr builds a Handler whose LiveState carries the given arr
 // fakes (nil-safe), over an empty store: the all-orphan edge.
 func newFileHandlerArr(store FileStore, sonarr FileSonarrClient, radarr FileRadarrClient) *Handler {
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakePathGuard{}
 	return NewHandler(Deps{
 		Store: store,
 		Resolve: &resolve.Resolver{

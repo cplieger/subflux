@@ -14,7 +14,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // HTTP-surface tests for the S7 FileRef contract on the sync verbs: the
@@ -64,7 +63,7 @@ func (fakeProc) SyncFromAudio(context.Context, []byte, string, string) api.Audio
 }
 
 func newSyncHarness(store *syncFakeStore) *Handler {
-	cfg := &testsupport.NopConfig{}
+	cfg := fakePathValidator{}
 	return New(Deps{
 		Store:        store,
 		SubtitleProc: fakeProc{},

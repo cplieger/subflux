@@ -85,7 +85,7 @@ type harnessStore interface {
 // validation, and no-op activity/alert/event sinks. The returned WaitGroup
 // is the handler's BGTracker; Wait it before finishing tests that reach the
 // background download path.
-func newHTTPHarness(db harnessStore, cfg *testsupport.NopConfig, providers []api.Provider) (*Handler, *sync.WaitGroup) {
+func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []api.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
@@ -118,7 +118,7 @@ func newHTTPHarness(db harnessStore, cfg *testsupport.NopConfig, providers []api
 }
 
 func newValidationHarness() *Handler {
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{}, nil)
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{}, nil)
 	return h
 }
 
@@ -246,7 +246,7 @@ func (p *dlFailingProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte
 
 func TestHandleManualDownload_download_error_returns_202(t *testing.T) {
 	t.Parallel()
-	h, wg := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
+	h, wg := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
 		[]api.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
@@ -383,7 +383,7 @@ func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.ManualLoc
 
 func TestHandleClearLock_db_error(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&clearLockErrorStore{}, &testsupport.NopConfig{}, nil)
+	h, _ := newHTTPHarness(&clearLockErrorStore{}, fakeManualCfg{}, nil)
 
 	body := `{"media_type":"movie","media_id":"tt123","language":"fr"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -477,7 +477,7 @@ func (p *resultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.
 
 func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
 		[]api.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
 			results: []api.Subtitle{
@@ -526,7 +526,7 @@ func (p *searchFailingProvider) Search(_ context.Context, _ *api.SearchRequest) 
 
 func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
 		[]api.Provider{
 			&searchFailingProvider{httpStubProvider{name: "bad"}},
 			&resultProvider{
@@ -583,7 +583,7 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 			{ReleaseName: "Movie.2024.WEB-DL-OTHER", Provider: "subdl"},
 		},
 	}
-	h, _ := newHTTPHarness(db, &testsupport.NopConfig{},
+	h, _ := newHTTPHarness(db, fakeManualCfg{},
 		[]api.Provider{&resultProvider{
 			httpStubProvider: httpStubProvider{name: "os"},
 			results: []api.Subtitle{

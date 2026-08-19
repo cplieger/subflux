@@ -15,7 +15,6 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 var errMock = errors.New("mock error")
@@ -58,7 +57,7 @@ func (m *fakeFileStore) HistoryMediaIDs(_ context.Context, mediaType api.MediaTy
 
 // newFileHandler builds a Handler around the given store and config, with a
 // resolver over the same store (as server_init wires it).
-func newFileHandler(store FileStore, cfg *testsupport.NopConfig) *Handler {
+func newFileHandler(store FileStore, cfg *fakePathGuard) *Handler {
 	return NewHandler(Deps{
 		Store: store,
 		Resolve: &resolve.Resolver{
@@ -86,7 +85,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 
 	t.Run("rejects_non_get", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodPost, "/api/state/ids", nil)
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
@@ -98,7 +97,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 
 	t.Run("missing_type_returns_400", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/state/ids", nil)
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
@@ -110,7 +109,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 
 	t.Run("returns_empty_array_for_nil", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/state/ids?type=movie", nil)
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
@@ -127,7 +126,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 	t.Run("passes_type_and_prefix", func(t *testing.T) {
 		t.Parallel()
 		store := &fakeFileStore{}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/state/ids?type=episode&prefix=tvdb-81189-", nil)
 		rec := httptest.NewRecorder()
@@ -145,7 +144,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 
 	t.Run("db_error_returns_500", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{histErr: errMock}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{histErr: errMock}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/state/ids?type=movie", nil)
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
@@ -158,7 +157,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 	t.Run("returns_ids", func(t *testing.T) {
 		t.Parallel()
 		h := newFileHandler(&fakeFileStore{histIDs: []string{"tmdb-123", "tmdb-456"}},
-			&testsupport.NopConfig{})
+			&fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/state/ids?type=movie", nil)
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
@@ -182,7 +181,7 @@ func TestHandleListFiles(t *testing.T) {
 
 	t.Run("rejects_non_get", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodPost, "/api/files", nil)
 		rec := httptest.NewRecorder()
 		h.HandleListFiles(rec, req)
@@ -205,7 +204,7 @@ func TestHandleListFiles(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+				h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 				req := httptest.NewRequest(http.MethodGet, "/api/files"+tt.query, nil)
 				rec := httptest.NewRecorder()
 				h.HandleListFiles(rec, req)
@@ -219,7 +218,7 @@ func TestHandleListFiles(t *testing.T) {
 
 	t.Run("invalid_media_type_returns_400", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/files?media_type=foo&media_id=tmdb-123", nil)
 		rec := httptest.NewRecorder()
@@ -232,7 +231,7 @@ func TestHandleListFiles(t *testing.T) {
 
 	t.Run("db_error_returns_500", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{getErr: errMock}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{getErr: errMock}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/files?media_type=movie&media_id=tmdb-123", nil)
 		rec := httptest.NewRecorder()
@@ -262,7 +261,7 @@ func TestHandleListFiles(t *testing.T) {
 				Source:   "embedded",
 				Codec:    "subrip",
 			},
-		}}, &testsupport.NopConfig{})
+		}}, &fakePathGuard{})
 
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/files?media_type=movie&media_id=tmdb-123", nil)
@@ -305,7 +304,7 @@ func TestHandleListFiles(t *testing.T) {
 
 	t.Run("empty_rows_returns_empty_array", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/files?media_type=movie&media_id=tmdb-999", nil)
 		rec := httptest.NewRecorder()
@@ -335,7 +334,7 @@ func TestHandleListFiles(t *testing.T) {
 				Source:   "external",
 				Path:     path,
 			},
-		}}, &testsupport.NopConfig{})
+		}}, &fakePathGuard{})
 
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/files?media_type=movie&media_id=tmdb-123", nil)
@@ -366,7 +365,7 @@ func TestHandleDeleteFile(t *testing.T) {
 
 	t.Run("rejects_non_delete", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 		rec := httptest.NewRecorder()
 		h.HandleDeleteFile(rec, req)
@@ -391,7 +390,7 @@ func TestHandleDeleteFile(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+				h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 				req := httptest.NewRequest(http.MethodDelete, "/api/files",
 					strings.NewReader(tt.body))
 				rec := httptest.NewRecorder()
@@ -416,7 +415,7 @@ func TestHandleDeleteFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/etc/movie.en.srt",
 		}}}
-		h := newFileHandler(store, &testsupport.NopConfig{PathErr: config.ErrPathNotAllowed})
+		h := newFileHandler(store, &fakePathGuard{pathErr: config.ErrPathNotAllowed})
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/files",
 			strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
@@ -438,7 +437,7 @@ func TestHandleDeleteFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/nonexistent/sub.srt",
 		}}}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/files",
 			strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
@@ -463,7 +462,7 @@ func TestHandleDeleteFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/nonexistent/sub.srt",
 		}}}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/files",
 			strings.NewReader(deleteBody("movie", "tmdb-123", "en", "forced", 0)))
@@ -559,7 +558,7 @@ func TestHandleDeleteFile_unresolved_ref_returns_404(t *testing.T) {
 				t.Fatalf("WriteFile() unexpected error: %v", err)
 			}
 			store := &fakeFileStore{rows: tt.rows(victim)}
-			h := newFileHandler(store, &testsupport.NopConfig{})
+			h := newFileHandler(store, &fakePathGuard{})
 
 			req := httptest.NewRequest(http.MethodDelete, "/api/files",
 				strings.NewReader(tt.body()))
@@ -605,7 +604,7 @@ func TestHandleDeleteFile_resolved_ref_deletes(t *testing.T) {
 			Source: "external", Path: manualPath, Ordinal: 1,
 		},
 	}}
-	h := newFileHandler(store, &testsupport.NopConfig{})
+	h := newFileHandler(store, &fakePathGuard{})
 
 	// Delete the ordinal-1 manual sibling; the auto file must survive.
 	req := httptest.NewRequest(http.MethodDelete, "/api/files",
@@ -641,7 +640,7 @@ func TestHandleDeleteFile_extension_refused_returns_409(t *testing.T) {
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: victim,
 	}}}
-	h := newFileHandler(store, &testsupport.NopConfig{})
+	h := newFileHandler(store, &fakePathGuard{})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/files",
 		strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
@@ -671,7 +670,7 @@ func TestHandleDeleteFile_store_lookup_error_returns_500(t *testing.T) {
 	if err := os.WriteFile(victim, []byte("data"), 0o644); err != nil {
 		t.Fatalf("WriteFile() unexpected error: %v", err)
 	}
-	h := newFileHandler(&fakeFileStore{getErr: errMock}, &testsupport.NopConfig{})
+	h := newFileHandler(&fakeFileStore{getErr: errMock}, &fakePathGuard{})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/files",
 		strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
@@ -694,7 +693,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("rejects_non_delete", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodGet, "/api/files/bulk", nil)
 		rec := httptest.NewRecorder()
 		h.HandleBulkDeleteFiles(rec, req)
@@ -706,7 +705,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("invalid_json_returns_400", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
 			strings.NewReader("not json"))
 		rec := httptest.NewRecorder()
@@ -730,7 +729,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+				h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 				req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
 					strings.NewReader(tt.body))
 				rec := httptest.NewRecorder()
@@ -745,7 +744,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("invalid_media_type_returns_400", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		body := `{"media_type":"foo","media_id":"tmdb-123"}`
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
 			strings.NewReader(body))
@@ -759,7 +758,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("db_error_returns_500", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{getErr: errMock}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{getErr: errMock}, &fakePathGuard{})
 		body := `{"media_type":"movie","media_id":"tmdb-123"}`
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
 			strings.NewReader(body))
@@ -789,7 +788,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 				Path:     "",
 			},
 		}}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 
 		body := `{"media_type":"movie","media_id":"tmdb-123"}`
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
@@ -835,7 +834,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 				Source: "external", Path: refused,
 			},
 		}}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 
 		body := `{"media_type":"movie","media_id":"tmdb-123"}`
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
@@ -863,7 +862,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 
 	t.Run("no_rows_returns_zero", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		body := `{"media_type":"movie","media_id":"tmdb-999"}`
 		req := httptest.NewRequest(http.MethodDelete, "/api/files/bulk",
 			strings.NewReader(body))
@@ -892,12 +891,12 @@ func TestDeleteExternalFile(t *testing.T) {
 
 	t.Run("skips_embedded_source", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		row := &api.SubtitleEntry{
 			Source: "embedded",
 			Path:   "/media/movie.srt",
 		}
-		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(embedded) = true, want false")
 		}
@@ -905,12 +904,12 @@ func TestDeleteExternalFile(t *testing.T) {
 
 	t.Run("skips_empty_path", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		row := &api.SubtitleEntry{
 			Source: "external",
 			Path:   "",
 		}
-		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(empty path) = true, want false")
 		}
@@ -918,13 +917,13 @@ func TestDeleteExternalFile(t *testing.T) {
 
 	t.Run("skips_invalid_path", func(t *testing.T) {
 		t.Parallel()
-		h := newFileHandler(&fakeFileStore{}, &testsupport.NopConfig{})
+		h := newFileHandler(&fakeFileStore{}, &fakePathGuard{})
 		row := &api.SubtitleEntry{
 			Source: "external",
 			Path:   "/etc/passwd",
 		}
 		got := h.deleteExternalFile(t.Context(),
-			&testsupport.NopConfig{PathErr: config.ErrPathNotAllowed}, api.MediaTypeMovie, row)
+			&fakePathGuard{pathErr: config.ErrPathNotAllowed}, api.MediaTypeMovie, row)
 		if got {
 			t.Error("deleteExternalFile(invalid path) = true, want false")
 		}
@@ -933,7 +932,7 @@ func TestDeleteExternalFile(t *testing.T) {
 	t.Run("succeeds_for_nonexistent_file", func(t *testing.T) {
 		t.Parallel()
 		store := &fakeFileStore{}
-		h := newFileHandler(store, &testsupport.NopConfig{})
+		h := newFileHandler(store, &fakePathGuard{})
 		row := &api.SubtitleEntry{
 			MediaID:  "tmdb-123",
 			Language: "en",
@@ -941,7 +940,7 @@ func TestDeleteExternalFile(t *testing.T) {
 			Source:   "external",
 			Path:     "/nonexistent/movie.en.srt",
 		}
-		got := h.deleteExternalFile(t.Context(), &testsupport.NopConfig{}, api.MediaTypeMovie, row)
+		got := h.deleteExternalFile(t.Context(), &fakePathGuard{}, api.MediaTypeMovie, row)
 		if !got {
 			t.Error("deleteExternalFile(nonexistent file) = false, want true")
 		}
