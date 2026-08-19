@@ -29,6 +29,7 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
@@ -152,9 +153,10 @@ type Store interface {
 	scheduler.Store
 	search.SearchStore
 
-	// Coverage counting, still shared as one interface because the three
-	// consumers of api.CoverageStore have not yet been split.
-	api.CoverageStore
+	// Coverage: the stats endpoint's two aggregate reads, and the one row read
+	// the bound missing-count closure performs.
+	queryhandlers.StatsStore
+	coverage.FileReader
 
 	// The store-backed capabilities the server itself operates: the hot
 	// snapshot for the backup loop and the file gauges for /metrics. Both used

@@ -1,36 +1,55 @@
-package server
+package coverage_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/testsupport"
 )
 
-// countMissingStore returns configurable subtitle files for countMissing tests.
+// These tests used to live in internal/server and reach this logic through
+// three one-line wrappers there whose stated reason was "package-level wrapper
+// for test access". Measuring the counting pass against the coverage surface
+// showed it calls exactly ONE method, so the wrappers had nothing left to
+// justify them and the tests belong next to the functions they assert.
+
+// countMissingStore is coverage.FileReader and nothing else: one method,
+// answering a canned row set per media type. The former version embedded the
+// server package's 34-method NopStore mock to satisfy a twelve-method
+// interface, of which this suite exercised one.
 type countMissingStore struct {
+	err          error
 	episodeFiles []api.SubtitleEntry
 	movieFiles   []api.SubtitleEntry
-	qhMockStore
 }
 
 func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
 	if mediaType == api.MediaTypeEpisode {
 		return m.episodeFiles, nil
 	}
 	return m.movieFiles, nil
 }
 
-// countMissingConfig returns configurable targets for countMissing tests.
+// countMissingConfig supplies the language targets the count is measured
+// against. api.ConfigProvider is still a single wide interface, so it embeds
+// the shared no-op config rather than re-implementing 28 accessors.
 type countMissingConfig struct {
+	testsupport.NopConfig
 	targets []api.SubtitleTarget
-	qhMockConfig
 }
 
 func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
 	return m.targets
 }
+
+var errMock = errors.New("mock store failure")
 
 // --- countMissing ---
 
@@ -39,7 +58,7 @@ func TestCountMissing_empty_series_and_movies(t *testing.T) {
 	cfg := &countMissingConfig{}
 	db := &countMissingStore{}
 
-	got := countMissing(t.Context(), cfg, db, nil, nil)
+	got := coverage.CountMissing(t.Context(), cfg, db, nil, nil)
 	if got != 0 {
 		t.Errorf("countMissing(nil, nil) = %d, want 0", got)
 	}
@@ -52,7 +71,7 @@ func TestCountMissingSeries_empty_series(t *testing.T) {
 	cfg := &countMissingConfig{}
 	db := &countMissingStore{}
 
-	got := countMissingSeries(t.Context(), cfg, db, nil, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, nil, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(nil) = %d, want 0", got)
 	}
@@ -68,7 +87,7 @@ func TestCountMissingSeries_series_with_zero_episodes(t *testing.T) {
 		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 0}},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(0 episodes) = %d, want 0", got)
 	}
@@ -84,7 +103,7 @@ func TestCountMissingSeries_series_with_nil_statistics(t *testing.T) {
 		{TvdbID: 81189, Statistics: nil},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(nil stats) = %d, want 0", got)
 	}
@@ -106,7 +125,7 @@ func TestCountMissingSeries_all_episodes_covered(t *testing.T) {
 		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 3}},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(all covered) = %d, want 0", got)
 	}
@@ -127,7 +146,7 @@ func TestCountMissingSeries_some_episodes_missing(t *testing.T) {
 	}
 
 	// 3 episodes, 1 covered → 2 missing.
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 2 {
 		t.Errorf("countMissingSeries(1 of 3 covered) = %d, want 2", got)
 	}
@@ -152,7 +171,7 @@ func TestCountMissingSeries_multiple_targets(t *testing.T) {
 	}
 
 	// 2 targets × 2 episodes = 4 expected. fr: 2 covered, en: 0 covered → 2 missing.
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 2 {
 		t.Errorf("countMissingSeries(2 targets, partial) = %d, want 2", got)
 	}
@@ -168,7 +187,7 @@ func TestCountMissingSeries_no_targets(t *testing.T) {
 		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5}},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(no targets) = %d, want 0", got)
 	}
@@ -191,7 +210,7 @@ func TestCountMissingSeries_different_series_isolated(t *testing.T) {
 
 	// Series 100: 1 ep, 1 covered → 0 missing.
 	// Series 200: 2 eps, 0 covered → 2 missing.
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 2 {
 		t.Errorf("countMissingSeries(two series) = %d, want 2", got)
 	}
@@ -213,7 +232,7 @@ func TestCountMissingSeries_variant_matching(t *testing.T) {
 	}
 
 	// Target is en/hi, but only en/standard exists → 1 missing.
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 1 {
 		t.Errorf("countMissingSeries(wrong variant) = %d, want 1", got)
 	}
@@ -226,7 +245,7 @@ func TestCountMissingMovies_empty_movies(t *testing.T) {
 	cfg := &countMissingConfig{}
 	db := &countMissingStore{}
 
-	got := countMissingMovies(t.Context(), cfg, db, nil, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, nil, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(nil) = %d, want 0", got)
 	}
@@ -242,7 +261,7 @@ func TestCountMissingMovies_movie_without_file(t *testing.T) {
 		{TmdbID: 1271, HasFile: false},
 	}
 
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(no file) = %d, want 0", got)
 	}
@@ -262,7 +281,7 @@ func TestCountMissingMovies_movie_fully_covered(t *testing.T) {
 		{TmdbID: 1271, HasFile: true},
 	}
 
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(covered) = %d, want 0", got)
 	}
@@ -278,7 +297,7 @@ func TestCountMissingMovies_movie_missing_subtitle(t *testing.T) {
 		{TmdbID: 1271, HasFile: true},
 	}
 
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 1 {
 		t.Errorf("countMissingMovies(missing) = %d, want 1", got)
 	}
@@ -302,7 +321,7 @@ func TestCountMissingMovies_multiple_targets(t *testing.T) {
 	}
 
 	// 2 targets, 1 covered → 1 missing.
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 1 {
 		t.Errorf("countMissingMovies(2 targets, 1 covered) = %d, want 1", got)
 	}
@@ -323,7 +342,7 @@ func TestCountMissingMovies_variant_matching(t *testing.T) {
 	}
 
 	// Target is en/hi, but only en/standard exists → 1 missing.
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 1 {
 		t.Errorf("countMissingMovies(wrong variant) = %d, want 1", got)
 	}
@@ -339,7 +358,7 @@ func TestCountMissingMovies_no_targets(t *testing.T) {
 		{TmdbID: 1271, HasFile: true},
 	}
 
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(no targets) = %d, want 0", got)
 	}
@@ -361,7 +380,7 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 	}
 
 	// Movie 100: covered. Movie 200: missing → 1 missing.
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 1 {
 		t.Errorf("countMissingMovies(2 movies, 1 covered) = %d, want 1", got)
 	}
@@ -369,24 +388,17 @@ func TestCountMissingMovies_multiple_movies(t *testing.T) {
 
 // --- countMissingSeries DB error ---
 
-// countMissingErrorStore returns an error from GetSubtitleFiles.
-type countMissingErrorStore struct{ qhMockStore }
-
-func (m *countMissingErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
-	return nil, errMock
-}
-
 func TestCountMissingSeries_db_error_returns_zero(t *testing.T) {
 	t.Parallel()
 	cfg := &countMissingConfig{
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
-	db := &countMissingErrorStore{}
+	db := &countMissingStore{err: errMock}
 	series := []arrapi.Series{
 		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5}},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, nil)
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, nil)
 	if got != 0 {
 		t.Errorf("countMissingSeries(db error) = %d, want 0", got)
 	}
@@ -397,12 +409,12 @@ func TestCountMissingMovies_db_error_returns_zero(t *testing.T) {
 	cfg := &countMissingConfig{
 		targets: []api.SubtitleTarget{{Code: "fr"}},
 	}
-	db := &countMissingErrorStore{}
+	db := &countMissingStore{err: errMock}
 	movies := []arrapi.Movie{
 		{TmdbID: 1271, HasFile: true},
 	}
 
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(db error) = %d, want 0", got)
 	}
@@ -426,7 +438,7 @@ func TestCountMissingSeries_ignored_codec_counts_as_missing(t *testing.T) {
 	}
 
 	// PGS is ignored → episode counts as missing.
-	got := countMissingSeries(t.Context(), cfg, db, series, map[string]bool{"pgs": true})
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, map[string]bool{"pgs": true})
 	if got != 1 {
 		t.Errorf("countMissingSeries(ignored codec) = %d, want 1", got)
 	}
@@ -446,7 +458,7 @@ func TestCountMissingSeries_usable_sub_not_missing(t *testing.T) {
 		{TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 1}},
 	}
 
-	got := countMissingSeries(t.Context(), cfg, db, series, map[string]bool{"pgs": true})
+	got := coverage.CountMissingSeries(t.Context(), cfg, db, series, map[string]bool{"pgs": true})
 	if got != 0 {
 		t.Errorf("countMissingSeries(usable external) = %d, want 0", got)
 	}
@@ -467,7 +479,7 @@ func TestCountMissingMovies_ignored_codec_counts_as_missing(t *testing.T) {
 	}
 
 	// VobSub is ignored → movie counts as missing.
-	got := countMissingMovies(t.Context(), cfg, db, movies, map[string]bool{"vobsub": true})
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, map[string]bool{"vobsub": true})
 	if got != 1 {
 		t.Errorf("countMissingMovies(ignored codec) = %d, want 1", got)
 	}
@@ -489,7 +501,7 @@ func TestCountMissingMovies_usable_overrides_ignored(t *testing.T) {
 	}
 
 	// Has both ignored PGS and usable external → not missing.
-	got := countMissingMovies(t.Context(), cfg, db, movies, map[string]bool{"pgs": true})
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, map[string]bool{"pgs": true})
 	if got != 0 {
 		t.Errorf("countMissingMovies(usable overrides ignored) = %d, want 0", got)
 	}
@@ -505,7 +517,7 @@ func TestCountMissingMovies_empty_media_id_skipped(t *testing.T) {
 	movies := []arrapi.Movie{
 		{TmdbID: 0, HasFile: true},
 	}
-	got := countMissingMovies(t.Context(), cfg, db, movies, nil)
+	got := coverage.CountMissingMovies(t.Context(), cfg, db, movies, nil)
 	if got != 0 {
 		t.Errorf("countMissingMovies(movie with empty mediaID) = %d, want 0", got)
 	}
@@ -532,7 +544,7 @@ func TestCountMissing_sums_series_and_movies(t *testing.T) {
 	}
 
 	// Series: 2 eps, 1 covered -> 1 missing. Movies: 1 missing. Total: 2.
-	got := countMissing(t.Context(), cfg, db, series, movies)
+	got := coverage.CountMissing(t.Context(), cfg, db, series, movies)
 	if got != 2 {
 		t.Errorf("countMissing(1 series missing + 1 movie missing) = %d, want 2", got)
 	}

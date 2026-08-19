@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -135,7 +136,8 @@ type nopStoreConsumers interface {
 	manualops.DownloadStore
 	polling.PollerStore
 	resolve.FileStore
-	api.CoverageStore
+	coverage.FileReader
+	queryhandlers.StatsStore
 }
 
 var _ nopStoreConsumers = (*NopStore)(nil)

@@ -9,9 +9,21 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 )
 
+// FileReader is the ONE thing the missing-count pass asks of the store: read
+// every subtitle-file row for a media type, once per type, and count against it
+// in memory. One of the twelve methods the coverage surface offers — this pass
+// records nothing, stamps nothing, and never reads scan state.
+//
+// Exported because queryhandlers names it: the CountMissing function value it
+// is handed takes this as a parameter, and naming this type is what keeps that
+// signature from drifting into a wider one.
+type FileReader interface {
+	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
+}
+
 // CountMissing returns the total number of missing subtitle targets across
 // all series and movies.
-func CountMissing(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
+func CountMissing(ctx context.Context, cfg api.ConfigProvider, db FileReader, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
 	ignoredCodecs := search.IgnoredCodecsFromConfig(cfg)
 	return CountMissingSeries(ctx, cfg, db, allSeries, ignoredCodecs) +
 		CountMissingMovies(ctx, cfg, db, allMovies, ignoredCodecs)
@@ -25,7 +37,7 @@ type langKey struct{ lang, variant string }
 type prefixCounts map[langKey]int
 
 // CountMissingSeries returns the number of missing subtitle targets for series.
-func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
+func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db FileReader, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
 	if len(allSeries) == 0 {
 		return 0
 	}
@@ -120,7 +132,7 @@ func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts
 }
 
 // CountMissingMovies returns the number of missing subtitle targets for movies.
-func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
+func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db FileReader, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
 	if len(allMovies) == 0 {
 		return 0
 	}

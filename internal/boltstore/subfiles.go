@@ -15,7 +15,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the subtitle_files half of api.CoverageStore plus the
+// This file holds the subtitle_files half of the coverage surface plus the
 // subtitle timing adjustments (sync_offsets bucket).
 //
 // subtitle_files keys are mt 0x00 mid 0x00 lang 0x00 variant 0x00 source 0x00

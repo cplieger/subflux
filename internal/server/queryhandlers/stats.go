@@ -43,7 +43,7 @@ func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
 	ls := h.state()
 	allSeries, allMovies, partial := fetchMediaCountsParallel(ctx, ls)
 
-	missing := h.countMissing(ctx, ls.Cfg, h.covDB, allSeries, allMovies)
+	missing := h.countMissing(ctx, ls.Cfg, allSeries, allMovies)
 
 	slog.Debug("handleStateStats",
 		"downloads", downloads, "searches", searches,

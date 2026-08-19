@@ -8,8 +8,9 @@
 // found false — there is one store implementation, and every consumer already
 // declares the surface it calls at its own site.
 //
-// The interfaces left in this file are the ones whose move is still pending:
-// CoverageStore (three consumers, splitting next) and ConfigProvider.
+// One interface is left in this file — ConfigProvider — and its move is pending
+// for a reason of its own: it needs internal/server to import internal/config,
+// and it is entangled with six downcast sites.
 package api
 
 import (
@@ -18,33 +19,6 @@ import (
 
 	"github.com/cplieger/auth/v4"
 )
-
-// --- Coverage ---
-
-// CoverageStore is the coverage read/write surface: what subtitle files exist
-// for a media item, and when that item was last scanned. Twelve methods, taken
-// whole by three packages — internal/server, server/coverage and
-// server/queryhandlers — which call different subsets of it.
-//
-// Splitting it at those three consumers is the remaining work; until then this
-// is the one store interface left in this package.
-type CoverageStore interface {
-	RecordSubtitleFiles(ctx context.Context, mediaType MediaType, mediaID string, files []SubtitleFile) (bool, error)
-	UpsertSubtitleFile(ctx context.Context, mediaType MediaType, mediaID string, f *SubtitleFile) error
-	GetSubtitleFiles(ctx context.Context, mediaType MediaType, mediaIDPrefix string) ([]SubtitleEntry, error)
-	DeleteSubtitleFile(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant, source SubtitleSource, path string) error
-	RecordScanState(ctx context.Context, rec *ScanRecord) error
-	GetScanStates(ctx context.Context, mediaType MediaType, mediaIDPrefix string) ([]ScanStateRow, error)
-	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
-	TotalSubtitleFiles(ctx context.Context) (int, error)
-	LastScanTime(ctx context.Context) (string, error)
-	// Scan-cycle mark (duration-aware resume): set when a full scan begins,
-	// cleared on normal completion. A dangling mark means the previous cycle
-	// was interrupted; ScanCycleStart returns the zero time when absent.
-	ScanCycleStart(ctx context.Context) (time.Time, error)
-	SetScanCycleStart(ctx context.Context, t time.Time) error
-	ClearScanCycleStart(ctx context.Context) error
-}
 
 // --- Configuration ---
 

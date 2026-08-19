@@ -19,7 +19,7 @@ import (
 // (search.SearchStore, scanning.ScanStore, scheduler.Store,
 // queryhandlers.QueryStore, synchandlers.SyncStore, filehandlers.FileStore,
 // coveragehandlers.CoverageStore, manualops.DownloadStore, polling.PollerStore,
-// resolve.FileStore, api.CoverageStore, and server.Store, which is the union of
+// resolve.FileStore, coverage.FileReader, and server.Store, which is the union of
 // most of those). nopstore_test.go states that union in one anonymous interface,
 // so a consumer that adds a method fails there with a readable message rather
 // than at a dozen install sites.

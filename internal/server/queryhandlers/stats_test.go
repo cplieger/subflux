@@ -33,7 +33,7 @@ func TestHandleStateStats_returns_counts(t *testing.T) {
 		CovDB:   &testsupport.NopStore{},
 		Metrics: &fakeMetrics{},
 		State:   func() *LiveState { return &LiveState{Cfg: cfg} },
-		CountMissing: func(_ context.Context, _ api.ConfigProvider, _ api.CoverageStore, _ []arrapi.Series, _ []arrapi.Movie) int {
+		CountMissing: func(_ context.Context, _ api.ConfigProvider, _ []arrapi.Series, _ []arrapi.Movie) int {
 			return 0
 		},
 	})

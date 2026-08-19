@@ -38,6 +38,15 @@ var (
 	_ StatsRadarrClient = api.RadarrClient(nil)
 )
 
+// StatsStore is the two aggregate reads the stats endpoint reports: how many
+// subtitle files are tracked, and when the last scan finished. 2 of the twelve
+// methods the coverage surface offers — /api/state/stats renders a summary, so
+// it never touches a per-item row.
+type StatsStore interface {
+	TotalSubtitleFiles(ctx context.Context) (int, error)
+	LastScanTime(ctx context.Context) (string, error)
+}
+
 // MetricsReader is the narrow interface for reading search metrics.
 type MetricsReader interface {
 	TotalSearches() int64
@@ -64,22 +73,28 @@ type LiveState struct {
 
 // Deps holds all dependencies for the query handler family.
 type Deps struct {
-	QueryDB      QueryStore
-	CovDB        api.CoverageStore
-	Metrics      MetricsReader
-	State        func() *LiveState
-	Configured   func() bool
-	CountMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
+	QueryDB    QueryStore
+	CovDB      StatsStore
+	Metrics    MetricsReader
+	State      func() *LiveState
+	Configured func() bool
+	// CountMissing counts missing subtitle targets. It is handed to this package
+	// ALREADY BOUND to the store: the count reads subtitle-file rows, this
+	// package never does, and taking the store as a parameter just to forward it
+	// is what made these handlers look like a store consumer twelve methods
+	// wide. cfg stays a parameter because it is hot-reloadable and arrives with
+	// each request's live snapshot.
+	CountMissing func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int
 }
 
 // Handler holds all dependencies for the query handler family.
 type Handler struct {
 	queryDB      QueryStore
-	covDB        api.CoverageStore
+	covDB        StatsStore
 	metrics      MetricsReader
 	state        func() *LiveState
 	configured   func() bool
-	countMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
+	countMissing func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int
 	statsCache   statsCache
 }
 

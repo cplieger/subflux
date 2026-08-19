@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -65,12 +67,17 @@ func (s *Server) initHandlers() {
 		s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
 	}
 	s.queryH = queryhandlers.New(queryhandlers.Deps{
-		QueryDB:      s.stores.query,
-		CovDB:        s.db,
-		Metrics:      s.metrics,
-		State:        s.queryLiveState,
-		Configured:   func() bool { return s.configured.Load() },
-		CountMissing: countMissing,
+		QueryDB:    s.stores.query,
+		CovDB:      s.db,
+		Metrics:    s.metrics,
+		State:      s.queryLiveState,
+		Configured: func() bool { return s.configured.Load() },
+		// Bound to the store here, at the composition root: coverage.CountMissing
+		// reads subtitle-file rows and queryhandlers does not, so the handler is
+		// handed a counter rather than a store to forward.
+		CountMissing: func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int {
+			return coverage.CountMissing(ctx, cfg, s.db, series, movies)
+		},
 	})
 	s.configH = confighandlers.New(&confighandlers.Deps{
 		LoadConfig:    s.loadConfig,
