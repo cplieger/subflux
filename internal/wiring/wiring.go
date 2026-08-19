@@ -1,10 +1,11 @@
 // Package wiring holds composition-root types that connect concrete
-// implementations across the api, metrics, search, and provider packages.
+// implementations across the config, provider, scorer, search and embedded
+// packages.
 //
 // This package exists to break import cycles that would otherwise arise from
-// defining wiring types (Func) in api/ alongside cross-cutting concerns.
-// wiring/ depends on boundary packages without polluting either with the
-// other's symbols.
+// defining wiring types (Func) in the shared types package alongside
+// cross-cutting concerns. wiring/ depends on boundary packages without
+// polluting either with the other's symbols.
 //
 // wiring/ is import-only by main.go (the composition root) and server/
 // (which receives a Func via WithWire and calls it on each config reload).

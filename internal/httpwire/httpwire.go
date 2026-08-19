@@ -2,7 +2,7 @@
 // will read from a peer, and the vocabulary it classifies a peer's response
 // with. Behavioural logic is delegated to github.com/cplieger/httpx/v5; what
 // stays here is application-specific — the caps, the User-Agent, and the thin
-// adapters bridging httpx error types to the internal api.* errors.
+// adapters bridging httpx error types to the internal subflux.* errors.
 //
 // Named for the wire rather than as an httputil: the bounds and the
 // classification are one concern (every export is about reading a response
@@ -64,7 +64,7 @@ func ParseRetryAfter(resp *http.Response) time.Duration {
 }
 
 // CheckHTTPStatus maps HTTP error status codes to typed errors.
-// Returns nil for 2xx/3xx. Bridges httpx error types to api.* types
+// Returns nil for 2xx/3xx. Bridges httpx error types to subflux.* types
 // so callers can continue using errors.As with *subflux.AuthError and
 // *subflux.RateLimitError.
 func CheckHTTPStatus(resp *http.Response) error {

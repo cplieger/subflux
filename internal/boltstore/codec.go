@@ -17,7 +17,7 @@ import (
 // and additively forward-compatible without a migration script. Bucket KEYS
 // stay binary and live in keys.go. The mt/mid/lang components of most records
 // live in the KEY (and in the secondary indexes), so the value structs below
-// deliberately omit them; a read reconstructs an api.* value from the key
+// deliberately omit them; a read reconstructs a subflux.* value from the key
 // components plus the decoded record.
 
 // --- Core-domain record value structs (JSON-encoded bbolt bucket values) ---

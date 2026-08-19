@@ -6,7 +6,7 @@ import (
 )
 
 // The Sonarr/Radarr DTOs are consumed directly as github.com/cplieger/arrapi
-// types throughout subflux; there are no api.* aliases for them. This file
+// types throughout subflux; there are no subflux.* aliases for them. This file
 // keeps the subtitle-app helpers that read those arr types, beside the client
 // that fetches them. arrapi's types are not subflux-local, so these are free
 // functions rather than methods.
