@@ -11,6 +11,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
@@ -160,7 +161,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := api.OriginalLangCode(ser.OriginalLanguage)
+		audioLang := arrsvc.OriginalLangCode(ser.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
@@ -178,7 +179,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 			Rule:       ruleName,
 			Targets:    tCov,
 			Tags:       ser.Tags,
-			Excluded:   api.HasExcludeTag(ser.Tags, excludeIDs),
+			Excluded:   arrsvc.HasExcludeTag(ser.Tags, excludeIDs),
 		})
 	}
 	slog.Debug("coverage: series computed", "count", len(out), "series_total", len(allSeries), "episode_files", len(allFiles))
@@ -245,7 +246,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := api.OriginalLangCode(m.OriginalLanguage)
+		audioLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
@@ -275,7 +276,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			Targets:        tCov,
 			Subs:           coverage.DeduplicateFileRows(movieFiles[mediaID]),
 			Tags:           m.Tags,
-			Excluded:       api.HasExcludeTag(m.Tags, excludeIDs),
+			Excluded:       arrsvc.HasExcludeTag(m.Tags, excludeIDs),
 		})
 	}
 	slog.Debug("coverage: movies computed", "count", len(out), "movie_total", len(allMovies), "movie_files", len(allFiles))

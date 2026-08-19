@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
@@ -25,8 +26,8 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 		"scene", ep.EpisodeFile.SceneName,
 		"path", ep.EpisodeFile.Path)
 
-	origLang := api.OriginalLangCode(series.OriginalLanguage)
-	audioLangs := api.AudioLanguages(ep.EpisodeFile.MediaInfo)
+	origLang := arrsvc.OriginalLangCode(series.OriginalLanguage)
+	audioLangs := arrsvc.AudioLanguages(ep.EpisodeFile.MediaInfo)
 	targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
 	req := EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
@@ -83,8 +84,8 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 		"scene", m.MovieFile.SceneName,
 		"path", m.MovieFile.Path)
 
-	origLang := api.OriginalLangCode(m.OriginalLanguage)
-	audioLangs := api.AudioLanguages(m.MovieFile.MediaInfo)
+	origLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
+	audioLangs := arrsvc.AudioLanguages(m.MovieFile.MediaInfo)
 	targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
 	req := MovieSearchRequest(m, ls.Cfg.LanguageCodes())
@@ -197,10 +198,10 @@ func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 // This is the single source of truth for the episode→SearchRequest mapping,
 // used by both scanning and polling.
 func EpisodeSearchRequest(series *arrapi.Series, ep *arrapi.Episode, langs []string) api.SearchRequest {
-	origLang := api.OriginalLangCode(series.OriginalLanguage)
+	origLang := arrsvc.OriginalLangCode(series.OriginalLanguage)
 	var audioLangs []string
 	if ep.EpisodeFile != nil {
-		audioLangs = api.AudioLanguages(ep.EpisodeFile.MediaInfo)
+		audioLangs = arrsvc.AudioLanguages(ep.EpisodeFile.MediaInfo)
 	}
 	resolvedAudio := origLang
 	if resolvedAudio == "" && len(audioLangs) > 0 {
@@ -233,10 +234,10 @@ func EpisodeSearchRequest(series *arrapi.Series, ep *arrapi.Episode, langs []str
 // This is the single source of truth for the movie→SearchRequest mapping,
 // used by both scanning and polling.
 func MovieSearchRequest(m *arrapi.Movie, langs []string) api.SearchRequest {
-	origLang := api.OriginalLangCode(m.OriginalLanguage)
+	origLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
 	var audioLangs []string
 	if m.MovieFile != nil {
-		audioLangs = api.AudioLanguages(m.MovieFile.MediaInfo)
+		audioLangs = arrsvc.AudioLanguages(m.MovieFile.MediaInfo)
 	}
 	resolvedAudio := origLang
 	if resolvedAudio == "" && len(audioLangs) > 0 {

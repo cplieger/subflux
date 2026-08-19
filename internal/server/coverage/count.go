@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/search"
 )
 
@@ -75,7 +76,7 @@ func CountMissingSeries(ctx context.Context, cfg CountCfg, db FileReader, allSer
 		if epCount == 0 {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(ser.OriginalLanguage), nil)
+		targets := cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(ser.OriginalLanguage), nil)
 		missing += missingForSeries(epCount, targets, prefixIdx[prefixes[i]])
 	}
 	return missing
@@ -162,7 +163,7 @@ func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMov
 		if !m.HasFile {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(m.OriginalLanguage), nil)
+		targets := cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(m.OriginalLanguage), nil)
 		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue

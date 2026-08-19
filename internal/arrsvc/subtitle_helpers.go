@@ -1,12 +1,15 @@
-package api
+package arrsvc
 
-import "github.com/cplieger/arrapi/v2"
+import (
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/api"
+)
 
 // The Sonarr/Radarr DTOs are consumed directly as github.com/cplieger/arrapi
 // types throughout subflux; there are no api.* aliases for them. This file
-// keeps the subtitle-app helpers that operate on those arr types. arrapi's
-// types are not subflux-local, so these are free functions rather than methods;
-// language-name -> ISO resolution lives in lang_resolve.go.
+// keeps the subtitle-app helpers that read those arr types, beside the client
+// that fetches them. arrapi's types are not subflux-local, so these are free
+// functions rather than methods.
 
 // OriginalLangCode returns the ISO 639-1 code for an arr original-language
 // reference, or "" when the reference is nil or the name is unmapped.
@@ -14,7 +17,7 @@ func OriginalLangCode(lang *arrapi.Language) string {
 	if lang == nil {
 		return ""
 	}
-	return LangNameToISO(lang.Name)
+	return api.LangNameToISO(lang.Name)
 }
 
 // AudioLanguages parses a file's MediaInfo audio-languages string into
@@ -23,7 +26,7 @@ func AudioLanguages(mi *arrapi.MediaInfo) []string {
 	if mi == nil || mi.AudioLanguages == "" {
 		return nil
 	}
-	return ParseAudioLangs(mi.AudioLanguages)
+	return api.ParseAudioLangs(mi.AudioLanguages)
 }
 
 // SeasonEpisodeFileCount returns the number of episode files for a specific

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -247,8 +247,8 @@ func (h *Handler) runMovieScan(ctx context.Context, stop <-chan struct{}, actID 
 	}
 	defer h.deps.ScanGuard.Release()
 
-	origLang := api.OriginalLangCode(movie.OriginalLanguage)
-	audioLangs := api.AudioLanguages(movie.MovieFile.MediaInfo)
+	origLang := arrsvc.OriginalLangCode(movie.OriginalLanguage)
+	audioLangs := arrsvc.AudioLanguages(movie.MovieFile.MediaInfo)
 	targets := op.st.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 	total := len(targets)
 

@@ -453,42 +453,6 @@ func TestCountNonTextBytes(t *testing.T) {
 	}
 }
 
-// --- HasExcludeTag ---
-
-func TestHasExcludeTag(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		excludeIDs map[int]struct{}
-		name       string
-		tags       []int
-		want       bool
-	}{
-		{name: "no tags no excludes", tags: nil, excludeIDs: nil, want: false},
-		{name: "no tags with excludes", tags: nil, excludeIDs: map[int]struct{}{1: {}}, want: false},
-		{name: "tags with no excludes", tags: []int{1, 2}, excludeIDs: nil, want: false},
-		{name: "tags with empty excludes", tags: []int{1, 2}, excludeIDs: map[int]struct{}{}, want: false},
-		{name: "matching tag", tags: []int{1, 2, 3}, excludeIDs: map[int]struct{}{2: {}}, want: true},
-		{name: "no matching tag", tags: []int{1, 2, 3}, excludeIDs: map[int]struct{}{4: {}}, want: false},
-		{name: "first tag matches", tags: []int{5, 6, 7}, excludeIDs: map[int]struct{}{5: {}}, want: true},
-		{name: "last tag matches", tags: []int{5, 6, 7}, excludeIDs: map[int]struct{}{7: {}}, want: true},
-		{name: "multiple excludes one match", tags: []int{1}, excludeIDs: map[int]struct{}{1: {}, 2: {}, 3: {}}, want: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := HasExcludeTag(tt.tags, tt.excludeIDs)
-
-			if got != tt.want {
-				t.Errorf("HasExcludeTag(%v, %v) = %v, want %v",
-					tt.tags, tt.excludeIDs, got, tt.want)
-			}
-		})
-	}
-}
-
 // --- ValidateSubtitleData PBT ---
 
 func TestValidateSubtitleData_pure_text_never_rejected(t *testing.T) {

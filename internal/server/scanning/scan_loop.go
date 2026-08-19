@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"golang.org/x/sync/errgroup"
@@ -239,7 +240,7 @@ func scanFullEpisode(ctx context.Context, deps *Deps, ls *LiveState,
 
 	outcome, langOutcomes, queried := ScanEpisode(ctx, deps, ls, series, ep)
 
-	seasonEpCount := api.SeasonEpisodeFileCount(series, ep.SeasonNumber)
+	seasonEpCount := arrsvc.SeasonEpisodeFileCount(series, ep.SeasonNumber)
 	recordEpisodeOutcomes(ctx, tracker, series, ep.SeasonNumber,
 		langOutcomes, seasonEpCount)
 
