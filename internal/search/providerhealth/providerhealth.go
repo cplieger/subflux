@@ -83,6 +83,10 @@ type Tracker struct {
 	threshold int
 }
 
+// IsTimedOut reports whether the provider is currently in cooldown. Reaching
+// the end of a cooldown is observed here rather than on a timer: the first call
+// past it clears the provider's failure history and logs the expiry, so a
+// provider nobody asks about stays timed out at no cost.
 func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -100,6 +104,9 @@ func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 	return true
 }
 
+// RecordSuccess forgets everything known about the provider. One success is
+// enough: the window counts CONSECUTIVE trouble, so a provider that answers has
+// no history worth carrying.
 func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -108,6 +115,11 @@ func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
 	delete(it.lastError, provider)
 }
 
+// RecordFailure adds one failure at the current time, drops the ones that have
+// fallen out of the window, and trips the cooldown when the survivors reach the
+// threshold. A provider already tripped is not re-tripped, so the cooldown runs
+// from the first failure that crossed the line rather than from the latest one.
+// err may be nil; its text is kept for Status and is never used to classify.
 func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -147,6 +159,8 @@ func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	}
 }
 
+// Reset re-enables every provider and discards all failure history. This is the
+// operator's escape hatch, not part of the normal cycle.
 func (it *Tracker) Reset() {
 	it.mu.Lock()
 	defer it.mu.Unlock()
@@ -167,6 +181,11 @@ func countAfter(times []time.Time, cutoff time.Time) int {
 	return count
 }
 
+// Status reports what an operator needs to see per provider: recent failures
+// against the threshold, whether it is timed out, how much cooldown is left, and
+// the last error's text. It reports only providers with something to say, and
+// unlike IsTimedOut it never mutates, so an expired cooldown is omitted here
+// rather than cleared.
 func (it *Tracker) Status() map[subflux.ProviderID]subflux.ProviderStatus {
 	it.mu.Lock()
 	defer it.mu.Unlock()

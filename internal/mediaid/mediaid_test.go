@@ -175,7 +175,7 @@ func TestEpisodeTakesOnePairNotTwoInts(t *testing.T) {
 	if got, want := fn.NumIn(), 3; got != want {
 		t.Fatalf("Episode takes %d parameters, want %d (season and episode travel as one SeasonEpisode)", got, want)
 	}
-	if got, want := fn.In(2), reflect.TypeOf(SeasonEpisode{}); got != want {
+	if got, want := fn.In(2), reflect.TypeFor[SeasonEpisode](); got != want {
 		t.Errorf("Episode's third parameter is %s, want %s", got, want)
 	}
 }

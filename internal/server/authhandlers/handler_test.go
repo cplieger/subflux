@@ -102,16 +102,16 @@ func TestParseIDFromPath_rejects(t *testing.T) {
 // validation returns the Argon2id hash to the client.
 func TestValidateAndHashPasswordResultsStayDistinctlyTyped(t *testing.T) {
 	t.Parallel()
-	hash, userMsg, err := ValidateAndHashPassword(t.Context(), PasswordCheck{
-		Password: "correct-horse-battery-staple",
-		Username: "alice",
-	}, nil)
-	if err != nil {
-		t.Fatalf("ValidateAndHashPassword() err = %v, want nil", err)
+	// Read the two result types off the function itself rather than off a
+	// returned value: that pins the SIGNATURE, which is what a transposition
+	// needs in order to compile.
+	fn := reflect.TypeOf(ValidateAndHashPassword)
+	gotHash, gotMsg := fn.Out(0), fn.Out(1)
+	if gotHash == gotMsg {
+		t.Errorf("both results have type %s; a transposed assignment would compile and write the hash into a 400 body", gotHash)
 	}
-	if reflect.TypeOf(hash) == reflect.TypeOf(userMsg) {
-		t.Errorf("hash and userMsg both have type %s; a transposed assignment would compile and write the hash into a 400 body",
-			reflect.TypeOf(hash))
+	if want := reflect.TypeFor[PasswordHash](); gotHash != want {
+		t.Errorf("first result is %s, want %s", gotHash, want)
 	}
 }
 

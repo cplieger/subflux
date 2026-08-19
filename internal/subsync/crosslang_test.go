@@ -233,10 +233,6 @@ func assertCuesAlign(t *testing.T, fn string, ref, got []Cue) {
 	}
 }
 
-// math_MaxInt64Sentinel is an unreachable cue distance used to seed the
-// nearest-cue search; any real distance is smaller.
-const math_MaxInt64Sentinel = int64(1) << 40
-
 func TestCrossLangAlign_early_returns(t *testing.T) {
 	t.Parallel()
 	makeCuesXL := func(n int, start, gap time.Duration, text string) []Cue {

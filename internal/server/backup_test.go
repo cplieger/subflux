@@ -132,7 +132,7 @@ func TestEnforceBackupMode_refusesASymlinkInsteadOfChmodingItsTarget(t *testing.
 func TestAtomicfileIsTheV3Module(t *testing.T) {
 	t.Parallel()
 	const want = "github.com/cplieger/atomicfile/v3"
-	if got := reflect.TypeOf(atomicfile.PendingFile{}).PkgPath(); got != want {
+	if got := reflect.TypeFor[atomicfile.PendingFile]().PkgPath(); got != want {
 		t.Errorf("atomicfile package path = %q, want %q", got, want)
 	}
 }
