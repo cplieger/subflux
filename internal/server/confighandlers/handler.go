@@ -44,9 +44,22 @@ type Deps struct {
 	DefaultConfig []byte
 }
 
+// arrEndpoints is what the config handlers read out of the LIVE configuration:
+// the two arr connection blocks, compared against the incoming ones so an
+// unchanged arr is never pinged. 2 of the 28 values the config offers.
+//
+// The candidate config these handlers load and activate is NOT this type: it
+// arrives from LoadConfig and leaves through HotReload whole, because the
+// composition root is what consumes it. Reading two values out of a config and
+// carrying a config are different jobs, and only the first one belongs here.
+type arrEndpoints interface {
+	Sonarr() api.ArrConfig
+	Radarr() api.ArrConfig
+}
+
 // StateView provides the live state needed by config handlers.
 type StateView struct {
-	Cfg api.ConfigProvider
+	Cfg arrEndpoints
 }
 
 // Handler holds all dependencies for the config handler family.
@@ -252,7 +265,7 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 // pingArrIfChanged pings an arr instance only when its URL or API key
 // differs from the current live config.
 func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
-	newArr api.ArrConfig, oldCfg api.ConfigProvider,
+	newArr api.ArrConfig, oldCfg arrEndpoints,
 ) error {
 	if newArr.URL == "" {
 		return nil

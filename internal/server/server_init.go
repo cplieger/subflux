@@ -75,7 +75,7 @@ func (s *Server) initHandlers() {
 		// Bound to the store here, at the composition root: coverage.CountMissing
 		// reads subtitle-file rows and queryhandlers does not, so the handler is
 		// handed a counter rather than a store to forward.
-		CountMissing: func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int {
+		CountMissing: func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int {
 			return coverage.CountMissing(ctx, cfg, s.db, series, movies)
 		},
 	})
@@ -164,7 +164,6 @@ func (s *Server) initHandlers() {
 		StateFunc: func() *mediahandlers.LiveState {
 			ls := s.state()
 			return &mediahandlers.LiveState{
-				Cfg:    ls.cfg,
 				Sonarr: ls.sonarr,
 				Radarr: ls.radarr,
 			}

@@ -21,9 +21,23 @@ type FileReader interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 }
 
+// CountCfg is what the missing-count pass reads out of the configuration: the
+// language targets a media item earns, and the embedded-codec policy that
+// decides which existing tracks count as usable. 2 of the 28 values the config
+// offers — counting is arithmetic over targets and rows, so it asks nothing
+// about providers, scoring, paths or the server runtime.
+//
+// Exported because queryhandlers names it: the CountMissing function value the
+// composition root binds and hands over takes this as its parameter, and naming
+// this type is what keeps that signature from drifting back to a wider one.
+type CountCfg interface {
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
+	EmbeddedPolicy() api.EmbeddedPolicy
+}
+
 // CountMissing returns the total number of missing subtitle targets across
 // all series and movies.
-func CountMissing(ctx context.Context, cfg api.ConfigProvider, db FileReader, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
+func CountMissing(ctx context.Context, cfg CountCfg, db FileReader, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
 	ignoredCodecs := search.IgnoredCodecsFromConfig(cfg)
 	return CountMissingSeries(ctx, cfg, db, allSeries, ignoredCodecs) +
 		CountMissingMovies(ctx, cfg, db, allMovies, ignoredCodecs)
@@ -37,7 +51,7 @@ type langKey struct{ lang, variant string }
 type prefixCounts map[langKey]int
 
 // CountMissingSeries returns the number of missing subtitle targets for series.
-func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db FileReader, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
+func CountMissingSeries(ctx context.Context, cfg CountCfg, db FileReader, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
 	if len(allSeries) == 0 {
 		return 0
 	}
@@ -132,7 +146,7 @@ func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts
 }
 
 // CountMissingMovies returns the number of missing subtitle targets for movies.
-func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db FileReader, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
+func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
 	if len(allMovies) == 0 {
 		return 0
 	}

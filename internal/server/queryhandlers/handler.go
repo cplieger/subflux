@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/coverage"
 )
 
 // QueryStore is the read-only introspection surface behind /api/state,
@@ -62,9 +63,35 @@ type queryEngine interface {
 	ResetTimeouts()
 }
 
+// queryCfg is the configuration surface the introspection endpoints render:
+// /api/config/parsed echoes the parsed settings back to the UI, /api/state/stats
+// reports the scan interval, and the per-item state view resolves targets and
+// the embedded-codec policy. 11 of the 28 values the config offers — wide for a
+// handler package because reporting the configuration IS this family's job, and
+// still short of the whole by the auth, logging, port and media-path halves it
+// never reads.
+//
+// It re-lists ResolveTargetsWithFallback and EmbeddedPolicy rather than
+// embedding coverage.CountCfg: this is what the handlers read for themselves,
+// and a consumer surface that borrows another package's interface stops
+// recording its own dependency.
+type queryCfg interface {
+	Providers() map[api.ProviderID]api.ProviderCfg
+	LanguageCodes() []string
+	LanguageRulesForUI() api.LanguageRulesJSON
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
+	EmbeddedPolicy() api.EmbeddedPolicy
+	Scores() api.Scores
+	Search() api.SearchConfig
+	Adaptive() api.AdaptiveConfig
+	PostProcess() api.PostProcessConfig
+	Sonarr() api.ArrConfig
+	Radarr() api.ArrConfig
+}
+
 // LiveState holds the hot-reloadable runtime state needed by query handlers.
 type LiveState struct {
-	Cfg       api.ConfigProvider
+	Cfg       queryCfg
 	Engine    queryEngine
 	Sonarr    StatsSonarrClient
 	Radarr    StatsRadarrClient
@@ -83,8 +110,11 @@ type Deps struct {
 	// package never does, and taking the store as a parameter just to forward it
 	// is what made these handlers look like a store consumer twelve methods
 	// wide. cfg stays a parameter because it is hot-reloadable and arrives with
-	// each request's live snapshot.
-	CountMissing func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int
+	// each request's live snapshot — 2 of the 28 values the config offers, named
+	// from coverage for the same reason the store half named FileReader there:
+	// the contract belongs to the function, and re-listing it here is how the
+	// two halves of one signature drift apart.
+	CountMissing func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int
 }
 
 // Handler holds all dependencies for the query handler family.
@@ -94,7 +124,7 @@ type Handler struct {
 	metrics      MetricsReader
 	state        func() *LiveState
 	configured   func() bool
-	countMissing func(ctx context.Context, cfg api.ConfigProvider, series []arrapi.Series, movies []arrapi.Movie) int
+	countMissing func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int
 	statsCache   statsCache
 }
 

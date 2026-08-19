@@ -61,9 +61,20 @@ type Deps struct {
 	StateFunc func() *LiveState
 }
 
+// coverageCfg is what the coverage endpoints read out of the configuration:
+// the language targets each media item earns, the embedded-codec policy that
+// decides which existing tracks count, and the arr exclude-tag list. 3 of the
+// 28 values the config offers — these handlers report coverage against the
+// language rules, so they ask nothing about providers, scoring or paths.
+type coverageCfg interface {
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []api.SubtitleTarget
+	EmbeddedPolicy() api.EmbeddedPolicy
+	Search() api.SearchConfig
+}
+
 // LiveState holds the runtime state needed by coverage handlers.
 type LiveState struct {
-	Cfg    api.ConfigProvider
+	Cfg    coverageCfg
 	Sonarr CoverageSonarrClient // nil when sonarr not configured
 	Radarr CoverageRadarrClient // nil when radarr not configured
 }

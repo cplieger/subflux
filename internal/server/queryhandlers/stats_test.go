@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -33,7 +34,7 @@ func TestHandleStateStats_returns_counts(t *testing.T) {
 		CovDB:   &testsupport.NopStore{},
 		Metrics: &fakeMetrics{},
 		State:   func() *LiveState { return &LiveState{Cfg: cfg} },
-		CountMissing: func(_ context.Context, _ api.ConfigProvider, _ []arrapi.Series, _ []arrapi.Movie) int {
+		CountMissing: func(_ context.Context, _ coverage.CountCfg, _ []arrapi.Series, _ []arrapi.Movie) int {
 			return 0
 		},
 	})

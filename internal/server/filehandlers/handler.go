@@ -67,6 +67,20 @@ var (
 	_ FileRadarrClient = api.RadarrClient(nil)
 )
 
+// pathGuard is the media-path half of the configuration, and the only half
+// these handlers read: validate a path against the configured media roots
+// before answering with it, and delete under those roots through the same
+// containment. 2 of the 28 values the config offers — the file manager reads
+// no language rule, no provider setting and no scoring weight.
+//
+// RemoveUnderRoot appears here as well as on remover because the bulk-delete
+// sweep forwards this value into the subtitle delete gate; remover is that
+// gate's own one-method view.
+type pathGuard interface {
+	ValidatePath(ctx context.Context, path string) error
+	RemoveUnderRoot(ctx context.Context, path string) error
+}
+
 // LiveState holds the runtime state needed by file handlers. The arr
 // clients (nil when unconfigured) feed the orphan walk's all-orphan
 // fallback: a media item whose files are all orphans has no store-derivable
@@ -74,7 +88,7 @@ var (
 // the arr item's external identity is verified to match the requested
 // media_id (the client-supplied media_id/arr_id pairing is never trusted).
 type LiveState struct {
-	Cfg    api.ConfigProvider
+	Cfg    pathGuard
 	Sonarr FileSonarrClient
 	Radarr FileRadarrClient
 }
@@ -437,7 +451,7 @@ func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 // targeted row's extension and answers 409 before any mutation, so the
 // in-sweep refusal branch here is defense-in-depth: a refused extension is
 // still loud (WARN log naming the gate) and the row is left untouched.
-func (h *Handler) deleteExternalFile(ctx context.Context, cfg api.ConfigProvider, mediaType api.MediaType, row *api.SubtitleEntry) bool {
+func (h *Handler) deleteExternalFile(ctx context.Context, cfg pathGuard, mediaType api.MediaType, row *api.SubtitleEntry) bool {
 	if row.Source == string(api.SourceEmbedded) || row.Path == "" {
 		return false
 	}

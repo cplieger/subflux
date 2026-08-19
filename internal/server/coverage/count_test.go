@@ -8,7 +8,6 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/coverage"
-	"github.com/cplieger/subflux/internal/testsupport"
 )
 
 // These tests used to live in internal/server and reach this logic through
@@ -37,17 +36,22 @@ func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType api.Me
 	return m.movieFiles, nil
 }
 
-// countMissingConfig supplies the language targets the count is measured
-// against. api.ConfigProvider is still a single wide interface, so it embeds
-// the shared no-op config rather than re-implementing 28 accessors.
+// countMissingConfig is coverage.CountCfg and nothing else: the language
+// targets the count is measured against, plus the embedded-codec policy the
+// row index is filtered by. The former version embedded the shared 28-method
+// no-op config to satisfy a whole-configuration parameter, of which this suite
+// exercises one.
 type countMissingConfig struct {
-	testsupport.NopConfig
 	targets []api.SubtitleTarget
 }
 
 func (m *countMissingConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
 	return m.targets
 }
+
+// EmbeddedPolicy answers the zero policy: no codec is ignored, so every
+// indexed track counts and the suite's arithmetic is over targets alone.
+func (m *countMissingConfig) EmbeddedPolicy() api.EmbeddedPolicy { return api.EmbeddedPolicy{} }
 
 var errMock = errors.New("mock store failure")
 

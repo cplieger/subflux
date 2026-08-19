@@ -18,8 +18,14 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-// AuthConfig is the narrow interface consumed by auth handlers for
-// configuration access. Mirrors the auth-related subset of api.ConfigProvider.
+// AuthConfig is the authentication half of the configuration, and the only
+// part these handlers read: whether password login is on at all, whether a new
+// password must be checked against the breach corpus, and whether OIDC is
+// available as an alternative factor. 3 of the 28 values the config offers.
+//
+// Exported because the composition root names it: the Config resolver below is
+// how the handlers see a hot-reloaded config, and the root has to write that
+// function's type.
 type AuthConfig interface {
 	BasicAuthEnabled() bool
 	CheckBreachedPasswords() bool
