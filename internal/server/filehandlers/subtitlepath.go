@@ -18,8 +18,10 @@ import (
 // The gate lives in this package because its callers are exactly the
 // filehandlers delete paths (single, bulk, orphan-handle) — it was a
 // package of its own until the one-importer boundary was rolled up.
-// Reconciliation performs no disk deletes today (it deletes DB rows only),
-// so there is no third caller to hunt for.
+// The reconcile sweep (server.deleteSubtitleFiles) is a fourth disk-delete
+// caller and goes straight to config.RemoveUnderRoot: it deletes
+// server-derived paths from subtitle_files rows, so it gets the containment
+// but not the extension capability check.
 
 // errSubtitleExtensionNotAllowed is returned when a deletion target's
 // extension does not carry the delete capability in the subtitle-extension

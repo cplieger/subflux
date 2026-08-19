@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/cplieger/subflux/internal/httpapi"
 )
@@ -34,22 +33,24 @@ func decodeJSONBodyAny(w http.ResponseWriter, r *http.Request, dst any, maxSize 
 	return httpapi.DecodeJSONBody(w, r, dst, maxSize)
 }
 
-// deleteSubtitleFiles validates and removes subtitle files from disk.
-// Paths that fail media root validation are skipped (logged as warnings).
+// deleteSubtitleFiles removes subtitle files from disk through the media-root
+// confinement, one warning per refusal.
+//
+// RemoveUnderRoot resolves and unlinks through the same *os.Root handle that
+// authorizes the path, so there is no window in which a component of an
+// already-validated path can be swapped for a symlink out of the tree. The
+// subtitle-delete path in filehandlers uses the same call; a validate-then-
+// os.Remove pair here would leave the app's two delete paths disagreeing about
+// their containment guarantee.
 func (s *Server) deleteSubtitleFiles(paths []string, logCtx string) {
 	ls := s.state()
 	ctx := context.Background()
 	for _, p := range paths {
-		if err := ls.cfg.ValidatePath(ctx, p); err != nil {
-			slog.Warn(logCtx+": path validation failed, skipping delete",
+		if err := ls.cfg.RemoveUnderRoot(ctx, p); err != nil {
+			slog.Warn(logCtx+": failed to delete subtitle",
 				"path", p, "error", err)
 			continue
 		}
-		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-			slog.Warn(logCtx+": failed to delete subtitle",
-				"path", p, "error", err)
-		} else if err == nil {
-			slog.Info(logCtx+": deleted subtitle", "path", p)
-		}
+		slog.Info(logCtx+": deleted subtitle", "path", p)
 	}
 }
