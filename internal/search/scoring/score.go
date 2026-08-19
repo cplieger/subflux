@@ -1,4 +1,12 @@
-// Package scoring provides pure subtitle scoring and identity filtering.
+// Package scoring holds the pure matching and weighting rules the scan engine
+// applies to a candidate: which subtitles identify as the requested item, which
+// weight categories a release hits, and the title and episode comparisons under
+// both.
+//
+// Its heaviest consumer by far is internal/search, which is why it sits here
+// rather than at the top level. internal/scorer is the configured engine over
+// these rules and uses exactly one symbol from this package; see its doc for
+// why the two stay apart despite the near-identical names.
 package scoring
 
 import (

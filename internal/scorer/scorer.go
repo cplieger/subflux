@@ -1,4 +1,19 @@
-// Package scorer implements subtitle scoring based on release matching.
+// Package scorer holds the CONFIGURED scoring engine: it carries the user's
+// weight table and answers the two questions callers outside the search domain
+// ask, what does this subtitle score and which tier is that score.
+//
+// It is deliberately separate from internal/search/scoring, which holds the pure
+// matching and weighting rules, and the near-identical names were examined
+// rather than left as an accident. They are two concerns, and the usage proves
+// it: internal/search reaches 14 distinct scoring symbols across 23 call sites
+// while this package uses exactly one, so the pure half belongs where its
+// consumer is, and three packages outside the search domain (the composition
+// root, internal/server, internal/wiring) hold this one. A merge in either
+// direction therefore either buries search's own rules behind a facade it does
+// not use or makes the server import a search subpackage. Neither name states a
+// category and neither shadows anything, so the pair is a reading cost, not a
+// rule violation, and renaming would churn 126 call sites to fix a confusion a
+// package doc can resolve.
 package scorer
 
 import (
