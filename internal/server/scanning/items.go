@@ -91,7 +91,7 @@ func SkipResumed(item ScanItem, recent map[string]bool, stats *subflux.ScanStats
 	if item.Ep != nil {
 		mediaID = mediaid.Episode(
 			item.Series.TvdbID, item.Series.ImdbID,
-			item.Ep.SeasonNumber, item.Ep.EpisodeNumber)
+			mediaid.SeasonEpisode{Season: item.Ep.SeasonNumber, Episode: item.Ep.EpisodeNumber})
 	} else {
 		mediaID = mediaid.Movie(item.Movie.TmdbID, item.Movie.ImdbID)
 		if mediaID == "" {

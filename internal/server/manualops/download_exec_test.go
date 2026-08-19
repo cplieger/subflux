@@ -122,6 +122,20 @@ func TestResolveMediaIDs(t *testing.T) {
 	}
 }
 
+// TestLookupEpisodeMediaID_pairOrder pins the season/episode order through the
+// production path that writes the coverage row's primary key. A transposition
+// here does not fail: it produces a well-formed key for a different episode.
+func TestLookupEpisodeMediaID_pairOrder(t *testing.T) {
+	t.Parallel()
+	ls := &LiveState{Sonarr: &fakeArr{series: arrapi.Series{TvdbID: 121361}}}
+	const want = "tvdb-121361-s01e09"
+	got := LookupEpisodeMediaID(t.Context(), ls, 7, 1, 9)
+	if got != want {
+		t.Errorf("LookupEpisodeMediaID(series 7, season 1, episode 9) = %q, want %q (a transposed pair yields tvdb-121361-s09e01, another episode's key)",
+			got, want)
+	}
+}
+
 func TestLookupMediaTitle(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -250,6 +264,87 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	}
 	if _, err := os.Stat(detail); err != nil {
 		t.Errorf("activity detail %q does not point at the written subtitle: %v", detail, err)
+	}
+}
+
+// emptyProvider answers 200 with no bytes — the shape a provider takes when it
+// has the record but not the file.
+type emptyProvider struct{}
+
+func (emptyProvider) Name() subflux.ProviderID { return "os" }
+func (emptyProvider) Search(context.Context, *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	return nil, nil
+}
+
+func (emptyProvider) Download(context.Context, *subflux.Subtitle) ([]byte, error) {
+	return []byte{}, nil
+}
+
+// recordingWarns captures the operator-facing alert text.
+type recordingWarns struct{ msgs []string }
+
+func (r *recordingWarns) RecordWarn(_, msg string) { r.msgs = append(r.msgs, msg) }
+
+// A zero-byte download must fail the manual path before anything lands: no
+// numbered .srt on disk, no history row, no manual lock. This path has no
+// length guard of its own — subtitlefile.Validate is the whole gate — and it
+// runs before the ordinal reservation, so a regression there both writes an
+// unreadable file and locks the quad against automation that would have fixed
+// it. The alert must name the empty file rather than blaming an archive format.
+func TestRunDownload_rejects_zero_byte_payload(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	videoPath := filepath.Join(dir, "movie.mkv")
+	if err := os.WriteFile(videoPath, []byte("fake video"), 0o600); err != nil {
+		t.Fatalf("write fake video: %v", err)
+	}
+
+	cfg := fakeManualCfg{}
+	scores := cfg.Scores()
+	sc := scorer.New(&scores)
+	engine := search.New(nil,
+		search.WithStore(&testsupport.NopStore{}), search.WithConfig(cfg),
+		search.WithMetrics(obs.New()), search.WithScorer(sc),
+		search.WithSyncer(syncing.Syncer{}),
+		search.WithTracks(embedded.Detector{}))
+
+	warns := &recordingWarns{}
+	store := &ordinalStore{}
+	deps := &SearchDeps{
+		DB:       &testsupport.NopStore{},
+		Activity: &recordingActivity{details: map[string]string{}},
+		Alerts:   warns,
+		Events:   fakeEvents{},
+	}
+	ls := &LiveState{Cfg: cfg, Engine: engine}
+
+	req := &DownloadRequest{
+		Provider: "os", SubtitleID: "sub-1", Language: "en",
+		MediaType: subflux.MediaTypeMovie, ArrID: 42,
+	}
+	req.SetVideoPath(videoPath)
+
+	if RunDownload(t.Context(), deps, ls, store, emptyProvider{}, req, "act-1") {
+		t.Error("RunDownload() = true: a zero-byte download reported success")
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read temp dir: %v", err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == subtitlefile.ExtSRT {
+			t.Errorf("a zero-byte subtitle was written to disk as %q", e.Name())
+		}
+	}
+	if rows := store.snapshot(); len(rows) != 0 {
+		t.Errorf("history recorded %d row(s) for a download that produced no subtitle", len(rows))
+	}
+	if len(warns.msgs) != 1 {
+		t.Fatalf("alerts = %v, want exactly one", warns.msgs)
+	}
+	if !strings.Contains(warns.msgs[0], "empty") {
+		t.Errorf("alert = %q, want it to name the empty file rather than the archive format", warns.msgs[0])
 	}
 }
 

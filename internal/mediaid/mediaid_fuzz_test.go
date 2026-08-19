@@ -15,7 +15,7 @@ func FuzzEpisode(f *testing.F) {
 	f.Add(-1, "", -1, -1)
 	f.Add(999999, "", 100, 100)
 	f.Fuzz(func(t *testing.T, tvdbID int, imdbID string, season, episode int) {
-		result := Episode(tvdbID, imdbID, season, episode)
+		result := Episode(tvdbID, imdbID, SeasonEpisode{Season: season, Episode: episode})
 		if tvdbID != 0 && !strings.HasPrefix(result, "tvdb-") {
 			t.Errorf("tvdbID=%d but result=%q does not start with tvdb-", tvdbID, result)
 		}
@@ -92,12 +92,12 @@ func FuzzBuild(f *testing.F) {
 				t.Errorf("Build movie: got %q, want %q", result, want)
 			}
 		case subflux.MediaTypeEpisode:
-			if want := Episode(tvdbID, imdbID, season, episode); result != want {
+			if want := Episode(tvdbID, imdbID, SeasonEpisode{Season: season, Episode: episode}); result != want {
 				t.Errorf("Build episode: got %q, want %q", result, want)
 			}
 		default:
 			// Unknown types fall through to the episode builder.
-			if want := Episode(tvdbID, imdbID, season, episode); result != want {
+			if want := Episode(tvdbID, imdbID, SeasonEpisode{Season: season, Episode: episode}); result != want {
 				t.Errorf("Build default: got %q, want %q", result, want)
 			}
 		}

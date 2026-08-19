@@ -1,6 +1,7 @@
 package mediaid
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -136,30 +137,46 @@ func TestEpisode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		imdbID  string
-		want    string
-		tvdbID  int
-		season  int
-		episode int
+		name   string
+		imdbID string
+		want   string
+		ep     SeasonEpisode
+		tvdbID int
 	}{
-		{name: "tvdb present", imdbID: "", want: "tvdb-81189-s03e07", tvdbID: 81189, season: 3, episode: 7},
-		{name: "imdb fallback", imdbID: "tt1234567", want: "tt1234567-s01e01", tvdbID: 0, season: 1, episode: 1},
-		{name: "both prefers tvdb", imdbID: "tt1234567", want: "tvdb-81189-s03e07", tvdbID: 81189, season: 3, episode: 7},
-		{name: "no IDs", imdbID: "", want: "s01e01", tvdbID: 0, season: 1, episode: 1},
+		{name: "tvdb present", imdbID: "", want: "tvdb-81189-s03e07", ep: SeasonEpisode{Season: 3, Episode: 7}, tvdbID: 81189},
+		{name: "imdb fallback", imdbID: "tt1234567", want: "tt1234567-s01e01", ep: SeasonEpisode{Season: 1, Episode: 1}, tvdbID: 0},
+		{name: "both prefers tvdb", imdbID: "tt1234567", want: "tvdb-81189-s03e07", ep: SeasonEpisode{Season: 3, Episode: 7}, tvdbID: 81189},
+		{name: "no IDs", imdbID: "", want: "s01e01", ep: SeasonEpisode{Season: 1, Episode: 1}, tvdbID: 0},
+		{name: "asymmetric pair", imdbID: "", want: "tvdb-121361-s01e09", ep: SeasonEpisode{Season: 1, Episode: 9}, tvdbID: 121361},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := Episode(tt.tvdbID, tt.imdbID, tt.season, tt.episode)
+			got := Episode(tt.tvdbID, tt.imdbID, tt.ep)
 
 			if got != tt.want {
-				t.Errorf("Episode(%d, %q, %d, %d) = %q, want %q",
-					tt.tvdbID, tt.imdbID, tt.season, tt.episode, got, tt.want)
+				t.Errorf("Episode(%d, %q, %+v) = %q, want %q",
+					tt.tvdbID, tt.imdbID, tt.ep, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestEpisodeTakesOnePairNotTwoInts pins the parameter SHAPE, not a value. The
+// season and episode numbers were adjacent ints, and a transposition there
+// yields "…-s09e01": a well-formed bbolt primary key and HTTP path segment for
+// a different episode, so nothing errors and the wrong row is written. Flatten
+// the pair back into two ints and this fails.
+func TestEpisodeTakesOnePairNotTwoInts(t *testing.T) {
+	t.Parallel()
+	fn := reflect.TypeOf(Episode)
+	if got, want := fn.NumIn(), 3; got != want {
+		t.Fatalf("Episode takes %d parameters, want %d (season and episode travel as one SeasonEpisode)", got, want)
+	}
+	if got, want := fn.In(2), reflect.TypeOf(SeasonEpisode{}); got != want {
+		t.Errorf("Episode's third parameter is %s, want %s", got, want)
 	}
 }
 
@@ -339,6 +356,6 @@ func BenchmarkBuild(b *testing.B) {
 func BenchmarkEpisode(b *testing.B) {
 	b.ReportAllocs()
 	for range b.N {
-		_ = Episode(98765, "tt7654321", 2, 14)
+		_ = Episode(98765, "tt7654321", SeasonEpisode{Season: 2, Episode: 14})
 	}
 }

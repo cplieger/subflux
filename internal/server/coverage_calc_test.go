@@ -254,7 +254,7 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 		season := rapid.IntRange(0, 99).Draw(t, "season")
 		episode := rapid.IntRange(1, 999).Draw(t, "episode")
 
-		epID := mediaid.Episode(tvdbID, "", season, episode)
+		epID := mediaid.Episode(tvdbID, "", mediaid.SeasonEpisode{Season: season, Episode: episode})
 		prefix := extractSeriesPrefix(epID)
 		wantPrefix := mediaid.SeriesPrefix(tvdbID, "")
 

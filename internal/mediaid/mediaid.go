@@ -49,11 +49,11 @@ func Build(req *subflux.SearchRequest) string {
 	case subflux.MediaTypeMovie:
 		return Movie(req.TmdbID, req.ImdbID)
 	case subflux.MediaTypeEpisode:
-		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
+		return Episode(req.TvdbID, req.ImdbID, SeasonEpisode{Season: req.Season, Episode: req.Episode})
 	default:
 		// Legacy fallthrough: treat unknown types as episodes so older
 		// scan state with missing subflux.MediaType still resolves.
-		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
+		return Episode(req.TvdbID, req.ImdbID, SeasonEpisode{Season: req.Season, Episode: req.Episode})
 	}
 }
 
@@ -69,18 +69,28 @@ func Movie(tmdbID int, imdbID string) string {
 	return ""
 }
 
+// SeasonEpisode is one episode's position inside a series. The two numbers
+// always travel together and as adjacent int parameters they were silently
+// transposable: s09e01 and s01e09 are both well-formed IDs, so a swap writes a
+// valid-looking primary key for a DIFFERENT episode instead of failing. Build
+// it with keyed fields — an unkeyed literal reintroduces the hazard.
+type SeasonEpisode struct {
+	Season  int
+	Episode int
+}
+
 // Episode returns the canonical media ID for an episode.
 // Prefer TVDB (Sonarr's canonical source), fall back to IMDB.
-func Episode(tvdbID int, imdbID string, season, episode int) string {
+func Episode(tvdbID int, imdbID string, ep SeasonEpisode) string {
 	if tvdbID != 0 {
 		var buf [32]byte
 		b := buf[:0]
 		b = append(b, "tvdb-"...)
 		b = strconv.AppendInt(b, int64(tvdbID), 10)
 		b = append(b, "-s"...)
-		b = appendPadded2(b, season)
+		b = appendPadded2(b, ep.Season)
 		b = append(b, 'e')
-		b = appendPadded2(b, episode)
+		b = appendPadded2(b, ep.Episode)
 		return string(b)
 	}
 	if imdbID != "" {
@@ -88,17 +98,17 @@ func Episode(tvdbID int, imdbID string, season, episode int) string {
 		b := buf[:0]
 		b = append(b, imdbID...)
 		b = append(b, "-s"...)
-		b = appendPadded2(b, season)
+		b = appendPadded2(b, ep.Season)
 		b = append(b, 'e')
-		b = appendPadded2(b, episode)
+		b = appendPadded2(b, ep.Episode)
 		return string(b)
 	}
 	var buf [8]byte
 	b := buf[:0]
 	b = append(b, 's')
-	b = appendPadded2(b, season)
+	b = appendPadded2(b, ep.Season)
 	b = append(b, 'e')
-	b = appendPadded2(b, episode)
+	b = appendPadded2(b, ep.Episode)
 	return string(b)
 }
 
@@ -117,7 +127,7 @@ func appendPadded2(b []byte, n int) []byte {
 
 // SeasonPrefix returns the media ID prefix shared by every episode of
 // one season, mirroring Episode's format through the episode
-// separator (e.g. "tvdb-123-s05e"). Episode(tvdb, imdb, season, N)
+// separator (e.g. "tvdb-123-s05e"). Episode(tvdb, imdb, SeasonEpisode{season, N})
 // has this prefix for every N in 0-99, so backoff and state rows for a
 // season are one prefix scan. Returns "" when neither ID is available
 // (matching Episode's unidentified-media fallback shape only per

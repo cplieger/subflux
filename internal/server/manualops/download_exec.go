@@ -233,7 +233,7 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 		slog.Warn("failed to look up series for media ID", "series_id", seriesID, "error", err)
 		return ""
 	}
-	return mediaid.Episode(ser.TvdbID, ser.ImdbID, season, episode)
+	return mediaid.Episode(ser.TvdbID, ser.ImdbID, mediaid.SeasonEpisode{Season: season, Episode: episode})
 }
 
 // LookupMediaTitle resolves the title for a media item from the arr client.
