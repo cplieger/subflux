@@ -116,9 +116,11 @@ type FileStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 }
 
-// PathValidator is the containment check run on every resolved path as
-// defense-in-depth (satisfied by api.ConfigProvider).
-type PathValidator interface {
+// pathValidator is the containment check run on every resolved path as
+// defense-in-depth. ONE of the 28 values the configuration offers — resolution
+// derives its paths from the store and the arrs, so the only thing it asks the
+// config is whether the path it produced sits under a configured media root.
+type pathValidator interface {
 	ValidatePath(ctx context.Context, path string) error
 }
 
@@ -135,7 +137,7 @@ type RadarrMovie interface {
 // State is the per-request snapshot of hot-reloadable dependencies. Arr
 // clients are nil when the corresponding arr is not configured.
 type State struct {
-	Cfg    PathValidator
+	Cfg    pathValidator
 	Sonarr SonarrEpisodes
 	Radarr RadarrMovie
 }

@@ -2,9 +2,13 @@ package search
 
 import "github.com/cplieger/subflux/internal/api"
 
-// SearchCfg is the narrow configuration interface consumed by the search engine.
-// Only the methods actually called by search are declared here.
-// The concrete config.Config satisfies this via structural typing.
+// SearchCfg is what the scan engine reads out of the configuration: the scoring
+// weights and floors it ranks candidates by, the provider allow-list and
+// priority order it queries in, the concurrency and retry limits it paces
+// itself with, and the sync/post-process settings it applies to a download.
+// 9 of the 28 values the configuration offers — the widest consumer surface in
+// the app, and still short of the whole by the auth, logging, server-runtime,
+// media-path and UI halves a search never reads.
 //
 //nolint:revive // name is established API; renaming would break consumers
 type SearchCfg interface {
