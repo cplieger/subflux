@@ -18,7 +18,7 @@ import (
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"golang.org/x/sync/errgroup"
@@ -319,7 +319,7 @@ func (p *Provider) fetchSubtitleFile(ctx context.Context, fileID int, link strin
 		return nil, fmt.Errorf("download subtitle: HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, fmt.Errorf("read subtitle: %w", err)
 	}

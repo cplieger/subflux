@@ -1,4 +1,4 @@
-package httputil
+package httpwire
 
 import (
 	"errors"

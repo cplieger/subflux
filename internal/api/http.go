@@ -45,7 +45,7 @@ const (
 	msgInternalError = "internal error"
 
 	// contentTypeJSON is the MIME type for JSON responses. Matches
-	// httputil.ContentTypeJSON but defined locally to avoid a circular import.
+	// httpwire.ContentTypeJSON but defined locally to avoid a circular import.
 	contentTypeJSON = "application/json"
 
 	// KeyStatus is the canonical JSON key for operation result status

@@ -19,7 +19,7 @@ import (
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subtitleext"
@@ -312,11 +312,11 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	if httpErr := httputil.CheckHTTPStatus(resp); httpErr != nil {
+	if httpErr := httpwire.CheckHTTPStatus(resp); httpErr != nil {
 		return nil, httpx.RedactSecret(httpErr, p.passkey)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, httpx.RedactSecret(err, p.passkey)
 	}
@@ -346,7 +346,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -354,7 +354,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, err
 	}
 
@@ -363,7 +363,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 			ID int `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes)).Decode(&result); err != nil { // torrent list limit
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // torrent list limit
 		return nil, err
 	}
 
@@ -393,7 +393,7 @@ func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *a
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -401,14 +401,14 @@ func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *a
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, err
 	}
 
 	var result struct {
 		Data []hdbSubtitleItem `json:"data"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes)).Decode(&result); err != nil { // subtitle list limit
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // subtitle list limit
 		return nil, err
 	}
 

@@ -10,7 +10,7 @@ import (
 
 	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
 )
 
@@ -70,8 +70,8 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_503",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -80,7 +80,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_502",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 502}},
+				{err: &httpwire.HTTPStatusError{Code: 502}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -89,7 +89,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_504",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 504}},
+				{err: &httpwire.HTTPStatusError{Code: 504}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -97,13 +97,13 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		},
 		{
 			name:      "no_retry_on_500",
-			dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 500}}},
+			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 500}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
 		{
 			name:      "no_retry_on_4xx",
-			dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 400}}},
+			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 400}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
@@ -122,9 +122,9 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "exhausts_retries",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
 			},
 			wantErr:   true,
 			wantCalls: 3,
@@ -155,7 +155,7 @@ func TestRetryProvider_context_cancellation(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
 	p := WrapRetry(inner, 3, time.Second)
@@ -177,9 +177,9 @@ func TestRetryProvider_cancellation_during_backoff(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
-			{err: &httputil.HTTPStatusError{Code: 503}},
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
 	p := WrapRetry(inner, 3, 500*time.Millisecond)
@@ -210,9 +210,9 @@ func TestRetryProvider_backoff_doubles_between_attempts(t *testing.T) {
 		retryFakeProvider: retryFakeProvider{
 			name: "test",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
 				{data: []byte("ok")},
 			},
 		},
@@ -241,7 +241,7 @@ func TestRetryProvider_maxAttempts_one_calls_once_no_backoff(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 			{data: []byte("should-not-reach")},
 		},
 	}
@@ -360,7 +360,7 @@ func TestRetryProvider_negative_retries_delegates_directly(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{
 		name:      "test",
-		dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 503}}},
+		dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 503}}},
 	}
 	p := WrapRetry(inner, -1, time.Millisecond)
 
@@ -489,7 +489,7 @@ func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 	recs := capture.Default(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{
-		{err: &httputil.HTTPStatusError{Code: 503}}, // transient: retried
+		{err: &httpwire.HTTPStatusError{Code: 503}}, // transient: retried
 		{data: []byte("ok")},                        // success on the second attempt
 	}}
 	p := WrapRetry(inner, 3, time.Millisecond)

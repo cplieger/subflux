@@ -161,7 +161,7 @@ method (*Pattern).String
 # Satisfying `error` is what makes these types returnable, and errors.Is/As
 # reach Unwrap through an anonymous interface inside the stdlib. Verified by
 # renaming: provider/registry.go:216 appends &RegistryError{} to a []error.
-# api.RateLimitError is returned as an error from httputil.go:72 and
+# api.RateLimitError is returned as an error from httpwire.go:72 and
 # betaseries.go:180; RegistryError.Unwrap is what lets registry_test.go:118's
 # errors.Is(err, cause) find the provider's own failure.
 # config's two structured validation errors are the same case: configFieldErr

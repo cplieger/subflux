@@ -21,7 +21,7 @@ import (
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 )
@@ -281,12 +281,12 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result apiResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
 	}
 	return &result, nil
@@ -299,7 +299,7 @@ func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, e
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, &api.RateLimitError{
 			Msg:        "download rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	// SubDL returns 500 with a tiny body when the download limit is exceeded.
@@ -307,14 +307,14 @@ func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, e
 	if resp.StatusCode == http.StatusInternalServerError && resp.ContentLength >= 0 && resp.ContentLength < 100 {
 		return nil, &api.RateLimitError{
 			Msg:        "download limit exceeded (500)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, &httputil.HTTPStatusError{Code: resp.StatusCode}
+		return nil, &httpwire.HTTPStatusError{Code: resp.StatusCode}
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, err
 	}

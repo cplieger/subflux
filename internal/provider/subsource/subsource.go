@@ -23,7 +23,7 @@ import (
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"golang.org/x/sync/errgroup"
@@ -189,13 +189,13 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	defer resp.Body.Close()
 
 	// Use CheckHTTPStatus for unified typed error dispatch. This honors the
-	// Retry-After header on 429 (via httputil.ParseRetryAfter) and returns
+	// Retry-After header on 429 (via httpwire.ParseRetryAfter) and returns
 	// *api.AuthError for 401/403 just like the search path.
-	if statusErr := httputil.CheckHTTPStatus(resp); statusErr != nil {
+	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
 		return nil, httpx.RedactSecret(statusErr, p.apiKey)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
@@ -391,12 +391,12 @@ func (p *Provider) doSearch(ctx context.Context, params url.Values) ([]searchRes
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result searchResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxSearchResponseBytes)).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("decode search: %w", err), p.apiKey)
 	}
 	return result.Data, nil
@@ -440,12 +440,12 @@ func (p *Provider) querySubtitles(ctx context.Context, titleID int, ssLang, isoL
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result subtitleResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("decode subtitles: %w", err), p.apiKey)
 	}
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/search/timeout"
@@ -122,14 +122,14 @@ func (noopHealth) Reset()                                        {}
 
 // atomicWriter is the default FileWriter that delegates to atomicfile.WriteFile.
 // WithMaxBytes mirrors the read bound on the data it persists: downloaded
-// subtitle payloads are capped at httputil.MaxDownloadBytes and read back by
+// subtitle payloads are capped at httpwire.MaxDownloadBytes and read back by
 // the sync handlers under the same bound, so a post-processed payload the
 // read path would refuse to load fails the write instead of landing on disk.
 type atomicWriter struct{}
 
 func (atomicWriter) WriteFile(ctx context.Context, path string, data []byte) error {
 	_, err := atomicfile.WriteFile(ctx, path, data,
-		atomicfile.WithMaxBytes(httputil.MaxDownloadBytes))
+		atomicfile.WithMaxBytes(httpwire.MaxDownloadBytes))
 	return err
 }
 

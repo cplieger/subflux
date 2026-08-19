@@ -17,7 +17,7 @@ import (
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 )
 
@@ -132,11 +132,11 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("betaseries: %w: %s", api.ErrSubtitleAbsent, sub.ID)
 	}
-	if err2 := httputil.CheckHTTPStatus(resp); err2 != nil {
+	if err2 := httpwire.CheckHTTPStatus(resp); err2 != nil {
 		return nil, err2
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	// (code 1001). Parse the error body to distinguish them.
 	if resp.StatusCode == http.StatusBadRequest {
 		defer resp.Body.Close()
-		data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxErrorBodyBytes))
+		data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxErrorBodyBytes))
 		if err != nil {
 			return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 		}
@@ -178,7 +178,7 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 		resp.Body.Close()
 		return nil, &api.RateLimitError{
 			Msg:        "rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -188,7 +188,7 @@ func (p *Provider) doGet(ctx context.Context, reqURL string) (io.ReadCloser, err
 	return struct {
 		io.Reader
 		io.Closer
-	}{io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes), resp.Body}, nil
+	}{io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes), resp.Body}, nil
 }
 
 // classifyBadRequest parses a BetaSeries 400 error response body and returns

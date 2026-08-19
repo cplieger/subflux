@@ -19,7 +19,7 @@ import (
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"golang.org/x/sync/errgroup"
@@ -55,17 +55,17 @@ func (p *Provider) Name() api.ProviderID { return providerName }
 // checkStatus maps gestdown's HTTP responses to typed errors. 423 Locked is
 // gestdown's custom rate-limit signal (Addic7ed throttle) with Retry-After
 // parsed into RateLimitError.RetryAfter so the scan engine's provider timeout
-// manager can honor the hint. Everything else defers to httputil.CheckHTTPStatus,
+// manager can honor the hint. Everything else defers to httpwire.CheckHTTPStatus,
 // which handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError
 // for other 4xx/5xx.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusLocked {
 		return &api.RateLimitError{
 			Msg:        "HTTP 423: rate limited",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
-	return httputil.CheckHTTPStatus(resp)
+	return httpwire.CheckHTTPStatus(resp)
 }
 
 // langEntry pairs a requested ISO language code with its Gestdown-specific
@@ -203,7 +203,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 		return nil, sErr
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxSingleSubtitleBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxSingleSubtitleBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (p *Provider) findShowUncached(ctx context.Context, tvdbID int) ([]showResu
 	}
 
 	var result showsResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxSearchResponseBytes)).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxSearchResponseBytes)).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode shows: %w", err)
 	}
 	return result.Shows, nil
@@ -341,7 +341,7 @@ func filterByEpisode(subs []api.Subtitle, episode int) []api.Subtitle {
 
 func (p *Provider) searchSeasonRetry(ctx context.Context, showID string, season int, gestLang, isoLang string) ([]api.Subtitle, error) {
 	var subs []api.Subtitle
-	err := httputil.RetryOnRateLimit(ctx, 3, 5*time.Minute, func() error {
+	err := httpwire.RetryOnRateLimit(ctx, 3, 5*time.Minute, func() error {
 		var searchErr error
 		subs, searchErr = p.searchSeason(ctx, showID, season, gestLang, isoLang)
 		return searchErr
@@ -373,7 +373,7 @@ func (p *Provider) searchSeason(ctx context.Context, showID string, season int, 
 	}
 
 	var result seasonResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes)).Decode(&result); err != nil { // season data limit
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // season data limit
 		return nil, fmt.Errorf("decode season: %w", err)
 	}
 

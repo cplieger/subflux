@@ -75,7 +75,7 @@ The only files that import concrete implementations:
 - `server/`: HTTP routing, SSE, middleware, and the embedded UI, split into
   focused subpackages (`authhandlers`, `confighandlers`, `synchandlers`,
   `manualops`, `scanning`, `scheduler`, `polling`, `events`, `coverage`, …).
-- `arrsvc/`, `obs/`, `cache/`, `httputil/`, `cliparse/`,
+- `arrsvc/`, `obs/`, `cache/`, `httpwire/`, `cliparse/`,
   `testsupport/`: focused helpers and thin wrappers over the shared
   `cplieger/*` libraries (`cliparse/` is the CLI grammar: one
   `ParseAndValidate` pass plus help rendering).

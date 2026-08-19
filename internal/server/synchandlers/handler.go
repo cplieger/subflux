@@ -13,7 +13,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/resolve"
 )
@@ -57,7 +57,7 @@ func New(d Deps) *Handler {
 }
 
 // MaxSyncSubSize caps subtitle file reads for sync operations.
-const MaxSyncSubSize = httputil.MaxDownloadBytes
+const MaxSyncSubSize = httpwire.MaxDownloadBytes
 
 // maxBodySize references the canonical constant from api.
 const maxBodySize = api.MaxDefaultBodySize

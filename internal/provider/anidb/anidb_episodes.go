@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/xmlx"
 )
 
@@ -163,19 +163,19 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	}
 	defer resp.Body.Close()
 
-	if statusErr := httputil.CheckHTTPStatus(resp); statusErr != nil {
+	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
 		return statusErr
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes+1))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes+1))
 	if err != nil {
 		return err
 	}
-	if int64(len(data)) > httputil.MaxJSONResponseBytes {
-		return fmt.Errorf("anidb episode XML exceeded %d bytes", httputil.MaxJSONResponseBytes)
+	if int64(len(data)) > httpwire.MaxJSONResponseBytes {
+		return fmt.Errorf("anidb episode XML exceeded %d bytes", httpwire.MaxJSONResponseBytes)
 	}
 
-	data, err = decompressIfGzipped(data, httputil.MaxJSONResponseBytes)
+	data, err = decompressIfGzipped(data, httpwire.MaxJSONResponseBytes)
 	if err != nil {
 		return fmt.Errorf("anidb: episodes decompress: %w", err)
 	}

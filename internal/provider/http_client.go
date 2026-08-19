@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 )
 
 // HTTPTimeoutStandard is the default timeout for lightweight provider APIs
@@ -37,9 +37,9 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 // last-resort guard above every per-site cap, so io.ReadAll callers fail
 // loudly instead of slurping an unbounded body if a per-site cap is missed.
 // The largest legitimate payloads are season-pack archive downloads capped
-// at httputil.MaxDownloadBytes (10 MB); the ceiling is 2x that. Per-site
+// at httpwire.MaxDownloadBytes (10 MB); the ceiling is 2x that. Per-site
 // caps stay authoritative for normal operation.
-const maxResponseBodyBytes = 2 * httputil.MaxDownloadBytes
+const maxResponseBodyBytes = 2 * httpwire.MaxDownloadBytes
 
 // errResponseBodyTooLarge reports a response body that exceeded
 // maxResponseBodyBytes. Surfaced by reads past the ceiling.
@@ -104,7 +104,7 @@ func (b *cappedBody) Close() error { return b.rc.Close() }
 func NewHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout:       timeout,
-		Transport:     &bodyCapTransport{base: &userAgentTransport{base: ssrf.SafeTransport(), ua: httputil.UserAgent}},
+		Transport:     &bodyCapTransport{base: &userAgentTransport{base: ssrf.SafeTransport(), ua: httpwire.UserAgent}},
 		CheckRedirect: ssrf.SafeRedirectPolicy(nil),
 	}
 }
@@ -125,7 +125,7 @@ func NewHTTPClientNoClientTimeout(allowedPorts ...uint16) *http.Client {
 		opts = append(opts, ssrf.WithAllowedPorts(allowedPorts...))
 	}
 	return &http.Client{
-		Transport:     &bodyCapTransport{base: &userAgentTransport{base: ssrf.SafeTransport(opts...), ua: httputil.UserAgent}},
+		Transport:     &bodyCapTransport{base: &userAgentTransport{base: ssrf.SafeTransport(opts...), ua: httpwire.UserAgent}},
 		CheckRedirect: ssrf.SafeRedirectPolicy(nil),
 	}
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
 )
 
@@ -85,7 +85,7 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 			}
 			return data, nil
 		}
-		if !httputil.IsTransient(err) {
+		if !httpwire.IsTransient(err) {
 			slog.Debug("download error is not transient, not retrying",
 				"provider", r.inner.Name(), "error", err)
 			return nil, err

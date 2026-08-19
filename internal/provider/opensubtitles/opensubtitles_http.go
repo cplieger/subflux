@@ -11,7 +11,7 @@ import (
 
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 )
 
 // doPostDownload performs a rate-limited, authenticated POST to the default
@@ -40,7 +40,7 @@ func (p *Provider) doPostDownload(ctx context.Context, path string,
 		p.invalidateTokenOn401(err)
 		return nil, err
 	}
-	return httputil.LimitedBody(resp), nil
+	return httpwire.LimitedBody(resp), nil
 }
 
 // logQuota records the per-account download quota telemetry returned by
@@ -97,7 +97,7 @@ func (p *Provider) doGet(ctx context.Context, path string, params url.Values) (i
 		p.invalidateTokenOn401(err)
 		return nil, err
 	}
-	return httputil.LimitedBody(resp), nil
+	return httpwire.LimitedBody(resp), nil
 }
 
 // invalidateTokenOn401 clears the cached token when the server returns 401,
@@ -134,14 +134,14 @@ func (p *Provider) doPostUnauthed(ctx context.Context, path string, body io.Read
 		resp.Body.Close()
 		return nil, err
 	}
-	return httputil.LimitedBody(resp), nil
+	return httpwire.LimitedBody(resp), nil
 }
 
 // setHeaders adds the required API key, user agent, and optional
 // authorization headers to an outgoing request.
 func (p *Provider) setHeaders(req *http.Request) {
-	req.Header.Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
-	req.Header.Set("Accept", httputil.ContentTypeJSON)
+	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
+	req.Header.Set("Accept", httpwire.ContentTypeJSON)
 	req.Header.Set("Api-Key", p.apiKey)
 
 	p.tokenMu.RLock()
@@ -155,13 +155,13 @@ func (p *Provider) setHeaders(req *http.Request) {
 // checkStatus maps OpenSubtitles HTTP responses to typed errors. 406 is the
 // OpenSubtitles-specific daily download-quota signal, mapped to RateLimitError
 // with the quota reset (next UTC midnight) as fallback when no Retry-After
-// hint is present. Everything else defers to httputil.CheckHTTPStatus, which
+// hint is present. Everything else defers to httpwire.CheckHTTPStatus, which
 // handles 401/403/429 (also with Retry-After) and returns *HTTPStatusError for
 // other 4xx/5xx. 401s surface as *api.AuthError, which the call sites'
 // invalidateTokenOn401 hook uses to force a fresh login.
 func checkStatus(resp *http.Response) error {
 	if resp.StatusCode == http.StatusNotAcceptable {
-		retryAfter := httputil.ParseRetryAfter(resp)
+		retryAfter := httpwire.ParseRetryAfter(resp)
 		if retryAfter == 0 {
 			retryAfter = untilNextUTCMidnight(time.Now())
 		}
@@ -170,7 +170,7 @@ func checkStatus(resp *http.Response) error {
 			RetryAfter: retryAfter,
 		}
 	}
-	return httputil.CheckHTTPStatus(resp)
+	return httpwire.CheckHTTPStatus(resp)
 }
 
 // untilNextUTCMidnight returns the duration from now until the next UTC midnight.

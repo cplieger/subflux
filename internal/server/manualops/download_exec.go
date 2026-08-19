@@ -9,7 +9,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
@@ -137,11 +137,11 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 
 	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles
-	// with ReadBounded(MaxSyncSubSize == httputil.MaxDownloadBytes), so a
+	// with ReadBounded(MaxSyncSubSize == httpwire.MaxDownloadBytes), so a
 	// post-processed payload the read path would refuse must fail here,
 	// loudly, instead of landing on disk.
 	if _, err := atomicfile.WriteFile(ctx, subPath, data,
-		atomicfile.WithMaxBytes(httputil.MaxDownloadBytes)); err != nil {
+		atomicfile.WithMaxBytes(httpwire.MaxDownloadBytes)); err != nil {
 		slog.Error("manual download: write failed", "path", subPath, "error", err)
 		NotifyError(deps, ErrorNotice{
 			Source: alertSourceManual,

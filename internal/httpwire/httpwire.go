@@ -1,8 +1,17 @@
-// Package httputil provides shared HTTP utilities for subtitle providers.
-// Behavioral logic is delegated to github.com/cplieger/httpx/v5; this package
-// retains application-specific constants and thin adapters that bridge httpx
-// error types to the internal api.* error types used across the codebase.
-package httputil
+// Package httpwire holds subflux's own HTTP wire policy: the byte bounds it
+// will read from a peer, and the vocabulary it classifies a peer's response
+// with. Behavioural logic is delegated to github.com/cplieger/httpx/v5; what
+// stays here is application-specific — the caps, the User-Agent, and the thin
+// adapters bridging httpx error types to the internal api.* errors.
+//
+// Named for the wire rather than as an httputil: the bounds and the
+// classification are one concern (every export is about reading a response
+// safely — the caps bound it, CheckHTTPStatus/IsTransient/ParseRetryAfter/
+// LimitedBody judge it), so splitting them would put a cap in one package and
+// the reader that applies it in another. Most consumers are providers, but
+// search, manualops and synchandlers read the caps too, which is why the name
+// is not provider-specific.
+package httpwire
 
 import (
 	"context"

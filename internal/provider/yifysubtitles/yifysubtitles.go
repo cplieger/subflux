@@ -15,7 +15,7 @@ import (
 
 	"github.com/cplieger/ssrf/v3"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 )
@@ -138,14 +138,14 @@ func (p *Provider) fetchDownload(ctx context.Context, dlURL, referer string) ([]
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, &api.RateLimitError{
 			Msg:        "rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	return io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 }
 
 // fetchPage retrieves an HTML page from YIFY Subtitles with browser-like
@@ -173,14 +173,14 @@ func (p *Provider) fetchPage(ctx context.Context, pageURL string) (string, error
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return "", &api.RateLimitError{
 			Msg:        "rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)) // HTML page limit
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)) // HTML page limit
 	if err != nil {
 		return "", err
 	}
