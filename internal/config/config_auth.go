@@ -7,7 +7,7 @@ import (
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
-// --- AuthConfigProvider methods ---
+// --- Authentication config accessors ---
 
 // BasicAuthEnabled returns whether password login is enabled.
 // Defaults to true if not explicitly set.

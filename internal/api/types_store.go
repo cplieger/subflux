@@ -4,7 +4,7 @@ import "time"
 
 // --- Query parameter structs ---
 
-// StateQuery groups the filter parameters for QueryStore.GetState.
+// StateQuery groups the filter parameters for Store.GetState.
 // Using a named struct (rather than positional string/int arguments)
 // makes call sites self-documenting and prevents silent swaps of
 // same-typed fields like Language/Provider/Search.

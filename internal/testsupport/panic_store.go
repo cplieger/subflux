@@ -16,11 +16,12 @@ var _ api.Store = (*panicStore)(nil)
 // no-op returns; test-specific mocks embed NopStore and override only the
 // methods they exercise.
 //
-// Transitional artifact: as narrow sub-interfaces (BackoffStore, DownloadStore,
-// QueryStore, HistoryStore, CoverageStore, etc.) are adopted by consumers,
-// tests should migrate to accept the narrowest interface and mock only the
-// 1-3 methods they need. panicStore remains useful until all consumers have
-// migrated away from the full api.Store interface.
+// It exists because api.Store is 36 methods wide, and it is the wrong tool for
+// most tests: a test that exercises three of them should accept the narrow
+// interface its subject declares (manualops.SearchStore, resolve.FileStore,
+// queryhandlers.QueryStore) and stub only those. The sub-interfaces this
+// comment used to point at as the migration target never had a consumer and
+// have been deleted; the consumer-declared ones are the target.
 type panicStore struct{}
 
 func (*panicStore) RecordNoResult(context.Context, api.MediaType, string, string, api.ProviderID, api.BackoffParams) error {

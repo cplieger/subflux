@@ -16,7 +16,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the maintenance domain (MaintStore): DeleteStateByPaths,
+// This file holds the maintenance domain: DeleteStateByPaths,
 // CleanupDrift, and ReconcileState. The private helpers
 // (collectVideoPathIDs, mediaHasState, deleteSubtitleFilesByMedia,
 // cleanOrphanedCoverageFor) are shared between DeleteStateByPaths and

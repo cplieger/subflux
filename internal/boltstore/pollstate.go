@@ -10,7 +10,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the poll_state domain (PollStore): the poll_state bucket
+// This file holds the poll_state domain: the poll_state bucket
 // (one row per canonical PollKey, e.g. "sonarr" / "radarr") holding the last
 // successful poll cursor. It mirrors the old SQLite store/store_poll.go
 // behaviour exactly (Requirements 6.2, 6.3).

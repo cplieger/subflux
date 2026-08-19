@@ -15,8 +15,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the subtitle_state domain: the DownloadStore,
-// ManualLockStore, HistoryStore, and the state-query half of QueryStore.
+// This file holds the subtitle_state domain: the download records, the manual
+// override locks, the download-history lookup, and the state queries.
 
 // SaveDownload records (or upgrades) a subtitle download in one write
 // transaction, preserving the old SQLite store's observable behaviour while
