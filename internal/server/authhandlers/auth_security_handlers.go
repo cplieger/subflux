@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // --- PUT /api/auth/password ---
@@ -32,14 +33,14 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
 		return
 	}
 
 	ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
 	if err != nil || !ok {
 		h.RateLimiter.Record(rlIP, rlUser)
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid current password")
+		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid current password")
 		return
 	}
 	h.RateLimiter.Reset(rlIP, rlUser)
@@ -62,12 +63,12 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		CheckBreach: checkBreach,
 	}, h.HTTPClient)
 	if userMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return
 	}
 	if hashErr != nil {
 		slog.Error("password change: hash", "error", hashErr)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	user.UpdatedAt = time.Now()
 	if err := h.SecDB.UpdateUser(ctx, user); err != nil {
 		slog.Error("password change: update user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -87,6 +88,6 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	slog.Info("security: password changed",
 		"username", user.Username, "ip", ClientIP(r))
 
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditPasswordChange, true, user.Username)
 }

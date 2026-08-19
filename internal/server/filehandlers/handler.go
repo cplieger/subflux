@@ -21,6 +21,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subtitleext"
@@ -126,25 +127,25 @@ type FileEntry struct {
 func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	mediaType := r.URL.Query().Get("media_type")
 	mediaID := r.URL.Query().Get("media_id")
 	if mediaType == "" || mediaID == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
 		return
 	}
 	if !api.MediaType(mediaType).Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 	arrID := 0 // absent disables the arr fallback
 	if raw := r.URL.Query().Get("arr_id"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n <= 0 {
-			api.BadRequestC(w, r, api.CodeBadRequest, "arr_id must be a positive integer")
+			httpapi.BadRequestC(w, r, api.CodeBadRequest, "arr_id must be a positive integer")
 			return
 		}
 		arrID = n
@@ -152,7 +153,7 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.deps.Store.GetSubtitleFiles(ctx, api.MediaType(mediaType), mediaID)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "list files")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "list files")
 		return
 	}
 
@@ -164,7 +165,7 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.WriteJSON(w, entries)
+	httpapi.WriteJSON(w, entries)
 }
 
 // storeEntries maps the store rows onto listing FileEntries, statting each
@@ -215,12 +216,12 @@ type DeleteFileRequest struct {
 func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodDelete {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	var req DeleteFileRequest
-	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 
@@ -230,11 +231,11 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language required (or orphan_handle)")
 		return
 	}
 	if !req.MediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 	if req.Variant == "" {
@@ -293,13 +294,13 @@ func (h *Handler) removeSubtitleFile(ctx context.Context, w http.ResponseWriter,
 		switch {
 		case errors.Is(err, errSubtitleExtensionNotAllowed):
 			slog.Warn("delete file: extension refused by subtitle delete gate", "path", path, "error", err)
-			api.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+			httpapi.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
 				"stored path does not carry a deletable subtitle extension")
 		case errors.Is(err, config.ErrPathNotAllowed):
 			slog.Warn("delete file: path rejected", "path", path, "error", err)
-			api.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid path")
+			httpapi.ForbiddenC(w, r, api.CodePathNotAllowed, "invalid path")
 		default:
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "delete file", "path", path)
+			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "delete file", "path", path)
 		}
 		return false
 	}
@@ -320,20 +321,20 @@ type BulkDeleteRequest struct {
 func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodDelete {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	var req BulkDeleteRequest
-	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 	if req.MediaType == "" || req.MediaID == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type and media_id required")
 		return
 	}
 	if !req.MediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -341,7 +342,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 
 	rows, err := h.deps.Store.GetSubtitleFiles(ctx, req.MediaType, req.MediaID)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "bulk delete: db fetch")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "bulk delete: db fetch")
 		return
 	}
 
@@ -352,7 +353,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	if path, refused := refusedBulkPath(rows); refused {
 		slog.Warn("bulk delete: extension refused by subtitle delete gate, refusing whole bulk",
 			"path", path)
-		api.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
+		httpapi.ConflictC(w, r, api.CodeSubtitleExtensionNotAllowed,
 			"a stored path does not carry a deletable subtitle extension")
 		return
 	}
@@ -385,7 +386,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 		},
 	})
 
-	api.WriteJSON(w, map[string]int{"deleted": deleted})
+	httpapi.WriteJSON(w, map[string]int{"deleted": deleted})
 }
 
 // refusedBulkPath returns the first targeted external row path whose
@@ -410,32 +411,32 @@ func refusedBulkPath(rows []api.SubtitleEntry) (string, bool) {
 func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	mediaType := r.URL.Query().Get("type")
 	prefix := r.URL.Query().Get("prefix")
 	if mediaType == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "type required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "type required")
 		return
 	}
 	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		api.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
 	if prefix != "" && !api.IsValidMediaPrefix(prefix) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
 		return
 	}
 	ids, err := h.deps.Store.HistoryMediaIDs(ctx, api.MediaType(mediaType), prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "history ids")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "history ids")
 		return
 	}
 	if ids == nil {
 		ids = []string{}
 	}
-	api.WriteJSON(w, ids)
+	httpapi.WriteJSON(w, ids)
 }
 
 // deleteExternalFile removes a single external subtitle file from disk and

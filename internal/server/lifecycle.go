@@ -12,6 +12,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/scanning"
@@ -262,7 +263,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // can carry the activity id.
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	if !s.scanning.CompareAndSwap(false, true) {
@@ -272,7 +273,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		// clears, so this lookup misses only in two sub-microsecond
 		// windows (owner accept, owner teardown).
 		if id, ok := s.activity.ActiveScan(activity.ScanScope{Kind: activity.ScanKindFull}); ok {
-			api.WriteJSONStatus(w, http.StatusAccepted,
+			httpapi.WriteJSONStatus(w, http.StatusAccepted,
 				scanning.ScanAccepted{ActivityID: id, Status: "scan already running"})
 			return
 		}
@@ -281,7 +282,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		// or the owner is inside its accept instant, where conflict is the
 		// honest answer (a re-click lands after the window).
 		if !s.scanning.CompareAndSwap(false, true) {
-			api.ConflictC(w, r, api.CodeScanInProgress, "scan already in progress")
+			httpapi.ConflictC(w, r, api.CodeScanInProgress, "scan already in progress")
 			return
 		}
 	}
@@ -290,7 +291,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		defer s.scanning.Store(false)
 		run(s.lifetime)
 	})
-	api.WriteJSONStatus(w, http.StatusAccepted,
+	httpapi.WriteJSONStatus(w, http.StatusAccepted,
 		scanning.ScanAccepted{ActivityID: actID, Status: "scan started"})
 }
 
@@ -319,7 +320,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 			http.ServeFileFS(w, r, staticSub, loginHTML)
 			return
 		}
-		api.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
+		httpapi.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
 		return
 	}
 

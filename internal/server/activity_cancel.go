@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -27,7 +28,7 @@ import (
 func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "activity id required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "activity id required")
 		return
 	}
 	user := api.UserFromContext(r.Context())
@@ -40,13 +41,13 @@ func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		slog.Info("activity cancel rejected: unknown id",
 			"activity_id", id, "user", username)
-		api.NotFoundC(w, r, api.CodeNotFound, "activity not found")
+		httpapi.NotFoundC(w, r, api.CodeNotFound, "activity not found")
 		return
 	}
 	if entry.RequiredRole == auth.RoleAdmin && !auth.HasRole(user, auth.RoleAdmin) {
 		slog.Info("activity cancel rejected: admin role required",
 			"activity_id", id, "user", username, "action", entry.Action)
-		api.ForbiddenC(w, r, api.CodeAuthRoleRequired, "admin role required to cancel this scan")
+		httpapi.ForbiddenC(w, r, api.CodeAuthRoleRequired, "admin role required to cancel this scan")
 		return
 	}
 
@@ -63,6 +64,6 @@ func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 		slog.Info("activity cancel rejected: not cancellable",
 			"activity_id", id, "user", username, "action", entry.Action,
 			"done", entry.Done)
-		api.ConflictC(w, r, "activity_not_cancellable", "activity is not cancellable")
+		httpapi.ConflictC(w, r, "activity_not_cancellable", "activity is not cancellable")
 	}
 }

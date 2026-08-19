@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -31,25 +32,25 @@ func configFilePath() string {
 // routes.go (GET here, DELETE on handleDismissAlert) like every other route.
 func (s *Server) handleGetAlerts(w http.ResponseWriter, _ *http.Request) {
 	visible := s.alerts.VisibleAlerts()
-	api.WriteJSON(w, visible)
+	httpapi.WriteJSON(w, visible)
 }
 
 // handleDismissAlert handles DELETE /api/alerts?id=N.
 func (s *Server) handleDismissAlert(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "id parameter required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "id parameter required")
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid id")
 		return
 	}
 	if s.alerts.Dismiss(id) {
-		api.WriteJSON(w, map[string]string{jsonKeyStatus: "dismissed"})
+		httpapi.WriteJSON(w, map[string]string{jsonKeyStatus: "dismissed"})
 	} else {
-		api.NotFoundC(w, r, api.CodeNotFound, "alert not found")
+		httpapi.NotFoundC(w, r, api.CodeNotFound, "alert not found")
 	}
 }
 
@@ -65,7 +66,7 @@ func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 
 	src := s.activity.Entries()
 	if len(src) == 0 {
-		api.WriteJSON(w, []activity.Entry{})
+		httpapi.WriteJSON(w, []activity.Entry{})
 		return
 	}
 	if len(src) > activityPageSize {
@@ -86,7 +87,7 @@ func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 			src[i].Cancellable = s.stops.Cancellable(src[i].ID)
 		}
 	}
-	api.WriteJSON(w, src)
+	httpapi.WriteJSON(w, src)
 }
 
 // handleDismissActivity removes a completed activity or cancels a queued one.
@@ -94,7 +95,7 @@ func (s *Server) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleDismissActivity(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "id required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "id required")
 		return
 	}
 	if s.activity.Cancel(id) {

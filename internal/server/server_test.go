@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/scanning"
@@ -173,11 +173,11 @@ func TestSecurityHeaders_passes_through_to_next_handler(t *testing.T) {
 func TestWriteJSON_sets_content_type(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	api.WriteJSON(rec, map[string]string{"key": "value"})
+	httpapi.WriteJSON(rec, map[string]string{"key": "value"})
 
 	ct := rec.Header().Get("Content-Type")
 	if ct != "application/json" {
-		t.Errorf("api.WriteJSON() Content-Type = %q, want %q", ct, "application/json")
+		t.Errorf("httpapi.WriteJSON() Content-Type = %q, want %q", ct, "application/json")
 	}
 
 	var result map[string]string
@@ -185,7 +185,7 @@ func TestWriteJSON_sets_content_type(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if result["key"] != "value" {
-		t.Errorf("api.WriteJSON() key = %q, want %q", result["key"], "value")
+		t.Errorf("httpapi.WriteJSON() key = %q, want %q", result["key"], "value")
 	}
 }
 

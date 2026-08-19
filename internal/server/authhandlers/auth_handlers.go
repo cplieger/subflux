@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // --- POST /api/auth/login ---
@@ -16,7 +17,7 @@ import (
 // HandleLogin handles POST /api/auth/login — authenticates with username and password.
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if cfg := h.Config(); cfg != nil && !cfg.BasicAuthEnabled() {
-		api.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
+		httpapi.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
 		return
 	}
 
@@ -38,7 +39,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Audit(r, slog.LevelWarn, AuditLoginRateLimited, false, req.Username,
 			slog.Int("retry_after_seconds", int(retryAfter.Seconds())+1))
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
 		return
 	}
 
@@ -48,7 +49,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	dbCancel()
 	if err != nil {
 		slog.Error("login: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -57,7 +58,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -66,7 +67,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "invalid_password"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	h.RateLimiter.Reset(rlIP, rlUser)
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
@@ -113,7 +114,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SessionCookie.ClearCookie(w, r)
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditLogout, true, user)
 }
 
@@ -126,11 +127,11 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	dbCancel()
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
-	api.WriteJSON(w, api.SetupStatus{
+	httpapi.WriteJSON(w, api.SetupStatus{
 		SetupRequired: count == 0,
 		ConfigValid:   h.Configured(),
 	})
@@ -150,11 +151,11 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username required")
 		return
 	}
 	if len([]rune(req.Username)) > maxUsernameLen {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username too long")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "username too long")
 		return
 	}
 
@@ -171,12 +172,12 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 		CheckBreach: checkBreach,
 	}, h.HTTPClient)
 	if userMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return
 	}
 	if err != nil {
 		slog.Error("setup: hash password", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -185,11 +186,11 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	count, err := h.Store.UserCount(ctx)
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 	if count > 0 {
-		api.ConflictC(w, r, api.CodeSetupAlreadyComplete, "setup already completed")
+		httpapi.ConflictC(w, r, api.CodeSetupAlreadyComplete, "setup already completed")
 		return
 	}
 
@@ -205,7 +206,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.Store.CreateUser(ctx, user); err != nil {
 		slog.Error("setup: create user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -213,7 +214,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("setup: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 	}
 }
 
@@ -237,7 +238,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		canLinkOIDC = false
 	}
 
-	api.WriteJSON(w, api.MeResponse{
+	httpapi.WriteJSON(w, api.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,

@@ -14,6 +14,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/embedded"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -113,7 +114,7 @@ func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []provider.Pro
 			return &LiveState{Cfg: cfg, Engine: engine, Providers: providers}
 		},
 		Resolve:    resolver,
-		DecodeJSON: api.DecodeJSONBody,
+		DecodeJSON: httpapi.DecodeJSONBody,
 	})
 	return h, wg
 }

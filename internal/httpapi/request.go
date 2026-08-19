@@ -1,19 +1,20 @@
-// http_request.go provides the HTTP handler prelude helpers every server
-// handler opens with: the method gate and the JSON body decoder. They sit beside
-// the response helpers in http.go and http_errors.go because the prelude writes
-// the same {error,code,request_id} envelope those helpers define.
+// request.go provides the HTTP handler prelude helpers every server handler
+// opens with: the method gate and the JSON body decoder. They sit beside the
+// response helpers in response.go and errors.go because the prelude writes the
+// same {error,code,request_id} envelope those helpers define.
 //
 // The method gate and body decoder delegate to the webhttp prelude primitives
 // (RequireMethod, LimitBody, MaxJSONBody) so subflux inherits the RFC-9110 Allow
 // header on 405s and the MaxBytesReader overflow-to-400 behavior, while keeping
 // subflux's own error-code taxonomy for the response envelope.
 
-package api
+package httpapi
 
 import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -51,7 +52,7 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, maxBytes in
 	}
 	if err := webhttp.DecodeJSONInto(w, r, dst, maxBytes); err != nil {
 		slog.Debug("decode request body failed", "path", r.URL.Path, "error", err)
-		BadRequestC(w, r, CodeBadRequest, "invalid json")
+		BadRequestC(w, r, api.CodeBadRequest, "invalid json")
 		return false
 	}
 	return true

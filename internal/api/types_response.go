@@ -22,6 +22,17 @@ const (
 
 // --- API response types ---
 
+// KeyStatus is the canonical JSON key for operation result status responses
+// (StatusResponse is the typed carrier). Used by server, scanning, and
+// confighandlers for the handful of status bodies still built as a map.
+const KeyStatus = "status"
+
+// StatusResponse is the canonical {"status": "..."} operation-result body
+// used by action endpoints (scan triggers, resets, logout).
+type StatusResponse struct {
+	Status string `json:"status"`
+}
+
 // Stats is the JSON response for GET /api/stats.
 type Stats struct {
 	LastScan            string `json:"last_scan"`

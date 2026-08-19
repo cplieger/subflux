@@ -12,6 +12,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -71,7 +72,7 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
 		slog.Debug("media series: sonarr not configured")
-		api.WriteJSON(w, []SeriesItem{})
+		httpapi.WriteJSON(w, []SeriesItem{})
 		return
 	}
 	// Use server context for singleflight to avoid cancellation from a single
@@ -101,10 +102,10 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("media browser: failed to fetch series", "error", err)
-		api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
+		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
 		return
 	}
-	api.WriteJSON(w, v)
+	httpapi.WriteJSON(w, v)
 }
 
 // MovieItem is the JSON shape returned by GET /api/media/movies. It carries
@@ -126,7 +127,7 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
 		slog.Debug("media movies: radarr not configured")
-		api.WriteJSON(w, []MovieItem{})
+		httpapi.WriteJSON(w, []MovieItem{})
 		return
 	}
 	// Use server context for singleflight — same rationale as HandleMediaSeries.
@@ -156,10 +157,10 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("media browser: failed to fetch movies", "error", err)
-		api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
+		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
 		return
 	}
-	api.WriteJSON(w, v)
+	httpapi.WriteJSON(w, v)
 }
 
 // EpisodeItem is the JSON shape for a single episode. It carries no file
@@ -188,18 +189,18 @@ type SeasonGroup struct {
 func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "sonarr not configured")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "sonarr not configured")
 		return
 	}
 
 	idStr := extractPathSegment(r.URL.Path, "/api/media/series/", "/episodes")
 	if idStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing series id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "missing series id")
 		return
 	}
 	seriesID, err := strconv.Atoi(idStr)
 	if err != nil || seriesID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid series id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid series id")
 		return
 	}
 
@@ -207,7 +208,7 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("media browser: failed to fetch episodes",
 			"series_id", seriesID, "error", err)
-		api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch episodes")
+		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch episodes")
 		return
 	}
 
@@ -228,7 +229,7 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, item)
 	}
-	api.WriteJSON(w, groupEpisodesBySeason(out))
+	httpapi.WriteJSON(w, groupEpisodesBySeason(out))
 }
 
 // groupEpisodesBySeason groups episodes by season number, sorted ascending.

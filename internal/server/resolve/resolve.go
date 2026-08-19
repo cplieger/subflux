@@ -30,6 +30,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // Sentinel errors; see the package doc for the handler status mapping.
@@ -329,11 +330,11 @@ func validateResolved(ctx context.Context, st *State, path string) error {
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrMediaNotFound):
-		api.NotFoundC(w, r, api.CodeMediaNotFound, "media not found")
+		httpapi.NotFoundC(w, r, api.CodeMediaNotFound, "media not found")
 	case errors.Is(err, ErrSubtitleNotFound):
-		api.NotFoundC(w, r, api.CodeSubtitleNotFound, "subtitle not found")
+		httpapi.NotFoundC(w, r, api.CodeSubtitleNotFound, "subtitle not found")
 	default:
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reference resolution")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reference resolution")
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/resolve"
@@ -73,7 +74,7 @@ func New(d Deps) *Handler {
 const MaxSyncSubSize = httpwire.MaxDownloadBytes
 
 // maxBodySize references the canonical constant from api.
-const maxBodySize = api.MaxDefaultBodySize
+const maxBodySize = httpapi.MaxDefaultBodySize
 
 // --- Request/Response types ---
 
@@ -148,15 +149,15 @@ type syncAudioPaths struct {
 // computed offset can be inspected. Lift the gate only when a
 // format-preserving ASS writer exists. The gate runs on the RESOLVED path.
 func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (req SyncAudioRequest, paths syncAudioPaths, ok bool) {
-	if !api.RequirePOST(w, r) {
+	if !httpapi.RequirePOST(w, r) {
 		return req, paths, false
 	}
-	if !api.DecodeJSONBody(w, r, &req, maxBodySize) {
+	if !httpapi.DecodeJSONBody(w, r, &req, maxBodySize) {
 		return req, paths, false
 	}
 	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
 	if err := ref.Validate(); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return req, paths, false
 	}
 	subPath, err := h.resolve.SubtitlePath(r.Context(), ref)
@@ -170,7 +171,7 @@ func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request)
 		return req, paths, false
 	}
 	if !req.DryRun && isASSSubtitlePath(subPath) {
-		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat,
+		httpapi.BadRequestC(w, r, api.CodeSyncUnsupportedFormat,
 			"audio sync cannot be applied to ASS/SSA subtitles (writeback is SRT-only and would discard styling); use dry_run to inspect the offset")
 		return req, paths, false
 	}
@@ -189,7 +190,7 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("sync audio: read subtitle failed",
 			"path", paths.subtitle, "error", err)
-		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to read subtitle")
+		httpapi.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to read subtitle")
 		return
 	}
 
@@ -225,7 +226,7 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 	if resp.Applied && result.Cues != nil && !req.DryRun {
 		cumOffset, err := h.applySyncResult(ctx, paths.subtitle, result.Cues, result.Offset, result.Confidence)
 		if err != nil {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "path", paths.subtitle)
+			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "path", paths.subtitle)
 			return
 		}
 		resp.OffsetMs = cumOffset
@@ -239,23 +240,23 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 		"applied", resp.Applied,
 		"dry_run", req.DryRun)
 
-	api.WriteJSON(w, resp)
+	httpapi.WriteJSON(w, resp)
 }
 
 // HandleSyncOffset handles POST /api/sync/offset.
 func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !api.RequirePOST(w, r) {
+	if !httpapi.RequirePOST(w, r) {
 		return
 	}
 
 	var req SyncOffsetRequest
-	if !api.DecodeJSONBody(w, r, &req, maxBodySize) {
+	if !httpapi.DecodeJSONBody(w, r, &req, maxBodySize) {
 		return
 	}
 	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
 	if err := ref.Validate(); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
 	subtitlePath, err := h.resolve.SubtitlePath(ctx, ref)
@@ -280,7 +281,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	if parseErr != nil || len(cues) == 0 {
 		slog.Debug("sync offset: read/parse failed",
 			"path", subtitlePath, "error", parseErr, "cues", len(cues))
-		api.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to parse subtitle")
+		httpapi.BadRequestC(w, r, api.CodeSyncUnsupportedFormat, "failed to parse subtitle")
 		return
 	}
 
@@ -295,7 +296,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 
 	srtData, err := h.subtitleProc.WriteSRT(cues)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "write SRT")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "write SRT")
 		return
 	}
 
@@ -304,7 +305,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	// refuse to load on the next request.
 	if _, err := atomicfile.WriteFile(ctx, subtitlePath, srtData,
 		atomicfile.WithMaxBytes(MaxSyncSubSize)); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", subtitlePath)
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "save", "path", subtitlePath)
 		return
 	}
 
@@ -318,12 +319,12 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 			"path", filepath.Base(subtitlePath),
 			"offset_ms", req.OffsetMs,
 			"error", err)
-		api.JSONErrorWithCode(w, r, http.StatusInternalServerError, api.CodeInternalError,
+		httpapi.JSONErrorWithCode(w, r, http.StatusInternalServerError, api.CodeInternalError,
 			"offset applied but tracking failed; re-open sync dialog to verify")
 		return
 	}
 
-	api.WriteJSON(w, map[string]int64{"applied_offset_ms": req.OffsetMs})
+	httpapi.WriteJSON(w, map[string]int64{"applied_offset_ms": req.OffsetMs})
 }
 
 // --- Helpers ---

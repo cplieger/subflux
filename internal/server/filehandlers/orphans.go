@@ -29,6 +29,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
@@ -220,11 +221,11 @@ var (
 func writeArrBindingError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errArrBindingMismatch):
-		api.BadRequestC(w, r, api.CodeBadRequest, "arr_id does not correspond to media_id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "arr_id does not correspond to media_id")
 	case errors.Is(err, errArrItemNotFound):
-		api.NotFoundC(w, r, api.CodeMediaNotFound, "arr_id addresses no known arr item")
+		httpapi.NotFoundC(w, r, api.CodeMediaNotFound, "arr_id addresses no known arr item")
 	default:
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan fallback")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan fallback")
 	}
 }
 
@@ -372,11 +373,11 @@ func (h *Handler) deleteOrphan(ctx context.Context, w http.ResponseWriter, r *ht
 	entry, res := h.orphans.consume(handle)
 	switch res {
 	case redeemUnknown:
-		api.NotFoundC(w, r, "orphan_handle_unknown",
+		httpapi.NotFoundC(w, r, "orphan_handle_unknown",
 			"unknown orphan handle; reload the file list")
 		return
 	case redeemExpired:
-		api.JSONErrorWithCode(w, r, http.StatusGone, "orphan_handle_expired",
+		httpapi.JSONErrorWithCode(w, r, http.StatusGone, "orphan_handle_expired",
 			"orphan handle expired; reload the file list")
 		return
 	case redeemOK:
@@ -386,18 +387,18 @@ func (h *Handler) deleteOrphan(ctx context.Context, w http.ResponseWriter, r *ht
 	if err := ls.Cfg.ValidatePath(ctx, entry.path); err != nil {
 		slog.Error("orphan delete: recorded path failed containment validation (invariant breach)",
 			"error", err)
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan delete")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "orphan delete")
 		return
 	}
 	fi, err := os.Stat(entry.path)
 	if err != nil {
-		api.NotFoundC(w, r, api.CodeSubtitleNotFound, "file no longer exists")
+		httpapi.NotFoundC(w, r, api.CodeSubtitleNotFound, "file no longer exists")
 		return
 	}
 	if fi.Size() != entry.size || !fi.ModTime().Equal(entry.mtime) {
 		slog.Warn("orphan delete: metadata changed since listing, refusing",
 			"recorded_size", entry.size, "current_size", fi.Size())
-		api.ConflictC(w, r, "orphan_changed",
+		httpapi.ConflictC(w, r, "orphan_changed",
 			"file changed since listing; reload the file list")
 		return
 	}

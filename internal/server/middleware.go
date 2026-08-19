@@ -5,6 +5,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // --- Request middleware ---
@@ -25,7 +26,7 @@ type sessionAuthenticator interface {
 func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.configured.Load() {
-			api.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "not configured; save a valid configuration first")
+			httpapi.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "not configured; save a valid configuration first")
 			return
 		}
 		next(w, r)
@@ -62,7 +63,7 @@ func (s *Server) requireRole(role auth.Role) middleware {
 		return func(w http.ResponseWriter, r *http.Request) {
 			user := api.UserFromContext(r.Context())
 			if !auth.HasRole(user, role) {
-				api.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
+				httpapi.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
 				return
 			}
 			next(w, r)

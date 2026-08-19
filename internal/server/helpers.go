@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // Handler preludes. Every handler opens with the same pattern:
@@ -22,7 +22,7 @@ import (
 // tiny, single-purpose, opinionated about the response shape.
 
 // maxDefaultBodySize references the canonical constant from api.
-const maxDefaultBodySize = api.MaxDefaultBodySize
+const maxDefaultBodySize = httpapi.MaxDefaultBodySize
 
 // decodeJSONBodyAny is a package-level function matching the signature
 // required by manualops.HandlerDeps.DecodeJSON. Uses maxDefaultBodySize
@@ -31,7 +31,7 @@ func decodeJSONBodyAny(w http.ResponseWriter, r *http.Request, dst any, maxSize 
 	if maxSize == 0 {
 		maxSize = maxDefaultBodySize
 	}
-	return api.DecodeJSONBody(w, r, dst, maxSize)
+	return httpapi.DecodeJSONBody(w, r, dst, maxSize)
 }
 
 // deleteSubtitleFiles validates and removes subtitle files from disk.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -52,7 +53,7 @@ func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: cal
 // HandleManualSearch handles GET /api/search?imdb=tt1234567&lang=fr&type=movie
 func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
@@ -60,12 +61,12 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	req, lang, mediaType, arrID := ParseSearchQuery(r)
 
 	if !IsValidLangCode(lang) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
 		return
 	}
 
 	if !mediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -74,7 +75,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	// request must never be silently truncated: reject oversized names
 	// loudly at the HTTP boundary instead.
 	if len(req.ReleaseName) > release.MaxNameLen {
-		api.BadRequestC(w, r, api.CodeBadRequest,
+		httpapi.BadRequestC(w, r, api.CodeBadRequest,
 			"release exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
 		return
 	}
@@ -108,7 +109,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := RunSearch(ctx, deps, ls, &req, lang, mediaType, filePath)
-	api.WriteJSON(w, result)
+	httpapi.WriteJSON(w, result)
 }
 
 // resolveSearchVideo resolves the arr-known video path for a manual search's
@@ -133,7 +134,7 @@ func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType api.MediaTyp
 func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
@@ -146,29 +147,29 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if key.MediaType == "" || key.MediaID == "" || key.Language == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language are required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language are required")
 		return
 	}
 
 	if !IsValidLangCode(key.Language) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
 		return
 	}
 
 	if !key.MediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 
 	// Variant is optional: empty clears the locks of every variant of the
 	// language; a specific variant clears only that quad's lock.
 	if !isValidLockVariant(key.Variant) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
 		return
 	}
 
 	if err := h.deps.DBFunc().ClearManualLock(ctx, key); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
 			"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
 			"variant", key.Variant)
 		return
@@ -182,13 +183,13 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		MediaType: key.MediaType, MediaID: key.MediaID, Language: key.Language,
 	})
 
-	api.WriteJSON(w, map[string]string{"status": "lock cleared"})
+	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }
 
 // HandleManualDownload handles POST /api/search/download.
 func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
@@ -198,7 +199,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := ValidateDownloadRequest(&req); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
 
@@ -213,7 +214,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if prov == nil {
-		api.BadRequestC(w, r, api.CodeSearchProviderDisabled, "provider not found")
+		httpapi.BadRequestC(w, r, api.CodeSearchProviderDisabled, "provider not found")
 		return
 	}
 
@@ -239,7 +240,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("%s %s", req.Provider, req.SubtitleID), activity.SourceManual)
 
 	// Return 202 immediately; run the download in the background.
-	api.WriteJSONStatus(w, http.StatusAccepted, DownloadAccepted{
+	httpapi.WriteJSONStatus(w, http.StatusAccepted, DownloadAccepted{
 		ActivityID: actID,
 		Status:     "accepted",
 	})

@@ -30,6 +30,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // resolveTimeout caps a resolve pass (full library listing + episode
@@ -168,12 +169,12 @@ func parseNarrowingParam(q url.Values, name string) (val *int, errMsg string) {
 // HandleSearchResolve handles GET /api/search/resolve.
 func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	params, errMsg := parseResolveParams(r.URL.Query())
 	if errMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, errMsg)
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, errMsg)
 		return
 	}
 
@@ -183,13 +184,13 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 	resp, err := ResolveQuery(ctx, h.deps.StateFunc(), &params)
 	switch {
 	case errors.Is(err, errResolveConflict):
-		api.BadRequestC(w, r, "resolve_conflict", err.Error())
+		httpapi.BadRequestC(w, r, "resolve_conflict", err.Error())
 	case err != nil:
 		slog.Error("search resolve failed", "error", err,
 			"title", params.Title, "imdb", params.Imdb, "tmdb", params.Tmdb, "type", params.Type)
-		api.BadGatewayC(w, r, api.CodeArrUnreachable, "media resolution failed: "+err.Error())
+		httpapi.BadGatewayC(w, r, api.CodeArrUnreachable, "media resolution failed: "+err.Error())
 	default:
-		api.WriteJSON(w, resp)
+		httpapi.WriteJSON(w, resp)
 	}
 }
 

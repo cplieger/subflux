@@ -11,6 +11,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"golang.org/x/sync/errgroup"
@@ -124,12 +125,12 @@ type MovieItem struct {
 func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
-		api.WriteJSON(w, []SeriesItem{})
+		httpapi.WriteJSON(w, []SeriesItem{})
 		return
 	}
 
@@ -137,9 +138,9 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errFetchSeries) {
 			slog.Error("coverage: failed to fetch series", "error", err)
-			api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
+			httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
 		} else {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage series files")
+			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage series files")
 		}
 		return
 	}
@@ -181,7 +182,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	slog.Debug("coverage: series computed", "count", len(out), "series_total", len(allSeries), "episode_files", len(allFiles))
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // groupEpisodeSubsBySeries buckets indexed episode subtitle maps by their
@@ -210,12 +211,12 @@ func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]
 func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
-		api.WriteJSON(w, []MovieItem{})
+		httpapi.WriteJSON(w, []MovieItem{})
 		return
 	}
 
@@ -223,9 +224,9 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errFetchMovies) {
 			slog.Error("coverage: failed to fetch movies", "error", err)
-			api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
+			httpapi.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
 		} else {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage movies files")
+			httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage movies files")
 		}
 		return
 	}
@@ -278,7 +279,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	slog.Debug("coverage: movies computed", "count", len(out), "movie_total", len(allMovies), "movie_files", len(allFiles))
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // HandleCoverageDetail returns per-episode subtitle files for a series.
@@ -286,27 +287,27 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleCoverageDetail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	tvdbStr := extractPathSegment(r.URL.Path, "/api/coverage/series/", "")
 	if tvdbStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing tvdb id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "missing tvdb id")
 		return
 	}
 	if tvdbID, err := strconv.Atoi(tvdbStr); err != nil || tvdbID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid tvdb id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid tvdb id")
 		return
 	}
 
 	prefix := "tvdb-" + tvdbStr + "-"
 	files, err := h.deps.Store.GetSubtitleFiles(ctx, api.MediaTypeEpisode, prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage detail")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage detail")
 		return
 	}
-	api.WriteJSON(w, coverage.DeduplicateFileRows(files))
+	httpapi.WriteJSON(w, coverage.DeduplicateFileRows(files))
 }
 
 // HandleScanStates returns scan timestamps for all scanned media items.
@@ -314,7 +315,7 @@ func (h *Handler) HandleCoverageDetail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 	mediaType := r.URL.Query().Get("type")
@@ -323,15 +324,15 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 		mediaType = string(api.MediaTypeEpisode)
 	}
 	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		api.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
 	states, err := h.deps.Store.GetScanStates(ctx, api.MediaType(mediaType), prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "scan states")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "scan states")
 		return
 	}
-	api.WriteJSON(w, states)
+	httpapi.WriteJSON(w, states)
 }
 
 // fetchCoverageSeriesData fetches series, exclude tags, and subtitle files concurrently.

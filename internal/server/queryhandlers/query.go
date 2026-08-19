@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
@@ -21,7 +22,7 @@ type providerTimeoutResponse = api.ProvidersResponse
 // GET /api/state?type=episode&lang=fr&provider=opensubtitles&limit=50
 func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	q := r.URL.Query()
@@ -54,29 +55,29 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 		Offset:    offset,
 	})
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "state")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "state")
 		return
 	}
 	slog.Debug("handleState", "results", len(entries),
 		"type", q.Get("type"), "lang", q.Get("lang"),
 		"provider", q.Get("provider"), "search", searchParam,
 		"limit", limit)
-	api.WriteJSON(w, entries)
+	httpapi.WriteJSON(w, entries)
 }
 
 // HandleBackoff returns items currently in adaptive search backoff.
 // GET /api/backoff
 func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	entries, err := h.queryDB.GetBackoffItems(ctx)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "backoff")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "backoff")
 		return
 	}
-	api.WriteJSON(w, entries)
+	httpapi.WriteJSON(w, entries)
 }
 
 // HandleBackoffByPrefix returns backoff entries for media IDs matching a prefix.
@@ -91,15 +92,15 @@ func (h *Handler) HandleBackoffByPrefix(w http.ResponseWriter, r *http.Request) 
 // GET /api/locks
 func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	entries, err := h.queryDB.GetManualLocks(ctx)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "locks")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", "locks")
 		return
 	}
-	api.WriteJSON(w, entries)
+	httpapi.WriteJSON(w, entries)
 }
 
 // ProviderInfo is one entry of the GET /api/providers response: a registered
@@ -113,7 +114,7 @@ type ProviderInfo struct {
 // HandleProviders returns registered providers with enabled status.
 // GET /api/providers
 func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
@@ -134,7 +135,7 @@ func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
 	slices.SortFunc(out, func(a, b ProviderInfo) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // ParsedConfig is the GET /api/config/parsed response: the live parsed
@@ -161,11 +162,11 @@ type ParsedConfig struct {
 // HandleConfigParsed returns the config as structured JSON.
 // GET /api/config/parsed
 func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	if !h.configured() {
-		api.WriteJSON(w, ParsedConfig{
+		httpapi.WriteJSON(w, ParsedConfig{
 			Configured: false,
 			Languages:  []string{},
 			Providers:  map[string]bool{},
@@ -186,7 +187,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	api.WriteJSON(w, ParsedConfig{
+	httpapi.WriteJSON(w, ParsedConfig{
 		Configured:     true,
 		Languages:      ls.Cfg.LanguageCodes(),
 		LanguageRules:  ls.Cfg.LanguageRulesForUI(),
@@ -206,7 +207,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 // HandleScore simulates scoring a subtitle against a video.
 // POST /api/score with JSON body.
 func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
-	if !api.RequirePOST(w, r) {
+	if !httpapi.RequirePOST(w, r) {
 		return
 	}
 	ls := h.state()
@@ -216,7 +217,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		SubRelease  string        `json:"sub_release"`
 		MatchedBy   string        `json:"matched_by"`
 	}
-	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 	// Both names are direct user input into the release parser. The parser
@@ -228,7 +229,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		{"sub_release", req.SubRelease},
 	} {
 		if len(f.value) > release.MaxNameLen {
-			api.BadRequestC(w, r, api.CodeBadRequest,
+			httpapi.BadRequestC(w, r, api.CodeBadRequest,
 				f.name+" exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
 			return
 		}
@@ -247,14 +248,14 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		"matched_by", req.MatchedBy,
 		"score", result.Score, "score_no_hash", result.ScoreNoHash)
 
-	api.WriteJSON(w, api.ScorePreview(result))
+	httpapi.WriteJSON(w, api.ScorePreview(result))
 }
 
 // HandleSearchTargets resolves subtitle targets for a media item
 // without actually searching. Useful for debugging language rules.
 // GET /api/search/targets?orig_lang=en&audio_langs=en,fr
 func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
@@ -290,7 +291,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 			MinScore:  t.MinScore,
 		})
 	}
-	api.WriteJSON(w, api.SearchTargets{
+	httpapi.WriteJSON(w, api.SearchTargets{
 		OrigLang:   origLang,
 		AudioLangs: audioLangs,
 		Targets:    out,
@@ -300,32 +301,32 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 // HandleProviderTimeout returns provider timeout state for all providers.
 // GET /api/providers/timeout
 func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) {
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
 	status, enabled := ls.Engine.ProviderTimeouts()
 	if !enabled {
-		api.WriteJSON(w, providerTimeoutResponse{})
+		httpapi.WriteJSON(w, providerTimeoutResponse{})
 		return
 	}
-	api.WriteJSON(w, providerTimeoutResponse{Enabled: true, Providers: status})
+	httpapi.WriteJSON(w, providerTimeoutResponse{Enabled: true, Providers: status})
 }
 
 // HandleProviderTimeoutReset clears all provider timeout state and re-enables all providers.
 // POST /api/providers/timeout/reset
 func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Request) {
-	if !api.RequirePOST(w, r) {
+	if !httpapi.RequirePOST(w, r) {
 		return
 	}
 	ls := h.state()
 	_, enabled := ls.Engine.ProviderTimeouts()
 	if !enabled {
-		api.WriteJSON(w, providerTimeoutResponse{})
+		httpapi.WriteJSON(w, providerTimeoutResponse{})
 		return
 	}
 	ls.Engine.ResetTimeouts()
-	api.Ok(w)
+	httpapi.Ok(w)
 }
 
 // handleTypePrefixQuery is a shared handler for GET endpoints that
@@ -333,7 +334,7 @@ func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Requ
 func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 	label string, queryFn func(string, string) (any, error),
 ) {
-	if !api.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	q := r.URL.Query()
@@ -342,19 +343,19 @@ func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 		mediaType = string(api.MediaTypeEpisode)
 	}
 	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		api.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
 	prefix := q.Get("prefix")
 	if prefix != "" && !api.IsValidMediaPrefix(prefix) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
 		return
 	}
 	result, err := queryFn(mediaType, prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", label)
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "query", label)
 		return
 	}
 	slog.Debug(label+" query completed", "media_type", mediaType, "prefix", prefix)
-	api.WriteJSON(w, result)
+	httpapi.WriteJSON(w, result)
 }

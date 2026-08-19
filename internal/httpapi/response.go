@@ -1,7 +1,24 @@
-// http.go provides HTTP response helpers shared across every server handler.
-// Consistent shape: all JSON responses go through WriteJSON/WriteJSONStatus,
-// which set Content-Type automatically. All error responses go through the
-// named helpers below.
+// Package httpapi is the handler plumbing of subflux's own HTTP API: the
+// prelude every handler opens with and the envelope every handler answers in.
+//
+// It is the inbound counterpart to internal/httpwire. httpwire is subflux
+// acting as an HTTP *client* — the byte caps it will read from a provider or an
+// arr, and the vocabulary it classifies their responses with. This package is
+// subflux acting as an HTTP *server* — what it accepts from its own callers
+// (method gate, body cap, JSON decode) and what it writes back to them (the
+// JSON payload and the {error,code,request_id} envelope). Both are "HTTP
+// policy", but they face opposite directions and share no symbol, so one
+// package holding both would hand every provider implementation the server's
+// 500-writer and hand the server a subtitle-download byte cap.
+//
+// The prelude and the response helpers are one concern, not two: RequireMethod
+// and DecodeJSONBody are observable only through the envelope this package
+// defines — their whole failure output is a 405 or a 400 in that shape.
+//
+// Not internal/server, where all thirteen consuming files live: twelve of them
+// are in server *subpackages* (authhandlers, confighandlers, scanning, ...) and
+// internal/server imports seventeen of those, so a child reaching back for the
+// helpers would close an import cycle.
 //
 // Wire format for errors:
 //
@@ -17,23 +34,21 @@
 // (github.com/cplieger/webhttp): jsonHeaders/WriteJSON/WriteJSONStatus/Ok and
 // the writeError envelope delegate to webhttp's mechanism, so the wire shape is
 // defined once in the library and stays byte-identical across every consumer.
-// subflux keeps its ~70-code taxonomy and the BadRequestC-style named helpers
-// on top; they just delegate now.
+// subflux keeps its ~70-code taxonomy (api.ErrorCode, which stays in the types
+// package because the wire generator discovers the enum there) and the
+// BadRequestC-style named helpers on top; they just delegate now.
 //
 // Hand-crafted JSON strings (`http.Error(w, ..., status)` for JSON,
 // `fmt.Fprint(w, \`{"ok":true}\`)`, `w.Write([]byte(...))` for JSON) are
 // forbidden. Use these helpers instead.
-//
-// Pattern mirrors apps/vibekit/web/internal/api/http.go and
-// apps/web-terminal-kiro/internal/api/middleware.go.
-
-package api
+package httpapi
 
 import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
 
+	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/webhttp/v2"
 )
 
@@ -45,19 +60,10 @@ const (
 	msgInternalError = "internal error"
 
 	// contentTypeJSON is the MIME type for JSON responses. Matches
-	// httpwire.ContentTypeJSON but defined locally to avoid a circular import.
+	// httpwire.ContentTypeJSON but defined locally: that package is the
+	// outbound client policy and this one is the inbound server policy, so
+	// neither imports the other.
 	contentTypeJSON = "application/json"
-
-	// KeyStatus is the canonical JSON key for operation result status
-	// responses (StatusResponse is the typed carrier).
-	// Used by server, scanning, and confighandlers packages.
-	KeyStatus = "status"
-
-	// ErrMsgSonarrNotConfigured is the canonical error message when Sonarr is nil.
-	ErrMsgSonarrNotConfigured = "sonarr not configured"
-
-	// ErrMsgRadarrNotConfigured is the canonical error message when Radarr is nil.
-	ErrMsgRadarrNotConfigured = "radarr not configured"
 )
 
 // errorResponse is the canonical JSON error envelope every helper in this file
@@ -103,7 +109,7 @@ func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
 // author-controlled or explicitly user-safe message. For wrapped internal
 // errors, use InternalErrorC(w, r, err, code), which logs the raw error and
 // returns a generic message.
-func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
+func JSONErrorWithCode(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }
 
@@ -114,16 +120,10 @@ func Ok(w http.ResponseWriter) {
 	webhttp.Ok(w)
 }
 
-// StatusResponse is the canonical {"status": "..."} operation-result body
-// used by action endpoints (scan triggers, resets, logout).
-type StatusResponse struct {
-	Status string `json:"status"`
-}
-
 // writeError is the single place all named error helpers funnel through. It
 // delegates to webhttp.WriteError, which builds the {error,code,request_id}
 // envelope and pulls the request id from r's context (nil-safe on r). The wire
 // shape is identical to the previous hand-built errorResponse.
-func writeError(w http.ResponseWriter, r *http.Request, status int, code ErrorCode, msg string) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, code api.ErrorCode, msg string) {
 	webhttp.WriteError(w, r, status, webhttp.ErrorCode(code), msg)
 }

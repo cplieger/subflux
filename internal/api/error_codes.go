@@ -1,9 +1,13 @@
 // error_codes.go: machine-readable error codes for the JSON envelope.
 //
-// These constants are referenced from BadRequestC / UnauthorizedC /
-// etc. call sites where the same code appears 3+ times across the
-// codebase. One-off codes (used by a single call site) are passed as
+// These constants are referenced from the httpapi.BadRequestC /
+// httpapi.UnauthorizedC / etc. call sites where the same code appears 3+ times
+// across the codebase. One-off codes (used by a single call site) are passed as
 // string literals at the call site to avoid pollution here.
+//
+// The enum stays in this package rather than moving out with those helpers:
+// internal/wirespec auto-discovers it by name for the TypeScript string-union
+// it generates, so the catalog is a wire type, not response plumbing.
 //
 // Source of truth for the full taxonomy:
 // /.kiro/notes/subflux-error-codes.md.

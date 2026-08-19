@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // ConfigLoader parses and validates config YAML into a candidate config. It is
@@ -137,14 +138,14 @@ func New(d *Deps) *Handler {
 }
 
 // maxBodySize references the canonical constant from api.
-const maxBodySize = api.MaxDefaultBodySize
+const maxBodySize = httpapi.MaxDefaultBodySize
 
 // HandleGetConfig returns the current config file with secrets redacted.
 func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	configPath := h.configPath()
 	data, err := atomicfile.ReadBounded(r.Context(), configPath, maxBodySize)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", configPath)
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", configPath)
 		return
 	}
 	data = RedactSecrets(data)
@@ -158,12 +159,12 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "failed to read body")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(data)) > maxBodySize {
 		slog.Warn("config request body too large", "size", len(data))
-		api.PayloadTooLargeC(w, r, api.CodeConfigTooLarge, "request body too large")
+		httpapi.PayloadTooLargeC(w, r, api.CodeConfigTooLarge, "request body too large")
 		return
 	}
 
@@ -180,7 +181,7 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		// Not the client's fault: the payload relies on keep-semantics
 		// secrets and the server could not read its own existing config.
 		// Fail closed — no save, no activation; details go to the log.
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
 		return
 	}
 
@@ -198,36 +199,36 @@ func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
 	defer h.saveMu.Unlock()
 
 	if h.configured() {
-		api.ConflictC(w, r, api.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
+		httpapi.ConflictC(w, r, api.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
 		return
 	}
 	if len(h.defaultConfig) == 0 {
-		api.InternalErrorC(w, r, errors.New("no default config available"), api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, errors.New("no default config available"), api.CodeInternalError)
 		return
 	}
 
 	configPath := h.configPath()
 	if err := atomicWriteConfig(r.Context(), configPath, h.defaultConfig); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reset config")
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reset config")
 		return
 	}
 
 	slog.Info("config reset to default example")
-	api.WriteJSON(w, map[string]string{api.KeyStatus: "config reset to defaults"})
+	httpapi.WriteJSON(w, map[string]string{api.KeyStatus: "config reset to defaults"})
 }
 
 // HandleValidatePath checks whether a filesystem path exists inside the container.
 // POST /api/config/validate-path  body: {"path": "/media"}
 func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	var req struct {
 		Path string `json:"path"`
 	}
-	if !api.DecodeJSONBody(w, r, &req, 4096) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 4096) {
 		return
 	}
 
@@ -245,7 +246,7 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, atomicfile.ErrEmptyPath) {
 			msg = "path is empty"
 		}
-		api.WriteJSON(w, PathValidationResponse{Error: msg})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: msg})
 		return
 	}
 	// Reject traversal in the path AS WRITTEN — before cleaning — then clean
@@ -260,31 +261,31 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	// that merely begins with or contains two dots (e.g. "/media/..extras",
 	// "/media/a..b") is legitimate and stays valid.
 	if pathinside.HasDotDot(p) {
-		api.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
 		return
 	}
 	p = filepath.Clean(p)
 
 	info, err := os.Stat(p)
 	if err != nil {
-		api.WriteJSON(w, PathValidationResponse{Error: "path does not exist"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path does not exist"})
 		return
 	}
 	if !info.IsDir() {
-		api.WriteJSON(w, PathValidationResponse{Error: "path is not a directory"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path is not a directory"})
 		return
 	}
 
-	api.WriteJSON(w, PathValidationResponse{Valid: true})
+	httpapi.WriteJSON(w, PathValidationResponse{Valid: true})
 }
 
 // HandleConfigSchema returns the full configuration schema for the UI.
 func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
-	api.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
+	httpapi.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(api.ProviderNameSynthetic))))
 }
 
 // --- Internal helpers ---

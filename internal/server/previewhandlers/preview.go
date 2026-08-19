@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
@@ -31,13 +32,13 @@ const displayGroupSeries = "series"
 // arr-known video path — no client-supplied path exists on this verb.
 func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	ref, err := resolve.MediaRefFromQuery(r.URL.Query())
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
 	videoPath, err := h.deps.Resolve.VideoPath(r.Context(), ref)
@@ -79,7 +80,7 @@ func (h *Handler) HandlePreviewVideo(w http.ResponseWriter, r *http.Request) {
 		slog.Warn(mode+" preview failed",
 			"path", videoPath, "error", err)
 		if !responseStarted(w) {
-			api.InternalErrorC(w, r, err, api.CodePreviewUnavailable, "path", videoPath, "mode", mode)
+			httpapi.InternalErrorC(w, r, err, api.CodePreviewUnavailable, "path", videoPath, "mode", mode)
 			return
 		}
 	}
@@ -210,19 +211,19 @@ func (h *Handler) runFFmpegStream(ctx context.Context, w http.ResponseWriter,
 // HandlePreviewPoster proxies poster images from Sonarr/Radarr.
 func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	mediaType := r.URL.Query().Get("type")
 	idStr := r.URL.Query().Get("id")
 	if mediaType == "" || idStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "type and id required")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "type and id required")
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid id")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid id")
 		return
 	}
 
@@ -233,9 +234,9 @@ func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 	arrURL, apiKey, ok := resolveArrConfig(ls, mediaType)
 	if !ok {
 		if mediaType != "movie" && mediaType != displayGroupSeries {
-			api.BadRequestC(w, r, api.CodeBadRequest, "type must be movie or series")
+			httpapi.BadRequestC(w, r, api.CodeBadRequest, "type must be movie or series")
 		} else {
-			api.BadRequestC(w, r, api.CodeBadRequest, mediaType+" arr not configured")
+			httpapi.BadRequestC(w, r, api.CodeBadRequest, mediaType+" arr not configured")
 		}
 		return
 	}
@@ -247,7 +248,7 @@ func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, posterURL, http.NoBody)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "build request", "url", posterURL)
+		httpapi.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "build request", "url", posterURL)
 		return
 	}
 	req.Header.Set("X-Api-Key", apiKey)
@@ -255,7 +256,7 @@ func (h *Handler) HandlePreviewPoster(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.deps.PosterClient.Do(req)
 	if err != nil {
 		slog.Debug("poster fetch failed", "url", posterURL, "error", err)
-		api.BadGatewayC(w, r, api.CodeBadGateway, "poster fetch failed")
+		httpapi.BadGatewayC(w, r, api.CodeBadGateway, "poster fetch failed")
 		return
 	}
 	defer resp.Body.Close()
@@ -272,7 +273,7 @@ func writePosterResponse(w http.ResponseWriter, r *http.Request, resp *http.Resp
 		if _, drainErr := io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)); drainErr != nil {
 			slog.Debug("failed to drain poster response", "error", drainErr)
 		}
-		api.NotFoundC(w, r, api.CodeNotFound, "poster not found")
+		httpapi.NotFoundC(w, r, api.CodeNotFound, "poster not found")
 		return
 	}
 
@@ -311,13 +312,13 @@ func resolveArrConfig(ls *LiveState, mediaType string) (arrURL, apiKey string, o
 // from the store; no client-supplied path.
 func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	ref, err := resolve.FileRefFromQuery(r.URL.Query())
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
 	subPath, err := h.deps.Resolve.SubtitlePath(r.Context(), ref)
@@ -330,7 +331,7 @@ func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 	if parseErr != nil || len(cues) == 0 {
 		slog.Warn("preview start: read/parse subtitle failed",
 			"path", subPath, "error", parseErr, "cues", len(cues))
-		api.BadRequestC(w, r, api.CodeBadRequest, "failed to parse subtitle")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to parse subtitle")
 		return
 	}
 
@@ -341,7 +342,7 @@ func (h *Handler) HandlePreviewStart(w http.ResponseWriter, r *http.Request) {
 	secs := int(startSec) % 60
 	desc := fmt.Sprintf("%d:%02d — dialogue-dense section", mins, secs)
 
-	api.WriteJSON(w, PreviewStartResponse{
+	httpapi.WriteJSON(w, PreviewStartResponse{
 		StartSeconds: startSec,
 		Description:  desc,
 	})
@@ -359,13 +360,13 @@ type PreviewStartResponse struct {
 // FileRef and resolved from the store; no client-supplied path.
 func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
 		return
 	}
 
 	ref, err := resolve.FileRefFromQuery(r.URL.Query())
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, err.Error())
 		return
 	}
 	subPath, err := h.deps.Resolve.SubtitlePath(r.Context(), ref)
@@ -398,7 +399,7 @@ func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		slog.Debug("preview subtitle: read failed",
 			"path", subPath, "error", err)
-		api.BadRequestC(w, r, api.CodeBadRequest, "failed to read subtitle")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to read subtitle")
 		return
 	}
 
@@ -407,7 +408,7 @@ func (h *Handler) HandlePreviewSubtitle(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		slog.Debug("preview subtitle: parse failed",
 			"path", subPath, "error", err)
-		api.BadRequestC(w, r, api.CodeBadRequest, "failed to parse subtitle")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "failed to parse subtitle")
 		return
 	}
 

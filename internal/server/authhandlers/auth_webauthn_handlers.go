@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -36,14 +37,14 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 	}
 	if err != nil {
 		slog.Error("webauthn: begin login", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
 	token, err := GenerateCeremonyToken()
 	if err != nil {
 		slog.Error("webauthn: generate token", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -52,11 +53,11 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 		CreatedAt: time.Now(),
 	}) {
 		slog.Warn("webauthn: ceremony session limit reached")
-		api.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "too many pending sessions")
+		httpapi.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "too many pending sessions")
 		return
 	}
 
-	api.WriteJSON(w, WebAuthnLoginBeginResponse{
+	httpapi.WriteJSON(w, WebAuthnLoginBeginResponse{
 		PublicKey:    assertion,
 		SessionToken: token,
 	})
@@ -88,25 +89,25 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 
 		var unknownCred *protocol.ErrorUnknownCredential
 		if errors.As(err, &unknownCred) {
-			api.WriteJSONStatus(w, http.StatusUnauthorized, api.WebAuthnUnknownCredentialResponse{
+			httpapi.WriteJSONStatus(w, http.StatusUnauthorized, api.WebAuthnUnknownCredentialResponse{
 				Error:  "unknown credential",
 				Signal: "unknown_credential",
 			})
 			return
 		}
 
-		api.UnauthorizedC(w, r, api.CodeWebAuthnAssertionFailed, "authentication failed")
+		httpapi.UnauthorizedC(w, r, api.CodeWebAuthnAssertionFailed, "authentication failed")
 		return
 	}
 
 	if !user.Enabled {
-		api.ForbiddenC(w, r, api.CodeAuthAccountDisabled, "account disabled")
+		httpapi.ForbiddenC(w, r, api.CodeAuthAccountDisabled, "account disabled")
 		return
 	}
 
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPasskey); err != nil {
 		slog.Error("webauthn: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,

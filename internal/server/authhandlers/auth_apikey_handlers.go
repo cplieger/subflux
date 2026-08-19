@@ -7,6 +7,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
 )
 
 // --- GET /api/auth/apikeys ---
@@ -18,7 +19,7 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.SecDB.ListAPIKeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("list api keys: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -33,7 +34,7 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // --- POST /api/auth/apikeys ---
@@ -50,14 +51,14 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len([]rune(req.Label)) > maxAPIKeyLabelLen {
-		api.BadRequestC(w, r, api.CodeBadRequest, "label too long")
+		httpapi.BadRequestC(w, r, api.CodeBadRequest, "label too long")
 		return
 	}
 
 	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
 	if err != nil {
 		slog.Error("generate api key: generate", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
@@ -73,14 +74,14 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.SecDB.CreateAPIKey(r.Context(), apiKey); err != nil {
 		slog.Error("generate api key: store", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: API key generated",
 		"username", user.Username, "label", req.Label, "ip", ClientIP(r))
 
-	api.WriteJSON(w, api.KeyGenerated{
+	httpapi.WriteJSON(w, api.KeyGenerated{
 		ID:        apiKey.ID,
 		Key:       plaintext,
 		KeyPrefix: prefix,
@@ -106,14 +107,14 @@ func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.SecDB.DeleteAPIKey(r.Context(), auth.KeyRef{ID: keyID, UserID: user.ID}); err != nil {
 		slog.Error("revoke api key: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, api.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: API key revoked",
 		"username", user.Username, "key_id", keyID, "ip", ClientIP(r))
 
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditAPIKeyRevoke, true, user.Username,
 		slog.Int64("key_id", keyID))
 }
