@@ -309,17 +309,15 @@ func episodeVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, er
 
 // validateResolved runs the media-roots containment check on a resolved
 // path against the resolution's one State snapshot. Server-derived paths
-// should never fail it, so a failure logs at ERROR (invariant breach) and
-// maps to a 500-class error, never a 4xx.
+// should never fail it, so a failure maps to a 500-class error, never a 4xx;
+// WriteError's InternalErrorC is where it is logged, so both failure reasons
+// travel in the error rather than being logged here as well.
 func validateResolved(ctx context.Context, st *State, path string) error {
 	if st == nil || st.Cfg == nil {
-		slog.Error("resolve: no config available for containment validation", "path", path)
-		return ErrPathInvariant
+		return fmt.Errorf("%w: no config available to validate %s", ErrPathInvariant, path)
 	}
 	if err := st.Cfg.ValidatePath(ctx, path); err != nil {
-		slog.Error("resolve: server-derived path failed containment validation (invariant breach)",
-			"path", path, "error", err)
-		return fmt.Errorf("%w: %w", ErrPathInvariant, err)
+		return fmt.Errorf("%w: server-derived path %s: %w", ErrPathInvariant, path, err)
 	}
 	return nil
 }

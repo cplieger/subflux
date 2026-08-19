@@ -96,9 +96,10 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 	// Fallback: title + season search.
 	results, err := p.searchByTitle(ctx, req)
 	if err != nil {
-		slog.Warn("animetosho title search failed",
-			"error", err, "media", req.MediaLabel())
-		return nil, err
+		// The provider-sweep boundary logs this with the provider name; the
+		// media label and which of the two legs failed are what it cannot
+		// reconstruct, so they ride the error.
+		return nil, fmt.Errorf("title search for %s: %w", req.MediaLabel(), err)
 	}
 	slog.Info("animetosho search complete",
 		"results", len(results), "media", req.MediaLabel())

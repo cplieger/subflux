@@ -409,11 +409,11 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []subfl
 	}
 
 	if err := h.store.SetSyncOffset(ctx, path, cumulativeOffset); err != nil {
-		slog.Error("audio sync: file saved but DB offset update failed",
-			"path", filepath.Base(path),
-			"cumulative_offset_ms", cumulativeOffset,
-			"error", err)
-		return 0, fmt.Errorf("offset applied but tracking failed (re-open the sync dialog to verify): %w", err)
+		// The 500 writer logs this at the boundary; the cumulative offset is
+		// what it cannot reconstruct, so it rides the error. The text stays in
+		// the log — the client gets the writer's generic envelope.
+		return 0, fmt.Errorf("file saved but offset tracking failed at %dms cumulative "+
+			"(re-open the sync dialog to verify): %w", cumulativeOffset, err)
 	}
 
 	slog.Info("audio sync applied",

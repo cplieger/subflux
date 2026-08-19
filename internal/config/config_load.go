@@ -255,7 +255,6 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	}
 
 	if err := validate(ctx, cfg); err != nil {
-		slog.Warn("config validation failed", "error", err)
 		return nil, err
 	}
 

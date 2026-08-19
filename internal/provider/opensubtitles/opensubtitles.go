@@ -224,14 +224,12 @@ func (p *Provider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitl
 
 	body, err := p.doGet(ctx, "/subtitles", params)
 	if err != nil {
-		slog.Warn("opensubtitles show count failed", "imdb", imdbID, "lang", lang, "error", err)
 		return 0, fmt.Errorf("show count: %w", err)
 	}
 	defer func() { httpx.DrainClose(body) }()
 
 	var resp searchResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
-		slog.Warn("opensubtitles show count decode failed", "imdb", imdbID, "lang", lang, "error", err)
 		return 0, fmt.Errorf("decode show count: %w", err)
 	}
 
@@ -268,9 +266,9 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 	body, err := p.doPostDownload(ctx, "/download", bytes.NewReader(reqBody))
 	if err != nil {
-		slog.Warn("opensubtitles download request failed",
-			"file_id", fileID, "error", err)
-		return nil, fmt.Errorf("request download: %w", err)
+		// file_id is the one attribute neither the retry wrapper nor the
+		// engine's download boundary can reconstruct.
+		return nil, fmt.Errorf("request download (file_id %d): %w", fileID, err)
 	}
 	defer httpx.DrainClose(body)
 

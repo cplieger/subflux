@@ -103,9 +103,6 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	// when zip extraction failed (e.g. RAR files from HDBits).
 	// subtitlefile.Validate is the single authority for both.
 	if err := subtitlefile.Validate(data); err != nil {
-		slog.Warn("downloaded data is not a subtitle file",
-			"media", req.MediaLabel(), "lang", lang,
-			"provider", best.sub.Provider, "error", err)
 		return "", fmt.Errorf("%w: %s: %w", ErrInvalidContent,
 			best.sub.Provider, err)
 	}

@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -104,9 +105,10 @@ func (r *retryProvider) Download(ctx context.Context, sub *subflux.Subtitle) ([]
 		backoff = httpx.SafeDouble(backoff)
 		backoff = min(backoff, maxRetryBackoff)
 	}
-	slog.Error("download failed after all attempts",
-		"provider", r.inner.Name(), "attempts", r.maxAttempts, "error", lastErr)
-	return nil, lastErr
+	// The report belongs to the caller: downloadBestCandidate logs this and
+	// tries the NEXT candidate, so an exhausted provider is often a step in a
+	// recovery. The attempt count it cannot reconstruct rides the error.
+	return nil, fmt.Errorf("after %d attempts: %w", r.maxAttempts, lastErr)
 }
 
 // retryCounterProvider extends retryProvider for providers that also

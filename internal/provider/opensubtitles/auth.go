@@ -61,14 +61,12 @@ func (p *Provider) login(ctx context.Context) error {
 	}
 	body, err := p.doPostUnauthed(ctx, "/login", bytes.NewReader(loginPayload))
 	if err != nil {
-		slog.Warn("opensubtitles login failed", "error", err)
 		return fmt.Errorf("login: %w", err)
 	}
 	defer func() { httpx.DrainClose(body) }()
 
 	var resp loginResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
-		slog.Warn("opensubtitles login response decode failed", "error", err)
 		return fmt.Errorf("decode login: %w", err)
 	}
 

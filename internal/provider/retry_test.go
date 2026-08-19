@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -511,6 +512,32 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 	}
 	if v, ok := recs.AttrValue(msgDownloadRetrying, "attempt"); !ok || v != "1" {
 		t.Errorf("retrying-warn attempt = %q (present=%v), want \"1\"", v, ok)
+	}
+}
+
+// TestRetryProvider_exhaustedDownloadIsNotLoggedAsError pins §4 ("never log
+// and return the same error") at the one site where the double log misreported
+// severity: downloadBestCandidate logs an exhausted provider and tries the NEXT
+// candidate, so a transient failure this wrapper recovers from at a different
+// provider must not have been announced here as an ERROR-level fault. The
+// attempt count the boundary cannot reconstruct travels in the error instead.
+func TestRetryProvider_exhaustedDownloadIsNotLoggedAsError(t *testing.T) {
+	recs := capture.Default(t)
+	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{
+		{err: &httpwire.HTTPStatusError{Code: 503}},
+		{err: &httpwire.HTTPStatusError{Code: 503}},
+	}}
+	p := WrapRetry(inner, 2, time.Millisecond)
+
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
+	if err == nil {
+		t.Fatal("Download() error = nil, want the exhausted-retries error")
+	}
+	if got := recs.CountLevel(slog.LevelError, ""); got != 0 {
+		t.Errorf("ERROR records = %d, want 0; the caller owns the report: %v", got, recs.Messages())
+	}
+	if !strings.Contains(err.Error(), "after 2 attempts") {
+		t.Errorf("error = %q, want it to carry the attempt count the boundary cannot see", err)
 	}
 }
 
