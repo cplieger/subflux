@@ -22,6 +22,7 @@ import (
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -204,7 +205,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	if err := api.ValidateSubtitleData(data); err != nil {
+	if err := subtitlefile.Validate(data); err != nil {
 		return nil, fmt.Errorf("gestdown: %w", err)
 	}
 	slog.Debug("gestdown download complete", "id", sub.ID, "bytes", len(data))

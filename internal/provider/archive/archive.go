@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"log/slog"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // Archive-member extension acceptance comes from the subtitle-extension
@@ -118,7 +118,7 @@ func LooksLikeSubtitle(data []byte) bool {
 	}
 
 	// Reject data with high concentrations of non-text bytes.
-	if api.CountNonTextBytes(probe)*10 > len(probe) {
+	if subtitlefile.CountNonText(probe)*10 > len(probe) {
 		return false
 	}
 

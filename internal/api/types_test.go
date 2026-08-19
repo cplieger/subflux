@@ -90,33 +90,6 @@ func TestEffectiveVariant_returns_set_variant(t *testing.T) {
 
 // --- VariantFromFlags ---
 
-func TestVariantFromFlags(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		want   Variant
-		hi     bool
-		forced bool
-	}{
-		{name: "standard", hi: false, forced: false, want: DefaultVariant},
-		{name: "hi", hi: true, forced: false, want: VariantHI},
-		{name: "forced", hi: false, forced: true, want: VariantForced},
-		{name: "hi takes precedence over forced", hi: true, forced: true, want: VariantHI},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := VariantFromFlags(SubtitleTags{HearingImpaired: tt.hi, Forced: tt.forced})
-			if got != tt.want {
-				t.Errorf("VariantFromFlags(SubtitleTags{HearingImpaired: %v, Forced: %v}) = %q, want %q",
-					tt.hi, tt.forced, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestMediaLabel(t *testing.T) {
 	t.Parallel()
 

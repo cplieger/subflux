@@ -21,6 +21,7 @@ import (
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
@@ -318,7 +319,7 @@ func (p *Provider) fetchSubtitleFile(ctx context.Context, fileID int, link strin
 		return nil, fmt.Errorf("read subtitle: %w", err)
 	}
 
-	if err := api.ValidateSubtitleData(data); err != nil {
+	if err := subtitlefile.Validate(data); err != nil {
 		return nil, fmt.Errorf("opensubtitles: %w", err)
 	}
 

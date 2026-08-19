@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // DownloadTimeout is the context timeout for manual downloads.
@@ -50,7 +51,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	}
 
 	// Reject binary data that isn't a valid subtitle file.
-	if err := api.ValidateSubtitleData(data); err != nil {
+	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
 		NotifyError(deps, ErrorNotice{
@@ -63,7 +64,7 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 
 	// Sync timing against existing reference subtitle. The video path was
 	// resolved server-side from the MediaRef by the handler (S7).
-	variant := api.VariantFromFlags(api.SubtitleTags{HearingImpaired: req.HearingImp, Forced: req.Forced})
+	variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: req.HearingImp, Forced: req.Forced})
 	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
 
 	// Resolve media IDs for coverage tracking and history recording.
@@ -134,8 +135,8 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		MediaType: req.MediaType, MediaID: historyMediaID,
 		Language: req.Language, Variant: variant,
 	})
-	subPath = api.ManualSubtitlePath(req.VideoPath(), n,
-		api.SubtitleTags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
+	subPath = subtitlefile.ManualPath(req.VideoPath(), n,
+		subtitlefile.Tags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
 	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles

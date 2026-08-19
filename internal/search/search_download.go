@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // SyncAndPostProcess syncs subtitle timing and normalizes content using
@@ -106,7 +107,7 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *api.SearchRequest,
 
 	// Reject binary archives that providers returned as-is when zip
 	// extraction failed (e.g. RAR files from HDBits).
-	if err := api.ValidateSubtitleData(data); err != nil {
+	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("downloaded data is not a subtitle file",
 			"media", req.MediaLabel(), "lang", lang,
 			"provider", best.sub.Provider, "error", err)
@@ -142,7 +143,7 @@ func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 	best *scoredSub, subPath, videoPath string, mediaType api.MediaType, mediaID, lang string,
 	syncOffsetMs int64, saveHI bool,
 ) {
-	saveVariant := api.VariantFromFlags(api.SubtitleTags{HearingImpaired: saveHI, Forced: best.sub.Forced})
+	saveVariant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: saveHI, Forced: best.sub.Forced})
 	if err := e.store.UpsertSubtitleFile(ctx, mediaType, mediaID, &api.SubtitleFile{
 		Language: lang,
 		Variant:  saveVariant,
@@ -214,7 +215,7 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	if pp.StripHI && variant != api.VariantHI {
 		saveHI = false
 	}
-	subPath = api.SubtitlePath(videoPath, api.SubtitleTags{Lang: lang, HearingImpaired: saveHI, Forced: best.sub.Forced})
+	subPath = subtitlefile.Path(videoPath, subtitlefile.Tags{Lang: lang, HearingImpaired: saveHI, Forced: best.sub.Forced})
 	return subPath, saveHI, processed
 }
 

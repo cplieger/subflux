@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"pgregory.net/rapid"
 )
 
@@ -775,12 +776,12 @@ func TestVariantFromFlags_roundtrip_matchesVariant(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		variant := api.VariantFromFlags(api.SubtitleTags{HearingImpaired: hi, Forced: forced})
+		variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: hi, Forced: forced})
 
 		// VariantFromFlags picks hi over forced when both are true,
 		// so the round-trip holds for all combinations.
 		if !matchesVariant(hi, forced, variant) {
-			t.Errorf("matchesVariant(%v, %v, api.VariantFromFlags(api.SubtitleTags{HearingImpaired: %v, Forced: %v})=%q) = false, want true",
+			t.Errorf("matchesVariant(%v, %v, subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: %v, Forced: %v})=%q) = false, want true",
 				hi, forced, hi, forced, variant)
 		}
 	})

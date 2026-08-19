@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // fakeStore returns a fixed row set for any media query.
@@ -63,7 +64,7 @@ func extRow(mediaID, lang, variant, path, videoPath string) api.SubtitleEntry {
 	return api.SubtitleEntry{
 		MediaID: mediaID, Language: lang, Variant: variant,
 		Source: string(api.SourceExternal), Path: path, VideoPath: videoPath,
-		Ordinal: api.ManualOrdinal(path),
+		Ordinal: subtitlefile.ManualOrdinal(path),
 	}
 }
 

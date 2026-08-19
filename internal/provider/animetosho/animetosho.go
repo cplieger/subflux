@@ -22,6 +22,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider/anidb"
 	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -144,7 +145,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 		"id", sub.ID, "bytes", len(data))
 
 	result := archive.Decompress(data)
-	if err := api.ValidateSubtitleData(result); err != nil {
+	if err := subtitlefile.Validate(result); err != nil {
 		return nil, fmt.Errorf("animetosho: %w", err)
 	}
 	return result, nil

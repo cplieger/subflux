@@ -11,7 +11,7 @@
 //   - OnDisk: extensions recognized as standalone subtitle files beside
 //     media files during library scans.
 //   - WriterOutput: extensions subflux itself writes (every writer emits
-//     .srt today; see api.SubtitleExtSRT).
+//     .srt today; see subtitlefile.ExtSRT).
 //   - Delete: the union view — anything an accept path could have produced
 //     or recognized must be deletable through the subtitle delete gate.
 //

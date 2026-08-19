@@ -19,6 +19,7 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -273,7 +274,7 @@ func (s *ordinalStore) NextManualNumber(_ context.Context, _ api.ManualLockKey) 
 	s.mu.Lock()
 	maxOrdinal := 0
 	for i := range s.rows {
-		if n := api.ManualOrdinal(s.rows[i].Path); n > maxOrdinal {
+		if n := subtitlefile.ManualOrdinal(s.rows[i].Path); n > maxOrdinal {
 			maxOrdinal = n
 		}
 	}
@@ -379,8 +380,8 @@ func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 		}
 	}
 
-	first := api.ManualSubtitlePath(videoPath, 1, api.SubtitleTags{Lang: "en"})
-	second := api.ManualSubtitlePath(videoPath, 2, api.SubtitleTags{Lang: "en"})
+	first := subtitlefile.ManualPath(videoPath, 1, subtitlefile.Tags{Lang: "en"})
+	second := subtitlefile.ManualPath(videoPath, 2, subtitlefile.Tags{Lang: "en"})
 	if got := readFileT(t, first); !strings.Contains(got, "Payload 1") {
 		t.Errorf("%s content = %q, want the FIRST download's payload intact", first, got)
 	}
@@ -416,8 +417,8 @@ func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 		t.Fatal("RunDownload(manual) = false, want success")
 	}
 
-	first := api.ManualSubtitlePath(videoPath, 1, api.SubtitleTags{Lang: "en"})
-	second := api.ManualSubtitlePath(videoPath, 2, api.SubtitleTags{Lang: "en"})
+	first := subtitlefile.ManualPath(videoPath, 1, subtitlefile.Tags{Lang: "en"})
+	second := subtitlefile.ManualPath(videoPath, 2, subtitlefile.Tags{Lang: "en"})
 	if got := readFileT(t, first); !strings.Contains(got, "Payload 1") {
 		t.Errorf("%s content = %q, want the top pick's payload intact", first, got)
 	}
@@ -491,13 +492,13 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 	}
 	ordinals := map[int]bool{}
 	for i := range rows {
-		ordinals[api.ManualOrdinal(rows[i].Path)] = true
+		ordinals[subtitlefile.ManualOrdinal(rows[i].Path)] = true
 	}
 	if !ordinals[1] || !ordinals[2] {
 		t.Fatalf("allocated ordinals = %v, want {1, 2} (no reuse)", ordinals)
 	}
-	c1 := readFileT(t, api.ManualSubtitlePath(videoPath, 1, api.SubtitleTags{Lang: "en"}))
-	c2 := readFileT(t, api.ManualSubtitlePath(videoPath, 2, api.SubtitleTags{Lang: "en"}))
+	c1 := readFileT(t, subtitlefile.ManualPath(videoPath, 1, subtitlefile.Tags{Lang: "en"}))
+	c2 := readFileT(t, subtitlefile.ManualPath(videoPath, 2, subtitlefile.Tags{Lang: "en"}))
 	if c1 == c2 {
 		t.Errorf("both ordinal files hold identical content %q; one download overwrote the other", c1)
 	}

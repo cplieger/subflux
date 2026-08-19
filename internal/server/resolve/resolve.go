@@ -31,6 +31,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // Sentinel errors; see the package doc for the handler status mapping.
@@ -50,7 +51,7 @@ var (
 
 // FileRef addresses exactly one stored subtitle file: the store row identity
 // (media_type, media_id, language, variant, source) plus the manual-sibling
-// ordinal parsed from the row's filename (api.ManualOrdinal; 0 = the
+// ordinal parsed from the row's filename (subtitlefile.ManualOrdinal; 0 = the
 // unnumbered auto file). A bare quad is NOT unique — manual ordinals share a
 // quad, and sync offsets are path-keyed in the store, so ambiguous
 // resolution would corrupt offset bookkeeping.
@@ -174,7 +175,7 @@ func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*a
 			row.Path == "" {
 			continue
 		}
-		if api.ManualOrdinal(row.Path) != ref.Ordinal {
+		if subtitlefile.ManualOrdinal(row.Path) != ref.Ordinal {
 			continue
 		}
 		if match != nil {

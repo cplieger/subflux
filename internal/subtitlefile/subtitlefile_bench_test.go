@@ -1,11 +1,11 @@
-package api
+package subtitlefile
 
 import (
 	"bytes"
 	"testing"
 )
 
-func BenchmarkValidateSubtitleData(b *testing.B) {
+func BenchmarkValidate(b *testing.B) {
 	for _, size := range []int{64, 512, 4096} {
 		data := bytes.Repeat([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello world\n\n"), size/40+1)
 		data = data[:size]
@@ -13,13 +13,13 @@ func BenchmarkValidateSubtitleData(b *testing.B) {
 			b.ReportAllocs()
 			b.SetBytes(int64(size))
 			for range b.N {
-				_ = ValidateSubtitleData(data)
+				_ = Validate(data)
 			}
 		})
 	}
 }
 
-func BenchmarkCountNonTextBytes(b *testing.B) {
+func BenchmarkCountNonText(b *testing.B) {
 	// 512 bytes with ~5% non-text to simulate realistic subtitle headers.
 	data := bytes.Repeat([]byte("Subtitle line with some text.\n"), 18)
 	data = data[:512]
@@ -30,7 +30,7 @@ func BenchmarkCountNonTextBytes(b *testing.B) {
 	b.ReportAllocs()
 	b.SetBytes(512)
 	for range b.N {
-		_ = CountNonTextBytes(data)
+		_ = CountNonText(data)
 	}
 }
 

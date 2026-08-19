@@ -685,7 +685,7 @@ export interface StructuredConfig {
  * never by path); Path and VideoPath stay populated for in-process consumers
  * (file listing size stat, deletion, reconciliation) but are json-omitted.
  * Ordinal is the manual-sibling number parsed from the row's filename
- * (api.ManualOrdinal) — together with (media_type, media_id, language,
+ * (subtitlefile.ManualOrdinal) — together with (media_type, media_id, language,
  * variant, source) it forms the wire FileRef the client echoes back to
  * address this exact file.
  */

@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/subtitleext"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // TestSeedTable pins the exact capability table from the design (S16): the
@@ -64,18 +64,18 @@ func TestViewSubsets(t *testing.T) {
 }
 
 // TestWriterCoverage asserts every extension the writers emit is in the
-// writerOutput view: api.SubtitlePath / api.ManualSubtitlePath (the two path
-// builders every save path routes through) emit api.SubtitleExtSRT, which
+// writerOutput view: subtitlefile.Path / subtitlefile.ManualPath (the two path
+// builders every save path routes through) emit subtitlefile.ExtSRT, which
 // must carry writerOutput (and therefore delete).
 func TestWriterCoverage(t *testing.T) {
 	t.Parallel()
-	if !subtitleext.WriterOutput(api.SubtitleExtSRT) {
-		t.Errorf("api.SubtitleExtSRT (%s) is not a writerOutput extension", api.SubtitleExtSRT)
+	if !subtitleext.WriterOutput(subtitlefile.ExtSRT) {
+		t.Errorf("subtitlefile.ExtSRT (%s) is not a writerOutput extension", subtitlefile.ExtSRT)
 	}
 	// The path builders must produce writer-covered extensions.
 	for _, p := range []string{
-		api.SubtitlePath("/media/movie.mkv", api.SubtitleTags{Lang: "fr"}),
-		api.ManualSubtitlePath("/media/movie.mkv", 2, api.SubtitleTags{Lang: "fr", Forced: true}),
+		subtitlefile.Path("/media/movie.mkv", subtitlefile.Tags{Lang: "fr"}),
+		subtitlefile.ManualPath("/media/movie.mkv", 2, subtitlefile.Tags{Lang: "fr", Forced: true}),
 	} {
 		if !subtitleext.WriterOutput(p) {
 			t.Errorf("writer-produced path %s not covered by writerOutput view", p)

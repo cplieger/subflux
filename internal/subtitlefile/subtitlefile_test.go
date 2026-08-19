@@ -1,4 +1,4 @@
-package api
+package subtitlefile
 
 import (
 	"bytes"
@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/api"
 	"pgregory.net/rapid"
 )
 
-func TestSubtitlePath(t *testing.T) {
+func TestPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -73,17 +74,17 @@ func TestSubtitlePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := SubtitlePath(tt.videoPath, SubtitleTags{Lang: tt.lang, HearingImpaired: tt.hi, Forced: tt.forced})
+			got := Path(tt.videoPath, Tags{Lang: tt.lang, HearingImpaired: tt.hi, Forced: tt.forced})
 
 			if got != tt.want {
-				t.Errorf("SubtitlePath(%q, %q, hi=%v, forced=%v) = %q, want %q",
+				t.Errorf("Path(%q, %q, hi=%v, forced=%v) = %q, want %q",
 					tt.videoPath, tt.lang, tt.hi, tt.forced, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestManualSubtitlePath(t *testing.T) {
+func TestManualPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -129,17 +130,17 @@ func TestManualSubtitlePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ManualSubtitlePath(tt.videoPath, tt.n, SubtitleTags{Lang: tt.lang})
+			got := ManualPath(tt.videoPath, tt.n, Tags{Lang: tt.lang})
 
 			if got != tt.want {
-				t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, want %q",
+				t.Errorf("ManualPath(%q, %q, %d) = %q, want %q",
 					tt.videoPath, tt.lang, tt.n, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestManualSubtitlePath_variants(t *testing.T) {
+func TestManualPath_variants(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -181,18 +182,18 @@ func TestManualSubtitlePath_variants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ManualSubtitlePath(tt.videoPath, tt.n, SubtitleTags{Lang: tt.lang, HearingImpaired: tt.hi, Forced: tt.forced})
+			got := ManualPath(tt.videoPath, tt.n, Tags{Lang: tt.lang, HearingImpaired: tt.hi, Forced: tt.forced})
 			if got != tt.want {
-				t.Errorf("ManualSubtitlePath(%q, %q, %d, hi=%t, forced=%t) = %q, want %q",
+				t.Errorf("ManualPath(%q, %q, %d, hi=%t, forced=%t) = %q, want %q",
 					tt.videoPath, tt.lang, tt.n, tt.hi, tt.forced, got, tt.want)
 			}
 		})
 	}
 }
 
-// --- SubtitlePath PBT ---
+// --- Path PBT ---
 
-func TestSubtitlePath_always_ends_with_srt(t *testing.T) {
+func TestPath_always_ends_with_srt(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -207,34 +208,34 @@ func TestSubtitlePath_always_ends_with_srt(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		got := SubtitlePath(videoPath, SubtitleTags{Lang: lang, HearingImpaired: hi, Forced: forced})
+		got := Path(videoPath, Tags{Lang: lang, HearingImpaired: hi, Forced: forced})
 
 		if !strings.HasSuffix(got, ".srt") {
-			t.Errorf("SubtitlePath(%q, %q, %v, %v) = %q, should end with .srt",
+			t.Errorf("Path(%q, %q, %v, %v) = %q, should end with .srt",
 				videoPath, lang, hi, forced, got)
 		}
 		if hi && !strings.Contains(got, ".hi") {
-			t.Errorf("SubtitlePath(%q, %q, hi=true) = %q, missing .hi",
+			t.Errorf("Path(%q, %q, hi=true) = %q, missing .hi",
 				videoPath, lang, got)
 		}
 		if forced && !strings.Contains(got, ".forced") {
-			t.Errorf("SubtitlePath(%q, %q, forced=true) = %q, missing .forced",
+			t.Errorf("Path(%q, %q, forced=true) = %q, missing .forced",
 				videoPath, lang, got)
 		}
 		base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
 		suffix := strings.TrimPrefix(got, base)
 		if !hi && strings.Contains(suffix, ".hi.") {
-			t.Errorf("SubtitlePath(%q, %q, hi=false) = %q, suffix %q should not contain .hi flag",
+			t.Errorf("Path(%q, %q, hi=false) = %q, suffix %q should not contain .hi flag",
 				videoPath, lang, got, suffix)
 		}
 		if !forced && strings.Contains(suffix, ".forced.") {
-			t.Errorf("SubtitlePath(%q, %q, forced=false) = %q, suffix %q should not contain .forced flag",
+			t.Errorf("Path(%q, %q, forced=false) = %q, suffix %q should not contain .forced flag",
 				videoPath, lang, got, suffix)
 		}
 	})
 }
 
-func TestSubtitlePath_always_contains_language_code(t *testing.T) {
+func TestPath_always_contains_language_code(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -243,37 +244,37 @@ func TestSubtitlePath_always_contains_language_code(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		got := SubtitlePath(videoPath, SubtitleTags{Lang: lang, HearingImpaired: hi, Forced: forced})
+		got := Path(videoPath, Tags{Lang: lang, HearingImpaired: hi, Forced: forced})
 
 		if !strings.Contains(got, "."+lang+".") {
-			t.Errorf("SubtitlePath(%q, %q, %v, %v) = %q, should contain .%s.",
+			t.Errorf("Path(%q, %q, %v, %v) = %q, should contain .%s.",
 				videoPath, lang, hi, forced, got, lang)
 		}
 	})
 }
 
-func TestSubtitlePath_hi_forced_suffix_ordering(t *testing.T) {
+func TestPath_hi_forced_suffix_ordering(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
 		videoPath := rapid.StringMatching(`/media/[a-zA-Z0-9._-]{1,30}\.[a-z]{2,4}`).Draw(t, "video_path")
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 
-		got := SubtitlePath(videoPath, SubtitleTags{Lang: lang, HearingImpaired: true, Forced: true})
+		got := Path(videoPath, Tags{Lang: lang, HearingImpaired: true, Forced: true})
 
 		hiIdx := strings.Index(got, ".hi.")
 		forcedIdx := strings.Index(got, ".forced.")
 		if hiIdx < 0 || forcedIdx < 0 {
-			t.Errorf("SubtitlePath(%q, %q, true, true) = %q, missing .hi. or .forced.",
+			t.Errorf("Path(%q, %q, true, true) = %q, missing .hi. or .forced.",
 				videoPath, lang, got)
 		} else if hiIdx >= forcedIdx {
-			t.Errorf("SubtitlePath(%q, %q, true, true) = %q, .hi. should come before .forced.",
+			t.Errorf("Path(%q, %q, true, true) = %q, .hi. should come before .forced.",
 				videoPath, lang, got)
 		}
 	})
 }
 
-func TestManualSubtitlePath_always_ends_with_srt(t *testing.T) {
+func TestManualPath_always_ends_with_srt(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -281,16 +282,16 @@ func TestManualSubtitlePath_always_ends_with_srt(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, n, SubtitleTags{Lang: lang})
+		got := ManualPath(videoPath, n, Tags{Lang: lang})
 
 		if !strings.HasSuffix(got, ".srt") {
-			t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, should end with .srt",
+			t.Errorf("ManualPath(%q, %q, %d) = %q, should end with .srt",
 				videoPath, lang, n, got)
 		}
 	})
 }
 
-func TestManualSubtitlePath_always_contains_language_code(t *testing.T) {
+func TestManualPath_always_contains_language_code(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -298,16 +299,16 @@ func TestManualSubtitlePath_always_contains_language_code(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, n, SubtitleTags{Lang: lang})
+		got := ManualPath(videoPath, n, Tags{Lang: lang})
 
 		if !strings.Contains(got, "."+lang+".") {
-			t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, should contain .%s.",
+			t.Errorf("ManualPath(%q, %q, %d) = %q, should contain .%s.",
 				videoPath, lang, n, got, lang)
 		}
 	})
 }
 
-func TestManualSubtitlePath_always_contains_number(t *testing.T) {
+func TestManualPath_always_contains_number(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -315,39 +316,39 @@ func TestManualSubtitlePath_always_contains_number(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, n, SubtitleTags{Lang: lang})
+		got := ManualPath(videoPath, n, Tags{Lang: lang})
 
 		numStr := "." + strconv.Itoa(n) + ".srt"
 		if !strings.HasSuffix(got, numStr) {
-			t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, should end with %q",
+			t.Errorf("ManualPath(%q, %q, %d) = %q, should end with %q",
 				videoPath, lang, n, got, numStr)
 		}
 	})
 }
 
-// TestSubtitlePath_strips_video_extension verifies the original video file
+// TestPath_strips_video_extension verifies the original video file
 // extension is replaced, not preserved in the output path.
-func TestSubtitlePath_strips_video_extension(t *testing.T) {
+func TestPath_strips_video_extension(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		ext := rapid.SampledFrom([]string{"mkv", "mp4", "avi", "wmv"}).Draw(t, "ext")
 		video := rapid.StringMatching(`/media/[a-z]+`).Draw(t, "base") + "." + ext
 		lang := rapid.StringMatching(`[a-z]{2}`).Draw(t, "lang")
 
-		path := SubtitlePath(video, SubtitleTags{Lang: lang})
+		path := Path(video, Tags{Lang: lang})
 
 		if !strings.HasSuffix(path, ".srt") {
-			t.Errorf("SubtitlePath() = %q, does not end with .srt", path)
+			t.Errorf("Path() = %q, does not end with .srt", path)
 		}
 		if strings.HasSuffix(path, "."+ext+".srt") {
-			t.Errorf("SubtitlePath() = %q, still contains video extension .%s", path, ext)
+			t.Errorf("Path() = %q, still contains video extension .%s", path, ext)
 		}
 	})
 }
 
-// --- ValidateSubtitleData ---
+// --- Validate ---
 
-func TestValidateSubtitleData(t *testing.T) {
+func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -382,25 +383,25 @@ func TestValidateSubtitleData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := ValidateSubtitleData(tt.data)
+			err := Validate(tt.data)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Fatal("ValidateSubtitleData() = nil, want error")
+					t.Fatal("Validate() = nil, want error")
 				}
-				if !errors.Is(err, ErrBinaryData) {
-					t.Errorf("ValidateSubtitleData() error = %v, want ErrBinaryData", err)
+				if !errors.Is(err, errBinary) {
+					t.Errorf("Validate() error = %v, want errBinary", err)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("ValidateSubtitleData() unexpected error: %v", err)
+				t.Errorf("Validate() unexpected error: %v", err)
 			}
 		})
 	}
 }
 
-func TestValidateSubtitleData_checks_only_first_512_bytes(t *testing.T) {
+func TestValidate_checks_only_first_512_bytes(t *testing.T) {
 	t.Parallel()
 
 	// 512 bytes of valid text followed by binary garbage.
@@ -409,15 +410,15 @@ func TestValidateSubtitleData_checks_only_first_512_bytes(t *testing.T) {
 	header = header[:512]
 	data := append(header, bytes.Repeat([]byte{0x01}, 1000)...)
 
-	err := ValidateSubtitleData(data)
+	err := Validate(data)
 	if err != nil {
-		t.Errorf("ValidateSubtitleData() with clean header = %v, want nil", err)
+		t.Errorf("Validate() with clean header = %v, want nil", err)
 	}
 }
 
-// --- CountNonTextBytes ---
+// --- CountNonText ---
 
-func TestCountNonTextBytes(t *testing.T) {
+func TestCountNonText(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -444,18 +445,18 @@ func TestCountNonTextBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := CountNonTextBytes(tt.data)
+			got := CountNonText(tt.data)
 
 			if got != tt.want {
-				t.Errorf("CountNonTextBytes(%v) = %d, want %d", tt.data, got, tt.want)
+				t.Errorf("CountNonText(%v) = %d, want %d", tt.data, got, tt.want)
 			}
 		})
 	}
 }
 
-// --- ValidateSubtitleData PBT ---
+// --- Validate PBT ---
 
-func TestValidateSubtitleData_pure_text_never_rejected(t *testing.T) {
+func TestValidate_pure_text_never_rejected(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -466,32 +467,32 @@ func TestValidateSubtitleData_pure_text_never_rejected(t *testing.T) {
 			data[i] = byte(rapid.IntRange(0x20, 0x7E).Draw(t, "byte"))
 		}
 
-		err := ValidateSubtitleData(data)
+		err := Validate(data)
 		if err != nil {
-			t.Errorf("ValidateSubtitleData(pure text, len=%d) = %v, want nil",
+			t.Errorf("Validate(pure text, len=%d) = %v, want nil",
 				length, err)
 		}
 	})
 }
 
-func TestCountNonTextBytes_never_negative(t *testing.T) {
+func TestCountNonText_never_negative(t *testing.T) {
 	t.Parallel()
 
 	rapid.Check(t, func(t *rapid.T) {
 		data := rapid.SliceOf(rapid.Byte()).Draw(t, "data")
 
-		got := CountNonTextBytes(data)
+		got := CountNonText(data)
 
 		if got < 0 {
-			t.Errorf("CountNonTextBytes() = %d, must be >= 0", got)
+			t.Errorf("CountNonText() = %d, must be >= 0", got)
 		}
 		if got > len(data) {
-			t.Errorf("CountNonTextBytes() = %d, must be <= len(data) %d", got, len(data))
+			t.Errorf("CountNonText() = %d, must be <= len(data) %d", got, len(data))
 		}
 	})
 }
 
-func TestValidateSubtitleData_archive_magic_always_detected(t *testing.T) {
+func TestValidate_archive_magic_always_detected(t *testing.T) {
 	t.Parallel()
 
 	magics := [][]byte{
@@ -509,11 +510,38 @@ func TestValidateSubtitleData_archive_magic_always_detected(t *testing.T) {
 		tail := rapid.SliceOfN(rapid.Byte(), 0, 100).Draw(t, "tail")
 		data := append(append([]byte{}, magic...), tail...)
 
-		err := ValidateSubtitleData(data)
+		err := Validate(data)
 
-		if !errors.Is(err, ErrBinaryData) {
-			t.Errorf("ValidateSubtitleData(magic=%x + %d tail bytes) = %v, want ErrBinaryData",
+		if !errors.Is(err, errBinary) {
+			t.Errorf("Validate(magic=%x + %d tail bytes) = %v, want errBinary",
 				magic, len(tail), err)
 		}
 	})
+}
+
+func TestVariantFromFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		want   api.Variant
+		hi     bool
+		forced bool
+	}{
+		{name: "standard", hi: false, forced: false, want: api.DefaultVariant},
+		{name: "hi", hi: true, forced: false, want: api.VariantHI},
+		{name: "forced", hi: false, forced: true, want: api.VariantForced},
+		{name: "hi takes precedence over forced", hi: true, forced: true, want: api.VariantHI},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := VariantFromFlags(Tags{HearingImpaired: tt.hi, Forced: tt.forced})
+			if got != tt.want {
+				t.Errorf("VariantFromFlags(Tags{HearingImpaired: %v, Forced: %v}) = %q, want %q",
+					tt.hi, tt.forced, got, tt.want)
+			}
+		})
+	}
 }

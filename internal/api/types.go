@@ -78,26 +78,6 @@ const (
 	VariantAliasForeign = "foreign"
 )
 
-// VariantFromFlags derives the variant from the HI/forced tags on a picked
-// subtitle. HI wins over forced when both happen to be set.
-//
-// It takes [SubtitleTags] rather than two adjacent bools: that is the same pair
-// SubtitleTags was introduced to make untransposable, and leaving this one
-// positional meant both shapes appeared in a single call chain (this function
-// and SubtitlePath were called 70 lines apart from the same two fields). The
-// Lang field is unused here — a variant does not depend on it — which is
-// harmless and keeps one type describing the whole segment.
-func VariantFromFlags(tags SubtitleTags) Variant {
-	switch {
-	case tags.HearingImpaired:
-		return VariantHI
-	case tags.Forced:
-		return VariantForced
-	default:
-		return DefaultVariant
-	}
-}
-
 // EffectiveVariant returns the variant, defaulting to DefaultVariant.
 func (t *SubtitleTarget) EffectiveVariant() Variant {
 	if t.Variant == "" {
