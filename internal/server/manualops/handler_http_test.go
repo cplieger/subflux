@@ -368,7 +368,7 @@ func TestHandleClearLock_success(t *testing.T) {
 // clearLockErrorStore is a minimal store whose ClearManualLock fails.
 type clearLockErrorStore struct{ testsupport.NopStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
+func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.ManualLockKey) error {
 	return errHTTPFake
 }
 

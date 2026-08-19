@@ -54,11 +54,11 @@ type SearchDeps struct {
 }
 
 // SearchStore is the narrow store interface for manual search operations.
-// ClearManualLock takes a variant; an empty variant means "all variants of
-// the language" (see api.ManualLockStore).
+// The lock key's empty variant means "all variants of the language" (see
+// api.ManualLockStore).
 type SearchStore interface {
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
+	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
 }
 
 // ActivityTracker manages activity lifecycle. Progress doubles as the
@@ -142,11 +142,4 @@ func IsValidLangCode(lang string) bool {
 func NotifyError(deps *SearchDeps, source, alertMsg, uiMsg string) {
 	deps.Alerts.RecordWarn(source, alertMsg)
 	deps.Events.PublishNotify(events.NotifyError, uiMsg)
-}
-
-// RunClearLock clears the manual lock for a media+language combination. An
-// empty variant clears the locks of every variant of the language; a specific
-// variant clears only that quad's lock.
-func RunClearLock(ctx context.Context, deps *SearchDeps, mediaType api.MediaType, mediaID, language string, variant api.Variant) error {
-	return deps.DB.ClearManualLock(ctx, mediaType, mediaID, language, variant)
 }

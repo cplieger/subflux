@@ -46,7 +46,7 @@ func (m *mockStore) SaveDownload(_ context.Context, _ *api.DownloadRecord) error
 	return nil
 }
 
-func (m *mockStore) IsManuallyLocked(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) (bool, error) {
+func (m *mockStore) IsManuallyLocked(_ context.Context, _ api.ManualLockKey) (bool, error) {
 	return m.manualLocked, nil
 }
 
@@ -55,7 +55,7 @@ type mockStoreLockErr struct {
 	testsupport.NopStore
 }
 
-func (m *mockStoreLockErr) IsManuallyLocked(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) (bool, error) {
+func (m *mockStoreLockErr) IsManuallyLocked(_ context.Context, _ api.ManualLockKey) (bool, error) {
 	return false, errors.New("lock check failed")
 }
 

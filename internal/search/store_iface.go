@@ -17,7 +17,7 @@ type SearchFlowStore interface {
 	BackedOffProviders(ctx context.Context, mediaType api.MediaType, mediaID, language string, maxAttempts int) ([]api.ProviderID, error)
 	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
 	CurrentScore(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error)
-	IsManuallyLocked(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (bool, error)
+	IsManuallyLocked(ctx context.Context, key api.ManualLockKey) (bool, error)
 }
 
 // CoverageRecorder is the narrow store interface for coverage tracking:

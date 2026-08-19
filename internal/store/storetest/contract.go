@@ -51,6 +51,12 @@ const (
 	provOS  = api.ProviderID("opensubtitles")
 
 	codecSubrip = "subrip"
+
+	// Media IDs for the two reconcile scenarios that name themselves: one
+	// where a sibling subtitle survives on disk, one where every subtitle is
+	// gone.
+	midSiblingPresent = "tt-sib"
+	midAllSubsGone    = "tt-all"
 )
 
 // TB is the subset of *testing.T the reusable behavioural assertions need. Real
@@ -265,7 +271,7 @@ func testSaveAutoRoundtrip(t *testing.T, s api.Store) {
 	}
 
 	// An auto-only triple is not manually locked.
-	locked, err := s.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt-rt-1", langEng, "")
+	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt-rt-1", Language: langEng, Variant: ""})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -379,7 +385,7 @@ func AssertClearManualLockNonDestructive(t TB, s api.Store) {
 		t.Fatalf("SaveDownload(manual): %v", err)
 	}
 
-	locked, err := s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langEng, api.VariantStandard)
+	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (before clear): %v", err)
 	}
@@ -395,11 +401,11 @@ func AssertClearManualLockNonDestructive(t TB, s api.Store) {
 		t.Fatalf("GetState before clear = %d rows, want 1", len(before))
 	}
 
-	if cerr := s.ClearManualLock(ctx, api.MediaTypeMovie, mid, langEng, api.VariantStandard); cerr != nil {
+	if cerr := s.ClearManualLock(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard}); cerr != nil {
 		t.Fatalf("ClearManualLock: %v", cerr)
 	}
 
-	locked, err = s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langEng, api.VariantStandard)
+	locked, err = s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (after clear): %v", err)
 	}
@@ -434,7 +440,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 	ctx := context.Background()
 	mid := "tt-mo-1"
 
-	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); n != 1 {
+	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 1 {
 		t.Fatalf("NextManualNumber (empty) = %d, want 1", n)
 	}
 
@@ -446,7 +452,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 		t.Fatalf("SaveDownload(manual 1): %v", err)
 	}
 
-	count, err := s.ManualDownloadCount(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard)
+	count, err := s.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}
@@ -454,7 +460,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 		t.Fatalf("ManualDownloadCount = %d, want 1", count)
 	}
 
-	paths, err := s.ManualSubtitlePaths(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard)
+	paths, err := s.ManualSubtitlePaths(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualSubtitlePaths: %v", err)
 	}
@@ -466,7 +472,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 	// from the path), so a second manual download lands at .2. The manual
 	// filename embeds the triple's language token (movie.<lang>.N.srt), which
 	// the engine relies on to locate the ordinal.
-	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); n != 2 {
+	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 2 {
 		t.Fatalf("NextManualNumber (after .1) = %d, want 2", n)
 	}
 
@@ -568,21 +574,21 @@ func assertVariantLockScoping(t *testing.T, s api.Store, mid string) {
 	}); err != nil {
 		t.Fatalf("SaveDownload(manual forced): %v", err)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langFra, api.VariantForced); lerr != nil || !locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantForced}); lerr != nil || !locked {
 		t.Fatalf("IsManuallyLocked(forced) = (%v, %v), want (true, nil)", locked, lerr)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); lerr != nil || locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); lerr != nil || locked {
 		t.Fatalf("IsManuallyLocked(standard) = (%v, %v), want (false, nil): forced lock must not leak", locked, lerr)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langFra, ""); lerr != nil || !locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || !locked {
 		t.Fatalf("IsManuallyLocked(any) = (%v, %v), want (true, nil)", locked, lerr)
 	}
 
 	// Manual ordinals advance per quad.
-	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantForced); n != 2 {
+	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantForced}); n != 2 {
 		t.Fatalf("NextManualNumber(forced) = %d, want 2 (one forced manual at .1)", n)
 	}
-	if n := s.NextManualNumber(ctx, api.MediaTypeMovie, mid, langFra, api.VariantStandard); n != 1 {
+	if n := s.NextManualNumber(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: api.VariantStandard}); n != 1 {
 		t.Fatalf("NextManualNumber(standard) = %d, want 1 (forced ordinal must not leak)", n)
 	}
 }
@@ -602,10 +608,10 @@ func assertVariantLockListAndClear(t *testing.T, s api.Store, mid string) {
 	}
 
 	// ClearManualLock("") clears every variant's lock for the language.
-	if err := s.ClearManualLock(ctx, api.MediaTypeMovie, mid, langFra, ""); err != nil {
+	if err := s.ClearManualLock(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); err != nil {
 		t.Fatalf("ClearManualLock(all variants): %v", err)
 	}
-	if locked, lerr := s.IsManuallyLocked(ctx, api.MediaTypeMovie, mid, langFra, ""); lerr != nil || locked {
+	if locked, lerr := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: mid, Language: langFra, Variant: ""}); lerr != nil || locked {
 		t.Fatalf("IsManuallyLocked(any) after clear-all = (%v, %v), want (false, nil)", locked, lerr)
 	}
 }
@@ -1068,21 +1074,21 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s api.Store) {
 	// Two manual rows for the same triple: one present, one gone. Both manual so
 	// deleting the gone one still leaves a manual lock behind.
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-sib", Language: langFra,
+		MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Present", Score: 100, Path: presentSub,
 		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(present): %v", err)
 	}
 	if err := s.SaveDownload(ctx, &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-sib", Language: langFra,
+		MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Missing", Score: 80, Path: missingSub,
 		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
 	}); err != nil {
 		t.Fatalf("SaveDownload(missing): %v", err)
 	}
 	// Backoff recorded AFTER the saves (SaveDownload clears triple backoff).
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-sib", langFra, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, midSiblingPresent, langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -1110,7 +1116,7 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s api.Store) {
 		t.Fatalf("attempts after reconcile = %d, want 1 (backoff preserved, not cleared)", attempts)
 	}
 
-	locked, err := s.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt-sib", langFra, api.VariantStandard)
+	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: midSiblingPresent, Language: langFra, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -1142,16 +1148,16 @@ func testReconcileAllSubsGone(t *testing.T, s api.Store) {
 	manualSub := filepath.Join(dir, "movie.fr.1.srt") // never created
 
 	mustSaveDownload(t, s, "auto", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-all", Language: langFra,
+		MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Auto", Score: 100, Path: autoSub,
 		Meta: &api.DownloadMeta{VideoPath: video},
 	})
 	mustSaveDownload(t, s, "manual", &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt-all", Language: langFra,
+		MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra,
 		ProviderName: provOS, ReleaseName: "Manual", Score: 200, Path: manualSub,
 		Meta: &api.DownloadMeta{VideoPath: video, Manual: true},
 	})
-	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, "tt-all", langFra, provOS, defaultBackoff()); err != nil {
+	if err := s.RecordNoResult(ctx, api.MediaTypeMovie, midAllSubsGone, langFra, provOS, defaultBackoff()); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
 
@@ -1179,7 +1185,7 @@ func testReconcileAllSubsGone(t *testing.T, s api.Store) {
 
 	// The manual lock is gone (manual row deleted) and the surviving auto row is
 	// reset for re-search.
-	locked, err := s.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt-all", langFra, api.VariantStandard)
+	locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: midAllSubsGone, Language: langFra, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}

@@ -42,7 +42,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (empty): %v", err)
 	}
@@ -54,7 +54,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
+	locked, err = db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (auto only): %v", err)
 	}
@@ -64,7 +64,7 @@ func TestIsManuallyLocked_detectsLockState(t *testing.T) {
 
 	// A manual row locks it.
 	saveManual(t, db, testProv, "Manual.Release", "/media/test.fr.1.srt", 70)
-	locked, err = db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
+	locked, err = db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked (manual): %v", err)
 	}
@@ -93,7 +93,7 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 		beforeIDs[r.ID] = r
 	}
 
-	if err := db.ClearManualLock(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil {
+	if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil {
 		t.Fatalf("ClearManualLock: %v", err)
 	}
 
@@ -124,14 +124,14 @@ func TestClearManualLock_nonDestructive(t *testing.T) {
 	}
 
 	// The lock is gone and the manual count is zero.
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked after clear: %v", err)
 	}
 	if locked {
 		t.Error("triple still locked after ClearManualLock")
 	}
-	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
+	count, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount after clear: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestClearManualLock_noManualRowsIsNoop(t *testing.T) {
 	}
 	before := readTripleRows(t, db, testMT, testMID, testLang)
 
-	if err := db.ClearManualLock(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil {
+	if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil {
 		t.Fatalf("ClearManualLock (no manual rows): %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestManualDownloadCount(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	if got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard); err != nil || got != 0 {
+	if got, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); err != nil || got != 0 {
 		t.Fatalf("empty count = (%d, %v), want (0, nil)", got, err)
 	}
 
@@ -190,7 +190,7 @@ func TestManualDownloadCount(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.B", "/media/test.fr.2.srt", 75)
 
-	got, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
+	got, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestManualSubtitlePaths_returnsNonEmptyManualPaths(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.A", "/media/test.fr.1.srt", 70)
 	saveManual(t, db, api.ProviderNameSubDL, "Manual.Empty", "", 60)
 
-	paths, err := db.ManualSubtitlePaths(ctx, testMT, testMID, testLang, api.VariantStandard)
+	paths, err := db.ManualSubtitlePaths(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualSubtitlePaths: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestNextManualNumber(t *testing.T) {
 	ctx := t.Context()
 
 	// Base case: no rows -> 1.
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
+	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 1 {
 		t.Errorf("NextManualNumber (empty) = %d, want 1", got)
 	}
 
@@ -240,7 +240,7 @@ func TestNextManualNumber(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Auto.Release", "/media/test.fr.srt", 80)); err != nil {
 		t.Fatalf("auto SaveDownload: %v", err)
 	}
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 1 {
+	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 1 {
 		t.Errorf("NextManualNumber (plain auto only) = %d, want 1", got)
 	}
 
@@ -250,13 +250,13 @@ func TestNextManualNumber(t *testing.T) {
 	if err := db.SaveDownload(ctx, autoRec(testProv, "Top.Pick", "/media/test.fr.1.srt", 90)); err != nil {
 		t.Fatalf("top-pick SaveDownload: %v", err)
 	}
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 2 {
+	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 2 {
 		t.Errorf("NextManualNumber (top-pick auto at .1) = %d, want 2 (auto ordinal reserved)", got)
 	}
 
 	// A manual row at ordinal 3 continues the mixed sequence -> next is 4.
 	saveManual(t, db, testProv, "Manual.3", "/media/test.fr.3.srt", 72)
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 4 {
+	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 4 {
 		t.Errorf("NextManualNumber (auto .1 + manual .3) = %d, want 4 (max ordinal 3 + 1)", got)
 	}
 }
@@ -270,7 +270,7 @@ func TestNextManualNumber_variantPaths(t *testing.T) {
 	saveManual(t, db, testProv, "Manual.hi", "/media/test.fr.hi.5.srt", 70)
 	saveManual(t, db, testProv, "Manual.forced", "/media/test.fr.forced.2.srt", 72)
 
-	if got := db.NextManualNumber(ctx, testMT, testMID, testLang, api.VariantStandard); got != 6 {
+	if got := db.NextManualNumber(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard}); got != 6 {
 		t.Errorf("NextManualNumber (variant paths) = %d, want 6 (max ordinal 5 + 1)", got)
 	}
 }
@@ -308,14 +308,14 @@ func TestManualLock_servedFromProjectionWithoutPrimaries(t *testing.T) {
 		t.Fatalf("clearing primaries: %v", err)
 	}
 
-	locked, err := db.IsManuallyLocked(ctx, testMT, testMID, testLang, api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
 	if !locked {
 		t.Error("IsManuallyLocked = false with primaries removed; it dereferenced primaries instead of the projection")
 	}
-	count, err := db.ManualDownloadCount(ctx, testMT, testMID, testLang, api.VariantStandard)
+	count, err := db.ManualDownloadCount(ctx, api.ManualLockKey{MediaType: testMT, MediaID: testMID, Language: testLang, Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("ManualDownloadCount: %v", err)
 	}

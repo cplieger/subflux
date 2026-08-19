@@ -113,7 +113,9 @@ type targetState struct {
 // continues. A store error fails CLOSED (treated as locked and skipped), the
 // same conservative stance the store itself takes.
 func (e *Engine) targetLocked(ctx context.Context, mediaType api.MediaType, mediaID, title, lang string, variant api.Variant) bool {
-	locked, err := e.store.IsManuallyLocked(ctx, mediaType, mediaID, lang, variant)
+	locked, err := e.store.IsManuallyLocked(ctx, api.ManualLockKey{
+		MediaType: mediaType, MediaID: mediaID, Language: lang, Variant: variant,
+	})
 	if err != nil {
 		slog.Warn("IsManuallyLocked failed, skipping target",
 			"media", title, "lang", lang, "variant", variant, "error", err)

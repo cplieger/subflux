@@ -220,7 +220,7 @@ func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 
 	case "clearLock":
 		tr := rapid.SampledFrom(pubTriples).Draw(rt, "clearTriple")
-		if err := db.ClearManualLock(ctx, tr.mt, tr.mid, tr.lang, api.VariantStandard); err != nil {
+		if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: tr.mt, MediaID: tr.mid, Language: tr.lang, Variant: api.VariantStandard}); err != nil {
 			rt.Fatalf("ClearManualLock: %v", err)
 		}
 

@@ -167,7 +167,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if manuals != 1 {
 		t.Errorf("manual rows after recovery = %d, want 1", manuals)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked = (%v, %v), want locked", locked, err)
 	}

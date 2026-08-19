@@ -234,7 +234,7 @@ func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 		t.Errorf("surviving row = {manual:%v release:%q}, want {true Manual}",
 			rows[0].Manual, rows[0].ReleaseName)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "fr", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "fr", Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
 			r.MediaImported, origImported)
 	}
 	// Lock cleared (manual row deleted) and backoff cleared.
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "fr", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "fr", Variant: api.VariantStandard})
 	if err != nil {
 		t.Fatalf("IsManuallyLocked: %v", err)
 	}
@@ -349,7 +349,7 @@ func TestReconcileState_allSubsGoneAutoOnlyReset(t *testing.T) {
 		api.ProviderNameSubDL, "RelB", sub2, video, 110, true)); err != nil {
 		t.Fatalf("SaveDownload(manual B): %v", err)
 	}
-	if err := db.ClearManualLock(ctx, api.MediaTypeMovie, "tt1", "fr", api.VariantStandard); err != nil {
+	if err := db.ClearManualLock(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "fr", Variant: api.VariantStandard}); err != nil {
 		t.Fatalf("ClearManualLock: %v", err)
 	}
 	// Now two auto rows exist for the triple.

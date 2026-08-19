@@ -251,7 +251,10 @@ export interface LoginSuccess {
   user: MeResponse;
 }
 
-/** ManualLockEntry represents a manually locked media+language+variant quad. */
+/**
+ * ManualLockEntry represents a manually locked media+language+variant quad:
+ * the quad the lock lives on plus that quad's manual-row count.
+ */
 export interface ManualLockEntry {
   media_type: MediaType;
   media_id: string;

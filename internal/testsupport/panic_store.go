@@ -71,23 +71,23 @@ func (*panicStore) HistoryMediaIDs(context.Context, api.MediaType, string) ([]st
 	panic("not implemented")
 }
 
-func (*panicStore) IsManuallyLocked(context.Context, api.MediaType, string, string, api.Variant) (bool, error) {
+func (*panicStore) IsManuallyLocked(context.Context, api.ManualLockKey) (bool, error) {
 	panic("not implemented")
 }
 
-func (*panicStore) ClearManualLock(context.Context, api.MediaType, string, string, api.Variant) error {
+func (*panicStore) ClearManualLock(context.Context, api.ManualLockKey) error {
 	panic("not implemented")
 }
 
-func (*panicStore) ManualDownloadCount(context.Context, api.MediaType, string, string, api.Variant) (int, error) {
+func (*panicStore) ManualDownloadCount(context.Context, api.ManualLockKey) (int, error) {
 	panic("not implemented")
 }
 
-func (*panicStore) ManualSubtitlePaths(context.Context, api.MediaType, string, string, api.Variant) ([]string, error) {
+func (*panicStore) ManualSubtitlePaths(context.Context, api.ManualLockKey) ([]string, error) {
 	panic("not implemented")
 }
 
-func (*panicStore) NextManualNumber(context.Context, api.MediaType, string, string, api.Variant) int {
+func (*panicStore) NextManualNumber(context.Context, api.ManualLockKey) int {
 	panic("not implemented")
 }
 

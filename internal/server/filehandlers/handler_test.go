@@ -42,11 +42,11 @@ func (m *fakeFileStore) DeleteSubtitleFile(_ context.Context, _ api.MediaType, _
 	return nil
 }
 
-func (m *fakeFileStore) ManualSubtitlePaths(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) ([]string, error) {
+func (m *fakeFileStore) ManualSubtitlePaths(_ context.Context, _ api.ManualLockKey) ([]string, error) {
 	return nil, nil
 }
 
-func (m *fakeFileStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
+func (m *fakeFileStore) ClearManualLock(_ context.Context, _ api.ManualLockKey) error {
 	return nil
 }
 

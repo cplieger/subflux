@@ -168,7 +168,7 @@ func TestMigrate_copyStepIdentity(t *testing.T) {
 
 	// The swapped-in handle is live: reads see the old rows, writes stick, and
 	// a fresh insert allocates past the preserved sequence.
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after copy = (%v, %v), want locked", locked, err)
 	}
@@ -231,7 +231,7 @@ func TestMigrate_copyStepTransform(t *testing.T) {
 	if got, err := db.GetSyncOffset(ctx, "/m/tt1.fr.srt"); err != nil || got != 0 {
 		t.Errorf("dropped offset = (%d, %v), want 0 (record dropped)", got, err)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after transform copy = (%v, %v), want locked", locked, err)
 	}
@@ -343,7 +343,7 @@ func TestMigrate_copyStepRenamesBucket(t *testing.T) {
 	if got := rawStampInOpenDB(t, db, metaKeyAuthSchemaVersion); string(got) != string(authStampBefore) {
 		t.Errorf("auth stamp changed across a rename copy step: %x -> %x", authStampBefore, got)
 	}
-	if locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard); err != nil || !locked {
+	if locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard}); err != nil || !locked {
 		t.Errorf("IsManuallyLocked after rename copy = (%v, %v), want locked", locked, err)
 	}
 	if temps := copyTempFiles(t, path); len(temps) != 0 {

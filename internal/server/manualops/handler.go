@@ -135,57 +135,48 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		MediaType api.MediaType `json:"media_type"`
-		MediaID   string        `json:"media_id"`
-		Language  string        `json:"language"`
-		Variant   api.Variant   `json:"variant,omitempty"`
-	}
-	if !h.deps.DecodeJSON(w, r, &req, 0) {
+	// The request body IS the lock key: its four json names (media_type,
+	// media_id, language, variant) are the wire shape, and api.ManualLockKey
+	// carries exactly those.
+	var key api.ManualLockKey
+	if !h.deps.DecodeJSON(w, r, &key, 0) {
 		return
 	}
 
-	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
+	if key.MediaType == "" || key.MediaID == "" || key.Language == "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language are required")
 		return
 	}
 
-	if !IsValidLangCode(req.Language) {
+	if !IsValidLangCode(key.Language) {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
 		return
 	}
 
-	if !req.MediaType.Valid() {
+	if !key.MediaType.Valid() {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
 		return
 	}
 
 	// Variant is optional: empty clears the locks of every variant of the
 	// language; a specific variant clears only that quad's lock.
-	if !isValidLockVariant(req.Variant) {
+	if !isValidLockVariant(key.Variant) {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
 		return
 	}
 
-	deps := &SearchDeps{
-		DB:       h.deps.DBFunc(),
-		Activity: h.deps.Activity,
-		Alerts:   h.deps.Alerts,
-		Events:   h.deps.Events,
-	}
-
-	if err := RunClearLock(ctx, deps, req.MediaType, req.MediaID, req.Language, req.Variant); err != nil {
+	if err := h.deps.DBFunc().ClearManualLock(ctx, key); err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
-			"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
-			"variant", req.Variant)
+			"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
+			"variant", key.Variant)
 		return
 	}
 
 	slog.Info("manual lock cleared",
-		"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
-		"variant", req.Variant)
+		"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
+		"variant", key.Variant)
 
-	h.deps.Events.PublishCoverageUpdate(req.MediaType, req.MediaID, req.Language, "")
+	h.deps.Events.PublishCoverageUpdate(key.MediaType, key.MediaID, key.Language, "")
 
 	api.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }

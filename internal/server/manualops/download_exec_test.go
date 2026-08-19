@@ -269,7 +269,7 @@ type ordinalStore struct {
 	rows   []api.DownloadRecord
 }
 
-func (s *ordinalStore) NextManualNumber(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) int {
+func (s *ordinalStore) NextManualNumber(_ context.Context, _ api.ManualLockKey) int {
 	s.mu.Lock()
 	maxOrdinal := 0
 	for i := range s.rows {

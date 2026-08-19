@@ -659,9 +659,9 @@ func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 	}
 
 	want := []api.ManualLockEntry{
-		{MediaType: api.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Variant: api.VariantStandard, Count: 1},
-		{MediaType: api.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Variant: api.VariantStandard, Count: 2},
-		{MediaType: api.MediaTypeMovie, MediaID: "tt-a", Language: "en", Variant: api.VariantStandard, Count: 1},
+		{ManualLockKey: api.ManualLockKey{MediaType: api.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Variant: api.VariantStandard}, Count: 1},
+		{ManualLockKey: api.ManualLockKey{MediaType: api.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Variant: api.VariantStandard}, Count: 2},
+		{ManualLockKey: api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt-a", Language: "en", Variant: api.VariantStandard}, Count: 1},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("locks = %+v, want %+v", got, want)

@@ -44,9 +44,9 @@ type destructiveClearStore struct {
 // ClearManualLock destructively deletes the manual rows for the quad. A
 // conforming implementation flips manual=false and preserves the rows; this
 // removes them, so AssertClearManualLockNonDestructive must report a failure.
-func (s destructiveClearStore) ClearManualLock(_ context.Context, mt api.MediaType, mid, lang string, variant api.Variant) error {
+func (s destructiveClearStore) ClearManualLock(_ context.Context, key api.ManualLockKey) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mt, mid, lang, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}

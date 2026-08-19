@@ -32,8 +32,8 @@ import (
 type FileStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant, source api.SubtitleSource, path string) error
-	ManualSubtitlePaths(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) ([]string, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
+	ManualSubtitlePaths(ctx context.Context, key api.ManualLockKey) ([]string, error)
+	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
 	HistoryMediaIDs(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error)
 }
 
@@ -476,7 +476,10 @@ type lockQuad struct {
 // files on disk for a media+language+variant quad. If none remain, clears
 // that quad's manual lock (sibling variants keep theirs).
 func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) {
-	paths, err := h.deps.Store.ManualSubtitlePaths(ctx, mediaType, mediaID, language, variant)
+	key := api.ManualLockKey{
+		MediaType: mediaType, MediaID: mediaID, Language: language, Variant: variant,
+	}
+	paths, err := h.deps.Store.ManualSubtitlePaths(ctx, key)
 	if err != nil {
 		slog.Warn("maybeRevertManualLock: failed to get paths", "error", err)
 		return
@@ -486,7 +489,7 @@ func (h *Handler) maybeRevertManualLock(ctx context.Context, mediaType api.Media
 			return
 		}
 	}
-	if err := h.deps.Store.ClearManualLock(ctx, mediaType, mediaID, language, variant); err != nil {
+	if err := h.deps.Store.ClearManualLock(ctx, key); err != nil {
 		slog.Warn("failed to clear manual lock after delete",
 			"media_id", mediaID, "lang", language, "variant", variant, "error", err)
 	} else if len(paths) > 0 {

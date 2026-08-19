@@ -71,7 +71,7 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("IsManuallyLocked_returns_false_no_error", func(t *testing.T) {
 		t.Parallel()
-		locked, err := s.IsManuallyLocked(ctx, api.MediaTypeMovie, "tmdb-4", "eng", api.VariantStandard)
+		locked, err := s.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tmdb-4", Language: "eng", Variant: api.VariantStandard})
 		if err != nil {
 			t.Fatalf("IsManuallyLocked: %v", err)
 		}

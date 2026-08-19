@@ -297,7 +297,7 @@ func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	}
 
 	for _, rec := range fx.manualRows {
-		locked, err := db.IsManuallyLocked(ctx, rec.MediaType, rec.MediaID, rec.Language, rec.Variant)
+		locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: rec.MediaType, MediaID: rec.MediaID, Language: rec.Language, Variant: rec.Variant})
 		if err != nil || !locked {
 			t.Errorf("IsManuallyLocked(%s/%s/%s/%s) = (%v, %v), want locked after reset", rec.MediaType, rec.MediaID, rec.Language, rec.Variant, locked, err)
 		}
@@ -468,7 +468,7 @@ func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 
 	// The raw-preserved row still answers through the canonical read paths:
 	// the lock holds and the row decodes with its known fields intact.
-	locked, err := mdb.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := mdb.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after raw-preserving reset = (%v, %v), want locked", locked, err)
 	}
@@ -547,7 +547,7 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	}
 
 	// Core still functionally alive: locks and offsets answer as before.
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, api.ManualLockKey{MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: api.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after auth reset = (%v, %v), want locked", locked, err)
 	}

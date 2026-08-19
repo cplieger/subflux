@@ -106,13 +106,14 @@ type BackoffEntry struct {
 	Failures  int        `json:"failures"`
 }
 
-// ManualLockEntry represents a manually locked media+language+variant quad.
+// ManualLockEntry represents a manually locked media+language+variant quad:
+// the quad the lock lives on plus that quad's manual-row count.
 type ManualLockEntry struct {
-	MediaType MediaType `json:"media_type"`
-	MediaID   string    `json:"media_id"`
-	Language  string    `json:"language"`
-	Variant   Variant   `json:"variant"`
-	Count     int       `json:"count"`
+	// The key is embedded untagged, so encoding/json promotes its four fields
+	// and the entry marshals FLAT — the wire shape stays the five fields it
+	// has always been (wiregen applies the same promotion rules).
+	ManualLockKey
+	Count int `json:"count"`
 }
 
 // EmbeddedTrack represents a subtitle track detected inside a video container.

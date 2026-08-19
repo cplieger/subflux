@@ -69,28 +69,28 @@ func (*NopStore) HistoryMediaIDs(context.Context, api.MediaType, string) ([]stri
 
 // --- Manual locks ---
 
-// IsManuallyLocked reports whether the item+language has a manual download lock.
-func (*NopStore) IsManuallyLocked(context.Context, api.MediaType, string, string, api.Variant) (bool, error) {
+// IsManuallyLocked reports whether the key's quad has a manual download lock.
+func (*NopStore) IsManuallyLocked(context.Context, api.ManualLockKey) (bool, error) {
 	return false, nil
 }
 
-// ClearManualLock removes the manual download lock for the given item and language.
-func (*NopStore) ClearManualLock(context.Context, api.MediaType, string, string, api.Variant) error {
+// ClearManualLock removes the manual download lock on the key's quad.
+func (*NopStore) ClearManualLock(context.Context, api.ManualLockKey) error {
 	return nil
 }
 
-// ManualDownloadCount returns the number of manual subtitle downloads for the item+language.
-func (*NopStore) ManualDownloadCount(context.Context, api.MediaType, string, string, api.Variant) (int, error) {
+// ManualDownloadCount returns the number of manual subtitle downloads on the key's quad.
+func (*NopStore) ManualDownloadCount(context.Context, api.ManualLockKey) (int, error) {
 	return 0, nil
 }
 
-// ManualSubtitlePaths returns paths of manually downloaded subtitle files for the item+language.
-func (*NopStore) ManualSubtitlePaths(context.Context, api.MediaType, string, string, api.Variant) ([]string, error) {
+// ManualSubtitlePaths returns paths of manually downloaded subtitle files on the key's quad.
+func (*NopStore) ManualSubtitlePaths(context.Context, api.ManualLockKey) ([]string, error) {
 	return nil, nil
 }
 
 // NextManualNumber returns the next sequential number for a manual subtitle file.
-func (*NopStore) NextManualNumber(context.Context, api.MediaType, string, string, api.Variant) int {
+func (*NopStore) NextManualNumber(context.Context, api.ManualLockKey) int {
 	return 1
 }
 

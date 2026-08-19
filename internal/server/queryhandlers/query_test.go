@@ -256,7 +256,12 @@ func TestHandleLocks(t *testing.T) {
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
 		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []api.ManualLockEntry{
-			{MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr", Count: 2},
+			{
+				ManualLockKey: api.ManualLockKey{
+					MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr",
+				},
+				Count: 2,
+			},
 		}}})
 		req := httptest.NewRequest(http.MethodGet, "/api/locks", nil)
 		w := httptest.NewRecorder()

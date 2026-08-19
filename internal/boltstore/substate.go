@@ -360,9 +360,9 @@ func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, varian
 }
 
 // IsManuallyLocked reports whether the quad has at least one manual row, so it
-// should be excluded from all automated actions. An empty variant asks whether
-// ANY variant of the language is locked (the language-level summary the manual
-// search popup shows). It mirrors the old SQLite
+// should be excluded from all automated actions. An empty key.Variant asks
+// whether ANY variant of the language is locked (the language-level summary the
+// manual search popup shows). It mirrors the old SQLite
 // `SELECT EXISTS(... WHERE ... AND manual = 1)` (Requirement 4.2), refined per
 // variant.
 //
@@ -371,14 +371,15 @@ func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, varian
 // (Requirement 18.3). As a lock-bearing read it fails closed: if the projection
 // cannot be read the quad is reported locked AND the error is returned, so a
 // decode fault can never silently unlock an item (Requirement 13.4).
-func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (bool, error) {
+func (d *DB) IsManuallyLocked(_ context.Context, key api.ManualLockKey) (bool, error) {
 	locked := false
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
-			if manual {
-				locked = true
-			}
-		})
+		return walkStateProjection(tx, key.MediaType, key.MediaID, key.Language, key.Variant,
+			func(manual bool, _ int, _ api.ProviderID) {
+				if manual {
+					locked = true
+				}
+			})
 	})
 	if err != nil {
 		return true, err // fail closed: treat the lock as held on a read fault
@@ -387,8 +388,8 @@ func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaI
 }
 
 // ClearManualLock removes the quad's manual lock so automated scans and
-// upgrades resume; an empty variant clears the locks of EVERY variant of the
-// language (the CLI/API "unlock this item+language" default). It is
+// upgrades resume; an empty key.Variant clears the locks of EVERY variant of
+// the language (the CLI/API "unlock this item+language" default). It is
 // NON-destructive: it flips each manual row's flag to auto (manual=false) and
 // rewrites the row, preserving its id, path, score, provider, release_name,
 // and media_imported, so the rows stay visible to GetState and DownloadedRefs
@@ -400,11 +401,12 @@ func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaI
 // with manual=false in the same transaction (the row keeps its id, so its
 // other index entries are unchanged and the downloads counter is not
 // double-counted). A quad with no manual row is a no-op.
-func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error {
+func (d *DB) ClearManualLock(_ context.Context, key api.ManualLockKey) error {
 	slog.Debug("ClearManualLock",
-		"media_type", mediaType, "media_id", mediaID, "lang", language, "variant", variant)
+		"media_type", key.MediaType, "media_id", key.MediaID,
+		"lang", key.Language, "variant", key.Variant)
 	return d.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -423,18 +425,19 @@ func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID
 }
 
 // ManualDownloadCount returns how many manual rows exist for the quad (exact
-// variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
+// key.Variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
 // manual = 1` (Requirement 15.6). Like IsManuallyLocked it is served purely
 // from the ix_state_quad projection's manual flag via walkStateProjection,
 // with no primary dereference (Requirement 18.3).
-func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (int, error) {
+func (d *DB) ManualDownloadCount(_ context.Context, key api.ManualLockKey) (int, error) {
 	count := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
-			if manual {
-				count++
-			}
-		})
+		return walkStateProjection(tx, key.MediaType, key.MediaID, key.Language, key.Variant,
+			func(manual bool, _ int, _ api.ProviderID) {
+				if manual {
+					count++
+				}
+			})
 	})
 	if err != nil {
 		return 0, err
@@ -443,7 +446,7 @@ func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, med
 }
 
 // ManualSubtitlePaths returns the subtitle file paths from every manual row for
-// the quad — or every variant of the language when variant is empty —
+// the quad — or every variant of the language when key.Variant is empty —
 // excluding rows with an empty path, mirroring the old SQLite
 // `SELECT path ... WHERE ... AND manual = 1 AND path != ”` (Requirement 15.6).
 // maybeRevertManualLock uses it (exact variant) to check which manual files
@@ -453,10 +456,10 @@ func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, med
 // (which carries only manual/score/provider), so this walks the quad via the
 // shared collectStateRows helper, which dereferences each primary and fails
 // closed on a decode error.
-func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) ([]string, error) {
+func (d *DB) ManualSubtitlePaths(_ context.Context, key api.ManualLockKey) ([]string, error) {
 	var paths []string
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -483,8 +486,8 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 // number and the atomic write would overwrite the top pick's file. Rows the
 // app numbered are what reserve ordinals, however they are flagged; plain
 // auto rows (movie.fr.srt) have no trailing ordinal and contribute nothing.
-// Sequences stay per variant: movie.fr.1.srt (standard) and
-// movie.fr.forced.1.srt (forced) advance independently, matching the
+// Sequences stay per variant (exact key.Variant): movie.fr.1.srt (standard)
+// and movie.fr.forced.1.srt (forced) advance independently, matching the
 // variant-aware manual file naming.
 //
 // The ordinal lives on the primary path, so this walks the quad via
@@ -495,10 +498,10 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 // fault falls back to ManualDownloadCount + 1, and to 1 if that also fails,
 // matching the old store's degraded path (the count-based fallback cannot
 // see auto-row ordinals; it only runs on a primary decode fault).
-func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) int {
+func (d *DB) NextManualNumber(_ context.Context, key api.ManualLockKey) int {
 	maxOrdinal := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -511,7 +514,7 @@ func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaI
 	})
 	if err != nil {
 		slog.Warn("NextManualNumber scan failed, falling back to count", "error", err)
-		count, cerr := d.ManualDownloadCount(context.Background(), mediaType, mediaID, language, variant)
+		count, cerr := d.ManualDownloadCount(context.Background(), key)
 		if cerr != nil {
 			return 1
 		}
@@ -825,8 +828,11 @@ type manualLockAccumulator struct {
 func (a *manualLockAccumulator) flush() {
 	if a.haveCur && a.curCnt > 0 {
 		a.out = append(a.out, api.ManualLockEntry{
-			MediaType: a.cur.mt, MediaID: a.cur.mid, Language: a.cur.lang,
-			Variant: a.cur.variant, Count: a.curCnt,
+			ManualLockKey: api.ManualLockKey{
+				MediaType: a.cur.mt, MediaID: a.cur.mid,
+				Language: a.cur.lang, Variant: a.cur.variant,
+			},
+			Count: a.curCnt,
 		})
 	}
 }

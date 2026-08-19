@@ -25,26 +25,45 @@ type DownloadStore interface {
 }
 
 // ManualLockStore groups manual override lock persistence. Locks live on the
-// (media_type, media_id, language, variant) quad: a manual forced download
-// locks only the forced target, leaving standard/hi automation untouched.
-//
-// Methods documented as accepting an empty variant treat "" as "any/all
-// variants of the language"; the rest require an exact variant.
+// (media_type, media_id, language, variant) quad — named ManualLockKey — so a
+// manual forced download locks only the forced target, leaving standard/hi
+// automation untouched.
 type ManualLockStore interface {
 	// IsManuallyLocked reports whether the quad has a manual row. An empty
-	// variant asks whether ANY variant of the language is locked.
-	IsManuallyLocked(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) (bool, error)
-	// ClearManualLock clears the quad's lock. An empty variant clears the
+	// key Variant asks whether ANY variant of the language is locked.
+	IsManuallyLocked(ctx context.Context, key ManualLockKey) (bool, error)
+	// ClearManualLock clears the quad's lock. An empty key Variant clears the
 	// locks of ALL variants of the language.
-	ClearManualLock(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) error
+	ClearManualLock(ctx context.Context, key ManualLockKey) error
 	// ManualDownloadCount counts the quad's manual rows (exact variant).
-	ManualDownloadCount(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) (int, error)
-	// ManualSubtitlePaths returns the manual rows' file paths. An empty
-	// variant returns the paths of ALL variants of the language.
-	ManualSubtitlePaths(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) ([]string, error)
+	ManualDownloadCount(ctx context.Context, key ManualLockKey) (int, error)
+	// ManualSubtitlePaths returns the manual rows' file paths. An empty key
+	// Variant returns the paths of ALL variants of the language.
+	ManualSubtitlePaths(ctx context.Context, key ManualLockKey) ([]string, error)
 	// NextManualNumber returns the next manual ordinal for the quad (exact
 	// variant): movie.fr.1.srt and movie.fr.forced.1.srt count independently.
-	NextManualNumber(ctx context.Context, mediaType MediaType, mediaID, language string, variant Variant) int
+	NextManualNumber(ctx context.Context, key ManualLockKey) int
+}
+
+// ManualLockKey addresses one manual-override lock: the (media_type, media_id,
+// language, variant) quad the lock lives on. Passing the quad as a named
+// struct rather than four positional arguments keeps MediaID and Language —
+// two adjacent strings — from being silently transposed at a call site, which
+// would compile and address the wrong lock.
+//
+// An empty Variant is a WILDCARD, and what it means is per method, not per
+// type: IsManuallyLocked, ClearManualLock and ManualSubtitlePaths read it as
+// "any/all variants of the language", while ManualDownloadCount and
+// NextManualNumber require an exact variant (a lock count and an ordinal
+// sequence are both per variant). Each method's doc states which it is.
+//
+// The json tags serve ManualLockEntry, which embeds this type and must keep
+// marshalling the quad flat under its established wire names.
+type ManualLockKey struct {
+	MediaType MediaType `json:"media_type"`
+	MediaID   string    `json:"media_id"`
+	Language  string    `json:"language"`
+	Variant   Variant   `json:"variant"`
 }
 
 // QueryStore groups read-only state inspection methods.
