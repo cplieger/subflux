@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // Handler preludes. Every handler opens with the same pattern:
@@ -21,8 +21,8 @@ import (
 // Pattern mirrors apps/vibekit/web/internal/git/helpers.go:
 // tiny, single-purpose, opinionated about the response shape.
 
-// maxDefaultBodySize references the canonical constant from httphelpers.
-const maxDefaultBodySize = httphelpers.MaxDefaultBodySize
+// maxDefaultBodySize references the canonical constant from api.
+const maxDefaultBodySize = api.MaxDefaultBodySize
 
 // decodeJSONBodyAny is a package-level function matching the signature
 // required by manualops.HandlerDeps.DecodeJSON. Uses maxDefaultBodySize
@@ -31,7 +31,7 @@ func decodeJSONBodyAny(w http.ResponseWriter, r *http.Request, dst any, maxSize 
 	if maxSize == 0 {
 		maxSize = maxDefaultBodySize
 	}
-	return httphelpers.DecodeJSONBody(w, r, dst, maxSize)
+	return api.DecodeJSONBody(w, r, dst, maxSize)
 }
 
 // deleteSubtitleFiles validates and removes subtitle files from disk.

@@ -14,7 +14,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // ScanGuard serializes manual scan requests. Extracted from activity.Log
@@ -373,7 +372,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req scanItemRequest
-	if !httphelpers.DecodeJSONBody(w, r, &req, 0) {
+	if !api.DecodeJSONBody(w, r, &req, 0) {
 		return
 	}
 	if req.MediaID <= 0 {

@@ -13,23 +13,23 @@ func searchSection() api.SchemaSection {
 		Fields: []api.SchemaField{
 			{
 				Key: "scan_interval", Label: "Scan Interval", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultScanInterval),
-				Placeholder: defaults.FormatDuration(defaults.DefaultScanInterval),
-				Min:         defaults.FormatDuration(defaults.MinScanInterval),
+				Default:     formatDuration(defaults.DefaultScanInterval),
+				Placeholder: formatDuration(defaults.DefaultScanInterval),
+				Min:         formatDuration(defaults.MinScanInterval),
 				Help:        "Time between full library scans (minimum 1h)",
 			},
 			{
 				Key: "scan_delay", Label: "Scan Delay", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultScanDelay),
-				Placeholder: defaults.FormatDuration(defaults.DefaultScanDelay),
-				Min:         defaults.FormatDuration(defaults.MinScanDelay),
+				Default:     formatDuration(defaults.DefaultScanDelay),
+				Placeholder: formatDuration(defaults.DefaultScanDelay),
+				Min:         formatDuration(defaults.MinScanDelay),
 				Help:        "Delay after items that queried providers during scans, to avoid hammering them (minimum 5s; items needing no provider work skip it)",
 			},
 			{
 				Key: "provider_timeout", Label: "Provider Timeout", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultProviderTimeout),
-				Placeholder: defaults.FormatDuration(defaults.DefaultProviderTimeout),
-				Min:         defaults.FormatDuration(defaults.MinProviderTimeout),
+				Default:     formatDuration(defaults.DefaultProviderTimeout),
+				Placeholder: formatDuration(defaults.DefaultProviderTimeout),
+				Min:         formatDuration(defaults.MinProviderTimeout),
 				Help:        "Cooldown after a provider fails repeatedly (minimum 1h, 0 to disable)",
 			},
 			{
@@ -71,13 +71,13 @@ func adaptiveSection() api.SchemaSection {
 		Fields: []api.SchemaField{
 			{
 				Key: "initial_delay", Label: "Initial Delay", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultAdaptiveInitDelay),
+				Default:     formatDuration(defaults.DefaultAdaptiveInitDelay),
 				Placeholder: "7D",
 				Help:        "Wait time before retrying a provider after no results",
 			},
 			{
 				Key: "max_delay", Label: "Max Delay", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultAdaptiveMaxDelay),
+				Default:     formatDuration(defaults.DefaultAdaptiveMaxDelay),
 				Placeholder: "3M",
 				Help:        "Maximum wait between retries",
 			},

@@ -21,7 +21,6 @@ import (
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
@@ -103,7 +102,7 @@ func newHTTPHarness(db api.Store, cfg api.ConfigProvider, providers []api.Provid
 			return &LiveState{Cfg: cfg, Engine: engine, Providers: providers}
 		},
 		Resolve:    resolver,
-		DecodeJSON: httphelpers.DecodeJSONBody,
+		DecodeJSON: api.DecodeJSONBody,
 	})
 	return h, wg
 }

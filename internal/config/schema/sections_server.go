@@ -58,9 +58,9 @@ func pollIntervalSection() api.SchemaSection {
 		Fields: []api.SchemaField{
 			{
 				Key: keyPollInterval, Label: "Poll interval", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultPollInterval),
-				Placeholder: defaults.FormatDuration(defaults.DefaultPollInterval),
-				Min:         defaults.FormatDuration(defaults.MinPollInterval),
+				Default:     formatDuration(defaults.DefaultPollInterval),
+				Placeholder: formatDuration(defaults.DefaultPollInterval),
+				Min:         formatDuration(defaults.MinPollInterval),
 				Help:        "How often to check Sonarr/Radarr for new imports (minimum 10s)",
 			},
 		},
@@ -112,13 +112,13 @@ func authSection() api.SchemaSection {
 				Key:     "session_idle_timeout",
 				Label:   "Session Idle Timeout",
 				Type:    fieldDuration,
-				Default: defaults.FormatDuration(defaults.DefaultSessionIdleTimeout),
+				Default: formatDuration(defaults.DefaultSessionIdleTimeout),
 			},
 			{
 				Key:     "session_absolute_timeout",
 				Label:   "Session Absolute Timeout",
 				Type:    fieldDuration,
-				Default: defaults.FormatDuration(defaults.DefaultSessionAbsoluteTimeout),
+				Default: formatDuration(defaults.DefaultSessionAbsoluteTimeout),
 			},
 			{
 				Key:     "check_breached_passwords",
@@ -227,9 +227,9 @@ func backupSection() api.SchemaSection {
 		Fields: []api.SchemaField{
 			{
 				Key: "frequency", Label: "Frequency", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultBackupFrequency),
-				Placeholder: defaults.FormatDuration(defaults.DefaultBackupFrequency),
-				Min:         defaults.FormatDuration(defaults.MinBackupFrequency),
+				Default:     formatDuration(defaults.DefaultBackupFrequency),
+				Placeholder: formatDuration(defaults.DefaultBackupFrequency),
+				Min:         formatDuration(defaults.MinBackupFrequency),
 				Help:        "How often to write a consistent database snapshot (minimum 1h).",
 			},
 			{

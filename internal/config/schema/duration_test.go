@@ -1,11 +1,14 @@
-package defaults
+package schema
 
 import (
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/config"
+	"pgregory.net/rapid"
 )
 
-// TestFormatDuration pins FormatDuration's output across every unit branch and
+// TestFormatDuration pins formatDuration's output across every unit branch and
 // the boundaries between them: a value that is an exact multiple of a unit is
 // rendered in that unit (730h -> "1M", 24h -> "1D", 60s stays "1m"), while a
 // value one step off the multiple falls through to the next-smaller unit
@@ -54,9 +57,42 @@ func TestFormatDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := FormatDuration(tt.input); got != tt.want {
-				t.Errorf("FormatDuration(%v) = %q, want %q", tt.input, got, tt.want)
+			if got := formatDuration(tt.input); got != tt.want {
+				t.Errorf("formatDuration(%v) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
+}
+
+// --- formatDuration/config.ParseDuration round-trip property ---
+
+// Every duration string the schema renders is a value the config loader must be
+// able to read back: the settings UI shows it as the default/placeholder and the
+// user may paste it straight into config.yaml. This pins that contract from the
+// producing side. The import of internal/config is test-only — the schema
+// package itself depends on config/defaults' VALUES, never on the loader.
+func TestFormatDuration_ParseDuration_roundtrip(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		// Generate durations that are exact multiples of their unit so
+		// formatDuration produces a clean representation.
+		unit := rapid.SampledFrom([]time.Duration{
+			time.Second,
+			time.Minute,
+			time.Hour,
+			24 * time.Hour,  // day
+			730 * time.Hour, // month
+		}).Draw(t, "unit")
+		n := rapid.IntRange(1, 500).Draw(t, "n")
+		d := time.Duration(n) * unit
+
+		formatted := formatDuration(d)
+		parsed, err := config.ParseDuration(formatted)
+		if err != nil {
+			t.Fatalf("ParseDuration(%q) error: %v (original: %v)", formatted, err, d)
+		}
+		if parsed != d {
+			t.Fatalf("round-trip failed: formatDuration(%v) = %q, ParseDuration(%q) = %v", d, formatted, formatted, parsed)
+		}
+	})
 }

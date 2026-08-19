@@ -1,11 +1,11 @@
-package defaults
+package schema
 
 import (
 	"testing"
 	"time"
 )
 
-// FuzzFormatDuration exercises FormatDuration with arbitrary durations
+// FuzzFormatDuration exercises formatDuration with arbitrary durations
 // checking that it never panics and always produces non-empty output for
 // non-negative inputs.
 func FuzzFormatDuration(f *testing.F) {
@@ -23,20 +23,20 @@ func FuzzFormatDuration(f *testing.F) {
 		if d < 0 {
 			return // negative durations are outside the domain
 		}
-		result := FormatDuration(d)
+		result := formatDuration(d)
 
 		// Invariant 1: never panics (implicit).
 
 		// Invariant 2: result is never empty for non-negative duration.
 		if result == "" {
-			t.Fatalf("FormatDuration(%v) returned empty string", d)
+			t.Fatalf("formatDuration(%v) returned empty string", d)
 		}
 
 		// Invariant 3: result always ends with a unit suffix.
 		last := result[len(result)-1]
 		validSuffix := last == 's' || last == 'm' || last == 'h' || last == 'D' || last == 'M'
 		if !validSuffix {
-			t.Fatalf("FormatDuration(%v) = %q has no valid unit suffix", d, result)
+			t.Fatalf("formatDuration(%v) = %q has no valid unit suffix", d, result)
 		}
 	})
 }

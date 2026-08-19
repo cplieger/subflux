@@ -15,7 +15,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httputil"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
@@ -60,8 +59,8 @@ func New(d Deps) *Handler {
 // MaxSyncSubSize caps subtitle file reads for sync operations.
 const MaxSyncSubSize = httputil.MaxDownloadBytes
 
-// maxBodySize references the canonical constant from httphelpers.
-const maxBodySize = httphelpers.MaxDefaultBodySize
+// maxBodySize references the canonical constant from api.
+const maxBodySize = api.MaxDefaultBodySize
 
 // --- Request/Response types ---
 
@@ -136,10 +135,10 @@ type syncAudioPaths struct {
 // computed offset can be inspected. Lift the gate only when a
 // format-preserving ASS writer exists. The gate runs on the RESOLVED path.
 func (h *Handler) decodeSyncAudioRequest(w http.ResponseWriter, r *http.Request) (req SyncAudioRequest, paths syncAudioPaths, ok bool) {
-	if !httphelpers.RequirePOST(w, r) {
+	if !api.RequirePOST(w, r) {
 		return req, paths, false
 	}
-	if !httphelpers.DecodeJSONBody(w, r, &req, maxBodySize) {
+	if !api.DecodeJSONBody(w, r, &req, maxBodySize) {
 		return req, paths, false
 	}
 	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)
@@ -233,12 +232,12 @@ func (h *Handler) HandleSyncAudio(w http.ResponseWriter, r *http.Request) {
 // HandleSyncOffset handles POST /api/sync/offset.
 func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !httphelpers.RequirePOST(w, r) {
+	if !api.RequirePOST(w, r) {
 		return
 	}
 
 	var req SyncOffsetRequest
-	if !httphelpers.DecodeJSONBody(w, r, &req, maxBodySize) {
+	if !api.DecodeJSONBody(w, r, &req, maxBodySize) {
 		return
 	}
 	ref := fileRef(req.MediaType, req.MediaID, req.Language, req.Variant, req.Source, req.Ordinal)

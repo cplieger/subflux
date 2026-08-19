@@ -7,14 +7,13 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"golang.org/x/sync/errgroup"
 )
 
 // HandleStateStats returns aggregate stats for the dashboard.
 // GET /api/state/stats
 func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	resp := h.statsCache.get(r.Context(), h.computeStateStats)

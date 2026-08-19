@@ -1,12 +1,10 @@
-package httphelpers_test
+package api
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 type decodeTarget struct {
@@ -21,7 +19,7 @@ func TestDecodeJSONBody_valid(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	var dst decodeTarget
-	ok := httphelpers.DecodeJSONBody(rec, req, &dst, 0)
+	ok := DecodeJSONBody(rec, req, &dst, 0)
 
 	if !ok {
 		t.Fatal("DecodeJSONBody(valid) = false, want true")
@@ -41,7 +39,7 @@ func TestDecodeJSONBody_invalid_returns_400(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	var dst decodeTarget
-	ok := httphelpers.DecodeJSONBody(rec, req, &dst, 0)
+	ok := DecodeJSONBody(rec, req, &dst, 0)
 
 	if ok {
 		t.Fatal("DecodeJSONBody(invalid) = true, want false")
@@ -62,7 +60,7 @@ func TestDecodeJSONBody_oversized_returns_400(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	var dst string
-	ok := httphelpers.DecodeJSONBody(rec, req, &dst, 5)
+	ok := DecodeJSONBody(rec, req, &dst, 5)
 
 	if ok {
 		t.Fatal("DecodeJSONBody(oversized, cap=5) = true, want false")
@@ -90,7 +88,7 @@ func TestRequireMethod(t *testing.T) {
 			req := httptest.NewRequest(tc.got, "/x", http.NoBody)
 			rec := httptest.NewRecorder()
 
-			ok := httphelpers.RequireMethod(rec, req, tc.want)
+			ok := RequireMethod(rec, req, tc.want)
 
 			if ok != tc.pass {
 				t.Errorf("RequireMethod(got %s, want %s) = %v, want %v",
@@ -118,7 +116,7 @@ func TestRequireGET_and_RequirePOST_reject_opposite_method(t *testing.T) {
 	t.Parallel()
 
 	getRec := httptest.NewRecorder()
-	if httphelpers.RequireGET(getRec, httptest.NewRequest(http.MethodPost, "/x", http.NoBody)) {
+	if RequireGET(getRec, httptest.NewRequest(http.MethodPost, "/x", http.NoBody)) {
 		t.Error("RequireGET(POST) = true, want false")
 	}
 	if getRec.Code != http.StatusMethodNotAllowed {
@@ -126,7 +124,7 @@ func TestRequireGET_and_RequirePOST_reject_opposite_method(t *testing.T) {
 	}
 
 	postRec := httptest.NewRecorder()
-	if httphelpers.RequirePOST(postRec, httptest.NewRequest(http.MethodGet, "/x", http.NoBody)) {
+	if RequirePOST(postRec, httptest.NewRequest(http.MethodGet, "/x", http.NoBody)) {
 		t.Error("RequirePOST(GET) = true, want false")
 	}
 	if postRec.Code != http.StatusMethodNotAllowed {

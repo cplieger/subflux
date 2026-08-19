@@ -16,7 +16,6 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // AlertLog is the narrow interface for alert operations.
@@ -97,8 +96,8 @@ func New(d *Deps) *Handler {
 	}
 }
 
-// maxBodySize references the canonical constant from httphelpers.
-const maxBodySize = httphelpers.MaxDefaultBodySize
+// maxBodySize references the canonical constant from api.
+const maxBodySize = api.MaxDefaultBodySize
 
 // HandleGetConfig returns the current config file with secrets redacted.
 func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +187,7 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path string `json:"path"`
 	}
-	if !httphelpers.DecodeJSONBody(w, r, &req, 4096) {
+	if !api.DecodeJSONBody(w, r, &req, 4096) {
 		return
 	}
 

@@ -97,5 +97,3 @@ func (h *Handler) StatsInvalidator() StatsCacheInvalidator { return &h.statsCach
 type StatsCacheInvalidator interface {
 	Invalidate()
 }
-
-// --- Shared helpers (delegated to httphelpers package) ---

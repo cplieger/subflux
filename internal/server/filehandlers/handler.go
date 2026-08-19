@@ -22,7 +22,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
@@ -216,7 +215,7 @@ func (h *Handler) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req DeleteFileRequest
-	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 
@@ -321,7 +320,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req BulkDeleteRequest
-	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 	if req.MediaType == "" || req.MediaID == "" {

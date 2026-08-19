@@ -11,7 +11,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 )
 
 // providerTimeoutResponse is an alias for the canonical wire type.
@@ -21,7 +20,7 @@ type providerTimeoutResponse = api.ProvidersResponse
 // GET /api/state?type=episode&lang=fr&provider=opensubtitles&limit=50
 func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	q := r.URL.Query()
@@ -68,7 +67,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 // GET /api/backoff
 func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	entries, err := h.queryDB.GetBackoffItems(ctx)
@@ -91,7 +90,7 @@ func (h *Handler) HandleBackoffByPrefix(w http.ResponseWriter, r *http.Request) 
 // GET /api/locks
 func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	entries, err := h.queryDB.GetManualLocks(ctx)
@@ -113,7 +112,7 @@ type ProviderInfo struct {
 // HandleProviders returns registered providers with enabled status.
 // GET /api/providers
 func (h *Handler) HandleProviders(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
@@ -161,7 +160,7 @@ type ParsedConfig struct {
 // HandleConfigParsed returns the config as structured JSON.
 // GET /api/config/parsed
 func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	if !h.configured() {
@@ -206,7 +205,7 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 // HandleScore simulates scoring a subtitle against a video.
 // POST /api/score with JSON body.
 func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequirePOST(w, r) {
+	if !api.RequirePOST(w, r) {
 		return
 	}
 	ls := h.state()
@@ -216,7 +215,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 		SubRelease  string        `json:"sub_release"`
 		MatchedBy   string        `json:"matched_by"`
 	}
-	if !httphelpers.DecodeJSONBody(w, r, &req, 1<<20) {
+	if !api.DecodeJSONBody(w, r, &req, 1<<20) {
 		return
 	}
 	// Both names are direct user input into the release parser. The parser
@@ -254,7 +253,7 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 // without actually searching. Useful for debugging language rules.
 // GET /api/search/targets?orig_lang=en&audio_langs=en,fr
 func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
@@ -300,7 +299,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 // HandleProviderTimeout returns provider timeout state for all providers.
 // GET /api/providers/timeout
 func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	ls := h.state()
@@ -315,7 +314,7 @@ func (h *Handler) HandleProviderTimeout(w http.ResponseWriter, r *http.Request) 
 // HandleProviderTimeoutReset clears all provider timeout state and re-enables all providers.
 // POST /api/providers/timeout/reset
 func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequirePOST(w, r) {
+	if !api.RequirePOST(w, r) {
 		return
 	}
 	ls := h.state()
@@ -333,7 +332,7 @@ func (h *Handler) HandleProviderTimeoutReset(w http.ResponseWriter, r *http.Requ
 func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 	label string, queryFn func(string, string) (any, error),
 ) {
-	if !httphelpers.RequireGET(w, r) {
+	if !api.RequireGET(w, r) {
 		return
 	}
 	q := r.URL.Query()
