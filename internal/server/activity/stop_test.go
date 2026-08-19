@@ -15,16 +15,16 @@ func TestStopRegistry_requestStop_invokes_callback_once(t *testing.T) {
 	defer unregister()
 
 	if got := r.RequestStop("1"); got != StopRequested {
-		t.Fatalf("first RequestStop = %v, want StopRequested", got)
+		t.Errorf("first RequestStop = %v, want StopRequested", got)
 	}
 	if calls != 1 {
-		t.Fatalf("callback calls = %d, want 1", calls)
+		t.Errorf("callback calls = %d, want 1", calls)
 	}
 
 	// Double-cancel is idempotent: reported as already stopping, callback
 	// NOT re-invoked.
 	if got := r.RequestStop("1"); got != StopAlreadyStopping {
-		t.Fatalf("second RequestStop = %v, want StopAlreadyStopping", got)
+		t.Errorf("second RequestStop = %v, want StopAlreadyStopping", got)
 	}
 	if calls != 1 {
 		t.Errorf("callback calls after double-cancel = %d, want 1", calls)

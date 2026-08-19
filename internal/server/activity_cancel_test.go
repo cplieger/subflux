@@ -64,7 +64,7 @@ func TestHandleCancelActivity_per_item_scan_any_user_204(t *testing.T) {
 
 	rec := cancelReq(t, s, id, plainUser())
 	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", rec.Code)
+		t.Errorf("status = %d, want 204", rec.Code)
 	}
 	if !*stopped {
 		t.Error("stop callback did not fire")

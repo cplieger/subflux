@@ -10,6 +10,10 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. The empty-ID check keeps t.Fatalf because it
+// establishes the ID every later assertion looks the entry up by.
+
 func TestActivityLog_start_records_entry(t *testing.T) {
 	t.Parallel()
 	al := activity.New(10)
@@ -25,7 +29,7 @@ func TestActivityLog_start_records_entry(t *testing.T) {
 		t.Fatal("entry not found after start()")
 	}
 	if n := len(al.Entries()); n != 1 {
-		t.Fatalf("entries count = %d, want 1", n)
+		t.Errorf("entries count = %d, want 1", n)
 	}
 	if entry.Action != "Scan" {
 		t.Errorf("entry.Action = %q, want %q", entry.Action, "Scan")
@@ -71,7 +75,7 @@ func TestActivityLog_end_marks_done(t *testing.T) {
 	al.End(id)
 
 	if n := len(al.Entries()); n != 1 {
-		t.Fatalf("entries count = %d, want 1", n)
+		t.Errorf("entries count = %d, want 1", n)
 	}
 	if e, _ := al.Get(id); !e.Done {
 		t.Errorf("entry %q should be done after end()", id)

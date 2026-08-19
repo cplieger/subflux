@@ -350,10 +350,10 @@ func TestDispatchCLI_single_parse_parity(t *testing.T) {
 	args := []string{"--pick", "3", "--download"}
 	code, handled := dispatchCLI("spy", args)
 	if !handled || code != 42 {
-		t.Fatalf("dispatchCLI(spy) = (%d, %v), want (42, true)", code, handled)
+		t.Errorf("dispatchCLI(spy) = (%d, %v), want (42, true)", code, handled)
 	}
 	if spyCalls != 1 {
-		t.Fatalf("runner invoked %d times, want exactly 1", spyCalls)
+		t.Errorf("runner invoked %d times, want exactly 1", spyCalls)
 	}
 
 	want, err := cliparse.ParseAndValidate(args, &spec)

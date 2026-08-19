@@ -323,7 +323,7 @@ func TestHandleBackoffByPrefix(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.HandleBackoffByPrefix(w, req)
 		if w.Code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 		if store.lastPrefixType != "episode" {
 			t.Errorf("GetBackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "episode")
@@ -338,7 +338,7 @@ func TestHandleBackoffByPrefix(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.HandleBackoffByPrefix(w, req)
 		if w.Code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 		if store.lastPrefixType != "movie" {
 			t.Errorf("GetBackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "movie")

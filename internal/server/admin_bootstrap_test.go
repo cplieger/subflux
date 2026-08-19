@@ -16,6 +16,12 @@ import (
 	"github.com/cplieger/subflux/internal/metrics"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. The status check before json.Unmarshal keeps
+// t.Fatalf — past it the envelope every later assertion reads is an error
+// body, so continuing would report a decode failure instead of the status
+// that caused it.
+
 // The custody trio (R1.5): the admin bootstrap channel lives exclusively on
 // the Unix-socket admin plane. (a) the TCP mux never routes it, (b) a socket
 // peer completes bootstrap with zero credentials over a real unix listener,
@@ -41,7 +47,7 @@ func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 
 	ct := w.Header().Get("Content-Type")
 	if !strings.HasPrefix(ct, "text/html") {
-		t.Fatalf("TCP /api/admin/bootstrap answered Content-Type %q (status %d, body %q) — a handler ran; want the SPA fallthrough (text/html)",
+		t.Errorf("TCP /api/admin/bootstrap answered Content-Type %q (status %d, body %q) — a handler ran; want the SPA fallthrough (text/html)",
 			ct, w.Code, w.Body.String())
 	}
 	if strings.Contains(w.Body.String(), "unknown action") {
@@ -113,7 +119,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 		t.Fatalf("unmarshal response %s: %v", respBody, err)
 	}
 	if env.Status != "ok" || env.Username != "admin" {
-		t.Fatalf("response = %+v, want status ok for admin", env)
+		t.Errorf("response = %+v, want status ok for admin", env)
 	}
 
 	updated, _, err := s.authStore.GetUserByUsername(ctx, "admin")

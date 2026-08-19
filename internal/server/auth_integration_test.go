@@ -459,7 +459,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("setup status: %d", rec.Code)
+		t.Errorf("setup status: %d", rec.Code)
 	}
 	var resp map[string]any
 	json.NewDecoder(rec.Body).Decode(&resp)
@@ -475,7 +475,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	rec = httptest.NewRecorder()
 	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("setup status: %d", rec.Code)
+		t.Errorf("setup status: %d", rec.Code)
 	}
 	var resp2 map[string]any
 	json.NewDecoder(rec.Body).Decode(&resp2)

@@ -504,7 +504,7 @@ func TestResolveQuery_tmdb_only_resolves_movie_first(t *testing.T) {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
 	if len(res.Items) != 1 || res.Items[0].MediaID != 7 {
-		t.Fatalf("ResolveQuery(tmdb only) = %+v, want the movie", res)
+		t.Errorf("ResolveQuery(tmdb only) = %+v, want the movie", res)
 	}
 	if got := sonarr.calls.Load(); got != 0 {
 		t.Errorf("sonarr consulted %d times, want 0 (movie arm resolves the tmdb id first)", got)
@@ -602,7 +602,7 @@ func TestResolveQuery_partial_arr_failure(t *testing.T) {
 		t.Fatalf("ResolveQuery(healthy arm satisfied) error = %v, want nil", err)
 	}
 	if len(res.Items) != 1 {
-		t.Fatalf("ResolveQuery() = %+v, want the movie", res)
+		t.Errorf("ResolveQuery() = %+v, want the movie", res)
 	}
 
 	// Nothing matched and an arm was down: the emptiness is unprovable, so
@@ -689,7 +689,7 @@ func TestHandleSearchResolve_conflict_400_with_machine_code(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.HandleSearchResolve(rec, req)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("HandleSearchResolve(conflict) status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Errorf("HandleSearchResolve(conflict) status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	if !strings.Contains(rec.Body.String(), "resolve_conflict") {
 		t.Errorf("HandleSearchResolve(conflict) body = %q, want the resolve_conflict machine code", rec.Body.String())

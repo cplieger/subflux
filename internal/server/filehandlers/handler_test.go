@@ -133,7 +133,7 @@ func TestHandleHistoryIDs(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleHistoryIDs(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleHistoryIDs() status = %d, want %d", rec.Code, http.StatusOK)
+			t.Errorf("HandleHistoryIDs() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.histType != "episode" {
 			t.Errorf("HistoryMediaIDs mediaType = %q, want %q", store.histType, "episode")
@@ -446,7 +446,7 @@ func TestHandleDeleteFile(t *testing.T) {
 		h.HandleDeleteFile(rec, req)
 
 		if rec.Code != http.StatusNoContent {
-			t.Fatalf("HandleDeleteFile() status = %d, want %d",
+			t.Errorf("HandleDeleteFile() status = %d, want %d",
 				rec.Code, http.StatusNoContent)
 		}
 		if store.variant != "standard" {
@@ -471,7 +471,7 @@ func TestHandleDeleteFile(t *testing.T) {
 		h.HandleDeleteFile(rec, req)
 
 		if rec.Code != http.StatusNoContent {
-			t.Fatalf("HandleDeleteFile() status = %d, want %d",
+			t.Errorf("HandleDeleteFile() status = %d, want %d",
 				rec.Code, http.StatusNoContent)
 		}
 		if store.variant != "forced" {
@@ -614,7 +614,7 @@ func TestHandleDeleteFile_resolved_ref_deletes(t *testing.T) {
 	h.HandleDeleteFile(rec, req)
 
 	if rec.Code != http.StatusNoContent {
-		t.Fatalf("HandleDeleteFile(ordinal 1) status = %d, want %d: %s",
+		t.Errorf("HandleDeleteFile(ordinal 1) status = %d, want %d: %s",
 			rec.Code, http.StatusNoContent, rec.Body.String())
 	}
 	if _, err := os.Stat(manualPath); !os.IsNotExist(err) {
@@ -649,7 +649,7 @@ func TestHandleDeleteFile_extension_refused_returns_409(t *testing.T) {
 	h.HandleDeleteFile(rec, req)
 
 	if rec.Code != http.StatusConflict {
-		t.Fatalf("HandleDeleteFile(.mkv target) status = %d, want %d",
+		t.Errorf("HandleDeleteFile(.mkv target) status = %d, want %d",
 			rec.Code, http.StatusConflict)
 	}
 	if !strings.Contains(rec.Body.String(), "subtitle_extension_not_allowed") {
@@ -844,7 +844,7 @@ func TestHandleBulkDeleteFiles(t *testing.T) {
 		h.HandleBulkDeleteFiles(rec, req)
 
 		if rec.Code != http.StatusConflict {
-			t.Fatalf("HandleBulkDeleteFiles(mixed set) status = %d, want %d: %s",
+			t.Errorf("HandleBulkDeleteFiles(mixed set) status = %d, want %d: %s",
 				rec.Code, http.StatusConflict, rec.Body.String())
 		}
 		if !strings.Contains(rec.Body.String(), "subtitle_extension_not_allowed") {

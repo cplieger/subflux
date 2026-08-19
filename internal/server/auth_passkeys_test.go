@@ -222,7 +222,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 	s.authH.HandleDeletePasskey(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("handleDeletePasskey status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+		t.Errorf("handleDeletePasskey status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	// Verify passkey is gone.

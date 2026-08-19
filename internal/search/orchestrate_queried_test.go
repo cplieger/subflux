@@ -128,7 +128,7 @@ func TestSearchTargets_queried_zero_when_all_providers_timed_out(t *testing.T) {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	if result.TargetsSearched() == 0 {
-		t.Fatalf("TargetsSearched() = 0, want > 0 (the group ran; only the sweep was suppressed)")
+		t.Errorf("TargetsSearched() = 0, want > 0 (the group ran; only the sweep was suppressed)")
 	}
 	if result.ProviderQueried() {
 		t.Errorf("ProviderQueried() = true with every provider health-timed-out, want false")

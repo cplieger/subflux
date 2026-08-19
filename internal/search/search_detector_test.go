@@ -93,7 +93,7 @@ func TestSearchTargets_ignored_codec_triggers_search(t *testing.T) {
 		t.Errorf("provider searches = %d, want 1 (ignored codec does not satisfy the target)", got)
 	}
 	if len(result.Paths()) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1 (external download)", len(result.Paths()))
+		t.Errorf("SearchTargets() returned %d paths, want 1 (external download)", len(result.Paths()))
 	}
 	// The pgs track stays visible in the recorded coverage inventory.
 	foundPGS := false

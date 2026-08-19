@@ -14,10 +14,10 @@ func TestCorrectFramerate_too_few_cues(t *testing.T) {
 	inc := makeCues(5, 0, 2*time.Second)
 	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Rate != 1.0 {
-		t.Fatalf("expected rate 1.0, got %f", result.Rate)
+		t.Errorf("expected rate 1.0, got %f", result.Rate)
 	}
 	if result.Confidence != ConfidenceNone {
-		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
+		t.Errorf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
 
@@ -46,10 +46,10 @@ func TestCorrectFramerate_known_ratio_23976_to_25(t *testing.T) {
 
 	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected framerate detection, got no confidence")
+		t.Error("expected framerate detection, got no confidence")
 	}
 	if result.Method != MethodFramerate {
-		t.Fatalf("expected method 'framerate', got %q", result.Method)
+		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 }
 
@@ -280,7 +280,7 @@ func TestGoldenSectionSearch_real_ratio(t *testing.T) {
 	// observedRatio should be close to 1.03.
 	result := goldenSectionSearch(t.Context(), ref, inc, 1.03, 0.95)
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence from GSS with real ratio")
+		t.Error("expected some confidence from GSS with real ratio")
 	}
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
@@ -409,7 +409,7 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 
 	// The function should still produce a result (via GSS fallthrough).
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence after GSS fallthrough")
+		t.Error("expected some confidence after GSS fallthrough")
 	}
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)

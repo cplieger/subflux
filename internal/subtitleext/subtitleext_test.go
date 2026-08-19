@@ -27,7 +27,7 @@ func TestSeedTable(t *testing.T) {
 	}
 	slices.Sort(wantExts)
 	if !slices.Equal(got, wantExts) {
-		t.Fatalf("Extensions() = %v, want %v", got, wantExts)
+		t.Errorf("Extensions() = %v, want %v", got, wantExts)
 	}
 	for ext, w := range want {
 		if g := subtitleext.ArchiveInput(ext); g != w.archive {

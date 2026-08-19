@@ -193,11 +193,11 @@ func TestCrossCorrelateEdges_known_offset(t *testing.T) {
 	}
 	result := crossCorrelateEdges(t.Context(), a, b)
 	if math.Abs(float64(result.OffsetFrames)-(-10)) > 2 {
-		t.Fatalf("CrossCorrelateEdges(known offset): OffsetFrames = %d, want ~-10",
+		t.Errorf("CrossCorrelateEdges(known offset): OffsetFrames = %d, want ~-10",
 			result.OffsetFrames)
 	}
 	if result.Peak < 0.5 {
-		t.Fatalf("CrossCorrelateEdges(known offset): peak = %f, want > 0.5", result.Peak)
+		t.Errorf("CrossCorrelateEdges(known offset): peak = %f, want > 0.5", result.Peak)
 	}
 }
 
@@ -255,10 +255,10 @@ func TestCrossCorrelateEdges_identical_signals(t *testing.T) {
 	}
 	result := crossCorrelateEdges(t.Context(), signal, signal)
 	if result.OffsetFrames != 0 {
-		t.Fatalf("CrossCorrelateEdges(identical): OffsetFrames = %d, want 0", result.OffsetFrames)
+		t.Errorf("CrossCorrelateEdges(identical): OffsetFrames = %d, want 0", result.OffsetFrames)
 	}
 	if result.Peak < 0.9 {
-		t.Fatalf("CrossCorrelateEdges(identical): Peak = %f, want >= 0.9", result.Peak)
+		t.Errorf("CrossCorrelateEdges(identical): Peak = %f, want >= 0.9", result.Peak)
 	}
 }
 

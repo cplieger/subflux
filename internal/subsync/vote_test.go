@@ -376,7 +376,7 @@ func TestArbitration_regression_noSplitCandidate(t *testing.T) {
 	// split generator emits nothing.
 	got := alignWithSplits(t.Context(), ref, inc, 0)
 	if got.Confidence != ConfidenceNone {
-		t.Fatalf("alignWithSplits(no-split input) confidence = %f, want 0 (no candidate)",
+		t.Errorf("alignWithSplits(no-split input) confidence = %f, want 0 (no candidate)",
 			float64(got.Confidence))
 	}
 

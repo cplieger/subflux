@@ -51,23 +51,23 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 
 	// Wrong password → 401, single-use token consumed, no link.
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "wrong"); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("wrong password status = %d, want 401", rec.Code)
+		t.Errorf("wrong password status = %d, want 401", rec.Code)
 	}
 	got, _, _ := db.GetUserByID(t.Context(), user.ID)
 	if got.OIDCSub != "" {
-		t.Fatalf("OIDCSub = %q, want empty after failed link", got.OIDCSub)
+		t.Errorf("OIDCSub = %q, want empty after failed link", got.OIDCSub)
 	}
 
 	// Correct password → 200 and the OIDC identity is linked in place.
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "correct-horse-battery-staple"); rec.Code != http.StatusOK {
-		t.Fatalf("correct password status = %d, want 200; body %s", rec.Code, rec.Body.String())
+		t.Errorf("correct password status = %d, want 200; body %s", rec.Code, rec.Body.String())
 	}
 	got, _, _ = db.GetUserByID(t.Context(), user.ID)
 	if got.OIDCSub != "new-sub" {
-		t.Fatalf("OIDCSub = %q, want new-sub after successful link", got.OIDCSub)
+		t.Errorf("OIDCSub = %q, want new-sub after successful link", got.OIDCSub)
 	}
 	if got.PasswordHash != "" {
-		t.Fatalf("PasswordHash not cleared; link-on-login must migrate to SSO-only")
+		t.Errorf("PasswordHash not cleared; link-on-login must migrate to SSO-only")
 	}
 }
 
@@ -79,11 +79,11 @@ func TestOIDCLink_refuses_last_local_admin(t *testing.T) {
 	admin := createTestUser(t, db, "soleadmin", "correct-horse-battery-staple") // createTestUser makes admins
 	rec := postLink(s, storeLink(t, s, admin.ID, "sub-z"), "correct-horse-battery-staple")
 	if rec.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want 409 for last local admin; body %s", rec.Code, rec.Body.String())
+		t.Errorf("status = %d, want 409 for last local admin; body %s", rec.Code, rec.Body.String())
 	}
 	got, _, _ := db.GetUserByID(t.Context(), admin.ID)
 	if got.OIDCSub != "" || got.PasswordHash == "" {
-		t.Fatal("account must be unchanged when migration is refused")
+		t.Error("account must be unchanged when migration is refused")
 	}
 }
 
@@ -112,7 +112,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.authH.HandleOIDCUnlink(rec, req)
 	if rec.Code != http.StatusConflict {
-		t.Fatalf("unlink (no other method) status = %d, want 409", rec.Code)
+		t.Errorf("unlink (no other method) status = %d, want 409", rec.Code)
 	}
 
 	// Account with a password → unlink allowed.
@@ -127,10 +127,10 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	rec2 := httptest.NewRecorder()
 	s.authH.HandleOIDCUnlink(rec2, req2)
 	if rec2.Code != http.StatusOK {
-		t.Fatalf("unlink (has password) status = %d, want 200; body %s", rec2.Code, rec2.Body.String())
+		t.Errorf("unlink (has password) status = %d, want 200; body %s", rec2.Code, rec2.Body.String())
 	}
 	got, _, _ := db.GetUserByID(t.Context(), withPass.ID)
 	if got.OIDCSub != "" {
-		t.Fatalf("OIDCSub = %q, want empty after unlink", got.OIDCSub)
+		t.Errorf("OIDCSub = %q, want empty after unlink", got.OIDCSub)
 	}
 }

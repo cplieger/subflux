@@ -182,7 +182,7 @@ func TestLogout_Success(t *testing.T) {
 	s.authH.HandleLogout(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify session was deleted from DB.

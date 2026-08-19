@@ -70,7 +70,7 @@ func TestActivityLog_progress_updates_entry(t *testing.T) {
 	al.Progress(id, 5, 20, "updated detail")
 
 	if n := len(al.Entries()); n != 1 {
-		t.Fatalf("entries count = %d, want 1", n)
+		t.Errorf("entries count = %d, want 1", n)
 	}
 	e, _ := al.Get(id)
 	if e.Current != 5 {

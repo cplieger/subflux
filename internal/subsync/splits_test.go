@@ -93,10 +93,10 @@ func TestAlignWithSplits_two_segments(t *testing.T) {
 
 	result := alignWithSplits(t.Context(), ref, inc, 500)
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence for two-segment case")
+		t.Error("expected some confidence for two-segment case")
 	}
 	if len(result.Cues) != 20 {
-		t.Fatalf("expected 20 cues, got %d", len(result.Cues))
+		t.Errorf("expected 20 cues, got %d", len(result.Cues))
 	}
 	// Multi-segment results carry the segments out as a transform descriptor.
 	if result.Source != SourceSplit {
@@ -258,11 +258,11 @@ func TestBuildSegments_merges_tiny(t *testing.T) {
 
 func TestMaxSegmentLen(t *testing.T) {
 	t.Parallel()
-	if maxSegmentLen(100) != 100 {
-		t.Fatal("expected 100 for small n")
+	if got := maxSegmentLen(100); got != 100 {
+		t.Errorf("maxSegmentLen(100) = %d, want 100 (no cap below the ceiling)", got)
 	}
-	if maxSegmentLen(1000) != 500 {
-		t.Fatal("expected 500 cap for large n")
+	if got := maxSegmentLen(1000); got != 500 {
+		t.Errorf("maxSegmentLen(1000) = %d, want 500 (capped)", got)
 	}
 }
 

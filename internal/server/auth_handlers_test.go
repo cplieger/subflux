@@ -31,7 +31,7 @@ func TestChangePassword_Success(t *testing.T) {
 	s.authH.HandleChangePassword(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+		t.Errorf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	// Verify new password works.

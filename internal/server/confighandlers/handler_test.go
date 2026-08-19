@@ -388,7 +388,7 @@ func TestHandleResetConfig_writes_default(t *testing.T) {
 	h.HandleResetConfig(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleResetConfig() status = %d, want %d", rec.Code, http.StatusOK)
+		t.Errorf("HandleResetConfig() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify the file was written.

@@ -399,7 +399,7 @@ func TestFileRefFromQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ref.Variant != string(api.VariantStandard) || ref.Source != string(api.SourceExternal) || ref.Ordinal != 0 {
-		t.Fatalf("defaults not applied: %+v", ref)
+		t.Errorf("defaults not applied: %+v", ref)
 	}
 
 	q.Set("ordinal", "3")
@@ -432,7 +432,7 @@ func TestMediaRefFromQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ref.MediaID != 7 || ref.Season != 1 || ref.Episode != 5 {
-		t.Fatalf("parsed %+v", ref)
+		t.Errorf("parsed %+v", ref)
 	}
 	if _, err := resolve.MediaRefFromQuery(url.Values{"media_type": {"episode"}, "media_id": {"7"}}); err == nil {
 		t.Fatal("episode without season/episode accepted")

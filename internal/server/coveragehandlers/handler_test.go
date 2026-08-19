@@ -264,7 +264,7 @@ func TestHandleScanStates(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
+			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "episode" {
 			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "episode")
@@ -280,7 +280,7 @@ func TestHandleScanStates(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
+			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "movie" {
 			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "movie")

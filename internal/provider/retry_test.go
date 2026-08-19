@@ -477,7 +477,7 @@ func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
 	if string(data) != "ok" {
-		t.Fatalf("Download() = %q, want %q", data, "ok")
+		t.Errorf("Download() = %q, want %q", data, "ok")
 	}
 	if got := recs.CountExact(msgDownloadRecovered); got != 0 {
 		t.Errorf("recovered-log count after first-attempt success = %d, want 0", got)
@@ -498,16 +498,16 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
 	if string(data) != "ok" {
-		t.Fatalf("Download() = %q, want %q", data, "ok")
+		t.Errorf("Download() = %q, want %q", data, "ok")
 	}
 	if got := recs.CountExact(msgDownloadRecovered); got != 1 {
-		t.Fatalf("recovered-log count = %d, want 1", got)
+		t.Errorf("recovered-log count = %d, want 1", got)
 	}
 	if v, ok := recs.AttrValue(msgDownloadRecovered, "attempts"); !ok || v != "2" {
 		t.Errorf("recovered-log attempts = %q (present=%v), want \"2\"", v, ok)
 	}
 	if got := recs.CountExact(msgDownloadRetrying); got != 1 {
-		t.Fatalf("retrying-warn count = %d, want 1", got)
+		t.Errorf("retrying-warn count = %d, want 1", got)
 	}
 	if v, ok := recs.AttrValue(msgDownloadRetrying, "attempt"); !ok || v != "1" {
 		t.Errorf("retrying-warn attempt = %q (present=%v), want \"1\"", v, ok)

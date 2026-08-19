@@ -291,7 +291,7 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	s.handleDismissAlert(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
+		t.Errorf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify the alert was dismissed: a dismissed alert leaves the visible set.

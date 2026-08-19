@@ -173,7 +173,7 @@ func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
 		t.Fatalf("CleanupExpiredOIDCStates(none expired): %v", err)
 	}
 	if n != 0 {
-		t.Fatalf("evicted = %d, want 0", n)
+		t.Errorf("evicted = %d, want 0", n)
 	}
 	if got := logs.CountExact("expired oidc states cleaned"); got != 0 {
 		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
@@ -186,7 +186,7 @@ func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
 		t.Fatalf("CleanupExpiredOIDCStates(one expired): %v", err)
 	}
 	if n != 1 {
-		t.Fatalf("evicted = %d, want 1", n)
+		t.Errorf("evicted = %d, want 1", n)
 	}
 	if got := logs.CountExact("expired oidc states cleaned"); got != 1 {
 		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)

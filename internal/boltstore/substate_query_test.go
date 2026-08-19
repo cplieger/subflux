@@ -305,7 +305,7 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 		t.Fatalf("GetState(all): %v", err)
 	}
 	if len(all) != 4 {
-		t.Fatalf("unfiltered count = %d, want 4", len(all))
+		t.Errorf("unfiltered count = %d, want 4", len(all))
 	}
 
 	// MediaType filter.

@@ -174,7 +174,7 @@ func TestProviderDefaults_declared_once_in_schema(t *testing.T) {
 		t.Fatal("opensubtitles schema no longer declares use_hash; the single-source default moved or vanished")
 	}
 	if declared.Default != "true" || declared.Type != "bool" {
-		t.Fatalf("use_hash declaration = %+v, want bool default true", declared)
+		t.Errorf("use_hash declaration = %+v, want bool default true", declared)
 	}
 
 	normalized := provider.NormalizeSettings(fields, nil)

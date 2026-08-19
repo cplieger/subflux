@@ -59,7 +59,7 @@ func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
 	if cred.ID < 1 {
-		t.Fatalf("CreatePasskey did not set a positive ID, got %d", cred.ID)
+		t.Errorf("CreatePasskey did not set a positive ID, got %d", cred.ID)
 	}
 	if cred.CreatedAt.IsZero() {
 		t.Errorf("CreatePasskey did not stamp CreatedAt")

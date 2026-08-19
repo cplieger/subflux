@@ -45,7 +45,7 @@ func TestSearchTargets_save_download_error_still_returns_path(t *testing.T) {
 	}
 	// Path should still be returned even when SaveDownload fails (it's a warning).
 	if len(result.Paths()) != 1 {
-		t.Fatalf("SearchTargets() returned %d paths, want 1 (SaveDownload error is non-fatal)", len(result.Paths()))
+		t.Errorf("SearchTargets() returned %d paths, want 1 (SaveDownload error is non-fatal)", len(result.Paths()))
 	}
 	if ms.saveCalled != true {
 		t.Error("SaveDownload not called")

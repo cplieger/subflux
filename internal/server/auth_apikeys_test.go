@@ -14,6 +14,11 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. A length check keeps t.Fatalf when a later line
+// indexes the slice it counted (keys[0]) — converting that one would turn a
+// clean failure into a panic.
+
 func TestListAPIKeys_Empty(t *testing.T) {
 	t.Parallel()
 	s, db := testAuthServer(t)
@@ -226,7 +231,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	s.authH.HandleRevokeAPIKey(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+		t.Errorf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	// Verify key is gone.

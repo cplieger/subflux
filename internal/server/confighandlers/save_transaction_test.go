@@ -92,16 +92,16 @@ languages:
 
 	a := <-recA
 	if a.Code != http.StatusOK {
-		t.Fatalf("save A status = %d, body %s", a.Code, a.Body.String())
+		t.Errorf("save A status = %d, body %s", a.Code, a.Body.String())
 	}
 	if recB.Code != http.StatusOK {
-		t.Fatalf("save B status = %d, body %s", recB.Code, recB.Body.String())
+		t.Errorf("save B status = %d, body %s", recB.Code, recB.Body.String())
 	}
 	mu.Lock()
 	gotCalls, gotLive := calls, liveURL
 	mu.Unlock()
 	if gotCalls != 2 {
-		t.Fatalf("hot reload calls = %d, want 2", gotCalls)
+		t.Errorf("hot reload calls = %d, want 2", gotCalls)
 	}
 
 	saved, err := os.ReadFile(cfgPath)

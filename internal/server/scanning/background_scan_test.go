@@ -23,6 +23,12 @@ import (
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. Two shapes keep t.Fatalf — the slot acquisition
+// that stages a QUEUED scan (without it the scan runs immediately and the
+// test measures nothing), and an accept status that gates decoding the
+// ScanAccepted body the later assertions read.
+
 // --- fakes ---
 
 // fakeEngine is a controllable api.SearchEngine: SearchTargets counts calls
@@ -361,7 +367,7 @@ func TestHandleScanSeries_preflight_not_found_404(t *testing.T) {
 
 	code, _ := rig.post(t, rig.h.HandleScanSeries, "/api/scan/series/42", "")
 	if code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 (synchronous preflight)", code)
+		t.Errorf("status = %d, want 404 (synchronous preflight)", code)
 	}
 	if n := len(rig.log.Entries()); n != 0 {
 		t.Errorf("activity entries = %d after preflight failure, want 0", n)
@@ -716,7 +722,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 
 		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID)
 		if outcome != activity.OutcomeCompleted {
-			t.Fatalf("outcome = %q, want completed", outcome)
+			t.Errorf("outcome = %q, want completed", outcome)
 		}
 		if db.cleared != 1 {
 			t.Errorf("cycle mark cleared %d times, want 1", db.cleared)
@@ -735,7 +741,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		cancel()
 		outcome := RunFullScan(ctx, make(chan struct{}), deps, ls, actID)
 		if outcome != activity.OutcomeShutdown {
-			t.Fatalf("outcome = %q, want shutdown", outcome)
+			t.Errorf("outcome = %q, want shutdown", outcome)
 		}
 		if db.cleared != 0 {
 			t.Errorf("cycle mark cleared %d times on shutdown, want 0 (resume signal stays)", db.cleared)
@@ -1044,7 +1050,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 
 	callsAtAccept := callCount()
 	if callsAtAccept != 2 {
-		t.Fatalf("state callbacks consulted %d times at accept, want exactly 2 (one combined state read + one deps read)", callsAtAccept)
+		t.Errorf("state callbacks consulted %d times at accept, want exactly 2 (one combined state read + one deps read)", callsAtAccept)
 	}
 
 	// Hot reload while the operation is queued: swap every generation callback.

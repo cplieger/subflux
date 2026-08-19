@@ -543,7 +543,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 		t.Fatalf("activate(issuer A) error = %v", err)
 	}
 	if loc := oidcRedirectLocation(t, h); !strings.HasPrefix(loc, issuerA.URL+"/auth") {
-		t.Fatalf("redirect after discovery A = %q, want prefix %q", loc, issuerA.URL+"/auth")
+		t.Errorf("redirect after discovery A = %q, want prefix %q", loc, issuerA.URL+"/auth")
 	}
 
 	// Edit the issuer. The forever-cached-provider bug served issuer A here.
@@ -552,7 +552,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 		t.Fatalf("activate(issuer B) error = %v", err)
 	}
 	if loc := oidcRedirectLocation(t, h); !strings.HasPrefix(loc, issuerB.URL+"/auth") {
-		t.Fatalf("redirect after issuer edit = %q, want prefix %q (fresh slot must re-discover)",
+		t.Errorf("redirect after issuer edit = %q, want prefix %q (fresh slot must re-discover)",
 			loc, issuerB.URL+"/auth")
 	}
 

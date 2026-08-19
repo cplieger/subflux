@@ -62,7 +62,7 @@ func TestParseTrustedProxies(t *testing.T) {
 				t.Fatalf("parseTrustedProxies(%v) unexpected error: %v", tt.in, err)
 			}
 			if len(nets) != tt.wantLen {
-				t.Fatalf("parseTrustedProxies(%v) len = %d, want %d", tt.in, len(nets), tt.wantLen)
+				t.Errorf("parseTrustedProxies(%v) len = %d, want %d", tt.in, len(nets), tt.wantLen)
 			}
 			if tt.contains != "" && !containsIP(nets, tt.contains) {
 				t.Errorf("parsed set %v does not contain %s", tt.in, tt.contains)
@@ -113,7 +113,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 		cfg.buildCaches(t.Context())
 		got := cfg.TrustedProxyNets()
 		if len(got) != 2 {
-			t.Fatalf("TrustedProxyNets() len = %d, want 2", len(got))
+			t.Errorf("TrustedProxyNets() len = %d, want 2", len(got))
 		}
 		if !containsIP(got, "10.9.8.7") {
 			t.Error("parsed set should contain 10.9.8.7 (inside 10.0.0.0/8)")

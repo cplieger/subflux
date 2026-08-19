@@ -14,7 +14,7 @@ func TestNopConfigContract(t *testing.T) {
 	var cfg search.SearchCfg = &testsupport.NopConfig{}
 
 	if s := cfg.Scores(); s == (api.Scores{}) {
-		t.Fatal("Scores() returned zero Scores; expected DefaultScores")
+		t.Error("Scores() returned zero Scores; expected DefaultScores")
 	}
 	_ = cfg.Search()
 	_ = cfg.Adaptive()
@@ -24,15 +24,15 @@ func TestNopConfigContract(t *testing.T) {
 	all := []api.ProviderID{"a", "b"}
 	got := cfg.ProvidersForTarget(nil, all)
 	if len(got) != len(all) {
-		t.Fatalf("ProvidersForTarget: got %d, want %d", len(got), len(all))
+		t.Errorf("ProvidersForTarget: got %d, want %d", len(got), len(all))
 	}
 	if cfg.MinScoreForTarget(nil, api.MediaTypeMovie) != 0 {
-		t.Fatal("MinScoreForTarget: expected 0")
+		t.Error("MinScoreForTarget: expected 0")
 	}
 	if cfg.ProviderPriority("x") != 0 {
-		t.Fatal("ProviderPriority: expected 0")
+		t.Error("ProviderPriority: expected 0")
 	}
 	if cfg.EmbeddedPolicy() != (api.EmbeddedPolicy{}) {
-		t.Fatal("EmbeddedPolicy: expected zero policy for zero NopConfig")
+		t.Error("EmbeddedPolicy: expected zero policy for zero NopConfig")
 	}
 }

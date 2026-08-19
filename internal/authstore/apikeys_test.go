@@ -47,7 +47,7 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
 	if key.ID < 1 {
-		t.Fatalf("CreateAPIKey did not set a positive ID, got %d", key.ID)
+		t.Errorf("CreateAPIKey did not set a positive ID, got %d", key.ID)
 	}
 	if key.CreatedAt.IsZero() {
 		t.Errorf("CreateAPIKey did not stamp CreatedAt")

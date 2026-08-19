@@ -182,7 +182,7 @@ func TestRecordSubtitleFiles_deletes_stale(t *testing.T) {
 	}
 	rows := listFiles(t, db, covMT, "tmdb-1")
 	if len(rows) != 1 || rows[0].Language != "fr" {
-		t.Fatalf("rows = %+v, want exactly the fr row", rows)
+		t.Errorf("rows = %+v, want exactly the fr row", rows)
 	}
 	if totalFiles(t, db) != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 after stale delete", totalFiles(t, db))

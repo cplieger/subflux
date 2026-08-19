@@ -29,10 +29,10 @@ func TestEnsureAdminSocketDir_creates0700(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !fi.IsDir() {
-		t.Fatal("not a directory")
+		t.Error("not a directory")
 	}
 	if got := fi.Mode().Perm(); got != 0o700 {
-		t.Fatalf("directory mode = %v, want 0700", got)
+		t.Errorf("directory mode = %v, want 0700", got)
 	}
 }
 
@@ -129,7 +129,7 @@ func TestAdminSocketListener_bindsAndClearsStaleSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	if fi.Mode().Perm() != 0o700 {
-		t.Fatalf("dir mode = %v, want 0700", fi.Mode().Perm())
+		t.Errorf("dir mode = %v, want 0700", fi.Mode().Perm())
 	}
 
 	srv := &http.Server{
@@ -155,7 +155,7 @@ func TestAdminSocketListener_bindsAndClearsStaleSocket(t *testing.T) {
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", resp.StatusCode)
+		t.Errorf("status = %d, want 204", resp.StatusCode)
 	}
 }
 

@@ -108,7 +108,7 @@ func TestHandleSyncOffset_resolvedRefKeysOffsetByPath(t *testing.T) {
 	h.HandleSyncOffset(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+		t.Errorf("status = %d: %s", rec.Code, rec.Body.String())
 	}
 	if store.setPath != subPath {
 		t.Errorf("offset recorded for %q, want the RESOLVED path %q", store.setPath, subPath)
@@ -130,7 +130,7 @@ func TestHandleSyncOffset_unresolvedRefReturns404(t *testing.T) {
 	h.HandleSyncOffset(rec, req)
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", rec.Code)
+		t.Errorf("status = %d, want 404", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "subtitle_not_found") {
 		t.Errorf("body = %q, want subtitle_not_found", rec.Body.String())
@@ -176,7 +176,7 @@ func TestHandleSyncAudio_assGateOnResolvedPath(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 (ASS apply refusal)", rec.Code)
+		t.Errorf("status = %d, want 400 (ASS apply refusal)", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "sync_unsupported_format") {
 		t.Errorf("body = %q, want sync_unsupported_format", rec.Body.String())
@@ -189,7 +189,7 @@ func TestHandleSyncAudio_assGateOnResolvedPath(t *testing.T) {
 	rec = httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("dry-run status = %d, want 200: %s", rec.Code, rec.Body.String())
+		t.Errorf("dry-run status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -215,7 +215,7 @@ func TestHandleSyncAudio_noVideoRecordedReturns404(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.HandleSyncAudio(rec, req)
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 (no video path derivable)", rec.Code)
+		t.Errorf("status = %d, want 404 (no video path derivable)", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "media_not_found") {
 		t.Errorf("body = %q, want media_not_found", rec.Body.String())

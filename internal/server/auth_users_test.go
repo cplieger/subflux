@@ -148,7 +148,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	s.authH.HandleDeleteUser(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("handleDeleteUser status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+		t.Errorf("handleDeleteUser status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	// Verify user is gone.

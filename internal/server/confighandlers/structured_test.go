@@ -15,6 +15,12 @@ import (
 	"github.com/cplieger/subflux/internal/config/schema"
 )
 
+// Abort vs report in this file: a save's status is a value mismatch and
+// reports with t.Errorf, because what the handler wrote to disk is an
+// independent fact worth seeing either way. The GET in the round-trip test
+// keeps t.Fatalf: its body is the save's INPUT, so past a failed GET the
+// save-back asserts on an error envelope.
+
 // --- test fixtures ---
 
 // structuredTestSchema is a compact stand-in for the real schema: one plain
@@ -134,7 +140,7 @@ languages:
 	h.saveMu.Unlock()
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
+		t.Errorf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
 	}
 	if !strings.Contains(rec.Body.String(), string(api.CodeConfigTooLarge)) {
 		t.Errorf("applyConfig(over-cap payload) body = %q, want error code %q",
@@ -187,10 +193,10 @@ func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 
 	paths := secretPaths(full)
 	if len(paths) != wantCount {
-		t.Fatalf("secretPaths found %d paths, schema declares %d Secret fields", len(paths), wantCount)
+		t.Errorf("secretPaths found %d paths, schema declares %d Secret fields", len(paths), wantCount)
 	}
 	if wantCount == 0 {
-		t.Fatal("schema declares zero secrets; the walker has nothing to protect (schema regression?)")
+		t.Error("schema declares zero secrets; the walker has nothing to protect (schema regression?)")
 	}
 }
 
@@ -207,7 +213,7 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, err := os.ReadFile(cfgPath)
@@ -255,7 +261,7 @@ languages:
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, _ := os.ReadFile(cfgPath)
@@ -300,7 +306,7 @@ languages:
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 	saved, _ := os.ReadFile(cfgPath)
 	if strings.Contains(string(saved), "old-password") {
@@ -400,7 +406,7 @@ providers:
 
 	rec := doStructuredSave(t, h, getRec.Body.String())
 	if rec.Code != http.StatusOK {
-		t.Fatalf("save-back status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("save-back status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, _ := os.ReadFile(cfgPath)
@@ -633,7 +639,7 @@ func TestStructuredSave_baseline_failure_with_explicit_secrets_saves(t *testing.
 
 	rec := doStructuredSave(t, h, explicitSecretsPayload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("explicit-secrets save over corrupt baseline status = %d, body %s",
+		t.Errorf("explicit-secrets save over corrupt baseline status = %d, body %s",
 			rec.Code, rec.Body.String())
 	}
 	if reloads != 1 {
@@ -677,7 +683,7 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 
 			rec := doStructuredSave(t, h, keepSecretsPayloadEmptyScalar)
 			if rec.Code != http.StatusOK {
-				t.Fatalf("keep-semantics save over empty baseline status = %d, body %s",
+				t.Errorf("keep-semantics save over empty baseline status = %d, body %s",
 					rec.Code, rec.Body.String())
 			}
 			saved, err := os.ReadFile(cfgPath)
