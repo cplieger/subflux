@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
-
 	"github.com/cplieger/webhttp/v2"
 )
 

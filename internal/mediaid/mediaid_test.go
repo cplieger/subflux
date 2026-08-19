@@ -67,7 +67,7 @@ func TestIsValidMediaPrefix_invalid_formats(t *testing.T) {
 	}
 }
 
-func TestBuildMediaID(t *testing.T) {
+func TestBuild(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -103,7 +103,7 @@ func TestBuildMediaID(t *testing.T) {
 	}
 }
 
-func TestBuildMovieID(t *testing.T) {
+func TestMovie(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -132,7 +132,7 @@ func TestBuildMovieID(t *testing.T) {
 	}
 }
 
-func TestBuildEpisodeID(t *testing.T) {
+func TestEpisode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -163,7 +163,7 @@ func TestBuildEpisodeID(t *testing.T) {
 	}
 }
 
-func TestBuildSeriesPrefix(t *testing.T) {
+func TestSeriesPrefix(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -321,7 +321,8 @@ func TestBuildMediaID_nil_request_returns_empty(t *testing.T) {
 		t.Errorf("Build(nil) = %q, want empty string", got)
 	}
 }
-func BenchmarkBuildMediaID(b *testing.B) {
+
+func BenchmarkBuild(b *testing.B) {
 	req := &api.SearchRequest{
 		MediaType: api.MediaTypeEpisode,
 		TvdbID:    12345,
@@ -335,7 +336,7 @@ func BenchmarkBuildMediaID(b *testing.B) {
 	}
 }
 
-func BenchmarkBuildEpisodeID(b *testing.B) {
+func BenchmarkEpisode(b *testing.B) {
 	b.ReportAllocs()
 	for range b.N {
 		_ = Episode(98765, "tt7654321", 2, 14)

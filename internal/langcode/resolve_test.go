@@ -34,7 +34,7 @@ func TestLogUnknownLang_logs_only_nonempty_name(t *testing.T) {
 
 // --- FromName ---
 
-func TestLangNameToISO(t *testing.T) {
+func TestFromName(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -85,7 +85,7 @@ func TestLangNameToISO(t *testing.T) {
 
 // --- ParseAudioList ---
 
-func TestParseAudioLangs(t *testing.T) {
+func TestParseAudioList(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

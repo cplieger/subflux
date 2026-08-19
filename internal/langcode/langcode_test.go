@@ -6,7 +6,7 @@ import (
 	"pgregory.net/rapid"
 )
 
-func TestCanonicalLangCode(t *testing.T) {
+func TestCanonical(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -93,7 +93,7 @@ func TestCanonicalLangCode(t *testing.T) {
 	}
 }
 
-func TestValidLangCode(t *testing.T) {
+func TestValid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
