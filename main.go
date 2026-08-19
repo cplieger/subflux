@@ -40,9 +40,15 @@ import (
 	"github.com/cplieger/webhttp/v2"
 )
 
-// Compile-time interface satisfaction checks.
+// Compile-time interface satisfaction checks. Each of these is a cross-package
+// join where neither side imports the other, so the assertion is the only place
+// the check can be made and a failure names the pair.
+//
+// *boltstore.DB is deliberately absent: newServer hands it straight to
+// server.New(db server.Store, ...), so the call site already type-checks the
+// whole surface the server requires, and storetest.Store checks the rest from
+// boltstore's own contract test.
 var (
-	_ api.Store          = (*boltstore.DB)(nil)
 	_ server.AuthStore   = (*authstore.Store)(nil)
 	_ api.ConfigProvider = (*config.Config)(nil)
 	_ api.Scorer         = (*scorer.Engine)(nil)
@@ -514,7 +520,7 @@ func newConfigLoader() api.ConfigLoader {
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
 func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg api.ConfigProvider, db api.Store, m search.SearchMetrics) (*search.Engine, api.Scorer, []api.Provider, error) {
+	return func(ctx context.Context, cfg api.ConfigProvider, db search.SearchStore, m search.SearchMetrics) (*search.Engine, api.Scorer, []api.Provider, error) {
 		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err

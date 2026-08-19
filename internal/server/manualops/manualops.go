@@ -53,9 +53,10 @@ type SearchDeps struct {
 	Events   EventPublisher
 }
 
-// SearchStore is the narrow store interface for manual search operations.
-// The lock key's empty variant means "all variants of the language" (see
-// api.ManualLockKey).
+// SearchStore is the two rows a manual search touches: what is already on disk
+// for the language (the popup's "downloaded" markers) and releasing a lock.
+// 2 of the 36 methods the store offers. The lock key's empty variant means
+// "all variants of the language" (see api.ManualLockKey).
 type SearchStore interface {
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key api.ManualLockKey) error

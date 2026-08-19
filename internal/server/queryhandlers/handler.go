@@ -10,7 +10,9 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// QueryStore documents the api.Store methods used by query handlers.
+// QueryStore is the read-only introspection surface behind /api/state,
+// /api/backoff and /api/locks: 5 of the 36 methods the store offers, all of
+// them reads. Nothing on this path writes, which is why no write appears here.
 type QueryStore interface {
 	GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error)
 	GetBackoffItems(ctx context.Context) ([]api.BackoffEntry, error)
@@ -18,9 +20,6 @@ type QueryStore interface {
 	GetManualLocks(ctx context.Context) ([]api.ManualLockEntry, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
-
-// Compile-time assertion: api.Store satisfies QueryStore.
-var _ QueryStore = api.Store(nil)
 
 // StatsSonarrClient is the Sonarr surface the stats handler uses.
 type StatsSonarrClient interface {

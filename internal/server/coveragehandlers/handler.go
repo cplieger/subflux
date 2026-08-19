@@ -21,14 +21,14 @@ var (
 	errFetchMovies = errors.New("fetch movies from arr")
 )
 
-// CoverageStore documents the api.Store methods used by coverage handlers.
+// CoverageStore is the two reads the coverage endpoints answer from: the
+// subtitle-file inventory and the scan-state rows. 2 of the 36 methods the
+// store offers, and 2 of the 12 in the coverage family — these handlers report
+// coverage, they never record it.
 type CoverageStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	GetScanStates(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error)
 }
-
-// Compile-time assertion: api.Store satisfies CoverageStore.
-var _ CoverageStore = api.Store(nil)
 
 // CoverageSonarrClient is the Sonarr surface coverage handlers use.
 type CoverageSonarrClient interface {

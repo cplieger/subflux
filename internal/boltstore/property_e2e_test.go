@@ -16,7 +16,7 @@ import (
 // Requirements 14.3, 18.5). It is the public-method sibling of
 // TestIndexHelpers_indexEqualsRescan in index_test.go: where that one drives the
 // typed wiring chokepoints (putState/deleteState/...) directly, this one drives
-// the PUBLIC api.Store domain methods (SaveDownload, RecordNoResult,
+// the PUBLIC domain methods (SaveDownload, RecordNoResult,
 // RecordSubtitleFiles, RecordScanState, ClearManualLock, DeleteStateByPaths,
 // ReconcileState) through a rich op alphabet, keys drawn from a SMALL pool to
 // force collisions, in-place upserts, and deletes. After every op sequence it
@@ -107,7 +107,7 @@ func allPubSubPaths() []string {
 	return out
 }
 
-// TestPublicStore_indexEqualsRescan drives the public api.Store domain methods
+// TestPublicStore_indexEqualsRescan drives the public domain methods
 // with a rich op alphabet and a small key pool, then asserts every index, the
 // ix_state_quad projection, and the maintained counters equal a full primary
 // re-scan (Requirements 14.3, 18.5).
@@ -143,7 +143,7 @@ func TestPublicStore_indexEqualsRescan(t *testing.T) {
 }
 
 // applyPublicOp draws one operation from the public-method op alphabet and
-// applies it through the real api.Store entry points.
+// applies it through the real store entry points.
 func applyPublicOp(rt *rapid.T, db *DB, ctx context.Context, env *statEnv) {
 	op := rapid.SampledFrom([]string{
 		"saveAuto", "saveManual",

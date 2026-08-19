@@ -38,7 +38,7 @@ import (
 type Func func(
 	ctx context.Context,
 	cfg api.ConfigProvider,
-	db api.Store,
+	db search.SearchStore,
 	m search.SearchMetrics,
 ) (*search.Engine, api.Scorer, []api.Provider, error)
 

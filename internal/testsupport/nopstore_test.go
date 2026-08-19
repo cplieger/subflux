@@ -5,6 +5,16 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/server/coveragehandlers"
+	"github.com/cplieger/subflux/internal/server/filehandlers"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/polling"
+	"github.com/cplieger/subflux/internal/server/queryhandlers"
+	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/server/scheduler"
+	"github.com/cplieger/subflux/internal/server/synchandlers"
 )
 
 // TestNopStoreContract verifies that NopStore satisfies the same basic
@@ -99,3 +109,33 @@ func TestNopStoreContract(t *testing.T) {
 		}
 	})
 }
+
+// nopStoreConsumers is the union of every narrow store interface NopStore is
+// installed as across the app. It lives in this file, not beside NopStore,
+// because a production file in testsupport must not pull eleven packages into
+// the build graph to hold one assertion — a _test.go file's imports are
+// test-only, so the check costs nothing.
+//
+// This is what replaced `var _ api.Store = (*NopStore)(nil)`. The old
+// assertion pinned the fake to a hand-written 36-method list; this one pins it
+// to what consumers actually ask for, so a package that adds a method to its
+// own interface breaks HERE with one readable error instead of at each of the
+// dozen sites that install the fake. server.Store is deliberately absent: it
+// embeds most of these and internal/server's own New(&NopStore{}) call is its
+// compile-time check.
+type nopStoreConsumers interface {
+	search.SearchStore
+	scanning.ScanStore
+	scanning.BackoffPrefixReader
+	scheduler.Store
+	queryhandlers.QueryStore
+	synchandlers.SyncStore
+	filehandlers.FileStore
+	coveragehandlers.CoverageStore
+	manualops.DownloadStore
+	polling.PollerStore
+	resolve.FileStore
+	api.CoverageStore
+}
+
+var _ nopStoreConsumers = (*NopStore)(nil)

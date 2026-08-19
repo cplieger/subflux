@@ -26,7 +26,9 @@ import (
 	"github.com/cplieger/subflux/internal/subtitleext"
 )
 
-// FileStore is the narrow store interface used by file handlers.
+// FileStore is what deleting a subtitle file has to touch: find the rows, drop
+// the one row, release a manual lock the deletion emptied, and answer the
+// media-ID listing. 5 of the 36 methods the store offers.
 type FileStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant, source api.SubtitleSource, path string) error
@@ -34,9 +36,6 @@ type FileStore interface {
 	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
 	HistoryMediaIDs(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error)
 }
-
-// Compile-time assertion: api.Store satisfies FileStore.
-var _ FileStore = api.Store(nil)
 
 // Deps holds the dependencies for file handlers.
 type Deps struct {

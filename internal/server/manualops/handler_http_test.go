@@ -70,12 +70,22 @@ func (p *httpStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte,
 	return nil, nil
 }
 
+// harnessStore is what newHTTPHarness needs from a store: the search engine's
+// surface, this package's own download surface, and the one method the
+// reference resolver calls. Three narrow interfaces rather than a 36-method
+// composite, which is what the harness was asking for before.
+type harnessStore interface {
+	search.SearchStore
+	DownloadStore
+	resolve.FileStore
+}
+
 // newHTTPHarness builds a Handler wired like the server's composition root:
 // a real search engine (accurate score simulation), permissive path
 // validation, and no-op activity/alert/event sinks. The returned WaitGroup
 // is the handler's BGTracker; Wait it before finishing tests that reach the
 // background download path.
-func newHTTPHarness(db api.Store, cfg api.ConfigProvider, providers []api.Provider) (*Handler, *sync.WaitGroup) {
+func newHTTPHarness(db harnessStore, cfg api.ConfigProvider, providers []api.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,

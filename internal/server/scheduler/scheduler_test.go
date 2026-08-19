@@ -24,8 +24,6 @@ type fakeStore struct {
 	reconcile    api.ReconcileResult
 }
 
-var _ api.Store = (*fakeStore)(nil)
-
 func (f *fakeStore) ReconcileState(context.Context) (api.ReconcileResult, error) {
 	return f.reconcile, f.reconcileErr
 }

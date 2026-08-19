@@ -176,8 +176,6 @@ func (s *Server) initHandlers() {
 // initManualHandler constructs the manualops.Handler with the server's dependencies.
 func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handler {
 	return manualops.NewHandler(manualops.HandlerDeps{
-		// api.Store is a compile-checked superset of manualops.DownloadStore,
-		// so the implicit interface conversion needs no assertion.
 		DBFunc:   func() manualops.DownloadStore { return s.db },
 		Activity: s.activity,
 		Alerts:   s.alerts,

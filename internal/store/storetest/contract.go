@@ -1,7 +1,13 @@
 // Package storetest provides a shared, engine-agnostic behavioral contract
-// suite for api.Store implementations. It depends ONLY on internal/api, so it
-// pins behaviour at the api.Store seam rather than at one engine's internals
-// (Requirement 14.1). boltstore.DB is the only engine today.
+// suite for the core subtitle store. It depends ONLY on internal/api, so it
+// pins behaviour at the store's own contract rather than at one engine's
+// internals (Requirement 14.1). boltstore.DB is the only engine today.
+//
+// The contract is the Store interface declared BELOW, in this package. That is
+// deliberate: a contract suite is the one consumer for which a wide store
+// interface is the honest shape, because the suite's whole job is to exercise
+// the surface an engine must implement. Every other consumer in the app takes
+// the two to seven methods it calls.
 //
 // # What this suite is
 //
@@ -19,7 +25,7 @@
 //     adaptive disabled, Requirement 7.8).
 //
 // Because it asserts exact values it requires a REAL persisting store: a no-op
-// fake (testsupport.NopStore) that discards writes cannot satisfy it, and the
+// fake that discards writes cannot satisfy it, and the
 // boltstore package proves the suite catches a regression by running one
 // promoted invariant (AssertClearManualLockNonDestructive) against a
 // deliberately broken stub and asserting the assertion fails.
@@ -70,10 +76,62 @@ type TB interface {
 	Fatalf(format string, args ...any)
 }
 
-// Suite runs the engine-agnostic behavioral contract against any api.Store
+// Store is the surface this suite exercises: 27 of the 36 methods the concrete
+// store exports. The nine it does not touch are GetBackoffItems,
+// HistoryMediaIDs, UpsertSubtitleFile, DeleteSubtitleFile, LastScanTime, the
+// three ScanCycleStart accessors, and Close — read paths and lifecycle that
+// their own consumers' tests cover. Listing 27 rather than inheriting 36 is
+// what makes that gap visible instead of implied.
+//
+// This is the one interface in subflux that names a broad store surface, and it
+// is declared here because this package IS its only consumer.
+type Store interface {
+	// Adaptive backoff.
+	RecordNoResult(ctx context.Context, mediaType api.MediaType, mediaID, language string, providerName api.ProviderID, bp api.BackoffParams) error
+	BackedOffProviders(ctx context.Context, mediaType api.MediaType, mediaID, language string, maxAttempts int) ([]api.ProviderID, error)
+	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
+
+	// Download records and history.
+	SaveDownload(ctx context.Context, rec *api.DownloadRecord) error
+	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
+	CurrentScore(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error)
+	GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error)
+
+	// Manual locks and ordinals.
+	IsManuallyLocked(ctx context.Context, key api.ManualLockKey) (bool, error)
+	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
+	ManualDownloadCount(ctx context.Context, key api.ManualLockKey) (int, error)
+	ManualSubtitlePaths(ctx context.Context, key api.ManualLockKey) ([]string, error)
+	NextManualNumber(ctx context.Context, key api.ManualLockKey) int
+	GetManualLocks(ctx context.Context) ([]api.ManualLockEntry, error)
+
+	// Coverage: subtitle files and scan state.
+	RecordSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaID string, files []api.SubtitleFile) (bool, error)
+	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
+	RecordScanState(ctx context.Context, rec *api.ScanRecord) error
+	GetScanStates(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error)
+	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
+	TotalSubtitleFiles(ctx context.Context) (int, error)
+
+	// Sync offsets.
+	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
+	GetSyncOffset(ctx context.Context, path string) (int64, error)
+
+	// Poll watermark.
+	GetPollTimestamp(ctx context.Context, key api.PollKey) (time.Time, error)
+	SetPollTimestamp(ctx context.Context, key api.PollKey, t time.Time) error
+
+	// Maintenance.
+	Stats(ctx context.Context) (downloads, attempts int, err error)
+	DeleteStateByPaths(ctx context.Context, paths []string) (api.CleanupResult, error)
+	CleanupDrift(ctx context.Context, drift api.ConfigDrift) error
+	ReconcileState(ctx context.Context) (api.ReconcileResult, error)
+}
+
+// Suite runs the engine-agnostic behavioral contract against any Store
 // produced by newStore. Each promoted finding is a NAMED subtest so a failure
 // names the exact behaviour that regressed.
-func Suite(t *testing.T, newStore func(t *testing.T) api.Store) {
+func Suite(t *testing.T, newStore func(t *testing.T) Store) {
 	t.Helper()
 
 	t.Run("RecordNoResult_then_BackedOff_eligibility", func(t *testing.T) {
@@ -188,7 +246,7 @@ func writeFile(t *testing.T, path string) {
 // mustSaveDownload saves rec via s.SaveDownload or fails the test, labelling the
 // failure with name so a fatal during a multi-step reconcile setup identifies
 // which save failed. It uses context.Background() (every caller's ctx).
-func mustSaveDownload(t *testing.T, s api.Store, name string, rec *api.DownloadRecord) {
+func mustSaveDownload(t *testing.T, s Store, name string, rec *api.DownloadRecord) {
 	t.Helper()
 	if err := s.SaveDownload(context.Background(), rec); err != nil {
 		t.Fatalf("SaveDownload(%s): %v", name, err)
@@ -197,7 +255,7 @@ func mustSaveDownload(t *testing.T, s api.Store, name string, rec *api.DownloadR
 
 // testBackoffEligibility asserts the no-row-means-eligible rule and that a
 // recorded attempt becomes backed off (Requirements 2.1, 2.2, 2.4).
-func testBackoffEligibility(t *testing.T, s api.Store) {
+func testBackoffEligibility(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -238,7 +296,7 @@ func containsProvider(list []api.ProviderID, p api.ProviderID) bool {
 
 // testSaveAutoRoundtrip asserts an auto download is retrievable via CurrentScore
 // (exact score + found) and DownloadedRefs (Requirements 3.4, 3.5).
-func testSaveAutoRoundtrip(t *testing.T, s api.Store) {
+func testSaveAutoRoundtrip(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	rec := &api.DownloadRecord{
@@ -283,7 +341,7 @@ func testSaveAutoRoundtrip(t *testing.T, s api.Store) {
 // testAutoUpsertPreservesImported asserts saving a second auto download for a
 // triple updates it in place AND preserves the original media_imported
 // (Requirement 3.1).
-func testAutoUpsertPreservesImported(t *testing.T, s api.Store) {
+func testAutoUpsertPreservesImported(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tt-up-1"
@@ -330,7 +388,7 @@ func testAutoUpsertPreservesImported(t *testing.T, s api.Store) {
 
 // testSaveClearsBackoff asserts SaveDownload clears the triple's backoff in the
 // same operation (Requirement 3.3): success clears adaptive backoff.
-func testSaveClearsBackoff(t *testing.T, s api.Store) {
+func testSaveClearsBackoff(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tt-cb-1"
@@ -371,7 +429,7 @@ func testSaveClearsBackoff(t *testing.T, s api.Store) {
 // against TB so the boltstore package can run it against a deliberately broken
 // (destructive) stub and assert the assertion fails — proving the suite catches
 // the regression.
-func AssertClearManualLockNonDestructive(t TB, s api.Store) {
+func AssertClearManualLockNonDestructive(t TB, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tt-cl-1"
@@ -435,7 +493,7 @@ func AssertClearManualLockNonDestructive(t TB, s api.Store) {
 
 // testManualOrdinals asserts manual count, the lock-list entry, and the next
 // manual ordinal derived from the path (Requirements 4.4, 15.5, 15.6).
-func testManualOrdinals(t *testing.T, s api.Store) {
+func testManualOrdinals(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tt-mo-1"
@@ -492,7 +550,7 @@ func testManualOrdinals(t *testing.T, s api.Store) {
 // lock reads, and ClearManualLock("") clears every variant's lock. The three
 // phases (row/score independence, lock scoping, lock listing + clear-all)
 // share seeded state, so they run in order on one store.
-func testVariantIndependence(t *testing.T, s api.Store) {
+func testVariantIndependence(t *testing.T, s Store) {
 	t.Helper()
 	mid := "tt-var-1"
 	assertVariantRowIndependence(t, s, mid)
@@ -502,7 +560,7 @@ func testVariantIndependence(t *testing.T, s api.Store) {
 
 // assertVariantRowIndependence seeds one auto row per variant and asserts the
 // rows and their scores stay independent per quad.
-func assertVariantRowIndependence(t *testing.T, s api.Store, mid string) {
+func assertVariantRowIndependence(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -544,7 +602,7 @@ func assertVariantRowIndependence(t *testing.T, s api.Store, mid string) {
 // assertVariantScores asserts CurrentScore answers per quad after the
 // standard(85)/forced(60) seeding, and reports not-found for the unseeded
 // hi variant.
-func assertVariantScores(t *testing.T, s api.Store, mid string) {
+func assertVariantScores(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -561,7 +619,7 @@ func assertVariantScores(t *testing.T, s api.Store, mid string) {
 
 // assertVariantLockScoping saves a manual forced download and asserts the lock
 // and the manual ordinal stay scoped to the forced quad.
-func assertVariantLockScoping(t *testing.T, s api.Store, mid string) {
+func assertVariantLockScoping(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -595,7 +653,7 @@ func assertVariantLockScoping(t *testing.T, s api.Store, mid string) {
 
 // assertVariantLockListAndClear asserts the lock list carries the variant and
 // that ClearManualLock("") clears every variant's lock for the language.
-func assertVariantLockListAndClear(t *testing.T, s api.Store, mid string) {
+func assertVariantLockListAndClear(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -618,7 +676,7 @@ func assertVariantLockListAndClear(t *testing.T, s api.Store, mid string) {
 
 // testPollTimestamp asserts a poll cursor round-trips and an absent key returns
 // the zero time without error (Requirements 6.2, 6.3).
-func testPollTimestamp(t *testing.T, s api.Store) {
+func testPollTimestamp(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -650,7 +708,7 @@ func testPollTimestamp(t *testing.T, s api.Store) {
 // independent sync_offsets bucket keyed by path, so the suite states that
 // precondition instead of assuming it — an engine that hangs offset_ms off the
 // subtitle_files row would no-op a SetSyncOffset for an unknown path.
-func testSyncOffset(t *testing.T, s api.Store) {
+func testSyncOffset(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	const path = "/media/show/episode.eng.srt"
@@ -674,7 +732,7 @@ func testSyncOffset(t *testing.T, s api.Store) {
 // testCoverageFiles asserts the subtitle-file inventory diff-sync: first record
 // reports changed and is retrievable; re-recording the same set reports no
 // change; the total counter is exact (Requirements 5.1, 5.2, 5.5).
-func testCoverageFiles(t *testing.T, s api.Store) {
+func testCoverageFiles(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	files := []api.SubtitleFile{
@@ -717,7 +775,7 @@ func testCoverageFiles(t *testing.T, s api.Store) {
 
 // testScanState asserts scan-state upsert + retrieval and the inclusive
 // RecentlyScanned cutoff (Requirements 5.2, 5.3, 5.4).
-func testScanState(t *testing.T, s api.Store) {
+func testScanState(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	mid := "tvdb-ss-1-s01e01"
@@ -760,7 +818,7 @@ func testScanState(t *testing.T, s api.Store) {
 // saveAuto is a small helper for the query case: it persists one auto download
 // row for a distinct triple with the given title/provider, so GetState filters
 // have material to match.
-func saveAuto(t *testing.T, s api.Store, mt api.MediaType, mid, lang string, prov api.ProviderID, title string, score int) {
+func saveAuto(t *testing.T, s Store, mt api.MediaType, mid, lang string, prov api.ProviderID, title string, score int) {
 	t.Helper()
 	if err := s.SaveDownload(context.Background(), &api.DownloadRecord{
 		MediaType: mt, MediaID: mid, Language: lang, ProviderName: prov,
@@ -775,7 +833,7 @@ func saveAuto(t *testing.T, s api.Store, mt api.MediaType, mid, lang string, pro
 // case-insensitive contains title search, and limit/offset pagination
 // (Requirements 15.1, 15.2, 15.3, 15.5). Pagination is asserted by set-union so
 // it is robust to engine-specific tie ordering on equal media_imported.
-func testGetStateQuery(t *testing.T, s api.Store) {
+func testGetStateQuery(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -827,7 +885,7 @@ func testGetStateQuery(t *testing.T, s api.Store) {
 
 // testDeleteStateByPaths asserts a video-path delete removes the state rows AND
 // their orphaned coverage and backoff (Requirement 7.6).
-func testDeleteStateByPaths(t *testing.T, s api.Store) {
+func testDeleteStateByPaths(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	const video = "/media/del/movie.mkv"
@@ -893,7 +951,7 @@ func testDeleteStateByPaths(t *testing.T, s api.Store) {
 
 // testCleanupDriftRemoved asserts config-drift cleanup deletes only the backoff
 // rows for removed languages, then for removed providers (Requirement 7.7).
-func testCleanupDriftRemoved(t *testing.T, s api.Store) {
+func testCleanupDriftRemoved(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	const mid = "tt-drift-1"
@@ -947,7 +1005,7 @@ func testCleanupDriftRemoved(t *testing.T, s api.Store) {
 
 // testCleanupDriftAdaptiveDisabled asserts disabling adaptive search clears ALL
 // backoff (Requirement 7.8).
-func testCleanupDriftAdaptiveDisabled(t *testing.T, s api.Store) {
+func testCleanupDriftAdaptiveDisabled(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -974,7 +1032,7 @@ func testCleanupDriftAdaptiveDisabled(t *testing.T, s api.Store) {
 // video file no longer exists is deleted along with its orphaned subtitle file,
 // the triple's backoff, and the media's orphaned scan_state; a row whose video
 // still exists is preserved (Requirement 7.1).
-func testReconcileVideoGone(t *testing.T, s api.Store) {
+func testReconcileVideoGone(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -1059,7 +1117,7 @@ func testReconcileVideoGone(t *testing.T, s api.Store) {
 // subtitle row for the same triple still has its file, only the missing row is
 // deleted; the remaining row, the manual lock, the backoff, and media_imported
 // are all preserved (Requirement 7.2).
-func testReconcileSubGoneSiblingPresent(t *testing.T, s api.Store) {
+func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -1137,7 +1195,7 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s api.Store) {
 // subtitle for a triple is gone but the video exists, the auto rows are reset in
 // place (path/score cleared), the manual rows are deleted, and the triple's
 // backoff is cleared (Requirement 7.3).
-func testReconcileAllSubsGone(t *testing.T, s api.Store) {
+func testReconcileAllSubsGone(t *testing.T, s Store) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()

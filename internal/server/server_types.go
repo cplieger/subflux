@@ -104,7 +104,7 @@ type Server struct {
 	lifetime context.Context
 	pollDeps
 	previewDeps
-	db           api.Store
+	db           Store
 	subtitleProc api.SubtitleProcessor
 	metrics      Metrics
 	registry     api.ProviderRegistry

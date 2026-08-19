@@ -9,18 +9,34 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// Compile-time assertion that NopStore implements api.Store.
-var _ api.Store = (*NopStore)(nil)
-
-// NopStore implements api.Store with all methods returning zero/nil values.
-// Embed it in test-specific mock structs and override only the methods
-// relevant to each test case.
+// NopStore is the shared store fake: every method returns a zero value and
+// nothing is persisted. Embed it in a test-specific mock and override only the
+// methods that test exercises.
 //
-// NopStore embeds panicStore (which panics on every method) and overrides
-// all methods with no-op returns. When a new method is added to api.Store,
-// only panicStore needs updating (the compiler tells you); NopStore then
-// inherits the panic until the no-op override is added here.
-type NopStore struct{ panicStore } //nolint:unused // embedded for compile-time interface safety
+// Its WIDTH is now derived, not declared. There is no store interface for it to
+// be exhaustive against any more, so what it must implement is exactly the
+// union of the narrow interfaces the eight packages that use it install it as
+// (search.SearchStore, scanning.ScanStore, scheduler.Store,
+// queryhandlers.QueryStore, synchandlers.SyncStore, filehandlers.FileStore,
+// coveragehandlers.CoverageStore, manualops.DownloadStore, polling.PollerStore,
+// resolve.FileStore, api.CoverageStore, and server.Store, which is the union of
+// most of those). nopstore_test.go states that union in one anonymous interface,
+// so a consumer that adds a method fails there with a readable message rather
+// than at a dozen install sites.
+//
+// Two methods went with the composite because nothing reaches them through an
+// interface: Close (main.go calls it on the concrete *boltstore.DB) and
+// ManualDownloadCount (boltstore's own NextManualNumber fallback and its tests
+// are the only callers). A sibling panicStore used to shadow all 36 methods so
+// that a new one would announce itself; every one of them was overridden here,
+// so it was 159 lines that changed no behaviour, and it is gone.
+type NopStore struct{}
+
+// BackupInto reports success without writing a snapshot.
+func (*NopStore) BackupInto(context.Context, string) error { return nil }
+
+// StoreFileStats reports an empty store.
+func (*NopStore) StoreFileStats() (fileBytes, freelistBytes int64) { return 0, 0 }
 
 // --- Backoff (search_attempts) ---
 
@@ -77,11 +93,6 @@ func (*NopStore) IsManuallyLocked(context.Context, api.ManualLockKey) (bool, err
 // ClearManualLock removes the manual download lock on the key's quad.
 func (*NopStore) ClearManualLock(context.Context, api.ManualLockKey) error {
 	return nil
-}
-
-// ManualDownloadCount returns the number of manual subtitle downloads on the key's quad.
-func (*NopStore) ManualDownloadCount(context.Context, api.ManualLockKey) (int, error) {
-	return 0, nil
 }
 
 // ManualSubtitlePaths returns paths of manually downloaded subtitle files on the key's quad.
@@ -185,6 +196,3 @@ func (*NopStore) CleanupDrift(context.Context, api.ConfigDrift) error { return n
 func (*NopStore) ReconcileState(context.Context) (api.ReconcileResult, error) {
 	return api.ReconcileResult{}, nil
 }
-
-// Close releases any resources held by the store.
-func (*NopStore) Close(context.Context) error { return nil }

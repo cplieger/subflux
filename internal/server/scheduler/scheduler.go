@@ -24,14 +24,13 @@ const StartupDelay = 30 * time.Second
 // are purged from the database.
 const AuthCleanupInterval = 15 * time.Minute
 
-// Store is the narrow store interface used by RunDBMaintenance.
+// Store is the two rows RunDBMaintenance touches: the reconcile pass and the
+// aggregate counts it logs afterwards. Two of the 36 methods the store offers,
+// which is why this is declared here and not taken as a wide type.
 type Store interface {
 	ReconcileState(ctx context.Context) (api.ReconcileResult, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
-
-// Compile-time assertion: api.Store satisfies Store.
-var _ Store = api.Store(nil)
 
 // ReconcileMetrics is the narrow observability interface for reconcile passes.
 // The concrete *obs.Metrics satisfies this via structural typing.
@@ -41,7 +40,7 @@ type ReconcileMetrics interface {
 
 // Deps holds all dependencies for the scheduler.
 type Deps struct {
-	DB api.Store
+	DB Store
 	// ScanDB is the scan-state surface the full scan needs (recency set,
 	// stamps, cycle mark); the composition root passes the same store as DB.
 	ScanDB scanning.ScanStore

@@ -18,14 +18,12 @@ import (
 	"github.com/cplieger/subflux/internal/server/resolve"
 )
 
-// SyncStore documents the api.Store methods used by sync handlers.
+// SyncStore is the offset pair audio-sync reads and writes: 2 of the 36
+// methods the store offers. Sync handlers touch no other row family.
 type SyncStore interface {
 	GetSyncOffset(ctx context.Context, path string) (int64, error)
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 }
-
-// Compile-time assertion: api.Store satisfies SyncStore.
-var _ SyncStore = api.Store(nil)
 
 // Deps holds all dependencies for the sync handler family. Resolve is the
 // S7 typed-reference resolver: sync verbs address the subtitle by FileRef

@@ -13,11 +13,6 @@ import (
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
-// backupStore is the narrow capability the backup runner needs from the store.
-type backupStore interface {
-	BackupInto(ctx context.Context, dest string) error
-}
-
 // runBackup periodically writes a consistent database snapshot and prunes old
 // backups until ctx is cancelled. It re-reads the live config each cycle, so
 // enable/frequency/retention/path changes take effect on the next iteration
@@ -50,10 +45,6 @@ func (s *Server) runOneBackup(ctx context.Context) {
 	if !ok || !cfg.BackupEnabled() {
 		return
 	}
-	bs, ok := s.db.(backupStore)
-	if !ok {
-		return
-	}
 	dir := cfg.BackupPath()
 	if dir == "" {
 		dir = filepath.Dir(config.DefaultDBPath)
@@ -64,7 +55,7 @@ func (s *Server) runOneBackup(ctx context.Context) {
 	}
 	dest := filepath.Join(dir, "subflux-"+time.Now().UTC().Format("20060102-150405")+".bolt")
 	start := time.Now()
-	if err := bs.BackupInto(ctx, dest); err != nil {
+	if err := s.db.BackupInto(ctx, dest); err != nil {
 		slog.Error("backup failed", "dest", dest, "error", err)
 		// A failed snapshot is another early disk-full signal; classify it so
 		// the persistent operator alert fires between maintenance windows.

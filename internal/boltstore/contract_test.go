@@ -10,7 +10,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// TestBoltStoreContract runs the engine-agnostic api.Store behavioral contract
+// TestBoltStoreContract runs the engine-agnostic behavioral contract
 // suite (internal/store/storetest) against the bbolt *DB, proving the new
 // engine satisfies every promoted finding — the three ReconcileState branches,
 // non-destructive ClearManualLock, backoff cleared on save, DeleteStateByPaths
@@ -19,7 +19,7 @@ import (
 // SQLite store.DB (internal/store) for parity.
 func TestBoltStoreContract(t *testing.T) {
 	t.Parallel()
-	storetest.Suite(t, func(t *testing.T) api.Store {
+	storetest.Suite(t, func(t *testing.T) storetest.Store {
 		path := filepath.Join(t.TempDir(), "subflux.bolt")
 		db, err := Open(path)
 		if err != nil {
@@ -31,7 +31,7 @@ func TestBoltStoreContract(t *testing.T) {
 	})
 }
 
-// destructiveClearStore is a deliberately broken api.Store: it embeds a real,
+// destructiveClearStore is a deliberately broken store: it embeds a real,
 // fully-functional *DB but overrides ClearManualLock to DELETE the quad's
 // manual rows instead of flipping them to auto. That violates the promoted
 // non-destructive-ClearManualLock invariant (the rows must be preserved and

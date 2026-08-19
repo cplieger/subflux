@@ -39,15 +39,13 @@ var (
 	_ PollRadarrClient = api.RadarrClient(nil)
 )
 
-// PollerStore is the narrow store interface consumed by poll-import processing.
-// Only DeleteStateByPaths is needed to clean up stale entries when a video
-// file disappears between poll cycles.
+// PollerStore is ONE of the 36 methods the store offers. An import cleans up
+// the rows of a video that disappeared between poll cycles and does nothing
+// else with the store; the poll watermark itself goes through PollCache, which
+// the server builds over the store on the poller's behalf.
 type PollerStore interface {
 	DeleteStateByPaths(ctx context.Context, paths []string) (api.CleanupResult, error)
 }
-
-// Compile-time assertion: api.Store satisfies PollerStore.
-var _ PollerStore = api.Store(nil)
 
 // PollerCfg is the narrow configuration interface consumed by the poller
 // subsystem. The full api.ConfigProvider satisfies it via structural typing.

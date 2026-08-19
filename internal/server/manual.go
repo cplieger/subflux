@@ -7,14 +7,14 @@ import (
 	"github.com/cplieger/subflux/internal/server/manualops"
 )
 
-// manualStore documents the api.Store methods used by manual search/download handlers.
+// manualStore is the two rows manual search and download touch directly from
+// the server root: what is already downloaded for a language, and releasing a
+// manual lock. Two methods, and it is embedded in Store rather than asserted
+// against a wide type, so the composite carries them by construction.
 type manualStore interface {
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key api.ManualLockKey) error
 }
-
-// Compile-time assertion: api.Store satisfies manualStore.
-var _ manualStore = api.Store(nil)
 
 // manualLiveState converts the server's liveState to manualops.LiveState.
 func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {

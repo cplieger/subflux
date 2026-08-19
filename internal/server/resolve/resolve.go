@@ -111,7 +111,7 @@ func (ref *MediaRef) Validate() error {
 }
 
 // FileStore is the store surface resolution needs: the per-media subtitle
-// rows (key-derived identity incl. path; satisfied by api.Store).
+// rows (key-derived identity incl. path).
 type FileStore interface {
 	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
 }
