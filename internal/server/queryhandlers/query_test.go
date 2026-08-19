@@ -110,6 +110,9 @@ func TestHandleState(t *testing.T) {
 		h := New(Deps{QueryDB: store})
 		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=3", nil)
 		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState == nil {
+			t.Fatal("HandleState did not reach the store, so there is no query to inspect")
+		}
 		if store.lastState.Offset != 3 {
 			t.Errorf("offset=3 produced Offset=%d, want 3", store.lastState.Offset)
 		}
@@ -121,6 +124,9 @@ func TestHandleState(t *testing.T) {
 		h := New(Deps{QueryDB: store})
 		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=-5", nil)
 		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState == nil {
+			t.Fatal("HandleState did not reach the store, so there is no query to inspect")
+		}
 		if store.lastState.Offset != 0 {
 			t.Errorf("offset=-5 produced Offset=%d, want 0 (only positive offsets apply)", store.lastState.Offset)
 		}
@@ -152,6 +158,9 @@ func TestHandleState(t *testing.T) {
 		h.HandleState(w, req)
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
+		}
+		if store.lastState == nil {
+			t.Fatal("HandleState answered 200 without reaching the store, so there is no query to inspect")
 		}
 		if store.lastState.MediaType != "episode" {
 			t.Errorf("GetState mediaType = %q, want %q", store.lastState.MediaType, "episode")
