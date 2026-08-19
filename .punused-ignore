@@ -76,8 +76,10 @@ method DeleteSubtitleFile
 # interface, so gopls attributes the reference to the interface member and the
 # implementation looks unused. Each is pinned by a compile-time assertion that
 # fails if the method is removed (verified by renaming each and building):
-#   (*Config).EmbeddedPolicy   config_load.go:22 var _ api.ConfigProvider
-#                              config_accessors.go:19 var _ api.SearchConfigProvider
+#   (*Config).EmbeddedPolicy   config_load.go:21 var _ api.ConfigProvider
+#                              (the nine per-facet assertions that used to sit
+#                              in config_accessors.go went with C11's flattening
+#                              of ConfigProvider; the composite one is the check)
 #   (*Config).Validate         config_types.go:308 var _ Validator
 #   (*NopConfig).EmbeddedPolicy testsupport/nopconfig.go:38 var _ api.ConfigProvider
 #   (*NopStore).Close          testsupport/nopstore.go:13 var _ api.Store

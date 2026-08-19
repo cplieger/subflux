@@ -113,6 +113,12 @@ type ArrConfig struct {
 	PublicURL string
 }
 
+// LogLevel is a typed string for log verbosity levels.
+type LogLevel string
+
+// LogFormat is a typed string for log output formats.
+type LogFormat string
+
 // ProviderCfg is a generic provider configuration block.
 type ProviderCfg struct {
 	Settings map[string]any

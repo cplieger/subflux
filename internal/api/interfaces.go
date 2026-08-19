@@ -13,6 +13,9 @@ package api
 
 import (
 	"context"
+	"time"
+
+	"github.com/cplieger/auth/v4"
 )
 
 // --- Persistence ---
@@ -38,20 +41,68 @@ type Store interface {
 
 // --- Configuration ---
 
-// ConfigProvider gives read access to configuration.
-// It composes the focused sub-interfaces defined in config_iface.go.
-// Consumers should accept the narrowest sub-interface that satisfies
-// their needs; ConfigProvider is for composition roots that need everything.
+// ConfigProvider is the whole read surface of the loaded configuration: all 28
+// values the app reads out of config.yaml. It is WIDE on purpose, and the width
+// is what restricts who may take it — a composition root, which by definition
+// holds everything so that it can hand each consumer something narrower.
+//
+// A consumer that reads three values declares a three-method interface at its
+// own site and accepts that; *config.Config satisfies both structurally, so
+// nothing has to be adapted. Nine sub-interfaces used to be declared here for
+// that purpose and not one consumer ever named them, so the width they were
+// meant to hide was never actually hidden from anybody.
+//
+// Do not carve a subset out of this type for a caller. The subset belongs at
+// the caller.
 type ConfigProvider interface {
-	ScoringConfig
-	LanguageResolver
-	ArrConfigProvider
-	ProviderConfigProvider
-	ServerConfig
-	PathValidator
-	SearchConfigProvider
-	AuthConfigProvider
-	UIConfigProvider
+	// Scoring weights.
+	Scores() Scores
+
+	// Language resolution: which subtitle targets a media item earns, and
+	// which providers and score floor apply to each.
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []SubtitleTarget
+	LanguageCodes() []string
+	ProvidersForTarget(t *SubtitleTarget, allProviders []ProviderID) []ProviderID
+	MinScoreForTarget(t *SubtitleTarget, mediaType MediaType) int
+
+	// Sonarr/Radarr connection details.
+	Sonarr() ArrConfig
+	Radarr() ArrConfig
+
+	// Provider settings and trust order.
+	Providers() map[ProviderID]ProviderCfg
+	ProviderPriority(name ProviderID) int
+
+	// Server runtime.
+	ServerPort() int
+	PollInterval() time.Duration
+	LoggingLevel() LogLevel
+	LoggingFormat() LogFormat
+
+	// Media-path containment. Both answer against the configured media roots.
+	ValidatePath(ctx context.Context, path string) error
+	RemoveUnderRoot(ctx context.Context, path string) error
+
+	// Search behaviour.
+	Search() SearchConfig
+	Adaptive() AdaptiveConfig
+	PostProcess() PostProcessConfig
+	Sync() SyncConfig
+	// EmbeddedPolicy returns the typed embedded subtitle codec policy
+	// from the top-level embedded_subtitles config section.
+	EmbeddedPolicy() EmbeddedPolicy
+
+	// Authentication.
+	BasicAuthEnabled() bool
+	OIDCEnabled() bool
+	OIDC() auth.OIDCConfig
+	SessionIdleTimeout() time.Duration
+	SessionAbsoluteTimeout() time.Duration
+	CheckBreachedPasswords() bool
+	WebAuthnRPID() string
+
+	// UI.
+	LanguageRulesForUI() LanguageRulesJSON
 }
 
 // --- Search & Scoring ---

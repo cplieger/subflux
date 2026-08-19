@@ -9,19 +9,6 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// Compile-time assertions: *Config satisfies all config sub-interfaces.
-var (
-	_ api.ScoringConfig          = (*Config)(nil)
-	_ api.LanguageResolver       = (*Config)(nil)
-	_ api.ArrConfigProvider      = (*Config)(nil)
-	_ api.ProviderConfigProvider = (*Config)(nil)
-	_ api.ServerConfig           = (*Config)(nil)
-	_ api.PathValidator          = (*Config)(nil)
-	_ api.SearchConfigProvider   = (*Config)(nil)
-	_ api.AuthConfigProvider     = (*Config)(nil)
-	_ api.UIConfigProvider       = (*Config)(nil)
-)
-
 // ResolveTargetsWithFallback implements the full language resolution chain:
 // 1. Match originalLanguage against rules
 // 2. If no match, try each audio track language against rules
