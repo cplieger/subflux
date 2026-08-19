@@ -124,8 +124,8 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 	}
 
 	var sc StructuredConfig
-	if err := json.Unmarshal(body, &sc); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid JSON: "+err.Error())
+	if decErr := json.Unmarshal(body, &sc); decErr != nil {
+		api.BadRequestC(w, r, api.CodeBadRequest, "invalid JSON: "+decErr.Error())
 		return
 	}
 	if len(sc.Sections) == 0 {

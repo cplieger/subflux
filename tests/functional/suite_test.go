@@ -269,21 +269,23 @@ func shellInt(v string) (int, bool) {
 // --- Lifecycle -----------------------------------------------------------------
 
 func (s *suite) waitReady(t *testing.T) {
+	t.Helper()
+
 	for range 30 {
 		if _, ok := s.curlSF(2*time.Second, s.baseURL+"/api/health"); ok {
 			return
 		}
 		time.Sleep(time.Second)
 	}
-	fmt.Printf("ERROR: subflux not reachable at %s\n", s.baseURL)
-	t.FailNow()
+	t.Fatalf("subflux not reachable at %s after 30 attempts", s.baseURL)
 }
 
 func (s *suite) saveConfig(t *testing.T) {
+	t.Helper()
+
 	s.original = s.apiGet("/api/config")
 	if s.original == "" {
-		fmt.Printf("ERROR: empty config\n")
-		t.FailNow()
+		t.Fatalf("GET /api/config returned an empty config; nothing to restore afterwards")
 	}
 	s.logf("Original config saved (%d bytes)", len(s.original))
 }

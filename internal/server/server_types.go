@@ -145,9 +145,8 @@ type Server struct {
 	// that happened to carry the first successful config save. Reach it
 	// through workerLaunchSignal, never directly: a nil channel would make
 	// the signal vanish into the select's default arm.
-	workerLaunch     chan struct{}
-	workerLaunchOnce sync.Once
-	defaultConfig    []byte
+	workerLaunch  chan struct{}
+	defaultConfig []byte
 	// hostGateInner is the middleware chain INSIDE the Host allowlist gate,
 	// assembled once by buildHandler before the listener opens;
 	// applyHostAllowlist re-wraps it with the live config's HostPolicy.
@@ -167,9 +166,11 @@ type Server struct {
 	// workersOnce is the background-worker latch: the worker set launches at
 	// most once per process, after the first successful activation.
 	workersOnce sync.Once
-	ready       webhttp.Ready
-	configured  atomic.Bool
-	scanning    atomic.Bool
+	// workerLaunchOnce guards the lazy construction of workerLaunch.
+	workerLaunchOnce sync.Once
+	ready            webhttp.Ready
+	configured       atomic.Bool
+	scanning         atomic.Bool
 }
 
 // Option configures a Server during construction.

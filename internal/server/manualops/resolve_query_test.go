@@ -717,51 +717,60 @@ func TestHandleSearchResolve_happy_and_ambiguous_200(t *testing.T) {
 	}}
 	h := resolveHarness(nil, radarr)
 
-	// Happy: unique title.
-	req := httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Alien", http.NoBody)
-	rec := httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(happy) status = %d, want 200", rec.Code)
-	}
-	var happy ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &happy); err != nil {
-		t.Fatalf("decode happy response: %v", err)
-	}
-	if !happy.Resolved || len(happy.Items) != 1 || happy.Items[0].MediaID != 3 {
-		t.Fatalf("happy response = %+v, want the Alien item", happy)
+	// All three outcomes answer 200 and differ only in the body, so each is
+	// its own subtest: a failure in one still reports the other two.
+	tests := []struct {
+		name  string
+		title string
+		want  func(t *testing.T, got *ResolveResponse)
+	}{
+		{
+			name:  "unique title resolves to one item",
+			title: "Alien",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if !got.Resolved || len(got.Items) != 1 || got.Items[0].MediaID != 3 {
+					t.Errorf("response = %+v, want the Alien item", got)
+				}
+			},
+		},
+		{
+			name:  "equal titles answer a typed candidate list",
+			title: "Dune",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if got.Resolved || len(got.Candidates) != 2 {
+					t.Errorf("response = %+v, want 2 candidates", got)
+				}
+			},
+		},
+		{
+			name:  "unknown title answers an empty result",
+			title: "Nope",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if got.Resolved || len(got.Items) != 0 || len(got.Candidates) != 0 {
+					t.Errorf("response = %+v, want all-empty", got)
+				}
+			},
+		},
 	}
 
-	// Ambiguous: equal titles answer 200 with a typed candidates result.
-	req = httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Dune", http.NoBody)
-	rec = httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(ambiguous) status = %d, want 200", rec.Code)
-	}
-	var amb ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &amb); err != nil {
-		t.Fatalf("decode ambiguous response: %v", err)
-	}
-	if amb.Resolved || len(amb.Candidates) != 2 {
-		t.Fatalf("ambiguous response = %+v, want 2 candidates", amb)
-	}
-
-	// Empty: unknown title answers 200 with an empty result.
-	req = httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Nope", http.NoBody)
-	rec = httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(empty) status = %d, want 200", rec.Code)
-	}
-	var empty ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &empty); err != nil {
-		t.Fatalf("decode empty response: %v", err)
-	}
-	if empty.Resolved || len(empty.Items) != 0 || len(empty.Candidates) != 0 {
-		t.Fatalf("empty response = %+v, want all-empty", empty)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodGet, "/api/search/resolve?type=movie&title="+tt.title, http.NoBody)
+			rec := httptest.NewRecorder()
+			h.HandleSearchResolve(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("HandleSearchResolve status = %d, want 200", rec.Code)
+			}
+			var got ResolveResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			tt.want(t, &got)
+		})
 	}
 }

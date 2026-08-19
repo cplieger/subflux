@@ -8,11 +8,11 @@ import (
 const tol = 1e-9
 
 // assertApprox fails when got is not within tol of want.
-func assertApprox(t *testing.T, name string, got, want float64) {
-	t.Helper()
-	if math.Abs(got-want) > tol {
-		t.Errorf("%s = %v, want %v (tol %v)", name, got, want, tol)
-	}
+// approxEq reports whether got is within tol of want. It returns the
+// comparison rather than performing the assertion, so each call site keeps its
+// own failure message and reads as the thing it is checking.
+func approxEq(got, want float64) bool {
+	return math.Abs(got-want) <= tol
 }
 
 // findRatio returns the RatioPair matching (from, to), if present.
@@ -42,9 +42,15 @@ func TestLinearRegression_twoPointPerfectLine(t *testing.T) {
 
 	slope, intercept, r2 := LinearRegression(points)
 
-	assertApprox(t, "slope", slope, 0.01)
-	assertApprox(t, "intercept", intercept, 5.0)
-	assertApprox(t, "r2", r2, 1.0)
+	if !approxEq(slope, 0.01) {
+		t.Errorf("slope = %v, want 0.01 (tol %v)", slope, tol)
+	}
+	if !approxEq(intercept, 5.0) {
+		t.Errorf("intercept = %v, want 5.0 (tol %v)", intercept, tol)
+	}
+	if !approxEq(r2, 1.0) {
+		t.Errorf("r2 = %v, want 1.0 (tol %v)", r2, tol)
+	}
 }
 
 // Fewer than two points returns the zero result.
@@ -83,9 +89,15 @@ func TestLinearRegression_threePointImperfectFit(t *testing.T) {
 
 	slope, intercept, r2 := LinearRegression(points)
 
-	assertApprox(t, "slope", slope, 0.011)
-	assertApprox(t, "intercept", intercept, -1.0)
-	assertApprox(t, "r2", r2, 0.9758064516129032)
+	if !approxEq(slope, 0.011) {
+		t.Errorf("slope = %v, want 0.011 (tol %v)", slope, tol)
+	}
+	if !approxEq(intercept, -1.0) {
+		t.Errorf("intercept = %v, want -1.0 (tol %v)", intercept, tol)
+	}
+	if !approxEq(r2, 0.9758064516129032) {
+		t.Errorf("r2 = %v, want 0.9758064516129032 (tol %v)", r2, tol)
+	}
 }
 
 // buildKnownRatios emits every ordered pair of distinct framerates and skips
@@ -115,11 +127,17 @@ func TestBuildKnownRatios_ratioIsToOverFrom(t *testing.T) {
 	if !ok {
 		t.Fatalf("buildKnownRatios() missing pair 24->48")
 	}
-	assertApprox(t, "ratio(24->48)", p.Ratio, 2.0) // 48/24 = 2.0, not 48*24 = 1152
+	// 48/24 = 2.0, not 48*24 = 1152.
+	if !approxEq(p.Ratio, 2.0) {
+		t.Errorf("ratio(24->48) = %v, want 2.0 (tol %v)", p.Ratio, tol)
+	}
 
 	p2, ok := findRatio(pairs, 25.0, 50.0)
 	if !ok {
 		t.Fatalf("buildKnownRatios() missing pair 25->50")
 	}
-	assertApprox(t, "ratio(25->50)", p2.Ratio, 2.0) // 50/25 = 2.0, not 50*25 = 1250
+	// 50/25 = 2.0, not 50*25 = 1250.
+	if !approxEq(p2.Ratio, 2.0) {
+		t.Errorf("ratio(25->50) = %v, want 2.0 (tol %v)", p2.Ratio, tol)
+	}
 }
