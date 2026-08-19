@@ -11,9 +11,9 @@ import (
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/search/providerhealth"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
-	"github.com/cplieger/subflux/internal/search/timeout"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
@@ -87,7 +87,7 @@ type Engine struct {
 	syncer          SubtitleSyncer
 	tracks          TrackDetector
 	fileWriter      FileWriter
-	timeout         timeout.ProviderHealth
+	timeout         providerHealth
 	gate            *mediaGate
 	syncExec        syncing.SyncExec
 	searchGroup     singleflight.Group
@@ -124,7 +124,19 @@ func WithTracks(t TrackDetector) Option { return func(e *Engine) { e.tracks = t 
 
 // WithTimeout sets the provider health tracker. When not set, the engine
 // constructs one from config (or uses noopHealth if disabled).
-func WithTimeout(h timeout.ProviderHealth) Option { return func(e *Engine) { e.timeout = h } }
+func WithTimeout(h providerHealth) Option { return func(e *Engine) { e.timeout = h } }
+
+// providerHealth is what the engine asks of a provider-health tracker, declared
+// here because this is the package that consumes it and the package that holds
+// the second implementation: providerhealth.Tracker counts real failures, and
+// noopHealth below answers for a configuration with timeouts disabled.
+type providerHealth interface {
+	IsTimedOut(provider subflux.ProviderID) bool
+	RecordSuccess(provider subflux.ProviderID)
+	RecordFailure(provider subflux.ProviderID, err error)
+	Status() map[subflux.ProviderID]subflux.ProviderStatus
+	Reset()
+}
 
 // noopHealth is a no-op implementation used when timeouts are disabled.
 type noopHealth struct{}
@@ -178,7 +190,7 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 	if e.timeout == nil {
 		cooldown := e.cfg.Search().ProviderTimeout
 		if cooldown > 0 {
-			e.timeout = timeout.New(timeout.Config{
+			e.timeout = providerhealth.New(providerhealth.Config{
 				Cooldown: cooldown,
 			})
 		}

@@ -1,4 +1,4 @@
-package timeout
+package providerhealth
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ func clockAt(t time.Time) *func() time.Time {
 	return &fn
 }
 
-func newTestTracker(threshold int, window, cooldown time.Duration, clock *func() time.Time) ProviderHealth {
+func newTestTracker(threshold int, window, cooldown time.Duration, clock *func() time.Time) *Tracker {
 	return New(Config{
 		Threshold: threshold,
 		Window:    window,
@@ -270,17 +270,17 @@ func TestProviderTimeout_status_not_timed_out_at_cooldown_expiry(t *testing.T) {
 // smaller when it has grown well past need (cap strictly over 2*threshold) yet
 // holds fewer than threshold live failures. These two tests pin the boundaries
 // where that shrink must NOT happen. Capacity is not observable through the
-// public API, so they seed the concrete tracker directly.
+// public API, so they seed the tracker's failure map directly.
 
-// newSeedableTracker returns the concrete *tracker so a test can pre-seed the
-// unexported failure map to set up a precise capacity scenario.
-func newSeedableTracker(threshold int, window, cooldown time.Duration, now time.Time) *tracker {
+// newSeedableTracker returns a tracker pinned to a fixed clock so a test can
+// pre-seed the unexported failure map to set up a precise capacity scenario.
+func newSeedableTracker(threshold int, window, cooldown time.Duration, now time.Time) *Tracker {
 	return New(Config{
 		Threshold: threshold,
 		Window:    window,
 		Cooldown:  cooldown,
 		Now:       func() time.Time { return now },
-	}).(*tracker)
+	})
 }
 
 func TestProviderTimeout_RecordFailure_keeps_capacity_when_cap_equals_twice_threshold(t *testing.T) {

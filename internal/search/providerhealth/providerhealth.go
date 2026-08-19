@@ -1,6 +1,20 @@
-// Package timeout provides provider health tracking with sliding-window
-// failure detection and cooldown-based timeout.
-package timeout
+// Package providerhealth tracks how a provider is behaving and takes a failing
+// one out of rotation: it counts failures in a sliding window and, past a
+// threshold, times the provider out for a cooldown.
+//
+// It stays its own package rather than folding into internal/search, which is
+// its only importer. Consumer count is not the test — a self-contained state
+// machine with its own property and fuzz tests is a package, the same reason
+// subsync/fft and subsync/framerate stayed theirs, and internal/search is
+// already the largest package in this domain. The name states that capability
+// rather than the mechanism: the folder used to be called timeout, which named
+// one of its two outcomes, and health alone would shadow cplieger/health, the
+// first-party library main.go imports.
+//
+// The interface its consumer needs is declared AT that consumer, beside the
+// no-op implementation it selects when timeouts are disabled. New returns the
+// concrete type.
+package providerhealth
 
 import (
 	"log/slog"
@@ -9,15 +23,6 @@ import (
 
 	"github.com/cplieger/subflux/internal/subflux"
 )
-
-// ProviderHealth abstracts provider timeout tracking.
-type ProviderHealth interface {
-	IsTimedOut(provider subflux.ProviderID) bool
-	RecordSuccess(provider subflux.ProviderID)
-	RecordFailure(provider subflux.ProviderID, err error)
-	Status() map[subflux.ProviderID]subflux.ProviderStatus
-	Reset()
-}
 
 // Config holds provider timeout settings.
 type Config struct {
@@ -38,7 +43,7 @@ const DefaultThreshold = 5
 const DefaultWindow = 10 * time.Minute
 
 // New creates a provider timeout tracker with the given config.
-func New(cfg Config) ProviderHealth {
+func New(cfg Config) *Tracker {
 	if cfg.Threshold <= 0 {
 		cfg.Threshold = DefaultThreshold
 	}
@@ -52,7 +57,7 @@ func New(cfg Config) ProviderHealth {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &tracker{
+	return &Tracker{
 		failures:  make(map[subflux.ProviderID][]time.Time),
 		tripped:   make(map[subflux.ProviderID]time.Time),
 		lastError: make(map[subflux.ProviderID]string),
@@ -63,8 +68,11 @@ func New(cfg Config) ProviderHealth {
 	}
 }
 
-// tracker implements ProviderHealth with sliding-window failure detection.
-type tracker struct {
+// Tracker counts per-provider failures in a sliding window and times a
+// provider out for a cooldown once the threshold is reached. Its zero value is
+// NOT usable: New allocates the three maps and the clock. Safe for concurrent
+// use.
+type Tracker struct {
 	failures  map[subflux.ProviderID][]time.Time
 	tripped   map[subflux.ProviderID]time.Time
 	lastError map[subflux.ProviderID]string
@@ -75,7 +83,7 @@ type tracker struct {
 	threshold int
 }
 
-func (it *tracker) IsTimedOut(provider subflux.ProviderID) bool {
+func (it *Tracker) IsTimedOut(provider subflux.ProviderID) bool {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	trippedAt, ok := it.tripped[provider]
@@ -92,7 +100,7 @@ func (it *tracker) IsTimedOut(provider subflux.ProviderID) bool {
 	return true
 }
 
-func (it *tracker) RecordSuccess(provider subflux.ProviderID) {
+func (it *Tracker) RecordSuccess(provider subflux.ProviderID) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	delete(it.failures, provider)
@@ -100,7 +108,7 @@ func (it *tracker) RecordSuccess(provider subflux.ProviderID) {
 	delete(it.lastError, provider)
 }
 
-func (it *tracker) RecordFailure(provider subflux.ProviderID, err error) {
+func (it *Tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
@@ -139,7 +147,7 @@ func (it *tracker) RecordFailure(provider subflux.ProviderID, err error) {
 	}
 }
 
-func (it *tracker) Reset() {
+func (it *Tracker) Reset() {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 	clear(it.failures)
@@ -159,7 +167,7 @@ func countAfter(times []time.Time, cutoff time.Time) int {
 	return count
 }
 
-func (it *tracker) Status() map[subflux.ProviderID]subflux.ProviderStatus {
+func (it *Tracker) Status() map[subflux.ProviderID]subflux.ProviderStatus {
 	it.mu.Lock()
 	defer it.mu.Unlock()
 
