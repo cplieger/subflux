@@ -1,4 +1,4 @@
-package api
+package authhandlers
 
 import (
 	"context"
@@ -6,6 +6,14 @@ import (
 	"github.com/cplieger/auth/v4"
 )
 
+// The request-scoped authentication values, and the only place they are put
+// into or read out of a context. They live in this package rather than in the
+// types package because they are authenticator glue, like the session cookie
+// config and the unauthorized-response policy beside them: the middleware in
+// internal/server writes both, and fourteen of the seventeen production reads
+// are handlers here. internal/server can import this package; the reverse would
+// be a cycle, which is what rules out the other direction.
+//
 // Context keys. Each uses a distinct private type so keys from different
 // categories cannot collide, and external packages cannot fabricate them.
 type (

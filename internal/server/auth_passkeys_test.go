@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
@@ -19,7 +18,7 @@ func TestListPasskeys_Empty(t *testing.T) {
 	user := createTestUser(t, db, "heidi", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/passkeys", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleListPasskeys(rec, req)
 
@@ -54,7 +53,7 @@ func TestListPasskeys_WithData(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/passkeys", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleListPasskeys(rec, req)
 
@@ -98,7 +97,7 @@ func TestRenamePasskey_Success(t *testing.T) {
 	body := `{"name":"New Name"}`
 	req := httptest.NewRequest(http.MethodPut,
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRenamePasskey(rec, req)
 
@@ -114,7 +113,7 @@ func TestRenamePasskey_EmptyName(t *testing.T) {
 
 	body := `{"name":""}`
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/1", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRenamePasskey(rec, req)
 
@@ -130,7 +129,7 @@ func TestRenamePasskey_InvalidID(t *testing.T) {
 
 	body := `{"name":"New"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/abc", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRenamePasskey(rec, req)
 
@@ -147,7 +146,7 @@ func TestRenamePasskey_NameTooLong(t *testing.T) {
 	longName := strings.Repeat("x", 129) // exceeds maxPasskeyNameLen=128
 	body := `{"name":"` + longName + `"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/passkeys/1", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRenamePasskey(rec, req)
 
@@ -168,7 +167,7 @@ func TestDeletePasskey_InvalidID(t *testing.T) {
 	user := createTestUser(t, db, "delpk-inv", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/passkeys/xyz", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeletePasskey(rec, req)
 
@@ -183,7 +182,7 @@ func TestDeletePasskey_MissingID(t *testing.T) {
 	user := createTestUser(t, db, "delpk-miss", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/passkeys/", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeletePasskey(rec, req)
 
@@ -217,7 +216,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeletePasskey(rec, req)
 
@@ -272,7 +271,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/passkeys/"+strconv.FormatInt(pkID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeletePasskey(rec, req)
 
@@ -305,7 +304,7 @@ func TestAuthMe_WithPasskeys(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleAuthMe(rec, req)
 

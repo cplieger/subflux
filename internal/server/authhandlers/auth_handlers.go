@@ -222,7 +222,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 // HandleAuthMe handles GET /api/auth/me — returns profile information for the current user.
 func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	passkeyCount, errPK := h.Store.PasskeyCountForUser(r.Context(), user.ID)
 	if errPK != nil {

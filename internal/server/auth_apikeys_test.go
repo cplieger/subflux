@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
 // Abort vs report in this file: a value mismatch reports with t.Errorf so
@@ -25,7 +25,7 @@ func TestListAPIKeys_Empty(t *testing.T) {
 	user := createTestUser(t, db, "ivan", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/apikeys", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleListAPIKeys(rec, req)
 
@@ -64,7 +64,7 @@ func TestListAPIKeys_WithData(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/apikeys", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleListAPIKeys(rec, req)
 
@@ -93,7 +93,7 @@ func TestGenerateAPIKey_Success(t *testing.T) {
 	body := `{"label":"test key","password":"correct-horse-battery-staple"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/apikeys",
 		strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleGenerateAPIKey(rec, req)
 
@@ -175,7 +175,7 @@ func TestGenerateAPIKey_LabelTooLong(t *testing.T) {
 	longLabel := strings.Repeat("x", 129) // exceeds maxAPIKeyLabelLen=128
 	body := `{"label":"` + longLabel + `","password":"correct-horse-battery-staple"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/apikeys", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleGenerateAPIKey(rec, req)
 
@@ -226,7 +226,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	// Revoke the key.
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/apikeys/"+strconv.FormatInt(keyID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRevokeAPIKey(rec, req)
 
@@ -250,7 +250,7 @@ func TestRevokeAPIKey_InvalidID(t *testing.T) {
 	user := createTestUser(t, db, "revoke-inv", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/apikeys/abc", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRevokeAPIKey(rec, req)
 
@@ -265,7 +265,7 @@ func TestRevokeAPIKey_MissingID(t *testing.T) {
 	user := createTestUser(t, db, "revoke-miss", "correct-horse-battery-staple")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/apikeys/", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleRevokeAPIKey(rec, req)
 

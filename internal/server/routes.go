@@ -35,7 +35,7 @@ package server
 // Group membership rules (enforced at read time, not compile time):
 //
 //  1. Every public-endpoint handler can access no authenticated state.
-//  2. Every non-public handler can read `api.UserFromContext(r.Context())`
+//  2. Every non-public handler can read `authhandlers.UserFromContext(r.Context())`
 //     without a nil check.
 //  3. Every admin handler can skip role checks.
 //  4. Configured handlers run only when a valid config is loaded; they may

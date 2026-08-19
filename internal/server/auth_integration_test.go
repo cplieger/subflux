@@ -72,7 +72,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	if sessHash != "" {
 		s.authStore.UpdateSessionActivity(req.Context(), sessHash, time.Now())
 	}
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("me: status = %d, want %d", rec.Code, http.StatusOK)
@@ -86,7 +86,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	// 4. Generate API key: POST /api/auth/apikeys.
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/apikeys",
 		strings.NewReader(`{"label":"integration-test","password":"super-secure-password-here"}`))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
 	s.authH.HandleGenerateAPIKey(rec, req)
 	if rec.Code != http.StatusOK {
@@ -107,7 +107,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("api key auth: %v", err)
 	}
-	req = req.WithContext(api.NewUserContext(req.Context(), apiUser))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), apiUser))
 	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("api key me: status = %d, want %d", rec.Code, http.StatusOK)
@@ -121,7 +121,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	keyID := keys[0].ID
 	req = httptest.NewRequest(http.MethodDelete,
 		"/api/auth/apikeys/"+strconv.FormatInt(keyID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
 	s.authH.HandleRevokeAPIKey(rec, req)
 	if rec.Code != http.StatusOK {

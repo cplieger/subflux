@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
 // cancelReq drives handleCancelActivity with a path-value id and an
@@ -21,7 +21,7 @@ func cancelReq(t *testing.T, s *Server, id string, user *auth.User) *httptest.Re
 	t.Helper()
 	ctx := t.Context()
 	if user != nil {
-		ctx = api.NewUserContext(ctx, user)
+		ctx = authhandlers.NewUserContext(ctx, user)
 	}
 	req := httptest.NewRequestWithContext(ctx,
 		http.MethodPost, "/api/activity/"+id+"/cancel", http.NoBody)
@@ -157,7 +157,7 @@ func TestHandleCancelActivity_missing_id_400(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, &qhMockStore{})
 
-	req := httptest.NewRequestWithContext(api.NewUserContext(t.Context(), plainUser()),
+	req := httptest.NewRequestWithContext(authhandlers.NewUserContext(t.Context(), plainUser()),
 		http.MethodPost, "/api/activity//cancel", http.NoBody)
 	rec := httptest.NewRecorder()
 	s.handleCancelActivity(rec, req)

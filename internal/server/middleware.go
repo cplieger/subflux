@@ -6,6 +6,7 @@ import (
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
 // --- Request middleware ---
@@ -40,8 +41,8 @@ func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 // Auth bypass is handled inside Authenticator.Authenticate; session-activity
 // writes happen inside the library's session verifier, throttled per session.
 //
-// Handlers downstream read the user with api.UserFromContext and the
-// session hash with api.SessionHashFromContext. The latter is empty for
+// Handlers downstream read the user with authhandlers.UserFromContext and the
+// session hash with authhandlers.SessionHashFromContext. The latter is empty for
 // API-key-authenticated requests.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -49,8 +50,8 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		ctx := api.NewUserContext(r.Context(), user)
-		ctx = api.NewSessionHashContext(ctx, sessHash)
+		ctx := authhandlers.NewUserContext(r.Context(), user)
+		ctx = authhandlers.NewSessionHashContext(ctx, sessHash)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -61,7 +62,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) requireRole(role auth.Role) middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user := api.UserFromContext(r.Context())
+			user := authhandlers.UserFromContext(r.Context())
 			if !auth.HasRole(user, role) {
 				httpapi.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
 				return

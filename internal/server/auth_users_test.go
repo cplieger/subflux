@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
 func TestListUsers_AdminOnly(t *testing.T) {
@@ -26,7 +26,7 @@ func TestListUsers_AdminOnly(t *testing.T) {
 	// requireRole(admin) middleware (see routes.go) and verified by the
 	// integration test suite; this handler does not re-check the role.
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/users", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleListUsers(rec, req)
 
@@ -50,7 +50,7 @@ func TestCreateUser_Success(t *testing.T) {
 
 	body := `{"username":"newuser","password":"new-user-password-here","role":"user","email":"new@example.com"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleCreateUser(rec, req)
 
@@ -86,7 +86,7 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 
 	body := `{"username":"badrole","password":"some-password-here-now","role":"superadmin"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleCreateUser(rec, req)
 
@@ -104,7 +104,7 @@ func TestCreateUser_EmptyUsername(t *testing.T) {
 
 	body := `{"username":"","password":"some-password-here-now"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleCreateUser(rec, req)
 
@@ -123,7 +123,7 @@ func TestCreateUser_UsernameTooLong(t *testing.T) {
 	longName := strings.Repeat("u", 65) // exceeds maxUsernameLen=64
 	body := `{"username":"` + longName + `","password":"some-password-here-now"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleCreateUser(rec, req)
 
@@ -143,7 +143,7 @@ func TestDeleteUser_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/users/"+strconv.FormatInt(victim.ID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeleteUser(rec, req)
 
@@ -170,7 +170,7 @@ func TestDeleteUser_CannotDeleteSelf(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete,
 		"/api/auth/users/"+strconv.FormatInt(admin.ID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeleteUser(rec, req)
 
@@ -187,7 +187,7 @@ func TestDeleteUser_InvalidID(t *testing.T) {
 	db.UpdateUser(t.Context(), admin)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/abc", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), admin))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), admin))
 	rec := httptest.NewRecorder()
 	s.authH.HandleDeleteUser(rec, req)
 

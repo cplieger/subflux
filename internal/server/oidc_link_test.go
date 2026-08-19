@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
@@ -108,7 +107,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodDelete, "/api/auth/oidc/link", http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), oidcOnly))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), oidcOnly))
 	rec := httptest.NewRecorder()
 	s.authH.HandleOIDCUnlink(rec, req)
 	if rec.Code != http.StatusConflict {
@@ -123,7 +122,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 		t.Fatal(err)
 	}
 	req2 := httptest.NewRequest(http.MethodDelete, "/api/auth/oidc/link", http.NoBody)
-	req2 = req2.WithContext(api.NewUserContext(req2.Context(), withPass))
+	req2 = req2.WithContext(authhandlers.NewUserContext(req2.Context(), withPass))
 	rec2 := httptest.NewRecorder()
 	s.authH.HandleOIDCUnlink(rec2, req2)
 	if rec2.Code != http.StatusOK {

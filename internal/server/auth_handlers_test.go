@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
@@ -21,7 +20,7 @@ func TestChangePassword_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/password",
 		strings.NewReader(body))
 	// Inject user into context (simulates auth middleware).
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	// Add session cookie so the handler can identify the current session.
 	req.AddCookie(&http.Cookie{
 		Name:  authhandlers.CookieNameHTTP,
@@ -53,7 +52,7 @@ func TestChangePassword_WrongCurrent(t *testing.T) {
 	body := `{"current_password":"wrong-current-password","new_password":"new-password-is-here-now"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/password",
 		strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleChangePassword(rec, req)
 
@@ -75,7 +74,7 @@ func TestChangePassword_ShortNewPassword(t *testing.T) {
 
 	body := `{"current_password":"correct-horse-battery-staple","new_password":"ab"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/password", strings.NewReader(body))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec := httptest.NewRecorder()
 	s.authH.HandleChangePassword(rec, req)
 

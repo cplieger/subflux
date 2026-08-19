@@ -349,7 +349,7 @@ func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
 // It refuses if doing so would leave the account with no way to log in (no
 // password and no passkey), mirroring the disable-password lockout guard.
 func (h *Handler) HandleOIDCUnlink(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 	ctx := r.Context()
 
 	if user.OIDCSub == "" {

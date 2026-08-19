@@ -14,7 +14,7 @@ import (
 
 // HandleListAPIKeys handles GET /api/auth/apikeys — lists API keys for the current user.
 func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	keys, err := h.SecDB.ListAPIKeysByUserID(r.Context(), user.ID)
 	if err != nil {
@@ -41,7 +41,7 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 
 // HandleGenerateAPIKey handles POST /api/auth/apikeys — generates a new API key for the current user.
 func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		Label string `json:"label"`
@@ -98,7 +98,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 // HandleRevokeAPIKey handles DELETE /api/auth/apikeys/{id} — revokes an API key owned by the current user.
 func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	keyID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/apikeys/", "api key id")
 	if !ok {

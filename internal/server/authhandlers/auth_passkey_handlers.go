@@ -18,7 +18,7 @@ import (
 
 // HandleListPasskeys handles GET /api/auth/passkeys — lists passkeys for the current user.
 func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
@@ -103,7 +103,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	// Adding a passkey creates a local login credential. SSO-governed accounts
 	// (no password) cannot self-provision one; local accounts must prove their
@@ -188,7 +188,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	sessData := h.consumeWebAuthnSession(w, r)
 	if sessData == nil {
@@ -250,7 +250,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 // HandleDeletePasskey handles DELETE /api/auth/passkeys/{id} — removes a passkey.
 // Refuses when deleting would leave the account with no authentication method.
 func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	passkeyID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/passkeys/", "passkey id")
 	if !ok {
@@ -299,7 +299,7 @@ func (h *Handler) HandleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 
 // HandleRenamePasskey handles PUT /api/auth/passkeys/{id} — renames a passkey.
 func (h *Handler) HandleRenamePasskey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	passkeyID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/passkeys/", "passkey id")
 	if !ok {

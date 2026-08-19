@@ -8,6 +8,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
 
 // handleCancelActivity handles POST /api/activity/{id}/cancel — the explicit
@@ -31,7 +32,7 @@ func (s *Server) handleCancelActivity(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, api.CodeBadRequest, "activity id required")
 		return
 	}
-	user := api.UserFromContext(r.Context())
+	user := authhandlers.UserFromContext(r.Context())
 	username := ""
 	if user != nil {
 		username = user.Username

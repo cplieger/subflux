@@ -17,7 +17,7 @@ import (
 // HandleChangePassword handles PUT /api/auth/password — changes the current user's
 // password after verifying the existing one, then invalidates all other sessions.
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		CurrentPassword string `json:"current_password"`
@@ -80,7 +80,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentHash := api.SessionHashFromContext(ctx)
+	currentHash := SessionHashFromContext(ctx)
 	if err := h.SecDB.DeleteUserSessions(ctx, user.ID, currentHash); err != nil {
 		slog.Warn("password change: invalidate sessions", "error", err)
 	}

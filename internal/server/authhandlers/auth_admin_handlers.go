@@ -40,7 +40,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreateUser handles POST /api/auth/users — creates a new user account.
 func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
-	admin := api.UserFromContext(r.Context())
+	admin := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		Username string    `json:"username"`
@@ -122,7 +122,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 // HandleDeleteUser handles DELETE /api/auth/users/{id} — deletes a user account.
 // Refuses to delete the caller's own account or the last admin.
 func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
-	admin := api.UserFromContext(r.Context())
+	admin := UserFromContext(r.Context())
 
 	userID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/users/", "user id")
 	if !ok {
