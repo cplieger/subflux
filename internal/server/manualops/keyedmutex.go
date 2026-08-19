@@ -66,11 +66,11 @@ var downloadPathGate = newQuadGate()
 // which falls back to the arr's raw imdbId string when TVDB/TMDB is absent, so
 // its alphabet is Sonarr/Radarr's choice rather than ours. The other three
 // genuinely cannot — subflux.MediaType and subflux.Variant are closed constant sets,
-// and lang has passed IsValidLangCode, which rejects every rune below 0x20.
-// That, not "media IDs never contain control characters", is why the old
-// NUL-joined form was injective: the single unconstrained component sat between
-// components whose alphabets pinned the field boundaries. keyenc escapes each
-// component instead, so the key stays injective without that argument — the
+// and lang has passed langcode.Valid, whose whole vocabulary is two ASCII
+// letters. That, not "media IDs never contain control characters", is why the
+// old NUL-joined form was injective: the single unconstrained component sat
+// between components whose alphabets pinned the field boundaries. keyenc escapes
+// each component instead, so the key stays injective without that argument — the
 // property matters because a merge would put two unrelated media items behind
 // ONE mutex, serializing an ordinal allocation and its atomic write against a
 // download that has nothing to do with them (distinct quads still write

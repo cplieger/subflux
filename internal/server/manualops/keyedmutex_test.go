@@ -19,18 +19,17 @@ func oldDownloadQuadKey(mt subflux.MediaType, mediaID, lang string, variant subf
 // ordinal allocation plus its atomic write and history insert serialize against
 // a download that has nothing to do with them.
 //
-// Exactly one of the four components can carry a separator, and it is not the
-// one the old comment named: mediaID is mediaid.Episode/BuildMovieID output,
-// which falls back to the arr's raw imdbId when TVDB/TMDB is absent. mediaType
-// and variant are closed constant sets, and lang has passed IsValidLangCode.
+// Exactly one of the four components can carry a separator: mediaID is
+// mediaid.Episode/BuildMovieID output, which falls back to the arr's raw imdbId
+// when TVDB/TMDB is absent. mediaType and variant are closed constant sets, and
+// lang has passed langcode.Valid, whose whole vocabulary is two ASCII letters.
 //
-// The two tables below are the honest split. The NUL cases collapse the old
-// form but need a control character in lang, which IsValidLangCode rejects — so
-// they were unreachable, and they are here to show that the old form's
-// injectivity rested on that validator rather than on the encoding. The ':'
-// cases are the reachable ones: IsValidLangCode permits ':' (it bars only '/',
-// '\', ".." and controls), so under a plain ':' join the same forge would have
-// been live — keyenc escaping is what keeps them apart.
+// So neither table's pairs are reachable through the HTTP boundary: both need a
+// separator inside lang, and no validator admits one. That is what they are for.
+// They record that the old NUL-joined form's injectivity rested on the language
+// validator rather than on the encoding — a dependency the gate has no business
+// holding — while keyenc escaping keeps the key injective for whatever alphabet
+// the arrs, or a future code space, turn out to admit.
 func TestDownloadQuadKeyCannotBeForged(t *testing.T) {
 	t.Parallel()
 

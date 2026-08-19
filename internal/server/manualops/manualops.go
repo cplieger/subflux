@@ -6,7 +6,6 @@ package manualops
 
 import (
 	"context"
-	"strings"
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/provider"
@@ -17,10 +16,6 @@ import (
 
 // MaxResults caps the number of results returned by manual search.
 const MaxResults = 50
-
-// MaxLangCodeLen caps language code length. BCP 47 codes are typically ≤11
-// chars (e.g. "pt-BR"); 20 provides headroom for unusual subtags.
-const MaxLangCodeLen = 20
 
 // SearchResult is a single result returned by the manual search API.
 type SearchResult struct {
@@ -147,19 +142,6 @@ func isValidLockVariant(v subflux.Variant) bool {
 	default:
 		return false
 	}
-}
-
-// IsValidLangCode rejects language codes that are too long, contain path
-// separators, traversal sequences, or control characters (including null
-// bytes that cause path truncation).
-func IsValidLangCode(lang string) bool {
-	if lang == "" || len(lang) > MaxLangCodeLen {
-		return false
-	}
-	if strings.ContainsAny(lang, "/\\") || strings.Contains(lang, "..") {
-		return false
-	}
-	return !strings.ContainsFunc(lang, func(r rune) bool { return r < 0x20 })
 }
 
 // alertSourceManual attributes an alert to the manual-download path. One

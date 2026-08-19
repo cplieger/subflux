@@ -1,6 +1,8 @@
 package langcode
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"pgregory.net/rapid"
@@ -250,6 +252,102 @@ func FuzzCanonical(f *testing.F) {
 		}
 		if again := Canonical(got); again != got {
 			t.Fatalf("Canonical not idempotent: %q -> %q -> %q", raw, got, again)
+		}
+	})
+}
+
+// --- the code space as a filename segment ---
+
+// maxCodeSegment bounds the language segment of a subtitle filename. The
+// internal space spells every code in two characters; the bound is what stops a
+// widening of the space from becoming a path-length problem on the network
+// shares these filenames land on.
+const maxCodeSegment = 8
+
+// unsafeInFilename reports why code cannot be a dot segment of a subtitle
+// filename, or "" when it can. The rules are the intersection of what POSIX,
+// the Win32 name grammar and SMB/NFS clients agree on, because a code accepted
+// here is written next to the media file on a share Windows clients read.
+func unsafeInFilename(code string) string {
+	switch {
+	case code == "":
+		return "it is empty"
+	case len(code) > maxCodeSegment:
+		return fmt.Sprintf("its length %d exceeds %d", len(code), maxCodeSegment)
+	case strings.ContainsAny(code, `/\`):
+		return "it contains a path separator"
+	case strings.Contains(code, ".."):
+		return "it contains a traversal sequence"
+	case strings.ContainsAny(code, `<>:"|?*`):
+		return "it contains a character the Win32 name grammar reserves"
+	case strings.HasPrefix(code, "."), strings.HasSuffix(code, "."),
+		strings.HasPrefix(code, " "), strings.HasSuffix(code, " "):
+		return "it begins or ends with a dot or space, which Win32 strips"
+	}
+	for _, r := range code {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Sprintf("it contains control char %#x", r)
+		}
+	}
+	return ""
+}
+
+// Every accepted code becomes a dot segment of the subtitle filename on disk,
+// and the manual-download boundary gates on nothing but Valid — so this is the
+// property that keeps an untrusted code out of a hostile filename. It walks the
+// short-input space exhaustively rather than sampling it: the accepted set is
+// two-letter codes plus the aliases, so three characters covers it with room to
+// spare, and the alphabet is what a caller can actually send.
+func TestValid_acceptedCodesAreSafeFilenameSegments(t *testing.T) {
+	t.Parallel()
+
+	const alphabet = `abcdefghijklmnopqrstuvwxyzABZ019-. :/\<>"|?*`
+	check := func(code string) {
+		if !Valid(code) {
+			return
+		}
+		if bad := unsafeInFilename(code); bad != "" {
+			t.Errorf("Valid(%q) = true, but as a filename segment %s", code, bad)
+		}
+	}
+
+	var buf [3]byte
+	for i := range len(alphabet) {
+		buf[0] = alphabet[i]
+		check(string(buf[:1]))
+		for j := range len(alphabet) {
+			buf[1] = alphabet[j]
+			check(string(buf[:2]))
+			for k := range len(alphabet) {
+				buf[2] = alphabet[k]
+				check(string(buf[:3]))
+			}
+		}
+	}
+}
+
+// FuzzValid_acceptedCodesAreFilenameSafe pins the same postcondition over
+// arbitrary input, which the exhaustive walk above cannot reach: multi-byte
+// runes, longer subtags and BCP 47 shapes. It replaces the manual path's own
+// character blocklist — a code Valid accepts is the only kind that reaches
+// subtitlefile.ManualPath, so an accepted ':' would open an NTFS alternate data
+// stream on the share and an accepted trailing dot would collapse two codes onto
+// one file.
+func FuzzValid_acceptedCodesAreFilenameSafe(f *testing.F) {
+	for _, seed := range []string{
+		"en", "pb", "pt-BR", "eng", "", "../../etc/passwd", "a\x00b", "en US",
+		"a:b", "en.", "en ", "CON", "en*", "en|", "zh-Hans", "yue",
+		strings.Repeat("a", 64),
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, code string) {
+		if !Valid(code) {
+			return // only accepted codes carry obligations
+		}
+		if bad := unsafeInFilename(code); bad != "" {
+			t.Fatalf("Valid(%q) = true, but as a filename segment %s", code, bad)
 		}
 	})
 }

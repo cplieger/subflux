@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/langcode"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -60,7 +61,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
 	req, lang, mediaType, arrID := ParseSearchQuery(r)
 
-	if !IsValidLangCode(lang) {
+	if !langcode.Valid(lang) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}
@@ -151,7 +152,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !IsValidLangCode(key.Language) {
+	if !langcode.Valid(key.Language) {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}

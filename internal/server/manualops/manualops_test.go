@@ -4,11 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 func TestValidateDownloadRequest(t *testing.T) {
@@ -57,6 +57,17 @@ func TestValidateDownloadRequest(t *testing.T) {
 			wantErr: ErrInvalidLangCode,
 		},
 		{
+			name:    "language code outside the internal space",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "eng"},
+			wantErr: ErrInvalidLangCode,
+		},
+		{
+			name:    "subflux's own Brazilian Portuguese code is accepted",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "pb"},
+			wantErr: nil,
+			wantMT:  subflux.MediaTypeMovie,
+		},
+		{
 			name:    "invalid media type",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: "invalid"},
 			wantErr: ErrInvalidMediaType,
@@ -82,29 +93,34 @@ func TestValidateDownloadRequest(t *testing.T) {
 	}
 }
 
-func TestIsValidLangCode(t *testing.T) {
+// POST /api/search/download is the ONE path by which an untrusted language code
+// reaches a filename: the automated path resolves its targets from validated
+// config, but this one takes the code from the request body and hands it to
+// subtitlefile.ManualPath, which writes it as a dot segment next to the media
+// file. Those directories are shared over SMB and NFS and read by Windows
+// clients, so a character POSIX allows and Win32 does not is a portability
+// break, not a cosmetic one: ':' opens an NTFS alternate data stream, the Win32
+// name grammar bars < > " | ? *, and a trailing dot or space is stripped, which
+// collapses two codes onto one file.
+//
+// A character blocklist cannot hold this line — a trailing dot is legal on its
+// own and composes into ".." in the rendered path. The gate is the closed
+// vocabulary instead, the same one config.validateLangCode applies.
+func TestValidateDownloadRequest_rejectsLangCodesUnsafeInAFilename(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		lang string
-		want bool
-	}{
-		{"eng", true},
-		{"pt-BR", true},
-		{"zh-Hans", true},
-		{"", false},
-		{strings.Repeat("a", MaxLangCodeLen), true},    // exactly the limit is valid
-		{strings.Repeat("a", MaxLangCodeLen+1), false}, // one over the limit
-		{"en/gb", false},
-		{"en\\gb", false},
-		{"en..gb", false},
-		{"en\x00gb", false},
-		{"en\tUS", false}, // tab (0x09) is a control char
-		{"en US", true},   // space (0x20) is not a control char
-	}
-	for _, tt := range tests {
-		if got := IsValidLangCode(tt.lang); got != tt.want {
-			t.Errorf("IsValidLangCode(%q) = %v, want %v", tt.lang, got, tt.want)
-		}
+	for _, lang := range []string{
+		"a:b", "en<", "en>", `en"`, "en|", "en?", "en*",
+		"en.", ".en", "en ", " en", "en\x00", "en/fr", `en\fr`, "en..fr",
+	} {
+		t.Run(lang, func(t *testing.T) {
+			t.Parallel()
+			req := DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: lang}
+			if err := ValidateDownloadRequest(&req); !errors.Is(err, ErrInvalidLangCode) {
+				t.Errorf("ValidateDownloadRequest(language=%q) error = %v, want ErrInvalidLangCode; "+
+					"it reaches the share as %q", lang, err,
+					subtitlefile.ManualPath("/media/movie.mkv", 1, subtitlefile.Tags{Lang: lang}))
+			}
+		})
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cplieger/subflux/internal/langcode"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -38,7 +39,12 @@ func (req *DownloadRequest) VideoPath() string { return req.videoPath }
 
 // Validation errors returned by ValidateDownloadRequest.
 var (
-	ErrMissingRequired  = errors.New("provider, subtitle_id, media_id, and language are required")
+	ErrMissingRequired = errors.New("provider, subtitle_id, media_id, and language are required")
+	// ErrInvalidLangCode is returned for a code outside subflux's internal
+	// code space (ISO 639-1 plus "pb"). The code becomes a dot segment of the
+	// subtitle filename written next to the media file, so this boundary gates
+	// on the same closed vocabulary the automated path uses rather than on a
+	// list of characters to bar: a vocabulary cannot be widened by an input.
 	ErrInvalidLangCode  = errors.New("invalid language code")
 	ErrInvalidMediaType = errors.New("invalid media_type")
 	ErrMissingEpisode   = errors.New("season and episode are required for episode downloads")
@@ -51,7 +57,7 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 	if req.Provider == "" || req.SubtitleID == "" || req.ArrID <= 0 || req.Language == "" {
 		return ErrMissingRequired
 	}
-	if !IsValidLangCode(req.Language) {
+	if !langcode.Valid(req.Language) {
 		return ErrInvalidLangCode
 	}
 	if req.MediaType != "" && !req.MediaType.Valid() {
