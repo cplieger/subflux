@@ -346,7 +346,7 @@ func TestDotNetOracleMetadata(t *testing.T) {
 
 // compareReleaseGroupObservable checks the consumed capture observable for
 // the release-group pattern: the last match's m[1], falling back to m[3]
-// (mirroring ParseReleaseGroup's consumption).
+// (mirroring ParseGroup's consumption).
 func compareReleaseGroupObservable(t *testing.T, contracts map[string]contractEntry, p *Pattern, name string, hit *oracleNameHits) {
 	t.Helper()
 	last := hit.Matches[len(hit.Matches)-1]

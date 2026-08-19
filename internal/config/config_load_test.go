@@ -20,8 +20,8 @@ func TestLoadFromBytes_minimal_valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.URL != "http://sonarr:8989" {
-		t.Errorf("Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://sonarr:8989")
+	if cfg.SonarrCfg.URL != "http://sonarr:8989" {
+		t.Errorf("Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://sonarr:8989")
 	}
 }
 
@@ -168,8 +168,8 @@ providers:
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.URL != "http://expanded:8989" {
-		t.Errorf("Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://expanded:8989")
+	if cfg.SonarrCfg.URL != "http://expanded:8989" {
+		t.Errorf("Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://expanded:8989")
 	}
 }
 
@@ -200,8 +200,8 @@ providers:
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.APIKey != evil {
-		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.Sonarr.APIKey, evil)
+	if cfg.SonarrCfg.APIKey != evil {
+		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.SonarrCfg.APIKey, evil)
 	}
 	if p := cfg.Providers["os"]; !p.Enabled {
 		t.Error("providers.os.enabled flipped to false: the expanded value rewrote document structure")
@@ -230,8 +230,8 @@ providers:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	// Unset env vars are preserved as literal "${VAR}".
-	if cfg.Sonarr.APIKey != "${SUBFLUX_TEST_UNSET_VAR_12345}" {
-		t.Errorf("Sonarr.APIKey = %q, want literal ${SUBFLUX_TEST_UNSET_VAR_12345}", cfg.Sonarr.APIKey)
+	if cfg.SonarrCfg.APIKey != "${SUBFLUX_TEST_UNSET_VAR_12345}" {
+		t.Errorf("Sonarr.APIKey = %q, want literal ${SUBFLUX_TEST_UNSET_VAR_12345}", cfg.SonarrCfg.APIKey)
 	}
 }
 
@@ -245,8 +245,8 @@ func TestLoad_reads_file(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(%q) unexpected error: %v", path, err)
 	}
-	if cfg.Sonarr.URL != "http://sonarr:8989" {
-		t.Errorf("Load().Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://sonarr:8989")
+	if cfg.SonarrCfg.URL != "http://sonarr:8989" {
+		t.Errorf("Load().Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://sonarr:8989")
 	}
 }
 
@@ -389,8 +389,8 @@ providers:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	// HOME is not in the allowed list, so it should be preserved as literal.
-	if cfg.Sonarr.APIKey != "${HOME}" {
-		t.Errorf("Sonarr.APIKey = %q, want literal ${HOME} (blocked)", cfg.Sonarr.APIKey)
+	if cfg.SonarrCfg.APIKey != "${HOME}" {
+		t.Errorf("Sonarr.APIKey = %q, want literal ${HOME} (blocked)", cfg.SonarrCfg.APIKey)
 	}
 }
 
@@ -472,10 +472,10 @@ func TestLoad_logs_arr_flags(t *testing.T) {
 	})
 
 	if !strings.Contains(out, "sonarr=true") {
-		t.Errorf("Load log = %q, want it to contain sonarr=true (SonarrConfig().URL != \"\")", out)
+		t.Errorf("Load log = %q, want it to contain sonarr=true (Sonarr().URL != \"\")", out)
 	}
 	if !strings.Contains(out, "radarr=false") {
-		t.Errorf("Load log = %q, want it to contain radarr=false (RadarrConfig().URL == \"\")", out)
+		t.Errorf("Load log = %q, want it to contain radarr=false (Radarr().URL == \"\")", out)
 	}
 }
 

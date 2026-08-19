@@ -25,11 +25,11 @@ var (
 )
 
 func countEpisodeCoverageGrouped(episodes []map[coverage.Key]*coverage.Status, targets []api.SubtitleTarget, total int) []coverage.TargetCoverage {
-	return coverage.CountEpisodeCoverageGrouped(episodes, targets, total)
+	return coverage.CountEpisodesGrouped(episodes, targets, total)
 }
 
 func countMovieCoverage(subs map[coverage.Key]*coverage.Status, targets []api.SubtitleTarget) []coverage.TargetCoverage {
-	return coverage.CountMovieCoverage(subs, targets)
+	return coverage.CountMovies(subs, targets)
 }
 
 func deduplicateFileRows(rows []api.SubtitleEntry) []api.SubtitleEntry {

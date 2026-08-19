@@ -26,7 +26,7 @@ type Info struct {
 	HDR              string
 }
 
-// ParseReleaseName extracts metadata from a scene/release name.
+// ParseName extracts metadata from a scene/release name.
 //
 // Input is clamped to MaxNameLen bytes before any pattern runs (defense in
 // depth for the layer's measured linear-time gate): a longer name is
@@ -34,7 +34,7 @@ type Info struct {
 // ClampName semantics, so callers that bypass provider.WrapRetry cannot
 // violate the input bound. Provider-path behavior is unchanged (those
 // names arrive already clamped).
-func ParseReleaseName(name string) Info {
+func ParseName(name string) Info {
 	name = ClampName(name)
 	if name == "" {
 		return Info{}
@@ -50,7 +50,7 @@ func ParseReleaseName(name string) Info {
 		info.Edition = strings.ToLower(m)
 	}
 
-	info.ReleaseGroup = ParseReleaseGroup(name)
+	info.ReleaseGroup = ParseGroup(name)
 
 	if slog.Default().Enabled(context.TODO(), slog.LevelDebug) {
 		slog.Debug("parsed release name",
@@ -64,8 +64,8 @@ func ParseReleaseName(name string) Info {
 	return info
 }
 
-// ParseReleaseGroup extracts the release group from a release name.
-func ParseReleaseGroup(name string) string {
+// ParseGroup extracts the release group from a release name.
+func ParseGroup(name string) string {
 	stripped := FileExtRe.ReplaceAllString(name, "")
 
 	if m := CompiledAnimeReleaseGroup.FindStringSubmatch(stripped); len(m) > 1 {

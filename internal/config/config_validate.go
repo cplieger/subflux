@@ -362,18 +362,18 @@ func warnArrURLs(name string, y yamlArrConfig) {
 // validateArrs checks that at least one arr endpoint is configured and
 // that configured endpoints have API keys. Returns an error on failure.
 func validateArrs(cfg *Config) error {
-	sonarr := cfg.SonarrConfig()
-	radarr := cfg.RadarrConfig()
+	sonarr := cfg.Sonarr()
+	radarr := cfg.Radarr()
 	if sonarr.URL == "" && radarr.URL == "" {
 		return ErrNoArr
 	}
-	warnArrURLs("sonarr", cfg.Sonarr)
-	warnArrURLs("radarr", cfg.Radarr)
+	warnArrURLs("sonarr", cfg.SonarrCfg)
+	warnArrURLs("radarr", cfg.RadarrCfg)
 	var missing []string
-	if sonarr.URL != "" && cfg.Sonarr.APIKey == "" {
+	if sonarr.URL != "" && cfg.SonarrCfg.APIKey == "" {
 		missing = append(missing, "sonarr")
 	}
-	if radarr.URL != "" && cfg.Radarr.APIKey == "" {
+	if radarr.URL != "" && cfg.RadarrCfg.APIKey == "" {
 		missing = append(missing, "radarr")
 	}
 	if len(missing) > 0 {

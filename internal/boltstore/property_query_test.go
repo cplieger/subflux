@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cplieger/subflux/internal/store/kv"
 	"os"
 	"path/filepath"
 	"sync"
@@ -199,7 +200,7 @@ func TestFaultInjection_updateAbortSeesNeither(t *testing.T) {
 			VideoPath:     "/media/fault.mkv",
 			MediaImported: time.Now().UTC(),
 		}
-		val, encErr := encodeRecord(&rec)
+		val, encErr := kv.Encode(&rec)
 		if encErr != nil {
 			return encErr
 		}

@@ -96,15 +96,6 @@ type scanRec struct {
 
 // --- Typed codec wrappers ---
 
-// encodeRecord serialises a core-domain record value as JSON via the shared
-// kv codec. It is a thin typed wrapper so call sites read as
-// encodeRecord(&rec) rather than threading the codec mechanism; PutIndexed
-// already encodes for index-maintained writes, so this is for the rare direct
-// put.
-func encodeRecord[T any](v *T) ([]byte, error) {
-	return kv.Encode(v)
-}
-
 // decodeRecord decodes a core-domain record value into v, applying the
 // supplied decode-failure policy. It is a thin typed wrapper over
 // kv.DecodeOrHandle: on a cursor walk the caller continues to the next

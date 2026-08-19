@@ -41,7 +41,7 @@ var _ api.ConfigProvider = (*activationTestConfig)(nil)
 
 func (c *activationTestConfig) WebAuthnRPID() string { return c.rpID }
 func (c *activationTestConfig) OIDCEnabled() bool    { return c.oidcOn }
-func (c *activationTestConfig) OIDCConfig() auth.OIDCConfig {
+func (c *activationTestConfig) OIDC() auth.OIDCConfig {
 	return c.oidcCfg
 }
 

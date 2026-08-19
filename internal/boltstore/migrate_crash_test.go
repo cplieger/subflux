@@ -78,7 +78,7 @@ func seedCrashFixture(t *testing.T, path string) {
 	if err != nil {
 		t.Fatalf("Open for auth seed: %v", err)
 	}
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	if err := as.CreateUser(t.Context(), &auth.User{Username: "alice", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -174,7 +174,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if got, err := db.GetSyncOffset(ctx, crashOffsetPath); err != nil || got != wantOffset {
 		t.Errorf("GetSyncOffset = (%d, %v), want %d", got, err, wantOffset)
 	}
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	if u, _, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
 		t.Errorf("auth user after recovery = (%+v, %v), want alice intact", u, err)
 	}

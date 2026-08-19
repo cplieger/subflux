@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	pathpkg "path"
+	"path"
 	"strings"
 	"time"
 
@@ -294,7 +294,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 // pre-migration .gz sibling in a dev tree is not addressable and falls
 // through to the fallbacks like any unknown path.
 func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
-	p := strings.TrimPrefix(pathpkg.Clean(r.URL.Path), "/")
+	p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 	if p == "" {
 		p = indexHTML
 	}

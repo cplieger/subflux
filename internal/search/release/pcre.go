@@ -57,7 +57,7 @@
 // download-retry provider wrapper (internal/provider.WrapRetry), which
 // both composition roots apply to every provider, clamps each search
 // result's ReleaseName via ClampName before it enters the engine.
-// ParseReleaseName additionally clamps its own input (defense in depth for
+// ParseName additionally clamps its own input (defense in depth for
 // callers that bypass the provider path). Scaling benchmarks in
 // pcre_bench_test.go demonstrate near-linear behavior within the bound.
 package release

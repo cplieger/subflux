@@ -356,7 +356,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	defer coreDB.Close(t.Context())
 
-	db := authstore.New(coreDB.BoltDB())
+	db := authstore.New(coreDB.Bolt())
 	if err := db.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +414,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	defer coreDB.Close(t.Context())
 
-	db = authstore.New(coreDB.BoltDB())
+	db = authstore.New(coreDB.Bolt())
 	if err := db.Open(); err != nil {
 		t.Fatal(err)
 	}

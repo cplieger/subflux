@@ -15,10 +15,10 @@ type SearchCfg interface {
 	Search() api.SearchConfig
 	// Adaptive returns the adaptive search configuration.
 	Adaptive() api.AdaptiveConfig
-	// SyncConfig returns subtitle sync/timing configuration.
-	SyncConfig() api.SyncConfig
-	// PostProcessConfig returns post-processing settings.
-	PostProcessConfig() api.PostProcessConfig
+	// Sync returns subtitle sync/timing configuration.
+	Sync() api.SyncConfig
+	// PostProcess returns post-processing settings.
+	PostProcess() api.PostProcessConfig
 	// ProvidersForTarget returns provider names allowed for this target.
 	// Empty slice means no providers will be searched for this target.
 	ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.ProviderID) []api.ProviderID

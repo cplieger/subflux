@@ -106,8 +106,8 @@ func (m *qhMockConfig) ProvidersForTarget(_ *api.SubtitleTarget, all []api.Provi
 func (m *qhMockConfig) MinScoreForTarget(_ *api.SubtitleTarget, _ api.MediaType) int { return 0 }
 func (m *qhMockConfig) Adaptive() api.AdaptiveConfig                                 { return m.adaptiveCfg }
 func (m *qhMockConfig) Search() api.SearchConfig                                     { return m.searchCfg }
-func (m *qhMockConfig) SonarrConfig() api.ArrConfig                                  { return m.sonarrCfg }
-func (m *qhMockConfig) RadarrConfig() api.ArrConfig                                  { return m.radarrCfg }
+func (m *qhMockConfig) Sonarr() api.ArrConfig                                        { return m.sonarrCfg }
+func (m *qhMockConfig) Radarr() api.ArrConfig                                        { return m.radarrCfg }
 func (m *qhMockConfig) ProviderConfigs() map[api.ProviderID]api.ProviderCfg          { return m.providers }
 func (m *qhMockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
 func (m *qhMockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
@@ -123,12 +123,12 @@ func (m *qhMockConfig) RemoveUnderRoot(_ context.Context, path string) error {
 	}
 	return nil
 }
-func (m *qhMockConfig) PostProcessConfig() api.PostProcessConfig  { return api.PostProcessConfig{} }
-func (m *qhMockConfig) SyncConfig() api.SyncConfig                { return api.SyncConfig{SyncSubtitles: true} }
+func (m *qhMockConfig) PostProcess() api.PostProcessConfig        { return api.PostProcessConfig{} }
+func (m *qhMockConfig) Sync() api.SyncConfig                      { return api.SyncConfig{SyncSubtitles: true} }
 func (m *qhMockConfig) LanguageRulesForUI() api.LanguageRulesJSON { return api.LanguageRulesJSON{} }
 func (m *qhMockConfig) BasicAuthEnabled() bool                    { return true }
 func (m *qhMockConfig) OIDCEnabled() bool                         { return false }
-func (m *qhMockConfig) OIDCConfig() auth.OIDCConfig               { return auth.OIDCConfig{} }
+func (m *qhMockConfig) OIDC() auth.OIDCConfig                     { return auth.OIDCConfig{} }
 func (m *qhMockConfig) SessionIdleTimeout() time.Duration         { return 24 * time.Hour }
 func (m *qhMockConfig) SessionAbsoluteTimeout() time.Duration     { return 7 * 24 * time.Hour }
 func (m *qhMockConfig) CheckBreachedPasswords() bool              { return false }

@@ -228,9 +228,9 @@ func genTime(rt *rapid.T, label string) time.Time {
 // asserts the two encodings are byte-identical (a stable round-trip).
 func assertRecStable[T any](rt *rapid.T, v *T) {
 	rt.Helper()
-	enc, err := encodeRecord(v)
+	enc, err := kv.Encode(v)
 	if err != nil {
-		rt.Fatalf("encodeRecord: %v", err)
+		rt.Fatalf("kv.Encode: %v", err)
 	}
 	var got T
 	skip, derr := decodeRecord(kv.FailClosed, "prop", []byte("k"), enc, &got)
@@ -240,7 +240,7 @@ func assertRecStable[T any](rt *rapid.T, v *T) {
 	if derr != nil {
 		rt.Fatalf("decodeRecord: %v", derr)
 	}
-	reEnc, err := encodeRecord(&got)
+	reEnc, err := kv.Encode(&got)
 	if err != nil {
 		rt.Fatalf("re-encode: %v", err)
 	}

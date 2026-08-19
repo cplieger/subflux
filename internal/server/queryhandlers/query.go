@@ -193,12 +193,12 @@ func (h *Handler) HandleConfigParsed(w http.ResponseWriter, r *http.Request) {
 		Providers:      provMap,
 		Search:         ls.Cfg.Search(),
 		Adaptive:       ls.Cfg.Adaptive(),
-		PostProcessing: ls.Cfg.PostProcessConfig(),
+		PostProcessing: ls.Cfg.PostProcess(),
 		Scores:         ls.Cfg.Scores(),
-		SonarrURL:      ls.Cfg.SonarrConfig().PublicURL,
-		RadarrURL:      ls.Cfg.RadarrConfig().PublicURL,
-		Sonarr:         ls.Cfg.SonarrConfig().URL != "",
-		Radarr:         ls.Cfg.RadarrConfig().URL != "",
+		SonarrURL:      ls.Cfg.Sonarr().PublicURL,
+		RadarrURL:      ls.Cfg.Radarr().PublicURL,
+		Sonarr:         ls.Cfg.Sonarr().URL != "",
+		Radarr:         ls.Cfg.Radarr().URL != "",
 		IgnoredCodecs:  ignoredCodecs,
 	})
 }

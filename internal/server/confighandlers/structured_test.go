@@ -160,7 +160,7 @@ languages:
 // does not understand.
 func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 	t.Parallel()
-	full := schema.Schema([]api.ProviderSchema{{
+	full := schema.Sections([]api.ProviderSchema{{
 		Name: "probe", Settings: []api.SchemaField{
 			{Key: "api_key", Secret: true},
 			{Key: "password", Secret: true},
@@ -219,7 +219,7 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("saved YAML does not round-trip through LoadFromBytes: %v\n%s", err, saved)
 	}
-	if got := cfg.SonarrConfig().APIKey; got != "k1" {
+	if got := cfg.Sonarr().APIKey; got != "k1" {
 		t.Errorf("round-tripped sonarr api_key = %q, want k1", got)
 	}
 	pc := cfg.ProviderConfigs()["opensubtitles"]
@@ -412,7 +412,7 @@ providers:
 	if err != nil {
 		t.Fatalf("original config does not load: %v", err)
 	}
-	if got, want := cfg.SonarrConfig(), orig.SonarrConfig(); got != want {
+	if got, want := cfg.Sonarr(), orig.Sonarr(); got != want {
 		t.Errorf("sonarr config drifted: got %+v, want %+v", got, want)
 	}
 	gotPC, wantPC := cfg.ProviderConfigs()["opensubtitles"], orig.ProviderConfigs()["opensubtitles"]

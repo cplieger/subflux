@@ -8,7 +8,7 @@ import (
 )
 
 // normalizeSet collects the normalized labels a format table can produce, so a
-// fuzz test can assert ParseReleaseName only ever emits known labels.
+// fuzz test can assert ParseName only ever emits known labels.
 func normalizeSet(formats []Format) map[string]bool {
 	m := make(map[string]bool, len(formats))
 	for _, ft := range formats {
@@ -32,20 +32,20 @@ func FuzzParseReleaseName(f *testing.F) {
 	validStreaming := normalizeSet(CompiledStreaming)
 
 	f.Fuzz(func(t *testing.T, name string) {
-		info := ParseReleaseName(name)
+		info := ParseName(name)
 		// Bounded output: every detected attribute is one of the known
 		// normalized labels for its category (or empty when nothing matched).
 		if info.Source != "" && !validSource[info.Source] {
-			t.Errorf("ParseReleaseName(%q).Source = %q, not a known source label", name, info.Source)
+			t.Errorf("ParseName(%q).Source = %q, not a known source label", name, info.Source)
 		}
 		if info.VideoCodec != "" && !validCodec[info.VideoCodec] {
-			t.Errorf("ParseReleaseName(%q).VideoCodec = %q, not a known codec label", name, info.VideoCodec)
+			t.Errorf("ParseName(%q).VideoCodec = %q, not a known codec label", name, info.VideoCodec)
 		}
 		if info.HDR != "" && !validHDR[info.HDR] {
-			t.Errorf("ParseReleaseName(%q).HDR = %q, not a known HDR label", name, info.HDR)
+			t.Errorf("ParseName(%q).HDR = %q, not a known HDR label", name, info.HDR)
 		}
 		if info.StreamingService != "" && !validStreaming[info.StreamingService] {
-			t.Errorf("ParseReleaseName(%q).StreamingService = %q, not a known streaming label", name, info.StreamingService)
+			t.Errorf("ParseName(%q).StreamingService = %q, not a known streaming label", name, info.StreamingService)
 		}
 	})
 }
@@ -58,7 +58,7 @@ func FuzzParseReleaseGroup(f *testing.F) {
 	f.Add("no-group-here")
 
 	f.Fuzz(func(t *testing.T, name string) {
-		group := ParseReleaseGroup(name)
+		group := ParseGroup(name)
 		if group == "" {
 			return
 		}
@@ -66,7 +66,7 @@ func FuzzParseReleaseGroup(f *testing.F) {
 		// extension-stripped input, never fabricated or transformed.
 		stripped := FileExtRe.ReplaceAllString(name, "")
 		if !strings.Contains(stripped, group) {
-			t.Errorf("ParseReleaseGroup(%q) = %q, not a substring of %q", name, group, stripped)
+			t.Errorf("ParseGroup(%q) = %q, not a substring of %q", name, group, stripped)
 		}
 	})
 }

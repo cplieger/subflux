@@ -177,7 +177,7 @@ func TestBuildProviderSchemas_with_providers(t *testing.T) {
 	}
 }
 
-// --- provider.ClearProviderCaches ---
+// --- provider.ClearCaches ---
 
 // mockCacheClearer tracks whether ClearCache was called.
 type mockCacheClearer struct {
@@ -193,7 +193,7 @@ func TestClearProviderCaches_calls_cache_clearers(t *testing.T) {
 	cc := &mockCacheClearer{stubProvider: stubProvider{name: "hdbits"}}
 	plain := &stubProvider{name: "os"}
 
-	provider.ClearProviderCaches([]api.Provider{plain, cc})
+	provider.ClearCaches([]api.Provider{plain, cc})
 
 	if !cc.cleared {
 		t.Error("ClearCache not called on provider implementing cacheClearer")
@@ -204,13 +204,13 @@ func TestClearProviderCaches_no_clearers(t *testing.T) {
 	t.Parallel()
 	plain := &stubProvider{name: "os"}
 	// Should not panic with no cacheClearer providers.
-	provider.ClearProviderCaches([]api.Provider{plain})
+	provider.ClearCaches([]api.Provider{plain})
 }
 
 func TestClearProviderCaches_nil_providers(t *testing.T) {
 	t.Parallel()
 	// Should not panic with nil slice.
-	provider.ClearProviderCaches(nil)
+	provider.ClearCaches(nil)
 }
 
 func TestBuildProviderSchemas_excludes_mock_provider(t *testing.T) {

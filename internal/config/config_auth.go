@@ -21,8 +21,8 @@ func (c *Config) BasicAuthEnabled() bool {
 // OIDCEnabled returns whether OIDC login is enabled.
 func (c *Config) OIDCEnabled() bool { return c.Auth.OIDCEnabled }
 
-// OIDCConfig returns the OIDC provider settings.
-func (c *Config) OIDCConfig() auth.OIDCConfig {
+// OIDC returns the OIDC provider settings.
+func (c *Config) OIDC() auth.OIDCConfig {
 	return auth.OIDCConfig{
 		IssuerURL:    c.Auth.OIDC.IssuerURL,
 		ClientID:     c.Auth.OIDC.ClientID,

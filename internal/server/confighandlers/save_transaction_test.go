@@ -47,7 +47,7 @@ func TestSaveTransaction_concurrent_saves_keep_live_and_disk_in_sync(t *testing.
 	)
 	hotReload := func(_ context.Context, cfg api.ConfigProvider) error {
 		mu.Lock()
-		liveURL = cfg.SonarrConfig().URL
+		liveURL = cfg.Sonarr().URL
 		calls++
 		first := calls == 1
 		mu.Unlock()
@@ -112,7 +112,7 @@ languages:
 	if err != nil {
 		t.Fatalf("persisted config does not load: %v\n%s", err, saved)
 	}
-	if diskURL := cfg.SonarrConfig().URL; diskURL != gotLive {
+	if diskURL := cfg.Sonarr().URL; diskURL != gotLive {
 		t.Errorf("live and disk generations diverged: last activated %q, on disk %q",
 			gotLive, diskURL)
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 // SyncAndPostProcess syncs subtitle timing and normalizes content using
-// the user's configured SyncConfig. It is the single entry point used by
+// the user's configured sync settings. It is the single entry point used by
 // manual downloads and any caller that wants the full "match the auto path"
 // behavior:
 //
@@ -31,8 +31,8 @@ import (
 func (e *Engine) SyncAndPostProcess(ctx context.Context, data []byte,
 	videoPath, lang string, variant api.Variant,
 ) (synced []byte, offsetMs int64) {
-	data, offsetMs = e.syncSubtitle(ctx, data, videoPath, lang, e.cfg.SyncConfig())
-	pp := e.cfg.PostProcessConfig()
+	data, offsetMs = e.syncSubtitle(ctx, data, videoPath, lang, e.cfg.Sync())
+	pp := e.cfg.PostProcess()
 	if variant == api.VariantHI {
 		pp.StripHI = false
 	}
@@ -120,7 +120,7 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *api.SearchRequest,
 	// Skip sync for forced subtitles: too few cues (10-30 in a 2-hour
 	// movie) for reliable alignment against a full reference or audio.
 	var syncOffsetMs int64
-	syncCfg := e.cfg.SyncConfig()
+	syncCfg := e.cfg.Sync()
 	if syncCfg.SyncSubtitles &&
 		best.sub.MatchedBy != api.MatchByHash &&
 		best.score < syncSkipThreshold(e.cfg.Scores()) &&
@@ -191,7 +191,7 @@ func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	videoPath, lang string, variant api.Variant,
 ) (subPath string, saveHI bool, processed []byte) {
-	pp := e.cfg.PostProcessConfig()
+	pp := e.cfg.PostProcess()
 	// Strip HI behavior depends on the target variant:
 	// - hi variant target: never strip (user explicitly wants HI annotations).
 	// - standard/forced target: honor the global strip_hi setting, even if

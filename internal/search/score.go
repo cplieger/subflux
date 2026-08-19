@@ -23,7 +23,7 @@ type scoredSub struct {
 // Hoisted to package level to eliminate per-call closure allocation in the scoring hot path.
 var defaultMatchDeps = scoring.MatchDeps{
 	ParseRelease: func(name string) scoring.ReleaseInfo {
-		r := release.ParseReleaseName(name)
+		r := release.ParseName(name)
 		return scoring.ReleaseInfo{
 			Source:           r.Source,
 			VideoCodec:       r.VideoCodec,

@@ -29,10 +29,10 @@ const (
 	placeholderMedia = "/media"
 )
 
-// Schema returns the full configuration schema for the UI.
-// Order matches config.example.yaml for consistency.
-// providerSchemas is built from the provider registry by the caller.
-func Schema(providerSchemas []api.ProviderSchema) []api.SchemaSection {
+// Sections returns the full configuration schema for the UI, in the order
+// config.example.yaml uses. providerSchemas is built from the provider
+// registry by the caller.
+func Sections(providerSchemas []api.ProviderSchema) []api.SchemaSection {
 	return []api.SchemaSection{
 		sonarrSection(),
 		radarrSection(),

@@ -39,7 +39,7 @@ func TestSyncSkipThreshold(t *testing.T) {
 // false) becomes observable.
 type stripHITestConfig struct{ mockConfig }
 
-func (stripHITestConfig) PostProcessConfig() api.PostProcessConfig {
+func (stripHITestConfig) PostProcess() api.PostProcessConfig {
 	return api.PostProcessConfig{StripHI: true, NormalizeEndings: true}
 }
 

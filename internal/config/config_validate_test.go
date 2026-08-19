@@ -17,7 +17,7 @@ func TestValidate(t *testing.T) {
 	// validBase returns a minimal valid Config for boundary testing.
 	validBase := func() *Config {
 		return &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -42,29 +42,29 @@ func TestValidate(t *testing.T) {
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "sonarr missing api_key", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "radarr missing api_key", cfg: &Config{
-			Radarr: yamlArrConfig{URL: "http://radarr:7878"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "radarr"},
 		{name: "both arr missing api_key", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989"},
-			Radarr: yamlArrConfig{URL: "http://radarr:7878"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "sonarr only passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -73,7 +73,7 @@ func TestValidate(t *testing.T) {
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "radarr only passes", cfg: &Config{
-			Radarr: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -82,8 +82,8 @@ func TestValidate(t *testing.T) {
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "both arr passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
-			Radarr: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -94,11 +94,11 @@ func TestValidate(t *testing.T) {
 
 		// language rules
 		{name: "no default fails", cfg: &Config{
-			Sonarr:          yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg:       yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "rules without default fails", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 			},
@@ -106,7 +106,7 @@ func TestValidate(t *testing.T) {
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty audio in rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -114,7 +114,7 @@ func TestValidate(t *testing.T) {
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: ""}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
@@ -122,14 +122,14 @@ func TestValidate(t *testing.T) {
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in default", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: ""}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "default rules only passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
@@ -137,7 +137,7 @@ func TestValidate(t *testing.T) {
 			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "duplicate audio rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{
 					{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}},
@@ -150,14 +150,14 @@ func TestValidate(t *testing.T) {
 
 		// providers
 		{name: "no enabled providers", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: false}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty providers map", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
@@ -520,7 +520,7 @@ func TestValidateScoring(t *testing.T) {
 	// given scoring weights (nil = defaults in use).
 	scoringBase := func(w *api.Scores) *Config {
 		return &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},

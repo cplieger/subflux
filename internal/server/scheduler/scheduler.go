@@ -171,7 +171,7 @@ func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID st
 		Activity:      deps.Activity,
 		Alerts:        deps.Alerts,
 		ShowSkipCache: deps.ShowSkipCache,
-		ClearCaches:   provider.ClearProviderCaches,
+		ClearCaches:   provider.ClearCaches,
 	}
 	scanLS := &scanning.LiveState{
 		Cfg:         ls.Cfg,

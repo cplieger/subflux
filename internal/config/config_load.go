@@ -162,8 +162,8 @@ func Load(ctx context.Context, path string) (*Config, error) {
 
 	slog.Info("config loaded",
 		"path", path,
-		"sonarr", cfg.SonarrConfig().URL != "",
-		"radarr", cfg.RadarrConfig().URL != "",
+		"sonarr", cfg.Sonarr().URL != "",
+		"radarr", cfg.Radarr().URL != "",
 		"providers", len(cfg.Providers),
 		"rules", len(cfg.Languages.Rules))
 

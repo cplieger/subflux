@@ -14,7 +14,7 @@ func BenchmarkParseReleaseName(b *testing.B) {
 	b.ReportAllocs()
 	for range b.N {
 		for _, name := range benchReleaseNames {
-			_ = ParseReleaseName(name)
+			_ = ParseName(name)
 		}
 	}
 }

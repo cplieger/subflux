@@ -7,11 +7,11 @@ import (
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
-// handleEvents delegates to events.HandleEvents. The client cap lives on the
+// handleEvents delegates to events.Handle. The client cap lives on the
 // hub itself (set at construction, re-applied by hot reload via
 // sseClientCap), so no per-request config read is needed here.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	events.HandleEvents(s.events, w, r)
+	events.Handle(s.events, w, r)
 }
 
 // sseClientCap resolves the configured SSE client cap, falling back to the

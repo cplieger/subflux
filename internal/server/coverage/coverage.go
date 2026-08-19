@@ -79,8 +79,8 @@ func ExtractSeriesPrefix(epMediaID string) string {
 	return ""
 }
 
-// CountEpisodeCoverageGrouped counts coverage from pre-grouped episode subtitle maps.
-func CountEpisodeCoverageGrouped(
+// CountEpisodesGrouped counts coverage from pre-grouped episode subtitle maps.
+func CountEpisodesGrouped(
 	episodes []map[Key]*Status,
 	targets []api.SubtitleTarget,
 	total int,
@@ -109,8 +109,8 @@ func CountEpisodeCoverageGrouped(
 	return out
 }
 
-// CountMovieCoverage returns target coverage for a single movie.
-func CountMovieCoverage(
+// CountMovies returns target coverage for a single movie.
+func CountMovies(
 	subs map[Key]*Status,
 	targets []api.SubtitleTarget,
 ) []TargetCoverage {

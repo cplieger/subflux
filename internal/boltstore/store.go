@@ -185,10 +185,10 @@ func bootstrap(db *bbolt.DB, coreCurrent, authCurrent uint64) error {
 	})
 }
 
-// BoltDB exposes the underlying *bbolt.DB handle so the auth store
+// Bolt exposes the underlying *bbolt.DB handle so the auth store
 // (internal/authstore) can share the same file. The auth store NEVER closes
 // this handle — the core store owns it exclusively.
-func (d *DB) BoltDB() *bbolt.DB {
+func (d *DB) Bolt() *bbolt.DB {
 	return d.db
 }
 

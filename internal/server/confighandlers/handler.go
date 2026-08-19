@@ -261,9 +261,9 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 	if oldCfg != nil {
 		var old api.ArrConfig
 		if name == "sonarr" {
-			old = oldCfg.SonarrConfig()
+			old = oldCfg.Sonarr()
 		} else {
-			old = oldCfg.RadarrConfig()
+			old = oldCfg.Radarr()
 		}
 		if newArr.URL == old.URL && newArr.APIKey == old.APIKey {
 			return nil

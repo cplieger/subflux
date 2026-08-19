@@ -128,14 +128,14 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 	// Arr clients are constructed HERE in both modes: activation owns their
 	// lifecycle (main.go builds none), so a failed construction rejects the
 	// candidate without side effects.
-	if sonarrCfg := newCfg.SonarrConfig(); sonarrCfg.URL != "" {
+	if sonarrCfg := newCfg.Sonarr(); sonarrCfg.URL != "" {
 		c, sonarrErr := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey)
 		if sonarrErr != nil {
 			return nil, fmt.Errorf("invalid sonarr config: %w", sonarrErr)
 		}
 		cand.sonarr = c
 	}
-	if radarrCfg := newCfg.RadarrConfig(); radarrCfg.URL != "" {
+	if radarrCfg := newCfg.Radarr(); radarrCfg.URL != "" {
 		c, radarrErr := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey)
 		if radarrErr != nil {
 			return nil, fmt.Errorf("invalid radarr config: %w", radarrErr)
@@ -368,7 +368,7 @@ func newOIDCSlot(cfg api.ConfigProvider) *oidcSlot {
 	if !cfg.OIDCEnabled() {
 		return nil
 	}
-	return &oidcSlot{cfg: cfg.OIDCConfig()}
+	return &oidcSlot{cfg: cfg.OIDC()}
 }
 
 // get returns the slot's provider, performing lazy network discovery on

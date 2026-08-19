@@ -16,7 +16,7 @@ func loadedConfig(t *testing.T) *Config {
 	t.Helper()
 
 	cfg := &Config{
-		Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+		SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 		Languages: LanguageRules{
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{
 				{Code: "fr", Variants: []string{"forced"}, Providers: []api.ProviderID{"a"}, Exclude: []api.ProviderID{"b"}},

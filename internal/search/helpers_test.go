@@ -77,7 +77,7 @@ func (m *mockConfig) Adaptive() api.AdaptiveConfig                              
 func (m *mockConfig) Search() api.SearchConfig                                     { return m.searchCfg }
 func (m *mockConfig) EmbeddedPolicy() api.EmbeddedPolicy                           { return m.embedded }
 func (m *mockConfig) ProviderPriority(_ api.ProviderID) int                        { return 99 }
-func (m *mockConfig) PostProcessConfig() api.PostProcessConfig {
+func (m *mockConfig) PostProcess() api.PostProcessConfig {
 	return api.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,
@@ -87,7 +87,7 @@ func (m *mockConfig) PostProcessConfig() api.PostProcessConfig {
 	}
 }
 
-func (m *mockConfig) SyncConfig() api.SyncConfig {
+func (m *mockConfig) Sync() api.SyncConfig {
 	return api.SyncConfig{SyncSubtitles: true}
 }
 

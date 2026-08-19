@@ -602,12 +602,12 @@ func (m *mockStoreWithSaveError) SaveDownload(_ context.Context, _ *api.Download
 
 // --- StripHI and hash match edge cases ---
 
-// mockConfigWithStripHI enables StripHI in PostProcessConfig.
+// mockConfigWithStripHI enables StripHI in the post-processing config.
 type mockConfigWithStripHI struct {
 	mockConfig
 }
 
-func (m *mockConfigWithStripHI) PostProcessConfig() api.PostProcessConfig {
+func (m *mockConfigWithStripHI) PostProcess() api.PostProcessConfig {
 	return api.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,

@@ -110,8 +110,8 @@ func (s *Server) hotReload(ctx context.Context, newCfg api.ConfigProvider) error
 
 	slog.Debug("hot reload: activating candidate config",
 		"providers", len(newCfg.ProviderConfigs()),
-		"sonarr", newCfg.SonarrConfig().URL != "",
-		"radarr", newCfg.RadarrConfig().URL != "")
+		"sonarr", newCfg.Sonarr().URL != "",
+		"radarr", newCfg.Radarr().URL != "")
 
 	return s.activate(ctx, newCfg, activateHot)
 }

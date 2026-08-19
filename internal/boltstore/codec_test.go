@@ -31,9 +31,9 @@ func TestRecordRoundTrip(t *testing.T) {
 // asserts the re-encoded bytes are byte-identical.
 func roundTrip[T any](t *testing.T, v *T) {
 	t.Helper()
-	enc, err := encodeRecord(v)
+	enc, err := kv.Encode(v)
 	if err != nil {
-		t.Fatalf("encodeRecord: %v", err)
+		t.Fatalf("kv.Encode: %v", err)
 	}
 	var got T
 	skip, derr := decodeRecord(kv.FailClosed, "test", []byte("k"), enc, &got)
@@ -43,7 +43,7 @@ func roundTrip[T any](t *testing.T, v *T) {
 	if derr != nil {
 		t.Fatalf("decodeRecord: %v", derr)
 	}
-	reEnc, err := encodeRecord(&got)
+	reEnc, err := kv.Encode(&got)
 	if err != nil {
 		t.Fatalf("re-encode: %v", err)
 	}

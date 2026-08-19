@@ -65,8 +65,8 @@ type Config struct {
 	cachedRuleTargets map[string][]api.SubtitleTarget
 	// cachedProviderConfigs is the pre-computed result of ProviderConfigs().
 	cachedProviderConfigs map[api.ProviderID]api.ProviderCfg
-	Sonarr                yamlArrConfig `yaml:"sonarr"`
-	Radarr                yamlArrConfig `yaml:"radarr"`
+	SonarrCfg             yamlArrConfig `yaml:"sonarr"`
+	RadarrCfg             yamlArrConfig `yaml:"radarr"`
 	Logging               LoggingConfig `yaml:"logging"`
 	Languages             LanguageRules `yaml:"languages"`
 	// cachedLangCodes is the pre-computed result of LanguageCodes().

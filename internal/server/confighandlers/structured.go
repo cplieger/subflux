@@ -124,7 +124,7 @@ func (h *Handler) HandleSaveConfigStructured(w http.ResponseWriter, r *http.Requ
 	}
 
 	var sc StructuredConfig
-	if err = json.Unmarshal(body, &sc); err != nil {
+	if err := json.Unmarshal(body, &sc); err != nil {
 		api.BadRequestC(w, r, api.CodeBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
@@ -337,11 +337,11 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 	}
 
 	oldCfg := h.state().Cfg
-	if pingErr := h.pingArrIfChanged(r.Context(), "sonarr", newCfg.SonarrConfig(), oldCfg); pingErr != nil {
+	if pingErr := h.pingArrIfChanged(r.Context(), "sonarr", newCfg.Sonarr(), oldCfg); pingErr != nil {
 		api.BadRequestC(w, r, api.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
 		return
 	}
-	if pingErr := h.pingArrIfChanged(r.Context(), "radarr", newCfg.RadarrConfig(), oldCfg); pingErr != nil {
+	if pingErr := h.pingArrIfChanged(r.Context(), "radarr", newCfg.Radarr(), oldCfg); pingErr != nil {
 		api.BadRequestC(w, r, api.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
 		return
 	}

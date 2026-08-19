@@ -19,13 +19,13 @@ type stream struct {
 	close  func()
 }
 
-// startStream connects an SSE client to a HandleEvents server. The client cap
+// startStream connects an SSE client to a Handle server. The client cap
 // lives on the bus itself (construct with New(cap)). The response body never
 // escapes: it is owned here and closed via t.Cleanup and/or st.close.
 func startStream(t *testing.T, bus *EventBus) stream {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		HandleEvents(bus, w, r)
+		Handle(bus, w, r)
 	}))
 	t.Cleanup(srv.Close)
 	resp, err := http.Get(srv.URL)

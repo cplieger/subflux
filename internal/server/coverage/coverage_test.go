@@ -189,7 +189,7 @@ func TestExtractSeriesPrefix(t *testing.T) {
 	}
 }
 
-// --- CountEpisodeCoverageGrouped ---
+// --- CountEpisodesGrouped ---
 
 func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.T) {
 	t.Parallel()
@@ -198,12 +198,12 @@ func TestCountEpisodeCoverageGrouped_countsUsableAndIgnoredPerTarget(t *testing.
 		{coverage.Key{Lang: "en", Variant: "standard"}: {IgnoredOnly: true}},
 		{}, // no en subtitle for this episode
 	}
-	got := coverage.CountEpisodeCoverageGrouped(episodes, []api.SubtitleTarget{{Code: "en"}}, 3)
+	got := coverage.CountEpisodesGrouped(episodes, []api.SubtitleTarget{{Code: "en"}}, 3)
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 1, Total: 3},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountEpisodeCoverageGrouped = %+v, want %+v", got, want)
+		t.Errorf("CountEpisodesGrouped = %+v, want %+v", got, want)
 	}
 }
 
@@ -216,7 +216,7 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 		},
 		{coverage.Key{Lang: "en", Variant: "standard"}: {Usable: true}},
 	}
-	got := coverage.CountEpisodeCoverageGrouped(episodes, []api.SubtitleTarget{
+	got := coverage.CountEpisodesGrouped(episodes, []api.SubtitleTarget{
 		{Code: "en"},
 		{Code: "fr", Variant: api.VariantForced},
 	}, 2)
@@ -225,42 +225,42 @@ func TestCountEpisodeCoverageGrouped_multipleTargets(t *testing.T) {
 		{Language: "fr", Variant: "forced", Have: 1, HaveIgnored: 0, Total: 2},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountEpisodeCoverageGrouped = %+v, want %+v", got, want)
+		t.Errorf("CountEpisodesGrouped = %+v, want %+v", got, want)
 	}
 }
 
 func TestCountEpisodeCoverageGrouped_noEpisodesKeepsTotal(t *testing.T) {
 	t.Parallel()
-	got := coverage.CountEpisodeCoverageGrouped(nil, []api.SubtitleTarget{{Code: "en"}}, 5)
+	got := coverage.CountEpisodesGrouped(nil, []api.SubtitleTarget{{Code: "en"}}, 5)
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 5},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountEpisodeCoverageGrouped(no episodes) = %+v, want %+v", got, want)
+		t.Errorf("CountEpisodesGrouped(no episodes) = %+v, want %+v", got, want)
 	}
 }
 
 func TestCountEpisodeCoverageGrouped_emptyTargets(t *testing.T) {
 	t.Parallel()
-	got := coverage.CountEpisodeCoverageGrouped(nil, nil, 3)
+	got := coverage.CountEpisodesGrouped(nil, nil, 3)
 	if len(got) != 0 {
-		t.Errorf("CountEpisodeCoverageGrouped(no targets) len = %d, want 0", len(got))
+		t.Errorf("CountEpisodesGrouped(no targets) len = %d, want 0", len(got))
 	}
 }
 
-// --- CountMovieCoverage ---
+// --- CountMovies ---
 
 func TestCountMovieCoverage_usableTarget(t *testing.T) {
 	t.Parallel()
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {Usable: true},
 	}
-	got := coverage.CountMovieCoverage(subs, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountMovieCoverage(usable) = %+v, want %+v", got, want)
+		t.Errorf("CountMovies(usable) = %+v, want %+v", got, want)
 	}
 }
 
@@ -269,23 +269,23 @@ func TestCountMovieCoverage_ignoredOnlyTarget(t *testing.T) {
 	subs := map[coverage.Key]*coverage.Status{
 		{Lang: "en", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	got := coverage.CountMovieCoverage(subs, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountMovieCoverage(ignored only) = %+v, want %+v", got, want)
+		t.Errorf("CountMovies(ignored only) = %+v, want %+v", got, want)
 	}
 }
 
 func TestCountMovieCoverage_missingTarget(t *testing.T) {
 	t.Parallel()
-	got := coverage.CountMovieCoverage(nil, []api.SubtitleTarget{{Code: "en"}})
+	got := coverage.CountMovies(nil, []api.SubtitleTarget{{Code: "en"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 0, HaveIgnored: 0, Total: 1},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountMovieCoverage(missing) = %+v, want %+v", got, want)
+		t.Errorf("CountMovies(missing) = %+v, want %+v", got, want)
 	}
 }
 
@@ -295,20 +295,20 @@ func TestCountMovieCoverage_multipleTargetsMixed(t *testing.T) {
 		{Lang: "en", Variant: "standard"}: {Usable: true},
 		{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	got := coverage.CountMovieCoverage(subs, []api.SubtitleTarget{{Code: "en"}, {Code: "fr"}})
+	got := coverage.CountMovies(subs, []api.SubtitleTarget{{Code: "en"}, {Code: "fr"}})
 	want := []coverage.TargetCoverage{
 		{Language: "en", Variant: "standard", Have: 1, HaveIgnored: 0, Total: 1},
 		{Language: "fr", Variant: "standard", Have: 0, HaveIgnored: 1, Total: 1},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CountMovieCoverage(mixed) = %+v, want %+v", got, want)
+		t.Errorf("CountMovies(mixed) = %+v, want %+v", got, want)
 	}
 }
 
 func TestCountMovieCoverage_emptyTargets(t *testing.T) {
 	t.Parallel()
-	if got := coverage.CountMovieCoverage(nil, nil); len(got) != 0 {
-		t.Errorf("CountMovieCoverage(no targets) len = %d, want 0", len(got))
+	if got := coverage.CountMovies(nil, nil); len(got) != 0 {
+		t.Errorf("CountMovies(no targets) len = %d, want 0", len(got))
 	}
 }
 

@@ -215,7 +215,7 @@ func runServer() int {
 		defer db.Close(ctx)
 
 		// Build auth store over the shared bbolt handle and start its sweeper.
-		authDB := authstore.New(db.BoltDB())
+		authDB := authstore.New(db.Bolt())
 		if err := authDB.Open(); err != nil {
 			slog.Error("failed to start auth sweeper", "error", err)
 			return 1
@@ -270,7 +270,7 @@ func runConfiguredServer(cfg *config.Config) int {
 	// Build auth store over the shared bbolt handle and start its sweeper,
 	// seeded with the configured session timeouts so eviction matches the
 	// request-path validator (hot reload re-applies them on change).
-	authDB := authstore.New(db.BoltDB())
+	authDB := authstore.New(db.Bolt())
 	authDB.SetSessionTimeouts(cfg.SessionIdleTimeout(), cfg.SessionAbsoluteTimeout())
 	if err := authDB.Open(); err != nil {
 		slog.Error("failed to start auth sweeper", "error", err)
@@ -469,7 +469,7 @@ func serverOptions(reg api.ProviderRegistry, syncExec syncing.SyncExec) []server
 		server.WithDefaultConfig(defaultConfig),
 		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
 		server.WithWire(newWireFunc(reg, syncExec)),
-		server.WithSchema(schema.Schema),
+		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
 		server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec)),
 		server.WithMetrics(metrics.New()),
@@ -525,7 +525,7 @@ func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Fun
 		engine := search.New(providers,
 			search.WithStore(db), search.WithConfig(cfg),
 			search.WithMetrics(m), search.WithScorer(sc),
-			search.WithSyncer(syncing.Syncer{MinConfidence: cfg.SyncConfig().SyncMinConfidence, LangMapper: classify.Alpha2FromAlpha3, Exec: syncExec}),
+			search.WithSyncer(syncing.Syncer{MinConfidence: cfg.Sync().SyncMinConfidence, LangMapper: classify.Alpha2FromAlpha3, Exec: syncExec}),
 			search.WithSyncExec(syncExec),
 			search.WithTracks(embedded.Detector{}))
 		return engine, sc, providers, nil

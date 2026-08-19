@@ -92,7 +92,7 @@ func TestConfig_trusted_proxies_load(t *testing.T) {
 
 	base := func() *Config {
 		return &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},

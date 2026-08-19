@@ -109,7 +109,7 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 func seedResetAuth(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 
 	alice := &auth.User{Username: "alice", Email: "alice@example.com", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true, OIDCIssuer: "https://idp", OIDCSub: "sub-alice"}
 	bob := &auth.User{Username: "bob", Role: auth.RoleUser, PasswordHash: "hash-b", Enabled: true}
@@ -206,7 +206,7 @@ func TestMigrate_coreResetPreservesIrreplaceable(t *testing.T) {
 		t.Errorf("auth stamp changed across the core reset: %x -> %x", authStampBefore, got)
 	}
 	assertAuthBucketsIdentical(t, db, authBefore)
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	u, _, err := as.GetUserByUsername(ctx, "alice")
 	if err != nil || u == nil || u.ID != fx.users[0].ID || u.PasswordHash != "hash-a" {
 		t.Errorf("GetUserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
@@ -514,7 +514,7 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 
 	// Auth domain functionally intact: same IDs, ownership links, uniqueness,
 	// and a live sequence.
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	for i, want := range fx.users {
 		u, _, err := as.GetUserByUsername(ctx, want.Username)
 		if err != nil || u == nil || u.ID != want.ID || u.PasswordHash != want.PasswordHash {

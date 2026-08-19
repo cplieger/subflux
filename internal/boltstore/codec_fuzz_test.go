@@ -91,7 +91,7 @@ func fuzzOne[T any](t *testing.T, bucket string, data []byte) {
 	}
 
 	// Decoded cleanly -> round-trip must be byte-stable.
-	enc, eerr := encodeRecord(&v)
+	enc, eerr := kv.Encode(&v)
 	if eerr != nil {
 		t.Fatalf("[%s] re-encode failed: %v", bucket, eerr)
 	}
@@ -99,7 +99,7 @@ func fuzzOne[T any](t *testing.T, bucket string, data []byte) {
 	if _, err := decodeRecord(kv.FailClosed, bucket, []byte("k"), enc, &v2); err != nil {
 		t.Fatalf("[%s] re-decode of re-encoded value failed: %v", bucket, err)
 	}
-	enc2, eerr := encodeRecord(&v2)
+	enc2, eerr := kv.Encode(&v2)
 	if eerr != nil {
 		t.Fatalf("[%s] second re-encode failed: %v", bucket, eerr)
 	}

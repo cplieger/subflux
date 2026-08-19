@@ -23,7 +23,7 @@ func testAdminServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { db.Close(context.Background()) })
 
-	authDB := authstore.New(db.BoltDB())
+	authDB := authstore.New(db.Bolt())
 	if err := authDB.Open(); err != nil {
 		t.Fatal(err)
 	}

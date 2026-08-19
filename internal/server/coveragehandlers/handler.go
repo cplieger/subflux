@@ -159,7 +159,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
-		tCov := coverage.CountEpisodeCoverageGrouped(grouped[i], targets, epCount)
+		tCov := coverage.CountEpisodesGrouped(grouped[i], targets, epCount)
 
 		out = append(out, SeriesItem{
 			ID:         ser.ID,
@@ -248,7 +248,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 		if mediaID == "" {
 			continue
 		}
-		tCov := coverage.CountMovieCoverage(movieSubs[mediaID], targets)
+		tCov := coverage.CountMovies(movieSubs[mediaID], targets)
 
 		var sceneName string
 		if m.MovieFile != nil {

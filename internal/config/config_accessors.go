@@ -123,22 +123,22 @@ func (c *Config) MinScoreForTarget(t *api.SubtitleTarget, _ api.MediaType) int {
 	return c.SearchCfg.MinScore
 }
 
-// SonarrConfig returns the Sonarr connection config.
+// Sonarr returns the Sonarr connection config.
 // Returns empty config when disabled.
-func (c *Config) SonarrConfig() api.ArrConfig {
-	if !c.Sonarr.isEnabled() {
+func (c *Config) Sonarr() api.ArrConfig {
+	if !c.SonarrCfg.isEnabled() {
 		return api.ArrConfig{}
 	}
-	return arrConfig(c.Sonarr)
+	return arrConfig(c.SonarrCfg)
 }
 
-// RadarrConfig returns the Radarr connection config.
+// Radarr returns the Radarr connection config.
 // Returns empty config when disabled.
-func (c *Config) RadarrConfig() api.ArrConfig {
-	if !c.Radarr.isEnabled() {
+func (c *Config) Radarr() api.ArrConfig {
+	if !c.RadarrCfg.isEnabled() {
 		return api.ArrConfig{}
 	}
-	return arrConfig(c.Radarr)
+	return arrConfig(c.RadarrCfg)
 }
 
 // arrConfig builds an ArrConfig with bidirectional URL fallback.
@@ -204,6 +204,14 @@ func yamlTargetToJSON(t *yamlSubtitleTarget) api.SubtitleTargJSON {
 
 // nonNilTargets returns a non-nil (possibly empty) slice so that a matched
 // rule with no subtitles ([]) stays distinguishable from "no match" (nil).
+//
+// The three states are real and all three are acted on: no rule matched (fall
+// through to the defaults), a rule matched and asks for no subtitles (skip this
+// media, do not fall through), and a rule matched with targets. Collapsing the
+// middle state onto either neighbour would silently start searching media the
+// operator configured to skip, or stop searching media with no rule at all.
+// The shape to reach for if this ever needs revisiting is (targets, matched
+// bool), which states the same thing without leaning on nil.
 func nonNilTargets(targets []api.SubtitleTarget) []api.SubtitleTarget {
 	if targets == nil {
 		return []api.SubtitleTarget{}

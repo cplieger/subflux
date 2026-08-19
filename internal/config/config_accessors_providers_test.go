@@ -19,20 +19,20 @@ func TestAccessors_return_configured_values(t *testing.T) {
 
 	t.Run("SonarrConfig", func(t *testing.T) {
 		t.Parallel()
-		got := cfg.SonarrConfig()
+		got := cfg.Sonarr()
 		if got.URL != "http://sonarr:8989" {
-			t.Errorf("SonarrConfig().URL = %q, want %q", got.URL, "http://sonarr:8989")
+			t.Errorf("Sonarr().URL = %q, want %q", got.URL, "http://sonarr:8989")
 		}
 		if got.APIKey != "test" {
-			t.Errorf("SonarrConfig().APIKey = %q, want %q", got.APIKey, "test")
+			t.Errorf("Sonarr().APIKey = %q, want %q", got.APIKey, "test")
 		}
 	})
 
 	t.Run("RadarrConfig_empty", func(t *testing.T) {
 		t.Parallel()
-		got := cfg.RadarrConfig()
+		got := cfg.Radarr()
 		if got.URL != "" {
-			t.Errorf("RadarrConfig().URL = %q, want empty", got.URL)
+			t.Errorf("Radarr().URL = %q, want empty", got.URL)
 		}
 	})
 
@@ -179,64 +179,64 @@ func TestProviderPriority(t *testing.T) {
 func TestArrConfig_url_only_fills_public_url(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "key"},
+		SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "key"},
 	}
 
-	got := cfg.SonarrConfig()
+	got := cfg.Sonarr()
 	if got.URL != "http://sonarr:8989" {
-		t.Errorf("SonarrConfig().URL = %q, want %q", got.URL, "http://sonarr:8989")
+		t.Errorf("Sonarr().URL = %q, want %q", got.URL, "http://sonarr:8989")
 	}
 	if got.PublicURL != "http://sonarr:8989" {
-		t.Errorf("SonarrConfig().PublicURL = %q, want %q (fallback from URL)", got.PublicURL, "http://sonarr:8989")
+		t.Errorf("Sonarr().PublicURL = %q, want %q (fallback from URL)", got.PublicURL, "http://sonarr:8989")
 	}
 }
 
 func TestArrConfig_public_url_only_fills_url(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Radarr: yamlArrConfig{PublicURL: "http://radarr.example.com", APIKey: "key"},
+		RadarrCfg: yamlArrConfig{PublicURL: "http://radarr.example.com", APIKey: "key"},
 	}
 
-	got := cfg.RadarrConfig()
+	got := cfg.Radarr()
 	if got.URL != "http://radarr.example.com" {
-		t.Errorf("RadarrConfig().URL = %q, want %q (fallback from PublicURL)", got.URL, "http://radarr.example.com")
+		t.Errorf("Radarr().URL = %q, want %q (fallback from PublicURL)", got.URL, "http://radarr.example.com")
 	}
 	if got.PublicURL != "http://radarr.example.com" {
-		t.Errorf("RadarrConfig().PublicURL = %q, want %q", got.PublicURL, "http://radarr.example.com")
+		t.Errorf("Radarr().PublicURL = %q, want %q", got.PublicURL, "http://radarr.example.com")
 	}
 }
 
 func TestArrConfig_both_urls_preserved(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Sonarr: yamlArrConfig{
+		SonarrCfg: yamlArrConfig{
 			URL:       "http://sonarr:8989",
 			PublicURL: "http://sonarr.example.com",
 			APIKey:    "key",
 		},
 	}
 
-	got := cfg.SonarrConfig()
+	got := cfg.Sonarr()
 	if got.URL != "http://sonarr:8989" {
-		t.Errorf("SonarrConfig().URL = %q, want %q", got.URL, "http://sonarr:8989")
+		t.Errorf("Sonarr().URL = %q, want %q", got.URL, "http://sonarr:8989")
 	}
 	if got.PublicURL != "http://sonarr.example.com" {
-		t.Errorf("SonarrConfig().PublicURL = %q, want %q", got.PublicURL, "http://sonarr.example.com")
+		t.Errorf("Sonarr().PublicURL = %q, want %q", got.PublicURL, "http://sonarr.example.com")
 	}
 }
 
 func TestArrConfig_neither_url_set(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Sonarr: yamlArrConfig{APIKey: "key"},
+		SonarrCfg: yamlArrConfig{APIKey: "key"},
 	}
 
-	got := cfg.SonarrConfig()
+	got := cfg.Sonarr()
 	if got.URL != "" {
-		t.Errorf("SonarrConfig().URL = %q, want empty", got.URL)
+		t.Errorf("Sonarr().URL = %q, want empty", got.URL)
 	}
 	if got.PublicURL != "" {
-		t.Errorf("SonarrConfig().PublicURL = %q, want empty", got.PublicURL)
+		t.Errorf("Sonarr().PublicURL = %q, want empty", got.PublicURL)
 	}
 }
 
@@ -246,7 +246,7 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 	t.Parallel()
 	// warnArrURLs "public_url set, url empty" branch.
 	cfg := &Config{
-		Radarr: yamlArrConfig{PublicURL: "http://radarr.example.com", APIKey: "test-key"},
+		RadarrCfg: yamlArrConfig{PublicURL: "http://radarr.example.com", APIKey: "test-key"},
 		Languages: LanguageRules{
 			Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 		},
@@ -274,24 +274,24 @@ func TestPostProcessConfig_returns_configured_values(t *testing.T) {
 		},
 	}
 
-	got := cfg.PostProcessConfig()
+	got := cfg.PostProcess()
 	if got.StripHI != true {
-		t.Errorf("PostProcessConfig().StripHI = %v, want true", got.StripHI)
+		t.Errorf("PostProcess().StripHI = %v, want true", got.StripHI)
 	}
 	if got.StripTags != false {
-		t.Errorf("PostProcessConfig().StripTags = %v, want false", got.StripTags)
+		t.Errorf("PostProcess().StripTags = %v, want false", got.StripTags)
 	}
 	if got.NormalizeUTF8 != true {
-		t.Errorf("PostProcessConfig().NormalizeUTF8 = %v, want true", got.NormalizeUTF8)
+		t.Errorf("PostProcess().NormalizeUTF8 = %v, want true", got.NormalizeUTF8)
 	}
 	if got.CleanWhitespace != false {
-		t.Errorf("PostProcessConfig().CleanWhitespace = %v, want false", got.CleanWhitespace)
+		t.Errorf("PostProcess().CleanWhitespace = %v, want false", got.CleanWhitespace)
 	}
 	if got.NormalizeEndings != true {
-		t.Errorf("PostProcessConfig().NormalizeEndings = %v, want true", got.NormalizeEndings)
+		t.Errorf("PostProcess().NormalizeEndings = %v, want true", got.NormalizeEndings)
 	}
 	if got.RemoveEmpty != false {
-		t.Errorf("PostProcessConfig().RemoveEmpty = %v, want false", got.RemoveEmpty)
+		t.Errorf("PostProcess().RemoveEmpty = %v, want false", got.RemoveEmpty)
 	}
 }
 
@@ -300,38 +300,38 @@ func TestPostProcessConfig_returns_configured_values(t *testing.T) {
 func TestSonarrConfig_disabled_returns_empty(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Sonarr: yamlArrConfig{
+		SonarrCfg: yamlArrConfig{
 			Enabled: new(false),
 			URL:     "http://sonarr:8989",
 			APIKey:  "key",
 		},
 	}
 
-	got := cfg.SonarrConfig()
+	got := cfg.Sonarr()
 	if got.URL != "" {
-		t.Errorf("SonarrConfig().URL = %q, want empty (disabled)", got.URL)
+		t.Errorf("Sonarr().URL = %q, want empty (disabled)", got.URL)
 	}
 	if got.APIKey != "" {
-		t.Errorf("SonarrConfig().APIKey = %q, want empty (disabled)", got.APIKey)
+		t.Errorf("Sonarr().APIKey = %q, want empty (disabled)", got.APIKey)
 	}
 }
 
 func TestRadarrConfig_disabled_returns_empty(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Radarr: yamlArrConfig{
+		RadarrCfg: yamlArrConfig{
 			Enabled: new(false),
 			URL:     "http://radarr:7878",
 			APIKey:  "key",
 		},
 	}
 
-	got := cfg.RadarrConfig()
+	got := cfg.Radarr()
 	if got.URL != "" {
-		t.Errorf("RadarrConfig().URL = %q, want empty (disabled)", got.URL)
+		t.Errorf("Radarr().URL = %q, want empty (disabled)", got.URL)
 	}
 	if got.APIKey != "" {
-		t.Errorf("RadarrConfig().APIKey = %q, want empty (disabled)", got.APIKey)
+		t.Errorf("Radarr().APIKey = %q, want empty (disabled)", got.APIKey)
 	}
 }
 
@@ -344,9 +344,9 @@ func TestSyncConfig_returns_configured_value(t *testing.T) {
 			SyncSubtitles: true,
 		},
 	}
-	got := cfg.SyncConfig()
+	got := cfg.Sync()
 	if !got.SyncSubtitles {
-		t.Error("SyncConfig().SyncSubtitles = false, want true")
+		t.Error("Sync().SyncSubtitles = false, want true")
 	}
 }
 
@@ -357,9 +357,9 @@ func TestSyncConfig_returns_false_when_disabled(t *testing.T) {
 			SyncSubtitles: false,
 		},
 	}
-	got := cfg.SyncConfig()
+	got := cfg.Sync()
 	if got.SyncSubtitles {
-		t.Error("SyncConfig().SyncSubtitles = true, want false")
+		t.Error("Sync().SyncSubtitles = true, want false")
 	}
 }
 
@@ -371,9 +371,9 @@ func TestSyncConfig_audio_sync_fallback(t *testing.T) {
 			AudioSyncFallback: true,
 		},
 	}
-	got := cfg.SyncConfig()
+	got := cfg.Sync()
 	if !got.AudioSyncFallback {
-		t.Error("SyncConfig().AudioSyncFallback = false, want true")
+		t.Error("Sync().AudioSyncFallback = false, want true")
 	}
 }
 
@@ -383,7 +383,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 		t.Run("min_score="+strconv.Itoa(score), func(t *testing.T) {
 			t.Parallel()
 			cfg := &Config{
-				Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+				SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 				Languages: LanguageRules{
 					Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 				},
@@ -425,14 +425,14 @@ func TestSyncConfig_zero_confidence_uses_default(t *testing.T) {
 	// A zero SyncMinConfidence is replaced by the default (0.6).
 	czero := &Config{}
 	czero.PostProcessing.SyncMinConfidence = 0
-	if got := czero.SyncConfig().SyncMinConfidence; got != 0.6 {
-		t.Errorf("SyncConfig().SyncMinConfidence(0) = %v, want 0.6 (DefaultSyncMinConfidence)", got)
+	if got := czero.Sync().SyncMinConfidence; got != 0.6 {
+		t.Errorf("Sync().SyncMinConfidence(0) = %v, want 0.6 (DefaultSyncMinConfidence)", got)
 	}
 	// A non-zero value is preserved unchanged.
 	cset := &Config{}
 	cset.PostProcessing.SyncMinConfidence = 0.42
-	if got := cset.SyncConfig().SyncMinConfidence; got != 0.42 {
-		t.Errorf("SyncConfig().SyncMinConfidence(0.42) = %v, want 0.42", got)
+	if got := cset.Sync().SyncMinConfidence; got != 0.42 {
+		t.Errorf("Sync().SyncMinConfidence(0.42) = %v, want 0.42", got)
 	}
 }
 

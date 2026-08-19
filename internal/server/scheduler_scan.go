@@ -24,7 +24,7 @@ func (s *Server) scanDeps() *scanning.Deps {
 		Activity:      &serveradapter.ActivityAdapter{A: s.activity},
 		Alerts:        &serveradapter.AlertAdapter{A: s.alerts},
 		ShowSkipCache: s.showSkipCache,
-		ClearCaches:   provider.ClearProviderCaches,
+		ClearCaches:   provider.ClearCaches,
 	}
 }
 

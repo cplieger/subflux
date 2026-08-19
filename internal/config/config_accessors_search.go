@@ -33,8 +33,8 @@ func (c *Config) Search() api.SearchConfig {
 	}
 }
 
-// PostProcessConfig returns the post-processing configuration.
-func (c *Config) PostProcessConfig() api.PostProcessConfig {
+// PostProcess returns the post-processing configuration.
+func (c *Config) PostProcess() api.PostProcessConfig {
 	return api.PostProcessConfig{
 		StripHI:          c.PostProcessing.StripHI,
 		StripTags:        c.PostProcessing.StripTags,
@@ -45,8 +45,8 @@ func (c *Config) PostProcessConfig() api.PostProcessConfig {
 	}
 }
 
-// SyncConfig returns the sync configuration.
-func (c *Config) SyncConfig() api.SyncConfig {
+// Sync returns the sync configuration.
+func (c *Config) Sync() api.SyncConfig {
 	sc := api.SyncConfig{
 		SyncSubtitles:     c.PostProcessing.SyncSubtitles,
 		AudioSyncFallback: c.PostProcessing.AudioSyncFallback,

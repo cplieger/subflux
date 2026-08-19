@@ -61,7 +61,7 @@ func FuzzHasArchiveSignature(f *testing.F) {
 	f.Add([]byte{0x1f, 0x8b}) // gzip magic — not an archive
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		result := HasArchiveSignature(data)
+		result := HasSignature(data)
 
 		isZIP := len(data) >= 4 &&
 			data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4
@@ -70,11 +70,11 @@ func FuzzHasArchiveSignature(f *testing.F) {
 			data[3] == '!' && data[4] == 0x1a && data[5] == 0x07
 
 		if (isZIP || isRAR) && !result {
-			t.Errorf("HasArchiveSignature = false for data with archive magic (zip=%v, rar=%v, len=%d)",
+			t.Errorf("HasSignature = false for data with archive magic (zip=%v, rar=%v, len=%d)",
 				isZIP, isRAR, len(data))
 		}
 		if result && !isZIP && !isRAR {
-			t.Errorf("HasArchiveSignature = true but data has no archive magic (len=%d, prefix=%x)",
+			t.Errorf("HasSignature = true but data has no archive magic (len=%d, prefix=%x)",
 				len(data), data[:min(8, len(data))])
 		}
 	})

@@ -94,8 +94,8 @@ func TestHasArchiveSignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := HasArchiveSignature(tt.data); got != tt.want {
-				t.Errorf("HasArchiveSignature() = %v, want %v", got, tt.want)
+			if got := HasSignature(tt.data); got != tt.want {
+				t.Errorf("HasSignature() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -122,7 +122,7 @@ func TestExtract(t *testing.T) {
 }
 
 // TestExtract_default_branch_zip exercises the unknown-magic branch of Extract:
-// a one-byte prefix makes HasArchiveSignature false (so neither the ZIP nor RAR
+// a one-byte prefix makes HasSignature false (so neither the ZIP nor RAR
 // fast path is taken), yet Go's archive/zip still reads the prefixed archive, so
 // the default branch's ZIP probe must succeed and return the subtitle.
 func TestExtract_default_branch_zip(t *testing.T) {
@@ -131,7 +131,7 @@ func TestExtract_default_branch_zip(t *testing.T) {
 	z := makeZip(t, zipEntry{name: "sub.srt", content: content})
 	prefixed := append([]byte{'X'}, z...)
 
-	if HasArchiveSignature(prefixed) {
+	if HasSignature(prefixed) {
 		t.Fatalf("prefixed zip unexpectedly has an archive signature (test setup)")
 	}
 	got := Extract(prefixed, 0, 0)
@@ -141,14 +141,14 @@ func TestExtract_default_branch_zip(t *testing.T) {
 }
 
 // TestExtract_default_branch_rar exercises the unknown-magic branch for RAR: a
-// byte prefix makes HasArchiveSignature false, and if rardecode still reads the
+// byte prefix makes HasSignature false, and if rardecode still reads the
 // prefixed RAR the default branch's RAR probe must return the subtitle.
 func TestExtract_default_branch_rar(t *testing.T) {
 	t.Parallel()
 	rar := loadRARFixture(t)
 	prefixed := append([]byte("ZZZZ"), rar...)
 
-	if HasArchiveSignature(prefixed) {
+	if HasSignature(prefixed) {
 		t.Fatalf("prefixed rar unexpectedly has an archive signature (test setup)")
 	}
 	got := Extract(prefixed, 0, 0)

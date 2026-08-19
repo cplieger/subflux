@@ -113,11 +113,11 @@ func (s *Server) initHandlers() {
 				pls.HasSonarr = ls.sonarr != nil
 				pls.HasRadarr = ls.radarr != nil
 				if ls.sonarr != nil {
-					sc := ls.cfg.SonarrConfig()
+					sc := ls.cfg.Sonarr()
 					pls.SonarrConfig = previewhandlers.ArrConfig{URL: sc.URL, APIKey: sc.APIKey}
 				}
 				if ls.radarr != nil {
-					rc := ls.cfg.RadarrConfig()
+					rc := ls.cfg.Radarr()
 					pls.RadarrConfig = previewhandlers.ArrConfig{URL: rc.URL, APIKey: rc.APIKey}
 				}
 			}

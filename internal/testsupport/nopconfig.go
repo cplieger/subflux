@@ -18,20 +18,20 @@ import (
 // lives in search test code to avoid testsupport→search→testsupport import
 // cycles (search test code imports testsupport).
 type NopConfig struct {
-	PathErr      error
-	ProviderCfgs map[api.ProviderID]api.ProviderCfg
-	RadarrCfg    api.ArrConfig
-	SonarrCfg    api.ArrConfig
-	LangRules    api.LanguageRulesJSON
-	Languages    []string
-	Targets      []api.SubtitleTarget
-	SearchConfig api.SearchConfig
-	AdaptiveCfg  api.AdaptiveConfig
-	Sync         api.SyncConfig
-	MinScore     int
-	ProviderPrio int
-	PostProcess  api.PostProcessConfig
-	Embedded     api.EmbeddedPolicy
+	PathErr        error
+	ProviderCfgs   map[api.ProviderID]api.ProviderCfg
+	RadarrCfg      api.ArrConfig
+	SonarrCfg      api.ArrConfig
+	LangRules      api.LanguageRulesJSON
+	Languages      []string
+	Targets        []api.SubtitleTarget
+	SearchConfig   api.SearchConfig
+	AdaptiveCfg    api.AdaptiveConfig
+	SyncCfg        api.SyncConfig
+	MinScore       int
+	ProviderPrio   int
+	PostProcessCfg api.PostProcessConfig
+	Embedded       api.EmbeddedPolicy
 }
 
 // Compile-time assertion: NopConfig satisfies the full config surface.
@@ -46,11 +46,11 @@ func (n *NopConfig) Search() api.SearchConfig { return n.SearchConfig }
 // Adaptive returns the configured adaptive backoff settings.
 func (n *NopConfig) Adaptive() api.AdaptiveConfig { return n.AdaptiveCfg }
 
-// SyncConfig returns the configured subtitle sync settings.
-func (n *NopConfig) SyncConfig() api.SyncConfig { return n.Sync }
+// Sync returns the configured subtitle sync settings.
+func (n *NopConfig) Sync() api.SyncConfig { return n.SyncCfg }
 
-// PostProcessConfig returns the configured post-processing settings.
-func (n *NopConfig) PostProcessConfig() api.PostProcessConfig { return n.PostProcess }
+// PostProcess returns the configured post-processing settings.
+func (n *NopConfig) PostProcess() api.PostProcessConfig { return n.PostProcessCfg }
 
 // ProvidersForTarget returns all providers unchanged (no include/exclude filtering).
 func (n *NopConfig) ProvidersForTarget(_ *api.SubtitleTarget, all []api.ProviderID) []api.ProviderID {
@@ -77,11 +77,11 @@ func (n *NopConfig) ResolveTargetsWithFallback(_ string, _ []string) []api.Subti
 // LanguageCodes returns the configured language codes.
 func (n *NopConfig) LanguageCodes() []string { return n.Languages }
 
-// SonarrConfig returns the configured Sonarr connection settings.
-func (n *NopConfig) SonarrConfig() api.ArrConfig { return n.SonarrCfg }
+// Sonarr returns the configured Sonarr connection settings.
+func (n *NopConfig) Sonarr() api.ArrConfig { return n.SonarrCfg }
 
-// RadarrConfig returns the configured Radarr connection settings.
-func (n *NopConfig) RadarrConfig() api.ArrConfig { return n.RadarrCfg }
+// Radarr returns the configured Radarr connection settings.
+func (n *NopConfig) Radarr() api.ArrConfig { return n.RadarrCfg }
 
 // ServerPort returns the default subflux port.
 func (n *NopConfig) ServerPort() int { return 8374 }
@@ -121,8 +121,8 @@ func (n *NopConfig) BasicAuthEnabled() bool { return true }
 // OIDCEnabled reports OIDC as disabled.
 func (n *NopConfig) OIDCEnabled() bool { return false }
 
-// OIDCConfig returns an empty OIDC configuration.
-func (n *NopConfig) OIDCConfig() auth.OIDCConfig { return auth.OIDCConfig{} }
+// OIDC returns an empty OIDC configuration.
+func (n *NopConfig) OIDC() auth.OIDCConfig { return auth.OIDCConfig{} }
 
 // SessionIdleTimeout returns a 24h idle timeout.
 func (n *NopConfig) SessionIdleTimeout() time.Duration { return 24 * time.Hour }

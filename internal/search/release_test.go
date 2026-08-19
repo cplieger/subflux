@@ -138,8 +138,8 @@ func TestParseReleaseName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := release.ParseReleaseName(tt.input); got != tt.want {
-				t.Errorf("release.ParseReleaseName(%q):\n got %+v\nwant %+v",
+			if got := release.ParseName(tt.input); got != tt.want {
+				t.Errorf("release.ParseName(%q):\n got %+v\nwant %+v",
 					tt.input, got, tt.want)
 			}
 		})
@@ -367,7 +367,7 @@ func TestParseReleaseName_never_panics(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		name := rapid.String().Draw(t, "name")
-		_ = release.ParseReleaseName(name)
+		_ = release.ParseName(name)
 	})
 }
 
@@ -377,7 +377,7 @@ func TestParseReleaseName_scene_names_never_panic(t *testing.T) {
 		// Generate strings that look like scene release names.
 		name := rapid.StringMatching(
 			`[A-Za-z0-9._-]{5,80}`).Draw(t, "scene_name")
-		info := release.ParseReleaseName(name)
+		info := release.ParseName(name)
 
 		// All normalized fields should be lowercase or empty.
 		for _, field := range []string{
@@ -398,12 +398,12 @@ func TestParseReleaseName_empty_returns_zero(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate whitespace-only strings (empty, spaces, tabs).
 		ws := rapid.StringMatching(`[ \t]{0,5}`).Draw(t, "whitespace")
-		info := release.ParseReleaseName(ws)
+		info := release.ParseName(ws)
 
 		// Whitespace-only strings won't match any regex, so all fields
 		// should be empty/false (same as zero value).
 		if info != (release.Info{}) {
-			t.Errorf("release.ParseReleaseName(%q) = %+v, want zero value", ws, info)
+			t.Errorf("release.ParseName(%q) = %+v, want zero value", ws, info)
 		}
 	})
 }
@@ -522,9 +522,9 @@ func TestScoreResults_matched_by_does_not_affect_release_score(t *testing.T) {
 func TestParseReleaseName_group_regex_no_match_returns_empty(t *testing.T) {
 	t.Parallel()
 	// Input with no dash-group pattern.
-	info := release.ParseReleaseName("Movie 2024 BluRay 1080p")
+	info := release.ParseName("Movie 2024 BluRay 1080p")
 	if info.ReleaseGroup != "" {
-		t.Errorf("release.ParseReleaseName(no dash).ReleaseGroup = %q, want empty",
+		t.Errorf("release.ParseName(no dash).ReleaseGroup = %q, want empty",
 			info.ReleaseGroup)
 	}
 }
@@ -532,9 +532,9 @@ func TestParseReleaseName_group_regex_no_match_returns_empty(t *testing.T) {
 func TestParseReleaseName_group_regex_single_char_group(t *testing.T) {
 	t.Parallel()
 	// Single character group name.
-	info := release.ParseReleaseName("Movie.2024.BluRay-X")
+	info := release.ParseName("Movie.2024.BluRay-X")
 	if info.ReleaseGroup != "X" {
-		t.Errorf("release.ParseReleaseName(single char group).ReleaseGroup = %q, want %q",
+		t.Errorf("release.ParseName(single char group).ReleaseGroup = %q, want %q",
 			info.ReleaseGroup, "X")
 	}
 }
@@ -666,9 +666,9 @@ func TestParseReleaseGroup_bracket_at_end(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			info := release.ParseReleaseName(tt.input)
+			info := release.ParseName(tt.input)
 			if info.ReleaseGroup != tt.want {
-				t.Errorf("release.ParseReleaseName(%q).ReleaseGroup = %q, want %q",
+				t.Errorf("release.ParseName(%q).ReleaseGroup = %q, want %q",
 					tt.input, info.ReleaseGroup, tt.want)
 			}
 		})
@@ -678,9 +678,9 @@ func TestParseReleaseGroup_bracket_at_end(t *testing.T) {
 func TestParseReleaseGroup_anime_format(t *testing.T) {
 	t.Parallel()
 	// Anime format: [SubGroup] at start.
-	info := release.ParseReleaseName("[SubTeam] Anime Title - 01 (1080p)")
+	info := release.ParseName("[SubTeam] Anime Title - 01 (1080p)")
 	if info.ReleaseGroup != "SubTeam" {
-		t.Errorf("release.ParseReleaseName(anime group).ReleaseGroup = %q, want %q",
+		t.Errorf("release.ParseName(anime group).ReleaseGroup = %q, want %q",
 			info.ReleaseGroup, "SubTeam")
 	}
 }
@@ -688,9 +688,9 @@ func TestParseReleaseGroup_anime_format(t *testing.T) {
 func TestParseReleaseGroup_file_extension_stripped(t *testing.T) {
 	t.Parallel()
 	// File extension should be stripped before group extraction.
-	info := release.ParseReleaseName("Movie.2024.BluRay-GRP.mkv")
+	info := release.ParseName("Movie.2024.BluRay-GRP.mkv")
 	if info.ReleaseGroup != "GRP" {
-		t.Errorf("release.ParseReleaseName(with ext).ReleaseGroup = %q, want %q",
+		t.Errorf("release.ParseName(with ext).ReleaseGroup = %q, want %q",
 			info.ReleaseGroup, "GRP")
 	}
 }

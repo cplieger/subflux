@@ -32,8 +32,8 @@ type LanguageResolver interface {
 
 // ArrConfigProvider provides Sonarr/Radarr connection configuration.
 type ArrConfigProvider interface {
-	SonarrConfig() ArrConfig
-	RadarrConfig() ArrConfig
+	Sonarr() ArrConfig
+	Radarr() ArrConfig
 }
 
 // ProviderConfigProvider provides provider settings.
@@ -60,8 +60,8 @@ type PathValidator interface {
 type SearchConfigProvider interface {
 	Search() SearchConfig
 	Adaptive() AdaptiveConfig
-	PostProcessConfig() PostProcessConfig
-	SyncConfig() SyncConfig
+	PostProcess() PostProcessConfig
+	Sync() SyncConfig
 	// EmbeddedPolicy returns the typed embedded subtitle codec policy
 	// from the top-level embedded_subtitles config section.
 	EmbeddedPolicy() EmbeddedPolicy
@@ -71,7 +71,7 @@ type SearchConfigProvider interface {
 type AuthConfigProvider interface {
 	BasicAuthEnabled() bool
 	OIDCEnabled() bool
-	OIDCConfig() auth.OIDCConfig
+	OIDC() auth.OIDCConfig
 	SessionIdleTimeout() time.Duration
 	SessionAbsoluteTimeout() time.Duration
 	CheckBreachedPasswords() bool

@@ -426,7 +426,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 	})
 
 	h := New(&Deps{
-		SchemaFunc: schema.Schema,
+		SchemaFunc: schema.Sections,
 		Registry:   reg,
 	})
 
@@ -455,7 +455,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 func TestHandleConfigSchema_rejects_non_get(t *testing.T) {
 	t.Parallel()
 	h := New(&Deps{
-		SchemaFunc: schema.Schema,
+		SchemaFunc: schema.Sections,
 		Registry:   provider.NewRegistry(),
 	})
 

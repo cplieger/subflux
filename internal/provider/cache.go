@@ -4,9 +4,9 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 )
 
-// ClearProviderCaches calls ClearCache on any provider that implements
+// ClearCaches calls ClearCache on any provider that implements
 // api.CacheClearer. Typically called at scan completion to free memory.
-func ClearProviderCaches(providers []api.Provider) {
+func ClearCaches(providers []api.Provider) {
 	for _, p := range providers {
 		if cc, ok := p.(api.CacheClearer); ok {
 			cc.ClearCache()

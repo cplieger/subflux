@@ -18,8 +18,8 @@ func TestNopConfigContract(t *testing.T) {
 	}
 	_ = cfg.Search()
 	_ = cfg.Adaptive()
-	_ = cfg.SyncConfig()
-	_ = cfg.PostProcessConfig()
+	_ = cfg.Sync()
+	_ = cfg.PostProcess()
 
 	all := []api.ProviderID{"a", "b"}
 	got := cfg.ProvidersForTarget(nil, all)
