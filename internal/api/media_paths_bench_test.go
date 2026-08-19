@@ -44,24 +44,3 @@ func sizeLabel(n int) string {
 		return "64B"
 	}
 }
-
-func BenchmarkBuildMediaID(b *testing.B) {
-	req := &SearchRequest{
-		MediaType: MediaTypeEpisode,
-		TvdbID:    12345,
-		ImdbID:    "tt1234567",
-		Season:    3,
-		Episode:   7,
-	}
-	b.ReportAllocs()
-	for range b.N {
-		_ = BuildMediaID(req)
-	}
-}
-
-func BenchmarkBuildEpisodeID(b *testing.B) {
-	b.ReportAllocs()
-	for range b.N {
-		_ = BuildEpisodeID(98765, "tt7654321", 2, 14)
-	}
-}

@@ -7,6 +7,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/search"
 )
 
@@ -88,7 +89,7 @@ func seriesPrefixes(allSeries []arrapi.Series) (prefixes []string, prefixSet map
 	prefixes = make([]string, 0, len(allSeries))
 	prefixSet = make(map[string]struct{}, len(allSeries))
 	for i := range allSeries {
-		prefix := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
+		prefix := mediaid.SeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
 		prefixes = append(prefixes, prefix)
 		if prefix != "" {
 			prefixSet[prefix] = struct{}{}
@@ -164,7 +165,7 @@ func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMov
 			continue
 		}
 		targets := cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(m.OriginalLanguage), nil)
-		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
+		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue
 		}

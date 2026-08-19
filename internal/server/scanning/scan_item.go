@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 )
 
@@ -40,7 +41,7 @@ func ScanEpisode(ctx context.Context, deps *Deps, ls *LiveState, series *arrapi.
 	queried := result.ProviderQueried()
 	paths := result.Paths()
 	if len(paths) > 0 || result.CoverageChanged {
-		mediaID := api.BuildMediaID(&req)
+		mediaID := mediaid.Build(&req)
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
 			MediaType: api.MediaTypeEpisode, MediaID: mediaID,
 		})
@@ -98,7 +99,7 @@ func scanMovieDetail(ctx context.Context, deps *Deps, ls *LiveState, m *arrapi.M
 	queried = result.ProviderQueried()
 	paths := result.Paths()
 	if len(paths) > 0 || result.CoverageChanged {
-		mediaID := api.BuildMediaID(&req)
+		mediaID := mediaid.Build(&req)
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
 			MediaType: api.MediaTypeMovie, MediaID: mediaID,
 		})

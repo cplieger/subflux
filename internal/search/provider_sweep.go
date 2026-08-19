@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"golang.org/x/sync/errgroup"
 )
@@ -114,7 +115,7 @@ func buildSearchKey(req *api.SearchRequest, providers []provider.Provider) strin
 
 	return keyenc.Join(
 		string(req.MediaType),
-		api.BuildMediaID(req),
+		mediaid.Build(req),
 		keyenc.Join(langs...),
 		req.VideoPath,
 		req.VideoHash,

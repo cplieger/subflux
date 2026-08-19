@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -139,7 +140,7 @@ type ManualSearchResponse struct {
 func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 	req *api.SearchRequest, lang string, mediaType api.MediaType, filePath string,
 ) ManualSearchResponse {
-	mediaID := api.BuildMediaID(req)
+	mediaID := mediaid.Build(req)
 	TryComputeHash(ctx, ls, req, filePath)
 
 	// Search all providers in parallel. Each provider gets its own timeout

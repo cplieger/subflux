@@ -13,6 +13,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"golang.org/x/sync/errgroup"
@@ -192,7 +193,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]map[coverage.Key]*coverage.Status) [][]map[coverage.Key]*coverage.Status {
 	prefixToIdx := make(map[string]int, len(allSeries))
 	for i := range allSeries {
-		p := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
+		p := mediaid.SeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
 		if p != "" {
 			prefixToIdx[p] = i
 		}
@@ -250,7 +251,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
-		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
+		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue
 		}

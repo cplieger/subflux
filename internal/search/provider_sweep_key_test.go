@@ -5,6 +5,7 @@ import (
 
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 )
 
@@ -87,7 +88,7 @@ func TestBuildSearchKeyIsStableAndUnescapedForOrdinaryInput(t *testing.T) {
 
 	want := keyenc.Join(
 		string(api.MediaTypeEpisode),
-		api.BuildMediaID(base),
+		mediaid.Build(base),
 		"en:fr",
 		"/media/tv/show/s01e02.mkv",
 		"0123456789abcdef",

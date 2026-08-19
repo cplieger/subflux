@@ -62,7 +62,7 @@ var downloadPathGate = newQuadGate()
 // downloadQuadKey builds the gate key for a quad.
 //
 // One of the four components can carry a separator, and it is not the one the
-// previous comment claimed: mediaID is api.BuildEpisodeID/BuildMovieID output,
+// previous comment claimed: mediaID is mediaid.Episode/BuildMovieID output,
 // which falls back to the arr's raw imdbId string when TVDB/TMDB is absent, so
 // its alphabet is Sonarr/Radarr's choice rather than ours. The other three
 // genuinely cannot — api.MediaType and api.Variant are closed constant sets,

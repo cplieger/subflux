@@ -316,7 +316,7 @@ func episodeFallbackDirs(ctx context.Context, ls *LiveState, mediaID string, arr
 }
 
 // episodeIDSuffixRe matches the season/episode suffix of an episode-level
-// store media ID as api.BuildEpisodeID emits it ("...-s01e05"; 3+ digits
+// store media ID as mediaid.Episode emits it ("...-s01e05"; 3+ digits
 // unpadded).
 var episodeIDSuffixRe = regexp.MustCompile(`-s(\d+)e(\d+)$`)
 
@@ -344,7 +344,7 @@ func splitEpisodeMediaID(mediaID string) (base string, season, episode int, hasE
 }
 
 // movieBindingMatches reports whether the arr movie's external identity is
-// the requested store media_id (api.BuildMovieID's formats: "tmdb-<id>",
+// the requested store media_id (mediaid.Movie's formats: "tmdb-<id>",
 // else the raw IMDB ID).
 func movieBindingMatches(mediaID string, m *arrapi.Movie) bool {
 	if m.TmdbID != 0 && mediaID == "tmdb-"+strconv.Itoa(m.TmdbID) {
@@ -354,7 +354,7 @@ func movieBindingMatches(mediaID string, m *arrapi.Movie) bool {
 }
 
 // seriesBindingMatches reports whether the arr series' external identity is
-// the requested media_id's series base (api.BuildEpisodeID's formats:
+// the requested media_id's series base (mediaid.Episode's formats:
 // "tvdb-<id>", else the raw IMDB ID).
 func seriesBindingMatches(base string, s *arrapi.Series) bool {
 	if s.TvdbID != 0 && base == "tvdb-"+strconv.Itoa(s.TvdbID) {

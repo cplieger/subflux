@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"golang.org/x/sync/errgroup"
@@ -272,7 +273,7 @@ func recordEpisodeOutcomes(ctx context.Context, tracker *seasonTracker,
 	series *arrapi.Series, season int,
 	outcomes []api.LangOutcome, seasonEpCount int,
 ) {
-	seasonIDPrefix := api.BuildSeasonIDPrefix(series.TvdbID, series.ImdbID, season)
+	seasonIDPrefix := mediaid.SeasonPrefix(series.TvdbID, series.ImdbID, season)
 	for i := range outcomes {
 		o := &outcomes[i]
 		if o.Kind != api.LangSearched {
@@ -302,7 +303,7 @@ func inventorySkipped(ctx context.Context, deps *Deps, ls *LiveState,
 	req := EpisodeSearchRequest(series, ep, ls.Cfg.LanguageCodes())
 	if changed := ls.Engine.InventoryCoverage(ctx, &req, ep.EpisodeFile.Path); changed {
 		deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
-			MediaType: api.MediaTypeEpisode, MediaID: api.BuildMediaID(&req),
+			MediaType: api.MediaTypeEpisode, MediaID: mediaid.Build(&req),
 		})
 	}
 }

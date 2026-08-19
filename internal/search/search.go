@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
@@ -388,7 +389,7 @@ func (e *Engine) stampScanState(ctx context.Context, mediaType api.MediaType,
 // search: "skip" means skip PROVIDER work, not local bookkeeping.
 func (e *Engine) InventoryCoverage(ctx context.Context, req *api.SearchRequest, videoPath string) bool {
 	mediaType := req.MediaType
-	mediaID := api.BuildMediaID(req)
+	mediaID := mediaid.Build(req)
 	if mediaID == "" {
 		return false
 	}
@@ -430,7 +431,7 @@ func (e *Engine) SearchTargets(ctx context.Context, req *api.SearchRequest,
 	req.VideoPath = videoPath
 
 	mediaType := req.MediaType
-	mediaID := api.BuildMediaID(req)
+	mediaID := mediaid.Build(req)
 
 	// Serialize work on the same media item across the scheduled scan, the
 	// history poller, and manual scans (P4). Unidentified media (empty

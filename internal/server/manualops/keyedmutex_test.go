@@ -20,7 +20,7 @@ func oldDownloadQuadKey(mt api.MediaType, mediaID, lang string, variant api.Vari
 // a download that has nothing to do with them.
 //
 // Exactly one of the four components can carry a separator, and it is not the
-// one the old comment named: mediaID is api.BuildEpisodeID/BuildMovieID output,
+// one the old comment named: mediaID is mediaid.Episode/BuildMovieID output,
 // which falls back to the arr's raw imdbId when TVDB/TMDB is absent. mediaType
 // and variant are closed constant sets, and lang has passed IsValidLangCode.
 //

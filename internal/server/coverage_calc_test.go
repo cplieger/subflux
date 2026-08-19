@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"pgregory.net/rapid"
 )
 
@@ -253,9 +254,9 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 		season := rapid.IntRange(0, 99).Draw(t, "season")
 		episode := rapid.IntRange(1, 999).Draw(t, "episode")
 
-		epID := api.BuildEpisodeID(tvdbID, "", season, episode)
+		epID := mediaid.Episode(tvdbID, "", season, episode)
 		prefix := extractSeriesPrefix(epID)
-		wantPrefix := api.BuildSeriesPrefix(tvdbID, "")
+		wantPrefix := mediaid.SeriesPrefix(tvdbID, "")
 
 		if prefix != wantPrefix {
 			t.Fatalf("extractSeriesPrefix(%q) = %q, want %q", epID, prefix, wantPrefix)

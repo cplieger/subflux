@@ -9,6 +9,7 @@ import (
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
 )
@@ -80,7 +81,7 @@ func (p *Poller) processPollImport(
 	}
 	searchPaths := searchResult.Paths()
 	if len(searchPaths) > 0 || searchResult.CoverageChanged {
-		mediaID := api.BuildMediaID(result.Req)
+		mediaID := mediaid.Build(result.Req)
 		p.deps.Events.Publish(events.Event{
 			Type: events.CoverageUpdate,
 			Data: events.CoverageEvent{

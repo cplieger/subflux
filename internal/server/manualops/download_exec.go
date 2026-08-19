@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/atomicfile/v2"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/events"
 )
@@ -201,7 +202,7 @@ func ResolveMediaIDs(ctx context.Context, ls *LiveState,
 		}
 	}
 	if historyID == "" {
-		historyID = api.BuildMediaID(&api.SearchRequest{MediaType: mediaType})
+		historyID = mediaid.Build(&api.SearchRequest{MediaType: mediaType})
 		slog.Debug("manual download: using fallback media ID",
 			"media_type", mediaType, "arr_id", arrID, "history_id", historyID)
 	}
@@ -231,7 +232,7 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 		slog.Warn("failed to look up series for media ID", "series_id", seriesID, "error", err)
 		return ""
 	}
-	return api.BuildEpisodeID(ser.TvdbID, ser.ImdbID, season, episode)
+	return mediaid.Episode(ser.TvdbID, ser.ImdbID, season, episode)
 }
 
 // LookupMediaTitle resolves the title for a media item from the arr client.

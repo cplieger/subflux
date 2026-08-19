@@ -24,11 +24,8 @@ func (mt MediaType) Valid() bool {
 // String implements fmt.Stringer.
 func (mt MediaType) String() string { return string(mt) }
 
-// Unexported aliases for internal use within this package.
-const (
-	mediaTypeMovie   = MediaTypeMovie
-	mediaTypeEpisode = MediaTypeEpisode
-)
+// mediaTypeEpisode is an unexported alias for internal use within this package.
+const mediaTypeEpisode = MediaTypeEpisode
 
 // --- Provider types (canonical, moved from provider package) ---
 

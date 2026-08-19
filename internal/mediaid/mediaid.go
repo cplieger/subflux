@@ -1,8 +1,25 @@
-package api
+// Package mediaid builds the stable identifier subflux addresses one media item
+// by: "tmdb-27205" for a movie, "tvdb-121361-s01e09" for an episode, plus the
+// prefixes that select a whole season or series in one scan.
+//
+// The identifier is the bbolt key for every per-item row (search_attempts,
+// subtitle_state, scan_state, backoff) and a path segment in the HTTP API, so
+// the format here is storage and wire contract in both directions: Episode and
+// SeasonPrefix must agree through the episode separator or a season's rows stop
+// being one prefix scan, and ValidPrefix is what keeps a client-supplied prefix
+// from selecting arbitrary rows.
+//
+// Separate from the subtitle FILENAME builders even though both spell a media
+// item's name: those address a file on a filesystem shared with Windows clients
+// and this addresses a row in a database, and of the nine consumers only
+// manualops and search use both.
+package mediaid
 
 import (
 	"regexp"
 	"strconv"
+
+	"github.com/cplieger/subflux/internal/api"
 )
 
 // mediaPrefixRe validates media ID prefix parameters. Accepts:
@@ -14,35 +31,35 @@ import (
 var mediaPrefixRe = regexp.MustCompile(
 	`^(?:tvdb-\d+-|tmdb-\d+-?|imdb-tt\d+)`)
 
-// IsValidMediaPrefix checks that a prefix parameter matches expected
+// ValidPrefix checks that a prefix parameter matches expected
 // media ID formats. Prevents arbitrary prefix queries that could
 // produce confusing results if the app is exposed without auth.
-func IsValidMediaPrefix(prefix string) bool {
+func ValidPrefix(prefix string) bool {
 	return mediaPrefixRe.MatchString(prefix)
 }
 
-// BuildMediaID creates a stable identifier for a media item from a search request.
+// Build creates a stable identifier for a media item from a search request.
 // Movies use TMDB ID (canonical for Radarr), episodes use TVDB ID (canonical for Sonarr).
 // IMDB is only used as a last resort fallback.
-func BuildMediaID(req *SearchRequest) string {
+func Build(req *api.SearchRequest) string {
 	if req == nil {
 		return ""
 	}
 	switch req.MediaType {
-	case mediaTypeMovie:
-		return BuildMovieID(req.TmdbID, req.ImdbID)
-	case mediaTypeEpisode:
-		return BuildEpisodeID(req.TvdbID, req.ImdbID, req.Season, req.Episode)
+	case api.MediaTypeMovie:
+		return Movie(req.TmdbID, req.ImdbID)
+	case api.MediaTypeEpisode:
+		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
 	default:
 		// Legacy fallthrough: treat unknown types as episodes so older
-		// scan state with missing MediaType still resolves.
-		return BuildEpisodeID(req.TvdbID, req.ImdbID, req.Season, req.Episode)
+		// scan state with missing api.MediaType still resolves.
+		return Episode(req.TvdbID, req.ImdbID, req.Season, req.Episode)
 	}
 }
 
-// BuildMovieID returns the canonical media ID for a movie.
+// Movie returns the canonical media ID for a movie.
 // Prefer TMDB (Radarr's canonical source), fall back to IMDB.
-func BuildMovieID(tmdbID int, imdbID string) string {
+func Movie(tmdbID int, imdbID string) string {
 	if tmdbID != 0 {
 		return "tmdb-" + strconv.Itoa(tmdbID)
 	}
@@ -52,9 +69,9 @@ func BuildMovieID(tmdbID int, imdbID string) string {
 	return ""
 }
 
-// BuildEpisodeID returns the canonical media ID for an episode.
+// Episode returns the canonical media ID for an episode.
 // Prefer TVDB (Sonarr's canonical source), fall back to IMDB.
-func BuildEpisodeID(tvdbID int, imdbID string, season, episode int) string {
+func Episode(tvdbID int, imdbID string, season, episode int) string {
 	if tvdbID != 0 {
 		var buf [32]byte
 		b := buf[:0]
@@ -98,14 +115,14 @@ func appendPadded2(b []byte, n int) []byte {
 	return b
 }
 
-// BuildSeasonIDPrefix returns the media ID prefix shared by every episode of
-// one season, mirroring BuildEpisodeID's format through the episode
-// separator (e.g. "tvdb-123-s05e"). BuildEpisodeID(tvdb, imdb, season, N)
+// SeasonPrefix returns the media ID prefix shared by every episode of
+// one season, mirroring Episode's format through the episode
+// separator (e.g. "tvdb-123-s05e"). Episode(tvdb, imdb, season, N)
 // has this prefix for every N in 0-99, so backoff and state rows for a
 // season are one prefix scan. Returns "" when neither ID is available
-// (matching BuildEpisodeID's unidentified-media fallback shape only per
+// (matching Episode's unidentified-media fallback shape only per
 // season would be meaninglessly broad).
-func BuildSeasonIDPrefix(tvdbID int, imdbID string, season int) string {
+func SeasonPrefix(tvdbID int, imdbID string, season int) string {
 	if tvdbID == 0 && imdbID == "" {
 		return ""
 	}
@@ -123,9 +140,9 @@ func BuildSeasonIDPrefix(tvdbID int, imdbID string, season int) string {
 	return string(b)
 }
 
-// BuildSeriesPrefix returns the media ID prefix for all episodes of a series.
+// SeriesPrefix returns the media ID prefix for all episodes of a series.
 // Used by coverage and missing-count queries to match all episodes via LIKE.
-func BuildSeriesPrefix(tvdbID int, imdbID string) string {
+func SeriesPrefix(tvdbID int, imdbID string) string {
 	if tvdbID != 0 {
 		return "tvdb-" + strconv.Itoa(tvdbID) + "-"
 	}

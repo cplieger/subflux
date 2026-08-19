@@ -22,6 +22,7 @@ import (
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/subtitleext"
@@ -424,7 +425,7 @@ func (h *Handler) HandleHistoryIDs(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
-	if prefix != "" && !api.IsValidMediaPrefix(prefix) {
+	if prefix != "" && !mediaid.ValidPrefix(prefix) {
 		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
 		return
 	}

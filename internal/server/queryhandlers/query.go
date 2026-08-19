@@ -10,6 +10,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
@@ -347,7 +348,7 @@ func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	prefix := q.Get("prefix")
-	if prefix != "" && !api.IsValidMediaPrefix(prefix) {
+	if prefix != "" && !mediaid.ValidPrefix(prefix) {
 		httpapi.BadRequestC(w, r, api.CodeBadRequest, "invalid prefix format")
 		return
 	}
