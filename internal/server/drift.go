@@ -1,36 +1,41 @@
-package api
+package server
 
-// DriftState is the drift-relevant projection of one config: the values whose
+import (
+	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/config"
+)
+
+// driftState is the drift-relevant projection of one config: the values whose
 // removal or disabling invalidates stored search attempts.
-type DriftState struct {
+type driftState struct {
 	// Languages are the configured subtitle language codes.
 	Languages []string
 	// Providers are the enabled provider IDs.
-	Providers []ProviderID
+	Providers []api.ProviderID
 	// AdaptiveEnabled reports whether adaptive search backoff is on.
 	AdaptiveEnabled bool
 }
 
-// DriftInputs pairs the outgoing config's state with the incoming one.
+// driftInputs pairs the outgoing config's state with the incoming one.
 //
 // The two are named rather than positional because they are the same type and
 // drift is directional: reading them the wrong way round reports the arriving
 // languages and providers as the departing ones, and the cleanup that follows
 // clears the search attempts of everything the operator just configured while
 // leaving the removed entries' attempts behind. Nothing downstream can detect
-// that inversion — both shapes are well-formed ConfigDrift values.
-type DriftInputs struct {
+// that inversion — both shapes are well-formed api.ConfigDrift values.
+type driftInputs struct {
 	// Old is the state of the config being replaced.
-	Old DriftState
+	Old driftState
 	// New is the state of the config replacing it.
-	New DriftState
+	New driftState
 }
 
-// DetectDrift compares the old and new config state to determine what DB
+// detectDrift compares the old and new config state to determine what DB
 // cleanup is needed. Duplicate entries in the old state are deduplicated;
 // each removed item appears at most once in the result.
-func DetectDrift(in *DriftInputs) ConfigDrift {
-	return ConfigDrift{
+func detectDrift(in *driftInputs) api.ConfigDrift {
+	return api.ConfigDrift{
 		RemovedLanguages: removedItems(in.Old.Languages, in.New.Languages),
 		RemovedProviders: removedProviderItems(in.Old.Providers, in.New.Providers),
 		AdaptiveDisabled: in.Old.AdaptiveEnabled && !in.New.AdaptiveEnabled,
@@ -50,13 +55,13 @@ func removedItems(old, current []string) []string {
 }
 
 // removedProviderItems returns provider IDs in old that are not in current, deduplicated.
-func removedProviderItems(old, current []ProviderID) []ProviderID {
-	currentSet := make(map[ProviderID]struct{}, len(current))
+func removedProviderItems(old, current []api.ProviderID) []api.ProviderID {
+	currentSet := make(map[api.ProviderID]struct{}, len(current))
 	for _, item := range current {
 		currentSet[item] = struct{}{}
 	}
-	seen := make(map[ProviderID]struct{}, len(old))
-	var removed []ProviderID
+	seen := make(map[api.ProviderID]struct{}, len(old))
+	var removed []api.ProviderID
 	for _, item := range old {
 		if _, ok := seen[item]; ok {
 			continue
@@ -91,9 +96,13 @@ func uniqueStrings(items []string) []string {
 	return out
 }
 
-// Empty returns true if no cleanup is needed.
-func (d *ConfigDrift) Empty() bool {
-	return len(d.RemovedLanguages) == 0 &&
-		len(d.RemovedProviders) == 0 &&
-		!d.AdaptiveDisabled
+// newDriftState projects the drift-relevant values out of a config, so the two
+// sides of a comparison are built by one function and cannot disagree on which
+// value goes where.
+func newDriftState(cfg *config.Config) driftState {
+	return driftState{
+		Languages:       cfg.LanguageCodes(),
+		Providers:       enabledProviders(cfg.Providers()),
+		AdaptiveEnabled: cfg.Adaptive().Enabled,
+	}
 }

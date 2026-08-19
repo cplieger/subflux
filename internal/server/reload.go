@@ -12,17 +12,6 @@ import (
 	"github.com/cplieger/webhttp/v2"
 )
 
-// driftState projects the drift-relevant values out of a config, so the two
-// sides of a comparison are built by one function and cannot disagree on which
-// value goes where.
-func driftState(cfg *config.Config) api.DriftState {
-	return api.DriftState{
-		Languages:       cfg.LanguageCodes(),
-		Providers:       enabledProviders(cfg.Providers()),
-		AdaptiveEnabled: cfg.Adaptive().Enabled,
-	}
-}
-
 // enabledProviders returns the sorted names of the enabled providers in a
 // provider map, used by activation's drift detection. It takes the MAP and not
 // a config: filtering and sorting is all it does, so the config was never an

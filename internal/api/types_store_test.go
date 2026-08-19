@@ -64,3 +64,27 @@ func TestManualLockEntry_unmarshalsTheFlatWireShape(t *testing.T) {
 		t.Errorf("decoded = %+v, want %+v", got, want)
 	}
 }
+
+func TestConfigDrift_Empty(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		drift ConfigDrift
+		want  bool
+	}{
+		{name: "zero value is empty", drift: ConfigDrift{}, want: true},
+		{name: "removed languages not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}}, want: false},
+		{name: "removed providers not empty", drift: ConfigDrift{RemovedProviders: []ProviderID{"opensubtitles"}}, want: false},
+		{name: "adaptive disabled not empty", drift: ConfigDrift{AdaptiveDisabled: true}, want: false},
+		{name: "all fields set not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}, RemovedProviders: []ProviderID{"os"}, AdaptiveDisabled: true}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.drift.Empty()
+			if got != tt.want {
+				t.Errorf("ConfigDrift.Empty() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

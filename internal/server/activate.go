@@ -117,9 +117,9 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mod
 	// Detect config drift against the outgoing config before anything is
 	// swapped. Skipped when transitioning from unconfigured (no old config).
 	if oldCfg != nil {
-		cand.drift = api.DetectDrift(&api.DriftInputs{
-			Old: driftState(oldCfg),
-			New: driftState(newCfg),
+		cand.drift = detectDrift(&driftInputs{
+			Old: newDriftState(oldCfg),
+			New: newDriftState(newCfg),
 		})
 	}
 

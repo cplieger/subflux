@@ -1,37 +1,14 @@
-package api
+package server
 
 import (
 	"slices"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/api"
 	"pgregory.net/rapid"
 )
 
-func TestConfigDrift_Empty(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		drift ConfigDrift
-		want  bool
-	}{
-		{name: "zero value is empty", drift: ConfigDrift{}, want: true},
-		{name: "removed languages not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}}, want: false},
-		{name: "removed providers not empty", drift: ConfigDrift{RemovedProviders: []ProviderID{"opensubtitles"}}, want: false},
-		{name: "adaptive disabled not empty", drift: ConfigDrift{AdaptiveDisabled: true}, want: false},
-		{name: "all fields set not empty", drift: ConfigDrift{RemovedLanguages: []string{"fr"}, RemovedProviders: []ProviderID{"os"}, AdaptiveDisabled: true}, want: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := tt.drift.Empty()
-			if got != tt.want {
-				t.Errorf("ConfigDrift.Empty() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// TestDetectDrift consolidates all scenario-based DetectDrift tests into a
+// TestDetectDrift consolidates all scenario-based detectDrift tests into a
 // single table-driven test.
 func TestDetectDrift(t *testing.T) {
 	t.Parallel()
@@ -40,10 +17,10 @@ func TestDetectDrift(t *testing.T) {
 		name                 string
 		oldLangs             []string
 		newLangs             []string
-		oldProvs             []ProviderID
-		newProvs             []ProviderID
+		oldProvs             []api.ProviderID
+		newProvs             []api.ProviderID
 		wantRemovedLangs     []string
-		wantRemovedProvs     []ProviderID
+		wantRemovedProvs     []api.ProviderID
 		oldAdaptive          bool
 		newAdaptive          bool
 		wantAdaptiveDisabled bool
@@ -53,8 +30,8 @@ func TestDetectDrift(t *testing.T) {
 			name:        "no changes",
 			oldLangs:    []string{"en", "fr"},
 			newLangs:    []string{"en", "fr"},
-			oldProvs:    []ProviderID{"os", "bs"},
-			newProvs:    []ProviderID{"os", "bs"},
+			oldProvs:    []api.ProviderID{"os", "bs"},
+			newProvs:    []api.ProviderID{"os", "bs"},
 			oldAdaptive: true,
 			newAdaptive: true,
 			wantEmpty:   true,
@@ -63,8 +40,8 @@ func TestDetectDrift(t *testing.T) {
 			name:             "removed language",
 			oldLangs:         []string{"en", "fr", "de"},
 			newLangs:         []string{"en", "fr"},
-			oldProvs:         []ProviderID{"os"},
-			newProvs:         []ProviderID{"os"},
+			oldProvs:         []api.ProviderID{"os"},
+			newProvs:         []api.ProviderID{"os"},
 			oldAdaptive:      true,
 			newAdaptive:      true,
 			wantRemovedLangs: []string{"de"},
@@ -73,18 +50,18 @@ func TestDetectDrift(t *testing.T) {
 			name:             "removed provider",
 			oldLangs:         []string{"en"},
 			newLangs:         []string{"en"},
-			oldProvs:         []ProviderID{"os", "bs", "yify"},
-			newProvs:         []ProviderID{"os"},
+			oldProvs:         []api.ProviderID{"os", "bs", "yify"},
+			newProvs:         []api.ProviderID{"os"},
 			oldAdaptive:      true,
 			newAdaptive:      true,
-			wantRemovedProvs: []ProviderID{"bs", "yify"},
+			wantRemovedProvs: []api.ProviderID{"bs", "yify"},
 		},
 		{
 			name:                 "adaptive disabled",
 			oldLangs:             []string{"en"},
 			newLangs:             []string{"en"},
-			oldProvs:             []ProviderID{"os"},
-			newProvs:             []ProviderID{"os"},
+			oldProvs:             []api.ProviderID{"os"},
+			newProvs:             []api.ProviderID{"os"},
 			oldAdaptive:          true,
 			newAdaptive:          false,
 			wantAdaptiveDisabled: true,
@@ -93,8 +70,8 @@ func TestDetectDrift(t *testing.T) {
 			name:        "adaptive enabled not flagged",
 			oldLangs:    []string{"en"},
 			newLangs:    []string{"en"},
-			oldProvs:    []ProviderID{"os"},
-			newProvs:    []ProviderID{"os"},
+			oldProvs:    []api.ProviderID{"os"},
+			newProvs:    []api.ProviderID{"os"},
 			oldAdaptive: false,
 			newAdaptive: true,
 			wantEmpty:   true,
@@ -103,12 +80,12 @@ func TestDetectDrift(t *testing.T) {
 			name:                 "all changes",
 			oldLangs:             []string{"en", "fr"},
 			newLangs:             []string{"en"},
-			oldProvs:             []ProviderID{"os", "bs"},
-			newProvs:             []ProviderID{"os"},
+			oldProvs:             []api.ProviderID{"os", "bs"},
+			newProvs:             []api.ProviderID{"os"},
 			oldAdaptive:          true,
 			newAdaptive:          false,
 			wantRemovedLangs:     []string{"fr"},
-			wantRemovedProvs:     []ProviderID{"bs"},
+			wantRemovedProvs:     []api.ProviderID{"bs"},
 			wantAdaptiveDisabled: true,
 		},
 		{
@@ -116,7 +93,7 @@ func TestDetectDrift(t *testing.T) {
 			oldLangs:    nil,
 			newLangs:    []string{"en"},
 			oldProvs:    nil,
-			newProvs:    []ProviderID{"os"},
+			newProvs:    []api.ProviderID{"os"},
 			oldAdaptive: false,
 			newAdaptive: true,
 			wantEmpty:   true,
@@ -125,12 +102,12 @@ func TestDetectDrift(t *testing.T) {
 			name:             "empty new config",
 			oldLangs:         []string{"en", "fr"},
 			newLangs:         nil,
-			oldProvs:         []ProviderID{"os"},
+			oldProvs:         []api.ProviderID{"os"},
 			newProvs:         nil,
 			oldAdaptive:      false,
 			newAdaptive:      false,
 			wantRemovedLangs: []string{"en", "fr"},
-			wantRemovedProvs: []ProviderID{"os"},
+			wantRemovedProvs: []api.ProviderID{"os"},
 		},
 		{
 			name:      "both nil",
@@ -140,10 +117,10 @@ func TestDetectDrift(t *testing.T) {
 			name:             "duplicate items in old",
 			oldLangs:         []string{"en", "en", "fr"},
 			newLangs:         []string{"en"},
-			oldProvs:         []ProviderID{"os", "os"},
-			newProvs:         []ProviderID{"bs"},
+			oldProvs:         []api.ProviderID{"os", "os"},
+			newProvs:         []api.ProviderID{"bs"},
 			wantRemovedLangs: []string{"fr"},
-			wantRemovedProvs: []ProviderID{"os"},
+			wantRemovedProvs: []api.ProviderID{"os"},
 		},
 	}
 
@@ -151,14 +128,14 @@ func TestDetectDrift(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := DetectDrift(&DriftInputs{
-				Old: DriftState{Languages: tt.oldLangs, Providers: tt.oldProvs, AdaptiveEnabled: tt.oldAdaptive},
-				New: DriftState{Languages: tt.newLangs, Providers: tt.newProvs, AdaptiveEnabled: tt.newAdaptive},
+			d := detectDrift(&driftInputs{
+				Old: driftState{Languages: tt.oldLangs, Providers: tt.oldProvs, AdaptiveEnabled: tt.oldAdaptive},
+				New: driftState{Languages: tt.newLangs, Providers: tt.newProvs, AdaptiveEnabled: tt.newAdaptive},
 			})
 
 			if tt.wantEmpty {
 				if !d.Empty() {
-					t.Errorf("DetectDrift() should be empty, got %+v", d)
+					t.Errorf("detectDrift() should be empty, got %+v", d)
 				}
 				return
 			}
@@ -190,21 +167,21 @@ func TestDetectDrift(t *testing.T) {
 	}
 }
 
-// --- DetectDrift PBT ---
+// --- detectDrift PBT ---
 
 func TestDetectDrift_order_independent(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		oldLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 10).Draw(t, "oldLangs")
 		newLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 10).Draw(t, "newLangs")
-		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]{3,8}`), func(s string) ProviderID { return ProviderID(s) }), 0, 10).Draw(t, "oldProvs")
-		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]{3,8}`), func(s string) ProviderID { return ProviderID(s) }), 0, 10).Draw(t, "newProvs")
+		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]{3,8}`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 10).Draw(t, "oldProvs")
+		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]{3,8}`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 10).Draw(t, "newProvs")
 		oldAdaptive := rapid.Bool().Draw(t, "oldAdaptive")
 		newAdaptive := rapid.Bool().Draw(t, "newAdaptive")
 
-		d1 := DetectDrift(&DriftInputs{
-			Old: DriftState{Languages: oldLangs, Providers: oldProvs, AdaptiveEnabled: oldAdaptive},
-			New: DriftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: newAdaptive},
+		d1 := detectDrift(&driftInputs{
+			Old: driftState{Languages: oldLangs, Providers: oldProvs, AdaptiveEnabled: oldAdaptive},
+			New: driftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: newAdaptive},
 		})
 
 		// Shuffle old slices - result should be the same (order independent).
@@ -213,9 +190,9 @@ func TestDetectDrift_order_independent(t *testing.T) {
 		shuffledProvs := slices.Clone(oldProvs)
 		slices.Reverse(shuffledProvs)
 
-		d2 := DetectDrift(&DriftInputs{
-			Old: DriftState{Languages: shuffledLangs, Providers: shuffledProvs, AdaptiveEnabled: oldAdaptive},
-			New: DriftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: newAdaptive},
+		d2 := detectDrift(&driftInputs{
+			Old: driftState{Languages: shuffledLangs, Providers: shuffledProvs, AdaptiveEnabled: oldAdaptive},
+			New: driftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: newAdaptive},
 		})
 
 		slices.Sort(d1.RemovedLanguages)
@@ -240,11 +217,11 @@ func TestDetectDrift_removed_always_subset_of_old(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		oldLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 5).Draw(t, "old_langs")
 		newLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 5).Draw(t, "new_langs")
-		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 5).Draw(t, "old_provs")
-		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 5).Draw(t, "new_provs")
-		d := DetectDrift(&DriftInputs{
-			Old: DriftState{Languages: oldLangs, Providers: oldProvs, AdaptiveEnabled: rapid.Bool().Draw(t, "oa")},
-			New: DriftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: rapid.Bool().Draw(t, "na")},
+		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 5).Draw(t, "old_provs")
+		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 5).Draw(t, "new_provs")
+		d := detectDrift(&driftInputs{
+			Old: driftState{Languages: oldLangs, Providers: oldProvs, AdaptiveEnabled: rapid.Bool().Draw(t, "oa")},
+			New: driftState{Languages: newLangs, Providers: newProvs, AdaptiveEnabled: rapid.Bool().Draw(t, "na")},
 		})
 		oldLangSet := make(map[string]bool, len(oldLangs))
 		for _, l := range oldLangs {
@@ -255,7 +232,7 @@ func TestDetectDrift_removed_always_subset_of_old(t *testing.T) {
 				t.Errorf("RemovedLanguages contains %q not in old %v", removed, oldLangs)
 			}
 		}
-		oldProvSet := make(map[ProviderID]bool, len(oldProvs))
+		oldProvSet := make(map[api.ProviderID]bool, len(oldProvs))
 		for _, p := range oldProvs {
 			oldProvSet[p] = true
 		}
@@ -272,11 +249,11 @@ func TestDetectDrift_removed_never_in_new(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		oldLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 5).Draw(t, "old_langs")
 		newLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 5).Draw(t, "new_langs")
-		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 5).Draw(t, "old_provs")
-		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 5).Draw(t, "new_provs")
-		d := DetectDrift(&DriftInputs{
-			Old: DriftState{Languages: oldLangs, Providers: oldProvs},
-			New: DriftState{Languages: newLangs, Providers: newProvs},
+		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 5).Draw(t, "old_provs")
+		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 5).Draw(t, "new_provs")
+		d := detectDrift(&driftInputs{
+			Old: driftState{Languages: oldLangs, Providers: oldProvs},
+			New: driftState{Languages: newLangs, Providers: newProvs},
 		})
 		newLangSet := make(map[string]bool, len(newLangs))
 		for _, l := range newLangs {
@@ -295,9 +272,9 @@ func TestDetectDrift_adaptive_disabled_only_when_was_enabled(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		old := rapid.Bool().Draw(t, "old")
 		cur := rapid.Bool().Draw(t, "new")
-		d := DetectDrift(&DriftInputs{
-			Old: DriftState{AdaptiveEnabled: old},
-			New: DriftState{AdaptiveEnabled: cur},
+		d := detectDrift(&driftInputs{
+			Old: driftState{AdaptiveEnabled: old},
+			New: driftState{AdaptiveEnabled: cur},
 		})
 		if d.AdaptiveDisabled && !old {
 			t.Errorf("AdaptiveDisabled=true but old was false")
@@ -313,11 +290,11 @@ func TestDetectDrift_removed_never_contains_duplicates(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		oldLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 8).Draw(t, "old_langs")
 		newLangs := rapid.SliceOfN(rapid.StringMatching(`[a-z]{2,3}`), 0, 5).Draw(t, "new_langs")
-		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 8).Draw(t, "old_provs")
-		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) ProviderID { return ProviderID(s) }), 0, 5).Draw(t, "new_provs")
-		d := DetectDrift(&DriftInputs{
-			Old: DriftState{Languages: oldLangs, Providers: oldProvs},
-			New: DriftState{Languages: newLangs, Providers: newProvs},
+		oldProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 8).Draw(t, "old_provs")
+		newProvs := rapid.SliceOfN(rapid.Map(rapid.StringMatching(`[a-z]+`), func(s string) api.ProviderID { return api.ProviderID(s) }), 0, 5).Draw(t, "new_provs")
+		d := detectDrift(&driftInputs{
+			Old: driftState{Languages: oldLangs, Providers: oldProvs},
+			New: driftState{Languages: newLangs, Providers: newProvs},
 		})
 		seen := make(map[string]bool)
 		for _, lang := range d.RemovedLanguages {
@@ -326,7 +303,7 @@ func TestDetectDrift_removed_never_contains_duplicates(t *testing.T) {
 			}
 			seen[lang] = true
 		}
-		seenProv := make(map[ProviderID]bool)
+		seenProv := make(map[api.ProviderID]bool)
 		for _, prov := range d.RemovedProviders {
 			if seenProv[prov] {
 				t.Errorf("RemovedProviders contains duplicate %q", prov)

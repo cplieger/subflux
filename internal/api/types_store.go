@@ -187,6 +187,13 @@ type ConfigDrift struct {
 	AdaptiveDisabled bool
 }
 
+// Empty returns true if no cleanup is needed.
+func (d *ConfigDrift) Empty() bool {
+	return len(d.RemovedLanguages) == 0 &&
+		len(d.RemovedProviders) == 0 &&
+		!d.AdaptiveDisabled
+}
+
 // CleanupResult holds the outcome of a media cleanup operation.
 // Used by both CleanupForMediaUpgrade and ReconcileState.
 type CleanupResult struct {
