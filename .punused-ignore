@@ -151,7 +151,7 @@ method UpdatePasskeyAfterLogin
 # --- fmt.Stringer pinned by a compile-time assertion ------------------------
 # Each of these has an explicit `var _ fmt.Stringer = T(...)` next to it, so the
 # method cannot be deleted without breaking the build (verified for MatchMethod:
-# api/types_search.go:140). The assertion names the TYPE, so punused still sees
+# api/types_search.go:137). The assertion names the TYPE, so punused still sees
 # the method as unreferenced.
 #   MatchMethod        api/types_search.go:140
 #   RegistryErrorKind  provider/registry.go:32 (also rendered by
@@ -240,7 +240,7 @@ constant NotifyInfo
 # Both fields are json-tagged and part of the generated TS contract, and NO Go
 # site populates either. They are whitelisted only to keep the gate at zero
 # while the removal decision is open; they are NOT healthy.
-#   ProviderTemplate (api/types.go:220) — `provider_template,omitempty` on
+#   ProviderTemplate (api/types.go:229) — `provider_template,omitempty` on
 #     SchemaSection. Never set, so never even serialized; the generated decoder
 #     treats it as optional and no TS module reads it.
 #   Variant (server/events/types.go:43) — `variant` on CoverageEvent, and
