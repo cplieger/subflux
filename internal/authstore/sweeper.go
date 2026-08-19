@@ -109,16 +109,17 @@ func (s *Store) sweepLoop(interval time.Duration, done chan struct{}) {
 // sweeper evicts on the SAME cutoffs the request-path session validator
 // enforces (sweeper eviction of an in-memory session is a hard logout, so a
 // shorter sweeper timeout would silently cap a longer configured one).
-// Non-positive values leave the current timeout unchanged. Safe for concurrent
-// use with a running sweeper.
-func (s *Store) SetSessionTimeouts(idle, absolute time.Duration) {
+// Non-positive fields leave the current timeout unchanged, so a partial
+// literal is a partial override rather than an instant-expiry pair. Safe for
+// concurrent use with a running sweeper.
+func (s *Store) SetSessionTimeouts(timeouts auth.SessionTimeouts) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if idle > 0 {
-		s.idleTimeout = idle
+	if timeouts.Idle > 0 {
+		s.idleTimeout = timeouts.Idle
 	}
-	if absolute > 0 {
-		s.absTimeout = absolute
+	if timeouts.Absolute > 0 {
+		s.absTimeout = timeouts.Absolute
 	}
 }
 

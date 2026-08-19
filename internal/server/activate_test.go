@@ -15,6 +15,7 @@ import (
 
 	"github.com/cplieger/auth/v4"
 	authwebauthn "github.com/cplieger/auth/v4/webauthn"
+	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
@@ -701,3 +702,15 @@ func TestStartWorkers_defaults_to_real_launcher(t *testing.T) {
 		t.Fatal("real worker set did not exit on a cancelled context")
 	}
 }
+
+// sessionTimeoutSetter is the optional capability activate() probes for to push
+// hot-reloaded session timeouts into the auth-store sweeper. The probe is a
+// type assertion, so a signature drift on either side silently stops applying
+// them; the assertion below is the compile-time check that keeps the two in
+// step, and it is why the parameter is auth.SessionTimeouts rather than a pair
+// of adjacent durations.
+type sessionTimeoutSetter interface {
+	SetSessionTimeouts(timeouts auth.SessionTimeouts)
+}
+
+var _ sessionTimeoutSetter = (*authstore.Store)(nil)

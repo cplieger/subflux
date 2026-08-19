@@ -231,9 +231,12 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *conf
 	// validator reads live config; a stale sweeper would hard-logout
 	// sessions early). Optional-capability pattern like backupStore.
 	if ts, ok := s.authStore.(interface {
-		SetSessionTimeouts(idle, absolute time.Duration)
+		SetSessionTimeouts(timeouts auth.SessionTimeouts)
 	}); ok {
-		ts.SetSessionTimeouts(newCfg.SessionIdleTimeout(), newCfg.SessionAbsoluteTimeout())
+		ts.SetSessionTimeouts(auth.SessionTimeouts{
+			Idle:     newCfg.SessionIdleTimeout(),
+			Absolute: newCfg.SessionAbsoluteTimeout(),
+		})
 	}
 
 	// Re-apply the SSE client cap on the running hub (admission-time

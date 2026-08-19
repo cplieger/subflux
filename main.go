@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
@@ -275,7 +276,10 @@ func runConfiguredServer(cfg *config.Config) int {
 	// seeded with the configured session timeouts so eviction matches the
 	// request-path validator (hot reload re-applies them on change).
 	authDB := authstore.New(db.Bolt())
-	authDB.SetSessionTimeouts(cfg.SessionIdleTimeout(), cfg.SessionAbsoluteTimeout())
+	authDB.SetSessionTimeouts(auth.SessionTimeouts{
+		Idle:     cfg.SessionIdleTimeout(),
+		Absolute: cfg.SessionAbsoluteTimeout(),
+	})
 	if err := authDB.Open(); err != nil {
 		slog.Error("failed to start auth sweeper", "error", err)
 		return 1

@@ -239,3 +239,52 @@ func TestSweeper_zeroIntervalUsesDefault(t *testing.T) {
 		})
 	}
 }
+
+// TestSetSessionTimeouts_appliesEachRole pins which duration lands in which
+// role. The two used to arrive as adjacent time.Durations, where a
+// transposition makes the idle cutoff effectively unbounded and the absolute
+// one an hour: a session in active use is hard-logged-out while an abandoned
+// one survives, and neither the setter nor the sweeper can tell.
+func TestSetSessionTimeouts_appliesEachRole(t *testing.T) {
+	s := newSweeperStore(t, time.Hour) // interval unused; sweepOnce is called directly
+	ctx := t.Context()
+	now := time.Now().UTC()
+
+	s.SetSessionTimeouts(auth.SessionTimeouts{Idle: time.Hour, Absolute: 240 * time.Hour})
+
+	// Created 2h ago, active now: inside both cutoffs. Under a transposed pair
+	// the absolute cutoff is 1h and this is evicted.
+	if err := s.CreateSession(ctx, mkSession("old-but-active", 1, now.Add(-2*time.Hour), now)); err != nil {
+		t.Fatalf("CreateSession(old-but-active): %v", err)
+	}
+	// Created 2h ago, idle 90m: past the 1h idle cutoff. Under a transposed
+	// pair the idle cutoff is 240h and this survives.
+	if err := s.CreateSession(ctx, mkSession("idle-too-long", 1, now.Add(-2*time.Hour), now.Add(-90*time.Minute))); err != nil {
+		t.Fatalf("CreateSession(idle-too-long): %v", err)
+	}
+
+	s.sweepOnce(now)
+
+	if !sessionPresent(t, s, "old-but-active") {
+		t.Error("session created 2h ago and active now was evicted: the absolute timeout is being enforced as the idle one")
+	}
+	if sessionPresent(t, s, "idle-too-long") {
+		t.Error("session idle for 90m survived a 1h idle timeout: the idle timeout is being enforced as the absolute one")
+	}
+}
+
+// TestSetSessionTimeouts_nonPositiveKeepsCurrent pins this setter's deliberate
+// divergence from auth.SessionTimeouts' own contract: a zero field there
+// expires every session instantly, while here it means "no override".
+func TestSetSessionTimeouts_nonPositiveKeepsCurrent(t *testing.T) {
+	s := newSweeperStore(t, time.Hour)
+	s.SetSessionTimeouts(auth.SessionTimeouts{Idle: 2 * time.Hour, Absolute: 48 * time.Hour})
+	s.SetSessionTimeouts(auth.SessionTimeouts{})
+
+	s.mu.RLock()
+	idle, absolute := s.idleTimeout, s.absTimeout
+	s.mu.RUnlock()
+	if idle != 2*time.Hour || absolute != 48*time.Hour {
+		t.Errorf("timeouts after a zero override = (%v, %v), want (2h0m0s, 48h0m0s)", idle, absolute)
+	}
+}
