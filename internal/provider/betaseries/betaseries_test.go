@@ -3,6 +3,8 @@ package betaseries
 import (
 	"errors"
 	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -313,5 +315,41 @@ func TestClassifyBadRequest(t *testing.T) {
 				rc.Close()
 			}
 		})
+	}
+}
+
+// --- Download ---
+
+// statusRoundTripper answers every request with a fixed status and empty body,
+// standing in for the upstream without a network dial.
+type statusRoundTripper struct{ status int }
+
+func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: rt.status,
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     make(http.Header),
+	}, nil
+}
+
+// A 404 on the subtitle URL means the upstream no longer holds the file the
+// search result named. Reporting it as a successful download of zero bytes
+// made a withdrawn upload indistinguishable from a provider serving an empty
+// or corrupt payload, so it must name itself.
+func TestDownloadAbsentUpstream(t *testing.T) {
+	t.Parallel()
+
+	p := &Provider{
+		client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}},
+		token:  "t",
+	}
+	sub := api.Subtitle{ID: "sub-1", DownloadURL: "https://api.betaseries.com/subtitles/sub-1"}
+
+	data, err := p.Download(t.Context(), &sub)
+	if !errors.Is(err, api.ErrSubtitleAbsent) {
+		t.Errorf("Download on 404 error = %v, want one wrapping api.ErrSubtitleAbsent", err)
+	}
+	if data != nil {
+		t.Errorf("Download on 404 data = %q, want nil", data)
 	}
 }

@@ -3,6 +3,7 @@ package config
 
 import (
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -46,7 +47,7 @@ func (c *Config) ResolveTargetsWithFallback(originalLang string, audioLangs []st
 
 	// Priority 3: default.
 	if c.cachedDefaultTargets != nil {
-		return c.cachedDefaultTargets
+		return cloneTargets(c.cachedDefaultTargets)
 	}
 	return targetsToAPI(c.Languages.Default)
 }
@@ -78,7 +79,7 @@ func computeLangCodes(rules []AudioRule, defaults []yamlSubtitleTarget) []string
 // audio language isn't known upfront.
 func (c *Config) LanguageCodes() []string {
 	if c.cachedLangCodes != nil {
-		return c.cachedLangCodes
+		return slices.Clone(c.cachedLangCodes)
 	}
 	// Fallback for configs not loaded via LoadFromBytes (e.g. tests).
 	return computeLangCodes(c.Languages.Rules, c.Languages.Default)
@@ -218,7 +219,7 @@ func (c *Config) matchRule(audioLang string) []api.SubtitleTarget {
 		if !ok {
 			return nil
 		}
-		return nonNilTargets(targets)
+		return nonNilTargets(cloneTargets(targets))
 	}
 	if c.ruleIndex != nil {
 		idx, ok := c.ruleIndex[audioLang]

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -130,13 +131,42 @@ type yamlSubtitleTarget struct {
 // toAPI converts a yamlSubtitleTarget to an api.SubtitleTarget.
 func (t *yamlSubtitleTarget) toAPI() api.SubtitleTarget {
 	return api.SubtitleTarget{
-		MinScore:  t.MinScore,
+		MinScore:  clonePtr(t.MinScore),
 		Code:      t.Code,
 		Variant:   api.Variant(t.Variant),
-		Variants:  t.Variants,
-		Providers: t.Providers,
-		Exclude:   t.Exclude,
+		Variants:  slices.Clone(t.Variants),
+		Providers: slices.Clone(t.Providers),
+		Exclude:   slices.Clone(t.Exclude),
 	}
+}
+
+// clonePtr returns a pointer to a copy of *p, or nil for a nil p, so a target
+// handed to a caller shares no pointee with the config it came from.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+// cloneTargets deep-copies a target slice: every field that is a reference
+// (the min-score pointer and the three string/ID slices) is copied too, so a
+// caller cannot reach back into the loaded config through one. It preserves
+// the nil/empty distinction nonNilTargets exists for.
+func cloneTargets(targets []api.SubtitleTarget) []api.SubtitleTarget {
+	if targets == nil {
+		return nil
+	}
+	out := make([]api.SubtitleTarget, len(targets))
+	for i := range targets {
+		out[i] = targets[i]
+		out[i].MinScore = clonePtr(targets[i].MinScore)
+		out[i].Variants = slices.Clone(targets[i].Variants)
+		out[i].Providers = slices.Clone(targets[i].Providers)
+		out[i].Exclude = slices.Clone(targets[i].Exclude)
+	}
+	return out
 }
 
 // targetsToAPI converts a slice of yamlSubtitleTarget to api.SubtitleTarget.

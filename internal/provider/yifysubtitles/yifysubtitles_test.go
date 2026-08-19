@@ -1,6 +1,10 @@
 package yifysubtitles
 
 import (
+	"errors"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/api"
@@ -401,4 +405,37 @@ func makeRow(rating, lang, href, release string, hi bool) string {
 		`<td>` + hiClass + `</td>` +
 		`<td>uploader</td>` +
 		`</tr>`
+}
+
+// --- Download ---
+
+// statusRoundTripper answers every request with a fixed status and empty body,
+// standing in for the upstream without a network dial.
+type statusRoundTripper struct{ status int }
+
+func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: rt.status,
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     make(http.Header),
+	}, nil
+}
+
+// A 404 on the subtitle detail page means the upstream no longer holds the
+// file the search result named. fetchPage reports that as an empty body
+// because the search path reads it as "no results"; the download path must
+// turn it into a named absence instead of a zero-byte success.
+func TestDownloadAbsentUpstream(t *testing.T) {
+	t.Parallel()
+
+	p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}}}
+	sub := api.Subtitle{ID: "sub-1", DownloadURL: serverURL + "/subtitles/sub-1"}
+
+	data, err := p.Download(t.Context(), &sub)
+	if !errors.Is(err, api.ErrSubtitleAbsent) {
+		t.Errorf("Download on 404 error = %v, want one wrapping api.ErrSubtitleAbsent", err)
+	}
+	if data != nil {
+		t.Errorf("Download on 404 data = %q, want nil", data)
+	}
 }

@@ -130,8 +130,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		slog.Debug("betaseries: subtitle not found", "url", sub.DownloadURL)
-		return nil, nil
+		return nil, fmt.Errorf("betaseries: %w: %s", api.ErrSubtitleAbsent, sub.ID)
 	}
 	if err2 := httputil.CheckHTTPStatus(resp); err2 != nil {
 		return nil, err2

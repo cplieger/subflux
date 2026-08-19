@@ -1,6 +1,10 @@
 package config
 
-import "github.com/cplieger/subflux/internal/api"
+import (
+	"maps"
+
+	"github.com/cplieger/subflux/internal/api"
+)
 
 // Adaptive returns the adaptive search config.
 func (c *Config) Adaptive() api.AdaptiveConfig {
@@ -66,15 +70,25 @@ func (c *Config) EmbeddedPolicy() api.EmbeddedPolicy {
 	}
 }
 
-// ProviderConfigs returns the provider configuration map.
+// ProviderConfigs returns the provider configuration map. The map, and every
+// Settings map inside it, is a copy: a caller that adds a provider or edits a
+// setting is editing its own copy, not the live configuration every subsequent
+// scan reads. The copy is deep because a shallow one would change nothing —
+// the aliasing that matters is the inner Settings map, which both the cached
+// and the recomputed path used to hand out directly.
 func (c *Config) ProviderConfigs() map[api.ProviderID]api.ProviderCfg {
-	if c.cachedProviderConfigs != nil {
-		return c.cachedProviderConfigs
+	src := c.cachedProviderConfigs
+	if src == nil {
+		// Fallback for configs not loaded via LoadFromBytes (e.g. tests).
+		src = make(map[api.ProviderID]api.ProviderCfg, len(c.Providers))
+		for k, v := range c.Providers {
+			src[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
+		}
 	}
-	// Fallback for configs not loaded via LoadFromBytes (e.g. tests).
-	out := make(map[api.ProviderID]api.ProviderCfg, len(c.Providers))
-	for k, v := range c.Providers {
-		out[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
+	out := make(map[api.ProviderID]api.ProviderCfg, len(src))
+	for k, v := range src {
+		v.Settings = maps.Clone(v.Settings)
+		out[k] = v
 	}
 	return out
 }

@@ -1,8 +1,24 @@
 package api
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // --- Provider errors ---
+
+// ErrSubtitleAbsent reports that the upstream no longer holds the subtitle a
+// search result named: the file the ID points at is gone (an expired listing,
+// a withdrawn upload, a retired mirror path). It is a normal outcome of a
+// download, not a fault of the provider or of subflux, and it is the one
+// download failure an operator should read as "search again later", not as
+// "this provider is broken".
+//
+// It exists because absence used to be reported as a successful download of
+// zero bytes, which the callers then rejected as an empty or invalid payload —
+// so a withdrawn upload and a provider serving corrupt data produced the same
+// operator-visible message. Providers return it wrapped with their own name.
+var ErrSubtitleAbsent = errors.New("subtitle absent upstream")
 
 // AuthError indicates invalid or expired credentials.
 type AuthError struct{ Msg string }

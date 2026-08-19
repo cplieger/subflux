@@ -30,6 +30,13 @@ type Provider interface {
 	Search(ctx context.Context, req *SearchRequest) ([]Subtitle, error)
 
 	// Download fetches the subtitle content for the given search result.
+	//
+	// A subtitle the upstream no longer holds is reported as an error
+	// wrapping ErrSubtitleAbsent, never as a successful download of zero
+	// bytes: absence and a truncated or corrupt payload are different
+	// operator problems, and returning nil bytes with a nil error made them
+	// read the same. Implementations therefore never return (nil, nil) —
+	// every return either carries subtitle content or names why it does not.
 	Download(ctx context.Context, sub *Subtitle) ([]byte, error)
 }
 

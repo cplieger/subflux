@@ -92,7 +92,7 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 		return nil, fmt.Errorf("fetch subtitle page: %w", err)
 	}
 	if body == "" {
-		return nil, nil // page not found (404)
+		return nil, fmt.Errorf("yifysubtitles: %w: %s", api.ErrSubtitleAbsent, sub.ID)
 	}
 
 	dlLink := extractDownloadLink(body)
@@ -149,8 +149,9 @@ func (p *Provider) fetchDownload(ctx context.Context, dlURL, referer string) ([]
 }
 
 // fetchPage retrieves an HTML page from YIFY Subtitles with browser-like
-// headers. Returns empty string (not error) for 404 responses. Body is
-// capped at 2 MB.
+// headers. A 404 yields an empty string and no error, because the two callers
+// read it differently: a missing search page is no results, while a missing
+// subtitle page is api.ErrSubtitleAbsent. Body is capped at 2 MB.
 func (p *Provider) fetchPage(ctx context.Context, pageURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, http.NoBody)
 	if err != nil {
