@@ -348,14 +348,14 @@ func BenchmarkBuild(b *testing.B) {
 		Episode:   7,
 	}
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_ = Build(req)
 	}
 }
 
 func BenchmarkEpisode(b *testing.B) {
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_ = Episode(98765, "tt7654321", SeasonEpisode{Season: 2, Episode: 14})
 	}
 }

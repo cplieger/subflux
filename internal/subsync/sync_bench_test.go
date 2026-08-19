@@ -36,7 +36,7 @@ func BenchmarkSyncWithOptions(b *testing.B) {
 		opts := tc.opts
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				SyncWithOptions(b.Context(), ref, inc, &opts)
 			}
 		})

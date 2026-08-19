@@ -14,7 +14,7 @@ func BenchmarkAlpha2FromAlpha3(b *testing.B) {
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				Alpha2FromAlpha3(tc.code)
 			}
 		})
@@ -36,7 +36,7 @@ func BenchmarkLookupLangName(b *testing.B) {
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				LookupLangName(tc.code, tc.overrides)
 			}
 		})

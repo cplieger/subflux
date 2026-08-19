@@ -33,7 +33,7 @@ func BenchmarkVoteOnCandidates(b *testing.B) {
 		}
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				voteOnCandidates(candidates, ref, inc)
 			}
 		})
@@ -62,7 +62,7 @@ func BenchmarkClusterCandidates(b *testing.B) {
 		},
 	}
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		clusterCandidates(candidates)
 	}
 }

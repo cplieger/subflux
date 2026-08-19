@@ -31,7 +31,7 @@ func BenchmarkCrossCorrelateEdges(b *testing.B) {
 		bSig := generateSignal(tc.lenB)
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				crossCorrelateEdges(b.Context(), a, bSig)
 			}
 		})
@@ -48,7 +48,7 @@ func BenchmarkFFT(b *testing.B) {
 		b.Run(sizeLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
 			buf := make([]complex128, n)
-			for range b.N {
+			for b.Loop() {
 				copy(buf, x)
 				fft.FFT(buf)
 			}

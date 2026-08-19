@@ -12,7 +12,7 @@ func BenchmarkValidate(b *testing.B) {
 		b.Run(sizeLabel(size), func(b *testing.B) {
 			b.ReportAllocs()
 			b.SetBytes(int64(size))
-			for range b.N {
+			for b.Loop() {
 				_ = Validate(data)
 			}
 		})
@@ -29,7 +29,7 @@ func BenchmarkCountNonText(b *testing.B) {
 	}
 	b.ReportAllocs()
 	b.SetBytes(512)
-	for range b.N {
+	for b.Loop() {
 		_ = CountNonText(data)
 	}
 }

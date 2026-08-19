@@ -43,7 +43,7 @@ func BenchmarkBuildMatches(b *testing.B) {
 		subs := makeSubs(count)
 		b.Run(benchName(count), func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				for _, sub := range subs {
 					BuildMatches(video, sub, deps)
 				}

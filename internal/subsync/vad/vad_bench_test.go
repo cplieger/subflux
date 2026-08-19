@@ -14,7 +14,7 @@ func BenchmarkVADProcessFrame(b *testing.B) {
 				frame[i] = int16(i % 1000)
 			}
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				v.processFrameLLR(frame)
 			}
 		})

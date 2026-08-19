@@ -574,7 +574,7 @@ func BenchmarkFilterSubtitleData(b *testing.B) {
 		items := makeItems(n)
 		b.Run(fmt.Sprintf("items=%d", n), func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				filterSubtitleData(items, req)
 			}
 		})
