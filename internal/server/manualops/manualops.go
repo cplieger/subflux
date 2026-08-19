@@ -55,7 +55,7 @@ type SearchDeps struct {
 
 // SearchStore is the narrow store interface for manual search operations.
 // The lock key's empty variant means "all variants of the language" (see
-// api.ManualLockStore).
+// api.ManualLockKey).
 type SearchStore interface {
 	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key api.ManualLockKey) error

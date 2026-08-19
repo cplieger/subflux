@@ -106,6 +106,28 @@ type BackoffEntry struct {
 	Failures  int        `json:"failures"`
 }
 
+// ManualLockKey addresses one manual-override lock: the (media_type, media_id,
+// language, variant) quad the lock lives on. Passing the quad as a named
+// struct rather than four positional arguments keeps MediaID and Language —
+// two adjacent strings — from being silently transposed at a call site, which
+// would compile and address the wrong lock.
+//
+// An empty Variant is a WILDCARD, and what it means is per method, not per
+// type: IsManuallyLocked, ClearManualLock and ManualSubtitlePaths read it as
+// "any/all variants of the language", while ManualDownloadCount and
+// NextManualNumber require an exact variant (a lock count and an ordinal
+// sequence are both per variant). Each method's doc on Store states which it
+// is.
+//
+// The json tags serve ManualLockEntry, which embeds this type and must keep
+// marshalling the quad flat under its established wire names.
+type ManualLockKey struct {
+	MediaType MediaType `json:"media_type"`
+	MediaID   string    `json:"media_id"`
+	Language  string    `json:"language"`
+	Variant   Variant   `json:"variant"`
+}
+
 // ManualLockEntry represents a manually locked media+language+variant quad:
 // the quad the lock lives on plus that quad's manual-row count.
 type ManualLockEntry struct {
@@ -114,6 +136,28 @@ type ManualLockEntry struct {
 	// has always been (wiregen applies the same promotion rules).
 	ManualLockKey
 	Count int `json:"count"`
+}
+
+// PollKey identifies an arr-source poll-timestamp row in the store.
+// Using a typed string instead of bare string prevents typo-induced
+// silent failures (e.g. "Sonarr" capitalization or "sonar" typo would
+// silently insert a new row and force history re-fetch).
+type PollKey string
+
+// Canonical poll-key values. New arr sources should add a constant here.
+const (
+	PollKeySonarr PollKey = "sonarr"
+	PollKeyRadarr PollKey = "radarr"
+)
+
+// Valid returns true if the PollKey is one of the canonical values.
+func (k PollKey) Valid() bool {
+	switch k {
+	case PollKeySonarr, PollKeyRadarr:
+		return true
+	default:
+		return false
+	}
 }
 
 // EmbeddedTrack represents a subtitle track detected inside a video container.
