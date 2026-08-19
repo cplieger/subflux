@@ -142,7 +142,7 @@ func TestCountShowSubtitles_short_circuits_on_empty_imdb(t *testing.T) {
 	// short-circuit happens before ensureToken/doGet.
 	p := &Provider{}
 	for _, imdb := range []string{"tt0", "tt00000", "0000", "tt"} {
-		count, err := p.CountShowSubtitles(t.Context(), imdb, "en")
+		count, err := p.CountShowSubtitles(t.Context(), api.ShowSubtitleQuery{ImdbID: imdb, Language: "en"})
 		if err != nil {
 			t.Errorf("CountShowSubtitles(%q) error = %v, want nil", imdb, err)
 		}

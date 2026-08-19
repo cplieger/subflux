@@ -164,7 +164,12 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, req.Username, true, checkBreach, h.HTTPClient)
+	hash, userMsg, err := ValidateAndHashPassword(r.Context(), PasswordCheck{
+		Password:    req.Password,
+		Username:    req.Username,
+		SoleFactor:  true,
+		CheckBreach: checkBreach,
+	}, h.HTTPClient)
 	if userMsg != "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return

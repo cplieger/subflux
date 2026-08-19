@@ -39,11 +39,17 @@ type SearchResult struct {
 	OnDisk     bool          `json:"on_disk"`
 }
 
+// WarnRecorder records an actionable warning for the UI's alert list.
+// activity.AlertLog satisfies it structurally.
+type WarnRecorder interface {
+	RecordWarn(source, msg string)
+}
+
 // SearchDeps holds the narrow dependencies for manual search execution.
 type SearchDeps struct {
 	DB       SearchStore
 	Activity ActivityTracker
-	Alerts   activity.WarnRecorder
+	Alerts   WarnRecorder
 	Events   EventPublisher
 }
 
@@ -141,6 +147,6 @@ func NotifyError(deps *SearchDeps, source, alertMsg, uiMsg string) {
 // RunClearLock clears the manual lock for a media+language combination. An
 // empty variant clears the locks of every variant of the language; a specific
 // variant clears only that quad's lock.
-func RunClearLock(ctx context.Context, deps *SearchDeps, mediaType, mediaID, language string, variant api.Variant) error {
-	return deps.DB.ClearManualLock(ctx, api.MediaType(mediaType), mediaID, language, variant)
+func RunClearLock(ctx context.Context, deps *SearchDeps, mediaType api.MediaType, mediaID, language string, variant api.Variant) error {
+	return deps.DB.ClearManualLock(ctx, mediaType, mediaID, language, variant)
 }

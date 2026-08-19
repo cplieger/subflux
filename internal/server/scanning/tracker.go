@@ -115,7 +115,7 @@ func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episo
 		slog.Debug("show skip cache hit", "imdb", imdbID, "lang", lang, "skip", skip)
 		return skip
 	}
-	count, err := st.counter.CountShowSubtitles(ctx, imdbID, lang)
+	count, err := st.counter.CountShowSubtitles(ctx, api.ShowSubtitleQuery{ImdbID: imdbID, Language: lang})
 	if err != nil {
 		slog.Warn("show subtitle count failed, not skipping",
 			"imdb", imdbID, "lang", lang, "error", err)

@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-// WarnRecorder is the narrow interface for recording warning alerts.
-// Both manualops and polling consume this single-method contract.
-// The concrete type AlertLog satisfies it via structural typing.
-type WarnRecorder interface {
-	RecordWarn(source, msg string)
-}
-
 // AlertLog tracks actionable errors for the UI.
 type AlertLog struct {
 	alerts []Alert

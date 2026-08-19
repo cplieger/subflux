@@ -22,7 +22,8 @@ type mockShowCounter struct {
 	calls  atomic.Int32
 }
 
-func (m *mockShowCounter) CountShowSubtitles(_ context.Context, imdbID, lang string) (int, error) {
+func (m *mockShowCounter) CountShowSubtitles(_ context.Context, q api.ShowSubtitleQuery) (int, error) {
+	imdbID, lang := q.ImdbID, q.Language
 	m.calls.Add(1)
 	if m.err != nil {
 		return 0, m.err
@@ -243,7 +244,7 @@ func TestResolveShowCounter_picks_first(t *testing.T) {
 	second := &mockShowCounter{counts: map[string]int{"tt1-fr": 99}}
 	counter := provider.ResolveShowCounter([]api.Provider{first, second})
 	st := newSeasonTracker(counter, showskip.New(1*time.Hour), seedDeps{})
-	count, _ := st.counter.CountShowSubtitles(t.Context(), "tt1", "fr")
+	count, _ := st.counter.CountShowSubtitles(t.Context(), api.ShowSubtitleQuery{ImdbID: "tt1", Language: "fr"})
 	if count != 0 {
 		t.Fatalf("expected count 0 from first provider, got %d", count)
 	}

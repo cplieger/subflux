@@ -22,7 +22,8 @@ type exactShowCounter struct {
 	calls  int
 }
 
-func (c *exactShowCounter) CountShowSubtitles(_ context.Context, imdbID, lang string) (int, error) {
+func (c *exactShowCounter) CountShowSubtitles(_ context.Context, q api.ShowSubtitleQuery) (int, error) {
+	imdbID, lang := q.ImdbID, q.Language
 	c.calls++
 	return c.counts[[2]string{imdbID, lang}], nil
 }

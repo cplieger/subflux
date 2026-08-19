@@ -13,7 +13,6 @@ import (
 	"github.com/cplieger/keyenc"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"golang.org/x/sync/errgroup"
 )
@@ -33,12 +32,18 @@ type StatsCacheInvalidator interface {
 	Invalidate()
 }
 
+// WarnRecorder records an actionable warning for the UI's alert list.
+// activity.AlertLog satisfies it structurally.
+type WarnRecorder interface {
+	RecordWarn(source, msg string)
+}
+
 // Deps holds all dependencies for the Poller.
 type Deps struct {
 	PollCache  *PollCache
 	Store      PollerStore
 	Metrics    PollerMetrics
-	Alerts     activity.WarnRecorder
+	Alerts     WarnRecorder
 	Events     PollerEvents
 	StatsCache StatsCacheInvalidator
 }

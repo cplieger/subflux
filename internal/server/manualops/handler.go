@@ -21,7 +21,7 @@ import (
 type HandlerDeps struct {
 	DBFunc     func() DownloadStore
 	Activity   ActivityTracker
-	Alerts     activity.WarnRecorder
+	Alerts     WarnRecorder
 	Events     EventPublisher
 	StateFunc  func() *LiveState
 	BGTracker  BGTracker
@@ -174,7 +174,7 @@ func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 		Events:   h.deps.Events,
 	}
 
-	if err := RunClearLock(ctx, deps, string(req.MediaType), req.MediaID, req.Language, req.Variant); err != nil {
+	if err := RunClearLock(ctx, deps, req.MediaType, req.MediaID, req.Language, req.Variant); err != nil {
 		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
 			"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
 			"variant", req.Variant)

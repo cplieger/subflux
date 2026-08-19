@@ -118,8 +118,8 @@ type retryCounterProvider struct {
 }
 
 // CountShowSubtitles delegates to the inner provider without retry.
-func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, imdbID, lang string) (int, error) {
-	return r.counter.CountShowSubtitles(ctx, imdbID, lang)
+func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error) {
+	return r.counter.CountShowSubtitles(ctx, q)
 }
 
 // ClearCache forwards to the inner provider if it implements api.CacheClearer.

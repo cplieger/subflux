@@ -119,7 +119,8 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
 	// independent sequences, matching the variant-aware manual file naming.
 	n := db.NextManualNumber(ctx, req.MediaType, historyMediaID, req.Language, variant)
-	subPath = api.ManualSubtitlePath(req.VideoPath(), req.Language, n, req.HearingImp, req.Forced)
+	subPath = api.ManualSubtitlePath(req.VideoPath(), req.Language, n,
+		api.SubtitleTags{HearingImpaired: req.HearingImp, Forced: req.Forced})
 
 	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles

@@ -200,7 +200,8 @@ func mergeNumberingResults(perScheme []numberingResult) ([]api.Subtitle, error) 
 // This enables show-level pre-checks: if a show has very few subtitles
 // relative to its episode count, the caller can skip the entire series.
 // Implements api.ShowSubtitleCounter.
-func (p *Provider) CountShowSubtitles(ctx context.Context, imdbID, lang string) (int, error) {
+func (p *Provider) CountShowSubtitles(ctx context.Context, q api.ShowSubtitleQuery) (int, error) {
+	imdbID, lang := q.ImdbID, q.Language
 	sanitized := classify.SanitizeImdbID(imdbID)
 	if sanitized == "" {
 		// Placeholder inputs like "tt0" / "tt00000" sanitize to empty.

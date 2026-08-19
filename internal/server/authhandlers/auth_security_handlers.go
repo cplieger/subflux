@@ -55,7 +55,12 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		soleFactor = cfg.BasicAuthEnabled()
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, req.NewPassword, user.Username, soleFactor, checkBreach, h.HTTPClient)
+	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, PasswordCheck{
+		Password:    req.NewPassword,
+		Username:    user.Username,
+		SoleFactor:  soleFactor,
+		CheckBreach: checkBreach,
+	}, h.HTTPClient)
 	if userMsg != "" {
 		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
 		return

@@ -113,11 +113,10 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 	// Detect config drift against the outgoing config before anything is
 	// swapped. Skipped when transitioning from unconfigured (no old config).
 	if oldCfg != nil {
-		cand.drift = api.DetectDrift(
-			oldCfg.LanguageCodes(), newCfg.LanguageCodes(),
-			enabledProviders(oldCfg), enabledProviders(newCfg),
-			oldCfg.Adaptive().Enabled, newCfg.Adaptive().Enabled,
-		)
+		cand.drift = api.DetectDrift(&api.DriftInputs{
+			Old: driftState(oldCfg),
+			New: driftState(newCfg),
+		})
 	}
 
 	engine, sc, providers, err := s.wire(ctx, newCfg, s.db, s.metrics)

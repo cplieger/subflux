@@ -1,18 +1,39 @@
 package api
 
-// DetectDrift compares old and new config state to determine what DB
-// cleanup is needed. Parameters are the extracted sets from each config.
-// Duplicate entries in old slices are deduplicated; each removed item
-// appears at most once in the result.
-func DetectDrift(
-	oldLangs, newLangs []string,
-	oldProviders, newProviders []ProviderID,
-	oldAdaptiveEnabled, newAdaptiveEnabled bool,
-) ConfigDrift {
+// DriftState is the drift-relevant projection of one config: the values whose
+// removal or disabling invalidates stored search attempts.
+type DriftState struct {
+	// Languages are the configured subtitle language codes.
+	Languages []string
+	// Providers are the enabled provider IDs.
+	Providers []ProviderID
+	// AdaptiveEnabled reports whether adaptive search backoff is on.
+	AdaptiveEnabled bool
+}
+
+// DriftInputs pairs the outgoing config's state with the incoming one.
+//
+// The two are named rather than positional because they are the same type and
+// drift is directional: reading them the wrong way round reports the arriving
+// languages and providers as the departing ones, and the cleanup that follows
+// clears the search attempts of everything the operator just configured while
+// leaving the removed entries' attempts behind. Nothing downstream can detect
+// that inversion — both shapes are well-formed ConfigDrift values.
+type DriftInputs struct {
+	// Old is the state of the config being replaced.
+	Old DriftState
+	// New is the state of the config replacing it.
+	New DriftState
+}
+
+// DetectDrift compares the old and new config state to determine what DB
+// cleanup is needed. Duplicate entries in the old state are deduplicated;
+// each removed item appears at most once in the result.
+func DetectDrift(in *DriftInputs) ConfigDrift {
 	return ConfigDrift{
-		RemovedLanguages: removedItems(oldLangs, newLangs),
-		RemovedProviders: removedProviderItems(oldProviders, newProviders),
-		AdaptiveDisabled: oldAdaptiveEnabled && !newAdaptiveEnabled,
+		RemovedLanguages: removedItems(in.Old.Languages, in.New.Languages),
+		RemovedProviders: removedProviderItems(in.Old.Providers, in.New.Providers),
+		AdaptiveDisabled: in.Old.AdaptiveEnabled && !in.New.AdaptiveEnabled,
 	}
 }
 

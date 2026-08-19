@@ -48,7 +48,7 @@ type retryFakeCounterProvider struct {
 	countCalls int
 }
 
-func (f *retryFakeCounterProvider) CountShowSubtitles(_ context.Context, _, _ string) (int, error) {
+func (f *retryFakeCounterProvider) CountShowSubtitles(_ context.Context, _ api.ShowSubtitleQuery) (int, error) {
 	f.countCalls++
 	return 42, nil
 }
@@ -299,7 +299,7 @@ func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	if !ok {
 		t.Fatal("wrapped provider does not implement ShowSubtitleCounter")
 	}
-	count, err := counter.CountShowSubtitles(t.Context(), "tt123", "en")
+	count, err := counter.CountShowSubtitles(t.Context(), api.ShowSubtitleQuery{ImdbID: "tt123", Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

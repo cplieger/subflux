@@ -12,6 +12,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/server/polling"
 	"github.com/cplieger/subflux/internal/server/scanning"
 )
 
@@ -22,7 +23,8 @@ var (
 	_ scanning.EventPublisher  = (*ScanEventAdapter)(nil)
 
 	_ manualops.ActivityTracker = (*ActivityAdapter)(nil)
-	_ activity.WarnRecorder     = (*AlertAdapter)(nil)
+	_ manualops.WarnRecorder    = (*AlertAdapter)(nil)
+	_ polling.WarnRecorder      = (*AlertAdapter)(nil)
 	_ manualops.EventPublisher  = (*ManualEventAdapter)(nil)
 )
 
@@ -66,7 +68,7 @@ func (a *ActivityAdapter) SetQueued(id string, queued bool) { a.A.SetQueued(id, 
 func (a *ActivityAdapter) IsCancelled(id string) bool { return a.A.IsCancelled(id) }
 
 // AlertAdapter bridges activity.AlertLog to scanning.AlertRecorder and
-// activity.WarnRecorder (superset of methods).
+// manualops.WarnRecorder / polling.WarnRecorder (superset of methods).
 type AlertAdapter struct{ A *activity.AlertLog }
 
 // Record emits an alert with the given category and message.

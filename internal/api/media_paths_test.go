@@ -73,7 +73,7 @@ func TestSubtitlePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := SubtitlePath(tt.videoPath, tt.lang, tt.hi, tt.forced)
+			got := SubtitlePath(tt.videoPath, tt.lang, SubtitleTags{HearingImpaired: tt.hi, Forced: tt.forced})
 
 			if got != tt.want {
 				t.Errorf("SubtitlePath(%q, %q, hi=%v, forced=%v) = %q, want %q",
@@ -129,7 +129,7 @@ func TestManualSubtitlePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ManualSubtitlePath(tt.videoPath, tt.lang, tt.n, false, false)
+			got := ManualSubtitlePath(tt.videoPath, tt.lang, tt.n, SubtitleTags{})
 
 			if got != tt.want {
 				t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, want %q",
@@ -181,7 +181,7 @@ func TestManualSubtitlePath_variants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ManualSubtitlePath(tt.videoPath, tt.lang, tt.n, tt.hi, tt.forced)
+			got := ManualSubtitlePath(tt.videoPath, tt.lang, tt.n, SubtitleTags{HearingImpaired: tt.hi, Forced: tt.forced})
 			if got != tt.want {
 				t.Errorf("ManualSubtitlePath(%q, %q, %d, hi=%t, forced=%t) = %q, want %q",
 					tt.videoPath, tt.lang, tt.n, tt.hi, tt.forced, got, tt.want)
@@ -207,7 +207,7 @@ func TestSubtitlePath_always_ends_with_srt(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		got := SubtitlePath(videoPath, lang, hi, forced)
+		got := SubtitlePath(videoPath, lang, SubtitleTags{HearingImpaired: hi, Forced: forced})
 
 		if !strings.HasSuffix(got, ".srt") {
 			t.Errorf("SubtitlePath(%q, %q, %v, %v) = %q, should end with .srt",
@@ -243,7 +243,7 @@ func TestSubtitlePath_always_contains_language_code(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		got := SubtitlePath(videoPath, lang, hi, forced)
+		got := SubtitlePath(videoPath, lang, SubtitleTags{HearingImpaired: hi, Forced: forced})
 
 		if !strings.Contains(got, "."+lang+".") {
 			t.Errorf("SubtitlePath(%q, %q, %v, %v) = %q, should contain .%s.",
@@ -259,7 +259,7 @@ func TestSubtitlePath_hi_forced_suffix_ordering(t *testing.T) {
 		videoPath := rapid.StringMatching(`/media/[a-zA-Z0-9._-]{1,30}\.[a-z]{2,4}`).Draw(t, "video_path")
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 
-		got := SubtitlePath(videoPath, lang, true, true)
+		got := SubtitlePath(videoPath, lang, SubtitleTags{HearingImpaired: true, Forced: true})
 
 		hiIdx := strings.Index(got, ".hi.")
 		forcedIdx := strings.Index(got, ".forced.")
@@ -281,7 +281,7 @@ func TestManualSubtitlePath_always_ends_with_srt(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, lang, n, false, false)
+		got := ManualSubtitlePath(videoPath, lang, n, SubtitleTags{})
 
 		if !strings.HasSuffix(got, ".srt") {
 			t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, should end with .srt",
@@ -298,7 +298,7 @@ func TestManualSubtitlePath_always_contains_language_code(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, lang, n, false, false)
+		got := ManualSubtitlePath(videoPath, lang, n, SubtitleTags{})
 
 		if !strings.Contains(got, "."+lang+".") {
 			t.Errorf("ManualSubtitlePath(%q, %q, %d) = %q, should contain .%s.",
@@ -315,7 +315,7 @@ func TestManualSubtitlePath_always_contains_number(t *testing.T) {
 		lang := rapid.StringMatching(`[a-z]{2,3}`).Draw(t, "lang")
 		n := rapid.IntRange(0, 100).Draw(t, "n")
 
-		got := ManualSubtitlePath(videoPath, lang, n, false, false)
+		got := ManualSubtitlePath(videoPath, lang, n, SubtitleTags{})
 
 		numStr := "." + strconv.Itoa(n) + ".srt"
 		if !strings.HasSuffix(got, numStr) {
@@ -334,7 +334,7 @@ func TestSubtitlePath_strips_video_extension(t *testing.T) {
 		video := rapid.StringMatching(`/media/[a-z]+`).Draw(t, "base") + "." + ext
 		lang := rapid.StringMatching(`[a-z]{2}`).Draw(t, "lang")
 
-		path := SubtitlePath(video, lang, false, false)
+		path := SubtitlePath(video, lang, SubtitleTags{})
 
 		if !strings.HasSuffix(path, ".srt") {
 			t.Errorf("SubtitlePath() = %q, does not end with .srt", path)

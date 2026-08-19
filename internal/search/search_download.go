@@ -214,7 +214,7 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	if pp.StripHI && variant != api.VariantHI {
 		saveHI = false
 	}
-	subPath = api.SubtitlePath(videoPath, lang, saveHI, best.sub.Forced)
+	subPath = api.SubtitlePath(videoPath, lang, api.SubtitleTags{HearingImpaired: saveHI, Forced: best.sub.Forced})
 	return subPath, saveHI, processed
 }
 

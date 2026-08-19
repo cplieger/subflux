@@ -149,23 +149,45 @@ func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
+// PasswordCheck is one password to validate, with the two policy choices that
+// change what "valid" means.
+//
+// All four are named rather than positional because both pairs are silently
+// transposable: the two strings are free-form user input, and swapping them
+// validates the username as a password and admits any password containing the
+// real one; the two booleans are independent policy switches, and a reversed
+// CheckBreach disables the breach lookup on a path the operator believes is
+// checked while shortening the length floor on one that is not.
+type PasswordCheck struct {
+	// Password is the candidate password.
+	Password string
+	// Username is the account it belongs to, rejected as a substring.
+	Username string
+	// SoleFactor is true when the password is the account's only
+	// authentication factor, which raises the length floor.
+	SoleFactor bool
+	// CheckBreach is true when the password must also be looked up in the
+	// breach corpus.
+	CheckBreach bool
+}
+
 // ValidateAndHashPassword validates password length and context (rejecting
 // passwords that contain the username or app name), checks against breach
-// databases (if checkBreach is true), and returns the Argon2id hash.
-func ValidateAndHashPassword(ctx context.Context, password, username string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
+// databases (when check.CheckBreach is set), and returns the Argon2id hash.
+func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *http.Client) (hash, userMsg string, err error) {
 	validateLen := auth.ValidateMultiFactorPasswordLength
-	if passwordOnly {
+	if check.SoleFactor {
 		validateLen = auth.ValidateSoloPasswordLength
 	}
-	if errLen := validateLen(password); errLen != nil {
+	if errLen := validateLen(check.Password); errLen != nil {
 		return "", errLen.Error(), nil
 	}
-	pctx := auth.PasswordContext{Username: username, ForbiddenWords: []string{"subflux"}}
-	if errCtx := auth.ValidatePasswordContext(password, pctx); errCtx != nil {
+	pctx := auth.PasswordContext{Username: check.Username, ForbiddenWords: []string{"subflux"}}
+	if errCtx := auth.ValidatePasswordContext(check.Password, pctx); errCtx != nil {
 		return "", errCtx.Error(), nil
 	}
-	if checkBreach {
-		breached, errBreach := auth.CheckBreachedPassword(ctx, client, password)
+	if check.CheckBreach {
+		breached, errBreach := auth.CheckBreachedPassword(ctx, client, check.Password)
 		if errBreach != nil {
 			slog.Warn("breached password check error", "error", errBreach)
 		}
@@ -173,7 +195,7 @@ func ValidateAndHashPassword(ctx context.Context, password, username string, pas
 			return "", msgBreachedPassword, nil
 		}
 	}
-	h, err := auth.HashPassword(password)
+	h, err := auth.HashPassword(check.Password)
 	if err != nil {
 		return "", "", err
 	}

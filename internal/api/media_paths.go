@@ -15,17 +15,39 @@ import (
 // writerOutput view so the two cannot drift.
 const SubtitleExtSRT = ".srt"
 
+// SubtitleTags are the variant tags a subtitle filename carries next to its
+// language code (movie.fr.hi.srt, movie.fr.forced.srt).
+//
+// The two are named rather than positional because a filename can carry
+// either, both or neither, so no shape or count distinguishes them: a
+// transposed pair writes a forced subtitle to the hearing-impaired target's
+// filename, which the next scan reads back as coverage for a language variant
+// nothing downloaded, and the operator's own file listing is the only place
+// the swap is visible.
+type SubtitleTags struct {
+	// HearingImpaired tags the file as a hearing-impaired (SDH) subtitle.
+	HearingImpaired bool
+	// Forced tags the file as a forced (foreign-parts-only) subtitle.
+	Forced bool
+}
+
+// suffix renders the language code plus the tags a filename carries, in the
+// order parseExternalSubPath reads them back.
+func (t SubtitleTags) suffix(lang string) string {
+	s := lang
+	if t.HearingImpaired {
+		s += ".hi"
+	}
+	if t.Forced {
+		s += ".forced"
+	}
+	return s
+}
+
 // SubtitlePath computes the subtitle file path for a video.
-func SubtitlePath(videoPath, lang string, hi, forced bool) string {
+func SubtitlePath(videoPath, lang string, tags SubtitleTags) string {
 	base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
-	suffix := lang
-	if hi {
-		suffix += ".hi"
-	}
-	if forced {
-		suffix += ".forced"
-	}
-	return base + "." + suffix + SubtitleExtSRT
+	return base + "." + tags.suffix(lang) + SubtitleExtSRT
 }
 
 // ManualSubtitlePath computes a numbered manual subtitle path.
@@ -33,16 +55,9 @@ func SubtitlePath(videoPath, lang string, hi, forced bool) string {
 // or movie.fr.forced.1.srt when the user deliberately downloaded an HI or
 // forced variant. The variant tag appears before the number so
 // parseExternalSubPath continues to recognize it on the next scan.
-func ManualSubtitlePath(videoPath, lang string, n int, hi, forced bool) string {
+func ManualSubtitlePath(videoPath, lang string, n int, tags SubtitleTags) string {
 	base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
-	suffix := lang
-	if hi {
-		suffix += ".hi"
-	}
-	if forced {
-		suffix += ".forced"
-	}
-	return fmt.Sprintf("%s.%s.%d"+SubtitleExtSRT, base, suffix, n)
+	return fmt.Sprintf("%s.%s.%d"+SubtitleExtSRT, base, tags.suffix(lang), n)
 }
 
 // ManualOrdinal parses the manual sibling number out of a subtitle path

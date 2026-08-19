@@ -46,9 +46,21 @@ type Provider interface {
 // Only providers with show-level query support implement this (OpenSubtitles).
 type ShowSubtitleCounter interface {
 	// CountShowSubtitles returns the total number of subtitles available for
-	// a show in the given language. The request should have ImdbID set and
-	// Season/Episode set to 0.
-	CountShowSubtitles(ctx context.Context, imdbID, lang string) (int, error)
+	// the queried show in the queried language.
+	CountShowSubtitles(ctx context.Context, q ShowSubtitleQuery) (int, error)
+}
+
+// ShowSubtitleQuery names the two values a show-level count is taken over.
+// They are both free-form strings that no call site can tell apart by shape,
+// so they are named rather than positional: a transposed pair would query a
+// language as if it were a show and answer zero, which the caller reads as a
+// legitimate "this show has almost no subtitles" and acts on by skipping the
+// whole series.
+type ShowSubtitleQuery struct {
+	// ImdbID is the show's IMDb identifier ("tt0903747").
+	ImdbID string
+	// Language is the subtitle language, in subflux's internal code space.
+	Language string
 }
 
 // CacheClearer is an optional interface for providers that cache download

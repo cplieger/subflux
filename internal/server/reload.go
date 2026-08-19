@@ -12,6 +12,17 @@ import (
 	"github.com/cplieger/webhttp/v2"
 )
 
+// driftState projects the drift-relevant values out of a config, so the two
+// sides of a comparison are built by one function and cannot disagree on which
+// value goes where.
+func driftState(cfg api.ConfigProvider) api.DriftState {
+	return api.DriftState{
+		Languages:       cfg.LanguageCodes(),
+		Providers:       enabledProviders(cfg),
+		AdaptiveEnabled: cfg.Adaptive().Enabled,
+	}
+}
+
 // enabledProviders returns the sorted names of enabled providers in a config,
 // used by activation's drift detection.
 func enabledProviders(cfg interface {

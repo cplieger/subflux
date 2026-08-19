@@ -74,8 +74,8 @@ func TestWriterCoverage(t *testing.T) {
 	}
 	// The path builders must produce writer-covered extensions.
 	for _, p := range []string{
-		api.SubtitlePath("/media/movie.mkv", "fr", false, false),
-		api.ManualSubtitlePath("/media/movie.mkv", "fr", 2, false, true),
+		api.SubtitlePath("/media/movie.mkv", "fr", api.SubtitleTags{}),
+		api.ManualSubtitlePath("/media/movie.mkv", "fr", 2, api.SubtitleTags{Forced: true}),
 	} {
 		if !subtitleext.WriterOutput(p) {
 			t.Errorf("writer-produced path %s not covered by writerOutput view", p)

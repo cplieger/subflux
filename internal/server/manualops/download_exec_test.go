@@ -379,8 +379,8 @@ func TestRunDownload_sequentialTopPicks_getDistinctOrdinals(t *testing.T) {
 		}
 	}
 
-	first := api.ManualSubtitlePath(videoPath, "en", 1, false, false)
-	second := api.ManualSubtitlePath(videoPath, "en", 2, false, false)
+	first := api.ManualSubtitlePath(videoPath, "en", 1, api.SubtitleTags{})
+	second := api.ManualSubtitlePath(videoPath, "en", 2, api.SubtitleTags{})
 	if got := readFileT(t, first); !strings.Contains(got, "Payload 1") {
 		t.Errorf("%s content = %q, want the FIRST download's payload intact", first, got)
 	}
@@ -416,8 +416,8 @@ func TestRunDownload_topPickThenManual_continuesSequence(t *testing.T) {
 		t.Fatal("RunDownload(manual) = false, want success")
 	}
 
-	first := api.ManualSubtitlePath(videoPath, "en", 1, false, false)
-	second := api.ManualSubtitlePath(videoPath, "en", 2, false, false)
+	first := api.ManualSubtitlePath(videoPath, "en", 1, api.SubtitleTags{})
+	second := api.ManualSubtitlePath(videoPath, "en", 2, api.SubtitleTags{})
 	if got := readFileT(t, first); !strings.Contains(got, "Payload 1") {
 		t.Errorf("%s content = %q, want the top pick's payload intact", first, got)
 	}
@@ -496,8 +496,8 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 	if !ordinals[1] || !ordinals[2] {
 		t.Fatalf("allocated ordinals = %v, want {1, 2} (no reuse)", ordinals)
 	}
-	c1 := readFileT(t, api.ManualSubtitlePath(videoPath, "en", 1, false, false))
-	c2 := readFileT(t, api.ManualSubtitlePath(videoPath, "en", 2, false, false))
+	c1 := readFileT(t, api.ManualSubtitlePath(videoPath, "en", 1, api.SubtitleTags{}))
+	c2 := readFileT(t, api.ManualSubtitlePath(videoPath, "en", 2, api.SubtitleTags{}))
 	if c1 == c2 {
 		t.Errorf("both ordinal files hold identical content %q; one download overwrote the other", c1)
 	}
