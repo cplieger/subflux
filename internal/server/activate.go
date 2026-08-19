@@ -344,11 +344,10 @@ func (s *Server) awaitWorkerLaunch(ctx context.Context) {
 // to Start. Reconcile is a scheduler-internal stage, not a worker.
 func (s *Server) launchWorkerSet(ctx context.Context) {
 	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics"})
-	s.bgWg.Add(4)
-	go func() { defer s.bgWg.Done(); s.runScheduler(ctx) }()
-	go func() { defer s.bgWg.Done(); s.runPoller(ctx) }()
-	go func() { defer s.bgWg.Done(); s.runBackup(ctx) }()
-	go func() { defer s.bgWg.Done(); s.runStoreMetrics(ctx) }()
+	s.bgWg.Go(func() { s.runScheduler(ctx) })
+	s.bgWg.Go(func() { s.runPoller(ctx) })
+	s.bgWg.Go(func() { s.runBackup(ctx) })
+	s.bgWg.Go(func() { s.runStoreMetrics(ctx) })
 }
 
 // --- OIDC lazy slot ---

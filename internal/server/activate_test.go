@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -714,3 +715,38 @@ type sessionTimeoutSetter interface {
 }
 
 var _ sessionTimeoutSetter = (*authstore.Store)(nil)
+
+// Mechanical pin for the background-goroutine house form. Every long-lived
+// goroutine this package starts registers with s.bgWg.Go, which cannot leak a
+// counter the way a bare Add(n) plus n deferred Done() calls can: a launch that
+// returns early, panics before its defer is installed, or gains an n+1th
+// goroutine without its Add being updated leaves serveAndWait's drain either
+// short or hung. `modernize` does not report the shape, so only a source scan
+// holds it.
+//
+// Scoped to this package's own files on purpose: the Add/Done pair is the
+// deliberate shape of the BGTracker interface the scanning and manualops
+// subpackages consume, which is &s.bgWg reached through two methods rather than
+// a closure.
+func TestBackgroundGoroutines_useBgWgGo(t *testing.T) {
+	t.Parallel()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read package dir: %v", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, readErr := os.ReadFile(name)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", name, readErr)
+		}
+		for _, form := range []string{"bgWg.Add(", "bgWg.Done()"} {
+			if strings.Contains(string(src), form) {
+				t.Errorf("%s uses %s; background goroutines register with bgWg.Go", name, form)
+			}
+		}
+	}
+}

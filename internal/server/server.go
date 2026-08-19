@@ -376,6 +376,17 @@ func (s *Server) getOIDC() *authoidc.Provider {
 	return slot.get(s.lifetime)
 }
 
+// GoBackground runs fn on the server's background goroutine set — the one set
+// serveAndWait drains, on a bounded budget, after HTTP shutdown completes. The
+// composition root uses it for the process-lifetime goroutines it owns rather
+// than the server (the admin bootstrap socket), so a goroutine started outside
+// this package still has an observable completion.
+//
+// Registration must happen before shutdown begins; the set is only waited on
+// after the request context is cancelled, so an fn that serves until ctx ends
+// is joined rather than abandoned.
+func (s *Server) GoBackground(fn func()) { s.bgWg.Go(fn) }
+
 // state returns the current live state snapshot.
 func (s *Server) state() *liveState { return s.live.Load() }
 

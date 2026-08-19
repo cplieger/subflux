@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -243,7 +244,7 @@ func runServer() int {
 			return 1
 		}
 
-		startAdminSocket(ctx, srv)
+		startAdminSocket(ctx, srv, config.AdminSocketDir, config.AdminSocketPath)
 
 		serveAndWait(ctx, cancel, m, func() {
 			srv.StartUnconfigured(ctx, func() { m.Set(true) })
@@ -306,7 +307,7 @@ func runConfiguredServer(cfg *config.Config) int {
 		return 1
 	}
 
-	startAdminSocket(ctx, srv)
+	startAdminSocket(ctx, srv, config.AdminSocketDir, config.AdminSocketPath)
 
 	serveAndWait(ctx, cancel, m, func() {
 		srv.Start(ctx, func() { m.Set(true) })
@@ -316,34 +317,50 @@ func runConfiguredServer(cfg *config.Config) int {
 
 // --- Admin socket (Unix-domain bootstrap plane) ---
 
-// startAdminSocket binds the admin bootstrap plane: srv.AdminHandler() served
-// on a Unix domain socket inside the private 0700 directory
-// config.AdminSocketDir. The directory is the custody boundary (only
-// same-container processes running as the server's UID can traverse it); the
-// 0600 chmod on the socket file is cosmetic hardening on top.
+// adminSocketHost is what the bootstrap plane needs from the server: the
+// handler to serve, the alert channel for the degraded path, and the background
+// goroutine set whose drain must include this listener's graceful shutdown.
+// Declared here because this file is the only consumer.
+type adminSocketHost interface {
+	AdminHandler() http.Handler
+	RecordPersistentAlert(source, msg string)
+	GoBackground(fn func())
+}
+
+// startAdminSocket binds the admin bootstrap plane: host.AdminHandler() served
+// on a Unix domain socket inside the private 0700 directory dir. The directory
+// is the custody boundary (only same-container processes running as the
+// server's UID can traverse it); the 0600 chmod on the socket file is cosmetic
+// hardening on top. dir and path are parameters, not the config constants, for
+// the same reason adminSocketListener takes them.
 //
 // Failure is DEGRADED, not fatal (R1.4): recovery via docker exec needs a
 // running server anyway, and a fatal would turn a mount misconfig into a
 // crash loop. On any setup error the failure is logged at ERROR, recorded as
 // a persistent operator alert, and TCP serving continues without the
 // bootstrap plane.
-func startAdminSocket(ctx context.Context, srv *server.Server) {
-	ln, err := adminSocketListener(ctx, config.AdminSocketDir, config.AdminSocketPath)
+func startAdminSocket(ctx context.Context, host adminSocketHost, dir, path string) {
+	ln, err := adminSocketListener(ctx, dir, path)
 	if err != nil {
 		slog.Error("admin socket unavailable; bootstrap commands will fail",
-			"path", config.AdminSocketPath, "error", err)
-		srv.RecordPersistentAlert("admin-socket",
-			"Admin bootstrap socket unavailable at "+config.AdminSocketPath+": "+err.Error()+
+			"path", path, "error", err)
+		host.RecordPersistentAlert("admin-socket",
+			"Admin bootstrap socket unavailable at "+path+": "+err.Error()+
 				". reset-password / generate-api-key will not work until this is fixed.")
 		return
 	}
 
-	adminSrv := webhttp.NewServer(srv.AdminHandler(),
+	adminSrv := webhttp.NewServer(host.AdminHandler(),
 		webhttp.WithReadTimeout(10*time.Second),
 		webhttp.WithWriteTimeout(60*time.Second),
 		webhttp.WithReadHeaderTimeout(10*time.Second),
 	)
-	go func() {
+	// On the server's background set like every other long-lived goroutine, so
+	// its drain report cannot claim every goroutine stopped while this one is
+	// still serving. The join is deadlock-free only because that set is awaited
+	// AFTER ctx cancellation: this Run serves until ctx ends, so a wait placed
+	// any earlier would block for the whole process lifetime.
+	host.GoBackground(func() {
 		// Shutdown rides the same signal context as the TCP server.
 		if err := webhttp.Run(ctx, adminSrv, ln, nil); err != nil {
 			slog.Error("admin socket server error", "error", err)
@@ -351,11 +368,11 @@ func startAdminSocket(ctx context.Context, srv *server.Server) {
 		// Crash-path belt only: closing a net-created unix listener already
 		// unlinks the socket file; this covers exit paths where Close did
 		// not run to completion.
-		if err := os.Remove(config.AdminSocketPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			slog.Debug("admin socket cleanup", "error", err)
 		}
-	}()
-	slog.Info("admin socket listening", "path", config.AdminSocketPath)
+	})
+	slog.Info("admin socket listening", "path", path)
 }
 
 // adminSocketListener prepares the custody directory and binds the Unix
@@ -460,7 +477,12 @@ func ensureConfigFile(path string, def []byte) error {
 		slog.Error("failed to create config dir", "path", filepath.Dir(path), "error", err)
 		return err
 	}
-	if err := os.WriteFile(path, def, 0o600); err != nil {
+	// Atomic like the two other writers of this same file (cli.go's
+	// doEnablePasswordLogin, confighandlers' atomicWriteConfig): the os.Stat
+	// guard above means a torn config.yaml exists and is therefore never
+	// rewritten, so a non-durable write here is permanent damage.
+	if _, err := atomicfile.WriteFile(context.Background(), path, def,
+		atomicfile.WithMode(0o600)); err != nil {
 		slog.Error("failed to write default config", "path", path, "error", err)
 		return err
 	}

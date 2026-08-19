@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -241,5 +245,97 @@ func TestEnsureAdminSocketDir_verifiesTheModeItCreated(t *testing.T) {
 	if got := fi.Mode(); got != os.ModeDir|0o700 {
 		t.Fatalf("created dir mode = %v, want %v: the mode it created was not verified",
 			got, os.ModeDir|0o700)
+	}
+}
+
+// fakeAdminHost stands in for *server.Server: it exposes the same three-method
+// surface startAdminSocket consumes, and its GoBackground mirrors the server's
+// background WaitGroup so a test can join what the composition root registered.
+// finished flips only inside the wrapper, so a goroutine started outside
+// GoBackground can never set it.
+type fakeAdminHost struct {
+	wg       sync.WaitGroup
+	finished atomic.Bool
+	alerts   atomic.Int32
+}
+
+func (f *fakeAdminHost) AdminHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+func (f *fakeAdminHost) RecordPersistentAlert(string, string) { f.alerts.Add(1) }
+
+func (f *fakeAdminHost) GoBackground(fn func()) {
+	f.wg.Go(func() {
+		fn()
+		f.finished.Store(true)
+	})
+}
+
+// TestStartAdminSocket_joinsItsServerOnTheBackgroundSet pins the observable
+// completion: the admin plane's graceful drain runs on the server's background
+// goroutine set, so the drain report that set gates cannot be emitted while the
+// socket is still serving. A goroutine nothing holds satisfies the round-trip
+// assertions below and leaves finished false, because only the GoBackground
+// wrapper sets it.
+//
+// It also pins the ordering the join depends on: the wait is entered only after
+// the context is cancelled. webhttp.Run serves until then, so a wait taken any
+// earlier would block for the whole process lifetime.
+func TestStartAdminSocket_joinsItsServerOnTheBackgroundSet(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join(t.TempDir(), "subflux-admin")
+	sock := filepath.Join(dir, "admin.sock")
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+
+	host := &fakeAdminHost{}
+	startAdminSocket(ctx, host, dir, sock)
+
+	if got := host.alerts.Load(); got != 0 {
+		t.Fatalf("persistent alerts = %d, want 0: setup should have succeeded", got)
+	}
+
+	// Prove it is really serving before shutdown, so the join below is joining
+	// a live server rather than an already-dead goroutine.
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", sock)
+			},
+		},
+	}
+	resp, err := client.Get("http://admin.sock/ping")
+	if err != nil {
+		t.Fatalf("round-trip over admin socket: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", resp.StatusCode)
+	}
+	if host.finished.Load() {
+		t.Fatal("background goroutine already finished while the socket was serving")
+	}
+
+	cancel()
+
+	joined := make(chan struct{})
+	go func() { host.wg.Wait(); close(joined) }()
+	select {
+	case <-joined:
+	case <-time.After(30 * time.Second):
+		t.Fatal("background set did not drain within 30s after cancellation")
+	}
+
+	if !host.finished.Load() {
+		t.Error("background set drained without the admin socket's shutdown: " +
+			"its goroutine is not registered on the server's WaitGroup")
+	}
+	if _, err := os.Lstat(sock); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("socket file still present after the join (lstat err = %v); "+
+			"the drain and its cleanup must complete before the wait returns", err)
 	}
 }
