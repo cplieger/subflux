@@ -197,7 +197,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	user := &auth.User{
 		Username:     req.Username,
-		PasswordHash: hash,
+		PasswordHash: string(hash),
 		Role:         auth.RoleAdmin,
 		Enabled:      true,
 		CreatedAt:    now,

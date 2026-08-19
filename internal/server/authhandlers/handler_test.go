@@ -3,7 +3,11 @@ package authhandlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/cplieger/auth/v4"
 )
 
 func TestExtractPathSegment(t *testing.T) {
@@ -86,6 +90,92 @@ func TestParseIDFromPath_rejects(t *testing.T) {
 			}
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("parseIDFromPath(%q) status = %d, want %d", tc.path, rec.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
+// TestValidateAndHashPasswordResultsStayDistinctlyTyped pins the type
+// separation, not a value: every call site writes the second result into a 400
+// response body and the first into auth.User.PasswordHash, so if the two ever
+// share a type again a transposed assignment compiles and each successful
+// validation returns the Argon2id hash to the client.
+func TestValidateAndHashPasswordResultsStayDistinctlyTyped(t *testing.T) {
+	t.Parallel()
+	hash, userMsg, err := ValidateAndHashPassword(t.Context(), PasswordCheck{
+		Password: "correct-horse-battery-staple",
+		Username: "alice",
+	}, nil)
+	if err != nil {
+		t.Fatalf("ValidateAndHashPassword() err = %v, want nil", err)
+	}
+	if reflect.TypeOf(hash) == reflect.TypeOf(userMsg) {
+		t.Errorf("hash and userMsg both have type %s; a transposed assignment would compile and write the hash into a 400 body",
+			reflect.TypeOf(hash))
+	}
+}
+
+func TestValidateAndHashPassword(t *testing.T) {
+	t.Parallel()
+	const (
+		username = "alice"
+		password = "correct-horse-battery-staple"
+	)
+	tests := []struct {
+		name     string
+		check    PasswordCheck
+		wantMsg  string // substring; "" means accepted
+		wantHash bool
+	}{
+		{
+			name:     "accepted",
+			check:    PasswordCheck{Password: password, Username: username},
+			wantHash: true,
+		},
+		{
+			name:    "too_short",
+			check:   PasswordCheck{Password: "short", Username: username},
+			wantMsg: "characters",
+		},
+		{
+			name:    "contains_username",
+			check:   PasswordCheck{Password: "alice-in-wonderland-and-beyond", Username: username},
+			wantMsg: "username",
+		},
+		{
+			name:    "contains_app_name",
+			check:   PasswordCheck{Password: "my-subflux-password-here", Username: username},
+			wantMsg: "forbidden word",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			hash, userMsg, err := ValidateAndHashPassword(t.Context(), tc.check, nil)
+			if err != nil {
+				t.Fatalf("ValidateAndHashPassword() err = %v, want nil", err)
+			}
+			if tc.wantMsg == "" {
+				if userMsg != "" {
+					t.Errorf("userMsg = %q, want empty", userMsg)
+				}
+			} else if !strings.Contains(userMsg, tc.wantMsg) {
+				t.Errorf("userMsg = %q, want it to mention %q", userMsg, tc.wantMsg)
+			}
+			if !tc.wantHash {
+				if hash != "" {
+					t.Errorf("hash = %q, want empty on rejection", hash)
+				}
+				return
+			}
+			// The accepted result must be the hash of the password, not the
+			// message: this is the assertion a transposition breaks.
+			ok, verifyErr := auth.VerifyPassword(tc.check.Password, string(hash))
+			if verifyErr != nil {
+				t.Fatalf("VerifyPassword(%q) err = %v", hash, verifyErr)
+			}
+			if !ok {
+				t.Errorf("VerifyPassword(password, hash) = false; hash result %q does not hash the password", hash)
 			}
 		})
 	}

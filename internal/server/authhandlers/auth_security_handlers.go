@@ -72,7 +72,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.PasswordHash = hash
+	user.PasswordHash = string(hash)
 	user.UpdatedAt = time.Now()
 	if err := h.SecDB.UpdateUser(ctx, user); err != nil {
 		slog.Error("password change: update user", "error", err)

@@ -178,10 +178,19 @@ type PasswordCheck struct {
 	CheckBreach bool
 }
 
+// PasswordHash is an Argon2id password hash. It is a distinct type so it
+// cannot be transposed with ValidateAndHashPassword's other string result, the
+// user-facing rejection message every call site writes into a 400 body: as two
+// plain strings a swapped assignment compiles and publishes the hash to the
+// client. Convert to string only at the auth.User boundary.
+type PasswordHash string
+
 // ValidateAndHashPassword validates password length and context (rejecting
 // passwords that contain the username or app name), checks against breach
 // databases (when check.CheckBreach is set), and returns the Argon2id hash.
-func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *http.Client) (hash, userMsg string, err error) {
+// A non-empty userMsg means the password was rejected on policy grounds and is
+// safe to show the caller; hash is empty in that case.
+func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *http.Client) (hash PasswordHash, userMsg string, err error) {
 	validateLen := auth.ValidateMultiFactorPasswordLength
 	if check.SoleFactor {
 		validateLen = auth.ValidateSoloPasswordLength
@@ -206,7 +215,7 @@ func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *h
 	if err != nil {
 		return "", "", err
 	}
-	return h, "", nil
+	return PasswordHash(h), "", nil
 }
 
 // requireWebAuthn resolves the current WebAuthn instance from the live

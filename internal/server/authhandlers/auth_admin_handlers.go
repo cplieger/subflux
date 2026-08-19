@@ -93,7 +93,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	newUser := &auth.User{
 		Username:     req.Username,
 		Email:        req.Email,
-		PasswordHash: hash,
+		PasswordHash: string(hash),
 		Role:         req.Role,
 		Enabled:      true,
 		CreatedAt:    now,
