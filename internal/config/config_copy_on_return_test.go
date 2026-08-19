@@ -145,3 +145,27 @@ func TestResolveTargetsCopiesOnReturn(t *testing.T) {
 		t.Errorf("default target variant = %q, want %q", afterDef[0].Variants[0], "hi")
 	}
 }
+
+// The exclude-tag list is the only reference-typed field in SearchConfig, and
+// the scan loop resolves it to arr tag IDs on every pass, so a caller that
+// sorts or rewrites the returned slice in place would be rewriting what every
+// later scan excludes. []string needs exactly one level of copy: a string is an
+// immutable value, so the clone shares nothing further.
+func TestSearchExcludeArrTagsCopiesOnReturn(t *testing.T) {
+	t.Parallel()
+
+	cfg := loadedConfig(t)
+	cfg.SearchCfg.ExcludeArrTags = []string{"no-subflux", "skip-me"}
+
+	got := cfg.Search().ExcludeArrTags
+	if len(got) != 2 {
+		t.Fatalf("Search().ExcludeArrTags len = %d, want 2", len(got))
+	}
+	got[0] = "tampered"
+	got[1] = ""
+
+	after := cfg.Search().ExcludeArrTags
+	if !slices.Equal(after, []string{"no-subflux", "skip-me"}) {
+		t.Errorf("Search().ExcludeArrTags = %v, want [no-subflux skip-me] (caller overwrote the live config)", after)
+	}
+}

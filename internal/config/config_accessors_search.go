@@ -2,6 +2,7 @@ package config
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -18,6 +19,12 @@ func (c *Config) Adaptive() subflux.AdaptiveConfig {
 }
 
 // Search returns the search config.
+//
+// ExcludeArrTags is cloned: it is the only reference-typed field in the struct,
+// and the scan loop reads it every pass, so a caller sorting or rewriting the
+// returned slice in place would be editing the live config. []string needs
+// exactly one level of copy — a string is an immutable value, so the clone
+// shares nothing a caller can reach.
 func (c *Config) Search() subflux.SearchConfig {
 	return subflux.SearchConfig{
 		ScanInterval:           c.SearchCfg.ScanInterval.D,
@@ -26,7 +33,7 @@ func (c *Config) Search() subflux.SearchConfig {
 		MinScore:               c.SearchCfg.MinScore,
 		UpgradeEnabled:         c.SearchCfg.UpgradeEnabled,
 		UpgradeWindowDays:      c.SearchCfg.UpgradeWindowDays,
-		ExcludeArrTags:         c.SearchCfg.ExcludeArrTags,
+		ExcludeArrTags:         slices.Clone(c.SearchCfg.ExcludeArrTags),
 		DownloadMaxAttempts:    c.SearchCfg.DownloadMaxAttempts,
 		MaxProviderConcurrency: c.SearchCfg.MaxProviderConcurrency,
 		MaxSSEClients:          c.SearchCfg.MaxSSEClients,
