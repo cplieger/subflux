@@ -122,7 +122,7 @@ func existingToSubtitleFiles(existing existingSubs) []api.SubtitleFile {
 	out := make([]api.SubtitleFile, 0,
 		len(existing.Embedded)+len(existing.External))
 	for _, emb := range existing.Embedded {
-		k := embKey{emb.Lang, api.VariantFromFlags(emb.HI, emb.Forced), emb.Codec}
+		k := embKey{emb.Lang, api.VariantFromFlags(api.SubtitleTags{HearingImpaired: emb.HI, Forced: emb.Forced}), emb.Codec}
 		if seenEmb[k] {
 			continue
 		}
@@ -137,7 +137,7 @@ func existingToSubtitleFiles(existing existingSubs) []api.SubtitleFile {
 	for _, ext := range existing.External {
 		out = append(out, api.SubtitleFile{
 			Language: ext.Lang,
-			Variant:  api.VariantFromFlags(ext.HI, ext.Forced),
+			Variant:  api.VariantFromFlags(api.SubtitleTags{HearingImpaired: ext.HI, Forced: ext.Forced}),
 			Source:   sourceExternal,
 			Path:     ext.Path,
 		})

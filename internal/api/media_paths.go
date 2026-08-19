@@ -18,13 +18,20 @@ const SubtitleExtSRT = ".srt"
 // SubtitleTags are the variant tags a subtitle filename carries next to its
 // language code (movie.fr.hi.srt, movie.fr.forced.srt).
 //
-// The two are named rather than positional because a filename can carry
-// either, both or neither, so no shape or count distinguishes them: a
+// The fields are named rather than positional because a filename can carry
+// either variant, both or neither, so no shape or count distinguishes them: a
 // transposed pair writes a forced subtitle to the hearing-impaired target's
 // filename, which the next scan reads back as coverage for a language variant
 // nothing downloaded, and the operator's own file listing is the only place
 // the swap is visible.
+//
+// Lang lives here rather than beside videoPath on the constructors, for the
+// same reason. It renders as part of this segment — suffix() always took it —
+// and as a second positional string it was transposable with videoPath, which
+// is the hazard this type exists to remove. Only the video path is positional.
 type SubtitleTags struct {
+	// Lang is the subtitle's language code, the segment's first element.
+	Lang string
 	// HearingImpaired tags the file as a hearing-impaired (SDH) subtitle.
 	HearingImpaired bool
 	// Forced tags the file as a forced (foreign-parts-only) subtitle.
@@ -33,8 +40,8 @@ type SubtitleTags struct {
 
 // suffix renders the language code plus the tags a filename carries, in the
 // order parseExternalSubPath reads them back.
-func (t SubtitleTags) suffix(lang string) string {
-	s := lang
+func (t SubtitleTags) suffix() string {
+	s := t.Lang
 	if t.HearingImpaired {
 		s += ".hi"
 	}
@@ -45,9 +52,9 @@ func (t SubtitleTags) suffix(lang string) string {
 }
 
 // SubtitlePath computes the subtitle file path for a video.
-func SubtitlePath(videoPath, lang string, tags SubtitleTags) string {
+func SubtitlePath(videoPath string, tags SubtitleTags) string {
 	base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
-	return base + "." + tags.suffix(lang) + SubtitleExtSRT
+	return base + "." + tags.suffix() + SubtitleExtSRT
 }
 
 // ManualSubtitlePath computes a numbered manual subtitle path.
@@ -55,9 +62,9 @@ func SubtitlePath(videoPath, lang string, tags SubtitleTags) string {
 // or movie.fr.forced.1.srt when the user deliberately downloaded an HI or
 // forced variant. The variant tag appears before the number so
 // parseExternalSubPath continues to recognize it on the next scan.
-func ManualSubtitlePath(videoPath, lang string, n int, tags SubtitleTags) string {
+func ManualSubtitlePath(videoPath string, n int, tags SubtitleTags) string {
 	base := strings.TrimSuffix(videoPath, filepath.Ext(videoPath))
-	return fmt.Sprintf("%s.%s.%d"+SubtitleExtSRT, base, tags.suffix(lang), n)
+	return fmt.Sprintf("%s.%s.%d"+SubtitleExtSRT, base, tags.suffix(), n)
 }
 
 // ManualOrdinal parses the manual sibling number out of a subtitle path

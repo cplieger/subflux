@@ -44,9 +44,21 @@ var (
 	_ api.RadarrClient = (*Radarr)(nil)
 )
 
+// APIKey is arrapi's credential type, re-exported so callers convert with
+// arrsvc.APIKey(...) instead of importing arrapi for one cast. An alias, not a
+// new type: it IS the library's type, and a second distinct one would add a
+// conversion without adding a guarantee.
+type APIKey = arrapi.APIKey
+
 // NewSonarr builds a Sonarr service for the given base URL and API key.
-func NewSonarr(baseURL, apiKey string) (*Sonarr, error) {
-	c, err := arrapi.NewSonarr(baseURL, arrapi.APIKey(apiKey),
+//
+// The key is typed rather than a second string: the two were adjacent and both
+// strings, so a transposed pair compiled and dialled the API key as a URL,
+// putting the credential in the connection error. The conversion to arrapi's
+// type used to happen INSIDE this function — one level past the boundary a
+// caller can actually get wrong.
+func NewSonarr(baseURL string, apiKey APIKey) (*Sonarr, error) {
+	c, err := arrapi.NewSonarr(baseURL, apiKey,
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err
@@ -54,9 +66,10 @@ func NewSonarr(baseURL, apiKey string) (*Sonarr, error) {
 	return &Sonarr{Sonarr: c}, nil
 }
 
-// NewRadarr builds a Radarr service for the given base URL and API key.
-func NewRadarr(baseURL, apiKey string) (*Radarr, error) {
-	c, err := arrapi.NewRadarr(baseURL, arrapi.APIKey(apiKey),
+// NewRadarr builds a Radarr service for the given base URL and API key. The key
+// is typed for the same reason [NewSonarr]'s is.
+func NewRadarr(baseURL string, apiKey APIKey) (*Radarr, error) {
+	c, err := arrapi.NewRadarr(baseURL, apiKey,
 		arrapi.WithMaxAttempts(maxAttempts), arrapi.WithBaseDelay(baseDelay))
 	if err != nil {
 		return nil, err

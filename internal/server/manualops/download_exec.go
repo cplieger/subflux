@@ -39,8 +39,11 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if err != nil {
 		slog.Error("manual download failed",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		NotifyError(deps, "manual", "Download failed from "+string(req.Provider),
-			"Download failed from "+string(req.Provider))
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  "Download failed from " + string(req.Provider),
+			UI:     "Download failed from " + string(req.Provider),
+		})
 		return false
 	}
 
@@ -48,15 +51,17 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if err := api.ValidateSubtitleData(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		NotifyError(deps, "manual",
-			fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider),
-			"Downloaded file is not a valid subtitle")
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider),
+			UI:     "Downloaded file is not a valid subtitle",
+		})
 		return false
 	}
 
 	// Sync timing against existing reference subtitle. The video path was
 	// resolved server-side from the MediaRef by the handler (S7).
-	variant := api.VariantFromFlags(req.HearingImp, req.Forced)
+	variant := api.VariantFromFlags(api.SubtitleTags{HearingImpaired: req.HearingImp, Forced: req.Forced})
 	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
 
 	// Resolve media IDs for coverage tracking and history recording.
@@ -122,8 +127,8 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		MediaType: req.MediaType, MediaID: historyMediaID,
 		Language: req.Language, Variant: variant,
 	})
-	subPath = api.ManualSubtitlePath(req.VideoPath(), req.Language, n,
-		api.SubtitleTags{HearingImpaired: req.HearingImp, Forced: req.Forced})
+	subPath = api.ManualSubtitlePath(req.VideoPath(), n,
+		api.SubtitleTags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
 	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles
@@ -133,8 +138,11 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	if _, err := atomicfile.WriteFile(ctx, subPath, data,
 		atomicfile.WithMaxBytes(httputil.MaxDownloadBytes)); err != nil {
 		slog.Error("manual download: write failed", "path", subPath, "error", err)
-		NotifyError(deps, "manual", "Write failed for manual subtitle download",
-			"Write failed for subtitle download")
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  "Write failed for manual subtitle download",
+			UI:     "Write failed for subtitle download",
+		})
 		return "", false
 	}
 
@@ -162,7 +170,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		Meta:         meta,
 	}); err != nil {
 		slog.Warn("failed to record manual download", "error", err)
-		deps.Alerts.RecordWarn("manual", "Download saved but history recording failed")
+		deps.Alerts.RecordWarn(alertSourceManual, "Download saved but history recording failed")
 	}
 	return subPath, true
 }

@@ -138,8 +138,32 @@ func IsValidLangCode(lang string) bool {
 	return !strings.ContainsFunc(lang, func(r rune) bool { return r < 0x20 })
 }
 
+// alertSourceManual attributes an alert to the manual-download path. One
+// constant because ErrorNotice made the four occurrences visible as the one
+// value they always were.
+const alertSourceManual = "manual"
+
+// ErrorNotice is one error's two audiences: the operator reading the alert log
+// and the user watching the UI.
+//
+// Named rather than positional because Alert and UI are both human-readable
+// text of the same type, so a transposition compiles and reads plausibly at the
+// call site while putting the internal diagnosis in front of the user and the
+// user-facing summary in the operator's alert log. Two of the three call sites
+// pass DIFFERENT strings for the two, which is exactly where such a swap leaves
+// no trace — the one that passes the same string twice would not even change
+// behaviour, so the reviewer gets no signal from the sites either.
+type ErrorNotice struct {
+	// Source attributes the alert to a subsystem.
+	Source string
+	// Alert is the operator-facing text; it lands in the alert log.
+	Alert string
+	// UI is the user-facing text; it lands on the notify bus.
+	UI string
+}
+
 // NotifyError publishes an error notification and records an alert.
-func NotifyError(deps *SearchDeps, source, alertMsg, uiMsg string) {
-	deps.Alerts.RecordWarn(source, alertMsg)
-	deps.Events.PublishNotify(events.NotifyError, uiMsg)
+func NotifyError(deps *SearchDeps, n ErrorNotice) {
+	deps.Alerts.RecordWarn(n.Source, n.Alert)
+	deps.Events.PublishNotify(events.NotifyError, n.UI)
 }

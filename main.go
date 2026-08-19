@@ -481,7 +481,7 @@ func serverOptions(reg api.ProviderRegistry, syncExec syncing.SyncExec) []server
 // the server for hot reload and config-save connectivity checks.
 func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
 	return func(baseURL, apiKey string) (api.SonarrClient, error) {
-		c, err := arrsvc.NewSonarr(baseURL, apiKey)
+		c, err := arrsvc.NewSonarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err
 		}
@@ -492,7 +492,7 @@ func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
 // newRadarrFactory returns a function that creates Radarr API clients.
 func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
 	return func(baseURL, apiKey string) (api.RadarrClient, error) {
-		c, err := arrsvc.NewRadarr(baseURL, apiKey)
+		c, err := arrsvc.NewRadarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err
 		}

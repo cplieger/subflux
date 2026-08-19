@@ -142,7 +142,7 @@ func (e *Engine) persistDownload(ctx context.Context, req *api.SearchRequest,
 	best *scoredSub, subPath, videoPath string, mediaType api.MediaType, mediaID, lang string,
 	syncOffsetMs int64, saveHI bool,
 ) {
-	saveVariant := api.VariantFromFlags(saveHI, best.sub.Forced)
+	saveVariant := api.VariantFromFlags(api.SubtitleTags{HearingImpaired: saveHI, Forced: best.sub.Forced})
 	if err := e.store.UpsertSubtitleFile(ctx, mediaType, mediaID, &api.SubtitleFile{
 		Language: lang,
 		Variant:  saveVariant,
@@ -214,7 +214,7 @@ func (e *Engine) postProcessSub(data []byte, best *scoredSub,
 	if pp.StripHI && variant != api.VariantHI {
 		saveHI = false
 	}
-	subPath = api.SubtitlePath(videoPath, lang, api.SubtitleTags{HearingImpaired: saveHI, Forced: best.sub.Forced})
+	subPath = api.SubtitlePath(videoPath, api.SubtitleTags{Lang: lang, HearingImpaired: saveHI, Forced: best.sub.Forced})
 	return subPath, saveHI, processed
 }
 

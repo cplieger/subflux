@@ -108,9 +108,9 @@ func TestVariantFromFlags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := VariantFromFlags(tt.hi, tt.forced)
+			got := VariantFromFlags(SubtitleTags{HearingImpaired: tt.hi, Forced: tt.forced})
 			if got != tt.want {
-				t.Errorf("VariantFromFlags(%v, %v) = %q, want %q",
+				t.Errorf("VariantFromFlags(SubtitleTags{HearingImpaired: %v, Forced: %v}) = %q, want %q",
 					tt.hi, tt.forced, got, tt.want)
 			}
 		})
