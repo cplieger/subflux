@@ -64,10 +64,6 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	s := &Server{
 		authDeps: authDeps{
 			authStore:     authDB,
-			adminDB:       authDB,
-			secDB:         authDB,
-			oidcDB:        authDB,
-			rateLimiter:   rl,
 			authenticator: authn,
 			ceremonies:    authhandlers.NewCeremonyStore(),
 		},

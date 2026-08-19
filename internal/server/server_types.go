@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
@@ -57,11 +56,7 @@ type storeFacade struct {
 // resolved per request, so a hot config edit takes effect without a restart.
 type authDeps struct {
 	authStore     AuthStore
-	adminDB       authhandlers.AuthAdminStore
-	secDB         authhandlers.SecurityStore
-	oidcDB        authhandlers.OIDCStore
 	authenticator sessionAuthenticator
-	rateLimiter   ratelimit.Checker
 	ceremonies    *authhandlers.CeremonyStore
 	authH         *authhandlers.Handler
 }

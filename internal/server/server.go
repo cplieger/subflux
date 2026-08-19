@@ -186,10 +186,6 @@ type AuthStore interface {
 // library's construction validation (a programming error, not runtime state).
 func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 	s.authStore = store
-	s.adminDB = store
-	s.secDB = store
-	s.oidcDB = store
-	s.rateLimiter = rl
 
 	// The library authenticator on its default verifier chain (session cookie,
 	// then API key), configured with subflux's three policies: the per-request

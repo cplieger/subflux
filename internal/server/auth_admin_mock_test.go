@@ -32,9 +32,6 @@ func testAdminServer(t *testing.T) *Server {
 	s := &Server{
 		authDeps: authDeps{
 			authStore:  authDB,
-			adminDB:    authDB,
-			secDB:      authDB,
-			oidcDB:     authDB,
 			ceremonies: authhandlers.NewCeremonyStore(),
 		},
 		activity: activity.New(10),
