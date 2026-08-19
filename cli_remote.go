@@ -415,7 +415,7 @@ func cliSearchRemote(p cliparse.Params, rc *searchRunConfig) int {
 	lang := p.String(cmdLang)
 
 	items, code := resolveSearchItems(p, rc)
-	if items == nil {
+	if code != 0 {
 		return code
 	}
 
@@ -430,10 +430,10 @@ func cliSearchRemote(p cliparse.Params, rc *searchRunConfig) int {
 }
 
 // resolveSearchItems calls the resolve endpoint and maps its outcome onto
-// the CLI contract: items to search (nil items + exit code otherwise), the
-// candidate list on ambiguity (exit 2), "no match" on an empty resolution
-// (exit 1), and a 400 (contradictory or invalid identifiers) as a usage
-// error (exit 2).
+// the CLI contract: the exit code carries the outcome and is what the caller
+// branches on — 0 with the items to search, the candidate list on ambiguity
+// (exit 2), "no match" on an empty resolution (exit 1), and a 400
+// (contradictory or invalid identifiers) as a usage error (exit 2).
 func resolveSearchItems(p cliparse.Params, rc *searchRunConfig) (items []cliResolvedItem, exit int) {
 	qv := url.Values{}
 	for _, k := range []string{"title", "imdb", "tmdb", cmdType} {
