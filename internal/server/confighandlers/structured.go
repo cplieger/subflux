@@ -29,8 +29,7 @@ import (
 // letting yaml.Marshal render it IS the canonical serializer — no duplicate
 // struct tree, no hand-rolled emitter. Like the previous UI save path, a
 // structured save regenerates the file from form values: unknown hand-added
-// keys and comments are not preserved (unchanged behavior, documented in
-// the steering doc).
+// keys and comments are not preserved (unchanged, documented behavior).
 
 // StructuredConfig is the wire shape both structured endpoints share.
 type StructuredConfig struct {
