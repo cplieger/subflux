@@ -72,12 +72,10 @@ func CheckHTTPStatus(resp *http.Response) error {
 	if err == nil {
 		return nil
 	}
-	var hAuth *httpx.AuthError
-	if errors.As(err, &hAuth) {
+	if hAuth, ok := errors.AsType[*httpx.AuthError](err); ok {
 		return &subflux.AuthError{Msg: hAuth.Msg}
 	}
-	var hRL *httpx.RateLimitError
-	if errors.As(err, &hRL) {
+	if hRL, ok := errors.AsType[*httpx.RateLimitError](err); ok {
 		return &subflux.RateLimitError{Msg: hRL.Msg, RetryAfter: hRL.RetryAfter}
 	}
 	return err
@@ -90,12 +88,10 @@ func IsTransient(err error) bool {
 	if err == nil {
 		return false
 	}
-	var authErr *subflux.AuthError
-	if errors.As(err, &authErr) {
+	if _, ok := errors.AsType[*subflux.AuthError](err); ok {
 		return false
 	}
-	var rlErr *subflux.RateLimitError
-	if errors.As(err, &rlErr) {
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 		return false
 	}
 	return httpx.IsTransient(err)
@@ -119,8 +115,7 @@ func RetryOnRateLimit(ctx context.Context, maxAttempts int, maxWait time.Duratio
 		if err == nil {
 			return struct{}{}, nil
 		}
-		var rl *subflux.RateLimitError
-		if errors.As(err, &rl) {
+		if rl, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 			return struct{}{}, &httpx.RateLimitError{Msg: rl.Msg, RetryAfter: rl.RetryAfter}
 		}
 		return struct{}{}, err

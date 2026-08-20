@@ -16,13 +16,11 @@ func TestManualLockEntry_marshalsTheKeyFlat(t *testing.T) {
 	t.Parallel()
 
 	entry := ManualLockEntry{
-		ManualLockKey: ManualLockKey{
-			MediaType: MediaTypeEpisode,
-			MediaID:   "tt0903747-s01e01",
-			Language:  "fr",
-			Variant:   VariantForced,
-		},
-		Count: 2,
+		MediaType: MediaTypeEpisode,
+		MediaID:   "tt0903747-s01e01",
+		Language:  "fr",
+		Variant:   VariantForced,
+		Count:     2,
 	}
 
 	raw, err := json.Marshal(entry)
@@ -52,13 +50,11 @@ func TestManualLockEntry_unmarshalsTheFlatWireShape(t *testing.T) {
 	}
 
 	want := ManualLockEntry{
-		ManualLockKey: ManualLockKey{
-			MediaType: MediaTypeMovie,
-			MediaID:   "tmdb-27205",
-			Language:  "en",
-			Variant:   VariantHI,
-		},
-		Count: 3,
+		MediaType: MediaTypeMovie,
+		MediaID:   "tmdb-27205",
+		Language:  "en",
+		Variant:   VariantHI,
+		Count:     3,
 	}
 	if got != want {
 		t.Errorf("decoded = %+v, want %+v", got, want)

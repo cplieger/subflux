@@ -108,16 +108,14 @@ func FuzzCheckHTTPStatus(f *testing.F) {
 
 		// Invariant 3: 401/403 return *subflux.AuthError.
 		if code == 401 || code == 403 {
-			var authErr *subflux.AuthError
-			if !errors.As(err, &authErr) {
+			if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
 				t.Fatalf("CheckHTTPStatus(%d) = %T, want *subflux.AuthError", code, err)
 			}
 		}
 
 		// Invariant 4: 429 returns *subflux.RateLimitError.
 		if code == 429 {
-			var rlErr *subflux.RateLimitError
-			if !errors.As(err, &rlErr) {
+			if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
 				t.Fatalf("CheckHTTPStatus(%d) = %T, want *subflux.RateLimitError", code, err)
 			}
 		}

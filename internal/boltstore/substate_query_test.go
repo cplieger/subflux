@@ -659,9 +659,9 @@ func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 	}
 
 	want := []subflux.ManualLockEntry{
-		{ManualLockKey: subflux.ManualLockKey{MediaType: subflux.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Variant: subflux.VariantStandard}, Count: 1},
-		{ManualLockKey: subflux.ManualLockKey{MediaType: subflux.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Variant: subflux.VariantStandard}, Count: 2},
-		{ManualLockKey: subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt-a", Language: "en", Variant: subflux.VariantStandard}, Count: 1},
+		{MediaType: subflux.MediaTypeEpisode, MediaID: "tt-a", Language: "fr", Variant: subflux.VariantStandard, Count: 1},
+		{MediaType: subflux.MediaTypeEpisode, MediaID: "tt-b", Language: "en", Variant: subflux.VariantStandard, Count: 2},
+		{MediaType: subflux.MediaTypeMovie, MediaID: "tt-a", Language: "en", Variant: subflux.VariantStandard, Count: 1},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("locks = %+v, want %+v", got, want)

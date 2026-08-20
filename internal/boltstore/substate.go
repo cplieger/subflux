@@ -828,10 +828,8 @@ type manualLockAccumulator struct {
 func (a *manualLockAccumulator) flush() {
 	if a.haveCur && a.curCnt > 0 {
 		a.out = append(a.out, subflux.ManualLockEntry{
-			ManualLockKey: subflux.ManualLockKey{
-				MediaType: a.cur.mt, MediaID: a.cur.mid,
-				Language: a.cur.lang, Variant: a.cur.variant,
-			},
+			MediaType: a.cur.mt, MediaID: a.cur.mid,
+			Language: a.cur.lang, Variant: a.cur.variant,
 			Count: a.curCnt,
 		})
 	}
