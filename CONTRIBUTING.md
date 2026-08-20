@@ -17,12 +17,14 @@ locally.
 - The **server** (`internal/server/`) exposes the JSON API and the embedded
   web UI, streams live updates over SSE, and hot-reloads config saves into a
   running engine.
-- The **CLI is the same binary**, and every subcommand is a remote command
-  against a running instance over HTTP: `subflux search` resolves media and
-  drives providers through the server (`/api/search/resolve` +
+- The **CLI is the same binary**. Its read and trigger subcommands are remote
+  commands against a running instance over HTTP: `subflux search` resolves
+  media and drives providers through the server (`/api/search/resolve` +
   `/api/search`), and `subflux status`, `scan`, `locks`, and friends read or
-  trigger server state. The CLI never opens the database or constructs the
-  search engine itself.
+  trigger server state. The account bootstrap commands (`reset-password`,
+  `generate-api-key`) go through the server's private Unix admin socket
+  instead, so you run them inside the container. The CLI never opens the
+  database or constructs the search engine itself.
 - State is a single bbolt file (`/config/subflux.bolt`); subtitle files are
   written alongside the media.
 
@@ -40,20 +42,23 @@ The only files that import concrete implementations:
 - `providers.go`: table-driven provider registration (`providerEntries`
   drives both `Register` and `RegisterSchema`).
 - `internal/wiring/`: composition-root types connecting concrete
-  implementations across api/obs/search/provider.
+  implementations across subflux/obs/search/provider.
 - `cmd/wire-codegen/`: build-time-only driver over the
   [`wiregen`](https://github.com/cplieger/wiregen) library; not a server
   runtime dependency.
 
 ### Domain packages (`internal/`)
 
-- `api/`: interface contracts and pure utility types. Every other package
-  depends only on this one. Auth domain types come directly from
-  `github.com/cplieger/auth/v2` and arr DTOs from
-  `github.com/cplieger/arrapi` (no local aliases or adapter package).
+- `subflux/`: the wire and domain types. It declares no interface and no
+  behaviour, and every other package depends only on it. The behaviour lives
+  in leaf packages instead: `httpapi` (the handler prelude and the error
+  envelope), `langcode`, `mediaid`, `subtitlefile`, and `arrsvc`. Auth domain
+  types come directly from `github.com/cplieger/auth/v4` and arr DTOs from
+  `github.com/cplieger/arrapi/v2` (no local aliases or adapter package).
 - `search/`: the scan engine (provider orchestration, retry policy, history
   polling, and the download pipeline). Subpackages: `scoring`, `syncing`
-  (sync + post-process glue), `timeout`, `release`.
+  (sync + post-process glue), `providerhealth` (per-provider health and
+  timeout state), `release`.
 - `subsync/`: the subtitle sync library (alass port, cross-language anchors,
   framerate correction, split-aware DP, audio sync). Subpackages: `ffmpeg`
   (subprocess wrappers), `fft`, `framerate`, `crosslang`, `vad` (the WebRTC
@@ -101,8 +106,10 @@ concatenated via `MANIFEST` files by the same bundle command.
 These exist because breaking them caused real bugs, or because a test fails
 CI when they drift.
 
-- **Dependencies flow one way.** New code depends on `internal/subflux`
-  interfaces, never sideways into another domain package's concretes.
+- **Dependencies flow one way.** New code depends on the `internal/subflux`
+  types, never sideways into another domain package's concretes. A package
+  that needs behaviour from another declares its own narrow interface and
+  takes it as a parameter.
 - **Providers are registry-driven.** No `init()`, no blank imports, no global
   state. A provider is one package plus one `providerEntries` row; the
   settings UI schema is discovered from the registry.
@@ -172,11 +179,12 @@ subflux search --title "The Wire"   # remote search through the server's provide
 ```
 
 CLI development workflow: run a server locally (`go run .` or the container),
-then point the CLI at it. All subcommands, including `search`, reach the
-instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`). When
-the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key (created
-via `subflux generate-api-key` or the web UI's Security dialog); the CLI
-sends it as `X-API-Key`. There is no local-execution search mode: the search
+then point the CLI at it. All remote subcommands, including `search`, reach
+the instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`).
+When the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key
+(created with `subflux generate-api-key` on the server's own host or
+container, or in the web UI's Security dialog); the CLI sends it as
+`X-API-Key`. There is no local-execution search mode: the search
 subcommand resolves media via `GET /api/search/resolve`, searches via
 `GET /api/search`, and downloads via the async `POST /api/search/download` +
 activity polling, so results, locks, and history are always coherent with
@@ -234,8 +242,11 @@ The one-shot option mirrors CI exactly (the same reusable-workflow logic the
 GitHub `ci.yaml` runs, Go and frontend jobs included):
 
 ```sh
-bash ci-local.sh subflux   # from a checkout of the cplieger/ci repo
+bash ../ci/ci-local.sh   # from this repo's root, with cplieger/ci checked out beside it
 ```
+
+The script takes no positional argument; it reads the workflow of the repo it
+runs in.
 
 The direct commands are the day-to-day path.
 
@@ -250,7 +261,7 @@ golangci-lint fmt          # apply gofumpt (+extra) and gci import grouping
 ```
 
 `golangci-lint run` reports unformatted files as issues, so the lint step
-also enforces formatting; `gocyclo` caps complexity at 18.
+also enforces formatting; `gocyclo` caps complexity at 15.
 
 ### Frontend (from `internal/server/static-src/`)
 

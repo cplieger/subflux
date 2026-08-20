@@ -60,7 +60,7 @@ First run lands in unconfigured mode: the settings dialog auto-opens and the ins
 ### Auth, API, and operations
 
 - **Multi-user auth (optional):** local passwords (Argon2id), passkeys/WebAuthn, OIDC with PKCE, per-user API keys, and login rate limiting.
-- **API and CLI:** the UI drives a JSON API you can use too; every CLI subcommand is a remote command against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`.
+- **API and CLI:** the UI drives a JSON API you can use too; the CLI's read and trigger subcommands run against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`. The account bootstrap commands (`reset-password`, `generate-api-key`) use a private Unix socket, so run them inside the container.
 - **Operations:** Prometheus metrics at `/metrics`, structured `slog` logging (UTC), a distroless file-marker healthcheck, graceful shutdown, scheduled bbolt hot backups with a staleness metric, database reconciliation before each scan, and scan resume after a restart.
 
 ## Run it
@@ -94,7 +94,7 @@ Finishing saves the config and activates everything in place (providers, arr cli
 
 ## Configuration reference
 
-All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
+All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. To pre-author the file instead, copy the annotated [`config.example.yaml`](config.example.yaml). The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created in the web UI, or with `subflux generate-api-key` inside the container) to authenticate them when auth is enabled.
 
 ### Environment variables in config.yaml
 
