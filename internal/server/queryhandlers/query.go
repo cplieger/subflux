@@ -47,7 +47,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	if len(searchParam) > 200 {
 		searchParam = searchParam[:200]
 	}
-	entries, err := h.queryDB.GetState(ctx, &subflux.StateQuery{
+	entries, err := h.queryDB.State(ctx, &subflux.StateQuery{
 		MediaType: subflux.MediaType(q.Get("type")),
 		Language:  q.Get("lang"),
 		Provider:  subflux.ProviderID(q.Get("provider")),
@@ -73,7 +73,7 @@ func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
 	}
-	entries, err := h.queryDB.GetBackoffItems(ctx)
+	entries, err := h.queryDB.BackoffItems(ctx)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "backoff")
 		return
@@ -86,7 +86,7 @@ func (h *Handler) HandleBackoff(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleBackoffByPrefix(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	handleTypePrefixQuery(w, r, "backoff prefix",
-		func(mt, p string) (any, error) { return h.queryDB.GetBackoffByPrefix(ctx, subflux.MediaType(mt), p) })
+		func(mt, p string) (any, error) { return h.queryDB.BackoffByPrefix(ctx, subflux.MediaType(mt), p) })
 }
 
 // HandleLocks returns all manually locked media+language pairs.
@@ -96,7 +96,7 @@ func (h *Handler) HandleLocks(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.RequireGET(w, r) {
 		return
 	}
-	entries, err := h.queryDB.GetManualLocks(ctx)
+	entries, err := h.queryDB.ManualLocks(ctx)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "locks")
 		return

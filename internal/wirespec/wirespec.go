@@ -143,7 +143,7 @@ func Registry() *wiregen.Registry {
 		"MediaType": {Values: []string{"movie", "episode", "series"}},
 		"Role":      {Values: []string{"admin", "user"}},
 		"Variant":   {}, "ScoreTier": {},
-		"NotifyLevel": {}, "ActivitySource": {},
+		"NotifyLevel": {}, "Source": {},
 		"AlertLevel": {}, "AlertKind": {},
 		// Scan scope kind + four-valued scan outcome (background scans S12);
 		// both auto-discovered from the activity package's const blocks.

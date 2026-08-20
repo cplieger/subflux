@@ -30,7 +30,7 @@ func loadedConfig(t *testing.T) *Config {
 		},
 		TrustedProxies:  []string{"10.0.0.0/8"},
 		PollIntervalCfg: Duration{D: 30 * time.Second},
-		SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)
@@ -155,7 +155,7 @@ func TestSearchExcludeArrTagsCopiesOnReturn(t *testing.T) {
 	t.Parallel()
 
 	cfg := loadedConfig(t)
-	cfg.SearchCfg.ExcludeArrTags = []string{"no-subflux", "skip-me"}
+	cfg.Cfg.ExcludeArrTags = []string{"no-subflux", "skip-me"}
 
 	got := cfg.Search().ExcludeArrTags
 	if len(got) != 2 {

@@ -20,11 +20,11 @@ type mockCoverageStore struct {
 	scanStates    []subflux.ScanStateRow
 }
 
-func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (m *mockCoverageStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.subtitleFiles, m.err
 }
 
-func (m *mockCoverageStore) GetScanStates(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
+func (m *mockCoverageStore) ScanStates(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
 	return m.scanStates, m.err
 }
 
@@ -102,14 +102,14 @@ func TestHandleCoverage(t *testing.T) {
 
 var errMock = errors.New("mock error")
 
-// trackingCoverageStore records the params passed to GetScanStates.
+// trackingCoverageStore records the params passed to ScanStates.
 type trackingCoverageStore struct {
 	mockCoverageStore
 	lastType   subflux.MediaType
 	lastPrefix string
 }
 
-func (m *trackingCoverageStore) GetScanStates(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.ScanStateRow, error) {
+func (m *trackingCoverageStore) ScanStates(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.ScanStateRow, error) {
 	m.lastType = mediaType
 	m.lastPrefix = prefix
 	return m.scanStates, m.err
@@ -266,7 +266,7 @@ func TestHandleScanStates(t *testing.T) {
 			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "episode" {
-			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "episode")
+			t.Errorf("ScanStates mediaType = %q, want %q", store.lastType, "episode")
 		}
 	})
 
@@ -282,10 +282,10 @@ func TestHandleScanStates(t *testing.T) {
 			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "movie" {
-			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "movie")
+			t.Errorf("ScanStates mediaType = %q, want %q", store.lastType, "movie")
 		}
 		if store.lastPrefix != "tmdb-123-" {
-			t.Errorf("GetScanStates prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
+			t.Errorf("ScanStates prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
 		}
 	})
 
@@ -423,11 +423,11 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 	}
 }
 
-// seriesDBErrorStore fails GetSubtitleFiles but not GetSeries, so the
+// seriesDBErrorStore fails SubtitleFiles but not GetSeries, so the
 // coverage fetch surfaces the store error as a 500 (vs the arr 502).
 type seriesDBErrorStore struct{ mockCoverageStore }
 
-func (m *seriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (m *seriesDBErrorStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return nil, errMock
 }
 

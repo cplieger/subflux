@@ -529,7 +529,6 @@ func TestHandleValidatePath_traversal_guard(t *testing.T) {
 		{name: "relative path refused", path: "media" + sep + "tv", wantErr: "path must be absolute"},
 	}
 
-	h := New(&Deps{})
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -540,7 +539,7 @@ func TestHandleValidatePath_traversal_guard(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/config/validate-path", bytes.NewReader(body))
 			rec := httptest.NewRecorder()
-			h.HandleValidatePath(rec, req)
+			HandleValidatePath(rec, req)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("HandleValidatePath(%q) status = %d, want %d", tc.path, rec.Code, http.StatusOK)

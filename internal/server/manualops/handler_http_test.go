@@ -38,10 +38,10 @@ var errHTTPFake = errors.New("mock error")
 // fakeActivity satisfies ActivityTracker with no-op lifecycle tracking.
 type fakeActivity struct{}
 
-func (fakeActivity) Start(string, string, activity.ActivitySource) string { return "act-1" }
-func (fakeActivity) End(string)                                           {}
-func (fakeActivity) Fail(string)                                          {}
-func (fakeActivity) Progress(string, int, int, string)                    {}
+func (fakeActivity) Start(string, string, activity.Source) string { return "act-1" }
+func (fakeActivity) End(string)                                   {}
+func (fakeActivity) Fail(string)                                  {}
+func (fakeActivity) Progress(string, int, int, string)            {}
 
 // fakeEvents satisfies EventPublisher with no-ops.
 type fakeEvents struct{}
@@ -77,7 +77,7 @@ func (p *httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]b
 // reference resolver calls. Three narrow interfaces rather than a 36-method
 // composite, which is what the harness was asking for before.
 type harnessStore interface {
-	search.SearchStore
+	search.Store
 	DownloadStore
 	resolve.FileStore
 }

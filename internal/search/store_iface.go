@@ -7,12 +7,10 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// SearchFlowStore is the narrow store interface for search flow operations:
+// FlowStore is the narrow store interface for search flow operations:
 // backoff tracking, download recording, score queries, and manual locks.
 // Consumed by orchestrate.go and search_download.go.
-//
-//nolint:revive // name is established API; renaming would break consumers
-type SearchFlowStore interface {
+type FlowStore interface {
 	RecordNoResult(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, providerName subflux.ProviderID, bp subflux.BackoffParams) error
 	BackedOffProviders(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, maxAttempts int) ([]subflux.ProviderID, error)
 	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
@@ -30,13 +28,11 @@ type CoverageRecorder interface {
 	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
 }
 
-// SearchStore is the composite store interface consumed by the search engine.
-// It combines SearchFlowStore (backoff + download + lock) and CoverageRecorder
+// Store is the composite store interface consumed by the search engine.
+// It combines FlowStore (backoff + download + lock) and CoverageRecorder
 // (file tracking + scan state). The concrete store.DB satisfies this via
 // structural typing.
-//
-//nolint:revive // name is established API; renaming would break consumers
-type SearchStore interface {
-	SearchFlowStore
+type Store interface {
+	FlowStore
 	CoverageRecorder
 }

@@ -66,8 +66,8 @@ type EventPublisher interface {
 
 // ActivityTracker manages scan activity lifecycle.
 type ActivityTracker interface {
-	Start(action, detail string, source activity.ActivitySource) string
-	StartScan(action, detail string, source activity.ActivitySource,
+	Start(action, detail string, source activity.Source) string
+	StartScan(action, detail string, source activity.Source,
 		scope activity.ScanScope, role auth.Role) (id string, existing bool)
 	End(id string)
 	Fail(id string)
@@ -91,7 +91,7 @@ type ActivityTracker interface {
 // answers 409, never a 204 for work that is already done. Callers keep a
 // deferred unregister as the panic fallback; the release is idempotent.
 func FinishScanActivity(unregister func(), tracker ActivityTracker, publisher EventPublisher,
-	actID, action, detail string, source activity.ActivitySource, outcome activity.Outcome,
+	actID, action, detail string, source activity.Source, outcome activity.Outcome,
 ) {
 	unregister()
 	switch outcome {
@@ -155,14 +155,14 @@ type AlertRecorder interface {
 // ScanSonarrClient is the Sonarr surface the full-scan engine needs:
 // wanted-episode iteration, exclude-tag resolution, and a post-download rescan.
 type ScanSonarrClient interface {
-	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
+	WantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanSeries(ctx context.Context, seriesID int) error
 }
 
 // ScanRadarrClient is the Radarr surface the full-scan engine needs.
 type ScanRadarrClient interface {
-	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
+	WantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanMovie(ctx context.Context, movieID int) error
 }

@@ -135,7 +135,7 @@ func validate(ctx context.Context, cfg *Config) error {
 	ve.Add(validateDurationConstraints([]durationConstraint{
 		{"poll_interval", cfg.PollIntervalCfg.D, defaults.MinPollInterval, false},
 	}))
-	ve.Add(validateSearch(&cfg.SearchCfg))
+	ve.Add(validateSearch(&cfg.Cfg))
 	ve.Add(validateAdaptive(&cfg.AdaptiveCfg))
 	ve.Add(validateScoring(cfg.Scoring.Weights))
 	if cfg.PostProcessing.AudioSyncFallback && !cfg.PostProcessing.SyncSubtitles {

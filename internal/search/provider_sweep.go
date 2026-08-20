@@ -224,7 +224,7 @@ func (e *Engine) unionProviders(states []targetState) []provider.Provider {
 }
 
 // filterByTargetProviders keeps only subtitles from providers allowed for the target.
-func (e *Engine) filterByTargetProviders(subs []subflux.Subtitle, allowed map[subflux.ProviderID]struct{}) []subflux.Subtitle {
+func filterByTargetProviders(subs []subflux.Subtitle, allowed map[subflux.ProviderID]struct{}) []subflux.Subtitle {
 	var out []subflux.Subtitle
 	for i := range subs {
 		if _, ok := allowed[subs[i].Provider]; ok {

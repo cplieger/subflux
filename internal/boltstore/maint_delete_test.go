@@ -157,12 +157,12 @@ func TestDeleteStateByPaths_cleansOrphanedCoverage(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 0 {
 		t.Errorf("TotalSubtitleFiles = %d, want 0 (orphaned files cleaned)", total)
 	}
-	states, err := db.GetScanStates(ctx, subflux.MediaTypeMovie, "tt9")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "tt9")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 0 {
-		t.Errorf("GetScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
+		t.Errorf("ScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
 	}
 }
 
@@ -193,12 +193,12 @@ func TestDeleteStateByPaths_preservesCoverageWhenStateRemains(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (coverage preserved)", total)
 	}
-	states, err := db.GetScanStates(ctx, subflux.MediaTypeMovie, "tt7")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "tt7")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 {
-		t.Errorf("GetScanStates = %d, want 1 (scan_state preserved)", len(states))
+		t.Errorf("ScanStates = %d, want 1 (scan_state preserved)", len(states))
 	}
 	if rows := readTripleRows(t, db, subflux.MediaTypeMovie, "tt7", "en"); len(rows) != 1 {
 		t.Errorf("en rows = %d, want 1 (preserved)", len(rows))
@@ -284,12 +284,12 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (unrelated coverage kept)", total)
 	}
-	states, err := db.GetScanStates(ctx, subflux.MediaTypeMovie, "ttKeep")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "ttKeep")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 {
-		t.Errorf("GetScanStates(ttKeep) = %d, want 1", len(states))
+		t.Errorf("ScanStates(ttKeep) = %d, want 1", len(states))
 	}
 	if rows := readTripleRows(t, db, subflux.MediaTypeMovie, "ttKeep", "en"); len(rows) != 1 {
 		t.Errorf("ttKeep rows = %d, want 1", len(rows))
@@ -344,12 +344,12 @@ func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 	// Both media items' scan_state gone (B proves the cleanup loop did not stop
 	// after the first media item).
 	for _, mid := range []string{"ttA", "ttB"} {
-		states, err := db.GetScanStates(ctx, subflux.MediaTypeMovie, mid)
+		states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, mid)
 		if err != nil {
-			t.Fatalf("GetScanStates(%s): %v", mid, err)
+			t.Fatalf("ScanStates(%s): %v", mid, err)
 		}
 		if len(states) != 0 {
-			t.Errorf("GetScanStates(%s) = %d, want 0 (orphan scan_state cleaned)", mid, len(states))
+			t.Errorf("ScanStates(%s) = %d, want 0 (orphan scan_state cleaned)", mid, len(states))
 		}
 	}
 }

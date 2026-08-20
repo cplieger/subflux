@@ -155,7 +155,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		}
 
 		g.Go(func() error {
-			subs, err := p.getSubtitles(gctx, id, req)
+			subs, err := p.fetchSubtitles(gctx, id, req)
 			if err != nil {
 				slog.Warn("hdbits: failed to get subtitles for torrent", "error", err)
 				return nil // non-fatal; continue other goroutines
@@ -375,9 +375,9 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	return ids, nil
 }
 
-// getSubtitles fetches subtitle metadata for a single torrent and filters
+// fetchSubtitles fetches subtitle metadata for a single torrent and filters
 // by language and content type (excludes commentary/extras).
-func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+func (p *Provider) fetchSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits fetching subtitles for torrent", "torrent_id", torrentID)
 
 	params := map[string]any{

@@ -30,12 +30,12 @@ func TestSyncOffset_setThenGetRoundTrip(t *testing.T) {
 			if err := db.SetSyncOffset(ctx, tc.path, tc.off); err != nil {
 				t.Fatalf("SetSyncOffset(%q, %d): %v", tc.path, tc.off, err)
 			}
-			got, err := db.GetSyncOffset(ctx, tc.path)
+			got, err := db.SyncOffset(ctx, tc.path)
 			if err != nil {
-				t.Fatalf("GetSyncOffset(%q): %v", tc.path, err)
+				t.Fatalf("SyncOffset(%q): %v", tc.path, err)
 			}
 			if got != tc.off {
-				t.Errorf("GetSyncOffset(%q) = %d, want %d", tc.path, got, tc.off)
+				t.Errorf("SyncOffset(%q) = %d, want %d", tc.path, got, tc.off)
 			}
 		})
 	}
@@ -47,12 +47,12 @@ func TestSyncOffset_setThenGetRoundTrip(t *testing.T) {
 func TestSyncOffset_getAbsentReturnsZero(t *testing.T) {
 	db, _ := openTemp(t)
 
-	got, err := db.GetSyncOffset(t.Context(), "/never/written.srt")
+	got, err := db.SyncOffset(t.Context(), "/never/written.srt")
 	if err != nil {
-		t.Fatalf("GetSyncOffset(absent): %v", err)
+		t.Fatalf("SyncOffset(absent): %v", err)
 	}
 	if got != 0 {
-		t.Errorf("GetSyncOffset(absent) = %d, want 0", got)
+		t.Errorf("SyncOffset(absent) = %d, want 0", got)
 	}
 }
 
@@ -69,12 +69,12 @@ func TestSyncOffset_overwriteUpdates(t *testing.T) {
 	if err := db.SetSyncOffset(ctx, path, -250); err != nil {
 		t.Fatalf("second SetSyncOffset: %v", err)
 	}
-	got, err := db.GetSyncOffset(ctx, path)
+	got, err := db.SyncOffset(ctx, path)
 	if err != nil {
-		t.Fatalf("GetSyncOffset: %v", err)
+		t.Fatalf("SyncOffset: %v", err)
 	}
 	if got != -250 {
-		t.Errorf("GetSyncOffset after overwrite = %d, want -250", got)
+		t.Errorf("SyncOffset after overwrite = %d, want -250", got)
 	}
 }
 
@@ -91,12 +91,12 @@ func TestPollTimestamp_setThenGetRoundTrip(t *testing.T) {
 		if err := db.SetPollTimestamp(ctx, key, want); err != nil {
 			t.Fatalf("SetPollTimestamp(%q): %v", key, err)
 		}
-		got, err := db.GetPollTimestamp(ctx, key)
+		got, err := db.PollTimestamp(ctx, key)
 		if err != nil {
-			t.Fatalf("GetPollTimestamp(%q): %v", key, err)
+			t.Fatalf("PollTimestamp(%q): %v", key, err)
 		}
 		if !got.Equal(want) {
-			t.Errorf("GetPollTimestamp(%q) = %v, want %v", key, got, want)
+			t.Errorf("PollTimestamp(%q) = %v, want %v", key, got, want)
 		}
 	}
 }
@@ -116,13 +116,13 @@ func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 		t.Fatalf("SetPollTimestamp(radarr): %v", err)
 	}
 
-	gotS, err := db.GetPollTimestamp(ctx, subflux.PollKeySonarr)
+	gotS, err := db.PollTimestamp(ctx, subflux.PollKeySonarr)
 	if err != nil {
-		t.Fatalf("GetPollTimestamp(sonarr): %v", err)
+		t.Fatalf("PollTimestamp(sonarr): %v", err)
 	}
-	gotR, err := db.GetPollTimestamp(ctx, subflux.PollKeyRadarr)
+	gotR, err := db.PollTimestamp(ctx, subflux.PollKeyRadarr)
 	if err != nil {
-		t.Fatalf("GetPollTimestamp(radarr): %v", err)
+		t.Fatalf("PollTimestamp(radarr): %v", err)
 	}
 	if !gotS.Equal(sonarrAt) {
 		t.Errorf("sonarr cursor = %v, want %v", gotS, sonarrAt)
@@ -137,12 +137,12 @@ func TestPollTimestamp_keysAreIndependent(t *testing.T) {
 func TestPollTimestamp_getAbsentReturnsZeroTime(t *testing.T) {
 	db, _ := openTemp(t)
 
-	got, err := db.GetPollTimestamp(t.Context(), subflux.PollKeySonarr)
+	got, err := db.PollTimestamp(t.Context(), subflux.PollKeySonarr)
 	if err != nil {
-		t.Fatalf("GetPollTimestamp(absent): %v", err)
+		t.Fatalf("PollTimestamp(absent): %v", err)
 	}
 	if !got.IsZero() {
-		t.Errorf("GetPollTimestamp(absent) = %v, want zero time", got)
+		t.Errorf("PollTimestamp(absent) = %v, want zero time", got)
 	}
 }
 
@@ -156,7 +156,7 @@ func TestPollTimestamp_invalidKeyRejected(t *testing.T) {
 	if err := db.SetPollTimestamp(ctx, subflux.PollKey("Sonarr"), time.Now()); err == nil {
 		t.Error("SetPollTimestamp(invalid key): error = nil, want rejection")
 	}
-	if _, err := db.GetPollTimestamp(ctx, subflux.PollKey("sonar")); err == nil {
-		t.Error("GetPollTimestamp(invalid key): error = nil, want rejection")
+	if _, err := db.PollTimestamp(ctx, subflux.PollKey("sonar")); err == nil {
+		t.Error("PollTimestamp(invalid key): error = nil, want rejection")
 	}
 }

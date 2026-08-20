@@ -187,11 +187,9 @@ func TestExtractDownloadLink(t *testing.T) {
 func TestParseResults(t *testing.T) {
 	t.Parallel()
 
-	p := &Provider{}
-
 	t.Run("empty html returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := p.parseResults("", []string{"en"})
+		got := parseResults("", []string{"en"})
 		if got != nil {
 			t.Errorf("parseResults(\"\") = %v, want nil", got)
 		}
@@ -200,7 +198,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("nil languages returns no results", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "English", `/subtitle/tt1`, "release", false)
-		got := p.parseResults(html, nil)
+		got := parseResults(html, nil)
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -209,7 +207,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("empty languages slice returns no results", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "English", `/subtitle/tt1`, "release", false)
-		got := p.parseResults(html, []string{})
+		got := parseResults(html, []string{})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -217,7 +215,7 @@ func TestParseResults(t *testing.T) {
 
 	t.Run("html without table rows returns no results", func(t *testing.T) {
 		t.Parallel()
-		got := p.parseResults("<div>no rows here</div>", []string{"en"})
+		got := parseResults("<div>no rows here</div>", []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -226,7 +224,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("row with fewer than 5 tds skipped", func(t *testing.T) {
 		t.Parallel()
 		html := `<tr><td>1</td><td>English</td><td>release</td></tr>`
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -235,7 +233,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("unknown language skipped", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "Klingon", `/sub/1`, "release-name", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -244,7 +242,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("language not in requested list skipped", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "French", `/sub/1`, "release-name", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -253,7 +251,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("valid row parsed correctly", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("8", "English", `/subtitle/tt123`, "Test.Release", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}
@@ -288,7 +286,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("hearing impaired detected", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("3", "English", `/subtitle/tt456`, "release", true)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}
@@ -302,7 +300,7 @@ func TestParseResults(t *testing.T) {
 		// The rating column is ignored (the scorer never consumed provider
 		// scores); a non-numeric cell must not break row parsing.
 		html := makeRow("bad", "English", `/subtitle/tt789`, "release", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}
@@ -318,7 +316,7 @@ func TestParseResults(t *testing.T) {
 			`<td></td>` +
 			`<td>uploader</td>` +
 			`</tr>`
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}
@@ -337,7 +335,7 @@ func TestParseResults(t *testing.T) {
 			`<td></td>` +
 			`<td>uploader</td>` +
 			`</tr>`
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -346,7 +344,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("empty href skipped", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "English", ``, "release", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -355,7 +353,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("href without leading slash skipped", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "English", `relative/path`, "release", false)
-		got := p.parseResults(html, []string{"en"})
+		got := parseResults(html, []string{"en"})
 		if len(got) != 0 {
 			t.Errorf("parseResults() = %d results, want 0", len(got))
 		}
@@ -365,7 +363,7 @@ func TestParseResults(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "English", `/subtitle/tt1`, "rel-en", false) +
 			makeRow("7", "French", `/subtitle/tt2`, "rel-fr", false)
-		got := p.parseResults(html, []string{"en", "fr"})
+		got := parseResults(html, []string{"en", "fr"})
 		if len(got) != 2 {
 			t.Fatalf("parseResults() = %d results, want 2", len(got))
 		}
@@ -380,7 +378,7 @@ func TestParseResults(t *testing.T) {
 	t.Run("Brazilian Portuguese maps to pb", func(t *testing.T) {
 		t.Parallel()
 		html := makeRow("5", "Brazilian Portuguese", `/subtitle/tt900`, "release", false)
-		got := p.parseResults(html, []string{"pb"})
+		got := parseResults(html, []string{"pb"})
 		if len(got) != 1 {
 			t.Fatalf("parseResults() = %d results, want 1", len(got))
 		}

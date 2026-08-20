@@ -89,7 +89,7 @@ const maxConfigSize = subflux.MaxSafeFileBytes
 func newWithDefaults() *Config {
 	return &Config{
 		PollIntervalCfg: Duration{D: defaults.DefaultPollInterval},
-		SearchCfg: yamlSearchConfig{
+		Cfg: yamlSearchConfig{
 			MinScore:            0,
 			ScanInterval:        Duration{D: defaults.DefaultScanInterval},
 			ProviderTimeout:     Duration{D: defaults.DefaultProviderTimeout},

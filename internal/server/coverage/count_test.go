@@ -26,7 +26,7 @@ type countMissingStore struct {
 	movieFiles   []subflux.SubtitleEntry
 }
 
-func (m *countMissingStore) GetSubtitleFiles(_ context.Context, mediaType subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (m *countMissingStore) SubtitleFiles(_ context.Context, mediaType subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	if m.err != nil {
 		return nil, m.err
 	}

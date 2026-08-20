@@ -12,7 +12,7 @@ import (
 // This file covers the task-5.1 subtitle_files domain: RecordSubtitleFiles
 // diff-sync (insert/update/delete + changed report, Requirement 5.1),
 // UpsertSubtitleFile / DeleteSubtitleFile single-row ops (Requirement 15.7),
-// GetSubtitleFiles listing with the prefix semantics and the subtitle_state
+// SubtitleFiles listing with the prefix semantics and the subtitle_state
 // score/video_path join (Requirement 5.2), the O(1) TotalSubtitleFiles counter
 // (Requirement 18.1), and per-media coverage derivable from KEYS without
 // decoding values (Requirement 18.2).
@@ -30,12 +30,12 @@ func subFile(lang string, variant subflux.Variant, source subflux.SubtitleSource
 	return subflux.SubtitleFile{Language: lang, Variant: variant, Source: source, Codec: codec, Path: path}
 }
 
-// listFiles is a context-free GetSubtitleFiles for tests.
+// listFiles is a context-free SubtitleFiles for tests.
 func listFiles(t *testing.T, db *DB, mt subflux.MediaType, prefix string) []subflux.SubtitleEntry {
 	t.Helper()
-	rows, err := db.GetSubtitleFiles(t.Context(), mt, prefix)
+	rows, err := db.SubtitleFiles(t.Context(), mt, prefix)
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles(%q, %q): %v", mt, prefix, err)
+		t.Fatalf("SubtitleFiles(%q, %q): %v", mt, prefix, err)
 	}
 	return rows
 }
@@ -69,7 +69,7 @@ func countFileRowsRaw(t *testing.T, db *DB) int {
 // setFileOffset stores a sync offset for a path through the production write
 // path (SetSyncOffset -> sync_offsets bucket). The offset lives solely in
 // sync_offsets — a subtitle_files rewrite cannot touch it — so the
-// "preserved" assertions below pin the GetSubtitleFiles join surviving codec
+// "preserved" assertions below pin the SubtitleFiles join surviving codec
 // updates.
 func setFileOffset(t *testing.T, db *DB, path string, offset int64) {
 	t.Helper()
@@ -289,7 +289,7 @@ func TestDeleteSubtitleFile_removes_and_noop(t *testing.T) {
 	}
 }
 
-// --- GetSubtitleFiles prefix semantics ---
+// --- SubtitleFiles prefix semantics ---
 
 func TestGetSubtitleFiles_prefix_modes(t *testing.T) {
 	db, _ := openTemp(t)
@@ -362,7 +362,7 @@ func TestGetSubtitleFiles_ordered_by_media_id_language_variant_source(t *testing
 	}
 }
 
-// --- GetSubtitleFiles score / video_path join ---
+// --- SubtitleFiles score / video_path join ---
 
 func TestGetSubtitleFiles_score_and_videopath_from_auto_state(t *testing.T) {
 	db, _ := openTemp(t)
@@ -420,7 +420,7 @@ func TestGetSubtitleFiles_no_auto_state_defaults_to_zero(t *testing.T) {
 // TestCoverage_fromKeysWithoutValueDecode proves per-media coverage (the set of
 // (language, variant) tracked for a media item) is derivable from subtitle_files
 // KEYS alone: it walks the bucket and parses keys with NO call to the value
-// codec, then asserts the derived set matches what GetSubtitleFiles reports.
+// codec, then asserts the derived set matches what SubtitleFiles reports.
 func TestCoverage_fromKeysWithoutValueDecode(t *testing.T) {
 	db, _ := openTemp(t)
 	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []subflux.SubtitleFile{
@@ -489,7 +489,7 @@ func TestTotalSubtitleFiles_counter_matches_raw_after_ops(t *testing.T) {
 
 // TestRecordSubtitleFiles_property_convergence drives random RecordSubtitleFiles
 // sequences across a small media-id pool and asserts, after every op, that
-// GetSubtitleFiles for a media item equals the last set recorded for it, and
+// SubtitleFiles for a media item equals the last set recorded for it, and
 // that the O(1) TotalSubtitleFiles counter equals both the model's total and a
 // raw bucket scan. This pins the diff-sync invariant (insert/update/delete
 // converge to exactly the recorded set) and the counter-maintenance invariant.

@@ -28,7 +28,7 @@ func (s *Server) scanDeps() *scanning.Deps {
 }
 
 // scanLiveState converts the server's liveState to scanning.LiveState.
-func (s *Server) scanLiveState(ls *liveState) *scanning.LiveState {
+func scanLiveState(ls *liveState) *scanning.LiveState {
 	return &scanning.LiveState{
 		Cfg:         ls.cfg,
 		Engine:      ls.engine,

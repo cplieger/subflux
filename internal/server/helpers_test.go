@@ -64,16 +64,16 @@ type qhMockStore struct {
 	attempts   int
 }
 
-func (m *qhMockStore) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+func (m *qhMockStore) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	m.stateLimit = q.Limit
 	return m.state, m.stateErr
 }
 
-func (m *qhMockStore) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
+func (m *qhMockStore) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
 	return m.backoff, m.backoffErr
 }
 
-func (m *qhMockStore) GetManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
+func (m *qhMockStore) ManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	return m.locks, m.locksErr
 }
 
@@ -169,11 +169,11 @@ func (dummyArrClient) GetHistorySince(context.Context, time.Time, ...arrapi.Even
 	return nil, nil
 }
 
-func (dummyArrClient) GetWantedEpisodes(context.Context, map[int]struct{}, func(arrapi.Series, arrapi.Episode) error) error {
+func (dummyArrClient) WantedEpisodes(context.Context, map[int]struct{}, func(arrapi.Series, arrapi.Episode) error) error {
 	return nil
 }
 
-func (dummyArrClient) GetWantedMovies(context.Context, map[int]struct{}, func(arrapi.Movie) error) error {
+func (dummyArrClient) WantedMovies(context.Context, map[int]struct{}, func(arrapi.Movie) error) error {
 	return nil
 }
 

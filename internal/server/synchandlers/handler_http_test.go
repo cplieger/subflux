@@ -30,11 +30,11 @@ type syncFakeStore struct {
 	setCalls  int
 }
 
-func (m *syncFakeStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (m *syncFakeStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.rows, nil
 }
 
-func (m *syncFakeStore) GetSyncOffset(_ context.Context, path string) (int64, error) {
+func (m *syncFakeStore) SyncOffset(_ context.Context, path string) (int64, error) {
 	m.getCalled = true
 	return m.offsets[path], nil
 }

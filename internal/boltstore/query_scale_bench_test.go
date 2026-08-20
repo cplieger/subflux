@@ -15,7 +15,7 @@ import (
 // scale (the README's 52k-episode reference deployment), so "optimize or
 // leave" decisions rest on measurements instead of intuition:
 //
-//   - GetManualLocks: index-only walk of ix_state_quad (manual flag lives in
+//   - ManualLocks: index-only walk of ix_state_quad (manual flag lives in
 //     the projection value; no primary dereference).
 //   - HistoryMediaIDs: DISTINCT media_id per media type, currently a full
 //     bucket ForEach with map dedup.
@@ -97,7 +97,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 // and times the index-walk queries against it. HistoryMediaIDs now uses the
 // skip-scan (adopted after this benchmark showed ~8.9x on the later-sorting
 // media type at parity in the single-language worst case); the benchmark
-// remains to catch regressions and to price GetManualLocks' full walk.
+// remains to catch regressions and to price ManualLocks' full walk.
 func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	ctx := b.Context()
 	db, err := Open(filepath.Join(b.TempDir(), "bench.bolt"))
@@ -115,10 +115,10 @@ func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	eps, movs := populateQuadIndex(b, db, seriesN, epsPer, moviesN, locksN)
 	b.Logf("populated: %d episode rows, %d movie rows, %d manual-lock rows", eps, movs, locksN)
 
-	b.Run("GetManualLocks/current", func(b *testing.B) {
+	b.Run("ManualLocks/current", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			locks, err := db.GetManualLocks(ctx)
+			locks, err := db.ManualLocks(ctx)
 			if err != nil {
 				b.Fatal(err)
 			}

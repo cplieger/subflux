@@ -69,7 +69,7 @@ func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]su
 		return nil, fmt.Errorf("fetch movie page: %w", err)
 	}
 
-	results := p.parseResults(body, req.Languages)
+	results := parseResults(body, req.Languages)
 
 	slog.Info("yifysubtitles search complete", "results", len(results), "media", req.MediaLabel())
 	return results, nil
@@ -193,13 +193,13 @@ var (
 	tagStripRe = regexp.MustCompile(`<[^>]*>`)
 )
 
-func (p *Provider) parseResults(html string, languages []string) []subflux.Subtitle {
+func parseResults(html string, languages []string) []subflux.Subtitle {
 	if html == "" {
 		return nil
 	}
 	var results []subflux.Subtitle
 	for _, row := range rowRe.FindAllStringSubmatch(html, -1) {
-		if sub, ok := p.parseRow(row[1], languages); ok {
+		if sub, ok := parseRow(row[1], languages); ok {
 			results = append(results, sub)
 		}
 	}
@@ -208,7 +208,7 @@ func (p *Provider) parseResults(html string, languages []string) []subflux.Subti
 
 // parseRow extracts a single subtitle result from a table row.
 // Returns false if the row should be skipped (wrong language, missing link, etc.).
-func (p *Provider) parseRow(rowHTML string, languages []string) (subflux.Subtitle, bool) {
+func parseRow(rowHTML string, languages []string) (subflux.Subtitle, bool) {
 	tds := tdRe.FindAllStringSubmatch(rowHTML, -1)
 	if len(tds) < 5 {
 		return subflux.Subtitle{}, false

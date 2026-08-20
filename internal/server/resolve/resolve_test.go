@@ -18,7 +18,7 @@ type fakeStore struct {
 	err  error
 }
 
-func (f *fakeStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (f *fakeStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return f.rows, f.err
 }
 

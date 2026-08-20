@@ -32,7 +32,7 @@ import (
 // the one row, release a manual lock the deletion emptied, and answer the
 // media-ID listing. 5 of the 36 methods the store offers.
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 	DeleteSubtitleFile(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant, source subflux.SubtitleSource, path string) error
 	ManualSubtitlePaths(ctx context.Context, key subflux.ManualLockKey) ([]string, error)
 	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
@@ -152,7 +152,7 @@ func (h *Handler) HandleListFiles(w http.ResponseWriter, r *http.Request) {
 		arrID = n
 	}
 
-	rows, err := h.deps.Store.GetSubtitleFiles(ctx, subflux.MediaType(mediaType), mediaID)
+	rows, err := h.deps.Store.SubtitleFiles(ctx, subflux.MediaType(mediaType), mediaID)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "list files")
 		return
@@ -341,7 +341,7 @@ func (h *Handler) HandleBulkDeleteFiles(w http.ResponseWriter, r *http.Request) 
 
 	ls := h.deps.StateFunc()
 
-	rows, err := h.deps.Store.GetSubtitleFiles(ctx, req.MediaType, req.MediaID)
+	rows, err := h.deps.Store.SubtitleFiles(ctx, req.MediaType, req.MediaID)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "bulk delete: db fetch")
 		return

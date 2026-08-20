@@ -17,7 +17,7 @@ type manualStore interface {
 }
 
 // manualLiveState converts the server's liveState to manualops.LiveState.
-func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {
+func manualLiveState(ls *liveState) *manualops.LiveState {
 	return &manualops.LiveState{
 		Cfg:       ls.cfg,
 		Engine:    ls.engine,
@@ -40,14 +40,14 @@ func lookupMediaTitle(ctx context.Context, ls *liveState, mediaType subflux.Medi
 
 // lookupMovieMediaID wraps manualops.LookupMovieMediaID with the server's
 // manualLiveState adapter.
-func (s *Server) lookupMovieMediaID(ctx context.Context, ls *liveState, arrID int) string {
-	return manualops.LookupMovieMediaID(ctx, s.manualLiveState(ls), arrID)
+func lookupMovieMediaID(ctx context.Context, ls *liveState, arrID int) string {
+	return manualops.LookupMovieMediaID(ctx, manualLiveState(ls), arrID)
 }
 
 // lookupEpisodeMediaID wraps manualops.LookupEpisodeMediaID with the server's
 // manualLiveState adapter.
-func (s *Server) lookupEpisodeMediaID(ctx context.Context, ls *liveState, seriesID, season, episode int) string {
-	return manualops.LookupEpisodeMediaID(ctx, s.manualLiveState(ls), seriesID, season, episode)
+func lookupEpisodeMediaID(ctx context.Context, ls *liveState, seriesID, season, episode int) string {
+	return manualops.LookupEpisodeMediaID(ctx, manualLiveState(ls), seriesID, season, episode)
 }
 
 // resolveMediaIDs wraps manualops.ResolveMediaIDs with the server's
@@ -55,5 +55,5 @@ func (s *Server) lookupEpisodeMediaID(ctx context.Context, ls *liveState, series
 func (s *Server) resolveMediaIDs(ctx context.Context, ls *liveState,
 	mediaType subflux.MediaType, arrID, season, episode int,
 ) (mediaID, title string) {
-	return manualops.ResolveMediaIDs(ctx, s.manualLiveState(ls), mediaType, arrID, season, episode)
+	return manualops.ResolveMediaIDs(ctx, manualLiveState(ls), mediaType, arrID, season, episode)
 }

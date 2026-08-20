@@ -133,7 +133,7 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 	}
 
 	// Further filter to only providers allowed for this target.
-	targetFiltered := e.filterByTargetProviders(filtered, state.allowedProvs)
+	targetFiltered := filterByTargetProviders(filtered, state.allowedProvs)
 
 	if len(targetFiltered) == 0 {
 		if !state.isUpgrade && len(outcome.succeeded()) > 0 {

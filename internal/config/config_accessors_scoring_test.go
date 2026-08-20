@@ -226,7 +226,7 @@ func TestLanguageCodes_never_has_duplicates(t *testing.T) {
 func TestMinScoreForTarget_per_target_override(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		SearchCfg: yamlSearchConfig{MinScore: 50},
+		Cfg: yamlSearchConfig{MinScore: 50},
 	}
 	target := &subflux.SubtitleTarget{Code: "fr", MinScore: new(75)}
 
@@ -239,7 +239,7 @@ func TestMinScoreForTarget_per_target_override(t *testing.T) {
 func TestMinScoreForTarget_falls_back_to_global(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		SearchCfg: yamlSearchConfig{MinScore: 50},
+		Cfg: yamlSearchConfig{MinScore: 50},
 	}
 	target := &subflux.SubtitleTarget{Code: "fr"}
 

@@ -108,7 +108,7 @@ func TestQuery_prefixCollision_DownloadedRefs(t *testing.T) {
 	}
 }
 
-// TestQuery_ascendingNextRetry asserts GetBackoffItems returns entries in
+// TestQuery_ascendingNextRetry asserts BackoffItems returns entries in
 // ascending next_retry order regardless of insertion order (Requirement 2.3).
 // This complements the existing TestGetBackoffItems_ascendingNextRetry by using
 // a wider spread of media ids and types.
@@ -124,9 +124,9 @@ func TestQuery_ascendingNextRetry(t *testing.T) {
 			attemptRec{LastTried: base, NextRetry: base.Add(d), Failures: 1})
 	}
 
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != len(times) {
 		t.Fatalf("got %d entries, want %d", len(got), len(times))
@@ -330,14 +330,14 @@ func TestReconcileConvergence(t *testing.T) {
 	}
 
 	// Compare final states: both scenarios must converge to the same state.
-	// We compare via GetState (all rows) since reconcile resets auto rows.
-	stateA, err := dbA.GetState(ctx, &subflux.StateQuery{})
+	// We compare via State (all rows) since reconcile resets auto rows.
+	stateA, err := dbA.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState(A): %v", err)
+		t.Fatalf("State(A): %v", err)
 	}
-	stateB, err := dbB.GetState(ctx, &subflux.StateQuery{})
+	stateB, err := dbB.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState(B): %v", err)
+		t.Fatalf("State(B): %v", err)
 	}
 
 	// Both should have the same number of rows (4 auto rows reset in place).
@@ -526,8 +526,8 @@ func TestConcurrent_SaveDownloadWhileReconcile(t *testing.T) {
 	}
 
 	// Final assertion: the store is still usable (no corruption).
-	_, err = db.GetState(ctx, &subflux.StateQuery{})
+	_, err = db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState after concurrent workload: %v", err)
+		t.Fatalf("State after concurrent workload: %v", err)
 	}
 }

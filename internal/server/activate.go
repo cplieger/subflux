@@ -155,7 +155,7 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mod
 
 	// OIDC: an immutable per-config lazy slot. Static shape was validated by
 	// config validation in the load path; network discovery stays lazy at
-	// request time (getOIDC). A new config gets a FRESH slot so a stale
+	// request time (oidcProvider). A new config gets a FRESH slot so a stale
 	// cached provider can never outlive an issuer edit; disabled = nil slot.
 	cand.oidc = newOIDCSlot(newCfg)
 

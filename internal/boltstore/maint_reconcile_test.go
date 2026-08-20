@@ -44,17 +44,17 @@ func rmfile(t *testing.T, path string) {
 }
 
 // assertDownloadsConsistent asserts the maintained downloads counter equals the
-// number of state rows actually returned by GetState (a full primary walk), so
+// number of state rows actually returned by State (a full primary walk), so
 // every reconcile branch keeps the O(1) counter consistent with the rows.
 func assertDownloadsConsistent(t *testing.T, db *DB) {
 	t.Helper()
 	downloads, _, _ := mustStats(t, db)
-	entries, err := db.GetState(t.Context(), &subflux.StateQuery{})
+	entries, err := db.State(t.Context(), &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if downloads != len(entries) {
-		t.Errorf("downloads counter = %d, but GetState returned %d rows (counter drift)",
+		t.Errorf("downloads counter = %d, but State returned %d rows (counter drift)",
 			downloads, len(entries))
 	}
 }
@@ -165,12 +165,12 @@ func TestReconcileState_videoGoneDeletesFanout(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 0 {
 		t.Errorf("TotalSubtitleFiles = %d, want 0 (orphaned coverage cleaned)", total)
 	}
-	states, err := db.GetScanStates(ctx, subflux.MediaTypeEpisode, "ep1")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeEpisode, "ep1")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 0 {
-		t.Errorf("GetScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
+		t.Errorf("ScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
 	}
 	assertDownloadsConsistent(t, db)
 }
@@ -424,12 +424,12 @@ func TestReconcileState_unrelatedMediaUntouched(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (survivor coverage kept)", total)
 	}
-	states, err := db.GetScanStates(ctx, subflux.MediaTypeMovie, "ttKeep")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "ttKeep")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 {
-		t.Errorf("GetScanStates(ttKeep) = %d, want 1", len(states))
+		t.Errorf("ScanStates(ttKeep) = %d, want 1", len(states))
 	}
 	assertDownloadsConsistent(t, db)
 }

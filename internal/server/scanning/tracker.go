@@ -52,7 +52,7 @@ type seasonState struct {
 // BackoffPrefixReader is the narrow store surface earlyStop seeding needs:
 // the season's existing adaptive-backoff rows by media-id prefix.
 type BackoffPrefixReader interface {
-	GetBackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
+	BackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
 }
 
 // seedDeps carries what earlyStop seeding reads. The seed is recomputed from
@@ -249,7 +249,7 @@ func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDP
 	if st.seed.Backoff == nil || seasonIDPrefix == "" || len(st.seed.Enabled) == 0 {
 		return 0
 	}
-	entries, err := st.seed.Backoff.GetBackoffByPrefix(ctx, subflux.MediaTypeEpisode, seasonIDPrefix)
+	entries, err := st.seed.Backoff.BackoffByPrefix(ctx, subflux.MediaTypeEpisode, seasonIDPrefix)
 	if err != nil {
 		slog.Warn("season tracker seed: backoff read failed, seeding 0",
 			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang, "error", err)

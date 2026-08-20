@@ -8,12 +8,12 @@ import (
 	"pgregory.net/rapid"
 )
 
-// This file covers the task-3.2 backoff listing behaviour: GetBackoffItems
+// This file covers the task-3.2 backoff listing behaviour: BackoffItems
 // (ascending next_retry via in-memory sort, Requirement 2.3) and
-// GetBackoffByPrefix (provider rows only, ordered media id then ascending
+// BackoffByPrefix (provider rows only, ordered media id then ascending
 // next_retry, Requirement 15.4), plus prefix isolation/inclusion semantics.
 
-// TestGetBackoffItems_ascendingNextRetry asserts GetBackoffItems returns every
+// TestGetBackoffItems_ascendingNextRetry asserts BackoffItems returns every
 // row ordered by ascending next_retry, regardless of insertion order
 // (Requirement 2.3).
 func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
@@ -28,9 +28,9 @@ func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
 	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt200", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 2})
 
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 3 {
 		t.Fatalf("got %d entries, want 3", len(got))
@@ -57,9 +57,9 @@ func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", subflux.ProviderID(""),
 		attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("got %d entries, want 1 (empty-provider row excluded)", len(got))
@@ -73,9 +73,9 @@ func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 // without error.
 func TestGetBackoffItems_empty(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("got %d entries, want 0", len(got))
@@ -99,9 +99,9 @@ func TestGetBackoffByPrefix_mediaIDThenNextRetry(t *testing.T) {
 	putAttemptRow(t, db, subflux.MediaTypeMovie, "ttB", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(got) != 4 {
 		t.Fatalf("got %d entries, want 4", len(got))
@@ -138,9 +138,9 @@ func TestGetBackoffByPrefix_prefixInclusionAndType(t *testing.T) {
 	// Same media id under a different media type must not match the movie query.
 	putAttemptRow(t, db, subflux.MediaTypeEpisode, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "tt1")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "tt1")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	gotIDs := map[string]int{}
 	for _, e := range got {
@@ -170,9 +170,9 @@ func TestGetBackoffByPrefix_excludesEmptyProvider(t *testing.T) {
 	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", subflux.ProviderID(""), attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(got) != 1 || got[0].Provider != testProv {
 		t.Fatalf("got %+v, want exactly one row for provider %q", got, testProv)
@@ -184,7 +184,7 @@ func TestGetBackoffByPrefix_excludesEmptyProvider(t *testing.T) {
 var byPrefixPool = []string{"tt1", "tt12", "tt2", "tt20"}
 
 // TestGetBackoffByPrefix_orderingProperty is a property test asserting that for
-// any randomly populated set of provider rows, GetBackoffByPrefix returns
+// any randomly populated set of provider rows, BackoffByPrefix returns
 // exactly the provider rows whose media id starts with the queried prefix,
 // ordered by (media id, next_retry) (Requirements 15.4, 8.3).
 func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
@@ -224,9 +224,9 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 
 		prefix := rapid.SampledFrom([]string{"", "tt1", "tt12", "tt2", "tt20", "ttX"}).Draw(rt, "prefix")
 
-		got, err := db.GetBackoffByPrefix(t.Context(), subflux.MediaTypeMovie, prefix)
+		got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, prefix)
 		if err != nil {
-			rt.Fatalf("GetBackoffByPrefix: %v", err)
+			rt.Fatalf("BackoffByPrefix: %v", err)
 		}
 
 		// Reference: filter by media-id starts-with prefix. This is the exact

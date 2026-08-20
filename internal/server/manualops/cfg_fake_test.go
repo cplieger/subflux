@@ -9,7 +9,7 @@ import (
 // fakeManualCfg is the config double for this package's tests. TEN methods out
 // of the 37 a *config.Config offers, and the width is the union of two demands:
 // pathValidator's ONE — all this package itself asks a config for — plus the 9
-// of search.SearchCfg, because these tests build a REAL search.Engine over the
+// of search.Cfg, because these tests build a REAL search.Engine over the
 // same value to exercise scoring and the download pipeline end to end.
 //
 // Every method returns a zero value, which is what the suite needs: it asserts
@@ -21,7 +21,7 @@ type fakeManualCfg struct{}
 
 var (
 	_ pathValidator = fakeManualCfg{}
-	// The engine's surface, spelled here rather than named: search.SearchCfg
+	// The engine's surface, spelled here rather than named: search.Cfg
 	// is another package's interface, and a fixture that references it would
 	// stop recording what THIS package's tests depend on.
 	_ interface {

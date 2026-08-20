@@ -254,7 +254,7 @@ func (s *Store) DeleteAPIKey(_ context.Context, ref auth.KeyRef) error {
 		if !ok {
 			return nil
 		}
-		hash, found, err := s.findUserAPIKeyByID(tx, ref.UserID, ref.ID)
+		hash, found, err := findUserAPIKeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
@@ -282,7 +282,7 @@ func (s *Store) DeleteAPIKey(_ context.Context, ref auth.KeyRef) error {
 // when the user has no key with that id. The returned hash is a string copy, so
 // it is safe to use for a Put/Delete after the cursor advances. Must be called
 // inside a transaction. Decoding fails closed.
-func (s *Store) findUserAPIKeyByID(tx *bbolt.Tx, userID, id int64) (hash string, found bool, err error) {
+func findUserAPIKeyByID(tx *bbolt.Tx, userID, id int64) (hash string, found bool, err error) {
 	ib, ok := authBucket(tx, bucketIxAPIKeyUser)
 	if !ok {
 		return "", false, nil

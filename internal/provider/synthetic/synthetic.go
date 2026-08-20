@@ -207,7 +207,7 @@ func (p *syntheticProvider) generateResults(req *subflux.SearchRequest) []subflu
 				Provider:    providerName,
 				ID:          fmt.Sprintf("synthetic-%s-%d", lang, i),
 				Language:    lang,
-				ReleaseName: p.releaseNameFor(req, i),
+				ReleaseName: releaseNameFor(req, i),
 				DownloadURL: fmt.Sprintf("synthetic://download/%s/%d", lang, i),
 				MatchedBy:   subflux.MatchByTitle,
 				Title:       req.Title,
@@ -248,7 +248,7 @@ func (p *syntheticProvider) generateSeasonPackResults(req *subflux.SearchRequest
 	return results
 }
 
-func (p *syntheticProvider) releaseNameFor(req *subflux.SearchRequest, idx int) string {
+func releaseNameFor(req *subflux.SearchRequest, idx int) string {
 	groups := []string{"FLUX", "NTb", "SPARKS", "YTS", "RARBG"}
 	sources := []string{"BluRay", "WEB-DL", "HDTV", "WEBRip"}
 	codecs := []string{"x264", "x265", "AV1"}

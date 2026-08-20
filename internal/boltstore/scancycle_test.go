@@ -80,12 +80,12 @@ func TestRecordScanState_searched_flag_roundtrip(t *testing.T) {
 	put("tvdb-1-s01e01", true)
 	put("tvdb-1-s01e02", false)
 
-	rows, err := db.GetScanStates(ctx, subflux.MediaTypeEpisode, "")
+	rows, err := db.ScanStates(ctx, subflux.MediaTypeEpisode, "")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(rows) != 2 {
-		t.Fatalf("GetScanStates rows = %d, want 2", len(rows))
+		t.Fatalf("ScanStates rows = %d, want 2", len(rows))
 	}
 	bySearched := map[string]bool{}
 	for _, r := range rows {
@@ -101,9 +101,9 @@ func TestRecordScanState_searched_flag_roundtrip(t *testing.T) {
 	// A later inventory-only visit overwrites a searched stamp: each stamp
 	// describes its own visit.
 	put("tvdb-1-s01e01", false)
-	rows, err = db.GetScanStates(ctx, subflux.MediaTypeEpisode, "tvdb-1-s01e01")
+	rows, err = db.ScanStates(ctx, subflux.MediaTypeEpisode, "tvdb-1-s01e01")
 	if err != nil {
-		t.Fatalf("GetScanStates (prefix): %v", err)
+		t.Fatalf("ScanStates (prefix): %v", err)
 	}
 	if len(rows) != 1 || rows[0].Searched {
 		t.Errorf("re-stamp rows = %+v, want single Searched=false row", rows)

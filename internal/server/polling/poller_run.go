@@ -312,7 +312,7 @@ func (p *Poller) executeBatch(ctx context.Context, b *sourceBatch) {
 
 	searchCfg := ls.Cfg.Search()
 	scanDelay := searchCfg.ScanDelay
-	excludeIDs := p.getExcludeTagIDs(ctx, resolver, string(b.source),
+	excludeIDs := p.excludeTagIDs(ctx, resolver, string(b.source),
 		searchCfg.ExcludeArrTags, ls.Cfg.PollInterval())
 
 	latest, oldestFailed, completed := p.runBatchEntries(ctx, ls, b, process, excludeIDs, scanDelay)
@@ -372,9 +372,9 @@ func (p *Poller) runBatchEntries(ctx context.Context, ls *LiveState, b *sourceBa
 	return latest, oldestFailed, true
 }
 
-// getExcludeTagIDs returns cached tag IDs if still valid, otherwise resolves
+// excludeTagIDs returns cached tag IDs if still valid, otherwise resolves
 // them from the arr client and caches with singleflight deduplication.
-func (p *Poller) getExcludeTagIDs(ctx context.Context, client tagResolver, cacheKey string,
+func (p *Poller) excludeTagIDs(ctx context.Context, client tagResolver, cacheKey string,
 	tags []string, _ time.Duration,
 ) map[int]struct{} {
 	ids, err := p.tagCache.GetOrFetchCtx(ctx, cacheKey, func(ctx context.Context) (map[int]struct{}, error) {

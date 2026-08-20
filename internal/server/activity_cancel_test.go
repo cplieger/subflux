@@ -36,7 +36,7 @@ func adminUser() *auth.User { return &auth.User{ID: 1, Username: "admin", Role: 
 
 // startScanEntry seeds a running scan entry with a live stop registration and
 // returns its id plus a probe for whether the stop callback fired.
-func startScanEntry(s *Server, source activity.ActivitySource, scope activity.ScanScope, role auth.Role) (id string, stopped *bool) {
+func startScanEntry(s *Server, source activity.Source, scope activity.ScanScope, role auth.Role) (id string, stopped *bool) {
 	id, _ = s.activity.StartScan("Scan", "detail", source, scope, role)
 	fired := false
 	s.stops.RegisterStop(id, func() { fired = true })
@@ -79,7 +79,7 @@ func TestHandleCancelActivity_per_item_scan_any_user_204(t *testing.T) {
 
 func TestHandleCancelActivity_full_scan_role_matrix(t *testing.T) {
 	t.Parallel()
-	sources := []activity.ActivitySource{activity.SourceManual, activity.SourceScheduled}
+	sources := []activity.Source{activity.SourceManual, activity.SourceScheduled}
 	for _, source := range sources {
 		t.Run(string(source), func(t *testing.T) {
 			t.Parallel()

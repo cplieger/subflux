@@ -74,11 +74,11 @@ func ValidateDownloadRequest(req *DownloadRequest) error {
 
 // DownloadStore is what saving a manual download writes: the next ordinal for
 // the numbered file, the coverage row, the timing offset, and the download
-// record — plus SearchStore, because a download re-reads what the search leg
+// record — plus Store, because a download re-reads what the search leg
 // read. 6 of the 36 methods the store offers, composed by embedding so the two
 // legs cannot disagree about the read half.
 type DownloadStore interface {
-	SearchStore
+	Store
 	NextManualNumber(ctx context.Context, key subflux.ManualLockKey) int
 	UpsertSubtitleFile(ctx context.Context, mediaType subflux.MediaType, mediaID string, sf *subflux.SubtitleFile) error
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error

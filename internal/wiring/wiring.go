@@ -43,14 +43,14 @@ import (
 // signature are composition roots — main.go supplies the func, internal/server
 // holds the live *config.Config and calls it — so neither end has anything to
 // hide from the other. What the wiring reads (Providers, Scores, Sync) plus what
-// it hands to search.WithConfig (SearchCfg's 9) is 12 of the type's 37 methods,
+// it hands to search.WithConfig (Cfg's 9) is 12 of the type's 37 methods,
 // but a wiring-owned interface stating those 12 would be a THIRD name for a
 // surface search already declares and config already implements.
 type Func func(
 	ctx context.Context,
 	cfg *config.Config,
-	db search.SearchStore,
-	m search.SearchMetrics,
+	db search.Store,
+	m search.Metrics,
 ) (*search.Engine, *scorer.Engine, []provider.Provider, error)
 
 // Compile-time assertion: embedded.Detector satisfies

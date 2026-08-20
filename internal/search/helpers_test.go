@@ -167,8 +167,8 @@ func (m *mockFilterConfig) ProvidersForTarget(target *subflux.SubtitleTarget, al
 }
 
 // newEngine is a test helper that mirrors the old 7-parameter New signature.
-func newEngine(providers []provider.Provider, db SearchStore, cfg SearchCfg,
-	m SearchMetrics, sc Scorer, syncer SubtitleSyncer, tracks TrackDetector,
+func newEngine(providers []provider.Provider, db Store, cfg Cfg,
+	m Metrics, sc Scorer, syncer SubtitleSyncer, tracks TrackDetector,
 ) *Engine {
 	return New(providers, WithStore(db), WithConfig(cfg),
 		WithMetrics(m), WithScorer(sc), WithSyncer(syncer), WithTracks(tracks))

@@ -191,7 +191,7 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 			continue
 		}
 		g.Go(func() error {
-			subs, err := p.getSubtitlesForEntry(
+			subs, err := p.fetchSubtitlesForEntry(
 				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode,
 			)
 			if err != nil {
@@ -229,7 +229,7 @@ func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry
 	slog.Debug("animetosho searching by anidb eid", "eid", eid)
 
 	var entries []feedEntry
-	if err := p.getJSON(ctx, fmt.Sprintf("%s?eid=%d", feedURL, eid), &entries); err != nil {
+	if err := p.fetchJSON(ctx, fmt.Sprintf("%s?eid=%d", feedURL, eid), &entries); err != nil {
 		return nil, err
 	}
 
@@ -239,11 +239,11 @@ func (p *Provider) searchEntriesByEID(ctx context.Context, eid int) ([]feedEntry
 	return filtered, nil
 }
 
-// getJSON performs a GET request and decodes the response body (capped at
+// fetchJSON performs a GET request and decodes the response body (capped at
 // 5 MB) into v. Returns typed provider errors from CheckHTTPStatus so
 // callers preserve Retry-After hints for 429 responses. Callers own any
 // structured debug logging around the request.
-func (p *Provider) getJSON(ctx context.Context, reqURL string, v any) error {
+func (p *Provider) fetchJSON(ctx context.Context, reqURL string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func (p *Provider) searchEntries(ctx context.Context,
 	slog.Debug("animetosho searching entries", "query", query)
 
 	var entries []feedEntry
-	if err := p.getJSON(ctx,
+	if err := p.fetchJSON(ctx,
 		fmt.Sprintf("%s?q=%s", feedURL, url.QueryEscape(query)), &entries); err != nil {
 		return nil, err
 	}
@@ -287,18 +287,18 @@ func (p *Provider) searchEntries(ctx context.Context,
 	return filtered, nil
 }
 
-// getSubtitlesForEntry fetches the detail page for a single torrent entry
+// fetchSubtitlesForEntry fetches the detail page for a single torrent entry
 // and extracts subtitle attachments matching the requested languages.
 // For season packs (multiple files), only the file matching the target
 // episode is used.
-func (p *Provider) getSubtitlesForEntry(ctx context.Context,
+func (p *Provider) fetchSubtitlesForEntry(ctx context.Context,
 	entryID int, languages []string,
 	season, episode, absEpisode int,
 ) ([]subflux.Subtitle, error) {
 	slog.Debug("animetosho fetching entry subtitles", "entry_id", entryID)
 
 	var result entryDetail
-	if err := p.getJSON(ctx,
+	if err := p.fetchJSON(ctx,
 		fmt.Sprintf("%s?show=torrent&id=%d", feedURL, entryID), &result); err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func filterCompleteEntries(entries []feedEntry) []feedEntry {
 // applying type, ID, language, and episode filters. For entries with multiple
 // files (season packs), only the file matching the target season+episode is
 // used. For single-file entries, all subtitle attachments are returned.
-// Pure function extracted from getSubtitlesForEntry for testability.
+// Pure function extracted from fetchSubtitlesForEntry for testability.
 func filterAttachments(result entryDetail, languages []string,
 	season, episode, absEpisode int,
 ) []subflux.Subtitle {

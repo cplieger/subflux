@@ -392,7 +392,7 @@ func (d *DB) IsManuallyLocked(_ context.Context, key subflux.ManualLockKey) (boo
 // the language (the CLI/API "unlock this item+language" default). It is
 // NON-destructive: it flips each manual row's flag to auto (manual=false) and
 // rewrites the row, preserving its id, path, score, provider, release_name,
-// and media_imported, so the rows stay visible to GetState and DownloadedRefs
+// and media_imported, so the rows stay visible to State and DownloadedRefs
 // (Requirement 4.3). This mirrors the old SQLite `UPDATE subtitle_state SET
 // manual = 0 WHERE ... AND manual = 1`, which was a flag flip, not a delete.
 //
@@ -525,7 +525,7 @@ func (d *DB) NextManualNumber(_ context.Context, key subflux.ManualLockKey) int 
 
 // defaultQueryLimit is the safety cap applied when a caller passes Limit <= 0
 // ("no explicit limit"), matching the old SQLite store's 1000-row hard cap that
-// prevents unbounded allocation on an unfiltered GetState (Requirement 15.3).
+// prevents unbounded allocation on an unfiltered State (Requirement 15.3).
 const defaultQueryLimit = 1000
 
 // preallocCap caps the result-slice capacity hint so a large requested Limit
@@ -535,7 +535,7 @@ const defaultQueryLimit = 1000
 const preallocCap = 256
 
 // stateQuadInfo is a comparable (media_type, media_id, language, variant)
-// tuple used as a grouping/map key by the index-only reads (GetManualLocks'
+// tuple used as a grouping/map key by the index-only reads (ManualLocks'
 // accumulator) and reconcile's per-quad grouping. Row-bearing reads take the
 // quad from the self-contained stateRec instead.
 type stateQuadInfo struct {
@@ -547,7 +547,7 @@ type stateQuadInfo struct {
 
 // splitStateQuadKey parses an ix_state_quad key (mt 0x00 mid 0x00 lang 0x00
 // variant 0x00 be64(id)) back into its quad components and surrogate id. It
-// serves the index-only reads (GetManualLocks, HistoryMediaIDs), which answer
+// serves the index-only reads (ManualLocks, HistoryMediaIDs), which answer
 // from the index walk without dereferencing primaries. ok is false for a key
 // too short to hold the id or missing the quad components.
 func splitStateQuadKey(key []byte) (quad stateQuadInfo, id int64, ok bool) {
@@ -645,10 +645,10 @@ func stateEntryFrom(sr *stateRec) subflux.StateEntry {
 // subflux.StateEntry and applies the query's filters against the decoded
 // (self-contained) primary record. It returns matched=false to skip the row on
 // any index/primary drift, a filtered-out row, or a tolerated decode skip;
-// derr is non-nil only on a fail-closed decode error. Extracted from GetState
+// derr is non-nil only on a fail-closed decode error. Extracted from State
 // so the reverse-walk loop stays a thin offset/limit pager over the matched
 // rows.
-func (d *DB) matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (entry subflux.StateEntry, matched bool, derr error) {
+func matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (entry subflux.StateEntry, matched bool, derr error) {
 	_, primary, ok := kv.SplitTimeIndexKey(indexKey)
 	if !ok {
 		return subflux.StateEntry{}, false, nil
@@ -680,8 +680,8 @@ func (d *DB) matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []by
 	return stateEntryFrom(&sr), true, nil
 }
 
-// GetState returns subtitle-state rows matching the query, most-recently-
-// imported first. It mirrors the old SQLite GetState (Requirement 8.4, 15.1,
+// State returns subtitle-state rows matching the query, most-recently-
+// imported first. It mirrors the old SQLite State (Requirement 8.4, 15.1,
 // 15.2, 15.3):
 //
 //   - Filters by media_type, language (both carried in the ix_state_quad key)
@@ -706,8 +706,8 @@ func (d *DB) matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []by
 // of table size. A row whose primary cannot be decoded is skipped with a
 // warning (subtitle_state is a derived bucket the next scan rebuilds; this is
 // not a lock-bearing read).
-func (d *DB) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
-	slog.Debug("GetState",
+func (d *DB) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+	slog.Debug("State",
 		"media_type", q.MediaType, "lang", q.Language,
 		"provider", q.Provider, "search", q.Search,
 		"limit", q.Limit, "offset", q.Offset)
@@ -729,13 +729,13 @@ func (d *DB) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.State
 			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
 		var err error
-		out, err = d.collectStatePage(imp, sb, q, limit, offset)
+		out, err = collectStatePage(imp, sb, q, limit, offset)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug("GetState result", "count", len(out))
+	slog.Debug("State result", "count", len(out))
 	return out, nil
 }
 
@@ -745,7 +745,7 @@ func (d *DB) GetState(_ context.Context, q *subflux.StateQuery) ([]subflux.State
 // (which applies the query's filters), skips the first `offset` matched rows,
 // and collects up to `limit` entries. It preallocates a fixed, modest capacity
 // rather than one derived from the untrusted limit; append grows it as needed.
-func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit, offset int) ([]subflux.StateEntry, error) {
+func collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit, offset int) ([]subflux.StateEntry, error) {
 	out := make([]subflux.StateEntry, 0, preallocCap)
 	skipped := 0
 	c := imp.Cursor()
@@ -753,7 +753,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit
 		if len(out) >= limit {
 			break
 		}
-		entry, matched, derr := d.matchStateRow(sb, q, k)
+		entry, matched, derr := matchStateRow(sb, q, k)
 		if derr != nil {
 			return nil, derr
 		}
@@ -770,7 +770,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit
 	return out, nil
 }
 
-// GetManualLocks returns one entry per manually locked quad (a quad with at
+// ManualLocks returns one entry per manually locked quad (a quad with at
 // least one manual row), each carrying its manual-row count, ordered by
 // media_type then media_id. It mirrors the old SQLite
 // `SELECT media_type, media_id, language, COUNT(*) ... WHERE manual = 1
@@ -785,7 +785,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit
 // yields groups already ordered by (media_type, media_id) — a deterministic
 // refinement of the old ORDER BY. As a lock-bearing read it FAILS CLOSED: an
 // undecodable projection aborts the read rather than silently dropping a lock.
-func (d *DB) GetManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
+func (d *DB) ManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	var acc manualLockAccumulator
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateQuad))

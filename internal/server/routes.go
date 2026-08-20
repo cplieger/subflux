@@ -46,6 +46,7 @@ import (
 	"slices"
 
 	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.
@@ -103,9 +104,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	record := func(reg routeReg) { s.routeRegs = append(s.routeRegs, reg) }
 	public := newRouteGroup(mux, "public", record)
 	user := newRouteGroup(mux, "user", record, s.requireAuth)
-	admin := newRouteGroup(mux, "admin", record, s.requireAuth, s.requireRole(auth.RoleAdmin))
+	admin := newRouteGroup(mux, "admin", record, s.requireAuth, requireRole(auth.RoleAdmin))
 	userConfigured := newRouteGroup(mux, "userConfigured", record, s.requireAuth, s.requireConfigured)
-	adminConfigured := newRouteGroup(mux, "adminConfigured", record, s.requireAuth, s.requireRole(auth.RoleAdmin), s.requireConfigured)
+	adminConfigured := newRouteGroup(mux, "adminConfigured", record, s.requireAuth, requireRole(auth.RoleAdmin), s.requireConfigured)
 
 	// --- public: no auth ---
 
@@ -193,7 +194,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// config, so it cannot be store-resolved by construction. Admin-only —
 	// it reveals filesystem structure and belongs to the config-editing
 	// role that consumes it.
-	admin.Add("POST /api/config/validate-path", s.configH.HandleValidatePath)
+	admin.Add("POST /api/config/validate-path", confighandlers.HandleValidatePath)
 
 	// --- userConfigured: requires session + valid config ---
 

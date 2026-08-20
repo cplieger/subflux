@@ -198,9 +198,9 @@ type recordingActivity struct {
 	details map[string]string
 }
 
-func (r *recordingActivity) Start(string, string, activity.ActivitySource) string { return "act-9" }
-func (r *recordingActivity) End(string)                                           {}
-func (r *recordingActivity) Fail(string)                                          {}
+func (r *recordingActivity) Start(string, string, activity.Source) string { return "act-9" }
+func (r *recordingActivity) End(string)                                   {}
+func (r *recordingActivity) Fail(string)                                  {}
 func (r *recordingActivity) Progress(id string, _, _ int, detail string) {
 	r.details[id] = detail
 }

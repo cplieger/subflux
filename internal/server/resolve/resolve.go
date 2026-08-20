@@ -115,7 +115,7 @@ func (ref *MediaRef) Validate() error {
 // FileStore is the store surface resolution needs: the per-media subtitle
 // rows (key-derived identity incl. path).
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 
 // pathValidator is the containment check run on every resolved path as
@@ -161,7 +161,7 @@ func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*s
 	if err := ref.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSubtitleNotFound, err)
 	}
-	rows, err := r.Store.GetSubtitleFiles(ctx, ref.MediaType, ref.MediaID)
+	rows, err := r.Store.SubtitleFiles(ctx, ref.MediaType, ref.MediaID)
 	if err != nil {
 		return nil, fmt.Errorf("subtitle rows for %s/%s: %w", ref.MediaType, ref.MediaID, err)
 	}
@@ -222,7 +222,7 @@ func (r *Resolver) VideoPathForFile(ctx context.Context, ref *FileRef) (string, 
 		}
 		return row.VideoPath, nil
 	}
-	rows, err := r.Store.GetSubtitleFiles(ctx, ref.MediaType, ref.MediaID)
+	rows, err := r.Store.SubtitleFiles(ctx, ref.MediaType, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("subtitle rows for %s/%s: %w", ref.MediaType, ref.MediaID, err)
 	}

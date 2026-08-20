@@ -101,13 +101,13 @@ func (c *Config) ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []su
 
 // MinScoreForTarget returns the minimum score for a target,
 // falling back to the global min_score. The mediaType parameter is part of
-// search.SearchCfg's signature for future per-media-type score overrides;
+// search.Cfg's signature for future per-media-type score overrides;
 // currently unused.
 func (c *Config) MinScoreForTarget(t *subflux.SubtitleTarget, _ subflux.MediaType) int {
 	if t.MinScore != nil {
 		return *t.MinScore
 	}
-	return c.SearchCfg.MinScore
+	return c.Cfg.MinScore
 }
 
 // Sonarr returns the Sonarr connection config.
@@ -140,9 +140,6 @@ func arrConfig(y yamlArrConfig) subflux.ArrConfig {
 	}
 	return subflux.ArrConfig{URL: url, APIKey: y.APIKey, PublicURL: pub}
 }
-
-// ServerPort returns the fixed HTTP server port.
-func (c *Config) ServerPort() int { return ServerPort }
 
 // PollInterval returns the configured arr history poll interval.
 func (c *Config) PollInterval() time.Duration { return c.PollIntervalCfg.D }

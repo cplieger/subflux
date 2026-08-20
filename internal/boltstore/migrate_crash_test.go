@@ -152,9 +152,9 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Irreplaceable fixture: the manual row, its lock, the offset, the user.
-	entries, err := db.GetState(ctx, &subflux.StateQuery{})
+	entries, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	manuals := 0
 	var maxID int64
@@ -171,8 +171,8 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked = (%v, %v), want locked", locked, err)
 	}
-	if got, err := db.GetSyncOffset(ctx, crashOffsetPath); err != nil || got != wantOffset {
-		t.Errorf("GetSyncOffset = (%d, %v), want %d", got, err, wantOffset)
+	if got, err := db.SyncOffset(ctx, crashOffsetPath); err != nil || got != wantOffset {
+		t.Errorf("SyncOffset = (%d, %v), want %d", got, err, wantOffset)
 	}
 	as := authstore.New(db.Bolt())
 	if u, _, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
@@ -195,9 +195,9 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after recovery: %v", err)
 	}
-	after, err := db.GetState(ctx, &subflux.StateQuery{})
+	after, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState after insert: %v", err)
+		t.Fatalf("State after insert: %v", err)
 	}
 	for _, e := range after {
 		if e.MediaID == "tt8" && e.ID <= maxID {

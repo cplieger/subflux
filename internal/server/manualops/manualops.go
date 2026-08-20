@@ -43,17 +43,17 @@ type WarnRecorder interface {
 
 // SearchDeps holds the narrow dependencies for manual search execution.
 type SearchDeps struct {
-	DB       SearchStore
+	DB       Store
 	Activity ActivityTracker
 	Alerts   WarnRecorder
 	Events   EventPublisher
 }
 
-// SearchStore is the two rows a manual search touches: what is already on disk
+// Store is the two rows a manual search touches: what is already on disk
 // for the language (the popup's "downloaded" markers) and releasing a lock.
 // 2 of the 36 methods the store offers. The lock key's empty variant means
 // "all variants of the language" (see subflux.ManualLockKey).
-type SearchStore interface {
+type Store interface {
 	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
 	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
@@ -63,7 +63,7 @@ type SearchStore interface {
 // the entry detail so activity consumers (the remote CLI's poll loop)
 // can report it.
 type ActivityTracker interface {
-	Start(action, detail string, source activity.ActivitySource) string
+	Start(action, detail string, source activity.Source) string
 	End(id string)
 	Fail(id string)
 	Progress(id string, current, total int, detail string)

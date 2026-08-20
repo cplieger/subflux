@@ -59,7 +59,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 // requireRole returns a middleware that authorizes requests based on the
 // user's role. Must be chained after requireAuth so UserFromContext is
 // populated. Admin is a superset of user (see auth.HasRole).
-func (s *Server) requireRole(role auth.Role) middleware {
+func requireRole(role auth.Role) middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			user := authhandlers.UserFromContext(r.Context())

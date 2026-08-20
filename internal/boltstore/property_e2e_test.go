@@ -34,7 +34,7 @@ import (
 // (manual, score, provider) projection, ix_state_imported, ix_state_video,
 // and ix_scan_at — is rebuilt by re-scanning the primary and compared exactly
 // (compareIndex). The maintained counters are compared to a primary row count
-// (verifyCounters). search_attempts has no secondary index (GetBackoffItems
+// (verifyCounters). search_attempts has no secondary index (BackoffItems
 // sorts in memory), so only its counter is checked.
 
 // pubTriple is a (media_type, media_id, language) triple drawn by the

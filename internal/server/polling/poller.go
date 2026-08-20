@@ -26,7 +26,7 @@ type PollRadarrClient interface {
 	RescanMovie(ctx context.Context, movieID int) error
 }
 
-// tagResolver is the minimal surface getExcludeTagIDs needs, shared by both
+// tagResolver is the minimal surface excludeTagIDs needs, shared by both
 // role clients.
 type tagResolver interface {
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}

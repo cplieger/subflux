@@ -29,8 +29,8 @@ var (
 // store offers, and 2 of the 12 in the coverage family — these handlers report
 // coverage, they never record it.
 type CoverageStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
-	GetScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	ScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
 }
 
 // CoverageSonarrClient is the Sonarr surface coverage handlers use.
@@ -304,7 +304,7 @@ func (h *Handler) HandleCoverageDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prefix := "tvdb-" + tvdbStr + "-"
-	files, err := h.deps.Store.GetSubtitleFiles(ctx, subflux.MediaTypeEpisode, prefix)
+	files, err := h.deps.Store.SubtitleFiles(ctx, subflux.MediaTypeEpisode, prefix)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage detail")
 		return
@@ -329,7 +329,7 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, subflux.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
-	states, err := h.deps.Store.GetScanStates(ctx, subflux.MediaType(mediaType), prefix)
+	states, err := h.deps.Store.ScanStates(ctx, subflux.MediaType(mediaType), prefix)
 	if err != nil {
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "scan states")
 		return
@@ -386,7 +386,7 @@ func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, med
 	})
 	g.Go(func() error {
 		var err error
-		allFiles, err = h.deps.Store.GetSubtitleFiles(gctx, mediaType, "")
+		allFiles, err = h.deps.Store.SubtitleFiles(gctx, mediaType, "")
 		return err
 	})
 	if err := g.Wait(); err != nil {

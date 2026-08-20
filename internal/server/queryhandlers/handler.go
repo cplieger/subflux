@@ -16,10 +16,10 @@ import (
 // /api/backoff and /api/locks: 5 of the 36 methods the store offers, all of
 // them reads. Nothing on this path writes, which is why no write appears here.
 type QueryStore interface {
-	GetState(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
-	GetBackoffItems(ctx context.Context) ([]subflux.BackoffEntry, error)
-	GetBackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
-	GetManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
+	State(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
+	BackoffItems(ctx context.Context) ([]subflux.BackoffEntry, error)
+	BackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
+	ManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 

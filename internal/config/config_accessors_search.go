@@ -27,16 +27,16 @@ func (c *Config) Adaptive() subflux.AdaptiveConfig {
 // shares nothing a caller can reach.
 func (c *Config) Search() subflux.SearchConfig {
 	return subflux.SearchConfig{
-		ScanInterval:           c.SearchCfg.ScanInterval.D,
-		ProviderTimeout:        c.SearchCfg.ProviderTimeout.D,
-		ScanDelay:              c.SearchCfg.ScanDelay.D,
-		MinScore:               c.SearchCfg.MinScore,
-		UpgradeEnabled:         c.SearchCfg.UpgradeEnabled,
-		UpgradeWindowDays:      c.SearchCfg.UpgradeWindowDays,
-		ExcludeArrTags:         slices.Clone(c.SearchCfg.ExcludeArrTags),
-		DownloadMaxAttempts:    c.SearchCfg.DownloadMaxAttempts,
-		MaxProviderConcurrency: c.SearchCfg.MaxProviderConcurrency,
-		MaxSSEClients:          c.SearchCfg.MaxSSEClients,
+		ScanInterval:           c.Cfg.ScanInterval.D,
+		ProviderTimeout:        c.Cfg.ProviderTimeout.D,
+		ScanDelay:              c.Cfg.ScanDelay.D,
+		MinScore:               c.Cfg.MinScore,
+		UpgradeEnabled:         c.Cfg.UpgradeEnabled,
+		UpgradeWindowDays:      c.Cfg.UpgradeWindowDays,
+		ExcludeArrTags:         slices.Clone(c.Cfg.ExcludeArrTags),
+		DownloadMaxAttempts:    c.Cfg.DownloadMaxAttempts,
+		MaxProviderConcurrency: c.Cfg.MaxProviderConcurrency,
+		MaxSSEClients:          c.Cfg.MaxSSEClients,
 	}
 }
 

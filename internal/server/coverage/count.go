@@ -20,7 +20,7 @@ import (
 // is handed takes this as a parameter, and naming this type is what keeps that
 // signature from drifting into a wider one.
 type FileReader interface {
-	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 
 // CountCfg is what the missing-count pass reads out of the configuration: the
@@ -57,7 +57,7 @@ func CountMissingSeries(ctx context.Context, cfg CountCfg, db FileReader, allSer
 	if len(allSeries) == 0 {
 		return 0
 	}
-	epFiles, err := db.GetSubtitleFiles(ctx, subflux.MediaTypeEpisode, "")
+	epFiles, err := db.SubtitleFiles(ctx, subflux.MediaTypeEpisode, "")
 	if err != nil {
 		slog.Warn("countMissingSeries: DB query failed", "error", err)
 		return 0
@@ -152,7 +152,7 @@ func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMov
 	if len(allMovies) == 0 {
 		return 0
 	}
-	movieFiles, err := db.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "")
+	movieFiles, err := db.SubtitleFiles(ctx, subflux.MediaTypeMovie, "")
 	if err != nil {
 		slog.Warn("countMissingMovies: DB query failed", "error", err)
 		return 0

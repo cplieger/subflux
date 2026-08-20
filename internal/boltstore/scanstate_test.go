@@ -9,7 +9,7 @@ import (
 )
 
 // This file covers the task-5.2 scan_state domain: RecordScanState upsert with
-// ix_scan_at maintenance (Requirement 5.3), GetScanStates listing/prefix/order
+// ix_scan_at maintenance (Requirement 5.3), ScanStates listing/prefix/order
 // (Requirement 5.2), RecentlyScanned with an INCLUSIVE cutoff served from the
 // scan index (Requirement 5.4), and LastScanTime formatting + empty-when-none
 // (Requirement 5.6).
@@ -79,22 +79,22 @@ func TestRecordScanState_upsert_updates_same_row(t *testing.T) {
 	}
 }
 
-// getScans is a context-free GetScanStates for tests.
+// getScans is a context-free ScanStates for tests.
 func getScans(t *testing.T, db *DB, mt subflux.MediaType, prefix string) []subflux.ScanStateRow {
 	t.Helper()
-	rows, err := db.GetScanStates(t.Context(), mt, prefix)
+	rows, err := db.ScanStates(t.Context(), mt, prefix)
 	if err != nil {
-		t.Fatalf("GetScanStates(%q, %q): %v", mt, prefix, err)
+		t.Fatalf("ScanStates(%q, %q): %v", mt, prefix, err)
 	}
 	return rows
 }
 
-// --- GetScanStates listing/prefix/order (Requirement 5.2) ---
+// --- ScanStates listing/prefix/order (Requirement 5.2) ---
 
 func TestGetScanStates_empty(t *testing.T) {
 	db, _ := openTemp(t)
 	if rows := getScans(t, db, scanMTEp, ""); len(rows) != 0 {
-		t.Errorf("empty store GetScanStates = %+v, want none", rows)
+		t.Errorf("empty store ScanStates = %+v, want none", rows)
 	}
 }
 

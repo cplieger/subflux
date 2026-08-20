@@ -219,7 +219,7 @@ func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
 
 // HandleValidatePath checks whether a filesystem path exists inside the container.
 // POST /api/config/validate-path  body: {"path": "/media"}
-func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
+func HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return

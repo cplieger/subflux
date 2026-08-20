@@ -180,9 +180,9 @@ func TestMigrate_copyStepIdentity(t *testing.T) {
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after copy: %v", err)
 	}
-	entries, err := db.GetState(ctx, &subflux.StateQuery{})
+	entries, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState after copy: %v", err)
+		t.Fatalf("State after copy: %v", err)
 	}
 	wantRows := len(fx.manualRows) + len(fx.autoRows) + 1
 	if len(entries) != wantRows {
@@ -225,10 +225,10 @@ func TestMigrate_copyStepTransform(t *testing.T) {
 	ctx := context.Background()
 	t.Cleanup(func() { _ = db.Close(ctx) })
 
-	if got, err := db.GetSyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != 251 {
+	if got, err := db.SyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != 251 {
 		t.Errorf("transformed offset = (%d, %v), want 251", got, err)
 	}
-	if got, err := db.GetSyncOffset(ctx, "/m/tt1.fr.srt"); err != nil || got != 0 {
+	if got, err := db.SyncOffset(ctx, "/m/tt1.fr.srt"); err != nil || got != 0 {
 		t.Errorf("dropped offset = (%d, %v), want 0 (record dropped)", got, err)
 	}
 	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})

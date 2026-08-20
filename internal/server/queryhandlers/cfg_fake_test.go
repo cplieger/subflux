@@ -7,7 +7,7 @@ import (
 // fakeQueryCfg is the config double for this package's tests. Its width is the
 // UNION of two demands and nothing more: queryCfg's 11 methods, because
 // reporting the configuration is this family's job, plus the 4 extra that
-// search.SearchCfg adds (Sync, ProvidersForTarget, MinScoreForTarget,
+// search.Cfg adds (Sync, ProvidersForTarget, MinScoreForTarget,
 // ProviderPriority) because the score-simulation and provider-timeout tests
 // build a REAL search engine over the same value. 15 methods out of the 37 a
 // *config.Config offers.
@@ -67,7 +67,7 @@ func (c *fakeQueryCfg) PostProcess() subflux.PostProcessConfig { return c.postPr
 func (c *fakeQueryCfg) Sonarr() subflux.ArrConfig              { return c.sonarrCfg }
 func (c *fakeQueryCfg) Radarr() subflux.ArrConfig              { return c.radarrCfg }
 
-// --- the four search.SearchCfg adds ---
+// --- the four search.Cfg adds ---
 
 func (c *fakeQueryCfg) Sync() subflux.SyncConfig { return c.syncCfg }
 

@@ -28,7 +28,7 @@ import (
 
 // scanTimeLayout is the display/serialisation format for scanned_at, matching
 // the old SQLite store's CURRENT_TIMESTAMP string ("YYYY-MM-DD HH:MM:SS", UTC).
-// LastScanTime and GetScanStates both render scanned_at with this layout so the
+// LastScanTime and ScanStates both render scanned_at with this layout so the
 // API shape is byte-identical to the SQLite engine.
 const scanTimeLayout = "2006-01-02 15:04:05"
 
@@ -53,8 +53,8 @@ func (d *DB) RecordScanState(_ context.Context, rec *subflux.ScanRecord) error {
 	})
 }
 
-// GetScanStates returns the scan_state rows for a media type and an optional
-// media-id prefix, ordered by media_id. It mirrors the old SQLite GetScanStates
+// ScanStates returns the scan_state rows for a media type and an optional
+// media-id prefix, ordered by media_id. It mirrors the old SQLite ScanStates
 // (Requirement 5.2), which builds its filter with txutil.AppendPrefixFilter: an
 // empty prefix returns every row of the media type, and a non-empty prefix is a
 // byte-PREFIX match (media_id LIKE 'prefix%'). The bbolt cursor yields keys in
@@ -62,7 +62,7 @@ func (d *DB) RecordScanState(_ context.Context, rec *subflux.ScanRecord) error {
 // media_id, matching the SQL ORDER BY for free. scanned_at is rendered with
 // scanTimeLayout to match the SQLite string shape. scan_state is a derived
 // bucket, so an undecodable value is skipped with a warning (Requirement 13.4).
-func (d *DB) GetScanStates(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error) {
+func (d *DB) ScanStates(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error) {
 	prefix := append(typePrefix(mediaType), mediaIDPrefix...)
 
 	var out []subflux.ScanStateRow

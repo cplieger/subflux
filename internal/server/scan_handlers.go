@@ -22,7 +22,7 @@ func (s *Server) initScanHandler() *scanning.Handler {
 				Cfg:    ls.cfg,
 				Sonarr: ls.sonarr,
 				Radarr: ls.radarr,
-			}, s.scanLiveState(ls)
+			}, scanLiveState(ls)
 		},
 		CtxFunc:         func() context.Context { return s.lifetime },
 		ScanDeps:        s.scanDeps,

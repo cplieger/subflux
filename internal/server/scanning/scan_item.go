@@ -152,7 +152,7 @@ func collectEpisodes(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 ) []ScanItem {
 	items := make([]ScanItem, 0, 60000)
 	slog.Debug("fetching series from sonarr")
-	err := ls.Sonarr.GetWantedEpisodes(ctx, excludeTags,
+	err := ls.Sonarr.WantedEpisodes(ctx, excludeTags,
 		func(series arrapi.Series, ep arrapi.Episode) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -177,7 +177,7 @@ func collectMovies(ctx context.Context, ls *LiveState, alerts AlertRecorder,
 ) []ScanItem {
 	items := make([]ScanItem, 0, 5000)
 	slog.Debug("fetching movies from radarr")
-	err := ls.Radarr.GetWantedMovies(ctx, excludeTags,
+	err := ls.Radarr.WantedMovies(ctx, excludeTags,
 		func(m arrapi.Movie) error {
 			if err := ctx.Err(); err != nil {
 				return err

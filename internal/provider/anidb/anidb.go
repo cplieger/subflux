@@ -86,7 +86,7 @@ type EpisodeResult struct {
 // Resolve maps a TVDB series ID + season + episode to AniDB IDs.
 // Returns nil if no mapping exists.
 func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *EpisodeResult {
-	list, err := m.getParsedMapping(ctx)
+	list, err := m.parsedMapping(ctx)
 	if err != nil {
 		slog.Warn("anidb: failed to fetch mapping", "error", err)
 		return nil
@@ -106,7 +106,7 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 
 	// If we have an API key, resolve the episode-specific ID.
 	if m.clientKey != "" && seriesID > 0 && epNo > 0 {
-		epID, epErr := m.getEpisodeID(ctx, seriesID, epNo)
+		epID, epErr := m.episodeID(ctx, seriesID, epNo)
 		if epErr != nil {
 			slog.Debug("anidb: episode ID lookup failed",
 				"series_id", seriesID, "ep_no", epNo, "error", epErr)
@@ -120,13 +120,13 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 
 // --- Mapping XML ---
 
-// getParsedMapping returns the cached parsed anime list, fetching and
+// parsedMapping returns the cached parsed anime list, fetching and
 // parsing the XML if the cache is stale or empty. The lock is held for
 // the entire fetch to prevent thundering herd on cache expiry. Since
 // the cache refreshes every 24h and the fetch takes <2s, blocking
 // concurrent callers is acceptable. On fetch failure, returns the stale
 // cache (if any) with a warning log rather than failing the lookup.
-func (m *Mapper) getParsedMapping(ctx context.Context) (*animeList, error) {
+func (m *Mapper) parsedMapping(ctx context.Context) (*animeList, error) {
 	m.mu.Lock()
 	if m.parsedList != nil && time.Since(m.mappingTime) < 24*time.Hour {
 		list := m.parsedList

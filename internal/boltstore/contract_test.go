@@ -14,7 +14,7 @@ import (
 // suite (internal/store/storetest) against the bbolt *DB, proving the new
 // engine satisfies every promoted finding — the three ReconcileState branches,
 // non-destructive ClearManualLock, backoff cleared on save, DeleteStateByPaths
-// orphan cleanup, GetState filter/search/limit/offset, and both CleanupDrift
+// orphan cleanup, State filter/search/limit/offset, and both CleanupDrift
 // branches (Requirements 14.1, 14.2). The same suite runs against the legacy
 // SQLite store.DB (internal/store) for parity.
 func TestBoltStoreContract(t *testing.T) {
@@ -35,7 +35,7 @@ func TestBoltStoreContract(t *testing.T) {
 // fully-functional *DB but overrides ClearManualLock to DELETE the quad's
 // manual rows instead of flipping them to auto. That violates the promoted
 // non-destructive-ClearManualLock invariant (the rows must be preserved and
-// stay visible to GetState/DownloadedRefs, Requirement 4.3). It exists only to
+// stay visible to State/DownloadedRefs, Requirement 4.3). It exists only to
 // prove the contract suite's assertions actually catch a regression.
 type destructiveClearStore struct {
 	*DB

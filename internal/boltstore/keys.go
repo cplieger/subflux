@@ -154,7 +154,7 @@ func mediaPrefix(mt subflux.MediaType, mid string) []byte {
 //
 //	mt 0x00
 //
-// Used to scan every subtitle_files row of a media type (GetSubtitleFiles with
+// Used to scan every subtitle_files row of a media type (SubtitleFiles with
 // no media-id filter). A media-id PREFIX filter (e.g. "tvdb-111-") appends the
 // prefix bytes after this separator, which is why the boundary after the type
 // must already be sealed by the trailing 0x00.

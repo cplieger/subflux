@@ -35,7 +35,7 @@ type attemptRec struct {
 // value is SELF-CONTAINED: it carries the (media_type, media_id, language,
 // variant) quad and the surrogate id even though both also appear in the
 // ix_state_quad index key and the primary key respectively. That duplication
-// is deliberate: reads that start from a surrogate id (GetState's reverse
+// is deliberate: reads that start from a surrogate id (State's reverse
 // ix_state_imported walk, DeleteStateByPaths' ix_state_video walk, reconcile's
 // primary scan) recover the quad from one decode instead of rebuilding an
 // id -> quad map from a full index walk, and a row dumped by the bbolt CLI is
@@ -68,7 +68,7 @@ type stateRec struct {
 // key-only prefix walk), leaving only these fields in the value. With the key
 // components they reconstruct an subflux.SubtitleEntry. A subtitle's cumulative
 // sync offset is NOT stored here: it lives solely in the sync_offsets bucket
-// (keyed by bare path), which GetSubtitleFiles joins at read time.
+// (keyed by bare path), which SubtitleFiles joins at read time.
 type fileRec struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Codec     string    `json:"codec"`

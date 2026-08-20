@@ -11,13 +11,13 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// ActivitySource is a typed string for activity entry source values.
-type ActivitySource string //nolint:revive // stutters but renaming breaks callers
+// Source is a typed string for activity entry source values.
+type Source string
 
 // Activity source constants.
 const (
-	SourceScheduled ActivitySource = "scheduled"
-	SourceManual    ActivitySource = "manual"
+	SourceScheduled Source = "scheduled"
+	SourceManual    Source = "manual"
 )
 
 // ScanKind identifies which scan endpoint family a scan activity belongs to.
@@ -93,7 +93,7 @@ type Entry struct {
 	ID           string            `json:"id"`
 	Action       string            `json:"action"`
 	Detail       string            `json:"detail"`
-	Source       ActivitySource    `json:"source"` // "scheduled" or "manual"
+	Source       Source            `json:"source"` // "scheduled" or "manual"
 	Kind         ScanKind          `json:"kind,omitempty"`
 	MediaType    subflux.MediaType `json:"media_type,omitempty"`
 	RequiredRole auth.Role         `json:"required_role,omitempty"`
@@ -115,7 +115,7 @@ func New(maxItems int) *Log {
 }
 
 // Start records a new activity and returns its ID.
-func (a *Log) Start(action, detail string, source ActivitySource) string {
+func (a *Log) Start(action, detail string, source Source) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.startLocked(Entry{Action: action, Detail: detail, Source: source})
@@ -127,7 +127,7 @@ func (a *Log) Start(action, detail string, source ActivitySource) string {
 // its ID is returned with existing=true and no new entry is created — the
 // find-and-create pair runs under one lock so two concurrent same-scope
 // starts cannot both create an entry.
-func (a *Log) StartScan(action, detail string, source ActivitySource,
+func (a *Log) StartScan(action, detail string, source Source,
 	scope ScanScope, role auth.Role,
 ) (id string, existing bool) {
 	a.mu.Lock()

@@ -248,7 +248,7 @@ func deleteState(tx *bolt.Tx, id int64) (existed bool, err error) {
 // putAttempt inserts or updates a search_attempts row and maintains the
 // attempts counter, all in tx. search_attempts has no secondary index: the
 // hot read (BackedOffProviders) is a primary prefix scan, and the rare
-// GetBackoffItems listing sorts the (small, bounded-by-active-backoff)
+// BackoffItems listing sorts the (small, bounded-by-active-backoff)
 // bucket in memory.
 func putAttempt(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, p subflux.ProviderID, rec *attemptRec) error {
 	return kv.PutIndexed(tx, bucketSearchAttempts, attemptKey(mt, mid, lang, p), rec,

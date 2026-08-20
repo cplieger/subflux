@@ -244,7 +244,7 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	// Use NewPoller (rather than &Poller{...}) so the internal tagCache
-	// is initialized; the entries reach getExcludeTagIDs which dereferences
+	// is initialized; the entries reach excludeTagIDs which dereferences
 	// tagCache.
 	p := NewPoller(deps, func() *LiveState { return ls })
 
@@ -279,9 +279,9 @@ func TestNewPoller_defaultTTL_caches_tags(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
+	p.excludeTagIDs(ctx, fake, "default", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
+	p.excludeTagIDs(ctx, fake, "default", nil, 0)
 	if got := fake.calls.Load(); got != 1 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (default-branch ttl=4m must cache)", got)
 	}
@@ -294,9 +294,9 @@ func TestNewPoller_shortInterval_TTL_expires(t *testing.T) {
 	cfg := &mockCfg{interval: time.Millisecond}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
+	p.excludeTagIDs(ctx, fake, "short", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
+	p.excludeTagIDs(ctx, fake, "short", nil, 0)
 	if got := fake.calls.Load(); got != 2 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 2 (ttl=2ms expires before %v)", got, ttlProbeDelay)
 	}
@@ -309,9 +309,9 @@ func TestNewPoller_longInterval_TTL_caches(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
+	p.excludeTagIDs(ctx, fake, "long", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
+	p.excludeTagIDs(ctx, fake, "long", nil, 0)
 	if got := fake.calls.Load(); got != 1 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (ttl=2h must cache)", got)
 	}
@@ -366,19 +366,19 @@ func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	}
 }
 
-// --- getExcludeTagIDs ---
+// --- excludeTagIDs ---
 
-// getExcludeTagIDs returns the resolved IDs on a successful fetch.
+// excludeTagIDs returns the resolved IDs on a successful fetch.
 func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{42: {}}}
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ids := p.getExcludeTagIDs(t.Context(), fake, "ok", nil, 0)
+	ids := p.excludeTagIDs(t.Context(), fake, "ok", nil, 0)
 	if ids == nil {
-		t.Fatalf("getExcludeTagIDs on success returned nil")
+		t.Fatalf("excludeTagIDs on success returned nil")
 	}
 	if _, ok := ids[42]; !ok || len(ids) != 1 {
-		t.Errorf("getExcludeTagIDs = %v, want map[42:{}]", ids)
+		t.Errorf("excludeTagIDs = %v, want map[42:{}]", ids)
 	}
 }
 

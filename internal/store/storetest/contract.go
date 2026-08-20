@@ -20,7 +20,7 @@
 //   - non-destructive ClearManualLock (rows preserved, lock cleared),
 //   - backoff cleared on SaveDownload,
 //   - DeleteStateByPaths orphan cleanup (rows + backoff + coverage),
-//   - GetState filter / search / limit / offset,
+//   - State filter / search / limit / offset,
 //   - both CleanupDrift branches (removed languages/providers, Requirement 7.7;
 //     adaptive disabled, Requirement 7.8).
 //
@@ -77,7 +77,7 @@ type TB interface {
 }
 
 // Store is the surface this suite exercises: 27 of the 36 methods the concrete
-// store exports. The nine it does not touch are GetBackoffItems,
+// store exports. The nine it does not touch are BackoffItems,
 // HistoryMediaIDs, UpsertSubtitleFile, DeleteSubtitleFile, LastScanTime, the
 // three ScanCycleStart accessors, and Close — read paths and lifecycle that
 // their own consumers' tests cover. Listing 27 rather than inheriting 36 is
@@ -89,13 +89,13 @@ type Store interface {
 	// Adaptive backoff.
 	RecordNoResult(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, providerName subflux.ProviderID, bp subflux.BackoffParams) error
 	BackedOffProviders(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, maxAttempts int) ([]subflux.ProviderID, error)
-	GetBackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
+	BackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
 
 	// Download records and history.
 	SaveDownload(ctx context.Context, rec *subflux.DownloadRecord) error
 	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
 	CurrentScore(ctx context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (score int, mediaImported time.Time, found bool, err error)
-	GetState(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
+	State(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
 
 	// Manual locks and ordinals.
 	IsManuallyLocked(ctx context.Context, key subflux.ManualLockKey) (bool, error)
@@ -103,22 +103,22 @@ type Store interface {
 	ManualDownloadCount(ctx context.Context, key subflux.ManualLockKey) (int, error)
 	ManualSubtitlePaths(ctx context.Context, key subflux.ManualLockKey) ([]string, error)
 	NextManualNumber(ctx context.Context, key subflux.ManualLockKey) int
-	GetManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
+	ManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
 
 	// Coverage: subtitle files and scan state.
 	RecordSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaID string, files []subflux.SubtitleFile) (bool, error)
-	GetSubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
-	GetScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
+	ScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
 	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
 	TotalSubtitleFiles(ctx context.Context) (int, error)
 
 	// Sync offsets.
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
-	GetSyncOffset(ctx context.Context, path string) (int64, error)
+	SyncOffset(ctx context.Context, path string) (int64, error)
 
 	// Poll watermark.
-	GetPollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
+	PollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
 	SetPollTimestamp(ctx context.Context, key subflux.PollKey, t time.Time) error
 
 	// Maintenance.
@@ -377,12 +377,12 @@ func testAutoUpsertPreservesImported(t *testing.T, s Store) {
 	}
 
 	// The upgrade is in place: still exactly one row for the triple.
-	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != 1 {
-		t.Fatalf("GetState = %d rows after auto upgrade, want 1 (updated in place)", len(entries))
+		t.Fatalf("State = %d rows after auto upgrade, want 1 (updated in place)", len(entries))
 	}
 }
 
@@ -425,7 +425,7 @@ func testSaveClearsBackoff(t *testing.T, s Store) {
 
 // AssertClearManualLockNonDestructive asserts ClearManualLock is a NON-destructive
 // flag flip: the lock is cleared but the rows are preserved and stay visible to
-// GetState and DownloadedRefs (Requirement 4.3). It is exported and written
+// State and DownloadedRefs (Requirement 4.3). It is exported and written
 // against TB so the boltstore package can run it against a deliberately broken
 // (destructive) stub and assert the assertion fails — proving the suite catches
 // the regression.
@@ -451,12 +451,12 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 		t.Fatalf("IsManuallyLocked before clear = false, want true (manual row present)")
 	}
 
-	before, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	before, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState (before clear): %v", err)
+		t.Fatalf("State (before clear): %v", err)
 	}
 	if len(before) != 1 {
-		t.Fatalf("GetState before clear = %d rows, want 1", len(before))
+		t.Fatalf("State before clear = %d rows, want 1", len(before))
 	}
 
 	if cerr := s.ClearManualLock(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: mid, Language: langEng, Variant: subflux.VariantStandard}); cerr != nil {
@@ -472,12 +472,12 @@ func AssertClearManualLockNonDestructive(t TB, s Store) {
 	}
 
 	// Non-destructive: the row is preserved (now auto) and still visible.
-	after, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	after, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState (after clear): %v", err)
+		t.Fatalf("State (after clear): %v", err)
 	}
 	if len(after) != 1 {
-		t.Errorf("GetState after clear = %d rows, want 1 (rows preserved, not deleted)", len(after))
+		t.Errorf("State after clear = %d rows, want 1 (rows preserved, not deleted)", len(after))
 	} else if after[0].Manual {
 		t.Errorf("row after clear Manual = true, want false (flipped to auto)")
 	}
@@ -534,13 +534,13 @@ func testManualOrdinals(t *testing.T, s Store) {
 		t.Fatalf("NextManualNumber (after .1) = %d, want 2", n)
 	}
 
-	locks, err := s.GetManualLocks(ctx)
+	locks, err := s.ManualLocks(ctx)
 	if err != nil {
-		t.Fatalf("GetManualLocks: %v", err)
+		t.Fatalf("ManualLocks: %v", err)
 	}
 	if len(locks) != 1 || locks[0].MediaID != mid || locks[0].Language != langFra ||
 		locks[0].Variant != subflux.VariantStandard || locks[0].Count != 1 {
-		t.Fatalf("GetManualLocks = %+v, want one entry {%s, %s, standard, count=1}", locks, mid, langFra)
+		t.Fatalf("ManualLocks = %+v, want one entry {%s, %s, standard, count=1}", locks, mid, langFra)
 	}
 }
 
@@ -581,19 +581,19 @@ func assertVariantRowIndependence(t *testing.T, s Store, mid string) {
 	}
 
 	// Two distinct rows: the forced save must not overwrite the standard row.
-	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != 2 {
-		t.Fatalf("GetState = %d rows after standard+forced saves, want 2 (independent quads)", len(entries))
+		t.Fatalf("State = %d rows after standard+forced saves, want 2 (independent quads)", len(entries))
 	}
 	variants := map[subflux.Variant]bool{}
 	for i := range entries {
 		variants[entries[i].Variant] = true
 	}
 	if !variants[subflux.VariantStandard] || !variants[subflux.VariantForced] {
-		t.Fatalf("GetState variants = %v, want standard and forced exposed", variants)
+		t.Fatalf("State variants = %v, want standard and forced exposed", variants)
 	}
 
 	assertVariantScores(t, s, mid)
@@ -657,12 +657,12 @@ func assertVariantLockListAndClear(t *testing.T, s Store, mid string) {
 	t.Helper()
 	ctx := context.Background()
 
-	locks, err := s.GetManualLocks(ctx)
+	locks, err := s.ManualLocks(ctx)
 	if err != nil {
-		t.Fatalf("GetManualLocks: %v", err)
+		t.Fatalf("ManualLocks: %v", err)
 	}
 	if len(locks) != 1 || locks[0].Variant != subflux.VariantForced || locks[0].Count != 1 {
-		t.Fatalf("GetManualLocks = %+v, want one forced entry with count=1", locks)
+		t.Fatalf("ManualLocks = %+v, want one forced entry with count=1", locks)
 	}
 
 	// ClearManualLock("") clears every variant's lock for the language.
@@ -681,24 +681,24 @@ func testPollTimestamp(t *testing.T, s Store) {
 	ctx := context.Background()
 
 	// Absent key: zero time, no error.
-	got, err := s.GetPollTimestamp(ctx, subflux.PollKeyRadarr)
+	got, err := s.PollTimestamp(ctx, subflux.PollKeyRadarr)
 	if err != nil {
-		t.Fatalf("GetPollTimestamp (absent): %v", err)
+		t.Fatalf("PollTimestamp (absent): %v", err)
 	}
 	if !got.IsZero() {
-		t.Fatalf("GetPollTimestamp (absent) = %v, want zero time", got)
+		t.Fatalf("PollTimestamp (absent) = %v, want zero time", got)
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
 	if serr := s.SetPollTimestamp(ctx, subflux.PollKeySonarr, now); serr != nil {
 		t.Fatalf("SetPollTimestamp: %v", serr)
 	}
-	got, err = s.GetPollTimestamp(ctx, subflux.PollKeySonarr)
+	got, err = s.PollTimestamp(ctx, subflux.PollKeySonarr)
 	if err != nil {
-		t.Fatalf("GetPollTimestamp: %v", err)
+		t.Fatalf("PollTimestamp: %v", err)
 	}
 	if !got.Equal(now) {
-		t.Fatalf("GetPollTimestamp = %v, want %v", got, now)
+		t.Fatalf("PollTimestamp = %v, want %v", got, now)
 	}
 }
 
@@ -720,12 +720,12 @@ func testSyncOffset(t *testing.T, s Store) {
 	if err := s.SetSyncOffset(ctx, path, 1500); err != nil {
 		t.Fatalf("SetSyncOffset: %v", err)
 	}
-	got, err := s.GetSyncOffset(ctx, path)
+	got, err := s.SyncOffset(ctx, path)
 	if err != nil {
-		t.Fatalf("GetSyncOffset: %v", err)
+		t.Fatalf("SyncOffset: %v", err)
 	}
 	if got != 1500 {
-		t.Fatalf("GetSyncOffset = %d, want 1500", got)
+		t.Fatalf("SyncOffset = %d, want 1500", got)
 	}
 }
 
@@ -747,12 +747,12 @@ func testCoverageFiles(t *testing.T, s Store) {
 		t.Fatalf("RecordSubtitleFiles (first) changed = false, want true")
 	}
 
-	got, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-cov-1")
+	got, err := s.SubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-cov-1")
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles: %v", err)
+		t.Fatalf("SubtitleFiles: %v", err)
 	}
 	if len(got) != 1 || got[0].Language != langEng || got[0].Path != "/m/cov.eng.srt" {
-		t.Fatalf("GetSubtitleFiles = %+v, want one eng row at /m/cov.eng.srt", got)
+		t.Fatalf("SubtitleFiles = %+v, want one eng row at /m/cov.eng.srt", got)
 	}
 
 	total, err := s.TotalSubtitleFiles(ctx)
@@ -788,12 +788,12 @@ func testScanState(t *testing.T, s Store) {
 		t.Fatalf("RecordScanState: %v", err)
 	}
 
-	states, err := s.GetScanStates(ctx, subflux.MediaTypeEpisode, "tvdb-ss-1")
+	states, err := s.ScanStates(ctx, subflux.MediaTypeEpisode, "tvdb-ss-1")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 || states[0].Title != "ScanShow" {
-		t.Fatalf("GetScanStates = %+v, want one row titled ScanShow", states)
+		t.Fatalf("ScanStates = %+v, want one row titled ScanShow", states)
 	}
 
 	// A cutoff in the past includes the just-recorded item.
@@ -816,7 +816,7 @@ func testScanState(t *testing.T, s Store) {
 }
 
 // saveAuto is a small helper for the query case: it persists one auto download
-// row for a distinct triple with the given title/provider, so GetState filters
+// row for a distinct triple with the given title/provider, so State filters
 // have material to match.
 func saveAuto(t *testing.T, s Store, mt subflux.MediaType, mid, lang string, prov subflux.ProviderID, title string, score int) {
 	t.Helper()
@@ -829,7 +829,7 @@ func saveAuto(t *testing.T, s Store, mt subflux.MediaType, mid, lang string, pro
 	}
 }
 
-// testGetStateQuery asserts GetState filtering (type/language/provider), the
+// testGetStateQuery asserts State filtering (type/language/provider), the
 // case-insensitive contains title search, and limit/offset pagination
 // (Requirements 15.1, 15.2, 15.3, 15.5). Pagination is asserted by set-union so
 // it is robust to engine-specific tie ordering on equal media_imported.
@@ -843,12 +843,12 @@ func testGetStateQuery(t *testing.T, s Store) {
 	saveAuto(t, s, subflux.MediaTypeEpisode, "ttq4", langEng, subflux.ProviderID("subdl"), "Delta", 40)
 
 	assertCount := func(name string, q *subflux.StateQuery, want int) []subflux.StateEntry {
-		entries, err := s.GetState(ctx, q)
+		entries, err := s.State(ctx, q)
 		if err != nil {
-			t.Fatalf("GetState(%s): %v", name, err)
+			t.Fatalf("State(%s): %v", name, err)
 		}
 		if len(entries) != want {
-			t.Fatalf("GetState(%s) = %d rows, want %d", name, len(entries), want)
+			t.Fatalf("State(%s) = %d rows, want %d", name, len(entries), want)
 		}
 		return entries
 	}
@@ -861,7 +861,7 @@ func testGetStateQuery(t *testing.T, s Store) {
 	// Case-insensitive contains search on title.
 	search := assertCount("search=alp", &subflux.StateQuery{Search: "alp"}, 1)
 	if search[0].MediaID != "ttq1" {
-		t.Fatalf("GetState(search=alp)[0].MediaID = %q, want ttq1", search[0].MediaID)
+		t.Fatalf("State(search=alp)[0].MediaID = %q, want ttq1", search[0].MediaID)
 	}
 
 	// Pagination: two disjoint pages of 2 cover all 4 distinct rows.
@@ -933,19 +933,19 @@ func testDeleteStateByPaths(t *testing.T, s Store) {
 		t.Fatalf("attempts after delete = %d, want 0 (triple backoff cleared)", attempts)
 	}
 
-	covg, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, mid)
+	covg, err := s.SubtitleFiles(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles: %v", err)
+		t.Fatalf("SubtitleFiles: %v", err)
 	}
 	if len(covg) != 0 {
-		t.Fatalf("GetSubtitleFiles after delete = %d, want 0 (orphan coverage cleaned)", len(covg))
+		t.Fatalf("SubtitleFiles after delete = %d, want 0 (orphan coverage cleaned)", len(covg))
 	}
-	scans, err := s.GetScanStates(ctx, subflux.MediaTypeMovie, mid)
+	scans, err := s.ScanStates(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(scans) != 0 {
-		t.Fatalf("GetScanStates after delete = %d, want 0 (orphan scan_state cleaned)", len(scans))
+		t.Fatalf("ScanStates after delete = %d, want 0 (orphan scan_state cleaned)", len(scans))
 	}
 }
 
@@ -974,9 +974,9 @@ func testCleanupDriftRemoved(t *testing.T, s Store) {
 	if err := s.CleanupDrift(ctx, subflux.ConfigDrift{RemovedLanguages: []string{langFra}}); err != nil {
 		t.Fatalf("CleanupDrift(removed lang fra): %v", err)
 	}
-	remaining, err := s.GetBackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
+	remaining, err := s.BackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(remaining) != 2 {
 		t.Fatalf("after removing lang fra: %d backoff rows, want 2", len(remaining))
@@ -991,9 +991,9 @@ func testCleanupDriftRemoved(t *testing.T, s Store) {
 	if cerr := s.CleanupDrift(ctx, subflux.ConfigDrift{RemovedProviders: []subflux.ProviderID{subflux.ProviderID("subdl")}}); cerr != nil {
 		t.Fatalf("CleanupDrift(removed provider subdl): %v", cerr)
 	}
-	remaining, err = s.GetBackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
+	remaining, err = s.BackoffByPrefix(ctx, subflux.MediaTypeMovie, mid)
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(remaining) != 1 {
 		t.Fatalf("after removing provider subdl: %d backoff rows, want 1", len(remaining))
@@ -1096,19 +1096,19 @@ func testReconcileVideoGone(t *testing.T, s Store) {
 	// The gone media's orphaned coverage and scan_state are cleaned; the
 	// present media keeps no coverage rows of its own (none recorded) — assert
 	// the gone media specifically.
-	goneScans, err := s.GetScanStates(ctx, subflux.MediaTypeMovie, "tt-gone")
+	goneScans, err := s.ScanStates(ctx, subflux.MediaTypeMovie, "tt-gone")
 	if err != nil {
-		t.Fatalf("GetScanStates(gone): %v", err)
+		t.Fatalf("ScanStates(gone): %v", err)
 	}
 	if len(goneScans) != 0 {
-		t.Fatalf("GetScanStates(gone) = %d, want 0 (orphaned scan_state cleaned)", len(goneScans))
+		t.Fatalf("ScanStates(gone) = %d, want 0 (orphaned scan_state cleaned)", len(goneScans))
 	}
-	goneFiles, err := s.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-gone")
+	goneFiles, err := s.SubtitleFiles(ctx, subflux.MediaTypeMovie, "tt-gone")
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles(gone): %v", err)
+		t.Fatalf("SubtitleFiles(gone): %v", err)
 	}
 	if len(goneFiles) != 0 {
-		t.Fatalf("GetSubtitleFiles(gone) = %d, want 0 (orphaned coverage cleaned)", len(goneFiles))
+		t.Fatalf("SubtitleFiles(gone) = %d, want 0 (orphaned coverage cleaned)", len(goneFiles))
 	}
 }
 
@@ -1182,12 +1182,12 @@ func testReconcileSubGoneSiblingPresent(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = false, want true (lock preserved)")
 	}
 
-	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != 1 || entries[0].ReleaseName != "Present" {
-		t.Fatalf("GetState = %+v, want one row 'Present'", entries)
+		t.Fatalf("State = %+v, want one row 'Present'", entries)
 	}
 }
 
@@ -1251,12 +1251,12 @@ func testReconcileAllSubsGone(t *testing.T, s Store) {
 		t.Fatalf("IsManuallyLocked after reconcile = true, want false (manual row deleted)")
 	}
 
-	entries, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
+	entries, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != 1 {
-		t.Fatalf("GetState = %d rows, want 1 (auto reset, manual deleted)", len(entries))
+		t.Fatalf("State = %d rows, want 1 (auto reset, manual deleted)", len(entries))
 	}
 	if entries[0].Manual {
 		t.Fatalf("surviving row Manual = true, want false")

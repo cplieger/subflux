@@ -76,7 +76,7 @@ type scanEvt struct {
 	action  string
 	detail  string
 	actID   string
-	source  activity.ActivitySource
+	source  activity.Source
 	outcome activity.Outcome
 }
 

@@ -321,7 +321,7 @@ func (s *Store) RenamePasskey(_ context.Context, ref auth.PasskeyRef, name strin
 		if !ok {
 			return nil
 		}
-		credID, rec, found, err := s.findUserPasskeyByID(tx, ref.UserID, ref.ID)
+		credID, rec, found, err := findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
@@ -349,7 +349,7 @@ func (s *Store) DeletePasskey(_ context.Context, ref auth.PasskeyRef) error {
 		if !ok {
 			return nil
 		}
-		credID, _, found, err := s.findUserPasskeyByID(tx, ref.UserID, ref.ID)
+		credID, _, found, err := findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
@@ -397,7 +397,7 @@ func (s *Store) PasskeyCountForUser(_ context.Context, userID int64) (int, error
 // returns found=false with no error when the user has no passkey with that id.
 // The returned credID is copied so it is safe to use for a Put/Delete after the
 // cursor advances. Must be called inside a transaction. Decoding fails closed.
-func (s *Store) findUserPasskeyByID(tx *bbolt.Tx, userID, id int64) (credID []byte, rec *pkRec, found bool, err error) {
+func findUserPasskeyByID(tx *bbolt.Tx, userID, id int64) (credID []byte, rec *pkRec, found bool, err error) {
 	ib, ok := authBucket(tx, bucketIxPasskeyUser)
 	if !ok {
 		return nil, nil, false, nil

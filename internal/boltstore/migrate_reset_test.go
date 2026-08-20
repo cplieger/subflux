@@ -265,9 +265,9 @@ func assertAuthBucketsIdentical(t *testing.T, db *DB, before map[string]map[stri
 func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	entries, err := db.GetState(ctx, &subflux.StateQuery{})
+	entries, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != len(fx.manualRows) {
 		t.Fatalf("state rows after reset = %d, want %d (manual only)", len(entries), len(fx.manualRows))
@@ -317,9 +317,9 @@ func assertCoreResetOffsets(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
 	for p, want := range fx.offsets {
-		got, err := db.GetSyncOffset(ctx, p)
+		got, err := db.SyncOffset(ctx, p)
 		if err != nil || got != want {
-			t.Errorf("GetSyncOffset(%s) = (%d, %v), want %d", p, got, err, want)
+			t.Errorf("SyncOffset(%s) = (%d, %v), want %d", p, got, err, want)
 		}
 	}
 }
@@ -336,8 +336,8 @@ func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 	if n, err := db.TotalSubtitleFiles(ctx); err != nil || n != 0 {
 		t.Errorf("TotalSubtitleFiles after reset = (%d, %v), want 0", n, err)
 	}
-	if items, err := db.GetBackoffItems(ctx); err != nil || len(items) != 0 {
-		t.Errorf("GetBackoffItems after reset = (%v, %v), want none", items, err)
+	if items, err := db.BackoffItems(ctx); err != nil || len(items) != 0 {
+		t.Errorf("BackoffItems after reset = (%v, %v), want none", items, err)
 	}
 	err := db.db.View(func(tx *bolt.Tx) error {
 		for _, name := range []string{bucketScanState, bucketIxScanAt, bucketSubtitleFiles, bucketSearchAttempts} {
@@ -354,7 +354,7 @@ func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 
 // assertOffsetReattachment proves a restored (momentarily orphaned) offset
 // reattaches once the scan rebuilds the file inventory: after
-// RecordSubtitleFiles re-lists the file, GetSubtitleFiles reports the offset.
+// RecordSubtitleFiles re-lists the file, SubtitleFiles reports the offset.
 func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
@@ -363,9 +363,9 @@ func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles (rebuild): %v", err)
 	}
-	files, err := db.GetSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt1")
+	files, err := db.SubtitleFiles(ctx, subflux.MediaTypeMovie, "tt1")
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles: %v", err)
+		t.Fatalf("SubtitleFiles: %v", err)
 	}
 	found := false
 	for _, f := range files {
@@ -377,7 +377,7 @@ func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 		}
 	}
 	if !found {
-		t.Error("rebuilt subtitle file missing from GetSubtitleFiles")
+		t.Error("rebuilt subtitle file missing from SubtitleFiles")
 	}
 }
 
@@ -472,9 +472,9 @@ func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after raw-preserving reset = (%v, %v), want locked", locked, err)
 	}
-	entries, err := mdb.GetState(ctx, &subflux.StateQuery{})
+	entries, err := mdb.State(ctx, &subflux.StateQuery{})
 	if err != nil || len(entries) != 1 {
-		t.Fatalf("GetState = (%d entries, %v), want the one manual survivor", len(entries), err)
+		t.Fatalf("State = (%d entries, %v), want the one manual survivor", len(entries), err)
 	}
 	if e := entries[0]; e.ID != 1 || !e.Manual || e.Path != "/m/tt1.en.1.srt" || e.Score != 88 {
 		t.Errorf("survivor decoded as %+v, want id 1, manual, path /m/tt1.en.1.srt, score 88", e)
@@ -551,8 +551,8 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after auth reset = (%v, %v), want locked", locked, err)
 	}
-	if got, err := db.GetSyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != fx.offsets["/m/tt1.en.1.srt"] {
-		t.Errorf("GetSyncOffset after auth reset = (%d, %v), want %d", got, err, fx.offsets["/m/tt1.en.1.srt"])
+	if got, err := db.SyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != fx.offsets["/m/tt1.en.1.srt"] {
+		t.Errorf("SyncOffset after auth reset = (%d, %v), want %d", got, err, fx.offsets["/m/tt1.en.1.srt"])
 	}
 }
 
@@ -777,8 +777,8 @@ func assertPropertyReset(rt *rapid.T, db *DB, wantManual map[string]int, wantOrd
 	}
 
 	for p, want := range wantOffsets {
-		if gotOff, oerr := db.GetSyncOffset(ctx, p); oerr != nil || gotOff != want {
-			rt.Errorf("GetSyncOffset(%s) = (%d, %v), want %d", p, gotOff, oerr, want)
+		if gotOff, oerr := db.SyncOffset(ctx, p); oerr != nil || gotOff != want {
+			rt.Errorf("SyncOffset(%s) = (%d, %v), want %d", p, gotOff, oerr, want)
 		}
 	}
 	downloads, attempts, err := db.Stats(ctx)

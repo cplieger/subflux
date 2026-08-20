@@ -485,8 +485,8 @@ func TestOpen_runsPendingLadderSequentially(t *testing.T) {
 	}
 
 	// Migrated store stays fully usable.
-	if _, err := db.GetState(t.Context(), &subflux.StateQuery{}); err != nil {
-		t.Errorf("GetState after migration: %v", err)
+	if _, err := db.State(t.Context(), &subflux.StateQuery{}); err != nil {
+		t.Errorf("State after migration: %v", err)
 	}
 	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)

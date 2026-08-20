@@ -14,11 +14,11 @@ import (
 // found=false when no auto row, manual rows ignored; Requirement 3.4) and
 // DownloadedRefs (distinct (release_name, provider) pairs across auto and manual
 // rows, empty release names excluded; Requirement 3.5). The listing and
-// aggregate queries: GetState (filter by type/language/provider, literal-escaped
+// aggregate queries: State (filter by type/language/provider, literal-escaped
 // contains-match title search, 1000-row default cap, media_imported DESC then
 // id DESC ordering with a tie, shallow + deep pagination; Requirements 8.4,
 // 15.1, 15.2, 15.3, 15.5, 18.4), Stats (O(1) maintained counters across inserts
-// and deletes; Requirements 15.1, 18.1), GetManualLocks (one entry per locked
+// and deletes; Requirements 15.1, 18.1), ManualLocks (one entry per locked
 // triple with count, ordered by media_type then media_id; Requirement 15.2),
 // and HistoryMediaIDs (distinct ids, type filter, literal-escaped prefix;
 // Requirements 8.4, 15.3).
@@ -261,7 +261,7 @@ func deleteStateRow(t *testing.T, db *DB, id int64) {
 	}
 }
 
-// stateIDs projects the surrogate ids from a GetState result, in result order,
+// stateIDs projects the surrogate ids from a State result, in result order,
 // so ordering/pagination assertions compare ids rather than whole structs.
 func stateIDs(entries []subflux.StateEntry) []int64 {
 	out := make([]int64, len(entries))
@@ -283,7 +283,7 @@ func equalIDs(a, b []int64) bool {
 	return true
 }
 
-// --- GetState filters ---
+// --- State filters ---
 
 // TestGetState_filtersByTypeLanguageProvider asserts each filter narrows the
 // result set independently and that zero-value fields mean "no filter"
@@ -300,18 +300,18 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	putStateRow(t, db, subflux.MediaTypeMovie, "mv-en-os", "en", stateRec{Provider: subflux.ProviderNameOpenSubtitles, Title: "Mv EN OS"})
 
 	// No filter: all four rows.
-	all, err := db.GetState(ctx, &subflux.StateQuery{})
+	all, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState(all): %v", err)
+		t.Fatalf("State(all): %v", err)
 	}
 	if len(all) != 4 {
 		t.Errorf("unfiltered count = %d, want 4", len(all))
 	}
 
 	// MediaType filter.
-	eps, err := db.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeEpisode})
+	eps, err := db.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeEpisode})
 	if err != nil {
-		t.Fatalf("GetState(type): %v", err)
+		t.Fatalf("State(type): %v", err)
 	}
 	if len(eps) != 2 {
 		t.Errorf("type=episode count = %d, want 2", len(eps))
@@ -323,9 +323,9 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	}
 
 	// Language filter.
-	fr, err := db.GetState(ctx, &subflux.StateQuery{Language: "fr"})
+	fr, err := db.State(ctx, &subflux.StateQuery{Language: "fr"})
 	if err != nil {
-		t.Fatalf("GetState(lang): %v", err)
+		t.Fatalf("State(lang): %v", err)
 	}
 	if len(fr) != 2 {
 		t.Errorf("lang=fr count = %d, want 2", len(fr))
@@ -337,9 +337,9 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	}
 
 	// Provider filter.
-	sd, err := db.GetState(ctx, &subflux.StateQuery{Provider: subflux.ProviderNameSubDL})
+	sd, err := db.State(ctx, &subflux.StateQuery{Provider: subflux.ProviderNameSubDL})
 	if err != nil {
-		t.Fatalf("GetState(provider): %v", err)
+		t.Fatalf("State(provider): %v", err)
 	}
 	if len(sd) != 2 {
 		t.Errorf("provider=subdl count = %d, want 2", len(sd))
@@ -351,11 +351,11 @@ func TestGetState_filtersByTypeLanguageProvider(t *testing.T) {
 	}
 
 	// Combined filters narrow to exactly one row.
-	combo, err := db.GetState(ctx, &subflux.StateQuery{
+	combo, err := db.State(ctx, &subflux.StateQuery{
 		MediaType: subflux.MediaTypeMovie, Language: "fr", Provider: subflux.ProviderNameSubDL,
 	})
 	if err != nil {
-		t.Fatalf("GetState(combo): %v", err)
+		t.Fatalf("State(combo): %v", err)
 	}
 	if len(combo) != 1 || combo[0].MediaID != "mv-fr-sd" {
 		t.Errorf("combined filter = %+v, want exactly the mv-fr-sd row", combo)
@@ -394,9 +394,9 @@ func TestGetState_titleSearchTreatsWildcardsLiterally(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := db.GetState(ctx, &subflux.StateQuery{Search: c.search})
+			got, err := db.State(ctx, &subflux.StateQuery{Search: c.search})
 			if err != nil {
-				t.Fatalf("GetState(search=%q): %v", c.search, err)
+				t.Fatalf("State(search=%q): %v", c.search, err)
 			}
 			if len(got) != len(c.wantMIDs) {
 				t.Fatalf("search %q matched %d rows %v, want %d %v",
@@ -455,9 +455,9 @@ func TestGetState_defaultThousandRowCap(t *testing.T) {
 		t.Fatalf("bulk insert: %v", err)
 	}
 
-	got, err := db.GetState(ctx, &subflux.StateQuery{}) // Limit unset -> default cap
+	got, err := db.State(ctx, &subflux.StateQuery{}) // Limit unset -> default cap
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(got) != defaultQueryLimit {
 		t.Errorf("unlimited query returned %d rows, want the %d default cap", len(got), defaultQueryLimit)
@@ -497,9 +497,9 @@ func TestGetState_orderingMediaImportedDescThenIDDesc(t *testing.T) {
 	idB := putStateRow(t, db, subflux.MediaTypeMovie, "m-b", "en", stateRec{Title: "B", MediaImported: t1})
 	idC := putStateRow(t, db, subflux.MediaTypeMovie, "m-c", "en", stateRec{Title: "C", MediaImported: t1})
 
-	got, err := db.GetState(ctx, &subflux.StateQuery{})
+	got, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	want := []int64{idA, idC, idB} // t2 first; then t1 tie broken by id DESC
 	if gotIDs := stateIDs(got); !equalIDs(gotIDs, want) {
@@ -525,36 +525,36 @@ func TestGetState_paginationShallowOffsetAndDeepPage(t *testing.T) {
 	fullDesc := []int64{ids[4], ids[3], ids[2], ids[1], ids[0]}
 
 	// Shallow page 1.
-	p1, err := db.GetState(ctx, &subflux.StateQuery{Limit: 2, Offset: 0})
+	p1, err := db.State(ctx, &subflux.StateQuery{Limit: 2, Offset: 0})
 	if err != nil {
-		t.Fatalf("GetState(page1): %v", err)
+		t.Fatalf("State(page1): %v", err)
 	}
 	if want := fullDesc[0:2]; !equalIDs(stateIDs(p1), want) {
 		t.Errorf("page1 = %v, want %v", stateIDs(p1), want)
 	}
 
 	// Shallow page 2.
-	p2, err := db.GetState(ctx, &subflux.StateQuery{Limit: 2, Offset: 2})
+	p2, err := db.State(ctx, &subflux.StateQuery{Limit: 2, Offset: 2})
 	if err != nil {
-		t.Fatalf("GetState(page2): %v", err)
+		t.Fatalf("State(page2): %v", err)
 	}
 	if want := fullDesc[2:4]; !equalIDs(stateIDs(p2), want) {
 		t.Errorf("page2 = %v, want %v", stateIDs(p2), want)
 	}
 
 	// Deep page: offset past the shallow pages returns the tail only.
-	deep, err := db.GetState(ctx, &subflux.StateQuery{Limit: 2, Offset: 4})
+	deep, err := db.State(ctx, &subflux.StateQuery{Limit: 2, Offset: 4})
 	if err != nil {
-		t.Fatalf("GetState(deep): %v", err)
+		t.Fatalf("State(deep): %v", err)
 	}
 	if want := fullDesc[4:5]; !equalIDs(stateIDs(deep), want) {
 		t.Errorf("deep page = %v, want %v", stateIDs(deep), want)
 	}
 
 	// Offset beyond the end returns nothing.
-	empty, err := db.GetState(ctx, &subflux.StateQuery{Limit: 2, Offset: 99})
+	empty, err := db.State(ctx, &subflux.StateQuery{Limit: 2, Offset: 99})
 	if err != nil {
-		t.Fatalf("GetState(beyond): %v", err)
+		t.Fatalf("State(beyond): %v", err)
 	}
 	if len(empty) != 0 {
 		t.Errorf("offset beyond end = %v, want empty", stateIDs(empty))
@@ -632,9 +632,9 @@ func TestStats_countersTrackInsertsAndDeletes(t *testing.T) {
 	}
 }
 
-// --- GetManualLocks ---
+// --- ManualLocks ---
 
-// TestGetManualLocks_oneEntryPerLockedTripleOrdered asserts GetManualLocks
+// TestGetManualLocks_oneEntryPerLockedTripleOrdered asserts ManualLocks
 // returns one entry per triple that has at least one manual row, carrying the
 // manual-row count, ordered by media_type then media_id; auto-only triples are
 // excluded (Requirement 15.2). Mirrors the old GROUP BY ... ORDER BY
@@ -653,9 +653,9 @@ func TestGetManualLocks_oneEntryPerLockedTripleOrdered(t *testing.T) {
 	// episode/tt-c/en: auto only -> must NOT appear.
 	putStateRow(t, db, subflux.MediaTypeEpisode, "tt-c", "en", stateRec{Manual: false, Path: "/m/c.en.srt"})
 
-	got, err := db.GetManualLocks(ctx)
+	got, err := db.ManualLocks(ctx)
 	if err != nil {
-		t.Fatalf("GetManualLocks: %v", err)
+		t.Fatalf("ManualLocks: %v", err)
 	}
 
 	want := []subflux.ManualLockEntry{
@@ -680,9 +680,9 @@ func TestGetManualLocks_emptyWhenNoManualRows(t *testing.T) {
 	ctx := t.Context()
 
 	putStateRow(t, db, subflux.MediaTypeMovie, "m-1", "en", stateRec{Manual: false})
-	got, err := db.GetManualLocks(ctx)
+	got, err := db.ManualLocks(ctx)
 	if err != nil {
-		t.Fatalf("GetManualLocks: %v", err)
+		t.Fatalf("ManualLocks: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("locks = %+v, want none (no manual rows)", got)

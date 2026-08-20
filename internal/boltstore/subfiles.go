@@ -25,7 +25,7 @@ import (
 // key-only prefix walk with no value decode (Requirement 18.2); only the codec
 // lives in the JSON value. The cumulative sync offset lives solely in the
 // sync_offsets bucket (keyed by bare path, written by SetSyncOffset);
-// GetSubtitleFiles joins it per row. Every write routes through the
+// SubtitleFiles joins it per row. Every write routes through the
 // putSubtitleFile / deleteSubtitleFile index-maintenance chokepoints so the
 // O(1) TotalSubtitleFiles counter in the meta bucket stays consistent in the
 // same transaction as the row write (Requirement 18.1), and deleteSubtitleFile
@@ -65,11 +65,11 @@ func (d *DB) RecordSubtitleFiles(_ context.Context, mediaType subflux.MediaType,
 		if err != nil {
 			return err
 		}
-		deleted, err := d.deleteStaleFileRows(tx, mediaType, mediaID, have, want)
+		deleted, err := deleteStaleFileRows(tx, mediaType, mediaID, have, want)
 		if err != nil {
 			return err
 		}
-		applied, err := d.applyWantedFileRows(tx, mediaType, mediaID, have, want)
+		applied, err := applyWantedFileRows(tx, mediaType, mediaID, have, want)
 		if err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (d *DB) RecordSubtitleFiles(_ context.Context, mediaType subflux.MediaType,
 // deleteStaleFileRows deletes the subtitle_files rows present in `have` but
 // absent from `want` (no longer on disk) through the deleteSubtitleFile
 // chokepoint, returning whether any row was actually removed.
-func (d *DB) deleteStaleFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
+func deleteStaleFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
 	changed := false
 	for k := range have {
 		if _, ok := want[k]; ok {
@@ -110,7 +110,7 @@ func (d *DB) deleteStaleFileRows(tx *bolt.Tx, mediaType subflux.MediaType, media
 // applyWantedFileRows inserts the rows in `want` missing from `have` and
 // rewrites rows whose codec changed, through the putFileRow chokepoint. It
 // returns whether any insert or codec update happened.
-func (d *DB) applyWantedFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
+func applyWantedFileRows(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, have map[subFileKey]fileRec, want map[subFileKey]string) (bool, error) {
 	changed := false
 	now := time.Now().UTC()
 	for k, codec := range want {
@@ -118,7 +118,7 @@ func (d *DB) applyWantedFileRows(tx *bolt.Tx, mediaType subflux.MediaType, media
 		switch {
 		case !exists, old.Codec != codec:
 			rec := fileRec{Codec: codec, UpdatedAt: now}
-			if perr := d.putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
+			if perr := putFileRow(tx, mediaType, mediaID, k, &rec); perr != nil {
 				return false, perr
 			}
 			changed = true
@@ -131,7 +131,7 @@ func (d *DB) applyWantedFileRows(tx *bolt.Tx, mediaType subflux.MediaType, media
 // through the putSubtitleFile chokepoint (which maintains the TotalSubtitleFiles
 // counter). It is a thin helper so RecordSubtitleFiles' insert and update arms
 // build the key identically.
-func (d *DB) putFileRow(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, k subFileKey, rec *fileRec) error {
+func putFileRow(tx *bolt.Tx, mediaType subflux.MediaType, mediaID string, k subFileKey, rec *fileRec) error {
 	key := subtitleFileKey(mediaType, mediaID, k.lang, subflux.Variant(k.variant), subflux.SubtitleSource(k.source), k.path)
 	return putSubtitleFile(tx, key, rec)
 }
@@ -204,10 +204,10 @@ func (d *DB) DeleteSubtitleFile(_ context.Context, mediaType subflux.MediaType, 
 	})
 }
 
-// GetSubtitleFiles returns the subtitle_files rows for a media type and an
+// SubtitleFiles returns the subtitle_files rows for a media type and an
 // optional media-id filter, ordered by media_id, language, variant, source
 // (the natural byte order of the composite key, so the cursor yields it for
-// free). It mirrors the old SQLite GetSubtitleFiles, including the prefix
+// free). It mirrors the old SQLite SubtitleFiles, including the prefix
 // semantics and the subtitle_state join (Requirement 5.2):
 //
 //   - an empty filter returns every row of the media type,
@@ -222,7 +222,7 @@ func (d *DB) DeleteSubtitleFile(_ context.Context, mediaType subflux.MediaType, 
 // COALESCE defaults: an embedded row always reports score 0 and an empty
 // video_path; an external row takes them from the triple's auto subtitle_state
 // row (see autoStateInfo). An undecodable value is skipped (derived bucket).
-func (d *DB) GetSubtitleFiles(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error) {
+func (d *DB) SubtitleFiles(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error) {
 	scanPrefix := filesScanPrefix(mediaType, mediaIDPrefix)
 
 	var out []subflux.SubtitleEntry
@@ -235,7 +235,7 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType subflux.MediaType, me
 		}
 		c := b.Cursor()
 		for key, v := c.Seek(scanPrefix); key != nil && bytes.HasPrefix(key, scanPrefix); key, v = c.Next() {
-			entry, skip, derr := d.subtitleEntryFromRow(tx, mediaType, key, v, autoCache)
+			entry, skip, derr := subtitleEntryFromRow(tx, mediaType, key, v, autoCache)
 			if derr != nil {
 				return derr
 			}
@@ -253,7 +253,7 @@ func (d *DB) GetSubtitleFiles(_ context.Context, mediaType subflux.MediaType, me
 }
 
 // autoStateJoin caches the subtitle_state auto-row join result (score and
-// video_path) for one (media_id, language) so GetSubtitleFiles stays O(rows)
+// video_path) for one (media_id, language) so SubtitleFiles stays O(rows)
 // even when a triple's rows are non-adjacent in cursor order.
 type autoStateJoin struct {
 	videoPath string
@@ -267,7 +267,7 @@ type autoStateJoin struct {
 // _id, language) cache; embedded rows keep the COALESCE defaults (score 0, empty
 // video_path). It returns skip=true for a malformed key or an undecodable
 // (tolerated, derived-bucket) value.
-func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType subflux.MediaType, key, v []byte, autoCache map[string]autoStateJoin) (subflux.SubtitleEntry, bool, error) {
+func subtitleEntryFromRow(tx *bolt.Tx, mediaType subflux.MediaType, key, v []byte, autoCache map[string]autoStateJoin) (subflux.SubtitleEntry, bool, error) {
 	parts := kv.Split(key)
 	if len(parts) < 6 {
 		return subflux.SubtitleEntry{}, true, nil // malformed key
@@ -311,7 +311,7 @@ func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType subflux.MediaType, key,
 	// The JOIN excludes embedded rows, so they keep the COALESCE defaults
 	// (score 0, empty video_path).
 	if source != string(subflux.SourceEmbedded) {
-		info := d.cachedAutoStateInfo(tx, mediaType, mid, lang, subflux.Variant(variant), autoCache)
+		info := cachedAutoStateInfo(tx, mediaType, mid, lang, subflux.Variant(variant), autoCache)
 		entry.Score = info.score
 		entry.VideoPath = info.videoPath
 	}
@@ -321,7 +321,7 @@ func (d *DB) subtitleEntryFromRow(tx *bolt.Tx, mediaType subflux.MediaType, key,
 // cachedAutoStateInfo returns the auto-row join (score, video_path) for the
 // (media_id, language, variant) quad, memoizing the autoStateInfo lookup in
 // cache.
-func (d *DB) cachedAutoStateInfo(tx *bolt.Tx, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant, cache map[string]autoStateJoin) autoStateJoin {
+func cachedAutoStateInfo(tx *bolt.Tx, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant, cache map[string]autoStateJoin) autoStateJoin {
 	cacheKey := mediaID + string(kv.Sep) + language + string(kv.Sep) + string(variant)
 	info, ok := cache[cacheKey]
 	if !ok {
@@ -332,7 +332,7 @@ func (d *DB) cachedAutoStateInfo(tx *bolt.Tx, mediaType subflux.MediaType, media
 	return info
 }
 
-// filesScanPrefix builds the bbolt cursor prefix for a GetSubtitleFiles query,
+// filesScanPrefix builds the bbolt cursor prefix for a SubtitleFiles query,
 // reproducing the old SQLite prefix semantics:
 //
 //   - "" -> typePrefix(mt) (mt 0x00): all rows of the media type,
@@ -353,7 +353,7 @@ func filesScanPrefix(mediaType subflux.MediaType, mediaIDPrefix string) []byte {
 }
 
 // autoStateInfo returns the representative auto (manual=false) subtitle_state
-// score and video_path for a quad, reproducing the GetSubtitleFiles LEFT JOIN
+// score and video_path for a quad, reproducing the SubtitleFiles LEFT JOIN
 // on (media_type, media_id, language) AND s.manual = 0, refined per variant so
 // a forced file row joins the forced auto row's score, never the standard
 // one's. When the quad has no auto row the COALESCE defaults apply (score 0,
@@ -380,7 +380,7 @@ func autoStateInfo(tx *bolt.Tx, mediaType subflux.MediaType, mediaID, language s
 
 // bestAutoStateID scans ix_state_quad for the quad and returns the surrogate
 // id and score of the highest-scored auto (manual=false) row. found is false
-// when the quad has no auto row. Only auto rows feed the GetSubtitleFiles
+// when the quad has no auto row. Only auto rows feed the SubtitleFiles
 // join; the highest-scored row is the representative, matching CurrentScore.
 func bestAutoStateID(idx *bolt.Bucket, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (id int64, score int, found bool) {
 	prefix := quadPrefix(mediaType, mediaID, language, variant)
@@ -463,7 +463,7 @@ func storedSyncOffset(tx *bolt.Tx, path string) (offsetMs int64, ok bool) {
 // JSON, since sync_offsets has no secondary index and no projection. The int64
 // is reinterpreted as a uint64 for encoding, which is bit-preserving, so a
 // negative offset (subtitle ahead of audio) round-trips exactly through
-// GetSyncOffset. A later set for the same path overwrites the prior value.
+// SyncOffset. A later set for the same path overwrites the prior value.
 func (d *DB) SetSyncOffset(_ context.Context, path string, offsetMs int64) error {
 	return d.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSyncOffsets))
@@ -474,12 +474,12 @@ func (d *DB) SetSyncOffset(_ context.Context, path string, offsetMs int64) error
 	})
 }
 
-// GetSyncOffset returns the stored sync offset (in milliseconds) for a subtitle
+// SyncOffset returns the stored sync offset (in milliseconds) for a subtitle
 // path, or 0 with no error when the path has no stored offset (Requirement
 // 6.1), matching the old SQLite store's not-found-means-zero behaviour. The
 // value is the be64(offset_ms) written by SetSyncOffset, decoded and
 // reinterpreted back to int64 (bit-preserving, so negatives round-trip).
-func (d *DB) GetSyncOffset(_ context.Context, path string) (int64, error) {
+func (d *DB) SyncOffset(_ context.Context, path string) (int64, error) {
 	var offset int64
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSyncOffsets))

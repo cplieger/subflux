@@ -22,7 +22,7 @@ import (
 // SyncStore is the offset pair audio-sync reads and writes: 2 of the 36
 // methods the store offers. Sync handlers touch no other row family.
 type SyncStore interface {
-	GetSyncOffset(ctx context.Context, path string) (int64, error)
+	SyncOffset(ctx context.Context, path string) (int64, error)
 	SetSyncOffset(ctx context.Context, path string, offsetMs int64) error
 }
 
@@ -269,7 +269,7 @@ func (h *Handler) HandleSyncOffset(w http.ResponseWriter, r *http.Request) {
 		"subtitle", filepath.Base(subtitlePath),
 		"offset_ms", req.OffsetMs)
 
-	currentOffset, err := h.store.GetSyncOffset(ctx, subtitlePath)
+	currentOffset, err := h.store.SyncOffset(ctx, subtitlePath)
 	if err != nil {
 		slog.Debug("sync offset: no previous offset, treating as zero",
 			"path", subtitlePath, "error", err)
@@ -393,7 +393,7 @@ func (h *Handler) applySyncResult(ctx context.Context, path string, cues []subfl
 		return 0, fmt.Errorf("save (write): %w", err)
 	}
 
-	prevOffset, offsetErr := h.store.GetSyncOffset(ctx, path)
+	prevOffset, offsetErr := h.store.SyncOffset(ctx, path)
 	if offsetErr != nil {
 		slog.Debug("no previous sync offset, starting from zero", "path", path)
 	}

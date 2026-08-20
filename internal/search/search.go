@@ -19,12 +19,10 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// SearchMetrics is the narrow observability interface consumed by the search
+// Metrics is the narrow observability interface consumed by the search
 // engine. Only the 4 methods actually called are required; the concrete
 // *obs.Metrics satisfies this via structural typing.
-//
-//nolint:revive // name is established API; renaming would break consumers
-type SearchMetrics interface {
+type Metrics interface {
 	RecordSearch(provider subflux.ProviderID, dur time.Duration, err error)
 	RecordDownload(provider subflux.ProviderID, err error)
 	AdaptiveSkip()
@@ -80,9 +78,9 @@ type Scorer interface {
 
 // Engine coordinates subtitle searches.
 type Engine struct {
-	store           SearchStore
-	cfg             SearchCfg
-	metrics         SearchMetrics
+	store           Store
+	cfg             Cfg
+	metrics         Metrics
 	scorer          Scorer
 	syncer          SubtitleSyncer
 	tracks          TrackDetector
@@ -100,13 +98,13 @@ type Engine struct {
 type Option func(*Engine)
 
 // WithStore sets the search store.
-func WithStore(s SearchStore) Option { return func(e *Engine) { e.store = s } }
+func WithStore(s Store) Option { return func(e *Engine) { e.store = s } }
 
 // WithConfig sets the search configuration.
-func WithConfig(c SearchCfg) Option { return func(e *Engine) { e.cfg = c } }
+func WithConfig(c Cfg) Option { return func(e *Engine) { e.cfg = c } }
 
 // WithMetrics sets the metrics recorder.
-func WithMetrics(m SearchMetrics) Option { return func(e *Engine) { e.metrics = m } }
+func WithMetrics(m Metrics) Option { return func(e *Engine) { e.metrics = m } }
 
 // WithScorer sets the subtitle scorer.
 func WithScorer(s Scorer) Option { return func(e *Engine) { e.scorer = s } }

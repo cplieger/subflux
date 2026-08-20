@@ -60,23 +60,23 @@ func TestNopStoreContract(t *testing.T) {
 
 	t.Run("GetBackoffItems_returns_nil_no_error", func(t *testing.T) {
 		t.Parallel()
-		got, err := s.GetBackoffItems(ctx)
+		got, err := s.BackoffItems(ctx)
 		if err != nil {
-			t.Fatalf("GetBackoffItems: %v", err)
+			t.Fatalf("BackoffItems: %v", err)
 		}
 		if got != nil {
-			t.Errorf("GetBackoffItems = %v, want nil", got)
+			t.Errorf("BackoffItems = %v, want nil", got)
 		}
 	})
 
 	t.Run("GetState_returns_nil_no_error", func(t *testing.T) {
 		t.Parallel()
-		got, err := s.GetState(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie, Language: "eng", Limit: 50})
+		got, err := s.State(ctx, &subflux.StateQuery{MediaType: subflux.MediaTypeMovie, Language: "eng", Limit: 50})
 		if err != nil {
-			t.Fatalf("GetState: %v", err)
+			t.Fatalf("State: %v", err)
 		}
 		if got != nil {
-			t.Errorf("GetState = %v, want nil", got)
+			t.Errorf("State = %v, want nil", got)
 		}
 	})
 
@@ -125,7 +125,7 @@ func TestNopStoreContract(t *testing.T) {
 // embeds most of these and internal/server's own New(&NopStore{}) call is its
 // compile-time check.
 type nopStoreConsumers interface {
-	search.SearchStore
+	search.Store
 	scanning.ScanStore
 	scanning.BackoffPrefixReader
 	scheduler.Store

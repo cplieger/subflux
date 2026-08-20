@@ -155,7 +155,7 @@ const (
 // returned run func executes the scan and applies its terminal outcome; the
 // caller owns the ScanningFlag guard and decides whether to run it inline
 // (scheduler tick) or in a background goroutine (HTTP handler).
-func PrepareFullScan(deps *Deps, source activity.ActivitySource) (actID string, run func(ctx context.Context)) {
+func PrepareFullScan(deps *Deps, source activity.Source) (actID string, run func(ctx context.Context)) {
 	actID, _ = deps.Activity.StartScan(FullScanAction, FullScanDetail, source,
 		activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
 	deps.Events.PublishScanStart(&events.ScanEvent{

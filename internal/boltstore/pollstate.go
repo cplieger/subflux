@@ -28,13 +28,13 @@ import (
 // original precision and timezone offset.
 const pollTimeLayout = time.RFC3339Nano
 
-// GetPollTimestamp returns the last poll cursor stored for an arr source, or the
+// PollTimestamp returns the last poll cursor stored for an arr source, or the
 // zero time with no error when the key has no stored value (Requirement 6.3),
 // matching the old SQLite not-found-means-zero behaviour. A non-canonical key is
 // rejected (mirrors the old store's key.Valid guard), and a stored value that
 // cannot be parsed as RFC3339Nano is surfaced as an error rather than silently
 // treated as the zero time.
-func (d *DB) GetPollTimestamp(_ context.Context, key subflux.PollKey) (time.Time, error) {
+func (d *DB) PollTimestamp(_ context.Context, key subflux.PollKey) (time.Time, error) {
 	if !key.Valid() {
 		return time.Time{}, fmt.Errorf("get poll timestamp: invalid key %q", key)
 	}
@@ -62,7 +62,7 @@ func (d *DB) GetPollTimestamp(_ context.Context, key subflux.PollKey) (time.Time
 }
 
 // SetPollTimestamp stores the last poll cursor for an arr source, formatted with
-// RFC3339Nano so GetPollTimestamp recovers it with full precision (Requirement
+// RFC3339Nano so PollTimestamp recovers it with full precision (Requirement
 // 6.2). A non-canonical key is rejected before any write (mirrors the old
 // store's key.Valid guard), preventing a typo from silently creating a new
 // cursor row and forcing a full history re-fetch. A later set overwrites the

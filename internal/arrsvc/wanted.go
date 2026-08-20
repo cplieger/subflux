@@ -21,12 +21,12 @@ type seriesEpisodes struct {
 	series   arrapi.Series
 }
 
-// GetWantedEpisodes invokes fn for every episode that needs a subtitle search.
+// WantedEpisodes invokes fn for every episode that needs a subtitle search.
 // It fetches the full series list first (closing that connection), then fetches
 // each non-excluded series' episodes concurrently (bounded to 6 goroutines),
 // then invokes fn sequentially. A series whose episode fetch keeps failing is
 // logged and skipped rather than aborting the whole scan.
-func (s *Sonarr) GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error {
+func (s *Sonarr) WantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error {
 	allSeries, err := s.GetSeries(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch series list: %w", err)
@@ -124,10 +124,10 @@ func dispatchEpisodes(ctx context.Context, results []seriesEpisodes, fn func(arr
 	return nil
 }
 
-// GetWantedMovies invokes fn for every movie that needs a subtitle search.
+// WantedMovies invokes fn for every movie that needs a subtitle search.
 // It fetches the full movie list first (closing that connection), then iterates
 // locally, skipping movies with an excluded tag or no file.
-func (r *Radarr) GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error {
+func (r *Radarr) WantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error {
 	allMovies, err := r.GetMovies(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch movie list: %w", err)

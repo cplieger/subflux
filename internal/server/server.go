@@ -104,7 +104,7 @@ type DurabilityMetrics interface {
 // because the composition root wires a single concrete recorder to all of
 // them, and it is the only place their sum is named.
 type Metrics interface {
-	search.SearchMetrics
+	search.Metrics
 	scanning.ScanMetrics
 	polling.PollerMetrics
 	queryhandlers.MetricsReader
@@ -153,7 +153,7 @@ type Store interface {
 	scanning.ScanStore
 	scanning.BackoffPrefixReader
 	scheduler.Store
-	search.SearchStore
+	search.Store
 
 	// Coverage: the stats endpoint's two aggregate reads, and the one row read
 	// the bound missing-count closure performs.
@@ -171,7 +171,7 @@ type Store interface {
 	// Read and write the history-poll watermark. Held by the server because
 	// polling reads it through the write-through PollCache the server builds,
 	// not directly.
-	GetPollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
+	PollTimestamp(ctx context.Context, key subflux.PollKey) (time.Time, error)
 	SetPollTimestamp(ctx context.Context, key subflux.PollKey, t time.Time) error
 
 	// Drop search_attempts rows for languages and providers a config edit
@@ -289,7 +289,7 @@ func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 		// hot config edit swaps what these return without re-wiring the
 		// handler (a direct field would stay stale forever).
 		WebAuthnResolver: func() *webauthn.WebAuthn { return s.state().webauthn },
-		OIDCResolver:     s.getOIDC,
+		OIDCResolver:     s.oidcProvider,
 		Ceremonies:       s.ceremonies,
 		Config: func() authhandlers.AuthConfig {
 			if ls := s.state(); ls != nil && ls.cfg != nil {
@@ -327,7 +327,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 
-	addr := fmt.Sprintf(":%d", ls.cfg.ServerPort())
+	addr := fmt.Sprintf(":%d", config.ServerPort)
 
 	if cfg := s.state().cfg; cfg != nil && cfg.AuthDisabled() {
 		slog.Warn("AUTHENTICATION DISABLED via auth.disable_auth config; all requests treated as admin")
@@ -357,12 +357,12 @@ func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
 	s.serveAndWait(ctx, addr, mux, onReady)
 }
 
-// getOIDC resolves the OIDC provider from the CURRENT snapshot's lazy slot.
+// oidcProvider resolves the OIDC provider from the CURRENT snapshot's lazy slot.
 // A nil slot means OIDC is disabled in the live config; otherwise the slot
 // performs (or reuses) its lazy discovery. Because the slot is per config,
 // an issuer edit activates a fresh slot and can never serve a provider
 // discovered under the previous config.
-func (s *Server) getOIDC() *authoidc.Provider {
+func (s *Server) oidcProvider() *authoidc.Provider {
 	slot := s.state().oidc
 	if slot == nil {
 		return nil

@@ -96,8 +96,8 @@ func TestAccessors_return_configured_values(t *testing.T) {
 
 	t.Run("ServerPort", func(t *testing.T) {
 		t.Parallel()
-		if got := cfg.ServerPort(); got != 8374 {
-			t.Errorf("ServerPort() = %d, want %d", got, 8374)
+		if ServerPort != 8374 {
+			t.Errorf("ServerPort = %d, want %d", ServerPort, 8374)
 		}
 	})
 
@@ -252,7 +252,7 @@ func TestValidate_radarr_public_url_only_passes(t *testing.T) {
 		},
 		PollIntervalCfg: Duration{D: 30 * time.Second},
 		ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
-		SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+		Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 	}
 	if err := validate(t.Context(), cfg); err != nil {
 		t.Errorf("validate() unexpected error for radarr with public_url only: %v", err)
@@ -389,7 +389,7 @@ func TestValidate_min_score_boundary_values(t *testing.T) {
 				},
 				ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 				PollIntervalCfg: Duration{D: 30 * time.Second},
-				SearchCfg:       yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+				Cfg:             yamlSearchConfig{MinScore: score, ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 			}
 			if err := validate(t.Context(), cfg); err != nil {
 				t.Errorf("validate() unexpected error for min_score=%d: %v", score, err)

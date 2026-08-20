@@ -16,7 +16,7 @@ import (
 // Its WIDTH is now derived, not declared. There is no store interface for it to
 // be exhaustive against any more, so what it must implement is exactly the
 // union of the narrow interfaces the eight packages that use it install it as
-// (search.SearchStore, scanning.ScanStore, scheduler.Store,
+// (search.Store, scanning.ScanStore, scheduler.Store,
 // queryhandlers.QueryStore, synchandlers.SyncStore, filehandlers.FileStore,
 // coveragehandlers.CoverageStore, manualops.DownloadStore, polling.PollerStore,
 // resolve.FileStore, coverage.FileReader, and server.Store, which is the union of
@@ -50,11 +50,11 @@ func (*NopStore) BackedOffProviders(context.Context, subflux.MediaType, string, 
 	return nil, nil
 }
 
-// GetBackoffItems returns all items currently in adaptive search backoff.
-func (*NopStore) GetBackoffItems(context.Context) ([]subflux.BackoffEntry, error) { return nil, nil }
+// BackoffItems returns all items currently in adaptive search backoff.
+func (*NopStore) BackoffItems(context.Context) ([]subflux.BackoffEntry, error) { return nil, nil }
 
-// GetBackoffByPrefix returns backoff entries matching the given media type and ID prefix.
-func (*NopStore) GetBackoffByPrefix(context.Context, subflux.MediaType, string) ([]subflux.BackoffEntry, error) {
+// BackoffByPrefix returns backoff entries matching the given media type and ID prefix.
+func (*NopStore) BackoffByPrefix(context.Context, subflux.MediaType, string) ([]subflux.BackoffEntry, error) {
 	return nil, nil
 }
 
@@ -73,8 +73,8 @@ func (*NopStore) CurrentScore(context.Context, subflux.MediaType, string, string
 	return 0, time.Time{}, false, nil
 }
 
-// GetState returns download state entries matching the query.
-func (*NopStore) GetState(context.Context, *subflux.StateQuery) ([]subflux.StateEntry, error) {
+// State returns download state entries matching the query.
+func (*NopStore) State(context.Context, *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	return nil, nil
 }
 
@@ -105,8 +105,8 @@ func (*NopStore) NextManualNumber(context.Context, subflux.ManualLockKey) int {
 	return 1
 }
 
-// GetManualLocks returns all active manual download locks.
-func (*NopStore) GetManualLocks(context.Context) ([]subflux.ManualLockEntry, error) { return nil, nil }
+// ManualLocks returns all active manual download locks.
+func (*NopStore) ManualLocks(context.Context) ([]subflux.ManualLockEntry, error) { return nil, nil }
 
 // --- Coverage (subtitle_files + scan_state) ---
 
@@ -120,8 +120,8 @@ func (*NopStore) UpsertSubtitleFile(context.Context, subflux.MediaType, string, 
 	return nil
 }
 
-// GetSubtitleFiles returns subtitle file records for a media item.
-func (*NopStore) GetSubtitleFiles(context.Context, subflux.MediaType, string) ([]subflux.SubtitleEntry, error) {
+// SubtitleFiles returns subtitle file records for a media item.
+func (*NopStore) SubtitleFiles(context.Context, subflux.MediaType, string) ([]subflux.SubtitleEntry, error) {
 	return nil, nil
 }
 
@@ -135,8 +135,8 @@ func (*NopStore) RecordScanState(context.Context, *subflux.ScanRecord) error {
 	return nil
 }
 
-// GetScanStates returns scan state records for a media item prefix.
-func (*NopStore) GetScanStates(context.Context, subflux.MediaType, string) ([]subflux.ScanStateRow, error) {
+// ScanStates returns scan state records for a media item prefix.
+func (*NopStore) ScanStates(context.Context, subflux.MediaType, string) ([]subflux.ScanStateRow, error) {
 	return nil, nil
 }
 
@@ -165,13 +165,13 @@ func (*NopStore) LastScanTime(context.Context) (string, error) { return "", nil 
 // SetSyncOffset stores the subtitle timing offset in milliseconds for a video path.
 func (*NopStore) SetSyncOffset(context.Context, string, int64) error { return nil }
 
-// GetSyncOffset returns the stored timing offset in milliseconds for a video path.
-func (*NopStore) GetSyncOffset(context.Context, string) (int64, error) { return 0, nil }
+// SyncOffset returns the stored timing offset in milliseconds for a video path.
+func (*NopStore) SyncOffset(context.Context, string) (int64, error) { return 0, nil }
 
 // --- Poll timestamps ---
 
-// GetPollTimestamp returns the last poll timestamp for the given poll key.
-func (*NopStore) GetPollTimestamp(context.Context, subflux.PollKey) (time.Time, error) {
+// PollTimestamp returns the last poll timestamp for the given poll key.
+func (*NopStore) PollTimestamp(context.Context, subflux.PollKey) (time.Time, error) {
 	return time.Time{}, nil
 }
 

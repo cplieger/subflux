@@ -72,11 +72,11 @@ func (NotifyEvent) eventData() {}
 // (completed | failed | cancelled | shutdown) — a cancelled scan is neither
 // a success nor a failure.
 type ScanEvent struct {
-	Action     string                  `json:"action"`
-	Detail     string                  `json:"detail"`
-	Source     activity.ActivitySource `json:"source"`
-	ActivityID string                  `json:"activity_id,omitempty"`
-	Outcome    activity.Outcome        `json:"outcome,omitempty"`
+	Action     string           `json:"action"`
+	Detail     string           `json:"detail"`
+	Source     activity.Source  `json:"source"`
+	ActivityID string           `json:"activity_id,omitempty"`
+	Outcome    activity.Outcome `json:"outcome,omitempty"`
 }
 
 func (ScanEvent) eventData() {}

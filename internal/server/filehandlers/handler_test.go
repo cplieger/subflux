@@ -31,7 +31,7 @@ type fakeFileStore struct {
 	histType    subflux.MediaType
 }
 
-func (m *fakeFileStore) GetSubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
+func (m *fakeFileStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.rows, m.getErr
 }
 

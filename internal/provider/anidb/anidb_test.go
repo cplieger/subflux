@@ -314,7 +314,7 @@ func TestBuildEpisodeCacheKey(t *testing.T) {
 func TestBuildEpisodeCacheKey_matches_getEpisodeID_format(t *testing.T) {
 	t.Parallel()
 
-	// Regression guard: getEpisodeID builds its cache key from two ints and
+	// Regression guard: episodeID builds its cache key from two ints and
 	// buildEpisodeCacheKey from a series id plus the XML episode string. Both go
 	// through keyenc.Join, and the literal below is the byte-identity oracle —
 	// the encoding must still spell a numeric key exactly as the previous

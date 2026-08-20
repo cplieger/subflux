@@ -100,7 +100,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{radarr: tt.radarr})
 
-			got := s.lookupMovieMediaID(t.Context(), s.state(), tt.arrID)
+			got := lookupMovieMediaID(t.Context(), s.state(), tt.arrID)
 			if got != tt.want {
 				t.Errorf("lookupMovieMediaID(ctx, ls, %d) = %q, want %q",
 					tt.arrID, got, tt.want)
@@ -137,7 +137,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{sonarr: tt.sonarr})
 
-			got := s.lookupEpisodeMediaID(t.Context(), s.state(), tt.series, tt.season, tt.episode)
+			got := lookupEpisodeMediaID(t.Context(), s.state(), tt.series, tt.season, tt.episode)
 			if got != tt.want {
 				t.Errorf("lookupEpisodeMediaID(ctx, ls, %d, %d, %d) = %q, want %q",
 					tt.series, tt.season, tt.episode, got, tt.want)

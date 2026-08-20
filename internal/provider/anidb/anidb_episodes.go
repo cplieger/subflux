@@ -21,7 +21,7 @@ import (
 
 // buildEpisodeCacheKey builds the episodeCache key for a series and
 // episode number string. Numeric episode numbers are normalized to their
-// integer form so lookups from getEpisodeID (which builds the same key from
+// integer form so lookups from episodeID (which builds the same key from
 // an int) match regardless of leading zeros or whitespace in the source XML.
 // Non-numeric episode numbers (S1/C1/T1 for specials, credits, trailers)
 // use the trimmed raw string.
@@ -34,7 +34,7 @@ import (
 // yields another episode's AniDB episode id, animetosho searches by that id
 // (searchByEpisodeID), and the WRONG episode's subtitle is scored and written
 // next to this video, where it then counts as covered and is never retried.
-// This key is built here (write side, from the XML) and in getEpisodeID (read
+// This key is built here (write side, from the XML) and in episodeID (read
 // side, from the resolved episode number); both must stay on this grammar or
 // every lookup misses. Ordinary epNos carry neither ':' nor '\', so the bytes
 // are unchanged.
@@ -63,7 +63,7 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 	return nil
 }
 
-// getEpisodeID returns the AniDB episode ID for a series+episode pair.
+// episodeID returns the AniDB episode ID for a series+episode pair.
 // Fetches and caches all episodes from the series on first access.
 //
 // Concurrent callers for the same seriesID coalesce via singleflight:
@@ -81,7 +81,7 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 // exactly; it is used anyway so the two sides share one encoder rather than
 // two format strings that can drift apart. See buildEpisodeCacheKey for what a
 // collision costs.
-func (m *Mapper) getEpisodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
+func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
 	cacheKey := keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(episodeNo))
 
 	// Fast path: already cached.

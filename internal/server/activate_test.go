@@ -82,7 +82,7 @@ type closableArrClient struct {
 func (c *closableArrClient) Close() { c.closed++ }
 
 // okWire is a wiring.Func that always succeeds with one stub provider.
-func okWire(_ context.Context, _ *config.Config, _ search.SearchStore, _ search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
+func okWire(_ context.Context, _ *config.Config, _ search.Store, _ search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 	return nil, nil, []provider.Provider{&stubProvider{name: "mock"}}, nil
 }
 
@@ -267,7 +267,7 @@ func TestActivate_prepare_failure_preserves_previous_snapshot(t *testing.T) {
 		{
 			name: "wire failure",
 			breakServer: func(s *Server) {
-				s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
+				s.wire = func(context.Context, *config.Config, search.Store, search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 					return nil, nil, nil, errMock
 				}
 			},
@@ -356,7 +356,7 @@ func TestWorkerLatch_wire_failure_then_successful_save_launches_once(t *testing.
 	t.Parallel()
 	s, launches := newActivationTestServer(t)
 
-	s.wire = func(context.Context, *config.Config, search.SearchStore, search.SearchMetrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
+	s.wire = func(context.Context, *config.Config, search.Store, search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
 		return nil, nil, nil, errMock
 	}
 	if err := s.hotReload(t.Context(), activationCfg{}.build(t)); err == nil {
@@ -513,7 +513,7 @@ func TestActivate_oidc_issuer_edit_rediscovers_fresh_slot(t *testing.T) {
 	s, _ := newActivationTestServer(t)
 	h := &authhandlers.Handler{
 		OidcDB:       fakeOIDCStore{},
-		OIDCResolver: s.getOIDC,
+		OIDCResolver: s.oidcProvider,
 	}
 
 	// Activate with issuer A and complete a SUCCESSFUL discovery.

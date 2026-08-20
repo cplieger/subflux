@@ -17,7 +17,7 @@ import (
 )
 
 // This file holds the adaptive-backoff domain (the search_attempts bucket):
-// RecordNoResult, BackedOffProviders, GetBackoffItems, and GetBackoffByPrefix.
+// RecordNoResult, BackedOffProviders, BackoffItems, and BackoffByPrefix.
 // The bucket has no secondary index: it is bounded by the number of
 // currently-backed-off (triple, provider) pairs, so the ordered listings sort
 // in memory instead of maintaining a due-order index on every write.
@@ -198,14 +198,14 @@ func decodeAttemptEntry(key, raw []byte) (subflux.BackoffEntry, bool, error) {
 	}, false, nil
 }
 
-// GetBackoffItems returns every backed-off provider row ordered by ascending
+// BackoffItems returns every backed-off provider row ordered by ascending
 // next_retry, then by primary key for a deterministic tie order. It scans the
 // primary bucket and sorts in memory: the bucket holds only currently
 // backed-off (triple, provider) pairs, so the sort input is small and bounded,
 // and this listing is a rare introspection call (CLI `subflux backoff`, the
 // backoff API). Rows with an empty provider component are excluded, matching
 // the old store's `WHERE provider != ” ORDER BY next_retry ASC`.
-func (d *DB) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
+func (d *DB) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
 	var out []subflux.BackoffEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
@@ -232,7 +232,7 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) 
 	return out, nil
 }
 
-// GetBackoffByPrefix returns the backed-off provider rows for one media type,
+// BackoffByPrefix returns the backed-off provider rows for one media type,
 // optionally narrowed to media ids that start with mediaIDPrefix, ordered by
 // media id then ascending next_retry. It prefix-scans the search_attempts
 // primary bucket on `mediaType 0x00 mediaIDPrefix` (an empty prefix returns
@@ -244,7 +244,7 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) 
 // The prefix is a media-id starts-with match (LIKE 'prefix%'): querying "tt1"
 // intentionally returns both "tt1" and "tt12", unlike the exact triple scans
 // which use a trailing separator for component-boundary isolation.
-func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error) {
+func (d *DB) BackoffByPrefix(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error) {
 	// Build `mediaType 0x00 mediaIDPrefix`. Join with a single component yields
 	// the bare media type with no trailing separator, then the separator and
 	// the (possibly empty) media-id prefix follow.

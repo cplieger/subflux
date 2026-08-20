@@ -49,7 +49,7 @@ func (s *Server) newResolver() *resolve.Resolver {
 func (s *Server) initHandlers() {
 	s.pollCache = polling.NewPollCache(
 		func(ctx context.Context, key subflux.PollKey) (time.Time, error) {
-			return s.db.GetPollTimestamp(ctx, key)
+			return s.db.PollTimestamp(ctx, key)
 		},
 		func(ctx context.Context, key subflux.PollKey, t time.Time) error {
 			err := s.db.SetPollTimestamp(ctx, key, t)

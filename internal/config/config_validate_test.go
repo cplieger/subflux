@@ -24,7 +24,7 @@ func TestValidate(t *testing.T) {
 			},
 			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
-			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 		}
 	}
 
@@ -70,7 +70,7 @@ func TestValidate(t *testing.T) {
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "radarr only passes", cfg: &Config{
 			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
@@ -79,7 +79,7 @@ func TestValidate(t *testing.T) {
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "both arr passes", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
@@ -89,7 +89,7 @@ func TestValidate(t *testing.T) {
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 
 		// language rules
@@ -103,7 +103,7 @@ func TestValidate(t *testing.T) {
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty audio in rule", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
@@ -134,7 +134,7 @@ func TestValidate(t *testing.T) {
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
 			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "duplicate audio rule", cfg: &Config{
 			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
@@ -190,55 +190,55 @@ func TestValidate(t *testing.T) {
 	}{
 		// provider_timeout boundaries
 		{name: "provider_timeout below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: 30 * time.Minute}
+			c.Cfg.ProviderTimeout = Duration{D: 30 * time.Minute}
 		}, wantErr: true, errContains: ""},
 		{name: "provider_timeout one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: time.Hour - time.Nanosecond}
+			c.Cfg.ProviderTimeout = Duration{D: time.Hour - time.Nanosecond}
 		}, wantErr: true, errContains: ""},
 		{name: "provider_timeout zero disables", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: 0}
+			c.Cfg.ProviderTimeout = Duration{D: 0}
 		}, wantErr: false, errContains: ""},
 		{name: "provider_timeout at minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: time.Hour}
+			c.Cfg.ProviderTimeout = Duration{D: time.Hour}
 		}, wantErr: false, errContains: ""},
 
 		// scan_delay boundaries
 		{name: "scan_delay below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: time.Second}
+			c.Cfg.ScanDelay = Duration{D: time.Second}
 		}, wantErr: true, errContains: ""},
 		{name: "scan_delay one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 5*time.Second - time.Nanosecond}
+			c.Cfg.ScanDelay = Duration{D: 5*time.Second - time.Nanosecond}
 		}, wantErr: true, errContains: ""},
 		{name: "scan_delay exact minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 5 * time.Second}
+			c.Cfg.ScanDelay = Duration{D: 5 * time.Second}
 		}, wantErr: false, errContains: ""},
 		{name: "scan_delay zero", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 0}
+			c.Cfg.ScanDelay = Duration{D: 0}
 		}, wantErr: true, errContains: ""},
 
 		// scan_interval boundaries
 		{name: "scan_interval below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: 30 * time.Minute}
+			c.Cfg.ScanInterval = Duration{D: 30 * time.Minute}
 		}, wantErr: true, errContains: "scan_interval"},
 		{name: "scan_interval one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: time.Hour - time.Nanosecond}
+			c.Cfg.ScanInterval = Duration{D: time.Hour - time.Nanosecond}
 		}, wantErr: true, errContains: "scan_interval"},
 		{name: "scan_interval at minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: time.Hour}
+			c.Cfg.ScanInterval = Duration{D: time.Hour}
 		}, wantErr: false, errContains: ""},
 
 		// upgrade_window_days boundaries
 		{name: "upgrade zero window_days", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = 0
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = 0
 		}, wantErr: true, errContains: ""},
 		{name: "upgrade negative window_days", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = -1
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = -1
 		}, wantErr: true, errContains: ""},
 		{name: "upgrade window_days one", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = 1
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = 1
 		}, wantErr: false, errContains: ""},
 
 		// adaptive_backoff boundaries
@@ -314,10 +314,10 @@ func TestValidate(t *testing.T) {
 
 		// min_score boundaries
 		{name: "min_score negative", mutate: func(c *Config) {
-			c.SearchCfg.MinScore = -1
+			c.Cfg.MinScore = -1
 		}, wantErr: true, errContains: "min_score"},
 		{name: "min_score over 100", mutate: func(c *Config) {
-			c.SearchCfg.MinScore = 101
+			c.Cfg.MinScore = 101
 		}, wantErr: true, errContains: "min_score"},
 
 		// audio_sync_fallback boundaries
@@ -527,7 +527,7 @@ func TestValidateScoring(t *testing.T) {
 			},
 			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
-			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 			Scoring:         ScoringConfig{Weights: w},
 		}
 	}

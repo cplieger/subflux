@@ -220,8 +220,8 @@ search:
 	if cfg.AdaptiveCfg.MaxDelay.D != 3*730*time.Hour {
 		t.Errorf("MaxDelay = %v, want 2190h", cfg.AdaptiveCfg.MaxDelay.D)
 	}
-	if cfg.SearchCfg.ProviderTimeout.D != 2*time.Hour {
-		t.Errorf("ProviderTimeout = %v, want 2h", cfg.SearchCfg.ProviderTimeout.D)
+	if cfg.Cfg.ProviderTimeout.D != 2*time.Hour {
+		t.Errorf("ProviderTimeout = %v, want 2h", cfg.Cfg.ProviderTimeout.D)
 	}
 }
 

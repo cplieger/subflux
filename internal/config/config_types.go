@@ -94,7 +94,7 @@ type Config struct {
 	cachedHostPolicy  *webhttp.HostPolicy
 	Auth              yamlAuthConfig        `yaml:"auth"`
 	Backup            yamlBackupConfig      `yaml:"backup"`
-	SearchCfg         yamlSearchConfig      `yaml:"search"`
+	Cfg               yamlSearchConfig      `yaml:"search"`
 	AdaptiveCfg       yamlAdaptiveConfig    `yaml:"adaptive"`
 	PostProcessing    yamlPostProcessConfig `yaml:"post_processing"`
 	EmbeddedSubtitles yamlEmbeddedConfig    `yaml:"embedded_subtitles"`

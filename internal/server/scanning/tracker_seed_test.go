@@ -22,7 +22,7 @@ type fakeBackoffReader struct {
 	gotPrefix string
 }
 
-func (f *fakeBackoffReader) GetBackoffByPrefix(_ context.Context, _ subflux.MediaType, prefix string) ([]subflux.BackoffEntry, error) {
+func (f *fakeBackoffReader) BackoffByPrefix(_ context.Context, _ subflux.MediaType, prefix string) ([]subflux.BackoffEntry, error) {
 	f.gotPrefix = prefix
 	return f.entries, f.err
 }
