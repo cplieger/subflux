@@ -24,7 +24,7 @@ import (
 // (Requirement 9.5, CVE-2023-45669). The old store overwrote unconditionally.
 //
 // auth_passkeys is PRIMARY-keyed by the raw credential_id (binary), so the
-// WebAuthn login hot path — GetPasskeyByCredentialID — is a single point get.
+// WebAuthn login hot path — PasskeyByCredentialID — is a single point get.
 // The surrogate id allocated from bbolt's NextSequence lives in the JSON value
 // (pkRec.ID) so the id-and-owner addressed methods (RenamePasskey,
 // DeletePasskey) can ownership-check a row; they resolve the credential_id by a
@@ -190,11 +190,11 @@ func insertPasskey(tx *bbolt.Tx, pb *bbolt.Bucket, cred *auth.PasskeyCredential)
 	return idxPut(tx, bucketIxPasskeyUser, passkeyUserIndexKey(cred.UserID, cred.CredentialID), nil)
 }
 
-// GetPasskeysByUserID returns all of a user's passkeys, ordered by creation
+// PasskeysByUserID returns all of a user's passkeys, ordered by creation
 // time then surrogate id (matching the old store's `ORDER BY created_at`). It
 // walks ix_passkey_user for the user and dereferences each credential id;
 // decoding fails closed (auth bucket).
-func (s *Store) GetPasskeysByUserID(_ context.Context, userID int64) ([]auth.PasskeyCredential, error) {
+func (s *Store) PasskeysByUserID(_ context.Context, userID int64) ([]auth.PasskeyCredential, error) {
 	var out []auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
 		var ferr error
@@ -244,10 +244,10 @@ func collectPasskeysByUser(tx *bbolt.Tx, userID int64) ([]auth.PasskeyCredential
 	return out, nil
 }
 
-// GetPasskeyByCredentialID looks up a passkey by its credential id (the
+// PasskeyByCredentialID looks up a passkey by its credential id (the
 // WebAuthn login hot path), reporting absence through found rather than a nil
 // credential with a nil error. Decoding fails closed.
-func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
+func (s *Store) PasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
 	var out *auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)

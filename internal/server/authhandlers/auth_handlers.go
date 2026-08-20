@@ -45,7 +45,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	dbCtx, dbCancel := dbCtx(ctx)
-	user, found, err := h.Store.GetUserByUsername(dbCtx, req.Username)
+	user, found, err := h.Store.UserByUsername(dbCtx, req.Username)
 	dbCancel()
 	if err != nil {
 		slog.Error("login: db error", "error", err)
@@ -103,8 +103,8 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	user := ""
 	token := SessionCookie.ReadCookie(r)
 	if token != "" {
-		if sess, ok, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && ok {
-			if u, ok, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && ok {
+		if sess, ok, err := h.Store.SessionByHash(r.Context(), auth.SessionHash(token)); err == nil && ok {
+			if u, ok, err := h.Store.UserByID(r.Context(), sess.UserID); err == nil && ok {
 				user = u.Username
 			}
 		}

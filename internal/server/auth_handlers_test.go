@@ -34,7 +34,7 @@ func TestChangePassword_Success(t *testing.T) {
 	}
 
 	// Verify new password works.
-	updated, _, err := db.GetUserByUsername(t.Context(), "frank")
+	updated, _, err := db.UserByUsername(t.Context(), "frank")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 	}
 
 	// Verify new password works.
-	updated, _, err := db.GetUserByUsername(t.Context(), "mallory")
+	updated, _, err := db.UserByUsername(t.Context(), "mallory")
 	if err != nil {
 		t.Fatal(err)
 	}

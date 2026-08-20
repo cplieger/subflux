@@ -55,7 +55,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 	}
 
 	ctx := r.Context()
-	user, found, err := s.authStore.GetUserByUsername(ctx, username)
+	user, found, err := s.authStore.UserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: reset-password lookup", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
@@ -106,7 +106,7 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 	}
 
 	ctx := r.Context()
-	user, found, err := s.authStore.GetUserByUsername(ctx, username)
+	user, found, err := s.authStore.UserByUsername(ctx, username)
 	if err != nil {
 		slog.Error("admin bootstrap: generate-api-key lookup", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)

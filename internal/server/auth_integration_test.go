@@ -421,7 +421,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	defer db.Close()
 
 	// Verify auth user survived re-open.
-	u, _, err := db.GetUserByUsername(ctx, "migration-test")
+	u, _, err := db.UserByUsername(ctx, "migration-test")
 	if err != nil || u == nil {
 		t.Fatal("auth user not preserved after re-open")
 	}
@@ -432,7 +432,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	k, _, err := db.GetAPIKeyByHash(ctx, "migration-key-hash")
+	k, _, err := db.APIKeyByHash(ctx, "migration-key-hash")
 	if err != nil {
 		t.Fatal(err)
 	}

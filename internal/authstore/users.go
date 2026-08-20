@@ -248,9 +248,9 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 	return nil
 }
 
-// GetUserByID looks up a user by surrogate id, reporting absence through found
+// UserByID looks up a user by surrogate id, reporting absence through found
 // (nil, false, nil) rather than a nil user with a nil error.
-func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, bool, error) {
+func (s *Store) UserByID(_ context.Context, id int64) (*auth.User, bool, error) {
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
 		ub, ok := authBucket(tx, bucketAuthUsers)
@@ -272,17 +272,17 @@ func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, bool, erro
 	return out, out != nil, err
 }
 
-// GetUserByUsername looks up a user case-insensitively by username via
+// UserByUsername looks up a user case-insensitively by username via
 // ix_user_name, reporting absence through found (Requirement 16.1).
-func (s *Store) GetUserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
+func (s *Store) UserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
 	return s.userByIndex(bucketIxUserName, userNameIndexKey(username))
 }
 
-// GetUserByEmail looks up a user case-insensitively by email, reporting absence
+// UserByEmail looks up a user case-insensitively by email, reporting absence
 // through found (Requirement 16.1). email is not indexed (it is not
 // unique in the schema), so this is a fail-closed scan of auth_users comparing
 // the ASCII-folded email of each row.
-func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
+func (s *Store) UserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
 	target := asciiFold(email)
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
@@ -306,11 +306,11 @@ func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, boo
 	return out, out != nil, err
 }
 
-// GetUserByOIDCSub looks up a user by (issuer, sub) via ix_user_oidc, reporting
+// UserByOIDCSub looks up a user by (issuer, sub) via ix_user_oidc, reporting
 // absence through found. An empty sub never matches, mirroring the SQLite
 // partial index keyed only on rows with oidc_sub != ”. Matching on subject
 // alone would be unsafe: a subject is unique only within its issuer.
-func (s *Store) GetUserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, bool, error) {
+func (s *Store) UserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, bool, error) {
 	if sub == "" {
 		return nil, false, nil
 	}

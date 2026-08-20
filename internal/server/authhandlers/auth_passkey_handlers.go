@@ -20,7 +20,7 @@ import (
 func (h *Handler) HandleListPasskeys(w http.ResponseWriter, r *http.Request) {
 	user := UserFromContext(r.Context())
 
-	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
+	creds, err := h.SecDB.PasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("list passkeys: db error", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
@@ -53,7 +53,7 @@ func (h *Handler) HandleWebAuthnSignalData(w http.ResponseWriter, r *http.Reques
 
 	user := UserFromContext(r.Context())
 
-	creds, err := h.SecDB.GetPasskeysByUserID(r.Context(), user.ID)
+	creds, err := h.SecDB.PasskeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("signal data: db error", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
@@ -135,7 +135,7 @@ func (h *Handler) HandleWebAuthnRegisterBegin(w http.ResponseWriter, r *http.Req
 	h.RateLimiter.Reset(rlIP, rlUser)
 
 	ctx := r.Context()
-	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
+	creds, err := h.SecDB.PasskeysByUserID(ctx, user.ID)
 	if err != nil {
 		slog.Error("webauthn register: get passkeys", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
@@ -196,7 +196,7 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	}
 
 	ctx := r.Context()
-	creds, err := h.SecDB.GetPasskeysByUserID(ctx, user.ID)
+	creds, err := h.SecDB.PasskeysByUserID(ctx, user.ID)
 	if err != nil {
 		slog.Error("webauthn register finish: get passkeys", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)

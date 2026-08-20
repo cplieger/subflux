@@ -122,7 +122,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 		t.Errorf("response = %+v, want status ok for admin", env)
 	}
 
-	updated, _, err := s.authStore.GetUserByUsername(ctx, "admin")
+	updated, _, err := s.authStore.UserByUsername(ctx, "admin")
 	if err != nil || updated == nil {
 		t.Fatalf("lookup after reset: %v", err)
 	}

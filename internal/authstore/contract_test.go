@@ -114,7 +114,7 @@ func TestSignCount_neverRegresses(t *testing.T) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, cred.CredentialID, 3, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin(lower): %v", err)
 	}
-	got, _, _ := s.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	got, _, _ := s.PasskeyByCredentialID(ctx, cred.CredentialID)
 	if got == nil || got.SignCount != 10 {
 		t.Errorf("sign_count after lower incoming = %v, want 10 (no regression)", got)
 	}
@@ -123,7 +123,7 @@ func TestSignCount_neverRegresses(t *testing.T) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, cred.CredentialID, 11, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin(higher): %v", err)
 	}
-	got, _, _ = s.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	got, _, _ = s.PasskeyByCredentialID(ctx, cred.CredentialID)
 	if got == nil || got.SignCount != 11 {
 		t.Errorf("sign_count after higher incoming = %v, want 11", got)
 	}
@@ -150,7 +150,7 @@ func TestCloneWarning_roundTrips(t *testing.T) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, cred.CredentialID, 2, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin: %v", err)
 	}
-	got, _, _ := s.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	got, _, _ := s.PasskeyByCredentialID(ctx, cred.CredentialID)
 	if got == nil || !got.CloneWarning {
 		t.Errorf("CloneWarning did not round-trip: %+v", got)
 	}
@@ -181,11 +181,11 @@ func TestEphemeral_emptyAfterReopen(t *testing.T) {
 	s2 := h.Reopen(t)
 
 	// Durable record survives.
-	if got, _, _ := s2.GetUserByUsername(ctx, "durable"); got == nil {
+	if got, _, _ := s2.UserByUsername(ctx, "durable"); got == nil {
 		t.Errorf("durable user did not survive reopen")
 	}
 	// Ephemeral records are gone.
-	if got, _, _ := s2.GetSessionByHash(ctx, "sess-1"); got != nil {
+	if got, _, _ := s2.SessionByHash(ctx, "sess-1"); got != nil {
 		t.Errorf("session survived reopen, want empty (ephemeral): %+v", got)
 	}
 	if _, _, _, err := s2.ConsumeOIDCState(ctx, "state-1"); err == nil {

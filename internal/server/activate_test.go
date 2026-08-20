@@ -482,11 +482,11 @@ func (fakeOIDCStore) ConsumeOIDCState(context.Context, auth.OIDCState) (auth.OID
 	return "", "", "", errMock
 }
 
-func (fakeOIDCStore) GetUserByOIDCSub(context.Context, string, string) (*auth.User, bool, error) {
+func (fakeOIDCStore) UserByOIDCSub(context.Context, string, string) (*auth.User, bool, error) {
 	return nil, false, nil
 }
 
-func (fakeOIDCStore) GetUserByUsername(context.Context, string) (*auth.User, bool, error) {
+func (fakeOIDCStore) UserByUsername(context.Context, string) (*auth.User, bool, error) {
 	return nil, false, nil
 }
 func (fakeOIDCStore) CreateUser(context.Context, *auth.User) error { return nil }

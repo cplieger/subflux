@@ -88,7 +88,7 @@ func TestRenamePasskey_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
+	creds, err := db.PasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}
@@ -208,7 +208,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
+	creds, err := db.PasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}
@@ -225,7 +225,7 @@ func TestDeletePasskey_Success(t *testing.T) {
 	}
 
 	// Verify passkey is gone.
-	remaining, err := db.GetPasskeysByUserID(t.Context(), user.ID)
+	remaining, err := db.PasskeysByUserID(t.Context(), user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestDeletePasskey_LastMethodGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	creds, err := db.GetPasskeysByUserID(t.Context(), user.ID)
+	creds, err := db.PasskeysByUserID(t.Context(), user.ID)
 	if err != nil || len(creds) == 0 {
 		t.Fatal("no passkeys found")
 	}

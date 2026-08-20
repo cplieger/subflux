@@ -14,15 +14,15 @@ import (
 // those flows call.
 type AccountStore interface {
 	CreateSession(ctx context.Context, sess *auth.Session) error
-	GetSessionByHash(ctx context.Context, tokenHash string) (sess *auth.Session, found bool, err error)
+	SessionByHash(ctx context.Context, tokenHash string) (sess *auth.Session, found bool, err error)
 	DeleteSession(ctx context.Context, tokenHash string) error
 	CreateUser(ctx context.Context, user *auth.User) error
-	GetUserByID(ctx context.Context, id int64) (user *auth.User, found bool, err error)
-	GetUserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
+	UserByID(ctx context.Context, id int64) (user *auth.User, found bool, err error)
+	UserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
 	UpdateUser(ctx context.Context, user *auth.User) error
 	ListUsers(ctx context.Context) ([]auth.User, error)
 	UserCount(ctx context.Context) (int, error)
-	GetPasskeysByUserID(ctx context.Context, userID int64) ([]auth.PasskeyCredential, error)
+	PasskeysByUserID(ctx context.Context, userID int64) ([]auth.PasskeyCredential, error)
 	PasskeyCountForUser(ctx context.Context, userID int64) (int, error)
 	DeletePasskey(ctx context.Context, ref auth.PasskeyRef) error
 	// UpdatePasskeyAfterLogin is the post-login credential-custody write the
@@ -42,7 +42,7 @@ type SecurityStore interface {
 	UpdateUser(ctx context.Context, user *auth.User) error
 	DeleteUserSessions(ctx context.Context, userID int64, exceptHash string) error
 	PasskeyCountForUser(ctx context.Context, userID int64) (int, error)
-	GetPasskeysByUserID(ctx context.Context, userID int64) ([]auth.PasskeyCredential, error)
+	PasskeysByUserID(ctx context.Context, userID int64) ([]auth.PasskeyCredential, error)
 	CreatePasskey(ctx context.Context, cred *auth.PasskeyCredential) error
 	DeletePasskey(ctx context.Context, ref auth.PasskeyRef) error
 	RenamePasskey(ctx context.Context, ref auth.PasskeyRef, name string) error
@@ -54,11 +54,11 @@ type SecurityStore interface {
 // OIDCStore is the narrow interface consumed by OIDC authentication handlers:
 // the login/callback leg (state custody plus the identity lookups that resolve
 // or create the user). The link/unlink leg needs the wider account surface
-// (GetUserByID, ListUsers, passkey inspection) and goes through Handler.Store.
+// (UserByID, ListUsers, passkey inspection) and goes through Handler.Store.
 type OIDCStore interface {
 	CreateOIDCState(ctx context.Context, state auth.OIDCState, nonce auth.OIDCNonce, codeVerifier auth.OIDCCodeVerifier, redirectURI string) error
 	ConsumeOIDCState(ctx context.Context, state auth.OIDCState) (nonce auth.OIDCNonce, codeVerifier auth.OIDCCodeVerifier, redirectURI string, err error)
-	GetUserByOIDCSub(ctx context.Context, issuer, sub string) (user *auth.User, found bool, err error)
-	GetUserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
+	UserByOIDCSub(ctx context.Context, issuer, sub string) (user *auth.User, found bool, err error)
+	UserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
 	CreateUser(ctx context.Context, user *auth.User) error
 }

@@ -299,11 +299,11 @@ func assertVictimIdentityFreed(t *testing.T, s SPI, victimID int64) {
 	t.Helper()
 	ctx := context.Background()
 
-	if got, found, err := s.GetUserByID(ctx, victimID); err != nil || found || got != nil {
-		t.Errorf("GetUserByID(victim) after delete = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
+	if got, found, err := s.UserByID(ctx, victimID); err != nil || found || got != nil {
+		t.Errorf("UserByID(victim) after delete = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
 	}
-	if got, found, err := s.GetUserByUsername(ctx, "victim"); err != nil || found || got != nil {
-		t.Errorf("GetUserByUsername(%q) after delete = (%+v, %t, %v), want (nil, false, nil)", "victim", got, found, err)
+	if got, found, err := s.UserByUsername(ctx, "victim"); err != nil || found || got != nil {
+		t.Errorf("UserByUsername(%q) after delete = (%+v, %t, %v), want (nil, false, nil)", "victim", got, found, err)
 	}
 	if err := s.CreateUser(ctx, mkUser("victim")); err != nil {
 		t.Errorf("recreate freed username: %v", err)
@@ -319,14 +319,14 @@ func assertVictimChildrenCascaded(t *testing.T, s SPI, victimID int64, vCred []b
 	if n, _ := s.PasskeyCountForUser(ctx, victimID); n != 0 {
 		t.Errorf("victim passkeys not cascaded: count = %d, want 0", n)
 	}
-	if got, found, err := s.GetPasskeyByCredentialID(ctx, vCred); err != nil || found || got != nil {
-		t.Errorf("GetPasskeyByCredentialID(victim) after cascade = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
+	if got, found, err := s.PasskeyByCredentialID(ctx, vCred); err != nil || found || got != nil {
+		t.Errorf("PasskeyByCredentialID(victim) after cascade = (%+v, %t, %v), want (nil, false, nil)", got, found, err)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, victimID); len(keys) != 0 {
 		t.Errorf("victim api keys not cascaded: count = %d, want 0", len(keys))
 	}
-	if got, found, err := s.GetSessionByHash(ctx, "victim-sess"); err != nil || found || got != nil {
-		t.Errorf("GetSessionByHash(%q) after cascade = (%+v, %t, %v), want (nil, false, nil)", "victim-sess", got, found, err)
+	if got, found, err := s.SessionByHash(ctx, "victim-sess"); err != nil || found || got != nil {
+		t.Errorf("SessionByHash(%q) after cascade = (%+v, %t, %v), want (nil, false, nil)", "victim-sess", got, found, err)
 	}
 }
 
@@ -336,17 +336,17 @@ func assertKeepUserIntact(t *testing.T, s SPI, keepID int64) {
 	t.Helper()
 	ctx := context.Background()
 
-	if got, found, err := s.GetUserByID(ctx, keepID); err != nil || !found || got == nil {
-		t.Errorf("GetUserByID(keep) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", got, found, err)
+	if got, found, err := s.UserByID(ctx, keepID); err != nil || !found || got == nil {
+		t.Errorf("UserByID(keep) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", got, found, err)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, keepID); n != 1 {
 		t.Errorf("keep passkey collaterally deleted: count = %d, want 1", n)
 	}
-	if got, found, err := s.GetAPIKeyByHash(ctx, "keep-hash"); err != nil || !found || got == nil {
-		t.Errorf("GetAPIKeyByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", "keep-hash", got, found, err)
+	if got, found, err := s.APIKeyByHash(ctx, "keep-hash"); err != nil || !found || got == nil {
+		t.Errorf("APIKeyByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally deleted", "keep-hash", got, found, err)
 	}
-	if got, found, err := s.GetSessionByHash(ctx, "keep-sess"); err != nil || !found || got == nil {
-		t.Errorf("GetSessionByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally cleared", "keep-sess", got, found, err)
+	if got, found, err := s.SessionByHash(ctx, "keep-sess"); err != nil || !found || got == nil {
+		t.Errorf("SessionByHash(%q) = (%+v, %t, %v), want (non-nil, true, nil): collaterally cleared", "keep-sess", got, found, err)
 	}
 }
 
@@ -412,9 +412,9 @@ func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	if err := s.CreatePasskey(ctx, mkPasskey(ownerID, cred, "original")); err != nil {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
-	pks, perr := s.GetPasskeysByUserID(ctx, ownerID)
+	pks, perr := s.PasskeysByUserID(ctx, ownerID)
 	if perr != nil || len(pks) != 1 {
-		t.Fatalf("GetPasskeysByUserID(owner) = (%d, %v), want (1, nil)", len(pks), perr)
+		t.Fatalf("PasskeysByUserID(owner) = (%d, %v), want (1, nil)", len(pks), perr)
 	}
 	pkID := pks[0].ID
 
@@ -422,7 +422,7 @@ func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: otherID}, "hijacked"); err != nil {
 		t.Fatalf("RenamePasskey(non-owner): %v", err)
 	}
-	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "original" {
+	if pks, _ := s.PasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "original" {
 		t.Errorf("non-owner rename mutated passkey: %+v", pks)
 	}
 	// Non-owner delete is a no-op: the passkey survives.
@@ -436,7 +436,7 @@ func assertPasskeyOwnership(t *testing.T, s SPI, ownerID, otherID int64) {
 	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: ownerID}, "renamed"); err != nil {
 		t.Fatalf("RenamePasskey(owner): %v", err)
 	}
-	if pks, _ := s.GetPasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "renamed" {
+	if pks, _ := s.PasskeysByUserID(ctx, ownerID); len(pks) != 1 || pks[0].Name != "renamed" {
 		t.Errorf("owner rename did not take effect: %+v", pks)
 	}
 	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: pkID, UserID: ownerID}); err != nil {
@@ -519,7 +519,7 @@ func testSessionExpiry(t *testing.T, h Harness) {
 		t.Errorf("evicted count = %d, want 2", n)
 	}
 	for hash, wantPresent := range map[string]bool{"live": true, "idle": false, "abs": false, "boundary": true} {
-		got, _, _ := s.GetSessionByHash(ctx, hash)
+		got, _, _ := s.SessionByHash(ctx, hash)
 		if present := got != nil; present != wantPresent {
 			t.Errorf("session %q present = %v, want %v", hash, present, wantPresent)
 		}
@@ -548,16 +548,16 @@ func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, cred.CredentialID, 9, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin: %v", err)
 	}
-	if got, _, _ := s.GetPasskeyByCredentialID(ctx, cred.CredentialID); got == nil || got.SignCount != 9 {
+	if got, _, _ := s.PasskeyByCredentialID(ctx, cred.CredentialID); got == nil || got.SignCount != 9 {
 		t.Fatalf("pre-reopen sign_count = %v, want 9", got)
 	}
 
 	// Simulate a process restart.
 	s2 := h.Reopen(t)
 
-	got, _, err := s2.GetPasskeyByCredentialID(ctx, cred.CredentialID)
+	got, _, err := s2.PasskeyByCredentialID(ctx, cred.CredentialID)
 	if err != nil {
-		t.Fatalf("GetPasskeyByCredentialID after reopen: %v", err)
+		t.Fatalf("PasskeyByCredentialID after reopen: %v", err)
 	}
 	if got == nil {
 		t.Fatalf("passkey did not survive reopen")
@@ -565,7 +565,7 @@ func testSignCountDurableAcrossReopen(t *testing.T, h Harness) {
 	if got.SignCount != 9 {
 		t.Errorf("sign_count after reopen = %d, want 9 (durable)", got.SignCount)
 	}
-	if gu, _, _ := s2.GetUserByUsername(ctx, "reopen-owner"); gu == nil {
+	if gu, _, _ := s2.UserByUsername(ctx, "reopen-owner"); gu == nil {
 		t.Errorf("durable user did not survive reopen")
 	}
 }

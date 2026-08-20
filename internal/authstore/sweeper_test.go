@@ -41,9 +41,9 @@ func waitFor(d time.Duration, cond func() bool) bool {
 // store (used as the eviction predicate).
 func sessionPresent(t *testing.T, s *Store, hash string) bool {
 	t.Helper()
-	got, _, err := s.GetSessionByHash(t.Context(), hash)
+	got, _, err := s.SessionByHash(t.Context(), hash)
 	if err != nil {
-		t.Fatalf("GetSessionByHash: %v", err)
+		t.Fatalf("SessionByHash: %v", err)
 	}
 	return got != nil
 }

@@ -187,7 +187,7 @@ func TestLogout_Success(t *testing.T) {
 
 	// Verify session was deleted from DB.
 	hash := auth.SessionHash(token)
-	sess, _, err := db.GetSessionByHash(t.Context(), hash)
+	sess, _, err := db.SessionByHash(t.Context(), hash)
 	if err != nil {
 		t.Fatal(err)
 	}

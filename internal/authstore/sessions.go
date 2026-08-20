@@ -20,7 +20,7 @@ import (
 // even though the backing store changed from a table to a map:
 //   - CreateSession stores by token hash; a copy is held so a caller mutating
 //     the passed struct afterwards cannot mutate stored state.
-//   - GetSessionByHash returns a copy (callers cannot mutate the stored row),
+//   - SessionByHash returns a copy (callers cannot mutate the stored row),
 //     and reports absence through found.
 //   - UpdateSessionActivity / DeleteSession / DeleteUserSessions on an absent
 //     row are no-ops returning nil (matching an UPDATE/DELETE affecting 0 rows).
@@ -57,11 +57,11 @@ func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 	return nil
 }
 
-// GetSessionByHash returns a copy of the session with the given token hash,
+// SessionByHash returns a copy of the session with the given token hash,
 // reporting absence through found rather than a nil session with a nil error. A
 // copy is returned so callers cannot mutate the stored session through the
 // returned pointer.
-func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
+func (s *Store) SessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
 	// cloneSession reads the stored struct's fields, so it must run while the
 	// read lock is held: a concurrent UpdateSessionActivity mutates
 	// LastActivity under the write lock, and cloning after RUnlock would race

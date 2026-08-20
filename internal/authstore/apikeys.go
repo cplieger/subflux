@@ -20,7 +20,7 @@ import (
 // store/authdb/apikeys.go behaviour exactly (Requirements 16.4, 16.6, 16.7).
 //
 // auth_api_keys is PRIMARY-keyed by the raw key_hash, so the API-auth hot path
-// — GetAPIKeyByHash — is a single point get (matching how passkeys are keyed by
+// — APIKeyByHash — is a single point get (matching how passkeys are keyed by
 // credential_id). The surrogate id allocated from bbolt's NextSequence lives in
 // the JSON value (keyRec.ID) so the id-and-owner addressed method (DeleteAPIKey)
 // can ownership-check a row; it resolves the key_hash by a user-scoped prefix
@@ -160,10 +160,10 @@ func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte)
 	return idxPut(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(key.UserID, key.KeyHash), nil)
 }
 
-// GetAPIKeyByHash looks up an API key by its hash (the API-auth hot path),
+// APIKeyByHash looks up an API key by its hash (the API-auth hot path),
 // reporting absence through found rather than a nil key with a nil error.
 // Decoding fails closed (auth bucket).
-func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
+func (s *Store) APIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
 	var out *auth.Key
 	err := s.view(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)

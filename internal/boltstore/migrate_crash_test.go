@@ -175,7 +175,7 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 		t.Errorf("SyncOffset = (%d, %v), want %d", got, err, wantOffset)
 	}
 	as := authstore.New(db.Bolt())
-	if u, _, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
+	if u, _, err := as.UserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
 		t.Errorf("auth user after recovery = (%+v, %v), want alice intact", u, err)
 	}
 

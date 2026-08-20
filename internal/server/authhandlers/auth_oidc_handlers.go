@@ -173,7 +173,7 @@ var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordles
 // Email and username are never used to auto-link; that is an account-takeover
 // vector. A username collision triggers an explicit, password-proven link.
 func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *auth.User, linkToken string, err error) {
-	bySub, found, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
+	bySub, found, err := h.OidcDB.UserByOIDCSub(ctx, claims.Issuer, claims.Subject)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by sub: %w", err)
 	}
@@ -185,7 +185,7 @@ func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims
 	if username == "" {
 		username = claims.Email
 	}
-	byName, found, err := h.OidcDB.GetUserByUsername(ctx, username)
+	byName, found, err := h.OidcDB.UserByUsername(ctx, username)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by username: %w", err)
 	}
@@ -244,7 +244,7 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	user, found, err := h.Store.GetUserByID(ctx, pending.UserID)
+	user, found, err := h.Store.UserByID(ctx, pending.UserID)
 	if err != nil || !found {
 		slog.Error("oidc link: user lookup", "error", err)
 		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
@@ -331,7 +331,7 @@ func (h *Handler) isLastLocalAdmin(ctx context.Context, u *auth.User) (bool, err
 // clearPasskeys removes all of a user's passkeys (best-effort) so that an
 // OIDC-migrated account retains no local login method.
 func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
-	passkeys, err := h.Store.GetPasskeysByUserID(ctx, userID)
+	passkeys, err := h.Store.PasskeysByUserID(ctx, userID)
 	if err != nil {
 		slog.Warn("oidc link: list passkeys", "error", err)
 		return

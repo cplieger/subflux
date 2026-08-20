@@ -207,11 +207,11 @@ func TestMigrate_coreResetPreservesIrreplaceable(t *testing.T) {
 	}
 	assertAuthBucketsIdentical(t, db, authBefore)
 	as := authstore.New(db.Bolt())
-	u, _, err := as.GetUserByUsername(ctx, "alice")
+	u, _, err := as.UserByUsername(ctx, "alice")
 	if err != nil || u == nil || u.ID != fx.users[0].ID || u.PasswordHash != "hash-a" {
-		t.Errorf("GetUserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
+		t.Errorf("UserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
 	}
-	pks, err := as.GetPasskeysByUserID(ctx, fx.users[0].ID)
+	pks, err := as.PasskeysByUserID(ctx, fx.users[0].ID)
 	if err != nil || len(pks) != 1 || pks[0].SignCount != 7 {
 		t.Errorf("passkeys after reset = (%+v, %v), want the seeded passkey", pks, err)
 	}
@@ -516,15 +516,15 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	// and a live sequence.
 	as := authstore.New(db.Bolt())
 	for i, want := range fx.users {
-		u, _, err := as.GetUserByUsername(ctx, want.Username)
+		u, _, err := as.UserByUsername(ctx, want.Username)
 		if err != nil || u == nil || u.ID != want.ID || u.PasswordHash != want.PasswordHash {
 			t.Errorf("user %d (%s) after auth reset = (%+v, %v), want preserved", i, want.Username, u, err)
 		}
 	}
-	if u, _, err := as.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
-		t.Errorf("GetUserByOIDCSub after auth reset = (%+v, %v), want alice via ix_user_oidc", u, err)
+	if u, _, err := as.UserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
+		t.Errorf("UserByOIDCSub after auth reset = (%+v, %v), want alice via ix_user_oidc", u, err)
 	}
-	pks, err := as.GetPasskeysByUserID(ctx, fx.users[0].ID)
+	pks, err := as.PasskeysByUserID(ctx, fx.users[0].ID)
 	if err != nil || len(pks) != 1 || string(pks[0].CredentialID) != string(fx.passkey.CredentialID) || pks[0].ID != fx.passkey.ID {
 		t.Errorf("passkeys after auth reset = (%+v, %v), want the seeded credential with its id", pks, err)
 	}

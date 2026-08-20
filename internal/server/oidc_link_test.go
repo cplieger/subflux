@@ -52,7 +52,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "wrong"); rec.Code != http.StatusUnauthorized {
 		t.Errorf("wrong password status = %d, want 401", rec.Code)
 	}
-	got, _, _ := db.GetUserByID(t.Context(), user.ID)
+	got, _, _ := db.UserByID(t.Context(), user.ID)
 	if got.OIDCSub != "" {
 		t.Errorf("OIDCSub = %q, want empty after failed link", got.OIDCSub)
 	}
@@ -61,7 +61,7 @@ func TestOIDCLink_requires_password_proof(t *testing.T) {
 	if rec := postLink(s, storeLink(t, s, user.ID, "new-sub"), "correct-horse-battery-staple"); rec.Code != http.StatusOK {
 		t.Errorf("correct password status = %d, want 200; body %s", rec.Code, rec.Body.String())
 	}
-	got, _, _ = db.GetUserByID(t.Context(), user.ID)
+	got, _, _ = db.UserByID(t.Context(), user.ID)
 	if got.OIDCSub != "new-sub" {
 		t.Errorf("OIDCSub = %q, want new-sub after successful link", got.OIDCSub)
 	}
@@ -80,7 +80,7 @@ func TestOIDCLink_refuses_last_local_admin(t *testing.T) {
 	if rec.Code != http.StatusConflict {
 		t.Errorf("status = %d, want 409 for last local admin; body %s", rec.Code, rec.Body.String())
 	}
-	got, _, _ := db.GetUserByID(t.Context(), admin.ID)
+	got, _, _ := db.UserByID(t.Context(), admin.ID)
 	if got.OIDCSub != "" || got.PasswordHash == "" {
 		t.Error("account must be unchanged when migration is refused")
 	}
@@ -128,7 +128,7 @@ func TestOIDCUnlink_last_method_guard(t *testing.T) {
 	if rec2.Code != http.StatusOK {
 		t.Errorf("unlink (has password) status = %d, want 200; body %s", rec2.Code, rec2.Body.String())
 	}
-	got, _, _ := db.GetUserByID(t.Context(), withPass.ID)
+	got, _, _ := db.UserByID(t.Context(), withPass.ID)
 	if got.OIDCSub != "" {
 		t.Errorf("OIDCSub = %q, want empty after unlink", got.OIDCSub)
 	}
