@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cplieger/subflux/internal/cache"
@@ -105,37 +106,50 @@ func TestFactory_requires_credentials(t *testing.T) {
 }
 
 // TestFactory_torrentCacheUsesOneHourTTL verifies the torrent-ID cache the
-// factory builds keeps entries alive well beyond a single request: a value
-// stored and read back a few milliseconds later must still be present, which
-// fails if the cache were constructed with a zero (or near-zero) TTL.
+// factory builds keeps entries alive for the full hour it declares, and drops
+// them once past it. The bubble's synthetic clock makes the real TTL boundary
+// testable: on a wall clock this could only afford a millisecond-scale proxy
+// that proves the TTL is merely non-zero, which is what the test asserted
+// before. cache.Cache is a mutex plus a time.Now comparison with no goroutine,
+// timer or descriptor of its own, and Factory performs no I/O, so nothing in
+// the bubble can park on an external fd and stall the clock.
 func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
-	p, err := Factory(t.Context(), map[string]any{
-		settingUsername: "user",
-		settingPasskey:  "passkey",
+	synctest.Test(t, func(t *testing.T) {
+		p, err := Factory(t.Context(), map[string]any{
+			settingUsername: "user",
+			settingPasskey:  "passkey",
+		})
+		if err != nil {
+			t.Fatalf("Factory() error = %v, want nil", err)
+		}
+		prov, ok := p.(*Provider)
+		if !ok {
+			t.Fatalf("Factory() returned %T, want *Provider", p)
+		}
+
+		const key = "torrents:tvdb:1:s1"
+		want := []int{11, 22, 33}
+		prov.torrentCache.Set(key, want)
+
+		// One second short of the declared hour: still live.
+		synctest.Sleep(time.Hour - time.Second)
+
+		got, found := prov.torrentCache.Get(key)
+		if !found {
+			t.Fatalf("torrentCache.Get(%q) at 59m59s found = false, want true", key)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
+		}
+
+		// Two seconds later the hour has elapsed: expired.
+		synctest.Sleep(2 * time.Second)
+
+		if _, found := prov.torrentCache.Get(key); found {
+			t.Errorf("torrentCache.Get(%q) at 1h0m1s found = true, want false "+
+				"(entry outlived the declared 1h TTL)", key)
+		}
 	})
-	if err != nil {
-		t.Fatalf("Factory() error = %v, want nil", err)
-	}
-	prov, ok := p.(*Provider)
-	if !ok {
-		t.Fatalf("Factory() returned %T, want *Provider", p)
-	}
-
-	const key = "torrents:tvdb:1:s1"
-	want := []int{11, 22, 33}
-	prov.torrentCache.Set(key, want)
-
-	// Far below the real 1h TTL, but past the Set instant a zero TTL would
-	// expire entries at.
-	time.Sleep(5 * time.Millisecond)
-
-	got, found := prov.torrentCache.Get(key)
-	if !found {
-		t.Fatalf("torrentCache.Get(%q) found = false, want true", key)
-	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
-	}
 }
 
 // --- Subtitle Data Filtering ---
