@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -130,8 +131,8 @@ func TestPosterClient(t *testing.T) {
 		if resp != nil {
 			_ = resp.Body.Close()
 		}
-		var ssrfErr *ssrf.Error
-		if !errors.As(err, &ssrfErr) || ssrfErr.Kind != ssrf.KindNonPublicIP {
+		ssrfErr, isSSRF := errors.AsType[*ssrf.Error](err)
+		if !isSSRF || ssrfErr.Kind != ssrf.KindNonPublicIP {
 			t.Errorf("Do() error = %v, want wrapped ssrf.KindNonPublicIP", err)
 		}
 		if publicCalled {
@@ -184,5 +185,42 @@ func TestPosterClient_hopCap(t *testing.T) {
 	}
 	if arrCalls != posterMaxRedirects+1 {
 		t.Errorf("arr requests = %d, want %d", arrCalls, posterMaxRedirects+1)
+	}
+}
+
+// TestSamePosterOrigin_foldsASCIIOnly pins the fold width of the same-origin
+// gate. The two hosts differ only in U+FB05 / U+FB06, a pair Unicode 17 folds
+// together: on go1.27.0 strings.EqualFold answers true for them (go1.26
+// answered false), so a gate built on EqualFold would call these one origin and
+// let the arr API key follow the redirect. Restore strings.EqualFold in
+// samePosterOrigin and this case fails.
+func TestSamePosterOrigin_foldsASCIIOnly(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, a, b string
+		want       bool
+	}{
+		{"ascii case differs", "https://Sonarr.LAN:8989", "https://sonarr.lan:8989", true},
+		{"scheme case differs", "HTTPS://sonarr.lan", "https://sonarr.lan", true},
+		{"unicode 17 st-ligature pair", "https://\uFB05.lan", "https://\uFB06.lan", false},
+		{"unicode 17 greek pair", "https://\u0390.lan", "https://\u1FD3.lan", false},
+		{"different host", "https://sonarr.lan", "https://radarr.lan", false},
+		{"implicit port matches explicit", "https://sonarr.lan", "https://sonarr.lan:443", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			a, err := url.Parse(tc.a)
+			if err != nil {
+				t.Fatalf("parse %q: %v", tc.a, err)
+			}
+			b, err := url.Parse(tc.b)
+			if err != nil {
+				t.Fatalf("parse %q: %v", tc.b, err)
+			}
+			if got := samePosterOrigin(a, b); got != tc.want {
+				t.Errorf("samePosterOrigin(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+			}
+		})
 	}
 }

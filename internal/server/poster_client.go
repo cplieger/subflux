@@ -126,10 +126,40 @@ func countPosterRedirect(via []*http.Request) error {
 // samePosterOrigin compares scheme, hostname, and effective port. Matching only
 // the hostname would let a redirect send the arr API key to another service on
 // the same machine, and would not model an HTTP origin correctly.
+//
+// The fold is ASCII-only, and that is load-bearing rather than pedantic. A URI
+// scheme and host are case-insensitive across ASCII and nothing else (RFC 3986
+// §3.2.2), while strings.EqualFold folds the whole Unicode range — and Go
+// 1.27's Unicode 17 tables widened it: measured on go1.27.0, EqualFold answers
+// true for "sonarr.\uFB05tore.lan" and "sonarr.\uFB06tore.lan", where go1.26
+// answered false. On a gate that decides whether the arr API key follows a
+// redirect, a fold wider than the host grammar is a wider gate.
 func samePosterOrigin(a, b *url.URL) bool {
-	return strings.EqualFold(a.Scheme, b.Scheme) &&
-		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+	return asciiEqualFold(a.Scheme, b.Scheme) &&
+		asciiEqualFold(a.Hostname(), b.Hostname()) &&
 		effectivePosterPort(a) == effectivePosterPort(b)
+}
+
+// asciiEqualFold reports whether a and b are equal under ASCII-only case
+// folding. Bytes outside A-Z/a-z must match exactly, so a multi-byte rune never
+// folds onto a different one.
+func asciiEqualFold(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range len(a) {
+		if asciiLower(a[i]) != asciiLower(b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func asciiLower(c byte) byte {
+	if c >= 'A' && c <= 'Z' {
+		return c + ('a' - 'A')
+	}
+	return c
 }
 
 func effectivePosterPort(u *url.URL) string {
