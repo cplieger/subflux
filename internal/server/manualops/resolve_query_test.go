@@ -494,7 +494,7 @@ func (c *countingSonarr) GetSeries(ctx context.Context) ([]arrapi.Series, error)
 // all (the pre-fix order ran the series arm first).
 func TestResolveQuery_tmdb_only_resolves_movie_first(t *testing.T) {
 	t.Parallel()
-	sonarr := &countingSonarr{resolveFakeSonarr: resolveFakeSonarr{series: testSeries()}}
+	sonarr := &countingSonarr{series: testSeries()}
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}

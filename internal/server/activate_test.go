@@ -724,10 +724,11 @@ var _ sessionTimeoutSetter = (*authstore.Store)(nil)
 // short or hung. `modernize` does not report the shape, so only a source scan
 // holds it.
 //
-// Scoped to this package's own files on purpose: the Add/Done pair is the
-// deliberate shape of the BGTracker interface the scanning and manualops
-// subpackages consume, which is &s.bgWg reached through two methods rather than
-// a closure.
+// Scoped to this package's own files on purpose: bgWg is a concrete
+// sync.WaitGroup here, so Add and Done are still callable and only a source
+// scan holds the form. The scanning and manualops subpackages reach the same
+// value through BGTracker, which declares Go and nothing else, so there the
+// compiler holds it and no scan is needed.
 func TestBackgroundGoroutines_useBgWgGo(t *testing.T) {
 	t.Parallel()
 	entries, err := os.ReadDir(".")

@@ -266,9 +266,7 @@ func TestHandleLocks(t *testing.T) {
 		t.Parallel()
 		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []subflux.ManualLockEntry{
 			{
-				ManualLockKey: subflux.ManualLockKey{
-					MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr",
-				},
+				MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr",
 				Count: 2,
 			},
 		}}})

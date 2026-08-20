@@ -34,11 +34,13 @@ type HandlerDeps struct {
 	DecodeJSON func(w http.ResponseWriter, r *http.Request, v any, maxSize int64) bool
 }
 
-// BGTracker allows the handler to register background goroutines for
-// graceful shutdown tracking.
+// BGTracker registers a background goroutine with the server's WaitGroup for
+// graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
+// launches and counts in one call: an Add/Done pair can leak a counter (an
+// early return or a panic before the defer is installed leaves the drain
+// hung), and a one-method surface makes that unrepresentable.
 type BGTracker interface {
-	Add(delta int)
-	Done()
+	Go(f func())
 }
 
 // Handler provides HTTP handlers for manual search and download endpoints.
@@ -246,11 +248,9 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		Status:     "accepted",
 	})
 
-	h.deps.BGTracker.Add(1)
-	go func() {
-		defer h.deps.BGTracker.Done()
+	h.deps.BGTracker.Go(func() {
 		h.runManualDownload(ls, prov, &req, actID)
-	}()
+	})
 }
 
 // DownloadAccepted is the typed 202 Accepted response for manual downloads.

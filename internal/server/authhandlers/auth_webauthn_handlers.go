@@ -87,8 +87,7 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		slog.Warn("webauthn: finish login failed", "error", err)
 
-		var unknownCred *protocol.ErrorUnknownCredential
-		if errors.As(err, &unknownCred) {
+		if _, unknownCred := errors.AsType[*protocol.ErrorUnknownCredential](err); unknownCred {
 			httpapi.WriteJSONStatus(w, http.StatusUnauthorized, subflux.WebAuthnUnknownCredentialResponse{
 				Error:  "unknown credential",
 				Signal: "unknown_credential",

@@ -3,7 +3,11 @@
 // handling — they operate solely on api types.
 package coverage
 
-import "github.com/cplieger/subflux/internal/subflux"
+import (
+	"strings"
+
+	"github.com/cplieger/subflux/internal/subflux"
+)
 
 // Key identifies a subtitle by language and variant for coverage indexing.
 type Key struct{ Lang, Variant string }
@@ -71,12 +75,12 @@ func ResolveRuleName(audioLang string, targets []subflux.SubtitleTarget) string 
 // Episode IDs are "{prefix}s{ss}e{ee}" (e.g. "tvdb-12345-s01e01").
 // Returns the prefix including the trailing "-", or "" if the format is unrecognized.
 func ExtractSeriesPrefix(epMediaID string) string {
-	for i := len(epMediaID) - 1; i >= 1; i-- {
-		if epMediaID[i-1] == '-' && epMediaID[i] == 's' {
-			return epMediaID[:i]
-		}
+	before, _, found := strings.CutLast(epMediaID, "-s")
+	if !found {
+		return ""
 	}
-	return ""
+	// len(before)+1 re-includes the separator's "-" without allocating.
+	return epMediaID[:len(before)+1]
 }
 
 // CountEpisodesGrouped counts coverage from pre-grouped episode subtitle maps.

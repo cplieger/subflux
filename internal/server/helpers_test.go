@@ -228,9 +228,7 @@ func newTestServer(t *testing.T, db *qhMockStore) *Server {
 		// via handleUI (no auth needed for static-asset serving). A bypass
 		// authenticator double keeps the Server invariant (auth is always
 		// wired) without requiring each test to stand up real auth state.
-		authDeps: authDeps{
-			authenticator: bypassAuthenticator{},
-		},
+		authenticator: bypassAuthenticator{},
 	}
 	s.configured.Store(true)
 	s.live.Store(&liveState{

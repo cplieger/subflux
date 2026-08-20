@@ -30,12 +30,10 @@ func testAdminServer(t *testing.T) *Server {
 	t.Cleanup(func() { authDB.Close() })
 
 	s := &Server{
-		authDeps: authDeps{
-			authStore:  authDB,
-			ceremonies: authhandlers.NewCeremonyStore(),
-		},
-		activity: activity.New(10),
-		alerts:   activity.NewAlertLog(10),
+		authStore:  authDB,
+		ceremonies: authhandlers.NewCeremonyStore(),
+		activity:   activity.New(10),
+		alerts:     activity.NewAlertLog(10),
 	}
 	// Breach checking off: this fixture has no HTTPClient (see testAuthServer).
 	s.live.Store(&liveState{cfg: testConfig(t, "auth:\n  check_breached_passwords: false")})

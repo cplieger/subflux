@@ -127,7 +127,7 @@ func (m *mockCacheClearer) ClearCache() { m.cleared = true }
 
 func TestClearCaches_calls_cache_clearers(t *testing.T) {
 	t.Parallel()
-	cc := &mockCacheClearer{stubProvider: stubProvider{name: "hdbits"}}
+	cc := &mockCacheClearer{name: "hdbits"}
 	plain := &stubProvider{name: "os"}
 
 	provider.ClearCaches([]provider.Provider{plain, cc})

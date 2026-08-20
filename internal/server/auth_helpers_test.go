@@ -62,13 +62,11 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 	}
 
 	s := &Server{
-		authDeps: authDeps{
-			authStore:     authDB,
-			authenticator: authn,
-			ceremonies:    authhandlers.NewCeremonyStore(),
-		},
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
+		authStore:     authDB,
+		authenticator: authn,
+		ceremonies:    authhandlers.NewCeremonyStore(),
+		activity:      activity.New(50),
+		alerts:        activity.NewAlertLog(100),
 	}
 	// check_breached_passwords: OFF, stated rather than inherited. The real
 	// config DEFAULTS IT ON, so these tests have never run the production

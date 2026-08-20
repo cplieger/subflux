@@ -481,7 +481,7 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	t.Parallel()
 	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
 		[]provider.Provider{&resultProvider{
-			httpStubProvider: httpStubProvider{name: "os"},
+			name: "os",
 			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
@@ -532,7 +532,7 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 		[]provider.Provider{
 			&searchFailingProvider{httpStubProvider{name: "bad"}},
 			&resultProvider{
-				httpStubProvider: httpStubProvider{name: "good"},
+				name: "good",
 				results: []subflux.Subtitle{
 					{
 						Provider: "good", Language: "fr", ReleaseName: "Movie-GRP",
@@ -587,7 +587,7 @@ func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 	}
 	h, _ := newHTTPHarness(db, fakeManualCfg{},
 		[]provider.Provider{&resultProvider{
-			httpStubProvider: httpStubProvider{name: "os"},
+			name: "os",
 			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",

@@ -125,11 +125,13 @@ type HandlerDeps struct {
 	BGTracker BGTracker
 }
 
-// BGTracker allows the scanning handler to register background goroutines
-// with the server's WaitGroup for graceful shutdown.
+// BGTracker registers a background goroutine with the server's WaitGroup for
+// graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
+// launches and counts in one call: an Add/Done pair can leak a counter (an
+// early return or a panic before the defer is installed leaves the drain
+// hung), and a one-method surface makes that unrepresentable.
 type BGTracker interface {
-	Add(delta int)
-	Done()
+	Go(f func())
 }
 
 // Handler provides HTTP handlers for the /api/scan/* endpoints.
@@ -220,9 +222,7 @@ func (h *Handler) startBackgroundScan(w http.ResponseWriter, action, detail stri
 		Action: action, Detail: detail, Source: activity.SourceManual, ActivityID: actID,
 	})
 
-	h.deps.BGTracker.Add(1)
-	go func() {
-		defer h.deps.BGTracker.Done()
+	h.deps.BGTracker.Go(func() {
 		// Panic fallback only: FinishScanActivity releases the registration
 		// explicitly BEFORE the terminal transition on every normal return,
 		// so a done entry never reports cancellable. The defer covers a
@@ -231,7 +231,7 @@ func (h *Handler) startBackgroundScan(w http.ResponseWriter, action, detail stri
 		defer unregister()
 		outcome := run(h.deps.CtxFunc(), stopCh, actID)
 		h.finishScan(unregister, actID, action, detail, outcome)
-	}()
+	})
 
 	httpapi.WriteJSONStatus(w, http.StatusAccepted,
 		ScanAccepted{ActivityID: actID, Status: "scan started"})

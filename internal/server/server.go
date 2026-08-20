@@ -187,20 +187,14 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 			query: db,
 			sync:  db,
 		},
-		registry: reg,
-		events:   events.New(events.DefaultMaxSSEClients),
-		activity: activity.New(50),
-		alerts:   activity.NewAlertLog(100),
-		authDeps: authDeps{
-			ceremonies: authhandlers.NewCeremonyStore(),
-		},
-		scanSubsystem: scanSubsystem{
-			showSkipCache: showskip.New(1 * time.Hour),
-		},
-		previewDeps: previewDeps{
-			ffmpegSem:    semaphore.NewWeighted(3),
-			posterClient: newPosterClient(),
-		},
+		registry:      reg,
+		events:        events.New(events.DefaultMaxSSEClients),
+		activity:      activity.New(50),
+		alerts:        activity.NewAlertLog(100),
+		ceremonies:    authhandlers.NewCeremonyStore(),
+		showSkipCache: showskip.New(1 * time.Hour),
+		ffmpegSem:     semaphore.NewWeighted(3),
+		posterClient:  newPosterClient(),
 	}
 	for _, o := range opts {
 		o(s)
