@@ -25,6 +25,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/server/storeops"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/wiring"
@@ -208,6 +209,7 @@ type Server struct {
 	events       *events.EventBus
 	coverageH    *coveragehandlers.Handler
 	activityH    *activityhandlers.Handler
+	storeOps     *storeops.Runner
 	syncH        *synchandlers.Handler
 	fileH        *filehandlers.Handler
 	mediaH       *mediahandlers.Handler

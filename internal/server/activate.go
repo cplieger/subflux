@@ -346,8 +346,8 @@ func (s *Server) launchWorkerSet(ctx context.Context) {
 	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics"})
 	s.bgWg.Go(func() { s.runScheduler(ctx) })
 	s.bgWg.Go(func() { s.runPoller(ctx) })
-	s.bgWg.Go(func() { s.runBackup(ctx) })
-	s.bgWg.Go(func() { s.runStoreMetrics(ctx) })
+	s.bgWg.Go(func() { s.storeOps.RunBackup(ctx) })
+	s.bgWg.Go(func() { s.storeOps.RunMetrics(ctx) })
 }
 
 // --- OIDC lazy slot ---

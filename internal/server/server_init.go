@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coverage"
@@ -17,6 +18,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/server/storeops"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -141,6 +143,12 @@ func (s *Server) initHandlers() {
 		ServerCtx:   func() context.Context { return s.lifetime },
 	})
 
+	s.storeOps = storeops.New(storeops.Deps{
+		DB:                    s.db,
+		Metrics:               s.metrics,
+		Cfg:                   func() *config.Config { return s.state().cfg },
+		RecordStoreWriteError: s.recordStoreWriteError,
+	})
 	s.activityH = activityhandlers.New(activityhandlers.Deps{
 		Activity: s.activity,
 		Alerts:   s.alerts,

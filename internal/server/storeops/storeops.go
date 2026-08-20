@@ -1,0 +1,206 @@
+// Package storeops runs the periodic operations that treat the bbolt file as an
+// operational artifact rather than a set of rows: timestamped snapshots with
+// retention pruning, and the file-size and freelist gauges.
+//
+// Both were background goroutine bodies on Server. They read four things —
+// the store, the metrics recorder, the live config, and the disk-full classifier —
+// which is the same Deps-plus-a-live-config shape the scheduler package already
+// takes, so they belong beside it rather than on the composition root. The two
+// share a package because they share a subject: one writes the file, the other
+// measures it, and both are the only code that cares how large it is.
+package storeops
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"slices"
+	"time"
+
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/config/defaults"
+)
+
+// StoreMetricsInterval is how often the store file-size and freelist gauges are
+// refreshed. 5 minutes keeps the /metrics scrape cheap (no per-request View tx)
+// while still catching file growth early enough for alerting.
+const StoreMetricsInterval = 5 * time.Minute
+
+// Store is the two methods these operations need of the store: snapshot the whole
+// file, and report its size. Both are whole-file concerns, which is why neither
+// appears in any row-level store interface.
+type Store interface {
+	BackupInto(ctx context.Context, dest string) error
+	StoreFileStats() (fileBytes, freelistBytes int64)
+}
+
+// Metrics is the narrow observability surface for these operations. The concrete
+// *obs.Metrics satisfies it structurally.
+type Metrics interface {
+	RecordBackupSuccess(dur time.Duration)
+	RecordStoreFileSize(bytes int64)
+	RecordStoreFreelistBytes(bytes int64)
+}
+
+// Deps is what the runners need.
+type Deps struct {
+	DB      Store
+	Metrics Metrics
+	// Cfg resolves the LIVE config each cycle, so enable, frequency, retention
+	// and path changes take effect on the next iteration without a restart. It
+	// returns nil in unconfigured mode, which the backup loop treats as disabled.
+	Cfg func() *config.Config
+	// RecordStoreWriteError classifies a write failure as a possible disk-full
+	// condition. Injected rather than imported: the classifier needs the concrete
+	// engine's error taxonomy, and this package names no engine.
+	RecordStoreWriteError func(error)
+}
+
+// Runner owns the periodic store-file operations.
+type Runner struct {
+	deps Deps
+}
+
+// New returns a Runner over deps.
+func New(deps Deps) *Runner { return &Runner{deps: deps} }
+
+// RunBackup periodically writes a consistent database snapshot and prunes old
+// backups until ctx is cancelled.
+func (r *Runner) RunBackup(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(r.frequency()):
+		}
+		r.runOnce(ctx)
+	}
+}
+
+// frequency returns the configured interval, clamped to the minimum, or the
+// default when unset or unconfigured.
+func (r *Runner) frequency() time.Duration {
+	if cfg := r.deps.Cfg(); cfg != nil {
+		if f := cfg.BackupFrequency(); f >= defaults.MinBackupFrequency {
+			return f
+		}
+	}
+	return defaults.DefaultBackupFrequency
+}
+
+// runOnce writes a single timestamped snapshot, then prunes old ones.
+func (r *Runner) runOnce(ctx context.Context) {
+	cfg := r.deps.Cfg()
+	if cfg == nil || !cfg.BackupEnabled() {
+		return
+	}
+	dir := cfg.BackupPath()
+	if dir == "" {
+		dir = filepath.Dir(config.DefaultDBPath)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		slog.Warn("backup: create directory failed", "dir", dir, "error", err)
+		return
+	}
+	dest := filepath.Join(dir, "subflux-"+time.Now().UTC().Format("20060102-150405")+".bolt")
+	start := time.Now()
+	if err := r.deps.DB.BackupInto(ctx, dest); err != nil {
+		slog.Error("backup failed", "dest", dest, "error", err)
+		// A failed snapshot is another early disk-full signal; classify it so
+		// the persistent operator alert fires between maintenance windows.
+		r.deps.RecordStoreWriteError(err)
+		return
+	}
+	dur := time.Since(start)
+	if err := enforceBackupMode(dest); err != nil {
+		slog.Warn("backup: mode enforcement failed", "dest", dest, "error", err)
+	}
+	slog.Info("database backup written", "dest", dest, "duration", dur.Round(time.Millisecond).String())
+	r.deps.Metrics.RecordBackupSuccess(dur)
+	pruneBackups(dir, cfg.BackupRetention())
+}
+
+// RunMetrics periodically reads the bbolt file size and freelist stats and records
+// them as Prometheus gauges. It exits when ctx is cancelled.
+func (r *Runner) RunMetrics(ctx context.Context) {
+	// Record once immediately at startup so the gauges are populated before the
+	// first scrape.
+	r.sample()
+
+	ticker := time.NewTicker(StoreMetricsInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.sample()
+		}
+	}
+}
+
+// sample records one reading of the file-size and freelist gauges.
+func (r *Runner) sample() {
+	fileBytes, freelistBytes := r.deps.DB.StoreFileStats()
+	r.deps.Metrics.RecordStoreFileSize(fileBytes)
+	r.deps.Metrics.RecordStoreFreelistBytes(freelistBytes)
+}
+
+// enforceBackupMode pins the finished snapshot to owner-only and PROVES the
+// filesystem stored that, which the os.Chmod it replaces could not.
+//
+// It matters here more than at an ordinary file because of what the artifact
+// holds: a bbolt snapshot is the whole file, so every backup carries the auth
+// buckets — users, password hashes, passkey credentials, API keys. A snapshot
+// stored 0640 instead of 0600 hands that to anyone in the file's group, and a
+// mode argument is a REQUEST: atomicfile's WithMode(0o600) create and a plain
+// os.Chmod both hand the mode to the kernel, and on a filesystem carrying an
+// inheritable group ACE the kernel stores something wider (measured on a ZFS
+// nfs4acl dataset, a 0o600 create comes back 0770). atomicfile.EnforceMode
+// fchmods the OPEN HANDLE, fstats that same handle, and reports
+// ErrModeNotStored rather than nil when the two disagree — so the warning above
+// now means "the snapshot is not 0600" instead of "the request errored".
+//
+// OpenRegular supplies the handle rather than an os.Open because the pathname is
+// the weak part of the old sequence: chmod-the-name-then-stat-the-name can pin
+// one file and certify another if the name is swapped in between, and it also
+// refuses a symlink or a non-regular occupant at the final component
+// (O_NOFOLLOW in the kernel, O_NONBLOCK so a planted FIFO cannot stall the
+// backup goroutine) instead of chmod'ing whatever the name happens to reach.
+// dest is absolute by BackupInto's documented contract, which atomicfile's
+// write path already enforces, so a relative path never reaches here.
+//
+// The WARN posture is deliberately UNCHANGED: a snapshot whose mode cannot be
+// pinned is still a valid, restorable backup, and destroying it would trade a
+// confidentiality problem for a durability one on the very path the operator
+// relies on. What changes is that the warning is now true.
+func enforceBackupMode(dest string) error {
+	f, _, err := atomicfile.OpenRegular(dest)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	_, err = atomicfile.EnforceMode(f, 0o600)
+	return err
+}
+
+// pruneBackups keeps the newest `keep` timestamped backups in dir and removes the
+// rest. Timestamped names sort chronologically, so lexical order is age order; the
+// glob excludes the live subflux.bolt (no dash).
+func pruneBackups(dir string, keep int) {
+	if keep < 1 {
+		keep = 1
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "subflux-*.bolt"))
+	if err != nil || len(matches) <= keep {
+		return
+	}
+	slices.Sort(matches)
+	for _, old := range matches[:len(matches)-keep] {
+		if rmErr := os.Remove(old); rmErr != nil {
+			slog.Warn("backup: prune failed", "file", old, "error", rmErr)
+		}
+	}
+}
