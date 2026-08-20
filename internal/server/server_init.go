@@ -63,9 +63,7 @@ func (s *Server) initHandlers() {
 			return err
 		},
 	)
-	if s.metrics != nil {
-		s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
-	}
+	s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
 	s.queryH = queryhandlers.New(queryhandlers.Deps{
 		QueryDB:    s.stores.query,
 		CovDB:      s.db,
@@ -191,19 +189,11 @@ func (s *Server) initHandlers() {
 // initManualHandler constructs the manualops.Handler with the server's dependencies.
 func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handler {
 	return manualops.NewHandler(manualops.HandlerDeps{
-		DBFunc:   func() manualops.DownloadStore { return s.db },
-		Activity: s.activity,
-		Alerts:   s.alerts,
-		Events:   s.events,
-		StateFunc: func() *manualops.LiveState {
-			ls := s.state()
-			return &manualops.LiveState{
-				Cfg: ls.cfg, Engine: ls.engine, Scorer: ls.scorer,
-				Sonarr: ls.sonarr, Radarr: ls.radarr,
-				SonarrLib: ls.sonarr, RadarrLib: ls.radarr,
-				Providers: ls.providers,
-			}
-		},
+		DBFunc:     func() manualops.DownloadStore { return s.db },
+		Activity:   s.activity,
+		Alerts:     s.alerts,
+		Events:     s.events,
+		StateFunc:  func() *manualops.LiveState { return manualLiveState(s.state()) },
 		BGTracker:  &s.bgWg,
 		ServerCtx:  func() context.Context { return s.lifetime },
 		Resolve:    resolver,

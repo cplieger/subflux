@@ -17,6 +17,12 @@ type manualStore interface {
 }
 
 // manualLiveState converts the server's liveState to manualops.LiveState.
+//
+// The ONE conversion. initManualHandler used to rebuild this struct inline, field
+// for field, while four thin wrappers here called this copy — and those wrappers
+// had no production caller at all, so the converter the app actually ran was the
+// duplicate and this one existed only for tests. The wrappers are deleted and
+// StateFunc calls this.
 func manualLiveState(ls *liveState) *manualops.LiveState {
 	return &manualops.LiveState{
 		Cfg:       ls.cfg,
@@ -28,32 +34,4 @@ func manualLiveState(ls *liveState) *manualops.LiveState {
 		RadarrLib: ls.radarr,
 		Providers: ls.providers,
 	}
-}
-
-// lookupMediaTitle wraps manualops.LookupMediaTitle, adapting from the
-// server's liveState to manualops.LiveState.
-func lookupMediaTitle(ctx context.Context, ls *liveState, mediaType subflux.MediaType, arrID int) string {
-	return manualops.LookupMediaTitle(ctx, &manualops.LiveState{
-		Cfg: ls.cfg, Engine: ls.engine, Sonarr: ls.sonarr, Radarr: ls.radarr, Providers: ls.providers,
-	}, mediaType, arrID)
-}
-
-// lookupMovieMediaID wraps manualops.LookupMovieMediaID with the server's
-// manualLiveState adapter.
-func lookupMovieMediaID(ctx context.Context, ls *liveState, arrID int) string {
-	return manualops.LookupMovieMediaID(ctx, manualLiveState(ls), arrID)
-}
-
-// lookupEpisodeMediaID wraps manualops.LookupEpisodeMediaID with the server's
-// manualLiveState adapter.
-func lookupEpisodeMediaID(ctx context.Context, ls *liveState, seriesID, season, episode int) string {
-	return manualops.LookupEpisodeMediaID(ctx, manualLiveState(ls), seriesID, season, episode)
-}
-
-// resolveMediaIDs wraps manualops.ResolveMediaIDs with the server's
-// manualLiveState adapter.
-func (s *Server) resolveMediaIDs(ctx context.Context, ls *liveState,
-	mediaType subflux.MediaType, arrID, season, episode int,
-) (mediaID, title string) {
-	return manualops.ResolveMediaIDs(ctx, manualLiveState(ls), mediaType, arrID, season, episode)
 }

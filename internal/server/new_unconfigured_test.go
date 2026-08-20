@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
@@ -30,8 +31,11 @@ func TestNew_UnconfiguredMode_NoPanic(t *testing.T) {
 			t.Fatalf("server.New panicked in unconfigured mode: %v", r)
 		}
 	}()
+	// WithMetrics because it is required, like every real caller supplies it.
+	// The subject here is the unconfigured CONFIG path, not a missing recorder.
 	srv := New(&testsupport.NopStore{}, nopProviderRegistry{},
 		WithDefaultConfig([]byte("# default\n")),
+		WithMetrics(obs.New()),
 	)
 	if srv == nil {
 		t.Fatal("New returned nil")

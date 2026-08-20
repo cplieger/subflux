@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -65,7 +66,7 @@ func TestLookupMediaTitle(t *testing.T) {
 				radarr: tt.radarr,
 				sonarr: tt.sonarr,
 			}
-			got := lookupMediaTitle(t.Context(), ls, tt.mediaType, tt.arrID)
+			got := manualops.LookupMediaTitle(t.Context(), manualLiveState(ls), tt.mediaType, tt.arrID)
 			if got != tt.want {
 				t.Errorf("lookupMediaTitle(ctx, ls, %q, %d) = %q, want %q",
 					tt.mediaType, tt.arrID, got, tt.want)
@@ -100,7 +101,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{radarr: tt.radarr})
 
-			got := lookupMovieMediaID(t.Context(), s.state(), tt.arrID)
+			got := manualops.LookupMovieMediaID(t.Context(), manualLiveState(s.state()), tt.arrID)
 			if got != tt.want {
 				t.Errorf("lookupMovieMediaID(ctx, ls, %d) = %q, want %q",
 					tt.arrID, got, tt.want)
@@ -137,7 +138,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{sonarr: tt.sonarr})
 
-			got := lookupEpisodeMediaID(t.Context(), s.state(), tt.series, tt.season, tt.episode)
+			got := manualops.LookupEpisodeMediaID(t.Context(), manualLiveState(s.state()), tt.series, tt.season, tt.episode)
 			if got != tt.want {
 				t.Errorf("lookupEpisodeMediaID(ctx, ls, %d, %d, %d) = %q, want %q",
 					tt.series, tt.season, tt.episode, got, tt.want)
@@ -251,8 +252,8 @@ func TestResolveMediaIDs(t *testing.T) {
 			}
 			s.live.Store(&liveState{radarr: tt.radarr, sonarr: tt.sonarr})
 
-			coverageID, historyID := s.resolveMediaIDs(
-				t.Context(), s.state(),
+			coverageID, historyID := manualops.ResolveMediaIDs(
+				t.Context(), manualLiveState(s.state()),
 				tt.mediaType, tt.arrID, tt.season, tt.episode,
 			)
 			if coverageID != tt.wantCoverage {

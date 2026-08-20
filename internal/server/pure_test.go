@@ -1,10 +1,8 @@
 package server
 
 import (
-	"context"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -64,49 +62,6 @@ func TestQueryInt_property_result_always_non_negative(t *testing.T) {
 			t.Errorf("manualops.QueryInt(%q) = %d, want >= 0", val, got)
 		}
 	})
-}
-
-// --- sleepCtx ---
-
-func TestSleepCtx_zero_duration_returns_immediately(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, 0)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, 0) = %v, want nil", err)
-	}
-}
-
-func TestSleepCtx_negative_duration_returns_immediately(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, -1)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, -1) = %v, want nil", err)
-	}
-}
-
-func TestSleepCtx_cancelled_context_returns_error(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately.
-
-	err := sleepCtx(ctx, 10*time.Second)
-	if err == nil {
-		t.Fatal("sleepCtx(cancelled, 10s) = nil, want context error")
-	}
-	if err != context.Canceled {
-		t.Errorf("sleepCtx(cancelled, 10s) = %v, want %v", err, context.Canceled)
-	}
-}
-
-func TestSleepCtx_short_duration_completes(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, 1*time.Millisecond)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, 1ms) = %v, want nil", err)
-	}
 }
 
 // --- extractAltTitles ---

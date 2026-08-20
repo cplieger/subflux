@@ -291,7 +291,9 @@ func WithSubtitleProc(p synchandlers.SubtitleProcessor) Option {
 	return func(s *Server) { s.subtitleProc = p }
 }
 
-// WithMetrics sets the metrics recorder.
+// WithMetrics sets the metrics recorder. REQUIRED despite being an Option:
+// twenty-two sites dereference s.metrics unguarded, so omitting it panics rather
+// than degrading. requireServiceable asserts it at Start.
 func WithMetrics(m Metrics) Option { return func(s *Server) { s.metrics = m } }
 
 // WithPort sets the HTTP listen port (unconfigured mode).

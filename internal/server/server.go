@@ -23,7 +23,6 @@ import (
 	"github.com/cplieger/auth/v4"
 	authoidc "github.com/cplieger/auth/v4/oidc"
 	"github.com/cplieger/auth/v4/ratelimit"
-	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -116,11 +115,6 @@ type Metrics interface {
 	DurabilityMetrics
 }
 
-// sleepCtx pauses for d, returning early if ctx is cancelled.
-func sleepCtx(ctx context.Context, d time.Duration) error {
-	return httpx.SleepCtx(ctx, d)
-}
-
 // Store is the persistence surface New requires: the union of the narrow
 // interfaces its consumers declare. It is the same shape as AuthStore below
 // and it exists for the same reason — this is the ONE site that fans a single
@@ -201,6 +195,16 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	}
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
+	}
+	// Metrics is REQUIRED, and it is checked here rather than at Start because
+	// initHandlers below binds it into four child Deps by value. Expressed as an
+	// Option it read as voluntary, and it never was: twenty-two sites dereference
+	// it unguarded, including the middleware chain and the /metrics mount. The
+	// single nil check that used to sit in initHandlers is what made a missing
+	// recorder look survivable — it postponed the panic to the first request
+	// instead of preventing it. Same shape as search.New's five required options.
+	if s.metrics == nil {
+		panic("server.New: WithMetrics is required")
 	}
 	// Apply the configured SSE client cap when a config option supplied one
 	// (hot reload re-applies later changes).
@@ -309,6 +313,7 @@ func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 // falls back to settings mode instead of refusing to serve, so a config that
 // boots today keeps booting.
 func (s *Server) Start(ctx context.Context, onReady func()) {
+	s.requireServiceable()
 	s.lifetime = ctx
 	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 	ls := s.state()
@@ -340,6 +345,7 @@ func (s *Server) Start(ctx context.Context, onReady func()) {
 
 // StartUnconfigured starts the HTTP server without a valid config.
 func (s *Server) StartUnconfigured(ctx context.Context, onReady func()) {
+	s.requireServiceable()
 	s.lifetime = ctx
 	s.bgWg.Go(func() { s.awaitWorkerLaunch(ctx) })
 
