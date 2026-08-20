@@ -11,17 +11,6 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// PollCacher is the interface for poll timestamp caching. Consumers depend
-// on this interface rather than the concrete *PollCache, enabling test
-// doubles and alternative implementations.
-type PollCacher interface {
-	Get(ctx context.Context, key subflux.PollKey) time.Time
-	Set(ctx context.Context, key subflux.PollKey, t time.Time)
-}
-
-// Compile-time assertion: *PollCache implements PollCacher.
-var _ PollCacher = (*PollCache)(nil)
-
 // PollCache is a write-through cache for poll timestamps. It absorbs
 // transient DB write failures: if the DB write fails, subsequent reads
 // still return the in-memory value instead of re-reading a stale DB entry.
