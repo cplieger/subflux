@@ -32,41 +32,24 @@ type AudioSyncHints struct {
 // inspectability and testability. The correlation can produce arbitrarily
 // large offsets, so results are clamped by the MaxOffset/MinOffset limits
 // below.
+// The two vad.Tuning values lead because they carry the pointer fields; the
+// scalars follow (govet fieldalignment).
 type audioSyncConfig struct {
-	MaxOffsetPct int64          // percentage of audio duration
-	MaxOffsetMs  int64          // hard ceiling in milliseconds
-	MinOffsetMs  int64          // hard floor for short clips
-	VADSafe      audioVADConfig // recall-biased pass
-	VADPrecise   audioVADConfig // precision-biased pass
-	AgreementMs  int64          // max disagreement between passes
+	VADSafe      vad.Tuning // recall-biased pass
+	VADPrecise   vad.Tuning // precision-biased pass
+	MaxOffsetPct int64      // percentage of audio duration
+	MaxOffsetMs  int64      // hard ceiling in milliseconds
+	MinOffsetMs  int64      // hard floor for short clips
+	AgreementMs  int64      // max disagreement between passes
 }
 
 var defaultAudioSyncConfig = audioSyncConfig{
 	MaxOffsetPct: 10,
 	MaxOffsetMs:  300_000, // 5 minutes
 	MinOffsetMs:  30_000,  // 30 seconds
-	VADSafe:      audioVADConfig{mode: vad.ModeVeryAggressive, threshold: 250, overhangFrames: 35, adaptScale: 0},
-	VADPrecise:   audioVADConfig{mode: vad.ModeVeryAggressive, threshold: 125, overhangFrames: 10, adaptScale: 0},
+	VADSafe:      vad.Tuning{Mode: vad.ModeVeryAggressive, Threshold: 250, OverhangFrames: 35, AdaptScale: 0},
+	VADPrecise:   vad.Tuning{Mode: vad.ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0},
 	AgreementMs:  500,
-}
-
-// audioVADConfig is one pass of GMM-VAD tuning. Each pass runs
-// vad.FramesBinaryThresholdTuned with these parameters; the safe and
-// precise passes use complementary tunings (safe pass biases toward
-// recall; precise pass biases toward precision).
-type audioVADConfig struct {
-	mode vad.Mode // VAD aggressiveness (vad.ModeQuality to vad.ModeVeryAggressive)
-	// threshold is the GMM log-likelihood-ratio a frame must reach to be called
-	// speech, compared against processFrameLLR's output. NOT milliseconds: the
-	// safe/precise pair is 250 and 125 LLR, and reading them as a duration makes
-	// the precise pass look like the more permissive one when it is the stricter.
-	threshold float64
-	// overhangFrames is how many frames the speech decision is held after the
-	// LLR drops below threshold — a frame COUNT feeding vad's hangover state
-	// machine, not a percentage. At 8kHz mono with vad's frame size, the 35 and
-	// 10 here are frames, so the safe pass holds speech about three times longer.
-	overhangFrames int
-	adaptScale     float64 // 0 = frozen adaptation (best for movie audio)
 }
 
 // audioSync performs audio-based synchronization without a reference subtitle.
@@ -140,11 +123,11 @@ func audioSyncFromPCM(ctx context.Context, incorrect []Cue, pcm []int16, hints A
 	var safeSig, preciseSig []float64
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		safeSig = runAudioVADPass(gctx, pcm, defaultAudioSyncConfig.VADSafe)
+		safeSig = vad.FramesBinary(gctx, pcm, defaultAudioSyncConfig.VADSafe)
 		return gctx.Err()
 	})
 	g.Go(func() error {
-		preciseSig = runAudioVADPass(gctx, pcm, defaultAudioSyncConfig.VADPrecise)
+		preciseSig = vad.FramesBinary(gctx, pcm, defaultAudioSyncConfig.VADPrecise)
 		return gctx.Err()
 	})
 	if err := g.Wait(); err != nil {
@@ -265,12 +248,4 @@ func buildVADSubSignal(cues []Cue, numFrames int) []float64 {
 		}
 	}
 	return sig
-}
-
-// runAudioVADPass runs one GMM-VAD pass with the given config.
-// Centralizes the call to vad.FramesBinaryThresholdTuned so that
-// defaultAudioSyncConfig.VADSafe / defaultAudioSyncConfig.VADPrecise tuning lives as named values rather
-// than positional magic numbers in audio_sync.
-func runAudioVADPass(ctx context.Context, pcm []int16, c audioVADConfig) []float64 {
-	return vad.FramesBinaryThresholdTuned(ctx, pcm, c.mode, c.threshold, c.overhangFrames, c.adaptScale, vad.Tuning{})
 }
