@@ -229,11 +229,6 @@ var cacheControlMW = cacheControlFor()
 
 // --- Top-level handlers ---
 
-// keyStatus is the JSON "status" response key used by the admin-bootstrap
-// responses ({"status":"ok"}). The health envelope now comes from
-// webhttp.ReadinessHandler, which owns its own struct and key ordering.
-const keyStatus = "status"
-
 // handleHealth reports HTTP serving state via webhttp.ReadinessHandler: 200 with
 // {"status":"ok"} when s.ready is set, 503 with {"status":"unready","reason":...}
 // during startup or graceful shutdown. s.ready (a webhttp.Ready) flips true once

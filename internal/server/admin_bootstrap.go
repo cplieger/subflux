@@ -1,163 +1,29 @@
 package server
 
 import (
-	"log/slog"
 	"net/http"
-	"time"
 
-	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/httpapi"
-	"github.com/cplieger/subflux/internal/server/authhandlers"
-	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/webhttp/v2"
+	"github.com/cplieger/subflux/internal/server/adminsocket"
 )
 
-// handleAdminBootstrap serves CLI auth commands (reset-password, generate-api-key)
-// routed through the running server. bbolt's exclusive OS file lock prevents the
-// CLI from opening the store directly while the server holds it, so the CLI posts
-// to this endpoint instead. It is served ONLY on the Unix-socket admin plane
-// (see AdminHandler); the kernel's socket custody — a 0700 directory only
-// same-container processes can traverse — is the security boundary, so the
-// handler itself requires no credentials (matching the first-boot recovery
-// use case via docker exec).
-func (s *Server) handleAdminBootstrap(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Action   string `json:"action"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Label    string `json:"label"`
-	}
-	// Cap + decode via webhttp.DecodeBody: it bounds the body at MaxJSONBody
-	// (1 MiB) with an http.MaxBytesReader and, on any decode failure (including
-	// trailing data past the single JSON object), writes the 400 envelope
-	// {error,code:"bad_request",request_id} — byte-identical to the previous
-	// httpapi.BadRequestC(subflux.CodeBadRequest) since both route through
-	// webhttp.WriteError.
-	if !webhttp.DecodeBody(w, r, &req, "invalid request body") {
-		return
-	}
-
-	switch req.Action {
-	case "reset-password":
-		s.bootstrapResetPassword(w, r, req.Username, req.Password)
-	case "generate-api-key":
-		s.bootstrapGenerateAPIKey(w, r, req.Username, req.Label)
-	default:
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "unknown action: "+req.Action)
-	}
-}
-
-func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, username, password string) {
-	if username == "" || password == "" {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username and password are required")
-		return
-	}
-
-	ctx := r.Context()
-	user, found, err := s.authStore.UserByUsername(ctx, username)
-	if err != nil {
-		slog.Error("admin bootstrap: reset-password lookup", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-	if !found {
-		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "user not found: "+username)
-		return
-	}
-
-	if errLen := auth.ValidateSoloPasswordLength(password); errLen != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errLen.Error())
-		return
-	}
-	pctx := auth.PasswordContext{Username: username, ForbiddenWords: []string{"subflux"}}
-	if errCtx := auth.ValidatePasswordContext(password, pctx); errCtx != nil {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errCtx.Error())
-		return
-	}
-
-	user.PasswordHash = auth.HashPassword(password)
-	user.UpdatedAt = time.Now()
-	if err := s.authStore.UpdateUser(ctx, user); err != nil {
-		slog.Error("admin bootstrap: update user", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-
-	if err := s.authStore.DeleteUserSessions(ctx, user.ID, ""); err != nil {
-		slog.Warn("admin bootstrap: invalidate sessions", "error", err)
-	}
-
-	slog.Info("admin bootstrap: password reset", "username", username, "ip", authhandlers.ClientIP(r))
-	httpapi.WriteJSON(w, map[string]string{keyStatus: "ok", "username": username})
-}
-
-func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request, username, label string) {
-	if username == "" {
-		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username is required")
-		return
-	}
-
-	ctx := r.Context()
-	user, found, err := s.authStore.UserByUsername(ctx, username)
-	if err != nil {
-		slog.Error("admin bootstrap: generate-api-key lookup", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-	if !found {
-		httpapi.NotFoundC(w, r, subflux.CodeNotFound, "user not found: "+username)
-		return
-	}
-
-	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
-
-	apiKey := &auth.Key{
-		UserID:    user.ID,
-		KeyHash:   hash,
-		KeyPrefix: prefix,
-		KeySuffix: suffix,
-		Label:     label,
-		CreatedAt: time.Now(),
-	}
-	if err := s.authStore.CreateAPIKey(ctx, apiKey); err != nil {
-		slog.Error("admin bootstrap: store api key", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-
-	slog.Info("admin bootstrap: API key generated",
-		"username", username, "label", label, "ip", authhandlers.ClientIP(r))
-	httpapi.WriteJSON(w, map[string]string{keyStatus: "ok", "key": plaintext})
-}
-
-// AdminHandler returns the admin-plane handler: a one-route mux serving
-// POST /api/admin/bootstrap, wrapped in the same access-log/request-ID and
-// panic-recovery middleware the TCP mux uses (the body limit is inside the
-// handler via webhttp.DecodeBody, exactly as on the TCP plane). It installs no
-// metric hook, deliberately: http_requests_total describes the public HTTP
-// surface, and this plane is one route reachable only by a same-container
-// process, so a series for it would carry no signal. Every http_requests_total
-// sample therefore comes from buildHandler's chain.
+// AdminHandler returns the admin-socket plane's handler.
 //
-// main.go serves it on a second http.Server bound to the Unix socket in the
-// 0700 directory config.AdminSocketDir — kernel socket custody replaces the
-// former requireLocalhost peer-address check, so the zero-credential
-// bootstrap channel is unreachable over every TCP path (netns-sharing peers
-// and proxied clients included). Both configured and unconfigured server
-// modes expose it.
+// Exported for the composition root: main.go owns that listener's lifecycle and
+// binds it to the Unix socket. The plane itself lives in
+// internal/server/adminsocket — its three handlers read one collaborator and no
+// live state, so they were the last handler cluster with no reason to sit on this
+// type.
+//
+// The plane is constructed HERE rather than held as a field, because a field would
+// need building after SetAuth supplies the store and would be nil until then —
+// another ordering rule in a type that already has one too many. adminsocket.Plane
+// holds nothing but its Deps, so building one costs nothing and this is called once
+// per process anyway.
 func (s *Server) AdminHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST "+config.AdminBootstrapURLPath, s.handleAdminBootstrap)
-	return webhttp.Chain(mux,
-		webhttp.Logging(
-			webhttp.WithLogger(slog.Default()),
-		),
-		webhttp.Recoverer(
-			webhttp.WithRecoverLogger(slog.Default()),
-			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),
-		),
-	)
+	return adminsocket.New(adminsocket.Deps{
+		Store:   s.authStore,
+		Metrics: s.metrics,
+	}).Handler()
 }
 
 // RecordPersistentAlert records a manually-dismissable operator alert.
