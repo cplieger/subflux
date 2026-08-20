@@ -15,7 +15,7 @@ func TestHandleDismissActivity_missing_id_returns_400(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissActivity(rec, req)
+	activityH(s).HandleDismissActivity(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("handleDismissActivity(no id) status = %d, want %d",
@@ -33,7 +33,7 @@ func TestHandleDismissActivity_cancels_queued_entry(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissActivity(rec, req)
+	activityH(s).HandleDismissActivity(rec, req)
 
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("handleDismissActivity(cancel queued) status = %d, want %d",
@@ -55,7 +55,7 @@ func TestHandleDismissActivity_dismisses_completed_entry(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissActivity(rec, req)
+	activityH(s).HandleDismissActivity(rec, req)
 
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("handleDismissActivity(dismiss done) status = %d, want %d",
@@ -74,7 +74,7 @@ func TestHandleDismissActivity_nonexistent_id_returns_204(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id=nonexistent", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissActivity(rec, req)
+	activityH(s).HandleDismissActivity(rec, req)
 
 	// dismiss() is a no-op for nonexistent IDs; handler still returns 204.
 	if rec.Code != http.StatusNoContent {

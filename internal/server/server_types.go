@@ -11,6 +11,7 @@ import (
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
@@ -206,6 +207,7 @@ type Server struct {
 	alerts       *activity.AlertLog
 	events       *events.EventBus
 	coverageH    *coveragehandlers.Handler
+	activityH    *activityhandlers.Handler
 	syncH        *synchandlers.Handler
 	fileH        *filehandlers.Handler
 	mediaH       *mediahandlers.Handler

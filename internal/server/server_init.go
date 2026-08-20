@@ -6,6 +6,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
@@ -140,6 +141,12 @@ func (s *Server) initHandlers() {
 		ServerCtx:   func() context.Context { return s.lifetime },
 	})
 
+	s.activityH = activityhandlers.New(activityhandlers.Deps{
+		Activity: s.activity,
+		Alerts:   s.alerts,
+		Stops:    &s.stops,
+		Events:   s.events,
+	})
 	s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
 		Store: s.db,
 		StateFunc: func() *coveragehandlers.LiveState {

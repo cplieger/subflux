@@ -134,7 +134,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// --- user: requires a session or valid API key ---
 
 	// Server-sent events (always available, config-independent).
-	user.Add("GET /api/events", s.handleEvents)
+	user.Add("GET /api/events", s.activityH.HandleEvents)
 
 	// Self-service account endpoints. These never delete credentials or
 	// mint long-lived tokens, so reauth is not required here. Operations
@@ -152,12 +152,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	user.Add("GET /api/config/schema", s.configH.HandleConfigSchema)
 
 	// Alerts (read + dismiss).
-	user.Add("GET /api/alerts", s.handleGetAlerts)
-	user.Add("DELETE /api/alerts", s.handleDismissAlert)
+	user.Add("GET /api/alerts", s.activityH.HandleGetAlerts)
+	user.Add("DELETE /api/alerts", s.activityH.HandleDismissAlert)
 
 	// Activity feed (user-visible history; config-independent).
-	user.Add("GET /api/activity", s.handleGetActivity)
-	user.Add("DELETE /api/activity", s.handleDismissActivity)
+	user.Add("GET /api/activity", s.activityH.HandleGetActivity)
+	user.Add("DELETE /api/activity", s.activityH.HandleDismissActivity)
 
 	// Credential management on your own account (delete own passkey, unlink
 	// own OIDC). Destructive actions are confirmed client-side. API-key
@@ -258,7 +258,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// (full scans: admin) against the entry's required_role. Distinct from
 	// the dismiss idiom (DELETE /api/activity?id=), which never stops
 	// running work.
-	userConfigured.Add("POST /api/activity/{id}/cancel", s.handleCancelActivity)
+	userConfigured.Add("POST /api/activity/{id}/cancel", s.activityH.HandleCancelActivity)
 
 	// Provider timeout reset.
 	adminConfigured.Add("POST /api/providers/timeout/reset", s.queryH.HandleProviderTimeoutReset)

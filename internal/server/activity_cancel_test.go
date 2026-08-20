@@ -27,7 +27,7 @@ func cancelReq(t *testing.T, s *Server, id string, user *auth.User) *httptest.Re
 		http.MethodPost, "/api/activity/"+id+"/cancel", http.NoBody)
 	req.SetPathValue("id", id)
 	rec := httptest.NewRecorder()
-	s.handleCancelActivity(rec, req)
+	activityH(s).HandleCancelActivity(rec, req)
 	return rec
 }
 
@@ -160,7 +160,7 @@ func TestHandleCancelActivity_missing_id_400(t *testing.T) {
 	req := httptest.NewRequestWithContext(authhandlers.NewUserContext(t.Context(), plainUser()),
 		http.MethodPost, "/api/activity//cancel", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleCancelActivity(rec, req)
+	activityH(s).HandleCancelActivity(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rec.Code)
 	}
@@ -177,7 +177,7 @@ func TestDismissActivity_never_stops_running_scans(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/activity?id="+id, http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissActivity(rec, req)
+	activityH(s).HandleDismissActivity(rec, req)
 
 	if *stopped {
 		t.Error("dismiss stopped running work; it must never do that")

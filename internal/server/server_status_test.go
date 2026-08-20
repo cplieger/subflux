@@ -36,7 +36,7 @@ func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
+	activityH(s).HandleGetAlerts(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetAlerts() status = %d, want %d", rec.Code, http.StatusOK)
@@ -62,7 +62,7 @@ func TestHandleGetAlerts_empty_when_no_alerts(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
+	activityH(s).HandleGetAlerts(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetAlerts() status = %d, want %d", rec.Code, http.StatusOK)
@@ -90,7 +90,7 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -124,7 +124,7 @@ func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -161,7 +161,7 @@ func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -276,7 +276,7 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/alerts?id="+strconv.Itoa(id), http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissAlert(rec, req)
+	activityH(s).HandleDismissAlert(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
@@ -298,7 +298,7 @@ func TestHandleGetActivity_empty_returns_empty_array(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)

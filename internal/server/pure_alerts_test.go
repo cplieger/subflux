@@ -50,7 +50,7 @@ func TestHandleDismissAlert(t *testing.T) {
 				http.MethodDelete, "/api/alerts"+query, http.NoBody)
 			w := httptest.NewRecorder()
 
-			s.handleDismissAlert(w, req)
+			activityH(s).HandleDismissAlert(w, req)
 
 			if w.Code != tt.wantCode {
 				t.Errorf("handleDismissAlert(%s) status = %d, want %d",
