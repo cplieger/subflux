@@ -36,12 +36,11 @@ func cloneSession(sess *auth.Session) *auth.Session {
 	if sess == nil {
 		return nil
 	}
-	cp := *sess
+	cp := new(*sess)
 	if sess.OIDCExpiry != nil {
-		t := *sess.OIDCExpiry
-		cp.OIDCExpiry = &t
+		cp.OIDCExpiry = new(*sess.OIDCExpiry)
 	}
-	return &cp
+	return cp
 }
 
 // CreateSession stores a new session in memory, keyed by its token hash. A copy

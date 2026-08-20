@@ -250,16 +250,14 @@ func TestSessions_concurrentAccess(t *testing.T) {
 
 	// Creators / updaters.
 	for w := range workers {
-		wg.Add(1)
-		go func(w int) {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range iters {
 				h := fmt.Sprintf("w%d-%d", w, i)
 				_ = s.CreateSession(ctx, mkSession(h, int64(w), now, now))
 				_ = s.UpdateSessionActivity(ctx, h, now.Add(time.Duration(i)*time.Second))
 				_, _, _ = s.GetSessionByHash(ctx, h)
 			}
-		}(w)
+		})
 	}
 	// Sweepers.
 	for range 2 {
@@ -271,14 +269,12 @@ func TestSessions_concurrentAccess(t *testing.T) {
 	}
 	// Per-user deleters.
 	for w := range workers {
-		wg.Add(1)
-		go func(w int) {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range iters {
 				_ = s.UpdateSessionActivity(ctx, fmt.Sprintf("w%d-%d", w, i), now)
 				_ = s.DeleteUserSessions(ctx, int64(w), fmt.Sprintf("w%d-0", w))
 			}
-		}(w)
+		})
 	}
 	wg.Wait()
 }

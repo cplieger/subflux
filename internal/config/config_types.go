@@ -146,8 +146,7 @@ func clonePtr[T any](p *T) *T {
 	if p == nil {
 		return nil
 	}
-	v := *p
-	return &v
+	return new(*p)
 }
 
 // cloneTargets deep-copies a target slice: every field that is a reference

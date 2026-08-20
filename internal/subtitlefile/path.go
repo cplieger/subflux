@@ -94,12 +94,8 @@ func ManualPath(videoPath string, n int, tags Tags) string {
 // path.
 func ManualOrdinal(path string) int {
 	base := strings.TrimSuffix(path, filepath.Ext(path))
-	i := strings.LastIndex(base, ".")
-	if i < 0 {
-		return 0
-	}
-	seg := base[i+1:]
-	if seg == "" {
+	_, seg, found := strings.CutLast(base, ".")
+	if !found || seg == "" {
 		return 0
 	}
 	for _, r := range seg {

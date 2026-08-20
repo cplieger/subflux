@@ -424,15 +424,13 @@ func TestMetrics_concurrent_safety(t *testing.T) {
 			t.Parallel()
 			m := New()
 			var wg sync.WaitGroup
-			wg.Add(tc.goroutines)
 			start := make(chan struct{})
 
 			for i := range tc.goroutines {
-				go func() {
+				wg.Go(func() {
 					<-start
 					tc.action(m, i)
-					wg.Done()
-				}()
+				})
 			}
 
 			close(start)
@@ -565,22 +563,19 @@ func TestMetrics_getOrCreate_concurrent_new_providers(t *testing.T) {
 	const uniqueProviders = 20
 	const sharedCount = 20
 	var wg sync.WaitGroup
-	wg.Add(uniqueProviders + sharedCount)
 	gate := make(chan struct{})
 
 	for i := range uniqueProviders {
-		go func() {
+		wg.Go(func() {
 			<-gate
 			m.RecordSearch(subflux.ProviderID(fmt.Sprintf("provider_%d", i)), 10*time.Millisecond, nil)
-			wg.Done()
-		}()
+		})
 	}
 	for range sharedCount {
-		go func() {
+		wg.Go(func() {
 			<-gate
 			m.RecordSearch("shared", 10*time.Millisecond, nil)
-			wg.Done()
-		}()
+		})
 	}
 
 	close(gate)
@@ -598,15 +593,13 @@ func TestRecordSearch_buckets_concurrent_safe(t *testing.T) {
 	const goroutines = 8
 	const perGoroutine = 200
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
 	for g := range goroutines {
-		go func(seed int) {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range perGoroutine {
-				ms := (seed*perGoroutine + i) % 50_000
+				ms := (g*perGoroutine + i) % 50_000
 				m.RecordSearch("os", time.Duration(ms)*time.Millisecond, nil)
 			}
-		}(g)
+		})
 	}
 	wg.Wait()
 
