@@ -55,10 +55,18 @@ var defaultAudioSyncConfig = audioSyncConfig{
 // precise passes use complementary tunings (safe pass biases toward
 // recall; precise pass biases toward precision).
 type audioVADConfig struct {
-	mode           vad.Mode // VAD aggressiveness (vad.ModeQuality to vad.ModeVeryAggressive)
-	threshold      float64  // overhang threshold in milliseconds
-	overhangFrames int      // overhang frames percentage
-	adaptScale     float64  // 0 = frozen adaptation (best for movie audio)
+	mode vad.Mode // VAD aggressiveness (vad.ModeQuality to vad.ModeVeryAggressive)
+	// threshold is the GMM log-likelihood-ratio a frame must reach to be called
+	// speech, compared against processFrameLLR's output. NOT milliseconds: the
+	// safe/precise pair is 250 and 125 LLR, and reading them as a duration makes
+	// the precise pass look like the more permissive one when it is the stricter.
+	threshold float64
+	// overhangFrames is how many frames the speech decision is held after the
+	// LLR drops below threshold — a frame COUNT feeding vad's hangover state
+	// machine, not a percentage. At 8kHz mono with vad's frame size, the 35 and
+	// 10 here are frames, so the safe pass holds speech about three times longer.
+	overhangFrames int
+	adaptScale     float64 // 0 = frozen adaptation (best for movie audio)
 }
 
 // audioSync performs audio-based synchronization without a reference subtitle.
