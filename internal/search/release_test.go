@@ -376,7 +376,8 @@ func TestParseName_scene_names_never_panic(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate strings that look like scene release names.
 		name := rapid.StringMatching(
-			`[A-Za-z0-9._-]{5,80}`).Draw(t, "scene_name")
+			`[A-Za-z0-9._-]{5,80}`,
+		).Draw(t, "scene_name")
 		info := release.ParseName(name)
 
 		// All normalized fields should be lowercase or empty.

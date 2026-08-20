@@ -14,7 +14,8 @@ var editionRe = regexp.MustCompile(
 	`(?i)\b(director'?s?[-. ]?cut|extended[-. ]?(?:cut|edition)?|` +
 		`unrated|uncut|theatrical|imax|remastered|criterion|` +
 		`special[-. ]?edition|anniversary[-. ]?edition|` +
-		`collector'?s?[-. ]?edition|limited[-. ]?edition)\b`)
+		`collector'?s?[-. ]?edition|limited[-. ]?edition)\b`,
+)
 
 // Info holds metadata extracted from a release/scene name.
 type Info struct {

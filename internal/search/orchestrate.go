@@ -123,7 +123,8 @@ func (e *Engine) processTargetVariant(ctx context.Context, req *subflux.SearchRe
 ) (path string, noResult bool) {
 	// Filter by variant.
 	filtered, variantFallback := filterByVariant(
-		outcome.results, state.variant)
+		outcome.results, state.variant,
+	)
 	if variantFallback {
 		slog.Info("no regular subs, using HI fallback",
 			"media", label, "lang", lang,

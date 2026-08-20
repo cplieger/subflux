@@ -160,7 +160,8 @@ func (e *Engine) buildTargetStates(ctx context.Context, req *subflux.SearchReque
 
 		needsSearch, isUpgrade, currentScore := decideTargetAction(
 			ctx, existing, searchCfg, e, mediaType, mediaID, lang,
-			t.Variant, label, upgradeCutoff, req.ForceUpgrade)
+			t.Variant, label, upgradeCutoff, req.ForceUpgrade,
+		)
 
 		states[i].needsSearch = needsSearch
 		states[i].isUpgrade = isUpgrade

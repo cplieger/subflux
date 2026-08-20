@@ -208,14 +208,12 @@ func TestRetryProvider_backoff_doubles_between_attempts(t *testing.T) {
 
 	callTimes := make([]time.Time, 0, 4)
 	inner := &retryFakeProviderTimed{
-		retryFakeProvider: retryFakeProvider{
-			name: "test",
-			dlResults: []dlResult{
-				{err: &httpwire.HTTPStatusError{Code: 503}},
-				{err: &httpwire.HTTPStatusError{Code: 503}},
-				{err: &httpwire.HTTPStatusError{Code: 503}},
-				{data: []byte("ok")},
-			},
+		name: "test",
+		dlResults: []dlResult{
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{data: []byte("ok")},
 		},
 		callTimes: &callTimes,
 	}
@@ -292,7 +290,7 @@ func TestRetryProvider_delegates_search(t *testing.T) {
 func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeCounterProvider{
-		retryFakeProvider: retryFakeProvider{name: "opensubtitles"},
+		name: "opensubtitles",
 	}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
@@ -324,7 +322,7 @@ func TestWrapRetry_plain_provider_no_counter(t *testing.T) {
 
 func TestRetryProvider_ClearCache_delegates(t *testing.T) {
 	t.Parallel()
-	inner := &retryFakeCacheProvider{retryFakeProvider: retryFakeProvider{name: "test"}}
+	inner := &retryFakeCacheProvider{name: "test"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
 	cc, ok := p.(CacheClearer)

@@ -302,7 +302,8 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 
 	slog.Debug("hdbits downloading subtitle", "subtitle_id", subID)
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, dlURL, http.NoBody)
+		ctx, http.MethodGet, dlURL, http.NoBody,
+	)
 	if err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
 	}

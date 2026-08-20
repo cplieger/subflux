@@ -68,8 +68,7 @@ func TestHandleDownloadResponse_429_rate_limit(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleDownloadResponse(429) expected error")
 	}
-	var rateErr *subflux.RateLimitError
-	if !errors.As(err, &rateErr) {
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
 		t.Errorf("handleDownloadResponse(429) error type = %T, want *subflux.RateLimitError", err)
 	}
 }
@@ -85,8 +84,7 @@ func TestHandleDownloadResponse_500_small_body_rate_limit(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleDownloadResponse(500, small) expected error")
 	}
-	var rateErr *subflux.RateLimitError
-	if !errors.As(err, &rateErr) {
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
 		t.Errorf("handleDownloadResponse(500, small) error type = %T, want *subflux.RateLimitError", err)
 	}
 }
@@ -194,8 +192,7 @@ func TestHandleDownloadResponse_500_boundary_content_length(t *testing.T) {
 			if err == nil {
 				t.Fatal("handleDownloadResponse(500) expected error")
 			}
-			var rateErr *subflux.RateLimitError
-			isRateLimit := errors.As(err, &rateErr)
+			_, isRateLimit := errors.AsType[*subflux.RateLimitError](err)
 			if isRateLimit != tt.wantRateLimit {
 				t.Errorf("handleDownloadResponse(500, ContentLength=%d) rate_limit=%v, want %v",
 					tt.contentLength, isRateLimit, tt.wantRateLimit)

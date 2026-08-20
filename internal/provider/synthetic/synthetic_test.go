@@ -117,13 +117,11 @@ func TestSearch_modes(t *testing.T) {
 				if tc.errType != "" {
 					switch tc.errType {
 					case "auth":
-						var authErr *subflux.AuthError
-						if !errors.As(err, &authErr) {
+						if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
 							t.Errorf("expected AuthError, got %T", err)
 						}
 					case "rate_limit":
-						var rlErr *subflux.RateLimitError
-						if !errors.As(err, &rlErr) {
+						if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
 							t.Errorf("expected RateLimitError, got %T", err)
 						}
 					case "deadline":

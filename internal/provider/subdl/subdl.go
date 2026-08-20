@@ -250,8 +250,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 	data, err := handleDownloadResponse(resp, sub.Season, sub.Episode)
 	if err != nil {
-		var rateErr *subflux.RateLimitError
-		if errors.As(err, &rateErr) {
+		if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 			slog.Warn("subdl: download rate limited", "url", fullURL)
 		}
 		return nil, httpx.RedactSecret(err, p.apiKey)

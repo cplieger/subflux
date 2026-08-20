@@ -175,7 +175,8 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
-		fetchCtx, http.MethodGet, mappingURL, http.NoBody)
+		fetchCtx, http.MethodGet, mappingURL, http.NoBody,
+	)
 	if err != nil {
 		return nil, err
 	}

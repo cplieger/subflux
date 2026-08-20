@@ -111,7 +111,8 @@ func TestFactory_options(t *testing.T) {
 		// registry tests; this pins that normalization reaches the factory).
 		{name: "normalized map carries declared default", extra: provider.NormalizeSettings(
 			[]subflux.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}},
-			nil), wantHash: true, wantAI: false},
+			nil,
+		), wantHash: true, wantAI: false},
 	}
 
 	for _, tt := range tests {

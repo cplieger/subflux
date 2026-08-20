@@ -117,7 +117,8 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	slog.Debug("animetosho downloading", "url", sub.DownloadURL)
 
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, sub.DownloadURL, http.NoBody)
+		ctx, http.MethodGet, sub.DownloadURL, http.NoBody,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +192,8 @@ func (p *Provider) collectSubtitles(ctx context.Context, entries []feedEntry, re
 		}
 		g.Go(func() error {
 			subs, err := p.getSubtitlesForEntry(
-				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode)
+				gctx, entry.ID, req.Languages, req.Season, req.Episode, req.AbsoluteEpisode,
+			)
 			if err != nil {
 				slog.Warn("animetosho: failed to get subs for entry",
 					"entry_id", entry.ID, "error", err)
@@ -380,7 +382,8 @@ func attachmentToSubtitle(att entryAttachment, languages []string) (subflux.Subt
 	}
 	// Detect Brazilian Portuguese from subtitle name.
 	if lang == "pt" && strings.Contains(
-		strings.ToLower(att.Info.Name), "brazil") {
+		strings.ToLower(att.Info.Name), "brazil",
+	) {
 		lang = "pb"
 	}
 	if !slices.Contains(languages, lang) {

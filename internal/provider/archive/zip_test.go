@@ -436,11 +436,11 @@ func TestIsValidSubtitleEntry_size_guards(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := &zip.File{FileHeader: zip.FileHeader{
+			f := &zip.File{
 				Name:               "a.srt",
 				CompressedSize64:   tc.comp,
 				UncompressedSize64: tc.uncomp,
-			}}
+			}
 			if got := IsValidSubtitleEntry(f); got != tc.want {
 				t.Errorf("IsValidSubtitleEntry(comp=%d, uncomp=%d) = %v, want %v",
 					tc.comp, tc.uncomp, got, tc.want)

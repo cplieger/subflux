@@ -103,14 +103,12 @@ func TestCheckStatus(t *testing.T) {
 				}
 				switch tt.wantType {
 				case "auth":
-					var authErr *subflux.AuthError
-					if !errors.As(err, &authErr) {
+					if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
 						t.Errorf("checkStatus(%d) error type = %T, want *subflux.AuthError",
 							tt.statusCode, err)
 					}
 				case "ratelimit":
-					var rlErr *subflux.RateLimitError
-					if !errors.As(err, &rlErr) {
+					if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
 						t.Errorf("checkStatus(%d) error type = %T, want *subflux.RateLimitError",
 							tt.statusCode, err)
 					}
@@ -134,8 +132,8 @@ func TestCheckStatus_parses_retry_after_seconds_on_429(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *subflux.RateLimitError
-	if !errors.As(err, &rl) {
+	rl, ok := errors.AsType[*subflux.RateLimitError](err)
+	if !ok {
 		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 42*time.Second {
@@ -152,8 +150,8 @@ func TestCheckStatus_missing_retry_after_on_429_is_zero(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *subflux.RateLimitError
-	if !errors.As(err, &rl) {
+	rl, ok := errors.AsType[*subflux.RateLimitError](err)
+	if !ok {
 		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 0 {
@@ -170,8 +168,8 @@ func TestCheckStatus_406_defaults_to_next_utc_midnight(t *testing.T) {
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *subflux.RateLimitError
-	if !errors.As(err, &rl) {
+	rl, ok := errors.AsType[*subflux.RateLimitError](err)
+	if !ok {
 		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	// Daily quota window is always ≤24h and >0s.
@@ -190,8 +188,8 @@ func TestCheckStatus_406_respects_retry_after_header_when_present(t *testing.T) 
 	defer resp.Body.Close()
 
 	err := checkStatus(resp)
-	var rl *subflux.RateLimitError
-	if !errors.As(err, &rl) {
+	rl, ok := errors.AsType[*subflux.RateLimitError](err)
+	if !ok {
 		t.Fatalf("checkStatus() error type = %T, want *subflux.RateLimitError", err)
 	}
 	if rl.RetryAfter != 7*time.Second {

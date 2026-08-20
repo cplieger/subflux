@@ -103,13 +103,16 @@ type mockMetrics struct {
 }
 
 func (m *mockMetrics) RecordSearch(_ subflux.ProviderID, _ time.Duration, _ error) { m.searches.Add(1) }
-func (m *mockMetrics) RecordDownload(_ subflux.ProviderID, _ error)                { m.downloads.Add(1) }
-func (m *mockMetrics) AdaptiveSkip()                                               { m.adaptiveSkips.Add(1) }
-func (m *mockMetrics) RecordEmbeddedDetectorError()                                { m.detectorErrs.Add(1) }
-func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration)                        {}
-func (m *mockMetrics) RecordImport(_ subflux.PollKey)                              {}
-func (m *mockMetrics) TotalSearches() int64                                        { return m.searches.Load() }
-func (m *mockMetrics) Handler() http.HandlerFunc                                   { return nil }
+
+func (m *mockMetrics) RecordDownload(_ subflux.ProviderID, _ error) { m.downloads.Add(1) }
+
+func (m *mockMetrics) AdaptiveSkip() { m.adaptiveSkips.Add(1) }
+
+func (m *mockMetrics) RecordEmbeddedDetectorError()         { m.detectorErrs.Add(1) }
+func (m *mockMetrics) RecordScan(_, _ int, _ time.Duration) {}
+func (m *mockMetrics) RecordImport(_ subflux.PollKey)       {}
+func (m *mockMetrics) TotalSearches() int64                 { return m.searches.Load() }
+func (m *mockMetrics) Handler() http.HandlerFunc            { return nil }
 
 type mockProvider struct {
 	name        string

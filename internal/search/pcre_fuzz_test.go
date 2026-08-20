@@ -54,8 +54,8 @@ func FuzzCompilePCRE(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		p, err := release.CompilePCRE(input)
 		if err != nil {
-			var ce *release.CompileError
-			if !errors.As(err, &ce) {
+			ce, ok := errors.AsType[*release.CompileError](err)
+			if !ok {
 				t.Fatalf("CompilePCRE(%q) error %v (%T) is not a *release.CompileError", input, err, err)
 			}
 			if ce.Error() == "" {

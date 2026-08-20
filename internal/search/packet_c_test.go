@@ -129,17 +129,14 @@ func TestSearchTargets_media_gate_serializes_same_item(t *testing.T) {
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, _ = e.SearchTargets(t.Context(), req1, videoPath, targets)
-	}()
+	})
 	// Ensure the first call is inside provider work before starting the second.
 	<-p.entered
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, _ = e.SearchTargets(t.Context(), req2, videoPath, targets)
-	}()
+	})
 
 	// Prove the second call is BLOCKED at the gate before releasing, so the
 	// assertion below measures contention rather than sequential execution.
@@ -168,19 +165,16 @@ func TestSearchTargets_media_gate_distinct_items_run_concurrently(t *testing.T) 
 
 	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, _ = e.SearchTargets(t.Context(),
 			&subflux.SearchRequest{MediaType: "movie", ImdbID: "tt111"},
 			filepath.Join(dir, "a.mkv"), targets)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		_, _ = e.SearchTargets(t.Context(),
 			&subflux.SearchRequest{MediaType: "movie", ImdbID: "tt222"},
 			filepath.Join(dir, "b.mkv"), targets)
-	}()
+	})
 
 	// Both provider calls must be in flight SIMULTANEOUSLY: a global lock
 	// would deadlock this wait (second entry never happens while the first

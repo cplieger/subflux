@@ -79,8 +79,7 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 	}
 	// SSRF validation must run before the request: the error must wrap an
 	// *ssrf.Error, not a transport/context error from a fallthrough.
-	var se *ssrf.Error
-	if !errors.As(err, &se) {
+	if _, ok := errors.AsType[*ssrf.Error](err); !ok {
 		t.Errorf("Download(loopback URL) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }
@@ -93,8 +92,7 @@ func TestDownload_rejects_internal_ip(t *testing.T) {
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")
 	}
-	var se *ssrf.Error
-	if !errors.As(err, &se) {
+	if _, ok := errors.AsType[*ssrf.Error](err); !ok {
 		t.Errorf("Download(private IP) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }

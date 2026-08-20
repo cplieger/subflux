@@ -412,7 +412,7 @@ func TestSearchTargets_strip_hi_standard_variant_removes_hi_flag(t *testing.T) {
 	videoPath := filepath.Join(dir, "movie.mkv")
 
 	ms := &mockStore{}
-	mc := &mockConfigWithStripHI{mockConfig: mockConfig{minScore: 0}}
+	mc := &mockConfigWithStripHI{minScore: 0}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\n[door creaks] Hello\r\n")
 	p := &mockProvider{
 		name: "test",

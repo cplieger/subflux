@@ -292,8 +292,7 @@ func TestClassifyBadRequest(t *testing.T) {
 					t.Fatal("classifyBadRequest() error = nil, want error")
 				}
 				if tt.wantErrType == "auth" {
-					var authErr *subflux.AuthError
-					if !errors.As(err, &authErr) {
+					if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
 						t.Errorf("error type = %T, want *subflux.AuthError", err)
 					}
 				}

@@ -151,9 +151,11 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 
 	reqURL := fmt.Sprintf(
 		"%s?request=anime&client=%s&clientver=%d&protover=1&aid=%d",
-		apiURL, url.QueryEscape(m.clientKey), clientVer, seriesID)
+		apiURL, url.QueryEscape(m.clientKey), clientVer, seriesID,
+	)
 	req, err := http.NewRequestWithContext(
-		fetchCtx, http.MethodGet, reqURL, http.NoBody)
+		fetchCtx, http.MethodGet, reqURL, http.NoBody,
+	)
 	if err != nil {
 		return err
 	}
