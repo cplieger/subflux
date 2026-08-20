@@ -53,7 +53,7 @@ func (fakeEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
 // resolution succeeds in handler tests without a live arr.
 type httpFakeRadarr struct{}
 
-func (httpFakeRadarr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (httpFakeRadarr) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return arrapi.Movie{ID: 42, MovieFile: &arrapi.MovieFile{Path: "/media/movie.mkv"}}, nil
 }
 

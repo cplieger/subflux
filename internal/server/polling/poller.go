@@ -11,17 +11,17 @@ import (
 // PollSonarrClient is the Sonarr surface the history poller uses: import-event
 // polling, per-item lookups, exclude-tag resolution, and a post-import rescan.
 type PollSonarrClient interface {
-	GetHistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
-	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
-	GetEpisodeByID(ctx context.Context, id int) (arrapi.Episode, error)
+	HistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
+	SeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	EpisodeByID(ctx context.Context, id int) (arrapi.Episode, error)
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanSeries(ctx context.Context, seriesID int) error
 }
 
 // PollRadarrClient is the Radarr surface the history poller uses.
 type PollRadarrClient interface {
-	GetHistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	HistorySince(ctx context.Context, since time.Time, eventTypes ...arrapi.EventType) ([]arrapi.HistoryRecord, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanMovie(ctx context.Context, movieID int) error
 }

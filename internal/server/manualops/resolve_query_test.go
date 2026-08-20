@@ -25,11 +25,11 @@ type resolveFakeSonarr struct {
 	epErr     error
 }
 
-func (f *resolveFakeSonarr) GetSeries(context.Context) ([]arrapi.Series, error) {
+func (f *resolveFakeSonarr) Series(context.Context) ([]arrapi.Series, error) {
 	return f.series, f.seriesErr
 }
 
-func (f *resolveFakeSonarr) GetEpisodes(_ context.Context, seriesID int) ([]arrapi.Episode, error) {
+func (f *resolveFakeSonarr) Episodes(_ context.Context, seriesID int) ([]arrapi.Episode, error) {
 	if f.epErr != nil {
 		return nil, f.epErr
 	}
@@ -42,7 +42,7 @@ type resolveFakeRadarr struct {
 	err    error
 }
 
-func (f *resolveFakeRadarr) GetMovies(context.Context) ([]arrapi.Movie, error) {
+func (f *resolveFakeRadarr) Movies(context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
 }
 
@@ -476,7 +476,7 @@ func TestResolveQuery_season_zero_with_tmdb_stays_series_only(t *testing.T) {
 	}
 }
 
-// countingSonarr wraps the sonarr fake and counts GetSeries calls, so tests
+// countingSonarr wraps the sonarr fake and counts Series calls, so tests
 // can assert whether the series arm was consulted at all.
 type countingSonarr struct {
 	resolveFakeSonarr
@@ -484,9 +484,9 @@ type countingSonarr struct {
 	calls atomic.Int32
 }
 
-func (c *countingSonarr) GetSeries(ctx context.Context) ([]arrapi.Series, error) {
+func (c *countingSonarr) Series(ctx context.Context) ([]arrapi.Series, error) {
 	c.calls.Add(1)
-	return c.resolveFakeSonarr.GetSeries(ctx)
+	return c.resolveFakeSonarr.Series(ctx)
 }
 
 // A tmdb-only query resolves the movie identity FIRST: tmdb is a movie-only

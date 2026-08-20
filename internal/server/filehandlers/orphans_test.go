@@ -236,11 +236,11 @@ type fakeSonarrArr struct {
 	series      arrapi.Series
 }
 
-func (f *fakeSonarrArr) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+func (f *fakeSonarrArr) SeriesByID(context.Context, int) (arrapi.Series, error) {
 	return f.series, f.seriesErr
 }
 
-func (f *fakeSonarrArr) GetEpisodes(context.Context, int) ([]arrapi.Episode, error) {
+func (f *fakeSonarrArr) Episodes(context.Context, int) ([]arrapi.Episode, error) {
 	return f.episodes, f.episodesErr
 }
 
@@ -250,7 +250,7 @@ type fakeRadarrArr struct {
 	movie arrapi.Movie
 }
 
-func (f *fakeRadarrArr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (f *fakeRadarrArr) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return f.movie, f.err
 }
 

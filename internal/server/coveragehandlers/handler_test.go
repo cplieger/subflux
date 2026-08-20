@@ -121,7 +121,7 @@ type covSonarrFake struct {
 	series []arrapi.Series
 }
 
-func (f *covSonarrFake) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+func (f *covSonarrFake) Series(_ context.Context) ([]arrapi.Series, error) {
 	return f.series, f.err
 }
 
@@ -135,7 +135,7 @@ type covRadarrFake struct {
 	movies []arrapi.Movie
 }
 
-func (f *covRadarrFake) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+func (f *covRadarrFake) Movies(_ context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
 }
 
@@ -418,12 +418,12 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 	h.HandleCoverageSeries(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
-		t.Errorf("HandleCoverageSeries(GetSeries error) status = %d, want %d",
+		t.Errorf("HandleCoverageSeries(Series error) status = %d, want %d",
 			rec.Code, http.StatusBadGateway)
 	}
 }
 
-// seriesDBErrorStore fails SubtitleFiles but not GetSeries, so the
+// seriesDBErrorStore fails SubtitleFiles but not Series, so the
 // coverage fetch surfaces the store error as a 500 (vs the arr 502).
 type seriesDBErrorStore struct{ mockCoverageStore }
 
@@ -597,7 +597,7 @@ func TestHandleCoverageMovies_get_movies_error_returns_502(t *testing.T) {
 	h.HandleCoverageMovies(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
-		t.Errorf("HandleCoverageMovies(GetMovies error) status = %d, want %d",
+		t.Errorf("HandleCoverageMovies(Movies error) status = %d, want %d",
 			rec.Code, http.StatusBadGateway)
 	}
 }

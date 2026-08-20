@@ -82,7 +82,7 @@ type Poller struct {
 }
 
 // sourceBatch is one detection fetch handed to the executor: the entries a
-// single GetHistorySince returned, plus the cursor that fetch used (the base
+// single HistorySince returned, plus the cursor that fetch used (the base
 // advanceWatermark compares against after execution).
 type sourceBatch struct {
 	source  PollSource
@@ -391,7 +391,7 @@ func (p *Poller) excludeTagIDs(ctx context.Context, client tagResolver, cacheKey
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
 	since := p.detectSince(ctx, subflux.PollKeySonarr)
-	entries, err := ls.Sonarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
+	entries, err := ls.Sonarr.HistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("sonarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
@@ -414,7 +414,7 @@ func (p *Poller) detectSonarr(ctx context.Context, ls *LiveState) int {
 // PollOnce to drive adaptive-burst polling).
 func (p *Poller) detectRadarr(ctx context.Context, ls *LiveState) int {
 	since := p.detectSince(ctx, subflux.PollKeyRadarr)
-	entries, err := ls.Radarr.GetHistorySince(ctx, since, arrapi.EventDownloadImported)
+	entries, err := ls.Radarr.HistorySince(ctx, since, arrapi.EventDownloadImported)
 	if err != nil {
 		slog.Warn("radarr poll failed", "since", since.UTC().Format(time.RFC3339), "error", err)
 		return 0
@@ -496,7 +496,7 @@ func (p *Poller) clearImportRetry(key string) {
 
 // advanceWatermark persists the poll cursor after a pass. Normally it moves
 // just past the newest entry; while a transiently-failed entry is being
-// retried it is held just BEFORE that entry so the next GetHistorySince
+// retried it is held just BEFORE that entry so the next HistorySince
 // re-fetches it. Entries after the failed one are re-fetched too — that is
 // cheap and bounded: re-processing an already-handled import finds its
 // targets covered and skips, and the hold lasts at most maxImportRetries

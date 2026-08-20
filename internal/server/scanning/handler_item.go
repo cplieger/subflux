@@ -27,7 +27,7 @@ import (
 func (h *Handler) scanEpisodes(ctx context.Context, stop <-chan struct{}, actID string,
 	op *opState, series *arrapi.Series, label string, filterEp func(*arrapi.Episode) bool,
 ) activity.Outcome {
-	episodes, err := op.st.Sonarr.GetEpisodes(ctx, series.ID)
+	episodes, err := op.st.Sonarr.Episodes(ctx, series.ID)
 	if err != nil {
 		slog.Error("scan: failed to fetch episodes",
 			"series", series.Title, "error", err)
@@ -172,7 +172,7 @@ func (h *Handler) runEpisodeScans(ctx context.Context, stop <-chan struct{},
 func (h *Handler) scanSingleEpisode(ctx context.Context, stop <-chan struct{}, actID string,
 	op *opState, series *arrapi.Series, seasonNum, episodeNum int,
 ) activity.Outcome {
-	episodes, err := op.st.Sonarr.GetEpisodes(ctx, series.ID)
+	episodes, err := op.st.Sonarr.Episodes(ctx, series.ID)
 	if err != nil {
 		slog.Error("scan episode: failed to fetch episodes",
 			"series", series.Title, "error", err)

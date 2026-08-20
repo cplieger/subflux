@@ -61,19 +61,19 @@ type mockHistoryPoller struct {
 	history    []arrapi.HistoryRecord
 }
 
-func (m *mockHistoryPoller) GetHistorySince(_ context.Context, _ time.Time, _ ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
+func (m *mockHistoryPoller) HistorySince(_ context.Context, _ time.Time, _ ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
 	return m.history, m.historyErr
 }
 
-func (m *mockHistoryPoller) GetSeriesByID(_ context.Context, id int) (arrapi.Series, error) {
+func (m *mockHistoryPoller) SeriesByID(_ context.Context, id int) (arrapi.Series, error) {
 	return m.series[id], nil
 }
 
-func (m *mockHistoryPoller) GetEpisodeByID(_ context.Context, id int) (arrapi.Episode, error) {
+func (m *mockHistoryPoller) EpisodeByID(_ context.Context, id int) (arrapi.Episode, error) {
 	return m.episodes[id], nil
 }
 
-func (m *mockHistoryPoller) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
+func (m *mockHistoryPoller) MovieByID(_ context.Context, id int) (arrapi.Movie, error) {
 	return m.movies[id], nil
 }
 
@@ -250,7 +250,7 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 
 	// Both entries' paths are missing on disk and will skip out of
 	// processPollImport; the count we care about is the entries-observed
-	// count from the GetHistorySince response, not the imports-applied
+	// count from the HistorySince response, not the imports-applied
 	// count. Adaptive burst keys off the former.
 	if n := p.PollOnce(t.Context()); n != 2 {
 		t.Errorf("PollOnce with 2 sonarr entries: got %d, want 2", n)

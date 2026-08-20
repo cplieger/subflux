@@ -18,13 +18,13 @@ import (
 
 // MediaSonarrClient is the Sonarr surface the media browser uses.
 type MediaSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // MediaRadarrClient is the Radarr surface the media browser uses.
 type MediaRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
 // Deps holds the dependencies for media handlers.
@@ -79,7 +79,7 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 	// request aborting a shared fetch that other callers are waiting on.
 	ctx := h.deps.ServerCtx()
 	v, err, _ := h.mediaSF.Do("series", func() (any, error) {
-		series, err := ls.Sonarr.GetSeries(ctx)
+		series, err := ls.Sonarr.Series(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 	// Use server context for singleflight — same rationale as HandleMediaSeries.
 	ctx := h.deps.ServerCtx()
 	v, err, _ := h.mediaSF.Do("movies", func() (any, error) {
-		movies, err := ls.Radarr.GetMovies(ctx)
+		movies, err := ls.Radarr.Movies(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +204,7 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	episodes, err := ls.Sonarr.GetEpisodes(r.Context(), seriesID)
+	episodes, err := ls.Sonarr.Episodes(r.Context(), seriesID)
 	if err != nil {
 		slog.Error("media browser: failed to fetch episodes",
 			"series_id", seriesID, "error", err)

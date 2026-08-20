@@ -35,13 +35,13 @@ type CoverageStore interface {
 
 // CoverageSonarrClient is the Sonarr surface coverage handlers use.
 type CoverageSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
 // CoverageRadarrClient is the Radarr surface coverage handlers use.
 type CoverageRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
@@ -341,7 +341,7 @@ func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (allSeries []arrapi.Series, excludeIDs map[int]struct{}, allFiles []subflux.SubtitleEntry, err error) {
 	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Sonarr, subflux.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
-		allSeries, ferr = ls.Sonarr.GetSeries(gctx)
+		allSeries, ferr = ls.Sonarr.Series(gctx)
 		if ferr != nil {
 			return fmt.Errorf("%w: %w", errFetchSeries, ferr)
 		}
@@ -357,7 +357,7 @@ func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (a
 func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (allMovies []arrapi.Movie, excludeIDs map[int]struct{}, allFiles []subflux.SubtitleEntry, err error) {
 	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Radarr, subflux.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
-		allMovies, ferr = ls.Radarr.GetMovies(gctx)
+		allMovies, ferr = ls.Radarr.Movies(gctx)
 		if ferr != nil {
 			return fmt.Errorf("%w: %w", errFetchMovies, ferr)
 		}

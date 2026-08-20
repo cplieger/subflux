@@ -15,25 +15,25 @@ import (
 // movieTitleArrClient returns a movie with a known title.
 type movieTitleArrClient struct{ dummyArrClient }
 
-func (movieTitleArrClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+func (movieTitleArrClient) MovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
 	return arrapi.Movie{Title: "Inception", TmdbID: 27205}, nil
 }
 
 // seriesTitleArrClient returns a series with a known title.
 type seriesTitleArrClient struct{ dummyArrClient }
 
-func (seriesTitleArrClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+func (seriesTitleArrClient) SeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
 	return arrapi.Series{Title: "Breaking Bad", TvdbID: 81189}, nil
 }
 
-// arrErrorClient returns errors from GetMovieByID and GetSeriesByID.
+// arrErrorClient returns errors from MovieByID and SeriesByID.
 type arrErrorClient struct{ dummyArrClient }
 
-func (arrErrorClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+func (arrErrorClient) MovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
 	return arrapi.Movie{}, errMock
 }
 
-func (arrErrorClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+func (arrErrorClient) SeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
 	return arrapi.Series{}, errMock
 }
 

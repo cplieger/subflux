@@ -128,12 +128,12 @@ type pathValidator interface {
 
 // SonarrEpisodes is the Sonarr surface MediaRef resolution needs.
 type SonarrEpisodes interface {
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // RadarrMovie is the Radarr surface MediaRef resolution needs.
 type RadarrMovie interface {
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
 // State is the per-request snapshot of hot-reloadable dependencies. Arr
@@ -274,7 +274,7 @@ func movieVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, erro
 	if st == nil || st.Radarr == nil {
 		return "", fmt.Errorf("%w: radarr not configured", ErrMediaNotFound)
 	}
-	m, err := st.Radarr.GetMovieByID(ctx, ref.MediaID)
+	m, err := st.Radarr.MovieByID(ctx, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("%w: movie %d: %w", ErrMediaNotFound, ref.MediaID, err)
 	}
@@ -290,7 +290,7 @@ func episodeVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, er
 	if st == nil || st.Sonarr == nil {
 		return "", fmt.Errorf("%w: sonarr not configured", ErrMediaNotFound)
 	}
-	episodes, err := st.Sonarr.GetEpisodes(ctx, ref.MediaID)
+	episodes, err := st.Sonarr.Episodes(ctx, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("%w: series %d: %w", ErrMediaNotFound, ref.MediaID, err)
 	}

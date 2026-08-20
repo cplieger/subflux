@@ -25,12 +25,12 @@ type QueryStore interface {
 
 // StatsSonarrClient is the Sonarr surface the stats handler uses.
 type StatsSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
 }
 
 // StatsRadarrClient is the Radarr surface the stats handler uses.
 type StatsRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
 // StatsStore is the two aggregate reads the stats endpoint reports: how many

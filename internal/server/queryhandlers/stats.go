@@ -71,7 +71,7 @@ func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arra
 
 	if ls.Sonarr != nil {
 		g.Go(func() error {
-			if got, err := ls.Sonarr.GetSeries(gctx); err == nil {
+			if got, err := ls.Sonarr.Series(gctx); err == nil {
 				series = got
 			} else {
 				slog.Warn("stats: sonarr unreachable, series counts will be zero", "error", err)
@@ -82,7 +82,7 @@ func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arra
 	}
 	if ls.Radarr != nil {
 		g.Go(func() error {
-			if got, err := ls.Radarr.GetMovies(gctx); err == nil {
+			if got, err := ls.Radarr.Movies(gctx); err == nil {
 				movies = got
 			} else {
 				slog.Warn("stats: radarr unreachable, movie counts will be zero", "error", err)

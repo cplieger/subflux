@@ -72,13 +72,13 @@ type ActivityTracker interface {
 // ManualSonarrClient is the Sonarr surface manual downloads use: series lookup
 // (for media-ID and title resolution) and a post-download rescan.
 type ManualSonarrClient interface {
-	GetSeriesByID(ctx context.Context, seriesID int) (arrapi.Series, error)
+	SeriesByID(ctx context.Context, seriesID int) (arrapi.Series, error)
 	RescanSeries(ctx context.Context, seriesID int) error
 }
 
 // ManualRadarrClient is the Radarr surface manual downloads use.
 type ManualRadarrClient interface {
-	GetMovieByID(ctx context.Context, movieID int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, movieID int) (arrapi.Movie, error)
 	RescanMovie(ctx context.Context, movieID int) error
 }
 

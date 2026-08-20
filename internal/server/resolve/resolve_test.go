@@ -36,7 +36,7 @@ type fakeSonarr struct {
 	err      error
 }
 
-func (f *fakeSonarr) GetEpisodes(context.Context, int) ([]arrapi.Episode, error) {
+func (f *fakeSonarr) Episodes(context.Context, int) ([]arrapi.Episode, error) {
 	return f.episodes, f.err
 }
 
@@ -45,7 +45,7 @@ type fakeRadarr struct {
 	err   error
 }
 
-func (f *fakeRadarr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (f *fakeRadarr) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return f.movie, f.err
 }
 

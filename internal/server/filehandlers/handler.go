@@ -51,14 +51,14 @@ type Deps struct {
 // the series identity for the media_id binding check plus the episodes'
 // file paths for the per-episode directory narrowing.
 type FileSonarrClient interface {
-	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	SeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // FileRadarrClient is the Radarr surface the bound orphan fallback needs:
 // the movie's identity for the media_id binding check plus its file path.
 type FileRadarrClient interface {
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
 // pathGuard is the media-path half of the configuration, and the only half

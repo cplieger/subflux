@@ -57,13 +57,13 @@ var errResolveConflict = errors.New("conflicting identifiers")
 // ResolveSonarrClient is the Sonarr surface query resolution uses: the full
 // series list for matching and per-series episodes for expansion.
 type ResolveSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // ResolveRadarrClient is the Radarr surface query resolution uses.
 type ResolveRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
 // ResolveSearchIDs carries the stable identifiers of a resolved item for
@@ -330,7 +330,7 @@ func resolveSeriesArm(ctx context.Context, sonarr ResolveSonarrClient, p *Resolv
 		}
 		return ResolveResponse{}, nil
 	}
-	allSeries, err := sonarr.GetSeries(ctx)
+	allSeries, err := sonarr.Series(ctx)
 	if err != nil {
 		return ResolveResponse{}, fmt.Errorf("sonarr: %w", err)
 	}
@@ -365,7 +365,7 @@ func resolveSeriesArm(ctx context.Context, sonarr ResolveSonarrClient, p *Resolv
 // season=0 expands exactly the specials season (and an episode filter still
 // applies within it).
 func expandSeries(ctx context.Context, sonarr ResolveSonarrClient, s *armCandidate, seasonFilter, episodeFilter *int) (ResolveResponse, error) {
-	episodes, err := sonarr.GetEpisodes(ctx, s.id)
+	episodes, err := sonarr.Episodes(ctx, s.id)
 	if err != nil {
 		return ResolveResponse{}, fmt.Errorf("sonarr: episodes for series %d: %w", s.id, err)
 	}
@@ -405,7 +405,7 @@ func resolveMovieArm(ctx context.Context, radarr ResolveRadarrClient, p *Resolve
 		}
 		return ResolveResponse{}, nil
 	}
-	movies, err := radarr.GetMovies(ctx)
+	movies, err := radarr.Movies(ctx)
 	if err != nil {
 		return ResolveResponse{}, fmt.Errorf("radarr: %w", err)
 	}

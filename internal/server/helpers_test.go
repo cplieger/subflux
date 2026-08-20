@@ -159,13 +159,13 @@ var (
 	_ RadarrClient = dummyArrClient{}
 )
 
-func (dummyArrClient) Ping(context.Context) error                         { return nil }
-func (dummyArrClient) GetSeries(context.Context) ([]arrapi.Series, error) { return nil, nil }
-func (dummyArrClient) GetEpisodes(context.Context, int) ([]arrapi.Episode, error) {
+func (dummyArrClient) Ping(context.Context) error                      { return nil }
+func (dummyArrClient) Series(context.Context) ([]arrapi.Series, error) { return nil, nil }
+func (dummyArrClient) Episodes(context.Context, int) ([]arrapi.Episode, error) {
 	return nil, nil
 }
-func (dummyArrClient) GetMovies(context.Context) ([]arrapi.Movie, error) { return nil, nil }
-func (dummyArrClient) GetHistorySince(context.Context, time.Time, ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
+func (dummyArrClient) Movies(context.Context) ([]arrapi.Movie, error) { return nil, nil }
+func (dummyArrClient) HistorySince(context.Context, time.Time, ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
 	return nil, nil
 }
 
@@ -182,15 +182,15 @@ func (dummyArrClient) ResolveExcludeTagIDs(context.Context, []string, bool) map[
 }
 func (dummyArrClient) RescanSeries(context.Context, int) error { return nil }
 func (dummyArrClient) RescanMovie(context.Context, int) error  { return nil }
-func (dummyArrClient) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+func (dummyArrClient) SeriesByID(context.Context, int) (arrapi.Series, error) {
 	return arrapi.Series{}, nil
 }
 
-func (dummyArrClient) GetEpisodeByID(context.Context, int) (arrapi.Episode, error) {
+func (dummyArrClient) EpisodeByID(context.Context, int) (arrapi.Episode, error) {
 	return arrapi.Episode{}, nil
 }
 
-func (dummyArrClient) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (dummyArrClient) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return arrapi.Movie{}, nil
 }
 

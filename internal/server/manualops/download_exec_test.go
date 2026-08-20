@@ -37,9 +37,9 @@ var (
 	_ ManualRadarrClient = (*fakeArr)(nil)
 )
 
-func (f *fakeArr) GetMovieByID(context.Context, int) (arrapi.Movie, error) { return f.movie, f.getErr }
+func (f *fakeArr) MovieByID(context.Context, int) (arrapi.Movie, error) { return f.movie, f.getErr }
 
-func (f *fakeArr) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+func (f *fakeArr) SeriesByID(context.Context, int) (arrapi.Series, error) {
 	return f.series, f.getErr
 }
 func (f *fakeArr) RescanMovie(context.Context, int) error  { return nil }

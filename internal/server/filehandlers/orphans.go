@@ -256,7 +256,7 @@ func movieFallbackDirs(ctx context.Context, ls *LiveState, mediaID string, arrID
 	if ls.Radarr == nil {
 		return nil
 	}
-	m, err := ls.Radarr.GetMovieByID(ctx, arrID)
+	m, err := ls.Radarr.MovieByID(ctx, arrID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			return fmt.Errorf("movie %d: %w", arrID, errArrItemNotFound)
@@ -287,7 +287,7 @@ func episodeFallbackDirs(ctx context.Context, ls *LiveState, mediaID string, arr
 	if !ok {
 		return fmt.Errorf("media_id %q has no bindable series identity: %w", mediaID, errArrBindingMismatch)
 	}
-	series, err := ls.Sonarr.GetSeriesByID(ctx, arrID)
+	series, err := ls.Sonarr.SeriesByID(ctx, arrID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			return fmt.Errorf("series %d: %w", arrID, errArrItemNotFound)
@@ -298,7 +298,7 @@ func episodeFallbackDirs(ctx context.Context, ls *LiveState, mediaID string, arr
 	if !seriesBindingMatches(base, &series) {
 		return fmt.Errorf("series %d is not the requested media item: %w", arrID, errArrBindingMismatch)
 	}
-	episodes, err := ls.Sonarr.GetEpisodes(ctx, arrID)
+	episodes, err := ls.Sonarr.Episodes(ctx, arrID)
 	if err != nil {
 		slog.Warn("orphan walk: episodes lookup failed", "arr_id", arrID, "error", err)
 		return nil

@@ -27,7 +27,7 @@ type seriesEpisodes struct {
 // then invokes fn sequentially. A series whose episode fetch keeps failing is
 // logged and skipped rather than aborting the whole scan.
 func (s *Sonarr) WantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error {
-	allSeries, err := s.GetSeries(ctx)
+	allSeries, err := s.Series(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch series list: %w", err)
 	}
@@ -91,7 +91,7 @@ func (s *Sonarr) collectWantedEpisodes(ctx context.Context, allSeries []arrapi.S
 // so one failing series doesn't abort the scan; the caller counts the failure
 // so the scan summary can report the partial library.
 func (s *Sonarr) fetchWantedForSeries(ctx context.Context, ser *arrapi.Series) (wanted []arrapi.Episode, ok bool) {
-	episodes, err := s.GetEpisodes(ctx, ser.ID)
+	episodes, err := s.Episodes(ctx, ser.ID)
 	if err != nil {
 		slog.Warn("failed to get episodes after retries, skipping series",
 			"series", ser.Title, "series_id", ser.ID, "error", err)
@@ -128,7 +128,7 @@ func dispatchEpisodes(ctx context.Context, results []seriesEpisodes, fn func(arr
 // It fetches the full movie list first (closing that connection), then iterates
 // locally, skipping movies with an excluded tag or no file.
 func (r *Radarr) WantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error {
-	allMovies, err := r.GetMovies(ctx)
+	allMovies, err := r.Movies(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch movie list: %w", err)
 	}

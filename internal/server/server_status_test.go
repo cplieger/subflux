@@ -212,7 +212,7 @@ func newManualDownloadServer(cfg *config.Config, radarr resolve.RadarrMovie) *Se
 // unknown.
 type statusFakeRadarr struct{ path string }
 
-func (f statusFakeRadarr) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
+func (f statusFakeRadarr) MovieByID(_ context.Context, id int) (arrapi.Movie, error) {
 	if id != 42 {
 		return arrapi.Movie{}, errors.New("movie not found")
 	}

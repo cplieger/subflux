@@ -20,11 +20,11 @@ type fakeSonarr struct {
 	episodes []arrapi.Episode
 }
 
-func (f *fakeSonarr) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+func (f *fakeSonarr) Series(_ context.Context) ([]arrapi.Series, error) {
 	return f.series, f.err
 }
 
-func (f *fakeSonarr) GetEpisodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
+func (f *fakeSonarr) Episodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
 	return f.episodes, f.err
 }
 
@@ -34,7 +34,7 @@ type fakeRadarr struct {
 	movies []arrapi.Movie
 }
 
-func (f *fakeRadarr) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+func (f *fakeRadarr) Movies(_ context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
 }
 

@@ -74,13 +74,13 @@ func (g *ScanGuard) Release() {
 
 // ScanHandlerSonarr is the Sonarr surface the manual scan HTTP handlers call.
 type ScanHandlerSonarr interface {
-	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	SeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // ScanHandlerRadarr is the Radarr surface the manual scan HTTP handlers call.
 type ScanHandlerRadarr interface {
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
 // HandlerState holds the runtime state needed by scan HTTP handlers.
@@ -255,7 +255,7 @@ func (h *Handler) finishScan(unregister func(), actID, action, detail string, ou
 func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 	st *HandlerState, seriesID int,
 ) (arrapi.Series, bool) {
-	series, err := st.Sonarr.GetSeriesByID(r.Context(), seriesID)
+	series, err := st.Sonarr.SeriesByID(r.Context(), seriesID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "series not found")
@@ -272,7 +272,7 @@ func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 	st *HandlerState, movieID int,
 ) (arrapi.Movie, bool) {
-	movie, err := st.Radarr.GetMovieByID(r.Context(), movieID)
+	movie, err := st.Radarr.MovieByID(r.Context(), movieID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
 			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "movie not found")

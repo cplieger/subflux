@@ -222,7 +222,7 @@ func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	if ls.Radarr == nil {
 		return ""
 	}
-	m, err := ls.Radarr.GetMovieByID(ctx, arrID)
+	m, err := ls.Radarr.MovieByID(ctx, arrID)
 	if err != nil {
 		slog.Warn("failed to look up movie for media ID", "arr_id", arrID, "error", err)
 		return ""
@@ -235,7 +235,7 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 	if ls.Sonarr == nil {
 		return ""
 	}
-	ser, err := ls.Sonarr.GetSeriesByID(ctx, seriesID)
+	ser, err := ls.Sonarr.SeriesByID(ctx, seriesID)
 	if err != nil {
 		slog.Warn("failed to look up series for media ID", "series_id", seriesID, "error", err)
 		return ""
@@ -249,11 +249,11 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.Medi
 		return ""
 	}
 	if mediaType == subflux.MediaTypeMovie && ls.Radarr != nil {
-		if m, err := ls.Radarr.GetMovieByID(ctx, arrID); err == nil {
+		if m, err := ls.Radarr.MovieByID(ctx, arrID); err == nil {
 			return m.Title
 		}
 	} else if mediaType == subflux.MediaTypeEpisode && ls.Sonarr != nil {
-		if ser, err := ls.Sonarr.GetSeriesByID(ctx, arrID); err == nil {
+		if ser, err := ls.Sonarr.SeriesByID(ctx, arrID); err == nil {
 			return ser.Title
 		}
 	}

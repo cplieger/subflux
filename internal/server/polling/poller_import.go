@@ -110,7 +110,7 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 	return p.processPollImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
-			series, err := ls.Sonarr.GetSeriesByID(ctx, entry.SeriesID)
+			series, err := ls.Sonarr.SeriesByID(ctx, entry.SeriesID)
 			if err != nil {
 				slog.Warn("poll: failed to get series", "series_id", entry.SeriesID, "error", err)
 				return nil, err
@@ -120,7 +120,7 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 				return nil, nil
 			}
 
-			ep, err := ls.Sonarr.GetEpisodeByID(ctx, entry.EpisodeID)
+			ep, err := ls.Sonarr.EpisodeByID(ctx, entry.EpisodeID)
 			if err != nil {
 				slog.Warn("poll: failed to get episode", "episode_id", entry.EpisodeID, "error", err)
 				return nil, err
@@ -158,7 +158,7 @@ func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *
 	return p.processPollImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
-			movie, err := ls.Radarr.GetMovieByID(ctx, entry.MovieID)
+			movie, err := ls.Radarr.MovieByID(ctx, entry.MovieID)
 			if err != nil {
 				slog.Warn("poll: failed to get movie", "movie_id", entry.MovieID, "error", err)
 				return nil, err
