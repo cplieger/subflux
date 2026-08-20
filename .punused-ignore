@@ -119,10 +119,24 @@ method (*Config).Validate
 # root package, so there is no `store.Composite` and no `AuthStore` alias here
 # any more; the union subflux does declare is server.AuthStore, at the one site
 # that fans a single concrete store out to five consumers.
-# All ten methods below are members of those roles. Their callers are the auth
+# All FIVE methods below are members of those roles, and each is reported
+# EU1001 (referenced from tests only). Their production callers are the auth
 # library's own authenticator, session, passkey, and API-key paths — a different
-# module, which is exactly what punused documents it cannot see. Removing any one
-# breaks an assertion at compile time (verified for UserCount).
+# module, which is exactly what punused documents it cannot see. Removing any
+# one breaks an assertion at compile time.
+#
+# FIVE MORE entries were removed rather than re-justified, because punused does
+# not report them: GetUserByID, UserCount, CreateSession, GetSessionByHash and
+# DeleteSession. Measured with the gate's own per-directory invocation
+# (`punused 'internal/authstore/*.go'`) — it names five methods here, and those
+# are not among them. subflux's OWN production code dials all five through the
+# interfaces that declare them: authhandlers.SessionStore and AccountStore
+# (server/authhandlers/iface.go:16-24), reached from auth_handlers.go:106-186
+# and auth_oidc_handlers.go:247. A cross-module exemption for a symbol the
+# module already references in production is a claim this file cannot support,
+# and the header calls that the difference between an adjudication and an
+# amnesty. If the interface hop ever disappears, the gate fails loudly and the
+# entry comes back with a real reason.
 #
 # This header was re-verified against v4 on 2026-08-19. It previously cited
 # auth/v2, a `store.Composite` alias, `authdb.go:16` (which is the `"time"`
@@ -130,13 +144,8 @@ method (*Config).Validate
 # longer resolves. The methods were still correctly adjudicated; only the
 # evidence had rotted, which this file's own header calls the difference between
 # an adjudication and an amnesty.
-method (*Store).GetUserByID
 method (*Store).GetUserByEmail
-method (*Store).UserCount
-method (*Store).CreateSession
-method (*Store).GetSessionByHash
 method (*Store).UpdateSessionActivity
-method (*Store).DeleteSession
 method (*Store).GetPasskeyByCredentialID
 method (*Store).UpdatePasskeyAfterLogin
 method (*Store).GetAPIKeyByHash
@@ -250,6 +259,31 @@ constant NotifyInfo
 # Resolve by removing the field in Go and regenerating, or by populating it.
 field ProviderTemplate
 field Variant is unused
+
+# --- Embedded key reached only through field promotion ----------------------
+# ManualLockEntry embeds ManualLockKey untagged so encoding/json promotes the
+# quad and the entry marshals FLAT — the five-field wire shape registered at
+# wirespec.go:91 and emitted into the generated TS decoder. The field is
+# load-bearing twice over: it is the only source of the entry's four data
+# fields, and its untagged embedding IS the flat wire contract.
+#
+# It reads as unused because Go 1.27's struct-literal field selectors let every
+# construction site name the PROMOTED fields directly — boltstore/substate.go
+# :830 builds `ManualLockEntry{MediaType: ..., MediaID: ..., Language: ...,
+# Variant: ..., Count: ...}` — so no site spells `ManualLockKey:` any more.
+# gopls attributes a promoted-field reference to the inner field, never to the
+# embedding.
+#
+# The three resolutions the gate offers are all unavailable here, which is why
+# this is an adjudication and not laziness. Deleting the field deletes the
+# entry's data. Re-nesting it under a named field breaks the flat wire shape.
+# And "wiring it up" means re-spelling `ManualLockKey:` at one arbitrary
+# literal, which go fix's embedlit modernizer immediately flags again — the two
+# gates want opposite things at this one site, and only punused has an
+# adjudication channel. Verified: the sole Go consumer of GetManualLocks
+# (queryhandlers/query.go:104) hands the slice straight to WriteJSON, so no
+# caller wants the key as a value either.
+field ManualLockKey is unused
 
 # --- ScorePreview fields populated by a struct conversion -------------------
 # queryhandlers/query.go:252 writes `subflux.ScorePreview(result)` — a whole-struct
