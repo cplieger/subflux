@@ -240,7 +240,8 @@ func (h *Handler) HandleScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := ls.Engine.SimulateScore(
-		req.MediaType, req.ReleaseName, req.SubRelease, subflux.MatchMethod(req.MatchedBy))
+		req.MediaType, req.ReleaseName, req.SubRelease, subflux.MatchMethod(req.MatchedBy),
+	)
 
 	slog.Debug("handleScore",
 		"media_type", req.MediaType,

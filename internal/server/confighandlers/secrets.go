@@ -24,7 +24,8 @@ func SecretKeyNames() []string { return secretKeyNames }
 
 // secretKeyRe matches YAML keys that typically contain secrets.
 var secretKeyRe = regexp.MustCompile(
-	`(?im)^(\s*(?:` + strings.Join(secretKeyNames, "|") + `)\s*:\s*)(.+)$`)
+	`(?im)^(\s*(?:` + strings.Join(secretKeyNames, "|") + `)\s*:\s*)(.+)$`,
+)
 
 // FindClosingQuote returns the index of the closing quote character in val.
 func FindClosingQuote(val []byte, q byte) int {
@@ -119,7 +120,8 @@ func MergeSecrets(newData []byte, configPath string) ([]byte, error) {
 			indent := len(line) - len(bytes.TrimLeft(line, " "))
 			lines[i] = append(
 				bytes.Repeat([]byte(" "), indent),
-				[]byte(key+": "+oldVal)...)
+				[]byte(key+": "+oldVal)...,
+			)
 		}
 	}
 	return bytes.Join(lines, []byte("\n")), nil

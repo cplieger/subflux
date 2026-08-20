@@ -214,7 +214,8 @@ func TestHandleScore_matched_by_affects_score(t *testing.T) {
 	scoreFor := func(matchedBy string) float64 {
 		body := fmt.Sprintf(
 			`{"media_type":"movie","release_name":%q,"sub_release":%q,"matched_by":%q}`,
-			release, release, matchedBy)
+			release, release, matchedBy,
+		)
 		req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader(body))
 		rec := httptest.NewRecorder()
 		h.HandleScore(rec, req)

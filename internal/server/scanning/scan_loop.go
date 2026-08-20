@@ -130,7 +130,8 @@ func RunFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, ls *Live
 		"backed_off", stats.MoviesBackedOff)
 	deps.Metrics.RecordScan(
 		stats.EpisodesSearched+stats.MoviesSearched,
-		totalFound, time.Since(start))
+		totalFound, time.Since(start),
+	)
 
 	// Clear provider download caches to free memory.
 	deps.ClearCaches(ls.Providers)

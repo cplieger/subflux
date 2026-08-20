@@ -38,6 +38,7 @@ var (
 )
 
 func (f *fakeArr) GetMovieByID(context.Context, int) (arrapi.Movie, error) { return f.movie, f.getErr }
+
 func (f *fakeArr) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
 	return f.series, f.getErr
 }
