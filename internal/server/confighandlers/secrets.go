@@ -19,7 +19,10 @@ import (
 var secretKeyNames = []string{"api_key", "password", "passkey", "token", "secret", "client_key", "anidb_client_key", "client_secret"}
 
 // SecretKeyNames returns the list of YAML keys treated as secrets.
-// Exported for cross-package testing (providers_test.go verifies coverage).
+//
+// Reached only by tests, deliberately: the root package providers_test asserts
+// every Secret:true field in the provider registry has an entry here, so CI fails
+// when a new provider adds a secret field this list misses.
 func SecretKeyNames() []string { return secretKeyNames }
 
 // secretKeyRe matches YAML keys that typically contain secrets.

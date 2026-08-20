@@ -68,6 +68,11 @@ func OnDisk(ext string) bool { return table[norm(ext)].onDisk }
 
 // WriterOutput reports whether ext (an extension or a path) is an extension
 // subflux's own writers emit.
+//
+// Reached only by tests today, and kept deliberately: the writerOutput capability
+// IS used in production, by Delete's union below, and these four accessors are one
+// per capability. Dropping the view whose callers happen to be absent would leave
+// an asymmetric vocabulary that the next writer path re-adds.
 func WriterOutput(ext string) bool { return table[norm(ext)].writerOutput }
 
 // Delete reports whether ext (an extension or a path) carries the delete

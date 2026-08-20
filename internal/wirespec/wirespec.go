@@ -542,6 +542,10 @@ func Endpoints() []wiregen.Endpoint {
 	}
 }
 
+// RoutePatterns is reached only by tests, which is this package's whole shape:
+// wirespec is build-time-only, imported by cmd/wire-codegen and by the
+// consistency test that compares this table against routes.go bidirectionally.
+//
 // RoutePatterns maps endpoint names to their routes.go registration pattern
 // when it differs from the default "METHOD path". Covers the prefix-style
 // registrations (Go 1.22 ServeMux trailing-slash patterns whose handlers
