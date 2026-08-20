@@ -195,7 +195,8 @@ func expandTargetList(targets []yamlSubtitleTarget, ruleCtx string) ([]yamlSubti
 	for _, t := range targets {
 		if t.Variant != "" && len(t.Variants) > 0 {
 			return nil, fmt.Errorf(
-				"%w (code=%s, context=%s)", ErrVariantConflict, t.Code, ruleCtx)
+				"%w (code=%s, context=%s)", ErrVariantConflict, t.Code, ruleCtx,
+			)
 		}
 		if len(t.Variants) == 0 {
 			result = append(result, t)

@@ -347,7 +347,8 @@ func (d *migrationDomain) pendingStep(st domainState) (migration, bool, error) {
 	}
 	return migration{}, false, fmt.Errorf(
 		"boltstore: no registered %s migration from schema v%d (this build's version is v%d); restore a backup or pre-migration snapshot written by a compatible version",
-		d.name, st.stored, d.current)
+		d.name, st.stored, d.current,
+	)
 }
 
 // nextPendingStep picks the next step across both domains: the core ladder

@@ -45,13 +45,15 @@ func TestProp_keyEncodeParse(t *testing.T) {
 
 		// attemptKey: mt 0x00 mid 0x00 lang 0x00 provider, Split round-trips.
 		if got := kv.Split(attemptKey(mt, mid, lang, provider)); !slices.Equal(
-			got, []string{string(mt), mid, lang, string(provider)}) {
+			got, []string{string(mt), mid, lang, string(provider)},
+		) {
 			rt.Errorf("Split(attemptKey) = %q, want %q", got, []string{string(mt), mid, lang, string(provider)})
 		}
 
 		// subtitleFileKey: six components, Split round-trips.
 		if got := kv.Split(subtitleFileKey(mt, mid, lang, variant, source, path)); !slices.Equal(
-			got, []string{string(mt), mid, lang, string(variant), string(source), path}) {
+			got, []string{string(mt), mid, lang, string(variant), string(source), path},
+		) {
 			rt.Errorf("Split(subtitleFileKey) = %q, want 6-component round-trip", got)
 		}
 

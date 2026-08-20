@@ -35,10 +35,12 @@ func validateLangCode(code, field, ctx string) error {
 	if canon := langcode.Canonical(code); canon != "" {
 		return configFieldErr(field, fmt.Sprintf(
 			"%s %q (%s) is not the code subflux uses for that language; use %q",
-			field, code, ctx, canon))
+			field, code, ctx, canon,
+		))
 	}
 	return configFieldErr(field, fmt.Sprintf(
-		"%s %q (%s) is not a known language code", field, code, ctx))
+		"%s %q (%s) is not a known language code", field, code, ctx,
+	))
 }
 
 // validateTarget checks a single subtitle target for validity.

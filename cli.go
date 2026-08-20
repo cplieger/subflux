@@ -57,7 +57,8 @@ func adminSocketRequest(body []byte) (data []byte, status int, err error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf(
 			"server admin socket unreachable at %s — is the server running in this container? (%w)",
-			config.AdminSocketPath, err)
+			config.AdminSocketPath, err,
+		)
 	}
 	defer resp.Body.Close()
 	data, err = io.ReadAll(io.LimitReader(resp.Body, 1<<20))

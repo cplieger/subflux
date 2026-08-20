@@ -65,7 +65,8 @@ var reDialogueStyle = regexp.MustCompile(
 		`ef\b|fsn\b|b&w|` + // common fansub abbreviations for dialogue variants
 		`letter|loudspeaker|` +
 		`gjm_` + // GJM fansub prefix
-		`)`)
+		`)`,
+)
 
 // classifyStyles decides which ASS styles are dialogue.
 //

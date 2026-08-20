@@ -29,7 +29,8 @@ import (
 //
 // Rejects arbitrary strings that could produce confusing query results.
 var mediaPrefixRe = regexp.MustCompile(
-	`^(?:tvdb-\d+-|tmdb-\d+-?|imdb-tt\d+)`)
+	`^(?:tvdb-\d+-|tmdb-\d+-?|imdb-tt\d+)`,
+)
 
 // ValidPrefix checks that a prefix parameter matches expected
 // media ID formats. Prevents arbitrary prefix queries that could

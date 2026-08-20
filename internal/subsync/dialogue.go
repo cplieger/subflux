@@ -26,7 +26,8 @@ var reASSNonDialogue = regexp.MustCompile(
 		`|p[1-9]` + // drawing mode
 		`|[kK][fFoO]?\d` + // karaoke timing (\k, \K, \kf, \ko variants)
 		`)` +
-		`|\{\*\\`) // ASS inline comment with override ({*\frz...} = sign typesetting)
+		`|\{\*\\`, // ASS inline comment with override ({*\frz...} = sign typesetting)
+)
 
 // reASSDrawing matches ASS vector drawing commands that appear as raw text
 // after ffmpeg ASS→SRT conversion. These are shapes, not text.
