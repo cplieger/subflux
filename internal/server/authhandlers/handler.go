@@ -103,12 +103,9 @@ func dbCtx(ctx context.Context) (context.Context, context.CancelFunc) {
 // createAndSetSession persists a session for the authenticated user and sets
 // the session cookie on the response.
 func (h *Handler) createAndSetSession(w http.ResponseWriter, r *http.Request,
-	user *auth.User, authMethod auth.Method, oidcExpiry *time.Time,
+	user *auth.User, authMethod auth.Method, oidcExpiry time.Time,
 ) error {
-	token, hash, err := auth.GenerateSessionToken()
-	if err != nil {
-		return fmt.Errorf("generate token: %w", err)
-	}
+	token, hash := auth.GenerateSessionToken()
 	now := time.Now()
 	sess := &auth.Session{
 		TokenHash:    hash,
@@ -149,7 +146,8 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 // createSessionAndRespond is the standard login completion: create session,
 // set cookie, write JSON.
 func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request, user *auth.User, authMethod auth.Method) error {
-	if err := h.createAndSetSession(w, r, user, authMethod, nil); err != nil {
+	// The zero Time: a password or passkey login has no OIDC token behind it.
+	if err := h.createAndSetSession(w, r, user, authMethod, time.Time{}); err != nil {
 		return err
 	}
 	h.respondLoginSuccess(w, r, user)
@@ -211,11 +209,7 @@ func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *h
 			return "", msgBreachedPassword, nil
 		}
 	}
-	h, err := auth.HashPassword(check.Password)
-	if err != nil {
-		return "", "", err
-	}
-	return PasswordHash(h), "", nil
+	return PasswordHash(auth.HashPassword(check.Password)), "", nil
 }
 
 // requireWebAuthn resolves the current WebAuthn instance from the live

@@ -45,14 +45,19 @@ import (
 // auth.Key field — including the json:"-" KeyHash — so the API key round-trips
 // through the bbolt codec without loss.
 type keyRec struct {
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	KeyHash   string     `json:"key_hash"`
-	KeyPrefix string     `json:"key_prefix"`
-	KeySuffix string     `json:"key_suffix"`
-	Label     string     `json:"label"`
-	ID        int64      `json:"id"`
-	UserID    int64      `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	// ExpiresAt is the zero Time for a key that never expires, matching
+	// auth.Key. omitzero rather than omitempty: a zero time.Time is not
+	// "empty" to encoding/json, so omitempty would persist it in full. Records
+	// written by the *time.Time era decode unchanged — a stored null leaves the
+	// value at its zero, which is the same "never expires" it always meant.
+	ExpiresAt time.Time `json:"expires_at,omitzero"`
+	KeyHash   string    `json:"key_hash"`
+	KeyPrefix string    `json:"key_prefix"`
+	KeySuffix string    `json:"key_suffix"`
+	Label     string    `json:"label"`
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
 }
 
 // toKeyRec projects an auth.Key into its persisted form.

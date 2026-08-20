@@ -76,14 +76,7 @@ func (s *Server) bootstrapResetPassword(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	hash, err := auth.HashPassword(password)
-	if err != nil {
-		slog.Error("admin bootstrap: hash password", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-
-	user.PasswordHash = hash
+	user.PasswordHash = auth.HashPassword(password)
 	user.UpdatedAt = time.Now()
 	if err := s.authStore.UpdateUser(ctx, user); err != nil {
 		slog.Error("admin bootstrap: update user", "error", err)
@@ -117,12 +110,7 @@ func (s *Server) bootstrapGenerateAPIKey(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-	if err != nil {
-		slog.Error("admin bootstrap: generate api key", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
+	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 
 	apiKey := &auth.Key{
 		UserID:    user.ID,

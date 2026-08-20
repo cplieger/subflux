@@ -71,10 +71,7 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 	s := testAdminServer(t)
 	s.metrics = obs.New() // AdminHandler's recover hook records panics
 
-	hash, err := auth.HashPassword("old-password-123456")
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := auth.HashPassword("old-password-123456")
 	ctx := t.Context()
 	user := &auth.User{Username: "admin", PasswordHash: hash, Role: auth.RoleAdmin, Enabled: true}
 	if err := s.authStore.CreateUser(ctx, user); err != nil {

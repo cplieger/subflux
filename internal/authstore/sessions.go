@@ -29,18 +29,19 @@ import (
 //     using the same strict (exclusive) comparison the SQLite cutoffs used.
 
 // cloneSession returns a deep copy of sess so the in-memory map never shares
-// mutable state with a caller. auth.Session is a flat struct except for the
-// OIDCExpiry *time.Time, which is copied to its own pointer so a caller cannot
-// reach through and mutate the stored expiry.
+// mutable state with a caller.
+//
+// A flat copy is now the whole job: auth.Session carries no pointers since
+// OIDCExpiry became a time.Time value, so there is no pointee left to alias. The
+// per-field deep copy this used to do for that one field is deleted rather than
+// kept "just in case" — a clone that hand-copies one field of many is the shape
+// that goes stale silently when a pointer field is added, and the compiler cannot
+// warn about it. If a pointer field ever returns, this needs revisiting.
 func cloneSession(sess *auth.Session) *auth.Session {
 	if sess == nil {
 		return nil
 	}
-	cp := new(*sess)
-	if sess.OIDCExpiry != nil {
-		cp.OIDCExpiry = new(*sess.OIDCExpiry)
-	}
-	return cp
+	return new(*sess)
 }
 
 // CreateSession stores a new session in memory, keyed by its token hash. A copy

@@ -39,7 +39,7 @@ func TestCreateSession_andGetByHash_roundTrips(t *testing.T) {
 	exp := now.Add(time.Hour)
 	want := mkSession("h1", 7, now, now)
 	want.AuthMethod = auth.MethodOIDC
-	want.OIDCExpiry = &exp
+	want.OIDCExpiry = exp
 
 	if err := s.CreateSession(ctx, want); err != nil {
 		t.Fatalf("CreateSession: %v", err)
@@ -54,7 +54,7 @@ func TestCreateSession_andGetByHash_roundTrips(t *testing.T) {
 	if got.TokenHash != "h1" || got.UserID != 7 || got.AuthMethod != auth.MethodOIDC || got.IPAddress != "10.0.0.1" {
 		t.Errorf("round-trip mismatch: %+v", got)
 	}
-	if got.OIDCExpiry == nil || !got.OIDCExpiry.Equal(exp) {
+	if !got.OIDCExpiry.Equal(exp) {
 		t.Errorf("OIDCExpiry round-trip = %v, want %v", got.OIDCExpiry, exp)
 	}
 }
@@ -81,17 +81,21 @@ func TestGetSessionByHash_returnsCopy(t *testing.T) {
 	// pointer handed to CreateSession so later mutations of that pointer cannot
 	// change the expectation.
 	wantExp := now.Add(time.Hour)
-	exp := wantExp
 	in := mkSession("h1", 1, now, now)
-	in.OIDCExpiry = &exp
+	in.OIDCExpiry = wantExp
 	if err := s.CreateSession(ctx, in); err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
 	// Mutating the caller's original struct after create must not affect storage.
+	//
+	// OIDCExpiry is assigned, not mutated through a pointer: it is a time.Time
+	// value since auth v4, so there is no shared cell left to write through. The
+	// assertion is the same one and it now holds by construction rather than by
+	// the store remembering to deep-copy one field.
 	in.UserID = 999
 	in.IPAddress = "evil"
-	*in.OIDCExpiry = now.Add(100 * time.Hour)
+	in.OIDCExpiry = now.Add(100 * time.Hour)
 
 	got, _, _ := s.SessionByHash(ctx, "h1")
 	if got.UserID != 1 || got.IPAddress != "10.0.0.1" {
@@ -103,7 +107,7 @@ func TestGetSessionByHash_returnsCopy(t *testing.T) {
 
 	// Mutating the returned copy must not affect a subsequent read either.
 	got.UserID = 555
-	*got.OIDCExpiry = now.Add(200 * time.Hour)
+	got.OIDCExpiry = now.Add(200 * time.Hour)
 	again, _, _ := s.SessionByHash(ctx, "h1")
 	if again.UserID != 1 || !again.OIDCExpiry.Equal(wantExp) {
 		t.Errorf("returned copy aliased stored session: %+v", again)

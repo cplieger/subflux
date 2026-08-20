@@ -24,7 +24,11 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := make([]APIKeyInfo, 0, len(keys))
-	for _, k := range keys {
+	// Indexed rather than a value range: auth.Key crossed gocritic's copy
+	// threshold when ExpiresAt became a time.Time value, and this projection reads
+	// five fields of it.
+	for i := range keys {
+		k := &keys[i]
 		out = append(out, APIKeyInfo{
 			ID:        k.ID,
 			KeyPrefix: k.KeyPrefix,
@@ -55,13 +59,7 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-	if err != nil {
-		slog.Error("generate api key: generate", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-
+	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 	now := time.Now()
 	apiKey := &auth.Key{
 		UserID:    user.ID,

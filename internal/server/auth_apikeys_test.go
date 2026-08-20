@@ -46,10 +46,7 @@ func TestListAPIKeys_WithData(t *testing.T) {
 	user := createTestUser(t, db, "listkeys-data", "correct-horse-battery-staple")
 
 	for i := range 2 {
-		_, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 		key := &auth.Key{
 			UserID:    user.ID,
 			KeyHash:   hash,
@@ -130,10 +127,7 @@ func TestGenerateAPIKey_StoresHash(t *testing.T) {
 	user := createTestUser(t, db, "nancy", "correct-horse-battery-staple")
 
 	// Generate an API key (same logic as CLI).
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-	if err != nil {
-		t.Fatal(err)
-	}
+	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 
 	apiKey := &auth.Key{
 		UserID:    user.ID,
@@ -196,10 +190,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	user := createTestUser(t, db, "karl", "correct-horse-battery-staple")
 
 	// Generate a key first.
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-	if err != nil {
-		t.Fatal(err)
-	}
+	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 	_ = plaintext
 	apiKey := &auth.Key{
 		UserID:    user.ID,

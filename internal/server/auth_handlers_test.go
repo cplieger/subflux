@@ -90,10 +90,7 @@ func TestResetPassword_UpdatesHash(t *testing.T) {
 
 	// Hash a new password and update the user (same logic as CLI).
 	newPassword := "new-password-for-reset"
-	hash, err := auth.HashPassword(newPassword)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := auth.HashPassword(newPassword)
 	user.PasswordHash = hash
 	if err := db.UpdateUser(t.Context(), user); err != nil {
 		t.Fatal(err)

@@ -27,30 +27,17 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state, err := authoidc.GenerateState()
-	if err != nil {
-		slog.Error("oidc: generate state", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
+	// These three cannot fail: the library's generators read crypto/rand, whose
+	// Read is documented never to return an error, so v4 dropped the always-nil
+	// error rather than making every caller write a branch it cannot reach.
+	state := authoidc.GenerateState()
 
 	// The library mints only one flavour of opaque random; the nonce is that
 	// value retyped for its role, so the conversion is written once, here at
 	// the mint, and every hop afterwards is compiler-checked.
-	nonceState, err := authoidc.GenerateState()
-	if err != nil {
-		slog.Error("oidc: generate nonce", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
-	nonce := authoidc.Nonce(nonceState)
+	nonce := authoidc.Nonce(authoidc.GenerateState())
 
-	verifier, challenge, err := authoidc.GeneratePKCE()
-	if err != nil {
-		slog.Error("oidc: generate PKCE", "error", err)
-		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
-		return
-	}
+	verifier, challenge := authoidc.GeneratePKCE()
 
 	redirectURI := auth.ValidateRedirectURI(r.URL.Query().Get("redirect"))
 

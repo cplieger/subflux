@@ -41,7 +41,7 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 
 	exp := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
 	key := sampleKey(7, "hash-abc", "ci-token")
-	key.ExpiresAt = &exp
+	key.ExpiresAt = exp
 
 	if err := s.CreateAPIKey(ctx, key); err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
@@ -66,7 +66,7 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 	if got.KeyHash != "hash-abc" || got.KeyPrefix != "sk_pre" || got.KeySuffix != "sufx" || got.Label != "ci-token" {
 		t.Errorf("scalar fields lost on round-trip: %+v", got)
 	}
-	if got.ExpiresAt == nil || !got.ExpiresAt.Equal(exp) {
+	if !got.ExpiresAt.Equal(exp) {
 		t.Errorf("expires_at lost on round-trip: got %v, want %v", got.ExpiresAt, exp)
 	}
 }

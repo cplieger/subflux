@@ -93,10 +93,7 @@ func testAuthServer(t *testing.T) (*Server, *authstore.Store) {
 // createTestUser creates a user in the DB with the given username and password.
 func createTestUser(t *testing.T, db *authstore.Store, username, password string) *auth.User {
 	t.Helper()
-	hash, err := auth.HashPassword(password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := auth.HashPassword(password)
 	now := time.Now()
 	user := &auth.User{
 		Username:     username,
@@ -116,10 +113,7 @@ func createTestUser(t *testing.T, db *authstore.Store, username, password string
 // plaintext token.
 func createTestSession(t *testing.T, db *authstore.Store, userID int64) string {
 	t.Helper()
-	token, hash, err := auth.GenerateSessionToken()
-	if err != nil {
-		t.Fatal(err)
-	}
+	token, hash := auth.GenerateSessionToken()
 	now := time.Now()
 	sess := &auth.Session{
 		TokenHash:    hash,
