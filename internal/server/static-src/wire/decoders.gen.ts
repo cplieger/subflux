@@ -3,7 +3,6 @@
 import { asObject, reqStr, reqNum, reqBool, optStr, optNum, optBool, reqOneOf, decodeArray, decodeRecord, type Decoder } from "../validators.js";
 import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, AudioRule, BackoffEntry, BulkDeleteRequest, CoverageEvent, CoverageTarget, DeleteFileRequest, DownloadAccepted, DownloadRequest, EpisodeItem, EventData, FileEntry, KeyGenerated, LanguageRules, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, NotifyEvent, ParsedConfig, PasskeyInfo, PasskeyRegistered, PathValidationResponse, PostProcessConfig, PreviewStartResponse, ProviderInfo, ProviderSchema, ProviderStatus, ProvidersResponse, ResolveCandidate, ResolveResponse, ResolveSearchIDs, ResolvedItem, ScanAccepted, ScanEvent, SchemaField, SchemaOption, SchemaSection, ScorePreview, Scores, SearchResult, SearchTarget, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, SignalData, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SubtitleTarget, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
-const ACTIVITY_SOURCES = ["scheduled", "manual"] as const;
 const ALERT_KINDS = ["persistent", "transient"] as const;
 const ALERT_LEVELS = ["error", "warn", "info"] as const;
 const MEDIA_TYPES = ["movie", "episode", "series"] as const;
@@ -12,6 +11,7 @@ const OUTCOMES = ["completed", "failed", "cancelled", "shutdown"] as const;
 const ROLES = ["admin", "user"] as const;
 const SCAN_KINDS = ["series", "season", "movie", "item", "full"] as const;
 const SCORE_TIERS = ["excellent", "good", "acceptable", "minimal", "none"] as const;
+const SOURCES = ["scheduled", "manual"] as const;
 const VARIANTS = ["standard", "hi", "forced"] as const;
 
 export const decodeAPIKeyInfo: Decoder<APIKeyInfo> = (v) => {
@@ -33,7 +33,7 @@ export const decodeActivityEntry: Decoder<ActivityEntry> = (v) => {
     id: reqStr(o, "id", "$.activity_entry"),
     action: reqStr(o, "action", "$.activity_entry"),
     detail: reqStr(o, "detail", "$.activity_entry"),
-    source: reqOneOf(o, "source", ACTIVITY_SOURCES, "$.activity_entry"),
+    source: reqOneOf(o, "source", SOURCES, "$.activity_entry"),
     done: reqBool(o, "done", "$.activity_entry"),
   };
   const endedAt = o["ended_at"] === null ? undefined : optStr(o, "ended_at", "$.activity_entry");
@@ -532,7 +532,7 @@ export const decodeScanEvent: Decoder<ScanEvent> = (v) => {
   const out: ScanEvent = {
     action: reqStr(o, "action", "$.scan_event"),
     detail: reqStr(o, "detail", "$.scan_event"),
-    source: reqOneOf(o, "source", ACTIVITY_SOURCES, "$.scan_event"),
+    source: reqOneOf(o, "source", SOURCES, "$.scan_event"),
   };
   const activityId = o["activity_id"] === null ? undefined : optStr(o, "activity_id", "$.scan_event");
   if (activityId !== undefined) out.activity_id = activityId;
