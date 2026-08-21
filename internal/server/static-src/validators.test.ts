@@ -104,6 +104,37 @@ describe("helpers", () => {
     ).toThrow(/\$\.list\[1\]: not number/);
   });
 
+  it("decodeArray chains the element error as the cause", () => {
+    // The re-thrown TypeError carries the per-index path; the ORIGINAL error
+    // rides along as `cause` so the innermost failure is still readable after
+    // an outer decoder has rewritten the message.
+    let caught: unknown;
+    try {
+      decodeArray([{}], () => {
+        throw new TypeError("inner failure");
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(TypeError);
+    expect((caught as TypeError).cause).toBeInstanceOf(TypeError);
+    expect(((caught as TypeError).cause as TypeError).message).toBe("inner failure");
+  });
+
+  it("decodeRecord chains the value error as the cause", () => {
+    let caught: unknown;
+    try {
+      decodeRecord({ a: {} }, () => {
+        throw new TypeError("inner failure");
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(TypeError);
+    expect((caught as TypeError).cause).toBeInstanceOf(TypeError);
+    expect(((caught as TypeError).cause as TypeError).message).toBe("inner failure");
+  });
+
   it("decodeRecord iterates entries with path-aware errors", () => {
     const out = decodeRecord({ a: 1, b: 2 }, (v) => {
       if (typeof v !== "number") {
