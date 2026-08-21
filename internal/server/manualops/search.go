@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
@@ -159,7 +160,7 @@ func RunSearch(ctx context.Context, deps *SearchDeps, ls *LiveState,
 			subs, err := p.Search(pctx, req)
 			if err != nil {
 				slog.Warn("manual search: provider failed",
-					"provider", p.Name(), "error", err)
+					"provider", p.Name(), "error", logsafe.Field(err.Error()))
 				return nil
 			}
 			results[i] = provResult{subs: subs}

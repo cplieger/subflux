@@ -30,6 +30,7 @@ import (
 
 	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -187,7 +188,7 @@ func (h *Handler) HandleSearchResolve(w http.ResponseWriter, r *http.Request) {
 		httpapi.BadRequestC(w, r, "resolve_conflict", err.Error())
 	case err != nil:
 		slog.Error("search resolve failed", "error", err,
-			"title", params.Title, "imdb", params.Imdb, "tmdb", params.Tmdb, "type", params.Type)
+			"title", logsafe.Field(params.Title), "imdb", logsafe.Field(params.Imdb), "tmdb", params.Tmdb, "type", logsafe.Field(params.Type))
 		httpapi.BadGatewayC(w, r, subflux.CodeArrUnreachable, "media resolution failed: "+err.Error())
 	default:
 		httpapi.WriteJSON(w, resp)

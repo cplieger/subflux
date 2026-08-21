@@ -17,6 +17,7 @@ import (
 	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/anidb"
 	"github.com/cplieger/subflux/internal/provider/archive"
@@ -273,7 +274,7 @@ func (p *Provider) searchEntries(ctx context.Context,
 	title string, season int,
 ) ([]feedEntry, error) {
 	query := fmt.Sprintf("%s S%02d", title, season)
-	slog.Debug("animetosho searching entries", "query", query)
+	slog.Debug("animetosho searching entries", "query", logsafe.Field(query))
 
 	var entries []feedEntry
 	if err := p.fetchJSON(ctx,
