@@ -318,6 +318,51 @@ func TestOpen_failsClosedOnMissingStampInPopulatedFile(t *testing.T) {
 	}
 }
 
+// TestOpen_emptiedFileWithNoStampBootstrapsFresh proves the populated-vs-fresh
+// probe reads DATA, not bucket existence: a file whose buckets were all
+// bootstrapped and then emptied carries nothing to lose, so a missing stamp
+// means "bootstrap at the current versions" rather than a refusal. meta is not
+// domain data either — its counters and the other domain's stamp must not make
+// the domain look populated.
+func TestOpen_emptiedFileWithNoStampBootstrapsFresh(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "subflux.bolt")
+	seedPopulatedV1Store(t, path)
+	rawUpdate(t, path, func(tx *bolt.Tx) error {
+		// Empty every bucket the store bootstrapped, leaving them in place, and
+		// drop the core stamp. meta keeps its counters and the auth stamp.
+		if ferr := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			if string(name) == bucketMeta {
+				return nil
+			}
+			var keys [][]byte
+			c := b.Cursor()
+			for k, _ := c.First(); k != nil; k, _ = c.Next() {
+				keys = append(keys, append([]byte(nil), k...))
+			}
+			for _, k := range keys {
+				if derr := b.Delete(k); derr != nil {
+					return derr
+				}
+			}
+			return nil
+		}); ferr != nil {
+			return ferr
+		}
+		return tx.Bucket([]byte(bucketMeta)).Delete(metaKeyCoreSchemaVersion)
+	})
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open of an emptied file with no core stamp: %v, want a fresh bootstrap", err)
+	}
+	if err := db.Close(t.Context()); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := rawReadStamp(t, path, metaKeyCoreSchemaVersion); string(got) != string(kv.Be64(coreSchemaVersion)) {
+		t.Errorf("core stamp after the bootstrap = %x, want be64(%d)", got, coreSchemaVersion)
+	}
+}
+
 // TestOpen_freshFileBootstrapsWithoutMigrations proves the fresh-file rule:
 // absent stamps in a file with no domain data mean "bootstrap at current
 // versions, run zero migrations" — never "run the ladder from 0". A ladder
