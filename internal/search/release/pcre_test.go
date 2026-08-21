@@ -217,6 +217,13 @@ func TestMarkerRule2_assertion_in_quantified_group_rejected(t *testing.T) {
 		{"lookbehind in optional group", `(?:(?<=a)b)?`},
 		{"nested two levels under repeat", `(?:x(?:y(?=z))){2}`},
 		{"lazy quantifier over group with assertion", `(?:a(?<!b))+?`},
+		// Every {m,n} spelling the quantifier scanner accepts reaches the
+		// same rejection: a bound at either end of the digit range, and a
+		// multi-digit maximum.
+		{"single digit nine repeat", `(a(?=b)){9}`},
+		{"bounded range ending in nine", `(a(?=b)){2,9}`},
+		{"multi digit maximum", `(a(?=b)){2,10}`},
+		{"open ended multi digit minimum", `(a(?=b)){10,}`},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -235,30 +242,39 @@ func TestMarkerRule2_assertion_in_quantified_group_rejected(t *testing.T) {
 
 // --- Typed compile errors: table-driven test per rejected shape (R3.6) ---
 
+// TestCompilePCRE_rejected_shapes pins, per rejected shape, both the
+// offending construct and the byte offset at which the source pattern
+// carries it. The offset is what points a pattern author at the character
+// to change, so it is part of the documented error contract.
 func TestCompilePCRE_rejected_shapes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
 		pattern       string
 		wantConstruct string
+		wantOffset    int
 	}{
-		{"numeric backreference", `(a)\1`, `\1`},
-		{"named backreference k", `(?<g>a)\k<g>`, `\k`},
-		{"relative backreference g", `(a)\g1`, `\g`},
-		{"python named backreference", `(?P=name)`, "(?P="},
-		{"atomic group", `(?>abc)`, "(?>"},
-		{"conditional group", `(?(1)a|b)`, "(?("},
-		{"inline comment", `(?#comment)a`, "(?#"},
-		{"quoted group name", `(?'name'a)`, "(?'"},
-		{"possessive quantifier", `a*+`, "*+"},
-		{"quantified lookahead", `(?=a)+`, "+"},
-		{"quantified lookbehind", `(?<!a)?`, "?"},
-		{"nested lookaround", `(?<=a(?=b))c`, "(?<="},
-		{"unterminated lookaround", `(?!unclosed`, "(?!"},
-		{"unterminated group", `(unclosed`, "("},
-		{"unmatched closing paren", `ab)`, ")"},
-		{"trailing backslash", "ab\\", `\`},
-		{"unterminated group name", `(?<name`, "(?<"},
+		{"numeric backreference", `(a)\1`, `\1`, 3},
+		{"named backreference k", `(?<g>a)\k<g>`, `\k`, 7},
+		{"relative backreference g", `(a)\g1`, `\g`, 3},
+		{"python named backreference", `(?P=name)`, "(?P=", 0},
+		{"atomic group", `(?>abc)`, "(?>", 0},
+		{"conditional group", `(?(1)a|b)`, "(?(", 0},
+		{"inline comment", `(?#comment)a`, "(?#", 0},
+		{"quoted group name", `(?'name'a)`, "(?'", 0},
+		{"possessive quantifier", `a*+`, "*+", 1},
+		{"quantified lookahead", `(?=a)+`, "+", 5},
+		{"quantified lookbehind", `(?<!a)?`, "?", 6},
+		{"nested lookaround", `(?<=a(?=b))c`, "(?<=", 5},
+		{"nested lookbehind inside lookahead", `(?=a(?<=b))`, "(?=", 4},
+		{"nested lookaround at assertion start", `(?=(?=a))`, "(?=", 3},
+		{"unterminated lookaround", `(?!unclosed`, "(?!", 0},
+		{"unterminated group", `(unclosed`, "(", 0},
+		{"unmatched closing paren", `ab)`, ")", 2},
+		{"trailing backslash", "ab\\", `\`, 2},
+		{"unterminated group name", `(?<name`, "(?<", 0},
+		{"empty inline flag group", `(?)`, "(?)", 0},
+		{"unterminated inline flag group", `(?i`, "(?i", 0},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -272,6 +288,9 @@ func TestCompilePCRE_rejected_shapes(t *testing.T) {
 				t.Errorf("CompilePCRE(%q) construct = %q, want %q (reason: %s)",
 					tc.pattern, ce.Construct, tc.wantConstruct, ce.Reason)
 			}
+			if ce.Offset != tc.wantOffset {
+				t.Errorf("CompilePCRE(%q) offset = %d, want %d", tc.pattern, ce.Offset, tc.wantOffset)
+			}
 			if ce.Reason == "" {
 				t.Errorf("CompilePCRE(%q) reason empty, want explanation", tc.pattern)
 			}
@@ -281,14 +300,51 @@ func TestCompilePCRE_rejected_shapes(t *testing.T) {
 
 // TestCompilePCRE_re2_core_rejection_is_typed pins that errors surfaced by
 // the underlying RE2 compiler (not the layer's own parser) also arrive as
-// typed *CompileError values.
+// typed *CompileError values carrying the whole core and no source offset:
+// RE2 reports no position, and a made-up one would point at the wrong
+// character. An unrecognized inline flag lands here rather than in the
+// parser's own unsupported-group-syntax rejection, because flag letters are
+// scanned generically and validated by the core compiler.
 func TestCompilePCRE_re2_core_rejection_is_typed(t *testing.T) {
 	t.Parallel()
-	for _, pat := range []string{`a{2,1}`, `foo(?=\p)`, `[z-a]`} {
-		_, err := CompilePCRE(pat)
-		if _, ok := errors.AsType[*CompileError](err); !ok {
-			t.Errorf("CompilePCRE(%q) error = %v (%T), want *CompileError", pat, err, err)
-		}
+	tests := []string{
+		`a{2,1}`, `[z-a]`,
+		`(?a:x)`, `(?z:x)`, `(?A:x)`, `(?Z:x)`,
+	}
+	for _, pat := range tests {
+		t.Run(pat, func(t *testing.T) {
+			t.Parallel()
+			_, err := CompilePCRE(pat)
+			ce, ok := errors.AsType[*CompileError](err)
+			if !ok {
+				t.Fatalf("CompilePCRE(%q) error = %v (%T), want *CompileError", pat, err, err)
+			}
+			if ce.Construct != pat {
+				t.Errorf("CompilePCRE(%q) construct = %q, want %q", pat, ce.Construct, pat)
+			}
+			if ce.Offset != -1 {
+				t.Errorf("CompilePCRE(%q) offset = %d, want -1 (RE2 reports no position)", pat, ce.Offset)
+			}
+		})
+	}
+}
+
+// TestCompilePCRE_assertion_rejected_by_re2 pins the assertion-inner
+// counterpart: an inner pattern RE2 cannot compile is reported at the
+// assertion's own source offset, not at -1.
+func TestCompilePCRE_assertion_rejected_by_re2(t *testing.T) {
+	t.Parallel()
+	const pat = `foo(?=\p)`
+	_, err := CompilePCRE(pat)
+	ce, ok := errors.AsType[*CompileError](err)
+	if !ok {
+		t.Fatalf("CompilePCRE(%q) error = %v (%T), want *CompileError", pat, err, err)
+	}
+	if ce.Construct != `\p` {
+		t.Errorf("CompilePCRE(%q) construct = %q, want %q", pat, ce.Construct, `\p`)
+	}
+	if ce.Offset != 3 {
+		t.Errorf("CompilePCRE(%q) offset = %d, want 3", pat, ce.Offset)
 	}
 }
 
@@ -314,8 +370,20 @@ func TestRetryShrink_assertion_after_quantified_element(t *testing.T) {
 		// Floor respected: [ab]+ has minimum width 1, so the assertion is
 		// never probed at width 0 (where it would hold).
 		{"floor respects plus minimum", `x([ab]+)(?<!.[ab])`, "xab", false},
+		// Same floor, multi-digit bound: [ab]{10,} keeps a minimum width of
+		// ten, so the probe stops well before the offset where (?<=a) would
+		// hold. The lookahead sitting between the two quantified elements is
+		// what makes the floor load-bearing here — the chain's own source
+		// spans an assertion, so no width-legality check can be built from
+		// it and the minimum width is the only bound left.
+		{"floor respects a multi digit minimum", `[ab]{10,}(?!z)[cd]+(?<=a)`, "aaaaaaaaaabcd", false},
 		// Assertion not quantifier-adjacent: no retry happens.
 		{"no retry without adjacent quantifier", `(ab)(?!c)`, "abc", false},
+		// The same-level pattern remainder is re-checked at the probed
+		// offset: "aa" satisfies the lookbehind but the trailing \d does
+		// not match there, so no width survives.
+		{"continuation holds at the probed offset", `[ab]+(?<=a)\d`, "aa1", true},
+		{"continuation fails at every probed offset", `[ab]+(?<=a)\d`, "aab1", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -351,6 +419,106 @@ func TestRetryShrink_flagship_release_group(t *testing.T) {
 	}
 	if m[2] != "" {
 		t.Errorf("m[2] = %q, want empty (part2 dropped by the accepted shrink)", m[2])
+	}
+}
+
+// TestRetryShrink_chain_adopted_from_group_tail pins WHICH quantified run a
+// lookbehind following a group is allowed to shrink: the group's own
+// trailing run, resolved through nested unquantified groups, and nothing
+// earlier. .NET retries the rightmost quantifier first and reaches an
+// earlier one only when the tail can still match, which for ((a+)b+) it
+// cannot: b+ has no shorter expansion and a+ shrinking leaves b+ facing an
+// 'a'.
+func TestRetryShrink_chain_adopted_from_group_tail(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    bool
+	}{
+		{"trailing run reached through a nested group", `(([ab]+))(?<=a)`, "aab", true},
+		{"an earlier nested run is not the chain", `((a+)b+)(?<=a)`, "aab", false},
+		// A quantified alternation group's minimum width is its NARROWEST
+		// branch, so the probe floor lets the shrink reach width 1.
+		{"alternation floor is the narrowest branch", `(a|bb)+(?<=a)`, "abb", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if got := p.MatchString(tc.input); got != tc.want {
+				t.Errorf("MatchString(%q) for %q = %v, want %v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
+// --- assertion evaluation subject (window and marker offset) ---
+
+// TestLookbehind_sees_enough_of_the_prefix pins that a lookbehind is
+// evaluated against enough preceding text to match: the subject is derived
+// from the inner pattern's maximum width, and an inner pattern with no
+// maximum width is evaluated against the whole prefix. A subject shorter
+// than the inner pattern can match would silently reject valid candidates.
+func TestLookbehind_sees_enough_of_the_prefix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    bool
+	}{
+		{"open ended repetition", `(?<=a{6,})b`, "aaaaaab", true},
+		{"open ended repetition unsatisfied", `(?<=a{6,})b`, "aaaab", false},
+		{"counted repetition", `(?<=a{8})b`, "aaaaaaaab", true},
+		{"counted repetition unsatisfied", `(?<=a{8})b`, "aaab", false},
+		{"counted repetition of a wide class", `(?<=[^x]{8})y`, "aaaaaaaay", true},
+		{"counted repetition of a wide class unsatisfied", `(?<=[^x]{8})y`, "aaay", false},
+		{"every alternative unbounded", `(?<=a.*z|b.*z)q`, "axxxxxxxzq", true},
+		{"every alternative unbounded unsatisfied", `(?<=a.*z|b.*z)q`, "xxq", false},
+		{"word boundary at the subject edge", `(?<=\bab)c`, "abc", true},
+		{"word boundary at the subject edge unsatisfied", `(?<=\bab)c`, "xabc", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if got := p.MatchString(tc.input); got != tc.want {
+				t.Errorf("MatchString(%q) for %q = %v, want %v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestLookahead_evaluated_at_the_marker_offset pins that a lookahead is
+// checked at its own position and nowhere else: an inner pattern that would
+// match further along the subject must not satisfy it. The dot-prefixed
+// rows are the shape whose matchability the evaluator resolves as a
+// threshold, so they must agree with the general path.
+func TestLookahead_evaluated_at_the_marker_offset(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    bool
+	}{
+		{"inner matches only further along", `(?=a+X)b`, "baaX", false},
+		{"inner matches at the marker", `(?=a+X)a`, "aaX", true},
+		{"dot prefixed inner at the marker", `(?=.+X)b`, "baaX", true},
+		{"dot prefixed inner unsatisfied", `(?=.+X)b`, "baa", false},
+		{"negated dot prefixed inner", `(?!.+X)b`, "baa", true},
+		{"negated dot prefixed inner vetoes", `(?!.+X)b`, "baaX", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if got := p.MatchString(tc.input); got != tc.want {
+				t.Errorf("MatchString(%q) for %q = %v, want %v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -572,6 +740,74 @@ func TestCompilePCRE_inline_flags(t *testing.T) {
 	}
 	if p.MatchString("Movie.2023.web") {
 		t.Error("lowercase web must not match inside (?-i:...)")
+	}
+	// A bodyless flag group is a zero-width element applying to the rest of
+	// the pattern.
+	rest := mustCompilePCRE(t, `(?i)abc`)
+	if !rest.MatchString("ABC") {
+		t.Error(`MatchString("ABC") for "(?i)abc" = false, want true`)
+	}
+	// A flag group with a body scopes its flags to that body.
+	scoped := mustCompilePCRE(t, `(?s:a.b)`)
+	if !scoped.MatchString("a\nb") {
+		t.Error("MatchString(\"a\\nb\") for \"(?s:a.b)\" = false, want true")
+	}
+}
+
+// TestCompilePCRE_named_groups_expose_numbering pins that .NET-style and
+// Python-style named captures compile to plain numbered captures: the name
+// is dropped, and the group takes its source-order slot in the submatch
+// slice.
+func TestCompilePCRE_named_groups_expose_numbering(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    []string
+	}{
+		{"dotnet named group", `(?<y>\d{4})`, "2024", []string{"2024", "2024"}},
+		{"python named group", `(?P<y>\d{4})`, "2024", []string{"2024", "2024"}},
+		{"multi character name is dropped", `(?<year>\d{4})`, "2024", []string{"2024", "2024"}},
+		{"two named groups in source order", `(?<a>x)(?P<b>y)`, "xy", []string{"xy", "x", "y"}},
+		{"named group beside a plain group", `(?<a>x)(y)`, "xy", []string{"xy", "x", "y"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			got := p.FindStringSubmatch(tc.input)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("FindStringSubmatch(%q) for %q = %#v, want %#v",
+					tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCompilePCRE_unterminated_repetition_is_a_literal pins that a brace run
+// the quantifier scanner does not accept stays literal text, the way RE2
+// itself treats it.
+func TestCompilePCRE_unterminated_repetition_is_a_literal(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+	}{
+		{"open minimum without closing brace", `a{1,`, "a{1,"},
+		{"lone opening brace", `a{`, "a{"},
+		{"no minimum digits", `a{,3}`, "a{,3}"},
+		{"non digit bound", `a{x}`, "a{x}"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if !p.MatchString(tc.input) {
+				t.Errorf("MatchString(%q) for %q = false, want true", tc.input, tc.pattern)
+			}
+		})
 	}
 }
 
