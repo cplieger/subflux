@@ -1,6 +1,17 @@
 package crosslang
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
+
+// scoreTol bounds how far a measured anchor or candidate score may sit from
+// the reference value recorded beside it. The scoring pipeline is floating
+// point and Go permits an implementation to fuse a multiply-add, so the last
+// bit or two of a score is not portable across architectures. Every scoring
+// change these tests exist to catch moves a score by at least 1e-3, so a 1e-9
+// window separates portable noise from a real difference.
+const scoreTol = 1e-9
 
 func TestExtractAnchors(t *testing.T) {
 	t.Parallel()
@@ -111,6 +122,20 @@ func TestExtractAnchors(t *testing.T) {
 			input:     "Москва is beautiful",
 			wantCogs:  []string{"beautiful"},
 			wantWords: 3,
+		},
+		{
+			// A hyphen inside a word is dropped rather than replaced, so the
+			// two halves join into one cognate the other language can match.
+			name:     "hyphen_joins_the_word_into_one_cognate",
+			input:    "hot-dog stand",
+			wantCogs: []string{"hotdog", "stand"},
+		},
+		{
+			// Same for an apostrophe: the contraction becomes a single
+			// all-letter cognate instead of a word broken by punctuation.
+			name:     "apostrophe_joins_the_contraction_into_one_cognate",
+			input:    "we don't know",
+			wantCogs: []string{"dont", "know"},
 		},
 	}
 	for _, tt := range tests {
@@ -269,6 +294,134 @@ func TestIsCognate(t *testing.T) {
 			t.Parallel()
 			if got := isCognate(tt.a, tt.b); got != tt.want {
 				t.Errorf("isCognate(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestHasAnyAnchor pins which cues count as anchored. Only a number, a proper
+// noun or a cognate makes a cue matchable across languages; punctuation alone
+// is shared by too many cues to carry any signal, and a cue with no features at
+// all must never be admitted — the anchored-cue count is what Align uses to
+// decide whether the incorrect track can be matched at all.
+func TestHasAnyAnchor(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   anchor
+		want bool
+	}{
+		{"no_features", anchor{}, false},
+		{"punctuation_only", anchor{Punctuation: "?"}, false},
+		{"number_only", anchor{Numbers: []string{"42"}}, true},
+		{"proper_noun_only", anchor{ProperNouns: []string{"Paris"}}, true},
+		{"cognate_only", anchor{Cognates: []string{"television"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			in := tt.in
+			if got := hasAnyAnchor(&in); got != tt.want {
+				t.Errorf("hasAnyAnchor(%+v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAnchorMatchScore pins the exact cross-language match score for hand-built
+// anchor pairs. The score is a weighted share: each feature contributes its
+// weight times the fraction of the larger list that matched, a feature present
+// on only one side contributes a smaller penalty weight to the denominator, and
+// a feature absent from both sides contributes nothing at all. Because the
+// score decides both which candidates survive the minimum and how the dynamic
+// program ranks them, the reference values are recorded rather than described.
+func TestAnchorMatchScore(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		desc string
+		a, b anchor
+		want float64
+	}{
+		{
+			name: "one_shared_number",
+			desc: "0.40 of 0.45: the number weight over itself plus the punctuation weight",
+			a:    anchor{Numbers: []string{"100"}},
+			b:    anchor{Numbers: []string{"100"}},
+			want: 0.8888888888888889,
+		},
+		{
+			name: "one_of_two_numbers_shared",
+			desc: "the number weight is scaled by the matched fraction of the longer list",
+			a:    anchor{Numbers: []string{"1", "2"}},
+			b:    anchor{Numbers: []string{"1"}},
+			want: 0.4444444444444445,
+		},
+		{
+			name: "proper_noun_only_on_the_reference_side",
+			desc: "an unmatchable feature costs the penalty weight, not the full weight",
+			a:    anchor{Numbers: []string{"1"}},
+			b:    anchor{Numbers: []string{"1"}, ProperNouns: []string{"Bo"}},
+			want: 0.6666666666666666,
+		},
+		{
+			name: "proper_noun_only_on_the_incorrect_side",
+			desc: "the penalty is symmetric in which side carries the feature",
+			a:    anchor{Numbers: []string{"1"}, ProperNouns: []string{"Bo"}},
+			b:    anchor{Numbers: []string{"1"}},
+			want: 0.6666666666666666,
+		},
+		{
+			name: "matching_question_marks",
+			desc: "a shared question mark earns the punctuation bonus",
+			a:    anchor{Numbers: []string{"1"}, Punctuation: "?"},
+			b:    anchor{Numbers: []string{"1"}, Punctuation: "?"},
+			want: 1.0,
+		},
+		{
+			name: "matching_exclamation_marks",
+			desc: "an exclamation mark earns it too",
+			a:    anchor{Numbers: []string{"1"}, Punctuation: "!"},
+			b:    anchor{Numbers: []string{"1"}, Punctuation: "!"},
+			want: 1.0,
+		},
+		{
+			name: "matching_periods",
+			desc: "a shared period does not: almost every cue ends in one",
+			a:    anchor{Numbers: []string{"1"}, Punctuation: "."},
+			b:    anchor{Numbers: []string{"1"}, Punctuation: "."},
+			want: 0.8888888888888889,
+		},
+		{
+			name: "question_mark_against_a_period",
+			desc: "mismatched terminal punctuation earns nothing",
+			a:    anchor{Numbers: []string{"1"}, Punctuation: "?"},
+			b:    anchor{Numbers: []string{"1"}, Punctuation: "."},
+			want: 0.8888888888888889,
+		},
+		{
+			name: "every_feature_present_and_only_the_punctuation_shared",
+			desc: "all four weights are in the denominator, so the score is the punctuation weight itself",
+			a:    anchor{Numbers: []string{"1"}, ProperNouns: []string{"Aa"}, Cognates: []string{"aaaa"}, Punctuation: "?"},
+			b:    anchor{Numbers: []string{"2"}, ProperNouns: []string{"Bb"}, Cognates: []string{"bbbb"}, Punctuation: "?"},
+			want: 0.05,
+		},
+		{
+			name: "no_features_on_either_side",
+			desc: "nothing matched and nothing was matchable",
+			a:    anchor{},
+			b:    anchor{},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a, b := tt.a, tt.b
+			got := anchorMatchScore(&a, &b)
+			if math.Abs(got-tt.want) > scoreTol {
+				t.Errorf("anchorMatchScore(%+v, %+v) = %v, want %v (%s)",
+					tt.a, tt.b, got, tt.want, tt.desc)
 			}
 		})
 	}
