@@ -1178,13 +1178,13 @@ describe("security dialog: API keys", () => {
 
   it("shows the new key exactly once, in full", async () => {
     asks.answers = ["CI runner"];
-    client.generateResult = { ok: true, data: { key: "sfx_live_abc123" } };
+    client.generateResult = { ok: true, data: { key: "not-a-real-key" } };
     await openSecurity();
 
     button("Generate API key").click();
     await settle();
 
-    expect(req(".sec-new-key code").textContent).toBe("sfx_live_abc123");
+    expect(req(".sec-new-key code").textContent).toBe("not-a-real-key");
   });
 
   it("announces the new key and takes focus so it cannot be missed", async () => {
@@ -1216,7 +1216,7 @@ describe("security dialog: API keys", () => {
 
   it("copies the new key to the clipboard", async () => {
     asks.answers = ["CI runner"];
-    client.generateResult = { ok: true, data: { key: "sfx_live_abc123" } };
+    client.generateResult = { ok: true, data: { key: "not-a-real-key" } };
     await openSecurity();
     button("Generate API key").click();
     await settle();
@@ -1224,7 +1224,7 @@ describe("security dialog: API keys", () => {
     button("Copy").click();
     await settle();
 
-    expect(clip.writes).toEqual(["sfx_live_abc123"]);
+    expect(clip.writes).toEqual(["not-a-real-key"]);
   });
 
   it("confirms a successful copy", async () => {
