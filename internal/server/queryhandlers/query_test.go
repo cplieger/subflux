@@ -8,44 +8,44 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 var errMock = errors.New("mock error")
 
 // mockQueryStore implements QueryStore for testing. It records the last
-// *api.StateQuery passed to GetState so tests can assert the limit/offset
+// *subflux.StateQuery passed to State so tests can assert the limit/offset
 // guards HandleState applies before querying, and the last type/prefix
-// passed to GetBackoffByPrefix.
+// passed to BackoffByPrefix.
 type mockQueryStore struct {
 	err            error
-	lastState      *api.StateQuery
-	lastPrefixType api.MediaType
+	lastState      *subflux.StateQuery
+	lastPrefixType subflux.MediaType
 	lastPrefix     string
-	stateEntries   []api.StateEntry
-	backoffItems   []api.BackoffEntry
-	manualLocks    []api.ManualLockEntry
+	stateEntries   []subflux.StateEntry
+	backoffItems   []subflux.BackoffEntry
+	manualLocks    []subflux.ManualLockEntry
 	downloads      int
 	attempts       int
 }
 
-func (m *mockQueryStore) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
+func (m *mockQueryStore) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
 	cp := *q
 	m.lastState = &cp
 	return m.stateEntries, m.err
 }
 
-func (m *mockQueryStore) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
+func (m *mockQueryStore) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
 	return m.backoffItems, m.err
 }
 
-func (m *mockQueryStore) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, prefix string) ([]api.BackoffEntry, error) {
+func (m *mockQueryStore) BackoffByPrefix(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.BackoffEntry, error) {
 	m.lastPrefixType = mediaType
 	m.lastPrefix = prefix
 	return m.backoffItems, m.err
 }
 
-func (m *mockQueryStore) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
+func (m *mockQueryStore) ManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	return m.manualLocks, m.err
 }
 
@@ -59,7 +59,7 @@ func TestHandleState(t *testing.T) {
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
 		h := New(Deps{
-			QueryDB: &mockQueryStore{stateEntries: []api.StateEntry{{
+			QueryDB: &mockQueryStore{stateEntries: []subflux.StateEntry{{
 				ID: 1, MediaType: "movie", MediaID: "tt123",
 				Language: "fr", Provider: "os", Score: 200,
 			}}},
@@ -73,7 +73,7 @@ func TestHandleState(t *testing.T) {
 		if ct := w.Header().Get("Content-Type"); ct != "application/json" {
 			t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 		}
-		var entries []api.StateEntry
+		var entries []subflux.StateEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -110,6 +110,9 @@ func TestHandleState(t *testing.T) {
 		h := New(Deps{QueryDB: store})
 		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=3", nil)
 		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState == nil {
+			t.Fatal("HandleState did not reach the store, so there is no query to inspect")
+		}
 		if store.lastState.Offset != 3 {
 			t.Errorf("offset=3 produced Offset=%d, want 3", store.lastState.Offset)
 		}
@@ -121,6 +124,9 @@ func TestHandleState(t *testing.T) {
 		h := New(Deps{QueryDB: store})
 		req := httptest.NewRequest(http.MethodGet, "/api/state?offset=-5", nil)
 		h.HandleState(httptest.NewRecorder(), req)
+		if store.lastState == nil {
+			t.Fatal("HandleState did not reach the store, so there is no query to inspect")
+		}
 		if store.lastState.Offset != 0 {
 			t.Errorf("offset=-5 produced Offset=%d, want 0 (only positive offsets apply)", store.lastState.Offset)
 		}
@@ -153,14 +159,17 @@ func TestHandleState(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
 		}
+		if store.lastState == nil {
+			t.Fatal("HandleState answered 200 without reaching the store, so there is no query to inspect")
+		}
 		if store.lastState.MediaType != "episode" {
-			t.Errorf("GetState mediaType = %q, want %q", store.lastState.MediaType, "episode")
+			t.Errorf("State mediaType = %q, want %q", store.lastState.MediaType, "episode")
 		}
 		if store.lastState.Language != "fr" {
-			t.Errorf("GetState language = %q, want %q", store.lastState.Language, "fr")
+			t.Errorf("State language = %q, want %q", store.lastState.Language, "fr")
 		}
 		if string(store.lastState.Provider) != "os" {
-			t.Errorf("GetState provider = %q, want %q", store.lastState.Provider, "os")
+			t.Errorf("State provider = %q, want %q", store.lastState.Provider, "os")
 		}
 	})
 }
@@ -209,7 +218,7 @@ func TestHandleBackoff(t *testing.T) {
 
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
-		h := New(Deps{QueryDB: &mockQueryStore{backoffItems: []api.BackoffEntry{
+		h := New(Deps{QueryDB: &mockQueryStore{backoffItems: []subflux.BackoffEntry{
 			{MediaType: "movie", MediaID: "tt123", Language: "fr", Failures: 3},
 		}}})
 		req := httptest.NewRequest(http.MethodGet, "/api/backoff", nil)
@@ -218,7 +227,7 @@ func TestHandleBackoff(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
 		}
-		var entries []api.BackoffEntry
+		var entries []subflux.BackoffEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -255,8 +264,11 @@ func TestHandleLocks(t *testing.T) {
 
 	t.Run("returns_entries_on_GET", func(t *testing.T) {
 		t.Parallel()
-		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []api.ManualLockEntry{
-			{MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr", Count: 2},
+		h := New(Deps{QueryDB: &mockQueryStore{manualLocks: []subflux.ManualLockEntry{
+			{
+				MediaType: "episode", MediaID: "tt456-s01e01", Language: "fr",
+				Count: 2,
+			},
 		}}})
 		req := httptest.NewRequest(http.MethodGet, "/api/locks", nil)
 		w := httptest.NewRecorder()
@@ -264,7 +276,7 @@ func TestHandleLocks(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
 		}
-		var entries []api.ManualLockEntry
+		var entries []subflux.ManualLockEntry
 		if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
@@ -318,10 +330,10 @@ func TestHandleBackoffByPrefix(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.HandleBackoffByPrefix(w, req)
 		if w.Code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 		if store.lastPrefixType != "episode" {
-			t.Errorf("GetBackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "episode")
+			t.Errorf("BackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "episode")
 		}
 	})
 
@@ -333,13 +345,13 @@ func TestHandleBackoffByPrefix(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.HandleBackoffByPrefix(w, req)
 		if w.Code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", w.Code)
+			t.Errorf("status = %d, want 200", w.Code)
 		}
 		if store.lastPrefixType != "movie" {
-			t.Errorf("GetBackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "movie")
+			t.Errorf("BackoffByPrefix mediaType = %q, want %q", store.lastPrefixType, "movie")
 		}
 		if store.lastPrefix != "tmdb-123-" {
-			t.Errorf("GetBackoffByPrefix prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
+			t.Errorf("BackoffByPrefix prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
 		}
 	})
 

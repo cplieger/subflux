@@ -7,7 +7,6 @@ package server
 import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // scanDeps builds the scanning.Deps from Server fields.
@@ -20,16 +19,16 @@ func (s *Server) scanDeps() *scanning.Deps {
 		DB:            s.db,
 		Backoff:       s.db,
 		Metrics:       s.metrics,
-		Events:        &serveradapter.ScanEventAdapter{E: s.events},
-		Activity:      &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:        &serveradapter.AlertAdapter{A: s.alerts},
+		Events:        s.events,
+		Activity:      s.activity,
+		Alerts:        s.alerts,
 		ShowSkipCache: s.showSkipCache,
-		ClearCaches:   provider.ClearProviderCaches,
+		ClearCaches:   provider.ClearCaches,
 	}
 }
 
 // scanLiveState converts the server's liveState to scanning.LiveState.
-func (s *Server) scanLiveState(ls *liveState) *scanning.LiveState {
+func scanLiveState(ls *liveState) *scanning.LiveState {
 	return &scanning.LiveState{
 		Cfg:         ls.cfg,
 		Engine:      ls.engine,

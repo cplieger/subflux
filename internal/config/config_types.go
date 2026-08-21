@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/cplieger/slogx"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/webhttp/v2"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -57,17 +58,17 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 // Config is the top-level configuration.
 type Config struct {
 	// ruleIndex maps audio language code to its index in Languages.Rules for O(1) lookup.
-	ruleIndex map[string]int
-	Providers map[api.ProviderID]yamlProviderCfg `yaml:"providers"`
-	Scoring   ScoringConfig                      `yaml:"scoring"`
-	// cachedRuleTargets maps audio language to pre-computed []api.SubtitleTarget.
-	cachedRuleTargets map[string][]api.SubtitleTarget
-	// cachedProviderConfigs is the pre-computed result of ProviderConfigs().
-	cachedProviderConfigs map[api.ProviderID]api.ProviderCfg
-	Sonarr                yamlArrConfig `yaml:"sonarr"`
-	Radarr                yamlArrConfig `yaml:"radarr"`
-	Logging               LoggingConfig `yaml:"logging"`
-	Languages             LanguageRules `yaml:"languages"`
+	ruleIndex    map[string]int
+	ProvidersCfg map[subflux.ProviderID]yamlProviderCfg `yaml:"providers"`
+	Scoring      ScoringConfig                          `yaml:"scoring"`
+	// cachedRuleTargets maps audio language to pre-computed []subflux.SubtitleTarget.
+	cachedRuleTargets map[string][]subflux.SubtitleTarget
+	// cachedProviders is the pre-computed result of Providers().
+	cachedProviders map[subflux.ProviderID]subflux.ProviderCfg
+	SonarrCfg       yamlArrConfig `yaml:"sonarr"`
+	RadarrCfg       yamlArrConfig `yaml:"radarr"`
+	Logging         LoggingConfig `yaml:"logging"`
+	Languages       LanguageRules `yaml:"languages"`
 	// cachedLangCodes is the pre-computed result of LanguageCodes().
 	cachedLangCodes []string
 	MediaRootDirs   []string `yaml:"media_roots"`
@@ -81,7 +82,7 @@ type Config struct {
 	// healthcheck keeps working). Empty (the default) accepts any Host.
 	AllowedHosts []string `yaml:"allowed_hosts"`
 	// cachedDefaultTargets is the pre-computed default targets.
-	cachedDefaultTargets []api.SubtitleTarget
+	cachedDefaultTargets []subflux.SubtitleTarget
 	// cachedRoots holds pre-opened *os.Root handles for media_roots,
 	// eliminating per-request OpenRoot syscalls.
 	cachedRoots []*os.Root
@@ -93,7 +94,7 @@ type Config struct {
 	cachedHostPolicy  *webhttp.HostPolicy
 	Auth              yamlAuthConfig        `yaml:"auth"`
 	Backup            yamlBackupConfig      `yaml:"backup"`
-	SearchCfg         yamlSearchConfig      `yaml:"search"`
+	Cfg               yamlSearchConfig      `yaml:"search"`
 	AdaptiveCfg       yamlAdaptiveConfig    `yaml:"adaptive"`
 	PostProcessing    yamlPostProcessConfig `yaml:"post_processing"`
 	EmbeddedSubtitles yamlEmbeddedConfig    `yaml:"embedded_subtitles"`
@@ -117,34 +118,62 @@ type AudioRule struct {
 	Subtitles []yamlSubtitleTarget `yaml:"subtitles"` // What to download
 }
 
-// yamlSubtitleTarget is the internal yaml-tagged version of api.SubtitleTarget.
+// yamlSubtitleTarget is the internal yaml-tagged version of subflux.SubtitleTarget.
 type yamlSubtitleTarget struct {
-	MinScore  *int             `yaml:"min_score,omitempty"`
-	Code      string           `yaml:"code"`
-	Variant   string           `yaml:"variant,omitempty"`
-	Variants  []string         `yaml:"variants,omitempty"`
-	Providers []api.ProviderID `yaml:"providers,omitempty"`
-	Exclude   []api.ProviderID `yaml:"exclude,omitempty"`
+	MinScore  *int                 `yaml:"min_score,omitempty"`
+	Code      string               `yaml:"code"`
+	Variant   string               `yaml:"variant,omitempty"`
+	Variants  []string             `yaml:"variants,omitempty"`
+	Providers []subflux.ProviderID `yaml:"providers,omitempty"`
+	Exclude   []subflux.ProviderID `yaml:"exclude,omitempty"`
 }
 
-// toAPI converts a yamlSubtitleTarget to an api.SubtitleTarget.
-func (t *yamlSubtitleTarget) toAPI() api.SubtitleTarget {
-	return api.SubtitleTarget{
-		MinScore:  t.MinScore,
+// toAPI converts a yamlSubtitleTarget to an subflux.SubtitleTarget.
+func (t *yamlSubtitleTarget) toAPI() subflux.SubtitleTarget {
+	return subflux.SubtitleTarget{
+		MinScore:  clonePtr(t.MinScore),
 		Code:      t.Code,
-		Variant:   api.Variant(t.Variant),
-		Variants:  t.Variants,
-		Providers: t.Providers,
-		Exclude:   t.Exclude,
+		Variant:   subflux.Variant(t.Variant),
+		Variants:  slices.Clone(t.Variants),
+		Providers: slices.Clone(t.Providers),
+		Exclude:   slices.Clone(t.Exclude),
 	}
 }
 
-// targetsToAPI converts a slice of yamlSubtitleTarget to api.SubtitleTarget.
-func targetsToAPI(targets []yamlSubtitleTarget) []api.SubtitleTarget {
+// clonePtr returns a pointer to a copy of *p, or nil for a nil p, so a target
+// handed to a caller shares no pointee with the config it came from.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	return new(*p)
+}
+
+// cloneTargets deep-copies a target slice: every field that is a reference
+// (the min-score pointer and the three string/ID slices) is copied too, so a
+// caller cannot reach back into the loaded config through one. It preserves
+// the nil/empty distinction nonNilTargets exists for.
+func cloneTargets(targets []subflux.SubtitleTarget) []subflux.SubtitleTarget {
 	if targets == nil {
 		return nil
 	}
-	out := make([]api.SubtitleTarget, len(targets))
+	out := make([]subflux.SubtitleTarget, len(targets))
+	for i := range targets {
+		out[i] = targets[i]
+		out[i].MinScore = clonePtr(targets[i].MinScore)
+		out[i].Variants = slices.Clone(targets[i].Variants)
+		out[i].Providers = slices.Clone(targets[i].Providers)
+		out[i].Exclude = slices.Clone(targets[i].Exclude)
+	}
+	return out
+}
+
+// targetsToAPI converts a slice of yamlSubtitleTarget to subflux.SubtitleTarget.
+func targetsToAPI(targets []yamlSubtitleTarget) []subflux.SubtitleTarget {
+	if targets == nil {
+		return nil
+	}
+	out := make([]subflux.SubtitleTarget, len(targets))
 	for i := range targets {
 		out[i] = targets[i].toAPI()
 	}
@@ -188,7 +217,7 @@ type yamlSearchConfig struct {
 
 // ScoringConfig allows users to customize scoring weights.
 type ScoringConfig struct {
-	Weights *api.Scores `yaml:"weights,omitempty"`
+	Weights *subflux.Scores `yaml:"weights,omitempty"`
 }
 
 // yamlAdaptiveConfig controls adaptive search backoff (yaml-tagged).
@@ -201,7 +230,7 @@ type yamlAdaptiveConfig struct {
 }
 
 // LogLevel is a typed string for log verbosity levels.
-type LogLevel = api.LogLevel
+type LogLevel = subflux.LogLevel
 
 // LogLevel constants for the supported log verbosity levels.
 const (
@@ -223,7 +252,7 @@ func ValidLogLevel(l LogLevel) bool {
 // LogFormat is a typed string for log output formats. The recognized values
 // are owned by slogx.ParseFormat (see ValidLogFormat), not by a local
 // vocabulary.
-type LogFormat = api.LogFormat
+type LogFormat = subflux.LogFormat
 
 // ValidLogFormat returns true if the format is a recognized value, judged by
 // slogx.ParseFormat — the same case-insensitive, trimming normalization

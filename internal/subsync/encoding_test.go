@@ -8,6 +8,11 @@ import (
 	"pgregory.net/rapid"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. The switch arms below are mutually exclusive, so
+// an arm holding a single assertion keeps t.Fatalf — there is no sibling on
+// that path for an abort to hide.
+
 func TestNormalizeEncoding(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -55,7 +60,7 @@ func TestNormalizeEncoding(t *testing.T) {
 				}
 			case tt.wantValidUTF:
 				if !utf8.Valid(got) {
-					t.Fatalf("produced invalid UTF-8: %x", got)
+					t.Errorf("produced invalid UTF-8: %x", got)
 				}
 				if tt.wantContains != "" && !bytes.Contains(got, []byte(tt.wantContains)) {
 					t.Fatalf("output %x missing %q", got, tt.wantContains)

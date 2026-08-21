@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/server/activity"
 )
 
@@ -27,7 +27,7 @@ import (
 func (h *Handler) scanEpisodes(ctx context.Context, stop <-chan struct{}, actID string,
 	op *opState, series *arrapi.Series, label string, filterEp func(*arrapi.Episode) bool,
 ) activity.Outcome {
-	episodes, err := op.st.Sonarr.GetEpisodes(ctx, series.ID)
+	episodes, err := op.st.Sonarr.Episodes(ctx, series.ID)
 	if err != nil {
 		slog.Error("scan: failed to fetch episodes",
 			"series", series.Title, "error", err)
@@ -172,7 +172,7 @@ func (h *Handler) runEpisodeScans(ctx context.Context, stop <-chan struct{},
 func (h *Handler) scanSingleEpisode(ctx context.Context, stop <-chan struct{}, actID string,
 	op *opState, series *arrapi.Series, seasonNum, episodeNum int,
 ) activity.Outcome {
-	episodes, err := op.st.Sonarr.GetEpisodes(ctx, series.ID)
+	episodes, err := op.st.Sonarr.Episodes(ctx, series.ID)
 	if err != nil {
 		slog.Error("scan episode: failed to fetch episodes",
 			"series", series.Title, "error", err)
@@ -247,8 +247,8 @@ func (h *Handler) runMovieScan(ctx context.Context, stop <-chan struct{}, actID 
 	}
 	defer h.deps.ScanGuard.Release()
 
-	origLang := api.OriginalLangCode(movie.OriginalLanguage)
-	audioLangs := api.AudioLanguages(movie.MovieFile.MediaInfo)
+	origLang := arrsvc.OriginalLangCode(movie.OriginalLanguage)
+	audioLangs := arrsvc.AudioLanguages(movie.MovieFile.MediaInfo)
 	targets := op.st.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 	total := len(targets)
 

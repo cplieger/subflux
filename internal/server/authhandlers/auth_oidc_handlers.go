@@ -9,9 +9,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/oidc ---
@@ -21,41 +23,37 @@ import (
 func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 	oidcProv := h.OIDCResolver()
 	if oidcProv == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "OIDC not configured")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "OIDC not configured")
 		return
 	}
 
-	state, err := authoidc.GenerateState()
-	if err != nil {
-		slog.Error("oidc: generate state", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
+	// These three cannot fail: the library's generators read crypto/rand, whose
+	// Read is documented never to return an error, so v4 dropped the always-nil
+	// error rather than making every caller write a branch it cannot reach.
+	state := authoidc.GenerateState()
 
-	nonce, err := authoidc.GenerateState()
-	if err != nil {
-		slog.Error("oidc: generate nonce", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
+	// The library mints only one flavour of opaque random; the nonce is that
+	// value retyped for its role, so the conversion is written once, here at
+	// the mint, and every hop afterwards is compiler-checked.
+	nonce := authoidc.Nonce(authoidc.GenerateState())
 
-	verifier, challenge, err := authoidc.GeneratePKCE()
-	if err != nil {
-		slog.Error("oidc: generate PKCE", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
+	verifier, challenge := authoidc.GeneratePKCE()
 
 	redirectURI := auth.ValidateRedirectURI(r.URL.Query().Get("redirect"))
 
 	ctx := r.Context()
 	if err := h.OidcDB.CreateOIDCState(ctx, state, nonce, verifier, redirectURI); err != nil {
 		slog.Error("oidc: store state", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	authURL := oidcProv.AuthorizationURL(state, nonce, challenge)
+	authURL, urlErr := oidcProv.AuthorizationURL(state, nonce, challenge)
+	if urlErr != nil {
+		slog.Error("oidc: build authorization URL", "error", urlErr)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
+		return
+	}
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
@@ -67,13 +65,13 @@ func (h *Handler) HandleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	oidcProv := h.OIDCResolver()
 	if oidcProv == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "OIDC not configured")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "OIDC not configured")
 		return
 	}
 
 	q := r.URL.Query()
-	stateParam := q.Get("state")
-	code := q.Get("code")
+	stateParam := authoidc.State(q.Get("state"))
+	code := authoidc.Code(q.Get("code"))
 
 	if errParam := q.Get("error"); errParam != "" {
 		desc := q.Get("error_description")
@@ -81,12 +79,12 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			slog.String("reason", "provider_error"),
 			slog.String("error", errParam),
 			slog.String("description", desc))
-		api.UnauthorizedC(w, r, api.CodeOIDCExchangeFailed, "authentication failed")
+		httpapi.UnauthorizedC(w, r, subflux.CodeOIDCExchangeFailed, "authentication failed")
 		return
 	}
 
 	if stateParam == "" || code == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing state or code")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing state or code")
 		return
 	}
 
@@ -96,7 +94,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
 			slog.String("reason", "invalid_state"))
-		api.UnauthorizedC(w, r, api.CodeOIDCStateInvalid, "invalid or expired state")
+		httpapi.UnauthorizedC(w, r, subflux.CodeOIDCStateInvalid, "invalid or expired state")
 		return
 	}
 
@@ -104,7 +102,7 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
 			slog.String("reason", "exchange_failed"))
-		api.UnauthorizedC(w, r, api.CodeOIDCExchangeFailed, "authentication failed")
+		httpapi.UnauthorizedC(w, r, subflux.CodeOIDCExchangeFailed, "authentication failed")
 		return
 	}
 
@@ -113,10 +111,10 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errOIDCLinkNoPassword) {
 			Audit(r, slog.LevelWarn, AuditOIDCCallback, false, "",
 				slog.String("reason", "username_conflict_no_password"))
-			api.ConflictC(w, r, api.CodeConflict, "an account with this username already exists")
+			httpapi.ConflictC(w, r, subflux.CodeConflict, "an account with this username already exists")
 			return
 		}
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "oidc resolve user")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "oidc resolve user")
 		return
 	}
 	if linkToken != "" {
@@ -132,13 +130,13 @@ func (h *Handler) HandleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if !user.Enabled {
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
 			slog.String("reason", "account_disabled"))
-		api.ForbiddenC(w, r, api.CodeAuthAccountDisabled, "account disabled")
+		httpapi.ForbiddenC(w, r, subflux.CodeAuthAccountDisabled, "account disabled")
 		return
 	}
 
 	if err := h.createAndSetSession(w, r, user, auth.MethodOIDC, oidcExpiry); err != nil {
 		slog.Error("oidc: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -162,7 +160,7 @@ var errOIDCLinkNoPassword = errors.New("oidc: username conflict with passwordles
 // Email and username are never used to auto-link; that is an account-takeover
 // vector. A username collision triggers an explicit, password-proven link.
 func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims) (user *auth.User, linkToken string, err error) {
-	bySub, found, err := h.OidcDB.GetUserByOIDCSub(ctx, claims.Issuer, claims.Subject)
+	bySub, found, err := h.OidcDB.UserByOIDCSub(ctx, claims.Issuer, claims.Subject)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by sub: %w", err)
 	}
@@ -174,7 +172,7 @@ func (h *Handler) resolveOrLinkOIDC(ctx context.Context, claims *authoidc.Claims
 	if username == "" {
 		username = claims.Email
 	}
-	byName, found, err := h.OidcDB.GetUserByUsername(ctx, username)
+	byName, found, err := h.OidcDB.UserByUsername(ctx, username)
 	if err != nil {
 		return nil, "", fmt.Errorf("lookup by username: %w", err)
 	}
@@ -228,35 +226,37 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 
 	pending, ok := h.Ceremonies.Link.LoadAndDelete(req.LinkToken)
 	if !ok || time.Since(pending.CreatedAt) > CeremonyTTL {
-		api.UnauthorizedC(w, r, api.CodeAuthSessionInvalid, "invalid or expired link token")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthSessionInvalid, "invalid or expired link token")
 		return
 	}
 
 	ctx := r.Context()
-	user, found, err := h.Store.GetUserByID(ctx, pending.UserID)
+	user, found, err := h.Store.UserByID(ctx, pending.UserID)
 	if err != nil || !found {
 		slog.Error("oidc link: user lookup", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	ip := ClientIP(r)
-	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(user.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
 		return
 	}
 
 	okPass, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !okPass {
-		h.RateLimiter.Record(ip, user.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditOIDCCallback, false, user.Username,
 			slog.String("reason", "link_password_invalid"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
-	h.RateLimiter.Reset(ip, user.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 
 	// Link-on-login is a MIGRATION to SSO governance: it removes the local
 	// password and passkeys so the IdP becomes the sole control point. Never
@@ -266,10 +266,10 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	defer h.migrateMu.Unlock()
 	if last, lerr := h.isLastLocalAdmin(ctx, user); lerr != nil {
 		slog.Error("oidc link: admin check", "error", lerr)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	} else if last {
-		api.ConflictC(w, r, api.CodeConflict,
+		httpapi.ConflictC(w, r, subflux.CodeConflict,
 			"cannot switch the last local admin to SSO-only; keep a break-glass admin or reset via the CLI")
 		return
 	}
@@ -280,14 +280,14 @@ func (h *Handler) HandleOIDCLink(w http.ResponseWriter, r *http.Request) {
 	user.UpdatedAt = time.Now()
 	if err := h.Store.UpdateUser(ctx, user); err != nil {
 		slog.Error("oidc link: update user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	h.clearPasskeys(ctx, user.ID)
 
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodOIDC); err != nil {
 		slog.Error("oidc link: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	slog.Info("oidc: account linked", "username", user.Username)
@@ -318,13 +318,13 @@ func (h *Handler) isLastLocalAdmin(ctx context.Context, u *auth.User) (bool, err
 // clearPasskeys removes all of a user's passkeys (best-effort) so that an
 // OIDC-migrated account retains no local login method.
 func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
-	passkeys, err := h.Store.GetPasskeysByUserID(ctx, userID)
+	passkeys, err := h.Store.PasskeysByUserID(ctx, userID)
 	if err != nil {
 		slog.Warn("oidc link: list passkeys", "error", err)
 		return
 	}
 	for i := range passkeys {
-		if derr := h.Store.DeletePasskey(ctx, passkeys[i].ID, userID); derr != nil {
+		if derr := h.Store.DeletePasskey(ctx, auth.PasskeyRef{ID: passkeys[i].ID, UserID: userID}); derr != nil {
 			slog.Warn("oidc link: delete passkey", "error", derr)
 		}
 	}
@@ -336,22 +336,22 @@ func (h *Handler) clearPasskeys(ctx context.Context, userID int64) {
 // It refuses if doing so would leave the account with no way to log in (no
 // password and no passkey), mirroring the disable-password lockout guard.
 func (h *Handler) HandleOIDCUnlink(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 	ctx := r.Context()
 
 	if user.OIDCSub == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "no OIDC account linked")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "no OIDC account linked")
 		return
 	}
 	if user.PasswordHash == "" {
 		passkeys, err := h.Store.PasskeyCountForUser(ctx, user.ID)
 		if err != nil {
 			slog.Error("oidc unlink: passkey count", "error", err)
-			api.InternalErrorC(w, r, nil, api.CodeInternalError)
+			httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 			return
 		}
 		if passkeys == 0 {
-			api.ConflictC(w, r, api.CodeConflict, "cannot unlink: set a password or add a passkey first")
+			httpapi.ConflictC(w, r, subflux.CodeConflict, "cannot unlink: set a password or add a passkey first")
 			return
 		}
 	}
@@ -361,9 +361,9 @@ func (h *Handler) HandleOIDCUnlink(w http.ResponseWriter, r *http.Request) {
 	user.UpdatedAt = time.Now()
 	if err := h.Store.UpdateUser(ctx, user); err != nil {
 		slog.Error("oidc unlink: update user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	slog.Info("oidc: account unlinked", "username", user.Username)
-	api.Ok(w)
+	httpapi.Ok(w)
 }

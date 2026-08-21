@@ -3,10 +3,11 @@ package provider
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestRegister_and_LoadAll(t *testing.T) {
@@ -14,12 +15,12 @@ func TestRegister_and_LoadAll(t *testing.T) {
 	r := NewRegistry()
 
 	called := false
-	r.Register("test", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("test", func(_ context.Context, _ map[string]any) (Provider, error) {
 		called = true
 		return &fakeProvider{name: "test"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: true, Settings: map[string]any{"key": "val"}},
 	})
 	if err != nil {
@@ -39,15 +40,15 @@ func TestRegister_and_LoadAll(t *testing.T) {
 func TestLoadAll_skips_disabled(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("disabled", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("disabled", func(_ context.Context, _ map[string]any) (Provider, error) {
 		t.Fatal("factory should not be called for disabled provider")
 		return nil, nil
 	})
-	r.Register("enabled", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("enabled", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "enabled"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"disabled": {Enabled: false},
 		"enabled":  {Enabled: true},
 	})
@@ -66,7 +67,7 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"unknown": {Enabled: true},
 	})
 	// Unknown provider is skipped with a warning; zero providers loading is
@@ -82,11 +83,11 @@ func TestLoadAll_unknown_provider_skipped(t *testing.T) {
 func TestLoadAll_unknown_provider_with_valid(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("good", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("good", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "good"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"good":    {Enabled: true},
 		"unknown": {Enabled: true},
 	})
@@ -102,11 +103,11 @@ func TestLoadAll_factory_error(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 	cause := errors.New("init failed")
-	r.Register("broken", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("broken", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, cause
 	})
 
-	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"broken": {Enabled: true},
 	})
 	if err == nil {
@@ -123,14 +124,14 @@ func TestLoadAll_factory_error(t *testing.T) {
 func TestLoadAll_partial_success(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	r.Register("good", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("good", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "good"}, nil
 	})
-	r.Register("broken", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("broken", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, errors.New("init failed")
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"good":   {Enabled: true},
 		"broken": {Enabled: true},
 	})
@@ -152,7 +153,7 @@ func TestLoadAll_no_providers_loaded(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: false},
 	})
 	// All-disabled is a deliberate, valid state after the embedded-detector
@@ -169,7 +170,7 @@ func TestLoadAll_empty_config(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{})
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{})
 	if err != nil {
 		t.Fatalf("LoadAll() unexpected error: %v", err)
 	}
@@ -181,13 +182,13 @@ func TestLoadAll_empty_config(t *testing.T) {
 func TestLoadAll_deterministic_order(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
-		r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	for _, name := range []subflux.ProviderID{"zeta", "alpha", "mid"} {
+		r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(name)}, nil
 		})
 	}
 
-	cfg := map[api.ProviderID]api.ProviderCfg{
+	cfg := map[subflux.ProviderID]subflux.ProviderCfg{
 		"zeta":  {Enabled: true},
 		"alpha": {Enabled: true},
 		"mid":   {Enabled: true},
@@ -220,7 +221,7 @@ func TestRegister_panics_empty_name(t *testing.T) {
 			t.Fatal("Register(\"\", f) did not panic")
 		}
 	}()
-	r.Register("", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return nil, nil
 	})
 }
@@ -242,13 +243,13 @@ func TestLoadAll_passes_settings_to_factory(t *testing.T) {
 	r := NewRegistry()
 
 	var got map[string]any
-	r.Register("test", func(_ context.Context, s map[string]any) (api.Provider, error) {
+	r.Register("test", func(_ context.Context, s map[string]any) (Provider, error) {
 		got = s
 		return &fakeProvider{name: "test"}, nil
 	})
 
 	want := map[string]any{"user": "alice", "pass": "secret"}
-	_, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	_, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"test": {Enabled: true, Settings: want},
 	})
 	if err != nil {
@@ -268,14 +269,14 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
 
-	r.Register("dup", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("dup", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "first"}, nil
 	})
-	r.Register("dup", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	r.Register("dup", func(_ context.Context, _ map[string]any) (Provider, error) {
 		return &fakeProvider{name: "second"}, nil
 	})
 
-	providers, err := r.LoadAll(t.Context(), map[api.ProviderID]api.ProviderCfg{
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
 		"dup": {Enabled: true},
 	})
 	if err != nil {
@@ -294,7 +295,7 @@ func TestRegister_overwrites_duplicate(t *testing.T) {
 func TestRegisterSchema_and_Schema(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	fields := []api.ProviderSchemaField{
+	fields := []subflux.ProviderSchemaField{
 		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
 		{Key: "enabled", Label: "Enabled", Type: "bool", Default: "true"},
 	}
@@ -309,6 +310,35 @@ func TestRegisterSchema_and_Schema(t *testing.T) {
 	}
 	if got[0].Key != "api_key" {
 		t.Errorf("Schema(\"test\")[0].Key = %q, want %q", got[0].Key, "api_key")
+	}
+}
+
+// The registry is built once at boot and read by the settings-UI handler on
+// every request, so a caller that sorts or rewrites the returned fields in
+// place would be rewriting what every later request renders. One level of clone
+// is the whole copy: ProviderSchemaField holds five strings and a bool and no
+// reference type.
+func TestSchema_copies_fields_on_return(t *testing.T) {
+	t.Parallel()
+	r := NewRegistry()
+	r.RegisterSchema("test", "Test Provider", []subflux.ProviderSchemaField{
+		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
+		{Key: "enabled", Label: "Enabled", Type: "bool", Default: "true"},
+	})
+
+	_, got := r.Schema("test")
+	if len(got) != 2 {
+		t.Fatalf("Schema(\"test\") returned %d fields, want 2", len(got))
+	}
+	got[0] = subflux.ProviderSchemaField{Key: "tampered", Secret: false}
+	got[1].Label = "tampered"
+
+	_, after := r.Schema("test")
+	if after[0].Key != "api_key" || !after[0].Secret {
+		t.Errorf("field[0] = %+v, want api_key/secret (caller edited the live schema)", after[0])
+	}
+	if after[1].Label != "Enabled" {
+		t.Errorf("field[1].Label = %q, want %q (caller edited the live schema)", after[1].Label, "Enabled")
 	}
 }
 
@@ -328,9 +358,9 @@ func TestSchema_unknown_provider(t *testing.T) {
 func TestProviderNames_sorted(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry()
-	for _, name := range []api.ProviderID{"zeta", "alpha", "mid"} {
+	for _, name := range []subflux.ProviderID{"zeta", "alpha", "mid"} {
 		n := name
-		r.Register(n, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+		r.Register(n, func(_ context.Context, _ map[string]any) (Provider, error) {
 			return &fakeProvider{name: string(n)}, nil
 		})
 	}
@@ -359,17 +389,36 @@ func TestProviderNames_empty_registry(t *testing.T) {
 
 // --- Test Helpers ---
 
-// fakeProvider implements api.Provider for testing.
+// fakeProvider implements Provider for testing.
 type fakeProvider struct {
 	name string
 }
 
-func (f *fakeProvider) Name() api.ProviderID { return api.ProviderID(f.name) }
+func (f *fakeProvider) Name() subflux.ProviderID { return subflux.ProviderID(f.name) }
 
-func (f *fakeProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (f *fakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *fakeProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (f *fakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
+}
+
+// Mechanical pin for the C14 deletion. The two things removed were a
+// declaration and a comment, so neither the compiler nor a linter can hold
+// them: `var _ = FactoryFunc(nil)` asserted nothing (a declared type is always
+// a valid type) and the doc above it described a `providerFactories` symbol
+// that has never existed in this package. A doc comment naming a symbol the
+// package does not declare is the defect; only a source scan sees it.
+func TestRegistrySource_noVacuousAssertionOrOrphanedDoc(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("registry.go")
+	if err != nil {
+		t.Fatalf("read registry.go: %v", err)
+	}
+	for _, dead := range []string{"providerFactories", "var _ = FactoryFunc("} {
+		if strings.Contains(string(src), dead) {
+			t.Errorf("registry.go still contains %q", dead)
+		}
+	}
 }

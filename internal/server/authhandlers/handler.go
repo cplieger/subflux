@@ -10,17 +10,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	"github.com/cplieger/auth/v3/ratelimit"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/authstore"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/webhttp/v2"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-// AuthConfig is the narrow interface consumed by auth handlers for
-// configuration access. Mirrors the auth-related subset of api.ConfigProvider.
+// AuthConfig is the authentication half of the configuration, and the only
+// part these handlers read: whether password login is on at all, whether a new
+// password must be checked against the breach corpus, and whether OIDC is
+// available as an alternative factor. 3 of the 37 values the config offers.
+//
+// Exported because the composition root names it: the Config resolver below is
+// how the handlers see a hot-reloaded config, and the root has to write that
+// function's type.
 type AuthConfig interface {
 	BasicAuthEnabled() bool
 	CheckBreachedPasswords() bool
@@ -30,7 +36,7 @@ type AuthConfig interface {
 // Handler holds all dependencies for the auth handler family.
 // Constructed by the server package and stored on the Server struct.
 type Handler struct {
-	Store       authstore.AuthStore
+	Store       AccountStore
 	AdminDB     AuthAdminStore
 	SecDB       SecurityStore
 	OidcDB      OIDCStore
@@ -82,7 +88,7 @@ const (
 func decodeAuthBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	var v T
 	if err := webhttp.DecodeJSONInto(w, r, &v, maxAuthBodySize); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid request body")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid request body")
 		return v, false
 	}
 	return v, true
@@ -97,12 +103,9 @@ func dbCtx(ctx context.Context) (context.Context, context.CancelFunc) {
 // createAndSetSession persists a session for the authenticated user and sets
 // the session cookie on the response.
 func (h *Handler) createAndSetSession(w http.ResponseWriter, r *http.Request,
-	user *auth.User, authMethod auth.Method, oidcExpiry *time.Time,
+	user *auth.User, authMethod auth.Method, oidcExpiry time.Time,
 ) error {
-	token, hash, err := auth.GenerateSessionToken()
-	if err != nil {
-		return fmt.Errorf("generate token: %w", err)
-	}
+	token, hash := auth.GenerateSessionToken()
 	now := time.Now()
 	sess := &auth.Session{
 		TokenHash:    hash,
@@ -127,9 +130,9 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 	if err != nil {
 		slog.Warn("login response: passkey count", "error", err)
 	}
-	api.WriteJSON(w, api.LoginSuccess{
+	httpapi.WriteJSON(w, subflux.LoginSuccess{
 		Redirect: "/",
-		User: api.MeResponse{
+		User: subflux.MeResponse{
 			ID:          user.ID,
 			Username:    user.Username,
 			Role:        user.Role,
@@ -143,25 +146,62 @@ func (h *Handler) respondLoginSuccess(w http.ResponseWriter, r *http.Request, us
 // createSessionAndRespond is the standard login completion: create session,
 // set cookie, write JSON.
 func (h *Handler) createSessionAndRespond(w http.ResponseWriter, r *http.Request, user *auth.User, authMethod auth.Method) error {
-	if err := h.createAndSetSession(w, r, user, authMethod, nil); err != nil {
+	// The zero Time: a password or passkey login has no OIDC token behind it.
+	if err := h.createAndSetSession(w, r, user, authMethod, time.Time{}); err != nil {
 		return err
 	}
 	h.respondLoginSuccess(w, r, user)
 	return nil
 }
 
+// PasswordCheck is one password to validate, with the two policy choices that
+// change what "valid" means.
+//
+// All four are named rather than positional because both pairs are silently
+// transposable: the two strings are free-form user input, and swapping them
+// validates the username as a password and admits any password containing the
+// real one; the two booleans are independent policy switches, and a reversed
+// CheckBreach disables the breach lookup on a path the operator believes is
+// checked while shortening the length floor on one that is not.
+type PasswordCheck struct {
+	// Password is the candidate password.
+	Password string
+	// Username is the account it belongs to, rejected as a substring.
+	Username string
+	// SoleFactor is true when the password is the account's only
+	// authentication factor, which raises the length floor.
+	SoleFactor bool
+	// CheckBreach is true when the password must also be looked up in the
+	// breach corpus.
+	CheckBreach bool
+}
+
+// PasswordHash is an Argon2id password hash. It is a distinct type so it
+// cannot be transposed with ValidateAndHashPassword's other string result, the
+// user-facing rejection message every call site writes into a 400 body: as two
+// plain strings a swapped assignment compiles and publishes the hash to the
+// client. Convert to string only at the auth.User boundary.
+type PasswordHash string
+
 // ValidateAndHashPassword validates password length and context (rejecting
 // passwords that contain the username or app name), checks against breach
-// databases (if checkBreach is true), and returns the Argon2id hash.
-func ValidateAndHashPassword(ctx context.Context, password, username string, passwordOnly, checkBreach bool, client *http.Client) (hash, userMsg string, err error) {
-	if errLen := auth.ValidatePasswordLength(password, passwordOnly); errLen != nil {
+// databases (when check.CheckBreach is set), and returns the Argon2id hash.
+// A non-empty userMsg means the password was rejected on policy grounds and is
+// safe to show the caller; hash is empty in that case.
+func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *http.Client) (hash PasswordHash, userMsg string, err error) {
+	validateLen := auth.ValidateMultiFactorPasswordLength
+	if check.SoleFactor {
+		validateLen = auth.ValidateSoloPasswordLength
+	}
+	if errLen := validateLen(check.Password); errLen != nil {
 		return "", errLen.Error(), nil
 	}
-	if errCtx := auth.ValidatePasswordContext(password, username, []string{"subflux"}); errCtx != nil {
+	pctx := auth.PasswordContext{Username: check.Username, ForbiddenWords: []string{"subflux"}}
+	if errCtx := auth.ValidatePasswordContext(check.Password, pctx); errCtx != nil {
 		return "", errCtx.Error(), nil
 	}
-	if checkBreach {
-		breached, errBreach := auth.CheckBreachedPassword(ctx, client, password)
+	if check.CheckBreach {
+		breached, errBreach := auth.CheckBreachedPassword(ctx, client, check.Password)
 		if errBreach != nil {
 			slog.Warn("breached password check error", "error", errBreach)
 		}
@@ -169,11 +209,7 @@ func ValidateAndHashPassword(ctx context.Context, password, username string, pas
 			return "", msgBreachedPassword, nil
 		}
 	}
-	h, err := auth.HashPassword(password)
-	if err != nil {
-		return "", "", err
-	}
-	return h, "", nil
+	return PasswordHash(auth.HashPassword(check.Password)), "", nil
 }
 
 // requireWebAuthn resolves the current WebAuthn instance from the live
@@ -185,7 +221,7 @@ func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bo
 		wa = h.WebAuthnResolver()
 	}
 	if wa == nil {
-		api.BadRequestC(w, nil, api.CodeBadRequest, "WebAuthn not configured")
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "WebAuthn not configured")
 		return nil, false
 	}
 	return wa, true
@@ -196,12 +232,12 @@ func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bo
 func (h *Handler) consumeWebAuthnSession(w http.ResponseWriter, r *http.Request) *webauthn.SessionData {
 	sessionToken := r.Header.Get(HeaderWebAuthnSession)
 	if sessionToken == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing session token")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing session token")
 		return nil
 	}
 	sessData := h.Ceremonies.ConsumeWebAuthnSession(sessionToken)
 	if sessData == nil {
-		api.UnauthorizedC(w, r, api.CodeWebAuthnSessionInvalid, "invalid or expired session")
+		httpapi.UnauthorizedC(w, r, subflux.CodeWebAuthnSessionInvalid, "invalid or expired session")
 		return nil
 	}
 	return sessData
@@ -227,12 +263,12 @@ func extractPathSegment(path, prefix, suffix string) string {
 func parseIDFromPath(w http.ResponseWriter, path, prefix, label string) (int64, bool) {
 	idStr := extractPathSegment(path, prefix, "")
 	if idStr == "" {
-		api.BadRequestC(w, nil, api.CodeBadRequest, "missing "+label)
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "missing "+label)
 		return 0, false
 	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		api.BadRequestC(w, nil, api.CodeBadRequest, "invalid "+label)
+		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "invalid "+label)
 		return 0, false
 	}
 	return id, true

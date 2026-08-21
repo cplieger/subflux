@@ -6,8 +6,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -15,7 +15,7 @@ import (
 // needed by preview handlers.
 type SubtitleProcessor interface {
 	NormalizeEncoding(data []byte) []byte
-	ParseSRT(data []byte) ([]api.SubtitleCue, error)
+	ParseSRT(data []byte) ([]subflux.SubtitleCue, error)
 }
 
 // ArrConfig holds the URL and API key for an arr instance.

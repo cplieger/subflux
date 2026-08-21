@@ -28,7 +28,7 @@ func BenchmarkHashFile(b *testing.B) {
 			ctx := b.Context()
 			b.ResetTimer()
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				_, _, err := hashFile(ctx, path)
 				if err != nil {
 					b.Fatal(err)

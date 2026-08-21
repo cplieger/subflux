@@ -3,7 +3,7 @@ package classify
 import (
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/langcode"
 )
 
 // Alpha2FromAlpha3 resolves any published language code onto subflux's internal
@@ -24,7 +24,7 @@ import (
 // (testdata/fuzz/FuzzAlpha2FromAlpha3) even though the function now resolves
 // more than alpha-3.
 func Alpha2FromAlpha3(code string) string {
-	return api.CanonicalLangCode(code)
+	return langcode.Canonical(code)
 }
 
 // SanitizeImdbID strips the "tt" prefix and leading zeros from an IMDB ID,
@@ -58,7 +58,7 @@ var LangRegistry = map[string]string{
 	"is": "Icelandic", "ga": "Irish", "cy": "Welsh",
 	"ka": "Georgian", "mn": "Mongolian", "km": "Khmer",
 	"lo": "Lao", "my": "Burmese",
-	api.LangBrazilianPortuguese: "Brazilian Portuguese",
+	langcode.BrazilianPortuguese: "Brazilian Portuguese",
 }
 
 // LangNameToISO2 is the reverse of LangRegistry: English name → ISO-2 code.

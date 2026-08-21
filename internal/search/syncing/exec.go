@@ -11,7 +11,8 @@ import (
 // installs the syncworker client instead, which runs each job in a
 // supervised one-shot child process so an out-of-memory sync kills the
 // worker, not the server (P13). The seam sits BELOW every public interface:
-// api.SubtitleSyncer, api.SubtitleProcessor, and the package-level strategy
+// search.SubtitleSyncer, the SubtitleProcessor interfaces its handler consumers
+// declare, and the package-level strategy
 // functions keep their exact signatures and semantics.
 type SyncExec interface {
 	// Reference aligns subtitle data against an embedded reference track

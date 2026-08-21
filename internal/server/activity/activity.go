@@ -7,17 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// ActivitySource is a typed string for activity entry source values.
-type ActivitySource string //nolint:revive // stutters but renaming breaks callers
+// Source is a typed string for activity entry source values.
+type Source string
 
 // Activity source constants.
 const (
-	SourceScheduled ActivitySource = "scheduled"
-	SourceManual    ActivitySource = "manual"
+	SourceScheduled Source = "scheduled"
+	SourceManual    Source = "manual"
 )
 
 // ScanKind identifies which scan endpoint family a scan activity belongs to.
@@ -56,7 +56,7 @@ const (
 // fields are stored flat on the Entry for serialization.
 type ScanScope struct {
 	Kind      ScanKind
-	MediaType api.MediaType
+	MediaType subflux.MediaType
 	MediaID   int
 	Season    int
 	Episode   int
@@ -88,34 +88,34 @@ type Log struct {
 // is a serialization-time flag merged from the StopRegistry by the activity
 // GET handler; it is never persisted on the stored entry.
 type Entry struct {
-	StartedAt    time.Time      `json:"started_at"`
-	EndedAt      *time.Time     `json:"ended_at,omitempty"`
-	ID           string         `json:"id"`
-	Action       string         `json:"action"`
-	Detail       string         `json:"detail"`
-	Source       ActivitySource `json:"source"` // "scheduled" or "manual"
-	Kind         ScanKind       `json:"kind,omitempty"`
-	MediaType    api.MediaType  `json:"media_type,omitempty"`
-	RequiredRole auth.Role      `json:"required_role,omitempty"`
-	MediaID      int            `json:"media_id,omitempty"`
-	Season       int            `json:"season,omitempty"`
-	Episode      int            `json:"episode,omitempty"`
-	Current      int            `json:"current,omitempty"`
-	Total        int            `json:"total,omitempty"`
-	Done         bool           `json:"done"`
-	Queued       bool           `json:"queued,omitempty"`
-	Cancelled    bool           `json:"cancelled,omitempty"`
-	Failed       bool           `json:"failed,omitempty"`
-	Cancellable  bool           `json:"cancellable,omitempty"`
+	StartedAt    time.Time         `json:"started_at"`
+	EndedAt      *time.Time        `json:"ended_at,omitempty"`
+	ID           string            `json:"id"`
+	Action       string            `json:"action"`
+	Detail       string            `json:"detail"`
+	Source       Source            `json:"source"` // "scheduled" or "manual"
+	Kind         ScanKind          `json:"kind,omitempty"`
+	MediaType    subflux.MediaType `json:"media_type,omitempty"`
+	RequiredRole auth.Role         `json:"required_role,omitempty"`
+	MediaID      int               `json:"media_id,omitempty"`
+	Season       int               `json:"season,omitempty"`
+	Episode      int               `json:"episode,omitempty"`
+	Current      int               `json:"current,omitempty"`
+	Total        int               `json:"total,omitempty"`
+	Done         bool              `json:"done"`
+	Queued       bool              `json:"queued,omitempty"`
+	Cancelled    bool              `json:"cancelled,omitempty"`
+	Failed       bool              `json:"failed,omitempty"`
+	Cancellable  bool              `json:"cancellable,omitempty"`
 }
 
-// New creates an ActivityLog with the given max capacity.
+// New creates a Log with the given max capacity.
 func New(maxItems int) *Log {
 	return &Log{maxItems: maxItems, index: make(map[string]int, maxItems)}
 }
 
 // Start records a new activity and returns its ID.
-func (a *Log) Start(action, detail string, source ActivitySource) string {
+func (a *Log) Start(action, detail string, source Source) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.startLocked(Entry{Action: action, Detail: detail, Source: source})
@@ -127,7 +127,7 @@ func (a *Log) Start(action, detail string, source ActivitySource) string {
 // its ID is returned with existing=true and no new entry is created — the
 // find-and-create pair runs under one lock so two concurrent same-scope
 // starts cannot both create an entry.
-func (a *Log) StartScan(action, detail string, source ActivitySource,
+func (a *Log) StartScan(action, detail string, source Source,
 	scope ScanScope, role auth.Role,
 ) (id string, existing bool) {
 	a.mu.Lock()

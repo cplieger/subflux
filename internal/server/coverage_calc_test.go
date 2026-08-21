@@ -3,7 +3,8 @@ package server
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -18,7 +19,7 @@ func TestIndexSubStatus(t *testing.T) {
 		checkKey     covKey
 		name         string
 		checkMediaID string
-		files        []api.SubtitleEntry
+		files        []subflux.SubtitleEntry
 		wantMediaIDs int
 		wantUsable   bool
 		wantIgnored  bool
@@ -31,7 +32,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "external_sub_is_usable",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"}},
 			ignored:      nil,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -41,7 +42,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_ignored_codec",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -51,7 +52,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name:         "embedded_non_ignored_codec",
-			files:        []api.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
+			files:        []subflux.SubtitleEntry{{MediaID: "tvdb-123-s01e01", Language: "fr", Variant: "standard", Source: "embedded", Codec: "srt"}},
 			ignored:      ignoredCodecs,
 			wantMediaIDs: 1,
 			checkMediaID: "tvdb-123-s01e01",
@@ -61,7 +62,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "usable_overrides_ignored",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 			},
@@ -74,7 +75,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "ignored_does_not_override_usable",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 			},
@@ -87,7 +88,7 @@ func TestIndexSubStatus(t *testing.T) {
 		},
 		{
 			name: "multiple_media_ids",
-			files: []api.SubtitleEntry{
+			files: []subflux.SubtitleEntry{
 				{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 				{MediaID: "ep2", Language: "en", Variant: "hi", Source: "embedded", Codec: "pgs"},
 			},
@@ -141,7 +142,7 @@ func TestIndexSubStatus(t *testing.T) {
 
 func TestResolveRuleName_with_audio_lang(t *testing.T) {
 	t.Parallel()
-	got := resolveRuleName("en", []api.SubtitleTarget{{Code: "fr"}})
+	got := resolveRuleName("en", []subflux.SubtitleTarget{{Code: "fr"}})
 	if got != "en" {
 		t.Errorf("resolveRuleName(en, targets) = %q, want %q", got, "en")
 	}
@@ -149,7 +150,7 @@ func TestResolveRuleName_with_audio_lang(t *testing.T) {
 
 func TestResolveRuleName_empty_lang_returns_default(t *testing.T) {
 	t.Parallel()
-	got := resolveRuleName("", []api.SubtitleTarget{{Code: "fr"}})
+	got := resolveRuleName("", []subflux.SubtitleTarget{{Code: "fr"}})
 	if got != ruleDefault {
 		t.Errorf("resolveRuleName('', targets) = %q, want %q", got, ruleDefault)
 	}
@@ -167,7 +168,7 @@ func TestResolveRuleName_no_targets_returns_no_targets(t *testing.T) {
 
 func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/a.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/b.srt"},
 		{MediaID: "ep1", Language: "en", Variant: "hi", Source: "embedded"},
@@ -180,7 +181,7 @@ func TestDeduplicateFileRows_collapses_duplicates(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "embedded"},
 		{MediaID: "ep1", Language: "en", Variant: "standard", Source: "external"},
@@ -194,7 +195,7 @@ func TestDeduplicateFileRows_preserves_distinct_rows(t *testing.T) {
 
 func TestDeduplicateFileRows_empty_input(t *testing.T) {
 	t.Parallel()
-	got := deduplicateFileRows([]api.SubtitleEntry{})
+	got := deduplicateFileRows([]subflux.SubtitleEntry{})
 	if len(got) != 0 {
 		t.Errorf("deduplicateFileRows(empty) returned %d rows, want 0", len(got))
 	}
@@ -202,7 +203,7 @@ func TestDeduplicateFileRows_empty_input(t *testing.T) {
 
 func TestDeduplicateFileRows_preserves_order(t *testing.T) {
 	t.Parallel()
-	rows := []api.SubtitleEntry{
+	rows := []subflux.SubtitleEntry{
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/first.srt"},
 		{MediaID: "ep1", Language: "fr", Variant: "standard", Source: "external", Path: "/second.srt"},
 	}
@@ -253,9 +254,9 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 		season := rapid.IntRange(0, 99).Draw(t, "season")
 		episode := rapid.IntRange(1, 999).Draw(t, "episode")
 
-		epID := api.BuildEpisodeID(tvdbID, "", season, episode)
+		epID := mediaid.Episode(tvdbID, "", mediaid.SeasonEpisode{Season: season, Episode: episode})
 		prefix := extractSeriesPrefix(epID)
-		wantPrefix := api.BuildSeriesPrefix(tvdbID, "")
+		wantPrefix := mediaid.SeriesPrefix(tvdbID, "")
 
 		if prefix != wantPrefix {
 			t.Fatalf("extractSeriesPrefix(%q) = %q, want %q", epID, prefix, wantPrefix)
@@ -263,45 +264,45 @@ func TestExtractSeriesPrefix_property_roundtrip_with_BuildEpisodeID(t *testing.T
 	})
 }
 
-// --- countEpisodeCoverageGrouped ---
+// --- countEpisodesGrouped ---
 
-func TestCountEpisodeCoverageGrouped_empty_episodes(t *testing.T) {
+func TestCountEpisodesGrouped_empty_episodes(t *testing.T) {
 	t.Parallel()
-	targets := []api.SubtitleTarget{{Code: "fr"}}
-	got := countEpisodeCoverageGrouped(nil, targets, 10)
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+	got := countEpisodesGrouped(nil, targets, 10)
 	if len(got) != 1 {
-		t.Fatalf("countEpisodeCoverageGrouped(nil, 1 target, 10) len = %d, want 1", len(got))
+		t.Fatalf("countEpisodesGrouped(nil, 1 target, 10) len = %d, want 1", len(got))
 	}
 	if got[0].Have != 0 || got[0].HaveIgnored != 0 || got[0].Total != 10 {
-		t.Errorf("countEpisodeCoverageGrouped(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 10}",
+		t.Errorf("countEpisodesGrouped(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 10}",
 			got[0].Have, got[0].HaveIgnored, got[0].Total)
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_counts_usable_and_ignored(t *testing.T) {
+func TestCountEpisodesGrouped_counts_usable_and_ignored(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{covKey{Lang: "fr", Variant: "standard"}: {Usable: true}},
 		{covKey{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true}},
 		{covKey{Lang: "en", Variant: "standard"}: {Usable: true}},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
-	got := countEpisodeCoverageGrouped(episodes, targets, 5)
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+	got := countEpisodesGrouped(episodes, targets, 5)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1", len(got))
 	}
 	if got[0].Have != 1 {
-		t.Errorf("countEpisodeCoverageGrouped Have = %d, want 1", got[0].Have)
+		t.Errorf("countEpisodesGrouped Have = %d, want 1", got[0].Have)
 	}
 	if got[0].HaveIgnored != 1 {
-		t.Errorf("countEpisodeCoverageGrouped HaveIgnored = %d, want 1", got[0].HaveIgnored)
+		t.Errorf("countEpisodesGrouped HaveIgnored = %d, want 1", got[0].HaveIgnored)
 	}
 	if got[0].Total != 5 {
-		t.Errorf("countEpisodeCoverageGrouped Total = %d, want 5", got[0].Total)
+		t.Errorf("countEpisodesGrouped Total = %d, want 5", got[0].Total)
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
+func TestCountEpisodesGrouped_multiple_targets(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{
@@ -309,11 +310,11 @@ func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
 			covKey{Lang: "en", Variant: "forced"}:   {Usable: true},
 		},
 	}
-	targets := []api.SubtitleTarget{
+	targets := []subflux.SubtitleTarget{
 		{Code: "fr"},
 		{Code: "en", Variant: "forced"},
 	}
-	got := countEpisodeCoverageGrouped(episodes, targets, 3)
+	got := countEpisodesGrouped(episodes, targets, 3)
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
@@ -325,76 +326,76 @@ func TestCountEpisodeCoverageGrouped_multiple_targets(t *testing.T) {
 	}
 }
 
-func TestCountEpisodeCoverageGrouped_no_targets(t *testing.T) {
+func TestCountEpisodesGrouped_no_targets(t *testing.T) {
 	t.Parallel()
 	episodes := []map[covKey]*covStatus{
 		{covKey{Lang: "fr", Variant: "standard"}: {Usable: true}},
 	}
-	got := countEpisodeCoverageGrouped(episodes, nil, 5)
+	got := countEpisodesGrouped(episodes, nil, 5)
 	if len(got) != 0 {
-		t.Errorf("countEpisodeCoverageGrouped(no targets) len = %d, want 0", len(got))
+		t.Errorf("countEpisodesGrouped(no targets) len = %d, want 0", len(got))
 	}
 }
 
-// --- countMovieCoverage ---
+// --- countMovies ---
 
-func TestCountMovieCoverage_nil_subs(t *testing.T) {
+func TestCountMovies_nil_subs(t *testing.T) {
 	t.Parallel()
-	targets := []api.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(nil, targets)
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+	got := countMovies(nil, targets)
 	if len(got) != 1 {
-		t.Fatalf("countMovieCoverage(nil) len = %d, want 1", len(got))
+		t.Fatalf("countMovies(nil) len = %d, want 1", len(got))
 	}
 	if got[0].Have != 0 || got[0].HaveIgnored != 0 || got[0].Total != 1 {
-		t.Errorf("countMovieCoverage(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 1}",
+		t.Errorf("countMovies(nil) = {Have:%d, HaveIgnored:%d, Total:%d}, want {0, 0, 1}",
 			got[0].Have, got[0].HaveIgnored, got[0].Total)
 	}
 }
 
-func TestCountMovieCoverage_usable_sub(t *testing.T) {
+func TestCountMovies_usable_sub(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(subs, targets)
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+	got := countMovies(subs, targets)
 	if got[0].Have != 1 {
-		t.Errorf("countMovieCoverage(usable) Have = %d, want 1", got[0].Have)
+		t.Errorf("countMovies(usable) Have = %d, want 1", got[0].Have)
 	}
 	if got[0].HaveIgnored != 0 {
-		t.Errorf("countMovieCoverage(usable) HaveIgnored = %d, want 0", got[0].HaveIgnored)
+		t.Errorf("countMovies(usable) HaveIgnored = %d, want 0", got[0].HaveIgnored)
 	}
 }
 
-func TestCountMovieCoverage_ignored_only(t *testing.T) {
+func TestCountMovies_ignored_only(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {IgnoredOnly: true},
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
-	got := countMovieCoverage(subs, targets)
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
+	got := countMovies(subs, targets)
 	if got[0].Have != 0 {
-		t.Errorf("countMovieCoverage(ignored) Have = %d, want 0", got[0].Have)
+		t.Errorf("countMovies(ignored) Have = %d, want 0", got[0].Have)
 	}
 	if got[0].HaveIgnored != 1 {
-		t.Errorf("countMovieCoverage(ignored) HaveIgnored = %d, want 1", got[0].HaveIgnored)
+		t.Errorf("countMovies(ignored) HaveIgnored = %d, want 1", got[0].HaveIgnored)
 	}
 }
 
-func TestCountMovieCoverage_multiple_targets(t *testing.T) {
+func TestCountMovies_multiple_targets(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 		{Lang: "en", Variant: "forced"}:   {IgnoredOnly: true},
 	}
-	targets := []api.SubtitleTarget{
+	targets := []subflux.SubtitleTarget{
 		{Code: "fr"},
 		{Code: "en", Variant: "forced"},
 		{Code: "de"},
 	}
-	got := countMovieCoverage(subs, targets)
+	got := countMovies(subs, targets)
 	if len(got) != 3 {
-		t.Fatalf("countMovieCoverage len = %d, want 3", len(got))
+		t.Fatalf("countMovies len = %d, want 3", len(got))
 	}
 	if got[0].Have != 1 || got[0].HaveIgnored != 0 {
 		t.Errorf("target fr = {Have:%d, HaveIgnored:%d}, want {1, 0}", got[0].Have, got[0].HaveIgnored)
@@ -407,13 +408,13 @@ func TestCountMovieCoverage_multiple_targets(t *testing.T) {
 	}
 }
 
-func TestCountMovieCoverage_no_targets(t *testing.T) {
+func TestCountMovies_no_targets(t *testing.T) {
 	t.Parallel()
 	subs := map[covKey]*covStatus{
 		{Lang: "fr", Variant: "standard"}: {Usable: true},
 	}
-	got := countMovieCoverage(subs, nil)
+	got := countMovies(subs, nil)
 	if len(got) != 0 {
-		t.Errorf("countMovieCoverage(no targets) len = %d, want 0", len(got))
+		t.Errorf("countMovies(no targets) len = %d, want 0", len(got))
 	}
 }

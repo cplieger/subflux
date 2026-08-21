@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- request-aware pacing (the inter-entry scan delay keys on provider traffic) ---
@@ -13,16 +13,16 @@ import (
 
 // queriedResult builds a SearchResult whose one language group issued n
 // provider queries.
-func queriedResult(n int) api.SearchResult {
-	return api.SearchResult{Langs: []api.LangOutcome{{
-		Lang: "en", Kind: api.LangSearched, Searched: 1, Queried: n,
+func queriedResult(n int) subflux.SearchResult {
+	return subflux.SearchResult{Langs: []subflux.LangOutcome{{
+		Lang: "en", Kind: subflux.LangSearched, Searched: 1, Queried: n,
 	}}}
 }
 
 // processPollImport reports queried=true only when the engine's search
 // actually issued provider queries; every skip path reports false.
 func TestProcessPollImport_queried_follows_engine(t *testing.T) {
-	buildOK := func(req *api.SearchRequest) func() (*ImportResult, error) {
+	buildOK := func(req *subflux.SearchRequest) func() (*ImportResult, error) {
 		return func() (*ImportResult, error) {
 			return &ImportResult{Req: req, Source: PollSourceSonarr, Label: "x"}, nil
 		}
@@ -35,7 +35,7 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 			Engine: &mockEngine{result: queriedResult(2)},
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
-		req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1"}
+		req := &subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1"}
 		retryable, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
 		if retryable || !queried {
 			t.Errorf("processPollImport = (retryable %v, queried %v), want (false, true)", retryable, queried)
@@ -46,12 +46,12 @@ func TestProcessPollImport_queried_follows_engine(t *testing.T) {
 		path := tempVideo(t)
 		ls := &LiveState{
 			Cfg: &mockCfg{langs: []string{"en"}},
-			Engine: &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{
-				Lang: "en", Kind: api.LangSkipped, Skipped: 1,
+			Engine: &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{
+				Lang: "en", Kind: subflux.LangSkipped, Skipped: 1,
 			}}}},
 		}
 		p := &Poller{deps: fullDeps(&mockStore{})}
-		req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1"}
+		req := &subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1"}
 		_, queried := p.processPollImport(t.Context(), ls, path, buildOK(req), nil)
 		if queried {
 			t.Errorf("queried = true for a skipped-group result, want false")

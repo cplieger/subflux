@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 )
 
 // http_requests_total's labels are the app's one unauthenticated
@@ -69,7 +69,7 @@ func recordThrough(t *testing.T, s *Server, mux *http.ServeMux, method, target s
 }
 
 func TestHTTPMetricLabelsRejectCallerChosenMethod(t *testing.T) {
-	s := &Server{metrics: metrics.New()}
+	s := &Server{metrics: obs.New()}
 
 	// The SPA fallthrough: no API route matches, the catch-all does, so a
 	// derivation that trusted r.Method reached the label verbatim.
@@ -166,7 +166,7 @@ func TestHTTPMetricLabelVocabulary(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			s := &Server{metrics: metrics.New()}
+			s := &Server{metrics: obs.New()}
 			body := recordThrough(t, s, catchAllMux(t), tc.method, tc.target)
 			for _, want := range tc.wantLabels {
 				if !strings.Contains(body, want) {

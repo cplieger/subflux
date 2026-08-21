@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
 )
@@ -18,7 +18,7 @@ import (
 // audio_sync_fallback (see Engine.syncSubtitle), and external SRT sync is
 // manual-only from the web UI.
 func SyncAgainstReference(ctx context.Context, data []byte, videoPath, lang string, mapper subsync.LangMapper, minConf ...float64) subsync.SyncResult {
-	threshold := float64(api.DefaultSyncMinConfidence)
+	threshold := float64(subflux.DefaultSyncMinConfidence)
 	if len(minConf) > 0 && minConf[0] > 0 {
 		threshold = minConf[0]
 	}

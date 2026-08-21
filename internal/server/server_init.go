@@ -4,9 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/server/activityhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/server/coverage"
 	"github.com/cplieger/subflux/internal/server/coveragehandlers"
 	"github.com/cplieger/subflux/internal/server/filehandlers"
 	"github.com/cplieger/subflux/internal/server/manualops"
@@ -15,8 +18,9 @@ import (
 	"github.com/cplieger/subflux/internal/server/previewhandlers"
 	"github.com/cplieger/subflux/internal/server/queryhandlers"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/server/storeops"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // newResolver builds the S7 typed-reference resolver over the store and the
@@ -47,31 +51,34 @@ func (s *Server) newResolver() *resolve.Resolver {
 // Called from New() after options are applied and live state is initialized.
 func (s *Server) initHandlers() {
 	s.pollCache = polling.NewPollCache(
-		func(ctx context.Context, key api.PollKey) (time.Time, error) {
-			return s.db.GetPollTimestamp(ctx, key)
+		func(ctx context.Context, key subflux.PollKey) (time.Time, error) {
+			return s.db.PollTimestamp(ctx, key)
 		},
-		func(ctx context.Context, key api.PollKey, t time.Time) error {
+		func(ctx context.Context, key subflux.PollKey, t time.Time) error {
 			err := s.db.SetPollTimestamp(ctx, key, t)
 			// The poll heartbeat writes every cycle, making it the earliest
 			// detector of a disk-full store between daily reconciles; classify
 			// the error and raise the persistent operator alert here instead of
 			// waiting for the next maintenance window.
 			if err != nil {
-				(&serveradapter.AlertAdapter{A: s.alerts}).RecordStoreWriteError(err)
+				s.recordStoreWriteError(err)
 			}
 			return err
 		},
 	)
-	if s.metrics != nil {
-		s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
-	}
+	s.pollCache.SetDirtyGauge(s.metrics.SetPollCursorsDirty)
 	s.queryH = queryhandlers.New(queryhandlers.Deps{
-		QueryDB:      s.stores.query,
-		CovDB:        s.db,
-		Metrics:      s.metrics,
-		State:        s.queryLiveState,
-		Configured:   func() bool { return s.configured.Load() },
-		CountMissing: countMissing,
+		QueryDB:    s.stores.query,
+		CovDB:      s.db,
+		Metrics:    s.metrics,
+		State:      s.queryLiveState,
+		Configured: func() bool { return s.configured.Load() },
+		// Bound to the store here, at the composition root: coverage.CountMissing
+		// reads subtitle-file rows and queryhandlers does not, so the handler is
+		// handed a counter rather than a store to forward.
+		CountMissing: func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int {
+			return coverage.CountMissing(ctx, cfg, s.db, series, movies)
+		},
 	})
 	s.configH = confighandlers.New(&confighandlers.Deps{
 		LoadConfig:    s.loadConfig,
@@ -79,9 +86,18 @@ func (s *Server) initHandlers() {
 		DefaultConfig: s.defaultConfig,
 		Registry:      s.registry,
 		Alerts:        s.alerts,
-		NewSonarr:     s.newSonarr,
-		NewRadarr:     s.newRadarr,
-		HotReload:     s.hotReload,
+		// The config handlers only ping, so their factory types return
+		// confighandlers.ArrPinger. Go has no return-type covariance for func
+		// values, so narrowing the server's own factory to what that consumer
+		// asked for is a wrap, done here because adapting is what a composition
+		// root is for.
+		NewSonarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
+			return s.newSonarr(baseURL, apiKey)
+		},
+		NewRadarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
+			return s.newRadarr(baseURL, apiKey)
+		},
+		HotReload: s.hotReload,
 		State: func() confighandlers.StateView {
 			ls := s.state()
 			return confighandlers.StateView{Cfg: ls.cfg}
@@ -113,20 +129,32 @@ func (s *Server) initHandlers() {
 				pls.HasSonarr = ls.sonarr != nil
 				pls.HasRadarr = ls.radarr != nil
 				if ls.sonarr != nil {
-					sc := ls.cfg.SonarrConfig()
+					sc := ls.cfg.Sonarr()
 					pls.SonarrConfig = previewhandlers.ArrConfig{URL: sc.URL, APIKey: sc.APIKey}
 				}
 				if ls.radarr != nil {
-					rc := ls.cfg.RadarrConfig()
+					rc := ls.cfg.Radarr()
 					pls.RadarrConfig = previewhandlers.ArrConfig{URL: rc.URL, APIKey: rc.APIKey}
 				}
 			}
 			return pls
 		},
 		ReadBounded: atomicfile.ReadBounded,
-		ServerCtx:   func() context.Context { return s.ctx },
+		ServerCtx:   func() context.Context { return s.lifetime },
 	})
 
+	s.storeOps = storeops.New(storeops.Deps{
+		DB:                    s.db,
+		Metrics:               s.metrics,
+		Cfg:                   func() *config.Config { return s.state().cfg },
+		RecordStoreWriteError: s.recordStoreWriteError,
+	})
+	s.activityH = activityhandlers.New(activityhandlers.Deps{
+		Activity: s.activity,
+		Alerts:   s.alerts,
+		Stops:    &s.stops,
+		Events:   s.events,
+	})
 	s.coverageH = coveragehandlers.NewHandler(coveragehandlers.Deps{
 		Store: s.db,
 		StateFunc: func() *coveragehandlers.LiveState {
@@ -158,12 +186,11 @@ func (s *Server) initHandlers() {
 		StateFunc: func() *mediahandlers.LiveState {
 			ls := s.state()
 			return &mediahandlers.LiveState{
-				Cfg:    ls.cfg,
 				Sonarr: ls.sonarr,
 				Radarr: ls.radarr,
 			}
 		},
-		ServerCtx: func() context.Context { return s.ctx },
+		ServerCtx: func() context.Context { return s.lifetime },
 	})
 
 	s.syncH = synchandlers.New(synchandlers.Deps{
@@ -177,23 +204,13 @@ func (s *Server) initHandlers() {
 // initManualHandler constructs the manualops.Handler with the server's dependencies.
 func (s *Server) initManualHandler(resolver *resolve.Resolver) *manualops.Handler {
 	return manualops.NewHandler(manualops.HandlerDeps{
-		// api.Store is a compile-checked superset of manualops.DownloadStore,
-		// so the implicit interface conversion needs no assertion.
-		DBFunc:   func() manualops.DownloadStore { return s.db },
-		Activity: &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
-		Events:   &serveradapter.ManualEventAdapter{E: s.events},
-		StateFunc: func() *manualops.LiveState {
-			ls := s.state()
-			return &manualops.LiveState{
-				Cfg: ls.cfg, Engine: ls.engine, Scorer: ls.scorer,
-				Sonarr: ls.sonarr, Radarr: ls.radarr,
-				SonarrLib: ls.sonarr, RadarrLib: ls.radarr,
-				Providers: ls.providers,
-			}
-		},
+		DBFunc:     func() manualops.DownloadStore { return s.db },
+		Activity:   s.activity,
+		Alerts:     s.alerts,
+		Events:     s.events,
+		StateFunc:  func() *manualops.LiveState { return manualLiveState(s.state()) },
 		BGTracker:  &s.bgWg,
-		ServerCtx:  func() context.Context { return s.ctx },
+		ServerCtx:  func() context.Context { return s.lifetime },
 		Resolve:    resolver,
 		DecodeJSON: decodeJSONBodyAny,
 	})

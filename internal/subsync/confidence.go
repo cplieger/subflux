@@ -27,7 +27,7 @@ var _ fmt.Stringer = SyncMethod("")
 // ConfidenceNone means no sync was performed or the result is unusable.
 // It is the only named point on the 0.0-1.0 Confidence scale: every other
 // threshold that production reads is a purpose-specific constant
-// (ShouldApplyThreshold here, api.DefaultSyncMinConfidence at the API layer)
+// (ShouldApplyThreshold here, subflux.DefaultSyncMinConfidence at the API layer)
 // or a per-strategy ceiling in DefaultConfidenceCaps.
 const ConfidenceNone Confidence = 0
 

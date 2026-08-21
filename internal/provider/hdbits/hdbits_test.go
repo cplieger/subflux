@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/provider/dlcache"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -98,45 +98,58 @@ func TestFactory_requires_credentials(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
-			if p.Name() != api.ProviderNameHDBits {
-				t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameHDBits)
+			if p.Name() != subflux.ProviderNameHDBits {
+				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameHDBits)
 			}
 		})
 	}
 }
 
 // TestFactory_torrentCacheUsesOneHourTTL verifies the torrent-ID cache the
-// factory builds keeps entries alive well beyond a single request: a value
-// stored and read back a few milliseconds later must still be present, which
-// fails if the cache were constructed with a zero (or near-zero) TTL.
+// factory builds keeps entries alive for the full hour it declares, and drops
+// them once past it. The bubble's synthetic clock makes the real TTL boundary
+// testable: on a wall clock this could only afford a millisecond-scale proxy
+// that proves the TTL is merely non-zero, which is what the test asserted
+// before. cache.Cache is a mutex plus a time.Now comparison with no goroutine,
+// timer or descriptor of its own, and Factory performs no I/O, so nothing in
+// the bubble can park on an external fd and stall the clock.
 func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
-	p, err := Factory(t.Context(), map[string]any{
-		settingUsername: "user",
-		settingPasskey:  "passkey",
+	synctest.Test(t, func(t *testing.T) {
+		p, err := Factory(t.Context(), map[string]any{
+			settingUsername: "user",
+			settingPasskey:  "passkey",
+		})
+		if err != nil {
+			t.Fatalf("Factory() error = %v, want nil", err)
+		}
+		prov, ok := p.(*Provider)
+		if !ok {
+			t.Fatalf("Factory() returned %T, want *Provider", p)
+		}
+
+		const key = "torrents:tvdb:1:s1"
+		want := []int{11, 22, 33}
+		prov.torrentCache.Set(key, want)
+
+		// One second short of the declared hour: still live.
+		synctest.Sleep(time.Hour - time.Second)
+
+		got, found := prov.torrentCache.Get(key)
+		if !found {
+			t.Fatalf("torrentCache.Get(%q) at 59m59s found = false, want true", key)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
+		}
+
+		// Two seconds later the hour has elapsed: expired.
+		synctest.Sleep(2 * time.Second)
+
+		if _, found := prov.torrentCache.Get(key); found {
+			t.Errorf("torrentCache.Get(%q) at 1h0m1s found = true, want false "+
+				"(entry outlived the declared 1h TTL)", key)
+		}
 	})
-	if err != nil {
-		t.Fatalf("Factory() error = %v, want nil", err)
-	}
-	prov, ok := p.(*Provider)
-	if !ok {
-		t.Fatalf("Factory() returned %T, want *Provider", p)
-	}
-
-	const key = "torrents:tvdb:1:s1"
-	want := []int{11, 22, 33}
-	prov.torrentCache.Set(key, want)
-
-	// Far below the real 1h TTL, but past the Set instant a zero TTL would
-	// expire entries at.
-	time.Sleep(5 * time.Millisecond)
-
-	got, found := prov.torrentCache.Get(key)
-	if !found {
-		t.Fatalf("torrentCache.Get(%q) found = false, want true", key)
-	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("torrentCache.Get(%q) = %v, want %v", key, got, want)
-	}
 }
 
 // --- Subtitle Data Filtering ---
@@ -144,21 +157,21 @@ func TestFactory_torrentCacheUsesOneHourTTL(t *testing.T) {
 func TestFilterSubtitleData(t *testing.T) {
 	t.Parallel()
 
-	type assertFunc func(t *testing.T, got []api.Subtitle)
+	type assertFunc func(t *testing.T, got []subflux.Subtitle)
 
 	tests := []struct {
-		req       *api.SearchRequest
+		req       *subflux.SearchRequest
 		assertFn  assertFunc
 		name      string
 		data      []hdbSubtitleItem
 		wantCount int
 	}{
-		{name: "nil data returns nil", data: nil, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "empty data returns nil", data: []hdbSubtitleItem{}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "basic movie result mapped correctly", data: []hdbSubtitleItem{{Title: "Test Sub", Filename: "test.srt", Language: "en", ID: 42}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+		{name: "nil data returns nil", data: nil, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "empty data returns nil", data: []hdbSubtitleItem{}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "basic movie result mapped correctly", data: []hdbSubtitleItem{{Title: "Test Sub", Filename: "test.srt", Language: "en", ID: 42}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
-			if got[0].Provider != api.ProviderNameHDBits {
-				t.Errorf("Provider = %q, want %q", got[0].Provider, api.ProviderNameHDBits)
+			if got[0].Provider != subflux.ProviderNameHDBits {
+				t.Errorf("Provider = %q, want %q", got[0].Provider, subflux.ProviderNameHDBits)
 			}
 			if got[0].ID != "42" {
 				t.Errorf("ID = %q, want %q", got[0].ID, "42")
@@ -169,47 +182,47 @@ func TestFilterSubtitleData(t *testing.T) {
 			if got[0].ReleaseName != "Test Sub" {
 				t.Errorf("ReleaseName = %q, want %q", got[0].ReleaseName, "Test Sub")
 			}
-			if got[0].MatchedBy != api.MatchByIMDB {
-				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByIMDB)
+			if got[0].MatchedBy != subflux.MatchByIMDB {
+				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByIMDB)
 			}
 		}},
-		{name: "episode sets matched_by to tvdb_id", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "episode"}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+		{name: "episode sets matched_by to tvdb_id", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "episode"}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
-			if got[0].MatchedBy != api.MatchByTVDB {
-				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTVDB)
+			if got[0].MatchedBy != subflux.MatchByTVDB {
+				t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTVDB)
 			}
 		}},
-		{name: "unknown language skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "xx", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "language not in requested list skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "fr", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "br mapped to pb", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "br", ID: 1}}, req: &api.SearchRequest{Languages: []string{"pb"}}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+		{name: "unknown language skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "xx", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "language not in requested list skipped", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "fr", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "br mapped to pb", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "br", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"pb"}}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
 			if got[0].Language != "pb" {
 				t.Errorf("Language = %q, want %q", got[0].Language, "pb")
 			}
 		}},
-		{name: "commentary title filtered", data: []hdbSubtitleItem{{Title: "Director's Commentary", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "commentary filename filtered", data: []hdbSubtitleItem{{Title: "Normal Title", Filename: "commentary.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "extras title filtered", data: []hdbSubtitleItem{{Title: "Extras Disc", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "extra without s not filtered", data: []hdbSubtitleItem{{Title: "Extraordinary Movie", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
-		{name: "case insensitive commentary", data: []hdbSubtitleItem{{Title: "COMMENTARY Track", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "nil languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: nil}, wantCount: 0, assertFn: nil},
-		{name: "empty languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{}}, wantCount: 0, assertFn: nil},
-		{name: "gr mapped to el", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "gr", ID: 1}}, req: &api.SearchRequest{Languages: []string{"el"}}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+		{name: "commentary title filtered", data: []hdbSubtitleItem{{Title: "Director's Commentary", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "commentary filename filtered", data: []hdbSubtitleItem{{Title: "Normal Title", Filename: "commentary.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "extras title filtered", data: []hdbSubtitleItem{{Title: "Extras Disc", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "extra without s not filtered", data: []hdbSubtitleItem{{Title: "Extraordinary Movie", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
+		{name: "case insensitive commentary", data: []hdbSubtitleItem{{Title: "COMMENTARY Track", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "nil languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: nil}, wantCount: 0, assertFn: nil},
+		{name: "empty languages returns no results", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{}}, wantCount: 0, assertFn: nil},
+		{name: "gr mapped to el", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "gr", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"el"}}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
 			if got[0].Language != "el" {
 				t.Errorf("Language = %q, want %q", got[0].Language, "el")
 			}
 		}},
-		{name: "non-subtitle extension filtered", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.mp4", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 0, assertFn: nil},
-		{name: "no extension accepted", data: []hdbSubtitleItem{{Title: "Sub", Filename: "subtitle_no_ext", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
-		{name: "lyrics title filtered", data: []hdbSubtitleItem{{Title: "Song Lyrics", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
-		{name: "forced in filename not filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "forced.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 1, assertFn: nil},
-		{name: "lyrics filename filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "lyrics.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "non-subtitle extension filtered", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.mp4", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 0, assertFn: nil},
+		{name: "no extension accepted", data: []hdbSubtitleItem{{Title: "Sub", Filename: "subtitle_no_ext", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 1, assertFn: nil},
+		{name: "lyrics title filtered", data: []hdbSubtitleItem{{Title: "Song Lyrics", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
+		{name: "forced in filename not filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "forced.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 1, assertFn: nil},
+		{name: "lyrics filename filtered", data: []hdbSubtitleItem{{Title: "Normal", Filename: "lyrics.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}}, wantCount: 0, assertFn: nil},
 		{name: "multiple requested languages", data: []hdbSubtitleItem{
 			{Title: "English Sub", Filename: "en.srt", Language: "en", ID: 1},
 			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 2},
 			{Title: "German Sub", Filename: "de.srt", Language: "de", ID: 3},
-		}, req: &api.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []api.Subtitle) {
+		}, req: &subflux.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
 			if got[0].Language != "en" {
 				t.Errorf("got[0].Language = %q, want %q", got[0].Language, "en")
@@ -218,7 +231,7 @@ func TestFilterSubtitleData(t *testing.T) {
 				t.Errorf("got[1].Language = %q, want %q", got[1].Language, "fr")
 			}
 		}},
-		{name: "season and episode propagated", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "episode", Season: 3, Episode: 7}, wantCount: 1, assertFn: func(t *testing.T, got []api.Subtitle) {
+		{name: "season and episode propagated", data: []hdbSubtitleItem{{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1}}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "episode", Season: 3, Episode: 7}, wantCount: 1, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
 			if got[0].Season != 3 {
 				t.Errorf("Season = %d, want 3", got[0].Season)
@@ -232,7 +245,7 @@ func TestFilterSubtitleData(t *testing.T) {
 			{Title: "Commentary", Filename: "c.srt", Language: "en", ID: 2},
 			{Title: "French Sub", Filename: "fr.srt", Language: "fr", ID: 3},
 			{Title: "Also Good", Filename: "also.srt", Language: "en", ID: 4},
-		}, req: &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []api.Subtitle) {
+		}, req: &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}, wantCount: 2, assertFn: func(t *testing.T, got []subflux.Subtitle) {
 			t.Helper()
 			if got[0].ID != "1" {
 				t.Errorf("got[0].ID = %q, want %q", got[0].ID, "1")
@@ -263,7 +276,7 @@ func TestFilterSubtitleData(t *testing.T) {
 			t.Run(ext, func(t *testing.T) {
 				t.Parallel()
 				data := []hdbSubtitleItem{{Title: "Sub", Filename: "sub" + ext, Language: "en", ID: 1}}
-				req := &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
+				req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 				got := filterSubtitleData(data, req)
 				if len(got) != 1 {
 					t.Errorf("filterSubtitleData(filename=%q) = %d results, want 1", "sub"+ext, len(got))
@@ -393,7 +406,7 @@ func TestClearCache_empties_both_caches(t *testing.T) {
 	t.Parallel()
 	p := &Provider{
 		torrentCache: cache.New[[]int](1 * time.Hour),
-		dlCache:      dlcache.New(100, 2<<20),
+		dlCache:      newDownloadCache(100, 2<<20),
 	}
 	p.dlCache.Put("1", []byte{0x50, 0x4b}, nil)
 	p.torrentCache.Set("key", []int{1, 2})
@@ -412,7 +425,7 @@ func TestFilterSubtitleData_forced_in_title_not_filtered(t *testing.T) {
 	data := []hdbSubtitleItem{
 		{Title: "Forced Narrative", Filename: "sub.srt", Language: "en", ID: 1},
 	}
-	req := &api.SearchRequest{Languages: []string{"en"}}
+	req := &subflux.SearchRequest{Languages: []string{"en"}}
 	got := filterSubtitleData(data, req)
 	if len(got) != 1 {
 		t.Errorf("filterSubtitleData() = %d results, want 1 (forced not filtered at provider level)", len(got))
@@ -440,7 +453,7 @@ func TestFilterSubtitleData_extras_word_boundary(t *testing.T) {
 			data := []hdbSubtitleItem{
 				{Title: tt.title, Filename: "sub.srt", Language: "en", ID: 1},
 			}
-			req := &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
+			req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 			got := filterSubtitleData(data, req)
 			if len(got) != tt.want {
 				t.Errorf("filterSubtitleData(title=%q) = %d results, want %d",
@@ -455,7 +468,7 @@ func TestFilterSubtitleData_does_not_set_variant_fields(t *testing.T) {
 	data := []hdbSubtitleItem{
 		{Title: "Sub", Filename: "sub.srt", Language: "en", ID: 1},
 	}
-	req := &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
+	req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 	got := filterSubtitleData(data, req)
 	if len(got) != 1 {
 		t.Fatalf("filterSubtitleData() = %d results, want 1", len(got))
@@ -534,7 +547,7 @@ func TestFilterSubtitleData_title_filename_concatenation(t *testing.T) {
 		data := []hdbSubtitleItem{
 			{Title: "com", Filename: "mentary.srt", Language: "en", ID: 1},
 		}
-		req := &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
+		req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 		got := filterSubtitleData(data, req)
 		if len(got) != 1 {
 			t.Errorf("filterSubtitleData() = %d results, want 1 (split word should not match)", len(got))
@@ -546,7 +559,7 @@ func TestFilterSubtitleData_title_filename_concatenation(t *testing.T) {
 		data := []hdbSubtitleItem{
 			{Title: "Movie commentary", Filename: "sub.srt", Language: "en", ID: 1},
 		}
-		req := &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
+		req := &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"}
 		got := filterSubtitleData(data, req)
 		if len(got) != 0 {
 			t.Errorf("filterSubtitleData() = %d results, want 0 (commentary at end of title)", len(got))
@@ -569,13 +582,13 @@ func BenchmarkFilterSubtitleData(b *testing.B) {
 		}
 		return items
 	}
-	req := &api.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}
+	req := &subflux.SearchRequest{Languages: []string{"en", "fr"}, MediaType: "movie"}
 
 	for _, n := range []int{10, 50, 100} {
 		items := makeItems(n)
 		b.Run(fmt.Sprintf("items=%d", n), func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				filterSubtitleData(items, req)
 			}
 		})
@@ -590,7 +603,7 @@ func TestBuildLookup(t *testing.T) {
 	p := &Provider{username: "user", passkey: "key"}
 
 	tests := []struct {
-		req          *api.SearchRequest
+		req          *subflux.SearchRequest
 		assertParams func(t *testing.T, params map[string]any)
 		name         string
 		wantCacheKey string
@@ -599,7 +612,7 @@ func TestBuildLookup(t *testing.T) {
 		// Valid inputs.
 		{
 			name:         "episode with valid tvdb",
-			req:          &api.SearchRequest{MediaType: "episode", TvdbID: 12345, Season: 3},
+			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 12345, Season: 3},
 			wantCacheKey: "torrents:tvdb:12345:s3",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
@@ -626,7 +639,7 @@ func TestBuildLookup(t *testing.T) {
 		},
 		{
 			name:         "episode with season zero",
-			req:          &api.SearchRequest{MediaType: "episode", TvdbID: 99, Season: 0},
+			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 99, Season: 0},
 			wantCacheKey: "torrents:tvdb:99:s0",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
@@ -641,7 +654,7 @@ func TestBuildLookup(t *testing.T) {
 		},
 		{
 			name:         "movie with valid imdb",
-			req:          &api.SearchRequest{MediaType: "movie", ImdbID: "tt1375666"},
+			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt1375666"},
 			wantCacheKey: "torrents:imdb:tt1375666",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
@@ -659,7 +672,7 @@ func TestBuildLookup(t *testing.T) {
 		},
 		{
 			name:         "movie strips tt prefix and leading zeros",
-			req:          &api.SearchRequest{MediaType: "movie", ImdbID: "tt0000042"},
+			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt0000042"},
 			wantCacheKey: "torrents:imdb:tt0000042",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
@@ -671,7 +684,7 @@ func TestBuildLookup(t *testing.T) {
 		},
 		{
 			name:         "non episode uses imdb branch",
-			req:          &api.SearchRequest{MediaType: "movie", ImdbID: "tt500", TvdbID: 9999},
+			req:          &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt500", TvdbID: 9999},
 			wantCacheKey: "torrents:imdb:tt500",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
@@ -686,11 +699,11 @@ func TestBuildLookup(t *testing.T) {
 		},
 		{
 			name:         "cache key distinguishes seasons",
-			req:          &api.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 1},
+			req:          &subflux.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 1},
 			wantCacheKey: "torrents:tvdb:77:s1",
 			assertParams: func(t *testing.T, params map[string]any) {
 				t.Helper()
-				req2 := &api.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 2}
+				req2 := &subflux.SearchRequest{MediaType: "episode", TvdbID: 77, Season: 2}
 				_, k2 := p.buildLookup(req2)
 				if k2 != "torrents:tvdb:77:s2" {
 					t.Errorf("S2 cacheKey = %q, want %q", k2, "torrents:tvdb:77:s2")
@@ -698,13 +711,13 @@ func TestBuildLookup(t *testing.T) {
 			},
 		},
 		// Invalid inputs (params should be nil).
-		{name: "episode with zero tvdb", req: &api.SearchRequest{MediaType: "episode", TvdbID: 0, Season: 1}, wantNil: true},
-		{name: "episode with negative tvdb", req: &api.SearchRequest{MediaType: "episode", TvdbID: -1, Season: 1}, wantNil: true},
-		{name: "movie with empty imdb", req: &api.SearchRequest{MediaType: "movie", ImdbID: ""}, wantNil: true},
-		{name: "movie with non-numeric imdb", req: &api.SearchRequest{MediaType: "movie", ImdbID: "ttabc"}, wantNil: true},
-		{name: "movie with letters inside imdb", req: &api.SearchRequest{MediaType: "movie", ImdbID: "tt12x45"}, wantNil: true},
-		{name: "empty media type with empty imdb", req: &api.SearchRequest{MediaType: "", ImdbID: ""}, wantNil: true},
-		{name: "unknown media type with no imdb", req: &api.SearchRequest{MediaType: "other", ImdbID: ""}, wantNil: true},
+		{name: "episode with zero tvdb", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: 0, Season: 1}, wantNil: true},
+		{name: "episode with negative tvdb", req: &subflux.SearchRequest{MediaType: "episode", TvdbID: -1, Season: 1}, wantNil: true},
+		{name: "movie with empty imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: ""}, wantNil: true},
+		{name: "movie with non-numeric imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "ttabc"}, wantNil: true},
+		{name: "movie with letters inside imdb", req: &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt12x45"}, wantNil: true},
+		{name: "empty media type with empty imdb", req: &subflux.SearchRequest{MediaType: "", ImdbID: ""}, wantNil: true},
+		{name: "unknown media type with no imdb", req: &subflux.SearchRequest{MediaType: "other", ImdbID: ""}, wantNil: true},
 	}
 
 	for _, tt := range tests {
@@ -782,10 +795,10 @@ func TestDownload_redactsPasskeyFromTransportError(t *testing.T) {
 		client: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, errors.New("dial tcp: i/o timeout")
 		})},
-		dlCache: dlcache.New(10, 1<<20),
+		dlCache: newDownloadCache(10, 1<<20),
 	}
 
-	_, err := p.Download(t.Context(), &api.Subtitle{ID: "123"})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{ID: "123"})
 	if err == nil {
 		t.Fatal("Download() with a failing transport expected an error")
 	}

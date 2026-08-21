@@ -14,10 +14,10 @@ func TestCorrectFramerate_too_few_cues(t *testing.T) {
 	inc := makeCues(5, 0, 2*time.Second)
 	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Rate != 1.0 {
-		t.Fatalf("expected rate 1.0, got %f", result.Rate)
+		t.Errorf("expected rate 1.0, got %f", result.Rate)
 	}
 	if result.Confidence != ConfidenceNone {
-		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
+		t.Errorf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
 
@@ -46,10 +46,10 @@ func TestCorrectFramerate_known_ratio_23976_to_25(t *testing.T) {
 
 	result := correctFramerate(t.Context(), ref, inc, "")
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected framerate detection, got no confidence")
+		t.Error("expected framerate detection, got no confidence")
 	}
 	if result.Method != MethodFramerate {
-		t.Fatalf("expected method 'framerate', got %q", result.Method)
+		t.Errorf("expected method 'framerate', got %q", result.Method)
 	}
 }
 
@@ -275,12 +275,12 @@ func TestGoldenSectionSearch_real_ratio(t *testing.T) {
 	t.Parallel()
 	// Use a non-standard ratio that doesn't match any known pair.
 	ref := makeLongCues(100, 30*time.Minute)
-	// Apply a custom ratio of 1.03 (not in knownRatios).
+	// Apply a custom ratio of 1.03 (not in framerate.KnownRatios).
 	inc := scaleCuesForTest(ref, 1.03)
 	// observedRatio should be close to 1.03.
 	result := goldenSectionSearch(t.Context(), ref, inc, 1.03, 0.95)
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence from GSS with real ratio")
+		t.Error("expected some confidence from GSS with real ratio")
 	}
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)
@@ -388,8 +388,9 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 	ref := makeLongCues(100, 30*time.Minute)
 
 	// The known ratio 25/23.976 ≈ 1.04270937...
-	// Apply a slightly different ratio (1.043) that's within framerateRatioTolerance
-	// of the known pair, but different enough that applying the exact known ratio
+	// Apply a slightly different ratio (1.043) that's within
+	// defaultFramerateConfig.RatioTolerance of the known pair, but different
+	// enough that applying the exact known ratio
 	// produces >200ms residual on some cues.
 	actualRatio := 1.043
 	inc := make([]Cue, len(ref))
@@ -409,7 +410,7 @@ func TestCorrectFramerate_known_ratio_rejected_falls_through_to_GSS(t *testing.T
 
 	// The function should still produce a result (via GSS fallthrough).
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence after GSS fallthrough")
+		t.Error("expected some confidence after GSS fallthrough")
 	}
 	if result.Method != MethodFramerate {
 		t.Errorf("expected method 'framerate', got %q", result.Method)

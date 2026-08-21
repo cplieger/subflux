@@ -21,36 +21,45 @@ func TestBuildVideoArgs(t *testing.T) {
 				t.Error("buildVideoArgs(0) should not contain -ss")
 			}
 		}
-		assertContains(t, args, "file:/media/movie.mkv",
-			"buildVideoArgs() missing file: prefixed input path")
-		assertContains(t, args, "pipe:1",
-			"buildVideoArgs() missing pipe:1 output")
-		assertContains(t, args, "frag_keyframe+empty_moov+default_base_moof",
-			"buildVideoArgs() missing fragmented movflags")
+		if !slices.Contains(args, "file:/media/movie.mkv") {
+			t.Error("buildVideoArgs() missing file: prefixed input path")
+		}
+		if !slices.Contains(args, "pipe:1") {
+			t.Error("buildVideoArgs() missing pipe:1 output")
+		}
+		if !slices.Contains(args, "frag_keyframe+empty_moov+default_base_moof") {
+			t.Error("buildVideoArgs() missing fragmented movflags")
+		}
 	})
 
 	t.Run("with start offset", func(t *testing.T) {
 		t.Parallel()
 		args := buildVideoArgs("/media/movie.mkv", 120.5)
 
-		assertContains(t, args, "-ss",
-			"buildVideoArgs(120.5) should contain -ss")
-		assertContains(t, args, "120.500",
-			"buildVideoArgs(120.5) should contain formatted offset")
+		if !slices.Contains(args, "-ss") {
+			t.Error("buildVideoArgs(120.5) should contain -ss")
+		}
+		if !slices.Contains(args, "120.500") {
+			t.Error("buildVideoArgs(120.5) should contain formatted offset")
+		}
 	})
 
 	t.Run("encoding settings", func(t *testing.T) {
 		t.Parallel()
 		args := buildVideoArgs("/media/movie.mkv", 0)
 
-		assertContains(t, args, "libx264",
-			"buildVideoArgs() should use libx264 codec")
-		assertContains(t, args, "ultrafast",
-			"buildVideoArgs() should use ultrafast preset")
-		assertContains(t, args, "scale=-2:360",
-			"buildVideoArgs() should scale to 360p")
-		assertContains(t, args, "aac",
-			"buildVideoArgs() should use aac audio codec")
+		if !slices.Contains(args, "libx264") {
+			t.Error("buildVideoArgs() should use libx264 codec")
+		}
+		if !slices.Contains(args, "ultrafast") {
+			t.Error("buildVideoArgs() should use ultrafast preset")
+		}
+		if !slices.Contains(args, "scale=-2:360") {
+			t.Error("buildVideoArgs() should scale to 360p")
+		}
+		if !slices.Contains(args, "aac") {
+			t.Error("buildVideoArgs() should use aac audio codec")
+		}
 	})
 
 	t.Run("ss appears before input for fast seek", func(t *testing.T) {
@@ -83,40 +92,48 @@ func TestBuildBufferedArgs(t *testing.T) {
 				t.Error("buildBufferedArgs(0) should not contain -ss")
 			}
 		}
-		assertContains(t, args, "/tmp/out.mp4",
-			"buildBufferedArgs() missing output path")
-		assertContains(t, args, "+faststart",
-			"buildBufferedArgs() missing faststart movflag")
-		assertContains(t, args, "-y",
-			"buildBufferedArgs() missing -y flag")
-		assertContains(t, args, "-t",
-			"buildBufferedArgs() missing -t duration limit")
+		if !slices.Contains(args, "/tmp/out.mp4") {
+			t.Error("buildBufferedArgs() missing output path")
+		}
+		if !slices.Contains(args, "+faststart") {
+			t.Error("buildBufferedArgs() missing faststart movflag")
+		}
+		if !slices.Contains(args, "-y") {
+			t.Error("buildBufferedArgs() missing -y flag")
+		}
+		if !slices.Contains(args, "-t") {
+			t.Error("buildBufferedArgs() missing -t duration limit")
+		}
 	})
 
 	t.Run("with start offset", func(t *testing.T) {
 		t.Parallel()
 		args := buildBufferedArgs("/media/movie.mkv", 60.0, "/tmp/out.mp4")
 
-		assertContains(t, args, "-ss",
-			"buildBufferedArgs(60) should contain -ss")
-		assertContains(t, args, "60.000",
-			"buildBufferedArgs(60) should contain formatted offset")
+		if !slices.Contains(args, "-ss") {
+			t.Error("buildBufferedArgs(60) should contain -ss")
+		}
+		if !slices.Contains(args, "60.000") {
+			t.Error("buildBufferedArgs(60) should contain formatted offset")
+		}
 	})
 
 	t.Run("uses file prefix for input", func(t *testing.T) {
 		t.Parallel()
 		args := buildBufferedArgs("/media/movie.mkv", 0, "/tmp/out.mp4")
 
-		assertContains(t, args, "file:/media/movie.mkv",
-			"buildBufferedArgs() missing file: prefixed input path")
+		if !slices.Contains(args, "file:/media/movie.mkv") {
+			t.Error("buildBufferedArgs() missing file: prefixed input path")
+		}
 	})
 
 	t.Run("duration limit matches constant", func(t *testing.T) {
 		t.Parallel()
 		args := buildBufferedArgs("/media/movie.mkv", 0, "/tmp/out.mp4")
 
-		assertContains(t, args, strconv.Itoa(bufferedMaxDuration),
-			"buildBufferedArgs() duration should match bufferedMaxDuration")
+		if !slices.Contains(args, strconv.Itoa(bufferedMaxDuration)) {
+			t.Error("buildBufferedArgs() duration should match bufferedMaxDuration")
+		}
 	})
 
 	t.Run("ss appears before input for fast seek", func(t *testing.T) {
@@ -133,14 +150,6 @@ func TestBuildBufferedArgs(t *testing.T) {
 				ssIdx, iIdx)
 		}
 	})
-}
-
-// assertContains checks that a string slice contains the expected value.
-func assertContains(t *testing.T, args []string, want, msg string) {
-	t.Helper()
-	if !slices.Contains(args, want) {
-		t.Errorf("%s: %v does not contain %q", msg, args, want)
-	}
 }
 
 // --- responseStarted ---

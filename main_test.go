@@ -350,10 +350,10 @@ func TestDispatchCLI_single_parse_parity(t *testing.T) {
 	args := []string{"--pick", "3", "--download"}
 	code, handled := dispatchCLI("spy", args)
 	if !handled || code != 42 {
-		t.Fatalf("dispatchCLI(spy) = (%d, %v), want (42, true)", code, handled)
+		t.Errorf("dispatchCLI(spy) = (%d, %v), want (42, true)", code, handled)
 	}
 	if spyCalls != 1 {
-		t.Fatalf("runner invoked %d times, want exactly 1", spyCalls)
+		t.Errorf("runner invoked %d times, want exactly 1", spyCalls)
 	}
 
 	want, err := cliparse.ParseAndValidate(args, &spec)
@@ -537,5 +537,42 @@ func TestEnsureConfigFile_existing_file_untouched(t *testing.T) {
 	}
 	if len(lines) != 0 {
 		t.Errorf("existing-file path logged %v, want silence", lines)
+	}
+}
+
+// TestEnsureConfigFile_refuses_symlink_target pins the write path itself. A
+// dangling symlink at the config path is the one input that separates the two
+// possible implementations: os.Stat reports it not-exist so the write proceeds,
+// and a plain os.WriteFile then follows the link and creates a file wherever it
+// points — outside the config directory, under a name the deployment never
+// chose. The atomicfile path this shares with the other two writers of
+// config.yaml (cli.go, confighandlers) refuses a symlink target outright, which
+// is the same hardening that makes the write atomic and fsynced.
+func TestEnsureConfigFile_refuses_symlink_target(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	outside := filepath.Join(dir, "elsewhere.yaml")
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatalf("seed dangling symlink: %v", err)
+	}
+	// Witness the premise: the guard cannot see a dangling link, so the write
+	// is genuinely reached. Without this the test could pass for the wrong
+	// reason on a platform where Stat resolves differently.
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Skipf("dangling symlink does not stat as not-exist here (err = %v)", err)
+	}
+
+	if err := ensureConfigFile(path, []byte("default: true\n")); err == nil {
+		t.Error("ensureConfigFile() error = nil, want a refusal for a symlinked config path")
+	}
+	if _, err := os.Lstat(outside); err == nil {
+		t.Error("the write followed the symlink and created its target outside the config path")
+	}
+	fi, err := os.Lstat(path)
+	if err != nil {
+		t.Fatalf("lstat config path: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Error("the refusal replaced the symlink; it must leave the foreign object alone")
 	}
 }

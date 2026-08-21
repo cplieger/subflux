@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -18,16 +18,16 @@ import (
 // (Requirement 2.4).
 
 const (
-	testMT   = api.MediaTypeEpisode
+	testMT   = subflux.MediaTypeEpisode
 	testMID  = "tt0903747-s01e01"
 	testLang = "en"
 )
 
-var testProv = api.ProviderNameOpenSubtitles
+var testProv = subflux.ProviderNameOpenSubtitles
 
 // readAttempt reads a single search_attempts row back via a View transaction.
 // found is false when no row exists for the key.
-func readAttempt(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api.ProviderID) (rec attemptRec, found bool) {
+func readAttempt(t *testing.T, db *DB, mt subflux.MediaType, mid, lang string, p subflux.ProviderID) (rec attemptRec, found bool) {
 	t.Helper()
 	err := db.db.View(func(tx *bolt.Tx) error {
 		raw := tx.Bucket([]byte(bucketSearchAttempts)).Get(attemptKey(mt, mid, lang, p))
@@ -59,8 +59,8 @@ func attemptRowCount(t *testing.T, db *DB) int {
 	return n
 }
 
-func defaultParams() api.BackoffParams {
-	return api.BackoffParams{
+func defaultParams() subflux.BackoffParams {
+	return subflux.BackoffParams{
 		InitialDelay: 5 * time.Minute,
 		MaxDelay:     6 * time.Hour,
 		Multiplier:   2.0,
@@ -110,7 +110,7 @@ func TestRecordNoResult_newRow(t *testing.T) {
 // max-delay clamp (Requirement 2.1).
 func TestRecordNoResult_incrementsExponential(t *testing.T) {
 	db, _ := openTemp(t)
-	bp := api.BackoffParams{InitialDelay: 60 * time.Second, MaxDelay: 600 * time.Second, Multiplier: 2.0}
+	bp := subflux.BackoffParams{InitialDelay: 60 * time.Second, MaxDelay: 600 * time.Second, Multiplier: 2.0}
 
 	// Expected delay (= next_retry - last_tried) for the k-th call:
 	//   k==1 -> InitialDelay
@@ -155,7 +155,7 @@ func TestRecordNoResult_nextRetryFormula(t *testing.T) {
 		initialSec := rapid.IntRange(1, 120).Draw(rt, "initialSec")
 		maxSec := rapid.IntRange(1, 7200).Draw(rt, "maxSec")
 		mult := rapid.SampledFrom([]float64{1.0, 1.5, 2.0, 3.0}).Draw(rt, "multiplier")
-		bp := api.BackoffParams{
+		bp := subflux.BackoffParams{
 			InitialDelay: time.Duration(initialSec) * time.Second,
 			MaxDelay:     time.Duration(maxSec) * time.Second,
 			Multiplier:   mult,
@@ -309,12 +309,12 @@ func TestBackedOffProviders_maxAttemptsZeroRetryOnly(t *testing.T) {
 func TestBackedOffProviders_prefixIsolation(t *testing.T) {
 	db, _ := openTemp(t)
 	future := time.Now().Add(time.Hour)
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt12", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "fr", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt12", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "fr", testProv, attemptRec{NextRetry: future, Failures: 1})
 
 	// Querying tt1/en must return only the tt1/en row, not tt12/en.
-	got, err := db.BackedOffProviders(t.Context(), api.MediaTypeMovie, "tt1", "en", 0)
+	got, err := db.BackedOffProviders(t.Context(), subflux.MediaTypeMovie, "tt1", "en", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestBackedOffProviders_prefixIsolation(t *testing.T) {
 	}
 
 	// Querying language "f" must NOT match the "fr" row.
-	got, err = db.BackedOffProviders(t.Context(), api.MediaTypeMovie, "tt1", "f", 0)
+	got, err = db.BackedOffProviders(t.Context(), subflux.MediaTypeMovie, "tt1", "f", 0)
 	if err != nil {
 		t.Fatalf("BackedOffProviders: %v", err)
 	}
@@ -333,10 +333,10 @@ func TestBackedOffProviders_prefixIsolation(t *testing.T) {
 }
 
 // providerSetPool is a small pool of distinct providers for the property test.
-var providerSetPool = []api.ProviderID{
-	api.ProviderNameOpenSubtitles,
-	api.ProviderNameGestdown,
-	api.ProviderNameSubDL,
+var providerSetPool = []subflux.ProviderID{
+	subflux.ProviderNameOpenSubtitles,
+	subflux.ProviderNameGestdown,
+	subflux.ProviderNameSubDL,
 }
 
 // TestBackedOffProviders_predicate is a property test asserting the returned
@@ -353,7 +353,7 @@ func TestBackedOffProviders_predicate(t *testing.T) {
 			future   bool
 			present  bool
 		}
-		specs := map[api.ProviderID]spec{}
+		specs := map[subflux.ProviderID]spec{}
 		for _, p := range providerSetPool {
 			present := rapid.Bool().Draw(rt, "present-"+string(p))
 			s := spec{present: present}
@@ -381,7 +381,7 @@ func TestBackedOffProviders_predicate(t *testing.T) {
 
 		// Reference predicate, mirroring the documented semantics.
 		maxAttempts := max(rawMax, 0)
-		var want []api.ProviderID
+		var want []subflux.ProviderID
 		for _, p := range providerSetPool {
 			s := specs[p]
 			if !s.present {
@@ -402,7 +402,7 @@ func TestBackedOffProviders_predicate(t *testing.T) {
 // putAttemptRow inserts a search_attempts row directly through the index
 // chokepoint so tests can control failures/next_retry without depending on the
 // internal clock.
-func putAttemptRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p api.ProviderID, rec attemptRec) {
+func putAttemptRow(t *testing.T, db *DB, mt subflux.MediaType, mid, lang string, p subflux.ProviderID, rec attemptRec) {
 	t.Helper()
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		return putAttempt(tx, mt, mid, lang, p, &rec)
@@ -413,12 +413,12 @@ func putAttemptRow(t *testing.T, db *DB, mt api.MediaType, mid, lang string, p a
 
 // sameProviderSet reports whether a and b contain the same providers regardless
 // of order.
-func sameProviderSet(a, b []api.ProviderID) bool {
+func sameProviderSet(a, b []subflux.ProviderID) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	as := append([]api.ProviderID(nil), a...)
-	bs := append([]api.ProviderID(nil), b...)
+	as := append([]subflux.ProviderID(nil), a...)
+	bs := append([]subflux.ProviderID(nil), b...)
 	slices.Sort(as)
 	slices.Sort(bs)
 	for i := range as {

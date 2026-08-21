@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -24,7 +24,7 @@ import (
 // --- Fixed pools (small, to force collisions / updates / deletes) ---
 
 type tripleKey struct {
-	mt   api.MediaType
+	mt   subflux.MediaType
 	mid  string
 	lang string
 }
@@ -35,39 +35,39 @@ type tripleKey struct {
 // prefix collisions in ix_state_quad, and the variant cycle makes one triple
 // carry two different variants (quad-boundary collisions within a language).
 var statePool = []tripleKey{
-	{api.MediaTypeMovie, "tt1", "en"},
-	{api.MediaTypeMovie, "tt1", "fr"},
-	{api.MediaTypeEpisode, "tt2", "en"},
+	{subflux.MediaTypeMovie, "tt1", "en"},
+	{subflux.MediaTypeMovie, "tt1", "fr"},
+	{subflux.MediaTypeEpisode, "tt2", "en"},
 }
 
-var variantPool = []api.Variant{api.VariantStandard, api.VariantForced}
+var variantPool = []subflux.Variant{subflux.VariantStandard, subflux.VariantForced}
 
 // quadFor maps a surrogate id to its (deterministic) quad, so both the write
 // path and the verification re-derive the same ix_state_quad key without a
 // separate model.
-func quadFor(id int64) (tripleKey, api.Variant) {
+func quadFor(id int64) (tripleKey, subflux.Variant) {
 	return statePool[int(id-1)%len(statePool)], variantPool[int(id-1)%len(variantPool)]
 }
 
-var providerPool = []api.ProviderID{
-	api.ProviderNameOpenSubtitles,
-	api.ProviderNameGestdown,
+var providerPool = []subflux.ProviderID{
+	subflux.ProviderNameOpenSubtitles,
+	subflux.ProviderNameGestdown,
 }
 
 var videoPathPool = []string{"/media/a.mkv", "/media/b.mkv"}
 
 // scanMediaPool is the (mt, mid) pool for scan_state rows.
 var scanMediaPool = []tripleKey{
-	{mt: api.MediaTypeMovie, mid: "tt1"},
-	{mt: api.MediaTypeEpisode, mid: "tt2"},
+	{mt: subflux.MediaTypeMovie, mid: "tt1"},
+	{mt: subflux.MediaTypeEpisode, mid: "tt2"},
 }
 
 type fileSpec struct {
-	mt      api.MediaType
+	mt      subflux.MediaType
 	mid     string
 	lang    string
-	variant api.Variant
-	source  api.SubtitleSource
+	variant subflux.Variant
+	source  subflux.SubtitleSource
 	path    string
 }
 
@@ -76,10 +76,10 @@ func (f fileSpec) key() []byte {
 }
 
 var fileSpecPool = []fileSpec{
-	{api.MediaTypeMovie, "tt1", "en", api.VariantStandard, api.SourceExternal, "/media/a.en.srt"},
-	{api.MediaTypeMovie, "tt1", "fr", api.VariantHI, api.SourceExternal, "/media/a.fr.srt"},
-	{api.MediaTypeEpisode, "tt2", "en", api.VariantStandard, api.SourceEmbedded, ""},
-	{api.MediaTypeEpisode, "tt2", "en", api.VariantStandard, api.SourceExternal, "/media/b.en.srt"},
+	{subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard, subflux.SourceExternal, "/media/a.en.srt"},
+	{subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantHI, subflux.SourceExternal, "/media/a.fr.srt"},
+	{subflux.MediaTypeEpisode, "tt2", "en", subflux.VariantStandard, subflux.SourceEmbedded, ""},
+	{subflux.MediaTypeEpisode, "tt2", "en", subflux.VariantStandard, subflux.SourceExternal, "/media/b.en.srt"},
 }
 
 var baseTime = time.Unix(1_700_000_000, 0).UTC()

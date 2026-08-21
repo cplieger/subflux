@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestParseManualSearchQuery(t *testing.T) {
@@ -15,7 +15,7 @@ func TestParseManualSearchQuery(t *testing.T) {
 		name        string
 		url         string
 		wantLang    string
-		wantType    api.MediaType
+		wantType    subflux.MediaType
 		wantTitle   string
 		wantRelease string
 		wantImdb    string
@@ -102,12 +102,12 @@ func TestParseManualSearchQuery(t *testing.T) {
 func TestBuildManualSearchResults_basic(t *testing.T) {
 	t.Parallel()
 
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", Language: "fr", ReleaseName: "Movie.2024.srt", MatchedBy: "hash", ID: "123", HearingImp: true, Forced: false}, Score: 300, Matches: map[string]int{"source": 28, "release_group": 23}},
-		{Sub: api.Subtitle{Provider: "yify", Language: "en", ReleaseName: "Movie.2024.en.srt", MatchedBy: "title", ID: "456"}, Score: 200},
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{Provider: "os", Language: "fr", ReleaseName: "Movie.2024.srt", MatchedBy: "hash", ID: "123", HearingImp: true, Forced: false}, Score: 300, Matches: map[string]int{"source": 28, "release_group": 23}},
+		{Sub: subflux.Subtitle{Provider: "yify", Language: "en", ReleaseName: "Movie.2024.en.srt", MatchedBy: "title", ID: "456"}, Score: 200},
 	}
 
-	refs := []api.DownloadedRef{
+	refs := []subflux.DownloadedRef{
 		{ReleaseName: "Movie.2024.srt", Provider: "os"},
 	}
 	results := manualops.BuildSearchResults(scored, refs, nil)
@@ -159,10 +159,10 @@ func TestBuildManualSearchResults_basic(t *testing.T) {
 func TestBuildManualSearchResults_limits_to_max(t *testing.T) {
 	t.Parallel()
 
-	scored := make([]api.ScoredResult, 60)
+	scored := make([]subflux.ScoredResult, 60)
 	for i := range scored {
-		scored[i] = api.ScoredResult{
-			Sub:   api.Subtitle{Provider: "os", Language: "en", ID: "id"},
+		scored[i] = subflux.ScoredResult{
+			Sub:   subflux.Subtitle{Provider: "os", Language: "en", ID: "id"},
 			Score: 100 - i,
 		}
 	}
@@ -188,8 +188,8 @@ func TestBuildManualSearchResults_empty_input(t *testing.T) {
 func TestBuildManualSearchResults_fewer_than_10(t *testing.T) {
 	t.Parallel()
 
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", Language: "fr", ID: "1"}, Score: 100},
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{Provider: "os", Language: "fr", ID: "1"}, Score: 100},
 	}
 
 	results := manualops.BuildSearchResults(scored, nil, nil)
@@ -202,12 +202,12 @@ func TestBuildManualSearchResults_fewer_than_10(t *testing.T) {
 func TestBuildManualSearchResults_on_disk_requires_both_provider_and_release(t *testing.T) {
 	t.Parallel()
 
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", Language: "fr", ReleaseName: "Movie.srt", ID: "1"}, Score: 100},
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{Provider: "os", Language: "fr", ReleaseName: "Movie.srt", ID: "1"}, Score: 100},
 	}
 
 	// Same provider, different release.
-	results := manualops.BuildSearchResults(scored, []api.DownloadedRef{
+	results := manualops.BuildSearchResults(scored, []subflux.DownloadedRef{
 		{ReleaseName: "Different.srt", Provider: "os"},
 	}, nil)
 	if results[0].OnDisk {
@@ -215,7 +215,7 @@ func TestBuildManualSearchResults_on_disk_requires_both_provider_and_release(t *
 	}
 
 	// Different provider, same release.
-	results = manualops.BuildSearchResults(scored, []api.DownloadedRef{
+	results = manualops.BuildSearchResults(scored, []subflux.DownloadedRef{
 		{ReleaseName: "Movie.srt", Provider: "yify"},
 	}, nil)
 	if results[0].OnDisk {
@@ -226,22 +226,22 @@ func TestBuildManualSearchResults_on_disk_requires_both_provider_and_release(t *
 func TestBuildManualSearchResults_multiple_historical_matches(t *testing.T) {
 	t.Parallel()
 
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{
 			Provider: "os", Language: "fr",
 			ReleaseName: "Movie.2024.BluRay-GRP", ID: "1",
 		}, Score: 300},
-		{Sub: api.Subtitle{
+		{Sub: subflux.Subtitle{
 			Provider: "subdl", Language: "fr",
 			ReleaseName: "Movie.2024.WEB-DL-OTHER", ID: "2",
 		}, Score: 250},
-		{Sub: api.Subtitle{
+		{Sub: subflux.Subtitle{
 			Provider: "yify", Language: "fr",
 			ReleaseName: "Movie.2024.Other-NEW", ID: "3",
 		}, Score: 200},
 	}
 
-	refs := []api.DownloadedRef{
+	refs := []subflux.DownloadedRef{
 		{ReleaseName: "Movie.2024.BluRay-GRP", Provider: "os"},
 		{ReleaseName: "Movie.2024.WEB-DL-OTHER", Provider: "subdl"},
 	}

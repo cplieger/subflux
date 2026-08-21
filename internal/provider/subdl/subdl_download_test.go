@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Download path validation ---
@@ -31,7 +31,7 @@ func TestDownload_rejects_non_relative_path(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			sub := &api.Subtitle{DownloadURL: tt.url}
+			sub := &subflux.Subtitle{DownloadURL: tt.url}
 			_, err := p.Download(t.Context(), sub)
 			if err == nil {
 				t.Errorf("Download(%q) expected error", tt.url)
@@ -68,9 +68,8 @@ func TestHandleDownloadResponse_429_rate_limit(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleDownloadResponse(429) expected error")
 	}
-	var rateErr *api.RateLimitError
-	if !errors.As(err, &rateErr) {
-		t.Errorf("handleDownloadResponse(429) error type = %T, want *api.RateLimitError", err)
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
+		t.Errorf("handleDownloadResponse(429) error type = %T, want *subflux.RateLimitError", err)
 	}
 }
 
@@ -85,9 +84,8 @@ func TestHandleDownloadResponse_500_small_body_rate_limit(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleDownloadResponse(500, small) expected error")
 	}
-	var rateErr *api.RateLimitError
-	if !errors.As(err, &rateErr) {
-		t.Errorf("handleDownloadResponse(500, small) error type = %T, want *api.RateLimitError", err)
+	if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
+		t.Errorf("handleDownloadResponse(500, small) error type = %T, want *subflux.RateLimitError", err)
 	}
 }
 
@@ -194,8 +192,7 @@ func TestHandleDownloadResponse_500_boundary_content_length(t *testing.T) {
 			if err == nil {
 				t.Fatal("handleDownloadResponse(500) expected error")
 			}
-			var rateErr *api.RateLimitError
-			isRateLimit := errors.As(err, &rateErr)
+			_, isRateLimit := errors.AsType[*subflux.RateLimitError](err)
 			if isRateLimit != tt.wantRateLimit {
 				t.Errorf("handleDownloadResponse(500, ContentLength=%d) rate_limit=%v, want %v",
 					tt.contentLength, isRateLimit, tt.wantRateLimit)

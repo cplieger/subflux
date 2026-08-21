@@ -24,7 +24,7 @@ func BenchmarkAlignWithSplits(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_ = alignWithSplits(b.Context(), ref, inc, 7.0)
 	}
 }

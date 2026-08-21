@@ -10,11 +10,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Deps holds the narrow dependencies the scan orchestration needs from
@@ -30,13 +32,13 @@ type Deps struct {
 	Alerts        AlertRecorder
 	ShowSkipCache *showskip.Cache
 	// ClearCaches clears provider download caches after scan completion.
-	ClearCaches func(providers []api.Provider)
+	ClearCaches func(providers []provider.Provider)
 }
 
 // ScanStore is the narrow store interface for scan state tracking.
 type ScanStore interface {
 	RecentlyScanned(ctx context.Context, cutoff time.Time) (map[string]bool, error)
-	RecordScanState(ctx context.Context, rec *api.ScanRecord) error
+	RecordScanState(ctx context.Context, rec *subflux.ScanRecord) error
 	// Scan-cycle mark (duration-aware resume): set when a full scan begins,
 	// cleared on normal completion. A dangling mark at the next scan start
 	// means the previous cycle was interrupted; the resume cutoff extends
@@ -55,16 +57,17 @@ type ScanMetrics interface {
 
 // EventPublisher publishes events to SSE clients. Scan events carry the
 // activity id (both) and the terminal outcome (scan:done).
+// *events.EventBus satisfies it structurally.
 type EventPublisher interface {
-	PublishCoverageUpdate(mediaType api.MediaType, mediaID string)
-	PublishScanStart(action, detail string, source activity.ActivitySource, actID string)
-	PublishScanDone(action, detail string, source activity.ActivitySource, actID string, outcome activity.Outcome)
+	PublishCoverageUpdate(ev *events.CoverageEvent)
+	PublishScanStart(ev *events.ScanEvent)
+	PublishScanDone(ev *events.ScanEvent)
 }
 
 // ActivityTracker manages scan activity lifecycle.
 type ActivityTracker interface {
-	Start(action, detail string, source activity.ActivitySource) string
-	StartScan(action, detail string, source activity.ActivitySource,
+	Start(action, detail string, source activity.Source) string
+	StartScan(action, detail string, source activity.Source,
 		scope activity.ScanScope, role auth.Role) (id string, existing bool)
 	End(id string)
 	Fail(id string)
@@ -87,8 +90,8 @@ type ActivityTracker interface {
 // no longer report cancellable, so a cancel arriving after completion
 // answers 409, never a 204 for work that is already done. Callers keep a
 // deferred unregister as the panic fallback; the release is idempotent.
-func FinishScanActivity(unregister func(), tracker ActivityTracker, events EventPublisher,
-	actID, action, detail string, source activity.ActivitySource, outcome activity.Outcome,
+func FinishScanActivity(unregister func(), tracker ActivityTracker, publisher EventPublisher,
+	actID, action, detail string, source activity.Source, outcome activity.Outcome,
 ) {
 	unregister()
 	switch outcome {
@@ -101,7 +104,9 @@ func FinishScanActivity(unregister func(), tracker ActivityTracker, events Event
 	case activity.OutcomeShutdown:
 		return
 	}
-	events.PublishScanDone(action, detail, source, actID, outcome)
+	publisher.PublishScanDone(&events.ScanEvent{
+		Action: action, Detail: detail, Source: source, ActivityID: actID, Outcome: outcome,
+	})
 }
 
 // stopRequested reports (without blocking) whether the stop signal fired.
@@ -150,24 +155,17 @@ type AlertRecorder interface {
 // ScanSonarrClient is the Sonarr surface the full-scan engine needs:
 // wanted-episode iteration, exclude-tag resolution, and a post-download rescan.
 type ScanSonarrClient interface {
-	GetWantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
+	WantedEpisodes(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Series, arrapi.Episode) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanSeries(ctx context.Context, seriesID int) error
 }
 
 // ScanRadarrClient is the Radarr surface the full-scan engine needs.
 type ScanRadarrClient interface {
-	GetWantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
+	WantedMovies(ctx context.Context, excludeTagIDs map[int]struct{}, fn func(arrapi.Movie) error) error
 	ResolveExcludeTagIDs(ctx context.Context, tagNames []string, logMissing bool) map[int]struct{}
 	RescanMovie(ctx context.Context, movieID int) error
 }
-
-// Compile-time assertions: the arrapi-backed role clients satisfy the scan
-// surfaces.
-var (
-	_ ScanSonarrClient = api.SonarrClient(nil)
-	_ ScanRadarrClient = api.RadarrClient(nil)
-)
 
 // buildSeedDeps assembles the season tracker's earlyStop seeding inputs from
 // the live scan state: the store's backoff reader, the enabled provider set,
@@ -178,7 +176,7 @@ func buildSeedDeps(deps *Deps, ls *LiveState) seedDeps {
 	if !adaptive.Enabled || deps.Backoff == nil {
 		return seedDeps{}
 	}
-	enabled := make(map[api.ProviderID]struct{}, len(ls.Providers))
+	enabled := make(map[subflux.ProviderID]struct{}, len(ls.Providers))
 	for _, p := range ls.Providers {
 		enabled[p.Name()] = struct{}{}
 	}
@@ -190,23 +188,42 @@ func buildSeedDeps(deps *Deps, ls *LiveState) seedDeps {
 	}
 }
 
-// LiveState holds the runtime state needed for a scan pass.
-type LiveState struct {
-	Cfg         api.ConfigProvider
-	Engine      api.SearchEngine
-	Sonarr      ScanSonarrClient
-	Radarr      ScanRadarrClient
-	ShowCounter api.ShowSubtitleCounter
-	Providers   []api.Provider
+// ScanEngine is the two things a scan asks of the search engine: search a
+// media item's language targets, or record what is already on disk without
+// touching a provider. Two of the eight methods the engine offers — score
+// simulation, provider-timeout state and post-download processing belong to
+// the manual and query paths, and a scan pass has no business reaching them.
+//
+// Exported because the scheduler names it: its LiveState carries the engine
+// straight through to this one, and naming this type is what keeps the two
+// declarations from drifting apart.
+type ScanEngine interface {
+	SearchTargets(ctx context.Context, req *subflux.SearchRequest, videoPath string, targets []subflux.SubtitleTarget) (subflux.SearchResult, error)
+	// InventoryCoverage records the on-disk/embedded inventory for an item
+	// WITHOUT any provider work, stamping its scan state as
+	// inventoried-not-searched. The skip paths (season early stop,
+	// show-level skip) call it so coverage stays truthful for items the
+	// scanner deliberately does not search.
+	InventoryCoverage(ctx context.Context, req *subflux.SearchRequest, videoPath string) (coverageChanged bool)
 }
 
-// ScanOutcome is a type alias for api.ScanOutcome.
-type ScanOutcome = api.ScanOutcome
+// LiveState holds the runtime state needed for a scan pass.
+type LiveState struct {
+	Cfg         ScanCfg
+	Engine      ScanEngine
+	Sonarr      ScanSonarrClient
+	Radarr      ScanRadarrClient
+	ShowCounter showCounter
+	Providers   []provider.Provider
+}
+
+// ScanOutcome is a type alias for subflux.ScanOutcome.
+type ScanOutcome = subflux.ScanOutcome
 
 // Scan outcome constants re-exported from api for local use.
 const (
-	ScanFound     = api.ScanFound
-	ScanSkipped   = api.ScanSkipped
-	ScanNoResult  = api.ScanNoResult
-	ScanBackedOff = api.ScanBackedOff
+	ScanFound     = subflux.ScanFound
+	ScanSkipped   = subflux.ScanSkipped
+	ScanNoResult  = subflux.ScanNoResult
+	ScanBackedOff = subflux.ScanBackedOff
 )

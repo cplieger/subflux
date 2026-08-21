@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -15,7 +15,7 @@ import (
 // scale (the README's 52k-episode reference deployment), so "optimize or
 // leave" decisions rest on measurements instead of intuition:
 //
-//   - GetManualLocks: index-only walk of ix_state_quad (manual flag lives in
+//   - ManualLocks: index-only walk of ix_state_quad (manual flag lives in
 //     the projection value; no primary dereference).
 //   - HistoryMediaIDs: DISTINCT media_id per media type, currently a full
 //     bucket ForEach with map dedup.
@@ -31,7 +31,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 	b.Helper()
 
 	type rowSpec struct {
-		mt     api.MediaType
+		mt     subflux.MediaType
 		mid    string
 		manual bool
 	}
@@ -39,14 +39,14 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 	for s := range series {
 		for e := range epsPer {
 			rows = append(rows, rowSpec{
-				api.MediaTypeEpisode,
+				subflux.MediaTypeEpisode,
 				fmt.Sprintf("tt%06d-s01e%02d", 100000+s, e+1), false,
 			})
 		}
 	}
 	epRows := len(rows)
 	for m := range movies {
-		rows = append(rows, rowSpec{api.MediaTypeMovie, fmt.Sprintf("tt%07d", 2000000+m), false})
+		rows = append(rows, rowSpec{subflux.MediaTypeMovie, fmt.Sprintf("tt%07d", 2000000+m), false})
 	}
 	// Sprinkle manual rows over existing episode quads (a locked quad = its
 	// auto row plus one manual row).
@@ -73,7 +73,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 					MediaType:     r.mt,
 					MediaID:       r.mid,
 					Language:      "fr",
-					Variant:       api.VariantStandard,
+					Variant:       subflux.VariantStandard,
 					Provider:      "opensubtitles",
 					Path:          "/media/x/" + r.mid + ".fr.srt",
 					VideoPath:     "/media/x/" + r.mid + ".mkv",
@@ -97,7 +97,7 @@ func populateQuadIndex(b *testing.B, db *DB, series, epsPer, movies, locks int) 
 // and times the index-walk queries against it. HistoryMediaIDs now uses the
 // skip-scan (adopted after this benchmark showed ~8.9x on the later-sorting
 // media type at parity in the single-language worst case); the benchmark
-// remains to catch regressions and to price GetManualLocks' full walk.
+// remains to catch regressions and to price ManualLocks' full walk.
 func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	ctx := b.Context()
 	db, err := Open(filepath.Join(b.TempDir(), "bench.bolt"))
@@ -115,10 +115,10 @@ func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	eps, movs := populateQuadIndex(b, db, seriesN, epsPer, moviesN, locksN)
 	b.Logf("populated: %d episode rows, %d movie rows, %d manual-lock rows", eps, movs, locksN)
 
-	b.Run("GetManualLocks/current", func(b *testing.B) {
+	b.Run("ManualLocks/current", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			locks, err := db.GetManualLocks(ctx)
+			locks, err := db.ManualLocks(ctx)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -131,7 +131,7 @@ func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	b.Run("HistoryMediaIDs/episodes/current", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			ids, err := db.HistoryMediaIDs(ctx, api.MediaTypeEpisode, "")
+			ids, err := db.HistoryMediaIDs(ctx, subflux.MediaTypeEpisode, "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -144,7 +144,7 @@ func BenchmarkQuadIndexQueriesAtScale(b *testing.B) {
 	b.Run("HistoryMediaIDs/movies/current", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			ids, err := db.HistoryMediaIDs(ctx, api.MediaTypeMovie, "")
+			ids, err := db.HistoryMediaIDs(ctx, subflux.MediaTypeMovie, "")
 			if err != nil {
 				b.Fatal(err)
 			}

@@ -6,8 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- PUT /api/auth/password ---
@@ -15,7 +17,7 @@ import (
 // HandleChangePassword handles PUT /api/auth/password — changes the current user's
 // password after verifying the existing one, then invalidates all other sessions.
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		CurrentPassword string `json:"current_password"`
@@ -25,21 +27,23 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := ClientIP(r)
-	allowed, retryAfter := h.RateLimiter.Allow(ip, user.Username)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(user.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
 		return
 	}
 
 	ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
 	if err != nil || !ok {
-		h.RateLimiter.Record(ip, user.Username)
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid current password")
+		h.RateLimiter.Record(rlIP, rlUser)
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid current password")
 		return
 	}
-	h.RateLimiter.Reset(ip, user.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 
 	ctx := r.Context()
 	// Password can authenticate on its own whenever basic auth is enabled,
@@ -52,26 +56,31 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		soleFactor = cfg.BasicAuthEnabled()
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, req.NewPassword, user.Username, soleFactor, checkBreach, h.HTTPClient)
+	hash, userMsg, hashErr := ValidateAndHashPassword(ctx, PasswordCheck{
+		Password:    req.NewPassword,
+		Username:    user.Username,
+		SoleFactor:  soleFactor,
+		CheckBreach: checkBreach,
+	}, h.HTTPClient)
 	if userMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, userMsg)
 		return
 	}
 	if hashErr != nil {
 		slog.Error("password change: hash", "error", hashErr)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	user.PasswordHash = hash
+	user.PasswordHash = string(hash)
 	user.UpdatedAt = time.Now()
 	if err := h.SecDB.UpdateUser(ctx, user); err != nil {
 		slog.Error("password change: update user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	currentHash := api.SessionHashFromContext(ctx)
+	currentHash := SessionHashFromContext(ctx)
 	if err := h.SecDB.DeleteUserSessions(ctx, user.ID, currentHash); err != nil {
 		slog.Warn("password change: invalidate sessions", "error", err)
 	}
@@ -79,6 +88,6 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	slog.Info("security: password changed",
 		"username", user.Username, "ip", ClientIP(r))
 
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditPasswordChange, true, user.Username)
 }

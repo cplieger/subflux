@@ -134,7 +134,7 @@ func TestIntegration_PostProcess_UTF16LE(t *testing.T) {
 
 	result := NormalizeEncoding(utf16le)
 	if !utf8.Valid(result) {
-		t.Fatal("result is not valid UTF-8")
+		t.Error("result is not valid UTF-8")
 	}
 	if bytes.Contains(result, []byte{0xFF, 0xFE}) {
 		t.Error("BOM not stripped")
@@ -155,7 +155,7 @@ func TestIntegration_PostProcess_UTF16BE(t *testing.T) {
 
 	result := NormalizeEncoding(utf16be)
 	if !utf8.Valid(result) {
-		t.Fatal("result is not valid UTF-8")
+		t.Error("result is not valid UTF-8")
 	}
 	if !strings.Contains(string(result), "Bonjour") {
 		t.Errorf("content lost: %q", result)
@@ -169,7 +169,7 @@ func TestIntegration_PostProcess_Windows1252(t *testing.T) {
 
 	result := NormalizeEncoding(input)
 	if !utf8.Valid(result) {
-		t.Fatal("result is not valid UTF-8")
+		t.Error("result is not valid UTF-8")
 	}
 	if !strings.Contains(string(result), "café") {
 		t.Errorf("Windows-1252 not converted: %q", result)

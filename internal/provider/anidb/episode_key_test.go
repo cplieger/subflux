@@ -22,13 +22,13 @@ func oldEpisodeCacheKey(seriesID int, epNo string) string {
 
 // TestEpisodeCacheKeyBuildersAgree is the site's load-bearing test: this key is
 // built in TWO places — buildEpisodeCacheKey on the WRITE side (from AniDB's
-// episodes XML) and getEpisodeID on the READ side (from the resolved episode
+// episodes XML) and episodeID on the READ side (from the resolved episode
 // number) — and if they disagree by one byte every lookup misses, degrading the
 // cache to one API call per episode against AniDB's 1-req-per-2s limit.
 //
 // It asserts agreement through the real read path rather than by re-deriving
 // the key: a cache seeded exactly as cacheEpisodes seeds it must be HIT by
-// getEpisodeID, which returns from its fast path before any HTTP.
+// episodeID, which returns from its fast path before any HTTP.
 func TestEpisodeCacheKeyBuildersAgree(t *testing.T) {
 	t.Parallel()
 
@@ -46,13 +46,13 @@ func TestEpisodeCacheKeyBuildersAgree(t *testing.T) {
 			m := NewMapper("")
 			m.episodeCache[buildEpisodeCacheKey(seriesID, xmlEpNo)] = epID
 
-			got, err := m.getEpisodeID(t.Context(), seriesID, episode)
+			got, err := m.episodeID(t.Context(), seriesID, episode)
 			if err != nil {
-				t.Fatalf("getEpisodeID() error = %v; the write-side key %q did not match the read-side lookup",
+				t.Fatalf("episodeID() error = %v; the write-side key %q did not match the read-side lookup",
 					err, buildEpisodeCacheKey(seriesID, xmlEpNo))
 			}
 			if got != epID {
-				t.Errorf("getEpisodeID() = %d, want %d", got, epID)
+				t.Errorf("episodeID() = %d, want %d", got, epID)
 			}
 		})
 	}

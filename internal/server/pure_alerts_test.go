@@ -50,7 +50,7 @@ func TestHandleDismissAlert(t *testing.T) {
 				http.MethodDelete, "/api/alerts"+query, http.NoBody)
 			w := httptest.NewRecorder()
 
-			s.handleDismissAlert(w, req)
+			activityH(s).HandleDismissAlert(w, req)
 
 			if w.Code != tt.wantCode {
 				t.Errorf("handleDismissAlert(%s) status = %d, want %d",
@@ -70,7 +70,7 @@ func TestActivityLog_progress_updates_entry(t *testing.T) {
 	al.Progress(id, 5, 20, "updated detail")
 
 	if n := len(al.Entries()); n != 1 {
-		t.Fatalf("entries count = %d, want 1", n)
+		t.Errorf("entries count = %d, want 1", n)
 	}
 	e, _ := al.Get(id)
 	if e.Current != 5 {

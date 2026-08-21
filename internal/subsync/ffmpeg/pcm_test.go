@@ -72,7 +72,7 @@ func TestReadPCMSamples_stopsAtMaxWithinRead(t *testing.T) {
 func TestReadPCMSamples_largeMaxDoesNotPreallocateCap(t *testing.T) {
 	got := readPCMSamples(bytes.NewReader([]byte{0x01, 0x00, 0x02, 0x00}), 100_000_000)
 	if len(got) != 2 {
-		t.Fatalf("readPCMSamples(4 bytes, max=100M) len = %d, want 2", len(got))
+		t.Errorf("readPCMSamples(4 bytes, max=100M) len = %d, want 2", len(got))
 	}
 	if cap(got) > initialPCMBufSamples {
 		t.Errorf("readPCMSamples(4 bytes, max=100M) cap = %d, want <= %d (no cap-sized prealloc)",

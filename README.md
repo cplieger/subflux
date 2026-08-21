@@ -41,7 +41,7 @@ Subflux was born from debugging Bazarr consuming 15-20 GB of RAM on a 52,000-epi
 
 ### The sync engine
 
-Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions: split-aware and framerate-aware alignment, audio sync via a re-tuned voice-activity detector cross-correlated with the subtitle's dialogue signal, and cross-language anchor matching (a French subtitle can sync against the English track embedded in the file). The strategies run concurrently and vote; the winner is applied only above a confidence threshold, so a sync that isn't confident doesn't happen. On the audio benchmark this passes 91.4% of 326 files with ~120 ms residual error.
+Downloaded subtitles rarely match your exact file, so subflux syncs every download before it reaches the disk. The engine is a from-scratch Go port of [alass](https://github.com/kaegi/alass) plus subflux's own additions: split-aware and framerate-aware alignment, audio sync via a re-tuned voice-activity detector cross-correlated with the subtitle's dialogue signal, and cross-language anchor matching (a French subtitle can sync against the English track embedded in the file). The strategies run concurrently and vote; the winner is applied only above a confidence threshold, so a sync that is not confident does not happen.
 
 Hash-matched and same-release downloads skip sync (their timing is already right), and forced subtitles skip it (too few cues to align reliably). Every saved file is post-processed: encoding normalization to UTF-8, hearing-impaired annotation removal, tag stripping, and whitespace cleanup. Auto-downloads sync against an embedded subtitle reference when the file has one (audio-based sync as an automatic fallback is opt-in); audio sync and manual offset adjustment are always available from the sync dialog.
 
@@ -60,10 +60,10 @@ First run lands in unconfigured mode: the settings dialog auto-opens and the ins
 ### Auth, API, and operations
 
 - **Multi-user auth (optional):** local passwords (Argon2id), passkeys/WebAuthn, OIDC with PKCE, per-user API keys, and login rate limiting.
-- **API and CLI:** the UI drives a JSON API you can use too; every CLI subcommand is a remote command against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`.
+- **API and CLI:** the UI drives a JSON API you can use too; the CLI's read and trigger subcommands run against a live instance (`subflux search`, `scan`, `status`, `locks`, `backoff`, `score`, ...) authenticated via `SUBFLUX_URL` / `SUBFLUX_API_KEY`. The account bootstrap commands (`reset-password`, `generate-api-key`) use a private Unix socket, so run them inside the container.
 - **Operations:** Prometheus metrics at `/metrics`, structured `slog` logging (UTC), a distroless file-marker healthcheck, graceful shutdown, scheduled bbolt hot backups with a staleness metric, database reconciliation before each scan, and scan resume after a restart.
 
-## Run it
+## Quick start
 
 Images are published to both `ghcr.io/cplieger/subflux` and `docker.io/cplieger/subflux`; use whichever registry you prefer.
 
@@ -94,7 +94,7 @@ Finishing saves the config and activates everything in place (providers, arr cli
 
 ## Configuration reference
 
-All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created with `subflux generate-api-key` or in the web UI) to authenticate them when auth is enabled.
+All settings are editable in the web UI (schema-driven form) and persist to `config.yaml`. To pre-author the file instead, copy the annotated [`config.example.yaml`](config.example.yaml). The CLI's subcommands, including manual search, run against a running instance via the `SUBFLUX_URL` env var; set `SUBFLUX_API_KEY` (created in the web UI, or with `subflux generate-api-key` inside the container) to authenticate them when auth is enabled.
 
 ### Environment variables in config.yaml
 
@@ -166,6 +166,18 @@ groups:
 Thresholds are starting points; add your scrape `job` label to the selectors if
 you run more than one instance, and route by whatever labels your Alertmanager
 uses.
+
+## Healthcheck
+
+The container probe runs `subflux health`, which reports healthy while the
+marker file `/tmp/.healthy` exists. Subflux creates it once the HTTP server is
+listening, in unconfigured mode as well as configured mode, and removes it on
+shutdown. So unhealthy means the process is gone or never finished starting, not
+that a scan failed or a provider is down: a bad provider key leaves the
+container healthy and serving the web UI so you can correct it. Docker checks
+every 30s after a 15s grace period and restarts the container after 3
+consecutive failures. `GET /api/health` is a separate, narrower signal for a
+load balancer, answering whether the server is ready to serve requests.
 
 ## Security
 

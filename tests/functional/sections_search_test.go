@@ -8,7 +8,7 @@ import (
 )
 
 // This file ports run.sh's search-focused sections: manual_search,
-// search_resolve, scoring, backoff, mock_provider, provider_errors.
+// search_resolve, scoring, backoff, synthetic_provider, provider_errors.
 
 func (s *suite) sectionManualSearch() {
 	s.log("=== Manual Search ===")
@@ -129,97 +129,97 @@ func (s *suite) sectionBackoff() {
 	s.logf("Clear lock (nonexistent): HTTP %s", s.lastStatus)
 }
 
-func (s *suite) sectionMockProvider() {
-	s.log("=== Mock Provider Modes ===")
+func (s *suite) sectionSyntheticProvider() {
+	s.log("=== Synthetic Provider Modes ===")
 
-	s.applyMockConfig("static", `      result_count: "5"`, "", "")
+	s.applySyntheticConfig("static", `      result_count: "5"`, "", "")
 	r := s.apiGet("/api/search?title=Test+Movie&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock static: search")
+	s.assertStatus("200", "Synthetic static: search")
 	count := resultsLen(r)
 	if n, ok := shellInt(count); ok && n > 0 {
-		s.pass(fmt.Sprintf("Mock static: %s results", count))
+		s.pass(fmt.Sprintf("Synthetic static: %s results", count))
 	} else {
-		s.fail("Mock static: 0 results")
+		s.fail("Synthetic static: 0 results")
 	}
 
-	s.applyMockConfig("empty", "", "", "")
+	s.applySyntheticConfig("empty", "", "", "")
 	r = s.apiGet("/api/search?title=Test+Movie&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock empty: search")
+	s.assertStatus("200", "Synthetic empty: search")
 	count = resultsLen(r)
 	if n, ok := shellInt(count); ok && n == 0 {
-		s.pass("Mock empty: 0 results")
+		s.pass("Synthetic empty: 0 results")
 	} else {
-		s.fail(fmt.Sprintf("Mock empty: %s results", count))
+		s.fail(fmt.Sprintf("Synthetic empty: %s results", count))
 	}
 
-	s.applyMockConfig("error", `      error_message: "test-failure-42"`, "", "")
+	s.applySyntheticConfig("error", `      error_message: "test-failure-42"`, "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock error: endpoint 200")
+	s.assertStatus("200", "Synthetic error: endpoint 200")
 
-	s.applyMockConfig("auth_error", "", "", "")
+	s.applySyntheticConfig("auth_error", "", "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock auth_error: endpoint 200")
+	s.assertStatus("200", "Synthetic auth_error: endpoint 200")
 
-	s.applyMockConfig("rate_limit", "", "", "")
+	s.applySyntheticConfig("rate_limit", "", "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock rate_limit: endpoint 200")
+	s.assertStatus("200", "Synthetic rate_limit: endpoint 200")
 
-	s.applyMockConfig("timeout", "", "", "")
+	s.applySyntheticConfig("timeout", "", "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock timeout: endpoint 200")
+	s.assertStatus("200", "Synthetic timeout: endpoint 200")
 
-	s.applyMockConfig("static", `      include_hash: "true"
+	s.applySyntheticConfig("static", `      include_hash: "true"
       result_count: "3"`, "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock hash: search")
+	s.assertStatus("200", "Synthetic hash: search")
 
-	s.applyMockConfig("static", `      hearing_impaired: "true"
+	s.applySyntheticConfig("static", `      hearing_impaired: "true"
       result_count: "2"`, "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock HI: search")
+	s.assertStatus("200", "Synthetic HI: search")
 
-	s.applyMockConfig("static", `      forced: "true"
+	s.applySyntheticConfig("static", `      forced: "true"
       result_count: "2"`, "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock forced: search")
+	s.assertStatus("200", "Synthetic forced: search")
 
-	s.applyMockConfig("static", `      languages: "fr"
+	s.applySyntheticConfig("static", `      languages: "fr"
       result_count: "3"`, "", "")
 	r = s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock lang filter: en query")
+	s.assertStatus("200", "Synthetic lang filter: en query")
 	count = resultsLen(r)
 	if n, ok := shellInt(count); ok && n == 0 {
-		s.pass("Mock lang filter: 0 en results")
+		s.pass("Synthetic lang filter: 0 en results")
 	} else {
-		s.logf("Mock lang filter: %s results", count)
+		s.logf("Synthetic lang filter: %s results", count)
 	}
 
 	r = s.apiGet("/api/search?title=Test&year=2024&lang=fr&type=movie")
 	count = resultsLen(r)
 	if n, ok := shellInt(count); ok && n > 0 {
-		s.pass("Mock lang filter: fr results")
+		s.pass("Synthetic lang filter: fr results")
 	} else {
-		s.fail("Mock lang filter: 0 fr")
+		s.fail("Synthetic lang filter: 0 fr")
 	}
 
-	s.applyMockConfig("static", `      download_error: "disk-full-test"`, "", "")
+	s.applySyntheticConfig("static", `      download_error: "disk-full-test"`, "", "")
 	s.apiGet("/api/search?title=Test&year=2024&lang=en&type=movie")
-	s.assertStatus("200", "Mock download error: search works")
+	s.assertStatus("200", "Synthetic download error: search works")
 
-	s.applyMockConfig("season_pack", "", "", "")
+	s.applySyntheticConfig("season_pack", "", "", "")
 	s.apiGet("/api/search?title=Breaking+Bad&season=1&episode=1&lang=en&type=episode&tvdb=81189")
-	s.assertStatus("200", "Mock season_pack: search")
+	s.assertStatus("200", "Synthetic season_pack: search")
 
 	// Slow mode with timing verification (epoch-second diff, like `date +%s`).
-	s.applyMockConfig("static", `      delay_ms: "1500"`, "", "")
+	s.applySyntheticConfig("static", `      delay_ms: "1500"`, "", "")
 	t0 := time.Now().Unix()
 	s.apiGet("/api/search?title=Slow&year=2024&lang=en&type=movie")
 	t1 := time.Now().Unix()
-	s.assertStatus("200", "Mock slow: completes")
+	s.assertStatus("200", "Synthetic slow: completes")
 	if t1-t0 >= 1 {
-		s.pass("Mock slow: >= 1s delay")
+		s.pass("Synthetic slow: >= 1s delay")
 	} else {
-		s.log("Mock slow: faster than expected")
+		s.log("Synthetic slow: faster than expected")
 	}
 
 	s.apiPut("/api/config", s.original)
@@ -230,7 +230,7 @@ func (s *suite) sectionMockProvider() {
 func (s *suite) sectionProviderErrors() {
 	s.log("=== Provider Error Scenarios ===")
 
-	s.applyMockConfig("flaky", `      flaky_rate: "0.8"`, "", "")
+	s.applySyntheticConfig("flaky", `      flaky_rate: "0.8"`, "", "")
 	flakyPass, flakyFail := 0, 0
 	for range 5 {
 		r := s.apiGet("/api/search?title=Flaky&year=2024&lang=en&type=movie")
@@ -243,17 +243,17 @@ func (s *suite) sectionProviderErrors() {
 	}
 	s.pass(fmt.Sprintf("Flaky provider: %d pass, %d fail", flakyPass, flakyFail))
 
-	s.applyMockConfig("error", "", "", "")
+	s.applySyntheticConfig("error", "", "", "")
 	for range 6 {
 		s.apiGet("/api/search?title=Timeout+Test&year=2024&lang=en&type=movie")
 	}
 	to := s.apiGet("/api/providers/timeout")
 	s.assertStatus("200", "Timeout state after errors")
-	timedOut := fieldJSONOrFalse(to, ".mock.timed_out")
+	timedOut := fieldJSONOrFalse(to, ".synthetic.timed_out")
 	if timedOut == "true" {
-		s.pass("Mock timed out")
+		s.pass("Synthetic timed out")
 	} else {
-		s.log("Mock not timed out (threshold)")
+		s.log("Synthetic not timed out (threshold)")
 	}
 
 	s.apiPost("/api/providers/timeout/reset", "")

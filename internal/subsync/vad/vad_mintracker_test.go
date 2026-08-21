@@ -59,14 +59,13 @@ func medianSmoothReference(frameCounter int32, sv [16]int16, meanVal int16) int1
 	return int16(tmp >> 15)
 }
 
-// assertLow16 compares the first 16 elements of got to want.
-func assertLow16(t *testing.T, name string, got []int16, want [16]int16) {
-	t.Helper()
-	var g [16]int16
-	copy(g[:], got)
-	if g != want {
-		t.Errorf("%s = %v, want %v", name, g, want)
-	}
+// low16 projects the first 16 entries of a tracker vector into a comparable
+// array. It returns the value instead of asserting on it, so the comparison and
+// its message stay at the call site.
+func low16(got []int16) [16]int16 {
+	var out [16]int16
+	copy(out[:], got)
+	return out
 }
 
 // TestFindMinimum_initial_state verifies the fresh-instance smoothing: with
@@ -222,8 +221,10 @@ func TestFindMinimum_aging_increment(t *testing.T) {
 		v.indexVec[i] = 5
 	}
 	v.findMinimum(200, 0) // 200 > seed max -> no insertion, only aging
-	assertLow16(t, "indexVec after aging increment", v.indexVec[:16],
-		[16]int16{6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6})
+	want := [16]int16{6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}
+	if got := low16(v.indexVec[:16]); got != want {
+		t.Errorf("indexVec after aging increment = %v, want %v", got, want)
+	}
 }
 
 // TestFindMinimum_eviction_shift verifies that an entry reaching the 100-frame
@@ -241,6 +242,8 @@ func TestFindMinimum_eviction_shift(t *testing.T) {
 	v.indexVec[5] = 100
 	// 10001 is above the post-eviction sv[15]=10000, so no insertion perturbs sv.
 	v.findMinimum(10001, 0)
-	assertLow16(t, "lowValue after eviction shift", v.lowValue[:16],
-		[16]int16{10, 20, 30, 40, 50, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 10000})
+	want := [16]int16{10, 20, 30, 40, 50, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 10000}
+	if got := low16(v.lowValue[:16]); got != want {
+		t.Errorf("lowValue after eviction shift = %v, want %v", got, want)
+	}
 }

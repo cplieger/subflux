@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
-// This file covers the task-3.2 backoff listing behaviour: GetBackoffItems
+// This file covers the task-3.2 backoff listing behaviour: BackoffItems
 // (ascending next_retry via in-memory sort, Requirement 2.3) and
-// GetBackoffByPrefix (provider rows only, ordered media id then ascending
+// BackoffByPrefix (provider rows only, ordered media id then ascending
 // next_retry, Requirement 15.4), plus prefix isolation/inclusion semantics.
 
-// TestGetBackoffItems_ascendingNextRetry asserts GetBackoffItems returns every
+// TestGetBackoffItems_ascendingNextRetry asserts BackoffItems returns every
 // row ordered by ascending next_retry, regardless of insertion order
 // (Requirement 2.3).
 func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
@@ -21,16 +21,16 @@ func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
 	base := time.Now()
 
 	// Insert three rows out of next_retry order.
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt300", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt300", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(3 * time.Hour), Failures: 3})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt100", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt100", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(1 * time.Hour), Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt200", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt200", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 2})
 
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 3 {
 		t.Fatalf("got %d entries, want 3", len(got))
@@ -52,14 +52,14 @@ func TestGetBackoffItems_ascendingNextRetry(t *testing.T) {
 func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 	db, _ := openTemp(t)
 	future := time.Now().Add(time.Hour)
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", testProv,
 		attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", api.ProviderID(""),
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", subflux.ProviderID(""),
 		attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("got %d entries, want 1 (empty-provider row excluded)", len(got))
@@ -73,9 +73,9 @@ func TestGetBackoffItems_excludesEmptyProvider(t *testing.T) {
 // without error.
 func TestGetBackoffItems_empty(t *testing.T) {
 	db, _ := openTemp(t)
-	got, err := db.GetBackoffItems(t.Context())
+	got, err := db.BackoffItems(t.Context())
 	if err != nil {
-		t.Fatalf("GetBackoffItems: %v", err)
+		t.Fatalf("BackoffItems: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("got %d entries, want 0", len(got))
@@ -90,18 +90,18 @@ func TestGetBackoffByPrefix_mediaIDThenNextRetry(t *testing.T) {
 
 	// Two media ids, each with two providers at different next_retry, inserted
 	// in an order that is neither media-id nor next_retry sorted.
-	putAttemptRow(t, db, api.MediaTypeMovie, "ttB", "en", api.ProviderNameGestdown,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "ttB", "en", subflux.ProviderNameGestdown,
 		attemptRec{LastTried: base, NextRetry: base.Add(4 * time.Hour), Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "ttA", "en", api.ProviderNameGestdown,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "ttA", "en", subflux.ProviderNameGestdown,
 		attemptRec{LastTried: base, NextRetry: base.Add(3 * time.Hour), Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "ttA", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "ttA", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(1 * time.Hour), Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "ttB", "en", testProv,
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "ttB", "en", testProv,
 		attemptRec{LastTried: base, NextRetry: base.Add(2 * time.Hour), Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(got) != 4 {
 		t.Fatalf("got %d entries, want 4", len(got))
@@ -132,20 +132,20 @@ func TestGetBackoffByPrefix_mediaIDThenNextRetry(t *testing.T) {
 func TestGetBackoffByPrefix_prefixInclusionAndType(t *testing.T) {
 	db, _ := openTemp(t)
 	future := time.Now().Add(time.Hour)
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt12", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt2", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt12", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt2", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 	// Same media id under a different media type must not match the movie query.
-	putAttemptRow(t, db, api.MediaTypeEpisode, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeEpisode, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "tt1")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "tt1")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	gotIDs := map[string]int{}
 	for _, e := range got {
 		gotIDs[e.MediaID]++
-		if e.MediaType != api.MediaTypeMovie {
+		if e.MediaType != subflux.MediaTypeMovie {
 			t.Errorf("entry media type = %q, want movie", e.MediaType)
 		}
 	}
@@ -167,12 +167,12 @@ func TestGetBackoffByPrefix_prefixInclusionAndType(t *testing.T) {
 func TestGetBackoffByPrefix_excludesEmptyProvider(t *testing.T) {
 	db, _ := openTemp(t)
 	future := time.Now().Add(time.Hour)
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
-	putAttemptRow(t, db, api.MediaTypeMovie, "tt1", "en", api.ProviderID(""), attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", testProv, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, subflux.MediaTypeMovie, "tt1", "en", subflux.ProviderID(""), attemptRec{NextRetry: future, Failures: 1})
 
-	got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, "")
+	got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, "")
 	if err != nil {
-		t.Fatalf("GetBackoffByPrefix: %v", err)
+		t.Fatalf("BackoffByPrefix: %v", err)
 	}
 	if len(got) != 1 || got[0].Provider != testProv {
 		t.Fatalf("got %+v, want exactly one row for provider %q", got, testProv)
@@ -184,7 +184,7 @@ func TestGetBackoffByPrefix_excludesEmptyProvider(t *testing.T) {
 var byPrefixPool = []string{"tt1", "tt12", "tt2", "tt20"}
 
 // TestGetBackoffByPrefix_orderingProperty is a property test asserting that for
-// any randomly populated set of provider rows, GetBackoffByPrefix returns
+// any randomly populated set of provider rows, BackoffByPrefix returns
 // exactly the provider rows whose media id starts with the queried prefix,
 // ordered by (media id, next_retry) (Requirements 15.4, 8.3).
 func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
@@ -195,7 +195,7 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 		type row struct {
 			next     time.Time
 			mid      string
-			provider api.ProviderID
+			provider subflux.ProviderID
 		}
 		var inserted []row
 		n := rapid.IntRange(0, 12).Draw(rt, "rows")
@@ -206,7 +206,7 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 			next := base.Add(time.Duration(offsetMin) * time.Minute)
 			// One row per (mid, provider): a duplicate overwrites, matching a
 			// single search_attempts row per triple+provider (lang fixed).
-			putAttemptRow(t, db, api.MediaTypeMovie, mid, testLang, prov,
+			putAttemptRow(t, db, subflux.MediaTypeMovie, mid, testLang, prov,
 				attemptRec{LastTried: base, NextRetry: next, Failures: 1})
 			// Track the latest write for each (mid, provider).
 			replaced := false
@@ -224,9 +224,9 @@ func TestGetBackoffByPrefix_orderingProperty(t *testing.T) {
 
 		prefix := rapid.SampledFrom([]string{"", "tt1", "tt12", "tt2", "tt20", "ttX"}).Draw(rt, "prefix")
 
-		got, err := db.GetBackoffByPrefix(t.Context(), api.MediaTypeMovie, prefix)
+		got, err := db.BackoffByPrefix(t.Context(), subflux.MediaTypeMovie, prefix)
 		if err != nil {
-			rt.Fatalf("GetBackoffByPrefix: %v", err)
+			rt.Fatalf("BackoffByPrefix: %v", err)
 		}
 
 		// Reference: filter by media-id starts-with prefix. This is the exact

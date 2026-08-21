@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // retryFakeProvider records calls and returns configured errors.
@@ -26,13 +27,13 @@ type dlResult struct {
 	data []byte
 }
 
-func (f *retryFakeProvider) Name() api.ProviderID { return api.ProviderID(f.name) }
+func (f *retryFakeProvider) Name() subflux.ProviderID { return subflux.ProviderID(f.name) }
 
-func (f *retryFakeProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (f *retryFakeProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (f *retryFakeProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (f *retryFakeProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	i := f.dlCalls
 	f.dlCalls++
 	if i < len(f.dlResults) {
@@ -48,7 +49,7 @@ type retryFakeCounterProvider struct {
 	countCalls int
 }
 
-func (f *retryFakeCounterProvider) CountShowSubtitles(_ context.Context, _, _ string) (int, error) {
+func (f *retryFakeCounterProvider) CountShowSubtitles(_ context.Context, _ subflux.ShowSubtitleQuery) (int, error) {
 	f.countCalls++
 	return 42, nil
 }
@@ -70,8 +71,8 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_503",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -80,7 +81,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_502",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 502}},
+				{err: &httpwire.HTTPStatusError{Code: 502}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -89,7 +90,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		{
 			name: "retries_on_504",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 504}},
+				{err: &httpwire.HTTPStatusError{Code: 504}},
 				{data: []byte("ok")},
 			},
 			wantErr:   false,
@@ -97,34 +98,34 @@ func TestRetryProvider_error_classification(t *testing.T) {
 		},
 		{
 			name:      "no_retry_on_500",
-			dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 500}}},
+			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 500}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
 		{
 			name:      "no_retry_on_4xx",
-			dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 400}}},
+			dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 400}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
 		{
 			name:      "no_retry_on_AuthError",
-			dlResults: []dlResult{{err: &api.AuthError{Msg: "invalid credentials"}}},
+			dlResults: []dlResult{{err: &subflux.AuthError{Msg: "invalid credentials"}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
 		{
 			name:      "no_retry_on_RateLimitError",
-			dlResults: []dlResult{{err: &api.RateLimitError{Msg: "rate limited"}}},
+			dlResults: []dlResult{{err: &subflux.RateLimitError{Msg: "rate limited"}}},
 			wantErr:   true,
 			wantCalls: 1,
 		},
 		{
 			name: "exhausts_retries",
 			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
+				{err: &httpwire.HTTPStatusError{Code: 503}},
 			},
 			wantErr:   true,
 			wantCalls: 3,
@@ -139,7 +140,7 @@ func TestRetryProvider_error_classification(t *testing.T) {
 			}
 			p := WrapRetry(inner, 3, time.Millisecond)
 
-			_, err := p.Download(t.Context(), &api.Subtitle{})
+			_, err := p.Download(t.Context(), &subflux.Subtitle{})
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tc.wantErr)
 			}
@@ -155,7 +156,7 @@ func TestRetryProvider_context_cancellation(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
 	p := WrapRetry(inner, 3, time.Second)
@@ -163,7 +164,7 @@ func TestRetryProvider_context_cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately.
 
-	_, err := p.Download(ctx, &api.Subtitle{})
+	_, err := p.Download(ctx, &subflux.Subtitle{})
 	if err == nil {
 		t.Fatal("expected error on cancelled context")
 	}
@@ -177,9 +178,9 @@ func TestRetryProvider_cancellation_during_backoff(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
-			{err: &httputil.HTTPStatusError{Code: 503}},
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 		},
 	}
 	p := WrapRetry(inner, 3, 500*time.Millisecond)
@@ -188,7 +189,7 @@ func TestRetryProvider_cancellation_during_backoff(t *testing.T) {
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
-	_, err := p.Download(ctx, &api.Subtitle{})
+	_, err := p.Download(ctx, &subflux.Subtitle{})
 	elapsed := time.Since(start)
 
 	if !errors.Is(err, context.Canceled) {
@@ -207,20 +208,18 @@ func TestRetryProvider_backoff_doubles_between_attempts(t *testing.T) {
 
 	callTimes := make([]time.Time, 0, 4)
 	inner := &retryFakeProviderTimed{
-		retryFakeProvider: retryFakeProvider{
-			name: "test",
-			dlResults: []dlResult{
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{err: &httputil.HTTPStatusError{Code: 503}},
-				{data: []byte("ok")},
-			},
+		name: "test",
+		dlResults: []dlResult{
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
+			{data: []byte("ok")},
 		},
 		callTimes: &callTimes,
 	}
 	p := WrapRetry(inner, 4, 50*time.Millisecond)
 
-	_, err := p.Download(t.Context(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -241,14 +240,14 @@ func TestRetryProvider_maxAttempts_one_calls_once_no_backoff(t *testing.T) {
 	inner := &retryFakeProvider{
 		name: "test",
 		dlResults: []dlResult{
-			{err: &httputil.HTTPStatusError{Code: 503}},
+			{err: &httpwire.HTTPStatusError{Code: 503}},
 			{data: []byte("should-not-reach")},
 		},
 	}
 	p := WrapRetry(inner, 1, 500*time.Millisecond)
 
 	start := time.Now()
-	_, err := p.Download(t.Context(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -279,7 +278,7 @@ func TestRetryProvider_delegates_search(t *testing.T) {
 	inner := &retryFakeProvider{name: "test"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	results, err := p.Search(t.Context(), &api.SearchRequest{})
+	results, err := p.Search(t.Context(), &subflux.SearchRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,15 +290,15 @@ func TestRetryProvider_delegates_search(t *testing.T) {
 func TestWrapRetry_preserves_ShowSubtitleCounter(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeCounterProvider{
-		retryFakeProvider: retryFakeProvider{name: "opensubtitles"},
+		name: "opensubtitles",
 	}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	counter, ok := p.(api.ShowSubtitleCounter)
+	counter, ok := p.(ShowSubtitleCounter)
 	if !ok {
 		t.Fatal("wrapped provider does not implement ShowSubtitleCounter")
 	}
-	count, err := counter.CountShowSubtitles(t.Context(), "tt123", "en")
+	count, err := counter.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{ImdbID: "tt123", Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -316,17 +315,17 @@ func TestWrapRetry_plain_provider_no_counter(t *testing.T) {
 	inner := &retryFakeProvider{name: "hdbits"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	if _, ok := p.(api.ShowSubtitleCounter); ok {
+	if _, ok := p.(ShowSubtitleCounter); ok {
 		t.Error("plain provider should not implement ShowSubtitleCounter")
 	}
 }
 
 func TestRetryProvider_ClearCache_delegates(t *testing.T) {
 	t.Parallel()
-	inner := &retryFakeCacheProvider{retryFakeProvider: retryFakeProvider{name: "test"}}
+	inner := &retryFakeCacheProvider{name: "test"}
 	p := WrapRetry(inner, 3, time.Millisecond)
 
-	cc, ok := p.(api.CacheClearer)
+	cc, ok := p.(CacheClearer)
 	if !ok {
 		t.Fatal("wrapped provider does not implement ClearCache")
 	}
@@ -344,7 +343,7 @@ func TestRetryProvider_zero_retries_delegates_directly(t *testing.T) {
 	}
 	p := WrapRetry(inner, 0, time.Millisecond)
 
-	data, err := p.Download(t.Context(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,11 +359,11 @@ func TestRetryProvider_negative_retries_delegates_directly(t *testing.T) {
 	t.Parallel()
 	inner := &retryFakeProvider{
 		name:      "test",
-		dlResults: []dlResult{{err: &httputil.HTTPStatusError{Code: 503}}},
+		dlResults: []dlResult{{err: &httpwire.HTTPStatusError{Code: 503}}},
 	}
 	p := WrapRetry(inner, -1, time.Millisecond)
 
-	_, err := p.Download(t.Context(), &api.Subtitle{})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -399,7 +398,7 @@ type retryFakeProviderTimed struct {
 	retryFakeProvider
 }
 
-func (f *retryFakeProviderTimed) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (f *retryFakeProviderTimed) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	*f.callTimes = append(*f.callTimes, time.Now())
 	i := f.dlCalls
 	f.dlCalls++
@@ -413,18 +412,18 @@ func (f *retryFakeProviderTimed) Download(_ context.Context, _ *api.Subtitle) ([
 
 type benchNoopProvider struct{}
 
-func (benchNoopProvider) Name() api.ProviderID { return "bench" }
-func (benchNoopProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (benchNoopProvider) Name() subflux.ProviderID { return "bench" }
+func (benchNoopProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (benchNoopProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (benchNoopProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return []byte("ok"), nil
 }
 
 func BenchmarkRetryProvider(b *testing.B) {
 	inner := benchNoopProvider{}
-	sub := &api.Subtitle{Provider: "bench", ID: "1"}
+	sub := &subflux.Subtitle{Provider: "bench", ID: "1"}
 
 	for _, attempts := range []int{1, 2, 3} {
 		name := fmt.Sprintf("attempts=%d", attempts)
@@ -432,16 +431,16 @@ func BenchmarkRetryProvider(b *testing.B) {
 			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
 			ctx := b.Context()
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, _ = rp.Download(ctx, sub)
 			}
 		})
 		b.Run("Search/"+name, func(b *testing.B) {
 			rp := WrapRetry(inner, attempts, 100*time.Millisecond)
 			ctx := b.Context()
-			req := &api.SearchRequest{Title: "test"}
+			req := &subflux.SearchRequest{Title: "test"}
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, _ = rp.Search(ctx, req)
 			}
 		})
@@ -472,12 +471,12 @@ func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 	recs := capture.Default(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{{data: []byte("ok")}}}
 	p := WrapRetry(inner, 3, time.Millisecond)
-	data, err := p.Download(t.Context(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
 	if string(data) != "ok" {
-		t.Fatalf("Download() = %q, want %q", data, "ok")
+		t.Errorf("Download() = %q, want %q", data, "ok")
 	}
 	if got := recs.CountExact(msgDownloadRecovered); got != 0 {
 		t.Errorf("recovered-log count after first-attempt success = %d, want 0", got)
@@ -489,28 +488,54 @@ func TestRetryProvider_noRecoveredLogOnFirstAttempt(t *testing.T) {
 func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 	recs := capture.Default(t)
 	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{
-		{err: &httputil.HTTPStatusError{Code: 503}}, // transient: retried
+		{err: &httpwire.HTTPStatusError{Code: 503}}, // transient: retried
 		{data: []byte("ok")},                        // success on the second attempt
 	}}
 	p := WrapRetry(inner, 3, time.Millisecond)
-	data, err := p.Download(t.Context(), &api.Subtitle{})
+	data, err := p.Download(t.Context(), &subflux.Subtitle{})
 	if err != nil {
 		t.Fatalf("Download() error = %v, want nil", err)
 	}
 	if string(data) != "ok" {
-		t.Fatalf("Download() = %q, want %q", data, "ok")
+		t.Errorf("Download() = %q, want %q", data, "ok")
 	}
 	if got := recs.CountExact(msgDownloadRecovered); got != 1 {
-		t.Fatalf("recovered-log count = %d, want 1", got)
+		t.Errorf("recovered-log count = %d, want 1", got)
 	}
 	if v, ok := recs.AttrValue(msgDownloadRecovered, "attempts"); !ok || v != "2" {
 		t.Errorf("recovered-log attempts = %q (present=%v), want \"2\"", v, ok)
 	}
 	if got := recs.CountExact(msgDownloadRetrying); got != 1 {
-		t.Fatalf("retrying-warn count = %d, want 1", got)
+		t.Errorf("retrying-warn count = %d, want 1", got)
 	}
 	if v, ok := recs.AttrValue(msgDownloadRetrying, "attempt"); !ok || v != "1" {
 		t.Errorf("retrying-warn attempt = %q (present=%v), want \"1\"", v, ok)
+	}
+}
+
+// TestRetryProvider_exhaustedDownloadIsNotLoggedAsError pins §4 ("never log
+// and return the same error") at the one site where the double log misreported
+// severity: downloadBestCandidate logs an exhausted provider and tries the NEXT
+// candidate, so a transient failure this wrapper recovers from at a different
+// provider must not have been announced here as an ERROR-level fault. The
+// attempt count the boundary cannot reconstruct travels in the error instead.
+func TestRetryProvider_exhaustedDownloadIsNotLoggedAsError(t *testing.T) {
+	recs := capture.Default(t)
+	inner := &retryFakeProvider{name: "p", dlResults: []dlResult{
+		{err: &httpwire.HTTPStatusError{Code: 503}},
+		{err: &httpwire.HTTPStatusError{Code: 503}},
+	}}
+	p := WrapRetry(inner, 2, time.Millisecond)
+
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
+	if err == nil {
+		t.Fatal("Download() error = nil, want the exhausted-retries error")
+	}
+	if got := recs.CountLevel(slog.LevelError, ""); got != 0 {
+		t.Errorf("ERROR records = %d, want 0; the caller owns the report: %v", got, recs.Messages())
+	}
+	if !strings.Contains(err.Error(), "after 2 attempts") {
+		t.Errorf("error = %q, want it to carry the attempt count the boundary cannot see", err)
 	}
 }
 
@@ -519,10 +544,10 @@ func TestRetryProvider_recoveredLogOnSecondAttempt(t *testing.T) {
 type searchResultProvider struct {
 	retryFakeProvider
 
-	subs []api.Subtitle
+	subs []subflux.Subtitle
 }
 
-func (f *searchResultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (f *searchResultProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return f.subs, nil
 }
 
@@ -533,13 +558,13 @@ func (f *searchResultProvider) Search(_ context.Context, _ *api.SearchRequest) (
 func TestRetryProvider_search_clamps_release_names(t *testing.T) {
 	t.Parallel()
 	long := strings.Repeat("a", release.MaxNameLen+200)
-	inner := &searchResultProvider{subs: []api.Subtitle{
+	inner := &searchResultProvider{subs: []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.1080p.BluRay.x264-GRP"},
 		{ReleaseName: long},
 	}}
 	p := WrapRetry(inner, 1, time.Millisecond)
 
-	subs, err := p.Search(t.Context(), &api.SearchRequest{})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{})
 	if err != nil {
 		t.Fatalf("Search() error = %v, want nil", err)
 	}

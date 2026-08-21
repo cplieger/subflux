@@ -12,14 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/envx/yamlenv"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/envx/yamlenv/v2"
 	"github.com/cplieger/subflux/internal/config/defaults"
-	"go.yaml.in/yaml/v3"
+	"github.com/cplieger/subflux/internal/subflux"
 )
-
-// Compile-time assertion: *Config satisfies api.ConfigProvider.
-var _ api.ConfigProvider = (*Config)(nil)
 
 // ParseDuration extends time.ParseDuration with D, M, and Y suffixes.
 func ParseDuration(s string) (time.Duration, error) {
@@ -86,14 +82,14 @@ var ErrConfigTooLarge = errors.New("config too large")
 var ErrVariantConflict = errors.New("cannot set both variant and variants")
 
 // maxConfigSize references the shared file-size cap from api.
-const maxConfigSize = api.MaxSafeFileBytes
+const maxConfigSize = subflux.MaxSafeFileBytes
 
 // newWithDefaults returns a Config pre-populated with default values.
 // YAML unmarshalling overlays user values on top of these defaults.
 func newWithDefaults() *Config {
 	return &Config{
 		PollIntervalCfg: Duration{D: defaults.DefaultPollInterval},
-		SearchCfg: yamlSearchConfig{
+		Cfg: yamlSearchConfig{
 			MinScore:            0,
 			ScanInterval:        Duration{D: defaults.DefaultScanInterval},
 			ProviderTimeout:     Duration{D: defaults.DefaultProviderTimeout},
@@ -102,7 +98,7 @@ func newWithDefaults() *Config {
 			UpgradeWindowDays:   defaults.DefaultUpgradeWindowDays,
 			MaxSSEClients:       defaults.DefaultMaxSSEClients,
 			ExcludeArrTags:      []string{defaultExcludeTag},
-			DownloadMaxAttempts: api.DefaultDownloadMaxAttempts,
+			DownloadMaxAttempts: subflux.DefaultDownloadMaxAttempts,
 		},
 		AdaptiveCfg: yamlAdaptiveConfig{
 			Enabled:           true,
@@ -163,9 +159,9 @@ func Load(ctx context.Context, path string) (*Config, error) {
 
 	slog.Info("config loaded",
 		"path", path,
-		"sonarr", cfg.SonarrConfig().URL != "",
-		"radarr", cfg.RadarrConfig().URL != "",
-		"providers", len(cfg.Providers),
+		"sonarr", cfg.Sonarr().URL != "",
+		"radarr", cfg.Radarr().URL != "",
+		"providers", len(cfg.ProvidersCfg),
 		"rules", len(cfg.Languages.Rules))
 
 	return cfg, nil
@@ -199,7 +195,8 @@ func expandTargetList(targets []yamlSubtitleTarget, ruleCtx string) ([]yamlSubti
 	for _, t := range targets {
 		if t.Variant != "" && len(t.Variants) > 0 {
 			return nil, fmt.Errorf(
-				"%w (code=%s, context=%s)", ErrVariantConflict, t.Code, ruleCtx)
+				"%w (code=%s, context=%s)", ErrVariantConflict, t.Code, ruleCtx,
+			)
 		}
 		if len(t.Variants) == 0 {
 			result = append(result, t)
@@ -259,7 +256,6 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 	}
 
 	if err := validate(ctx, cfg); err != nil {
-		slog.Warn("config validation failed", "error", err)
 		return nil, err
 	}
 
@@ -270,17 +266,20 @@ func LoadFromBytes(ctx context.Context, data []byte) (*Config, error) {
 
 // appOwnedDecodeErr reports whether a decode error came from this package's
 // own UnmarshalYAML implementations (Duration's "invalid duration ..."):
-// neither a *yaml.TypeError nor "yaml:"-prefixed. yamlenv.Load returns such
-// errors unchanged onto the two operator surfaces (the startup log and the
-// PUT /api/config response body): their vocabulary is app-owned, value-safe
-// by construction (Duration deliberately withholds the offending scalar),
-// and pinned by tests. Everything yaml.v3 itself produces stays sanitized
-// by the library.
+// yamlenv wraps exactly those in *yamlenv.UnmarshalerError, and never wraps one
+// of yaml.v3's own errors, so the type IS the provenance answer. yamlenv.Load
+// returns such errors unchanged onto the two operator surfaces (the startup log
+// and the PUT /api/config response body): their vocabulary is app-owned,
+// value-safe by construction (Duration deliberately withholds the offending
+// scalar), and pinned by tests. Everything yaml.v3 itself produces stays
+// sanitized by the library.
+//
+// The former test — no *yaml.TypeError and no "yaml:" message prefix — decided
+// provenance from yaml.v3's wording, so a reworded prefix upstream would have
+// flipped it toward disclosing a library error on both surfaces.
 func appOwnedDecodeErr(err error) bool {
-	if _, ok := errors.AsType[*yaml.TypeError](err); ok {
-		return false
-	}
-	return !strings.HasPrefix(err.Error(), "yaml:")
+	_, ok := errors.AsType[*yamlenv.UnmarshalerError](err)
+	return ok
 }
 
 // buildCaches pre-computes lookup structures after config is fully loaded.
@@ -295,14 +294,14 @@ func (c *Config) buildCaches(ctx context.Context) {
 	c.cachedLangCodes = computeLangCodes(c.Languages.Rules, c.Languages.Default)
 
 	// Pre-compute provider configs map.
-	pc := make(map[api.ProviderID]api.ProviderCfg, len(c.Providers))
-	for k, v := range c.Providers {
-		pc[k] = api.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
+	pc := make(map[subflux.ProviderID]subflux.ProviderCfg, len(c.ProvidersCfg))
+	for k, v := range c.ProvidersCfg {
+		pc[k] = subflux.ProviderCfg{Settings: v.Settings, Enabled: v.Enabled, Priority: v.Priority}
 	}
-	c.cachedProviderConfigs = pc
+	c.cachedProviders = pc
 
 	// Pre-compute rule targets to avoid per-call allocations in matchRule.
-	c.cachedRuleTargets = make(map[string][]api.SubtitleTarget, len(c.Languages.Rules))
+	c.cachedRuleTargets = make(map[string][]subflux.SubtitleTarget, len(c.Languages.Rules))
 	for _, rule := range c.Languages.Rules {
 		c.cachedRuleTargets[rule.Audio] = targetsToAPI(rule.Subtitles)
 	}

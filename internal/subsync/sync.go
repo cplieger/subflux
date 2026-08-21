@@ -165,16 +165,15 @@ func referenceSync(ctx context.Context, reference, incorrect []Cue, opts *SyncOp
 	// Strategy 3: Constant offset (alass). (pure CPU)
 	g.Go(func() error {
 		cues, offset := syncCues(gctx, reference, incorrect)
-		r := SyncResult{
-			Cues:      cues,
-			Offset:    offset.Milliseconds(),
-			Rate:      1.0,
-			Method:    MethodOffset,
-			Source:    SourceOffset,
-			Transform: Transform{Kind: TransformShift, Shift: offset.Milliseconds()},
+		candidates[2] = SyncResult{
+			Cues:       cues,
+			Offset:     offset.Milliseconds(),
+			Rate:       1.0,
+			Method:     MethodOffset,
+			Source:     SourceOffset,
+			Transform:  Transform{Kind: TransformShift, Shift: offset.Milliseconds()},
+			Confidence: constantOffsetConfidence(reference, incorrect, offset),
 		}
-		r.Confidence = constantOffsetConfidence(reference, incorrect, offset)
-		candidates[2] = r
 		return nil
 	})
 

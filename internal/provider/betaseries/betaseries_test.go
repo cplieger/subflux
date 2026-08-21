@@ -3,9 +3,11 @@ package betaseries
 import (
 	"errors"
 	"io"
+	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestBetaLangToISO(t *testing.T) {
@@ -67,8 +69,8 @@ func TestFactory(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
-			if p.Name() != api.ProviderNameBetaSeries {
-				t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameBetaSeries)
+			if p.Name() != subflux.ProviderNameBetaSeries {
+				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameBetaSeries)
 			}
 		})
 	}
@@ -119,8 +121,8 @@ func TestFilterSubtitleEntries(t *testing.T) {
 		if got[0].DownloadURL != "https://example.com/42.srt" {
 			t.Errorf("DownloadURL = %q, want %q", got[0].DownloadURL, "https://example.com/42.srt")
 		}
-		if got[0].MatchedBy != api.MatchByTVDB {
-			t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTVDB)
+		if got[0].MatchedBy != subflux.MatchByTVDB {
+			t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTVDB)
 		}
 		if got[0].Season != 1 {
 			t.Errorf("Season = %d, want 1", got[0].Season)
@@ -290,9 +292,8 @@ func TestClassifyBadRequest(t *testing.T) {
 					t.Fatal("classifyBadRequest() error = nil, want error")
 				}
 				if tt.wantErrType == "auth" {
-					var authErr *api.AuthError
-					if !errors.As(err, &authErr) {
-						t.Errorf("error type = %T, want *api.AuthError", err)
+					if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
+						t.Errorf("error type = %T, want *subflux.AuthError", err)
 					}
 				}
 				if tt.wantErrMsg != "" && err.Error() != tt.wantErrMsg {
@@ -313,5 +314,41 @@ func TestClassifyBadRequest(t *testing.T) {
 				rc.Close()
 			}
 		})
+	}
+}
+
+// --- Download ---
+
+// statusRoundTripper answers every request with a fixed status and empty body,
+// standing in for the upstream without a network dial.
+type statusRoundTripper struct{ status int }
+
+func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: rt.status,
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     make(http.Header),
+	}, nil
+}
+
+// A 404 on the subtitle URL means the upstream no longer holds the file the
+// search result named. Reporting it as a successful download of zero bytes
+// made a withdrawn upload indistinguishable from a provider serving an empty
+// or corrupt payload, so it must name itself.
+func TestDownloadAbsentUpstream(t *testing.T) {
+	t.Parallel()
+
+	p := &Provider{
+		client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound}},
+		token:  "t",
+	}
+	sub := subflux.Subtitle{ID: "sub-1", DownloadURL: "https://api.betaseries.com/subtitles/sub-1"}
+
+	data, err := p.Download(t.Context(), &sub)
+	if !errors.Is(err, subflux.ErrSubtitleAbsent) {
+		t.Errorf("Download on 404 error = %v, want one wrapping subflux.ErrSubtitleAbsent", err)
+	}
+	if data != nil {
+		t.Errorf("Download on 404 data = %q, want nil", data)
 	}
 }

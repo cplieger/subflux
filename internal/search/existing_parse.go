@@ -3,7 +3,7 @@ package search
 import (
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- External subtitle path parsing ---
@@ -25,9 +25,9 @@ func parseExternalSubPath(path, base, ext string) externalSub {
 
 	for _, p := range parts[1:] {
 		switch strings.ToLower(p) {
-		case string(api.VariantHI), api.VariantAliasSDH:
+		case string(subflux.VariantHI), subflux.VariantAliasSDH:
 			sub.HI = true
-		case string(api.VariantForced), api.VariantAliasForeign:
+		case string(subflux.VariantForced), subflux.VariantAliasForeign:
 			sub.Forced = true
 		}
 	}

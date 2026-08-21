@@ -8,13 +8,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // StartupDelay is the delay before the first scan after startup.
@@ -24,24 +24,23 @@ const StartupDelay = 30 * time.Second
 // are purged from the database.
 const AuthCleanupInterval = 15 * time.Minute
 
-// Store is the narrow store interface used by RunDBMaintenance.
+// Store is the two rows RunDBMaintenance touches: the reconcile pass and the
+// aggregate counts it logs afterwards. Two of the 36 methods the store offers,
+// which is why this is declared here and not taken as a wide type.
 type Store interface {
-	ReconcileState(ctx context.Context) (api.ReconcileResult, error)
+	ReconcileState(ctx context.Context) (subflux.ReconcileResult, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 
-// Compile-time assertion: api.Store satisfies Store.
-var _ Store = api.Store(nil)
-
 // ReconcileMetrics is the narrow observability interface for reconcile passes.
-// The concrete *metrics.Metrics satisfies this via structural typing.
+// The concrete *obs.Metrics satisfies this via structural typing.
 type ReconcileMetrics interface {
 	RecordReconcile(deleted int, reset int64, dur time.Duration)
 }
 
 // Deps holds all dependencies for the scheduler.
 type Deps struct {
-	DB api.Store
+	DB Store
 	// ScanDB is the scan-state surface the full scan needs (recency set,
 	// stamps, cycle mark); the composition root passes the same store as DB.
 	ScanDB scanning.ScanStore
@@ -49,9 +48,20 @@ type Deps struct {
 	Backoff          scanning.BackoffPrefixReader
 	Metrics          scanning.ScanMetrics
 	ReconcileMetrics ReconcileMetrics // nil-safe; omit to skip reconcile metrics
-	Events           *serveradapter.ScanEventAdapter
-	Activity         *serveradapter.ActivityAdapter
-	Alerts           *serveradapter.AlertAdapter
+	// Events, Activity and Alerts are the scan-engine surfaces; the
+	// scheduler uses StartScan/PublishScanStart itself and hands the same
+	// three straight to scanning.Deps, so they are scanning's interfaces
+	// rather than duplicates. *events.EventBus, *activity.Log and
+	// *activity.AlertLog satisfy them directly.
+	Events   scanning.EventPublisher
+	Activity scanning.ActivityTracker
+	Alerts   scanning.AlertRecorder
+	// RecordStoreWriteError escalates a failed store write to a persistent
+	// operator alert when the error looks like disk exhaustion. Owned by the
+	// composition root because classification needs the storage engine and
+	// the same escalation serves the backup and poll-heartbeat writes.
+	// Nil-safe; omit to skip the escalation.
+	RecordStoreWriteError func(err error)
 	// Stops registers the graceful stop callback of the running full scan;
 	// scheduled scans register too (stoppable by admins).
 	Stops               *activity.StopRegistry
@@ -62,12 +72,19 @@ type Deps struct {
 }
 
 // LiveState holds the live state needed by the scheduler.
+//
+// Every field is typed as scanning's own interface, for the same reason
+// Deps.ScanDB is. The scheduler reads exactly ONE of the 37 values the config
+// offers — Search(), for the scan interval and the upgrade flag it logs — reads
+// nothing at all off the arr clients, and otherwise only carries the values into
+// scanning.LiveState. A separate declaration here would have to be assignable to
+// scanning's surface anyway, so it could only drift.
 type LiveState struct {
-	Cfg       api.ConfigProvider
-	Engine    api.SearchEngine
-	Sonarr    api.SonarrClient
-	Radarr    api.RadarrClient
-	Providers []api.Provider
+	Cfg       scanning.ScanCfg
+	Engine    scanning.ScanEngine
+	Sonarr    scanning.ScanSonarrClient
+	Radarr    scanning.ScanRadarrClient
+	Providers []provider.Provider
 }
 
 // Run runs the periodic scan and DB maintenance tickers until ctx is cancelled.
@@ -138,10 +155,12 @@ const (
 // returned run func executes the scan and applies its terminal outcome; the
 // caller owns the ScanningFlag guard and decides whether to run it inline
 // (scheduler tick) or in a background goroutine (HTTP handler).
-func PrepareFullScan(deps *Deps, source activity.ActivitySource) (actID string, run func(ctx context.Context)) {
+func PrepareFullScan(deps *Deps, source activity.Source) (actID string, run func(ctx context.Context)) {
 	actID, _ = deps.Activity.StartScan(FullScanAction, FullScanDetail, source,
 		activity.ScanScope{Kind: activity.ScanKindFull}, auth.RoleAdmin)
-	deps.Events.PublishScanStart(FullScanAction, FullScanDetail, source, actID)
+	deps.Events.PublishScanStart(&events.ScanEvent{
+		Action: FullScanAction, Detail: FullScanDetail, Source: source, ActivityID: actID,
+	})
 	stopCh := make(chan struct{})
 	unregister := deps.Stops.RegisterStop(actID, func() { close(stopCh) })
 	run = func(ctx context.Context) {
@@ -171,7 +190,7 @@ func runFullScan(ctx context.Context, stop <-chan struct{}, deps *Deps, actID st
 		Activity:      deps.Activity,
 		Alerts:        deps.Alerts,
 		ShowSkipCache: deps.ShowSkipCache,
-		ClearCaches:   provider.ClearProviderCaches,
+		ClearCaches:   provider.ClearCaches,
 	}
 	scanLS := &scanning.LiveState{
 		Cfg:         ls.Cfg,
@@ -193,8 +212,8 @@ func RunDBMaintenance(ctx context.Context, deps *Deps) {
 		slog.Warn("db maintenance: reconcile failed", "error", err)
 		// Surface a persistent alert on disk-full or repeated write failure
 		// so operators are notified before the system crash-loops.
-		if deps.Alerts != nil {
-			deps.Alerts.RecordStoreWriteError(err)
+		if deps.RecordStoreWriteError != nil {
+			deps.RecordStoreWriteError(err)
 		}
 	} else if len(result.Deleted.Paths) > 0 || result.ResetCount > 0 {
 		slog.Info("db maintenance: reconciled stale entries",

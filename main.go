@@ -10,17 +10,18 @@ import (
 	"io/fs"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/auth/v3/ratelimit"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
@@ -28,25 +29,30 @@ import (
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/embedded"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/syncworker"
 	"github.com/cplieger/subflux/internal/wiring"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
-// Compile-time interface satisfaction checks.
-var (
-	_ api.Store           = (*boltstore.DB)(nil)
-	_ authstore.AuthStore = (*authstore.Store)(nil)
-	_ api.ConfigProvider  = (*config.Config)(nil)
-	_ api.Scorer          = (*scorer.Engine)(nil)
-)
+// Compile-time interface satisfaction checks. Each of these is a cross-package
+// join where neither side imports the other, so the assertion is the only place
+// the check can be made and a failure names the pair.
+//
+// *boltstore.DB, *scorer.Engine and *config.Config are deliberately absent: all
+// three are handed straight to a typed parameter (server.New(db server.Store,
+// ...), the wiring.Func return, and server.WithConfig(*config.Config)), so the
+// call site already type-checks the surface each consumer requires.
+// storetest.Store checks the store's remainder from boltstore's own contract
+// test.
+var _ server.AuthStore = (*authstore.Store)(nil)
 
 //go:embed config.example.yaml
 var defaultConfig []byte
@@ -215,7 +221,7 @@ func runServer() int {
 		defer db.Close(ctx)
 
 		// Build auth store over the shared bbolt handle and start its sweeper.
-		authDB := authstore.New(db.BoltDB())
+		authDB := authstore.New(db.Bolt())
 		if err := authDB.Open(); err != nil {
 			slog.Error("failed to start auth sweeper", "error", err)
 			return 1
@@ -231,14 +237,14 @@ func runServer() int {
 
 		// Auth setup. WebAuthn/OIDC are built by activation on the first
 		// successful config save, never here.
-		rateLimiter := ratelimit.NewRateLimiter(ctx, ratelimit.DefaultConfig())
-		defer rateLimiter.Stop()
+		rateLimiter := ratelimit.New(ctx, ratelimit.DefaultConfig())
+		defer stopRateLimiter(ctx, rateLimiter)
 		if err := srv.SetAuth(authDB, rateLimiter); err != nil {
 			slog.Error("failed to assemble authenticator", "error", err)
 			return 1
 		}
 
-		startAdminSocket(ctx, srv)
+		startAdminSocket(ctx, srv, config.AdminSocketDir, config.AdminSocketPath)
 
 		serveAndWait(ctx, cancel, m, func() {
 			srv.StartUnconfigured(ctx, func() { m.Set(true) })
@@ -270,8 +276,11 @@ func runConfiguredServer(cfg *config.Config) int {
 	// Build auth store over the shared bbolt handle and start its sweeper,
 	// seeded with the configured session timeouts so eviction matches the
 	// request-path validator (hot reload re-applies them on change).
-	authDB := authstore.New(db.BoltDB())
-	authDB.SetSessionTimeouts(cfg.SessionIdleTimeout(), cfg.SessionAbsoluteTimeout())
+	authDB := authstore.New(db.Bolt())
+	authDB.SetSessionTimeouts(auth.SessionTimeouts{
+		Idle:     cfg.SessionIdleTimeout(),
+		Absolute: cfg.SessionAbsoluteTimeout(),
+	})
 	if err := authDB.Open(); err != nil {
 		slog.Error("failed to start auth sweeper", "error", err)
 		return 1
@@ -291,14 +300,14 @@ func runConfiguredServer(cfg *config.Config) int {
 		append(serverOptions(reg, syncExec), server.WithConfig(cfg))...)
 
 	// Auth setup.
-	rateLimiter := ratelimit.NewRateLimiter(ctx, ratelimit.DefaultConfig())
-	defer rateLimiter.Stop()
+	rateLimiter := ratelimit.New(ctx, ratelimit.DefaultConfig())
+	defer stopRateLimiter(ctx, rateLimiter)
 	if err := srv.SetAuth(authDB, rateLimiter); err != nil {
 		slog.Error("failed to assemble authenticator", "error", err)
 		return 1
 	}
 
-	startAdminSocket(ctx, srv)
+	startAdminSocket(ctx, srv, config.AdminSocketDir, config.AdminSocketPath)
 
 	serveAndWait(ctx, cancel, m, func() {
 		srv.Start(ctx, func() { m.Set(true) })
@@ -308,34 +317,50 @@ func runConfiguredServer(cfg *config.Config) int {
 
 // --- Admin socket (Unix-domain bootstrap plane) ---
 
-// startAdminSocket binds the admin bootstrap plane: srv.AdminHandler() served
-// on a Unix domain socket inside the private 0700 directory
-// config.AdminSocketDir. The directory is the custody boundary (only
-// same-container processes running as the server's UID can traverse it); the
-// 0600 chmod on the socket file is cosmetic hardening on top.
+// adminSocketHost is what the bootstrap plane needs from the server: the
+// handler to serve, the alert channel for the degraded path, and the background
+// goroutine set whose drain must include this listener's graceful shutdown.
+// Declared here because this file is the only consumer.
+type adminSocketHost interface {
+	AdminHandler() http.Handler
+	RecordPersistentAlert(source, msg string)
+	GoBackground(fn func())
+}
+
+// startAdminSocket binds the admin bootstrap plane: host.AdminHandler() served
+// on a Unix domain socket inside the private 0700 directory dir. The directory
+// is the custody boundary (only same-container processes running as the
+// server's UID can traverse it); the 0600 chmod on the socket file is cosmetic
+// hardening on top. dir and path are parameters, not the config constants, for
+// the same reason adminSocketListener takes them.
 //
 // Failure is DEGRADED, not fatal (R1.4): recovery via docker exec needs a
 // running server anyway, and a fatal would turn a mount misconfig into a
 // crash loop. On any setup error the failure is logged at ERROR, recorded as
 // a persistent operator alert, and TCP serving continues without the
 // bootstrap plane.
-func startAdminSocket(ctx context.Context, srv *server.Server) {
-	ln, err := adminSocketListener(ctx, config.AdminSocketDir, config.AdminSocketPath)
+func startAdminSocket(ctx context.Context, host adminSocketHost, dir, path string) {
+	ln, err := adminSocketListener(ctx, dir, path)
 	if err != nil {
 		slog.Error("admin socket unavailable; bootstrap commands will fail",
-			"path", config.AdminSocketPath, "error", err)
-		srv.RecordPersistentAlert("admin-socket",
-			"Admin bootstrap socket unavailable at "+config.AdminSocketPath+": "+err.Error()+
+			"path", path, "error", err)
+		host.RecordPersistentAlert("admin-socket",
+			"Admin bootstrap socket unavailable at "+path+": "+err.Error()+
 				". reset-password / generate-api-key will not work until this is fixed.")
 		return
 	}
 
-	adminSrv := webhttp.NewServer(srv.AdminHandler(),
+	adminSrv := webhttp.NewServer(host.AdminHandler(),
 		webhttp.WithReadTimeout(10*time.Second),
 		webhttp.WithWriteTimeout(60*time.Second),
 		webhttp.WithReadHeaderTimeout(10*time.Second),
 	)
-	go func() {
+	// On the server's background set like every other long-lived goroutine, so
+	// its drain report cannot claim every goroutine stopped while this one is
+	// still serving. The join is deadlock-free only because that set is awaited
+	// AFTER ctx cancellation: this Run serves until ctx ends, so a wait placed
+	// any earlier would block for the whole process lifetime.
+	host.GoBackground(func() {
 		// Shutdown rides the same signal context as the TCP server.
 		if err := webhttp.Run(ctx, adminSrv, ln, nil); err != nil {
 			slog.Error("admin socket server error", "error", err)
@@ -343,11 +368,11 @@ func startAdminSocket(ctx context.Context, srv *server.Server) {
 		// Crash-path belt only: closing a net-created unix listener already
 		// unlinks the socket file; this covers exit paths where Close did
 		// not run to completion.
-		if err := os.Remove(config.AdminSocketPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			slog.Debug("admin socket cleanup", "error", err)
 		}
-	}()
-	slog.Info("admin socket listening", "path", config.AdminSocketPath)
+	})
+	slog.Info("admin socket listening", "path", path)
 }
 
 // adminSocketListener prepares the custody directory and binds the Unix
@@ -398,6 +423,23 @@ func ensureAdminSocketDir(dir string) error {
 	return nil
 }
 
+// rateLimiterShutdownTimeout bounds the wait for the rate limiter's prune
+// goroutine to exit. It is generous: the goroutine only has to notice a closed
+// channel, so exceeding this means it is wedged, which is worth a log line.
+const rateLimiterShutdownTimeout = 5 * time.Second
+
+// stopRateLimiter stops the limiter's prune goroutine and waits for it to exit.
+// The wait runs on a context detached from ctx, because ctx is already cancelled
+// by the time this deferred call runs: waiting on it would report a timeout the
+// instant shutdown began, before the goroutine had any chance to leave.
+func stopRateLimiter(ctx context.Context, rl *ratelimit.RateLimiter) {
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rateLimiterShutdownTimeout)
+	defer cancel()
+	if err := rl.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("rate limiter shutdown did not complete", "error", err)
+	}
+}
+
 // serveAndWait starts fn in a goroutine and blocks until ctx is cancelled
 // or fn returns early (e.g. port bind failure). Returns after fn completes.
 func serveAndWait(ctx context.Context, cancel context.CancelFunc, m *health.Marker, fn func()) {
@@ -435,7 +477,12 @@ func ensureConfigFile(path string, def []byte) error {
 		slog.Error("failed to create config dir", "path", filepath.Dir(path), "error", err)
 		return err
 	}
-	if err := os.WriteFile(path, def, 0o600); err != nil {
+	// Atomic like the two other writers of this same file (cli.go's
+	// doEnablePasswordLogin, confighandlers' atomicWriteConfig): the os.Stat
+	// guard above means a torn config.yaml exists and is therefore never
+	// rewritten, so a non-durable write here is permanent damage.
+	if _, err := atomicfile.WriteFile(context.Background(), path, def,
+		atomicfile.WithMode(0o600)); err != nil {
 		slog.Error("failed to write default config", "path", path, "error", err)
 		return err
 	}
@@ -447,24 +494,24 @@ func ensureConfigFile(path string, def []byte) error {
 // server assemblies (configured cold boot and unconfigured mode); the callers
 // append only their mode-specific option (WithConfig / WithPort). One builder
 // means the two assemblies cannot drift apart again.
-func serverOptions(reg api.ProviderRegistry, syncExec syncing.SyncExec) []server.Option {
+func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.Option {
 	return []server.Option{
 		server.WithDefaultConfig(defaultConfig),
 		server.WithArrClientFactories(newSonarrFactory(), newRadarrFactory()),
 		server.WithWire(newWireFunc(reg, syncExec)),
-		server.WithSchema(schema.Schema),
+		server.WithSchema(schema.Sections),
 		server.WithConfigLoader(newConfigLoader()),
 		server.WithSubtitleProc(syncing.NewSubtitleProcessorWithExec(syncExec)),
-		server.WithMetrics(metrics.New()),
+		server.WithMetrics(obs.New()),
 		server.WithLogSetup(setupLogging),
 	}
 }
 
 // newSonarrFactory returns a function that creates Sonarr API clients, used by
 // the server for hot reload and config-save connectivity checks.
-func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
-	return func(baseURL, apiKey string) (api.SonarrClient, error) {
-		c, err := arrsvc.NewSonarr(baseURL, apiKey)
+func newSonarrFactory() func(baseURL, apiKey string) (server.SonarrClient, error) {
+	return func(baseURL, apiKey string) (server.SonarrClient, error) {
+		c, err := arrsvc.NewSonarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err
 		}
@@ -473,9 +520,9 @@ func newSonarrFactory() func(baseURL, apiKey string) (api.SonarrClient, error) {
 }
 
 // newRadarrFactory returns a function that creates Radarr API clients.
-func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
-	return func(baseURL, apiKey string) (api.RadarrClient, error) {
-		c, err := arrsvc.NewRadarr(baseURL, apiKey)
+func newRadarrFactory() func(baseURL, apiKey string) (server.RadarrClient, error) {
+	return func(baseURL, apiKey string) (server.RadarrClient, error) {
+		c, err := arrsvc.NewRadarr(baseURL, arrsvc.APIKey(apiKey))
 		if err != nil {
 			return nil, err
 		}
@@ -484,8 +531,8 @@ func newRadarrFactory() func(baseURL, apiKey string) (api.RadarrClient, error) {
 }
 
 // newConfigLoader returns a ConfigLoader that parses and validates config YAML.
-func newConfigLoader() api.ConfigLoader {
-	return func(data []byte) (api.ConfigProvider, error) {
+func newConfigLoader() confighandlers.ConfigLoader {
+	return func(data []byte) (*config.Config, error) {
 		return config.LoadFromBytes(context.Background(), data)
 	}
 }
@@ -496,9 +543,9 @@ func newConfigLoader() api.ConfigLoader {
 // carries the process-isolation executor (P13) into every engine the wire
 // builds — one client instance (one concurrency-one slot) survives hot
 // reloads, so replacing the config never doubles the alignment concurrency.
-func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Func {
-	return func(ctx context.Context, cfg api.ConfigProvider, db api.Store, m search.SearchMetrics) (api.SearchEngine, api.Scorer, []api.Provider, error) {
-		providers, err := reg.LoadAll(ctx, cfg.ProviderConfigs())
+func newWireFunc(reg *provider.Registry, syncExec syncing.SyncExec) wiring.Func {
+	return func(ctx context.Context, cfg *config.Config, db search.Store, m search.Metrics) (*search.Engine, *scorer.Engine, []provider.Provider, error) {
+		providers, err := reg.LoadAll(ctx, cfg.Providers())
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -508,7 +555,7 @@ func newWireFunc(reg api.ProviderRegistry, syncExec syncing.SyncExec) wiring.Fun
 		engine := search.New(providers,
 			search.WithStore(db), search.WithConfig(cfg),
 			search.WithMetrics(m), search.WithScorer(sc),
-			search.WithSyncer(syncing.Syncer{MinConfidence: cfg.SyncConfig().SyncMinConfidence, LangMapper: classify.Alpha2FromAlpha3, Exec: syncExec}),
+			search.WithSyncer(syncing.Syncer{MinConfidence: cfg.Sync().SyncMinConfidence, LangMapper: classify.Alpha2FromAlpha3, Exec: syncExec}),
 			search.WithSyncExec(syncExec),
 			search.WithTracks(embedded.Detector{}))
 		return engine, sc, providers, nil

@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scanning"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // precheckImportPath verifies the imported video still exists on disk and that
@@ -66,7 +68,7 @@ func (p *Poller) processPollImport(
 
 	slog.Info("poll: import detected",
 		"media", result.Label, "path", path)
-	p.deps.Metrics.RecordImport(api.PollKey(result.Source))
+	p.deps.Metrics.RecordImport(subflux.PollKey(result.Source))
 
 	searchResult, searchErr := ls.Engine.SearchTargets(ctx, result.Req, path, result.Targets)
 	queried = searchResult.ProviderQueried()
@@ -79,7 +81,7 @@ func (p *Poller) processPollImport(
 	}
 	searchPaths := searchResult.Paths()
 	if len(searchPaths) > 0 || searchResult.CoverageChanged {
-		mediaID := api.BuildMediaID(result.Req)
+		mediaID := mediaid.Build(result.Req)
 		p.deps.Events.Publish(events.Event{
 			Type: events.CoverageUpdate,
 			Data: events.CoverageEvent{
@@ -108,17 +110,17 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 	return p.processPollImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
-			series, err := ls.Sonarr.GetSeriesByID(ctx, entry.SeriesID)
+			series, err := ls.Sonarr.SeriesByID(ctx, entry.SeriesID)
 			if err != nil {
 				slog.Warn("poll: failed to get series", "series_id", entry.SeriesID, "error", err)
 				return nil, err
 			}
-			if api.HasExcludeTag(series.Tags, excludeIDs) {
+			if arrsvc.HasExcludeTag(series.Tags, excludeIDs) {
 				slog.Info("poll: series excluded by tag", "series", series.Title)
 				return nil, nil
 			}
 
-			ep, err := ls.Sonarr.GetEpisodeByID(ctx, entry.EpisodeID)
+			ep, err := ls.Sonarr.EpisodeByID(ctx, entry.EpisodeID)
 			if err != nil {
 				slog.Warn("poll: failed to get episode", "episode_id", entry.EpisodeID, "error", err)
 				return nil, err
@@ -126,10 +128,10 @@ func (p *Poller) processSonarrImport(ctx context.Context, ls *LiveState, entry *
 
 			label := fmt.Sprintf("%s (%d) - S%02dE%02d", series.Title, series.Year, ep.SeasonNumber, ep.EpisodeNumber)
 
-			origLang := api.OriginalLangCode(series.OriginalLanguage)
+			origLang := arrsvc.OriginalLangCode(series.OriginalLanguage)
 			var audioLangs []string
 			if ep.EpisodeFile != nil {
-				audioLangs = api.AudioLanguages(ep.EpisodeFile.MediaInfo)
+				audioLangs = arrsvc.AudioLanguages(ep.EpisodeFile.MediaInfo)
 			}
 			targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 
@@ -156,22 +158,22 @@ func (p *Poller) processRadarrImport(ctx context.Context, ls *LiveState, entry *
 	return p.processPollImport(
 		ctx, ls, path,
 		func() (*ImportResult, error) {
-			movie, err := ls.Radarr.GetMovieByID(ctx, entry.MovieID)
+			movie, err := ls.Radarr.MovieByID(ctx, entry.MovieID)
 			if err != nil {
 				slog.Warn("poll: failed to get movie", "movie_id", entry.MovieID, "error", err)
 				return nil, err
 			}
-			if api.HasExcludeTag(movie.Tags, excludeIDs) {
+			if arrsvc.HasExcludeTag(movie.Tags, excludeIDs) {
 				slog.Info("poll: movie excluded by tag", "movie", movie.Title)
 				return nil, nil
 			}
 
 			label := fmt.Sprintf("%s (%d)", movie.Title, movie.Year)
 
-			origLang := api.OriginalLangCode(movie.OriginalLanguage)
+			origLang := arrsvc.OriginalLangCode(movie.OriginalLanguage)
 			var audioLangs []string
 			if movie.MovieFile != nil {
-				audioLangs = api.AudioLanguages(movie.MovieFile.MediaInfo)
+				audioLangs = arrsvc.AudioLanguages(movie.MovieFile.MediaInfo)
 			}
 			targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 

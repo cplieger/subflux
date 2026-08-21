@@ -3,7 +3,7 @@ package scoring
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzNormalizeTitle_idempotent verifies NormalizeTitle is idempotent:
@@ -71,7 +71,7 @@ func FuzzEpisodeNumberMatch(f *testing.F) {
 			return
 		}
 
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			Season:          season,
 			Episode:         episode,
 			SceneSeason:     sceneSeason,
@@ -94,7 +94,7 @@ func FuzzAnyReleaseNameMatches(f *testing.F) {
 	f.Add("Show", "Show.II.S01E01", "")
 
 	f.Fuzz(func(t *testing.T, title, releaseName, altTitle string) {
-		req := &api.SearchRequest{
+		req := &subflux.SearchRequest{
 			Title: title,
 		}
 		if altTitle != "" {

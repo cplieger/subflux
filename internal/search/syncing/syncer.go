@@ -6,7 +6,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
@@ -28,7 +28,7 @@ type Syncer struct {
 	LangMapper subsync.LangMapper
 
 	// MinConfidence is the minimum confidence threshold for auto-sync.
-	// When zero, defaults to api.DefaultSyncMinConfidence (0.6).
+	// When zero, defaults to subflux.DefaultSyncMinConfidence (0.6).
 	MinConfidence float64
 }
 
@@ -71,7 +71,7 @@ func (s Syncer) Sync(ctx context.Context, data []byte, videoPath, lang string) (
 }
 
 // PostProcess applies encoding normalization, HI removal, tag stripping, etc.
-func (Syncer) PostProcess(data []byte, pp api.PostProcessConfig) []byte {
+func (Syncer) PostProcess(data []byte, pp subflux.PostProcessConfig) []byte {
 	opts := subsync.PostProcessOptions{
 		StripHI:              pp.StripHI,
 		StripTags:            pp.StripTags,

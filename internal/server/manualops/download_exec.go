@@ -2,15 +2,19 @@ package manualops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/httpwire"
+	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // DownloadTimeout is the context timeout for manual downloads.
@@ -22,10 +26,10 @@ const DownloadTimeout = 5 * time.Minute
 // consumers (the remote CLI's poll loop) learn where the file landed.
 // Returns true on success.
 func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db DownloadStore,
-	prov api.Provider, req *DownloadRequest, actID string,
+	prov provider.Provider, req *DownloadRequest, actID string,
 ) bool {
 	// Download the subtitle.
-	sub := api.Subtitle{
+	sub := subflux.Subtitle{
 		Provider:    req.Provider,
 		ID:          req.SubtitleID,
 		DownloadURL: req.SubtitleID,
@@ -39,24 +43,35 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 	if err != nil {
 		slog.Error("manual download failed",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		NotifyError(deps, "manual", "Download failed from "+string(req.Provider),
-			"Download failed from "+string(req.Provider))
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  "Download failed from " + string(req.Provider),
+			UI:     "Download failed from " + string(req.Provider),
+		})
 		return false
 	}
 
-	// Reject binary data that isn't a valid subtitle file.
-	if err := api.ValidateSubtitleData(data); err != nil {
+	// Reject bytes that are not a subtitle. subtitlefile.Validate owns both
+	// refusals; only the operator-facing text distinguishes them, because
+	// blaming the archive format for a body that had no bytes misdiagnoses it.
+	if err := subtitlefile.Validate(data); err != nil {
 		slog.Warn("manual download: invalid subtitle data",
 			"provider", req.Provider, "subtitle_id", req.SubtitleID, "error", err)
-		NotifyError(deps, "manual",
-			fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider),
-			"Downloaded file is not a valid subtitle")
+		alert := fmt.Sprintf("Downloaded file from %s is not a valid subtitle (unsupported archive format?)", req.Provider)
+		if errors.Is(err, subtitlefile.ErrEmpty) {
+			alert = fmt.Sprintf("%s returned an empty file for this subtitle", req.Provider)
+		}
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  alert,
+			UI:     "Downloaded file is not a valid subtitle",
+		})
 		return false
 	}
 
 	// Sync timing against existing reference subtitle. The video path was
 	// resolved server-side from the MediaRef by the handler (S7).
-	variant := api.VariantFromFlags(req.HearingImp, req.Forced)
+	variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: req.HearingImp, Forced: req.Forced})
 	data, syncOffsetMs := ls.Engine.SyncAndPostProcess(ctx, data, req.VideoPath(), req.Language, variant)
 
 	// Resolve media IDs for coverage tracking and history recording.
@@ -93,7 +108,12 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 
 	// Publish success events.
 	deps.Events.PublishNotify(events.NotifySuccess, "Subtitle downloaded")
-	deps.Events.PublishCoverageUpdate(mediaType, effectiveMediaID, req.Language, string(req.Provider))
+	deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+		MediaType: mediaType,
+		MediaID:   effectiveMediaID,
+		Language:  req.Language,
+		Source:    string(req.Provider),
+	})
 
 	return true
 }
@@ -111,26 +131,33 @@ func RunDownload(ctx context.Context, deps *SearchDeps, ls *LiveState, db Downlo
 // history-recording failure warns and keeps the saved file, matching the
 // previous non-fatal behavior.
 func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadStore,
-	req *DownloadRequest, historyMediaID, title string, variant api.Variant, data []byte,
+	req *DownloadRequest, historyMediaID, title string, variant subflux.Variant, data []byte,
 ) (subPath string, ok bool) {
 	unlock := downloadPathGate.lock(downloadQuadKey(req.MediaType, historyMediaID, req.Language, variant))
 	defer unlock()
 
 	// Ordinals advance per quad: movie.fr.1.srt and movie.fr.forced.1.srt are
 	// independent sequences, matching the variant-aware manual file naming.
-	n := db.NextManualNumber(ctx, req.MediaType, historyMediaID, req.Language, variant)
-	subPath = api.ManualSubtitlePath(req.VideoPath(), req.Language, n, req.HearingImp, req.Forced)
+	n := db.NextManualNumber(ctx, subflux.ManualLockKey{
+		MediaType: req.MediaType, MediaID: historyMediaID,
+		Language: req.Language, Variant: variant,
+	})
+	subPath = subtitlefile.ManualPath(req.VideoPath(), n,
+		subtitlefile.Tags{Lang: req.Language, HearingImpaired: req.HearingImp, Forced: req.Forced})
 
 	// Atomic write: temp file + rename prevents corruption on crash.
 	// WithMaxBytes mirrors the read bound: the sync handlers load subtitles
-	// with ReadBounded(MaxSyncSubSize == httputil.MaxDownloadBytes), so a
+	// with ReadBounded(MaxSyncSubSize == httpwire.MaxDownloadBytes), so a
 	// post-processed payload the read path would refuse must fail here,
 	// loudly, instead of landing on disk.
 	if _, err := atomicfile.WriteFile(ctx, subPath, data,
-		atomicfile.WithMaxBytes(httputil.MaxDownloadBytes)); err != nil {
+		atomicfile.WithMaxBytes(httpwire.MaxDownloadBytes)); err != nil {
 		slog.Error("manual download: write failed", "path", subPath, "error", err)
-		NotifyError(deps, "manual", "Write failed for manual subtitle download",
-			"Write failed for subtitle download")
+		NotifyError(deps, ErrorNotice{
+			Source: alertSourceManual,
+			Alert:  "Write failed for manual subtitle download",
+			UI:     "Write failed for subtitle download",
+		})
 		return "", false
 	}
 
@@ -139,14 +166,14 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 	// Record in history. A top pick records as auto (manual=false) but
 	// still occupies a numbered path, which is why ordinal discovery scans
 	// every row's path regardless of the Manual flag.
-	meta := &api.DownloadMeta{
+	meta := &subflux.DownloadMeta{
 		Manual:    !req.TopPick,
 		VideoPath: req.VideoPath(),
 		Season:    req.Season,
 		Episode:   req.Episode,
 		Title:     title,
 	}
-	if err := db.SaveDownload(ctx, &api.DownloadRecord{
+	if err := db.SaveDownload(ctx, &subflux.DownloadRecord{
 		MediaType:    req.MediaType,
 		MediaID:      historyMediaID,
 		Language:     req.Language,
@@ -158,7 +185,7 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 		Meta:         meta,
 	}); err != nil {
 		slog.Warn("failed to record manual download", "error", err)
-		deps.Alerts.RecordWarn("manual", "Download saved but history recording failed")
+		deps.Alerts.RecordWarn(alertSourceManual, "Download saved but history recording failed")
 	}
 	return subPath, true
 }
@@ -166,24 +193,24 @@ func commitNumberedSubtitle(ctx context.Context, deps *SearchDeps, db DownloadSt
 // ResolveMediaIDs determines the coverage and history media IDs for a manual
 // download.
 func ResolveMediaIDs(ctx context.Context, ls *LiveState,
-	mediaType api.MediaType, arrID, season, episode int,
+	mediaType subflux.MediaType, arrID, season, episode int,
 ) (coverageID, historyID string) {
-	if mediaType == api.MediaTypeMovie && arrID > 0 {
+	if mediaType == subflux.MediaTypeMovie && arrID > 0 {
 		coverageID = LookupMovieMediaID(ctx, ls, arrID)
-	} else if mediaType == api.MediaTypeEpisode && arrID > 0 {
+	} else if mediaType == subflux.MediaTypeEpisode && arrID > 0 {
 		coverageID = LookupEpisodeMediaID(ctx, ls, arrID, season, episode)
 	}
 
 	historyID = coverageID
 	if historyID == "" && arrID > 0 {
-		if mediaType == api.MediaTypeMovie {
+		if mediaType == subflux.MediaTypeMovie {
 			historyID = fmt.Sprintf("radarr-%d", arrID)
 		} else {
 			historyID = fmt.Sprintf("sonarr-%d-s%02de%02d", arrID, season, episode)
 		}
 	}
 	if historyID == "" {
-		historyID = api.BuildMediaID(&api.SearchRequest{MediaType: mediaType})
+		historyID = mediaid.Build(&subflux.SearchRequest{MediaType: mediaType})
 		slog.Debug("manual download: using fallback media ID",
 			"media_type", mediaType, "arr_id", arrID, "history_id", historyID)
 	}
@@ -195,7 +222,7 @@ func LookupMovieMediaID(ctx context.Context, ls *LiveState, arrID int) string {
 	if ls.Radarr == nil {
 		return ""
 	}
-	m, err := ls.Radarr.GetMovieByID(ctx, arrID)
+	m, err := ls.Radarr.MovieByID(ctx, arrID)
 	if err != nil {
 		slog.Warn("failed to look up movie for media ID", "arr_id", arrID, "error", err)
 		return ""
@@ -208,25 +235,25 @@ func LookupEpisodeMediaID(ctx context.Context, ls *LiveState, seriesID, season, 
 	if ls.Sonarr == nil {
 		return ""
 	}
-	ser, err := ls.Sonarr.GetSeriesByID(ctx, seriesID)
+	ser, err := ls.Sonarr.SeriesByID(ctx, seriesID)
 	if err != nil {
 		slog.Warn("failed to look up series for media ID", "series_id", seriesID, "error", err)
 		return ""
 	}
-	return api.BuildEpisodeID(ser.TvdbID, ser.ImdbID, season, episode)
+	return mediaid.Episode(ser.TvdbID, ser.ImdbID, mediaid.SeasonEpisode{Season: season, Episode: episode})
 }
 
 // LookupMediaTitle resolves the title for a media item from the arr client.
-func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaType, arrID int) string {
+func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType subflux.MediaType, arrID int) string {
 	if arrID <= 0 {
 		return ""
 	}
-	if mediaType == api.MediaTypeMovie && ls.Radarr != nil {
-		if m, err := ls.Radarr.GetMovieByID(ctx, arrID); err == nil {
+	if mediaType == subflux.MediaTypeMovie && ls.Radarr != nil {
+		if m, err := ls.Radarr.MovieByID(ctx, arrID); err == nil {
 			return m.Title
 		}
-	} else if mediaType == api.MediaTypeEpisode && ls.Sonarr != nil {
-		if ser, err := ls.Sonarr.GetSeriesByID(ctx, arrID); err == nil {
+	} else if mediaType == subflux.MediaTypeEpisode && ls.Sonarr != nil {
+		if ser, err := ls.Sonarr.SeriesByID(ctx, arrID); err == nil {
 			return ser.Title
 		}
 	}
@@ -236,25 +263,25 @@ func LookupMediaTitle(ctx context.Context, ls *LiveState, mediaType api.MediaTyp
 // PostDownloadUpdate updates coverage DB and refreshes the arr after a
 // successful manual download.
 func PostDownloadUpdate(ctx context.Context, ls *LiveState, db DownloadStore,
-	req *DownloadRequest, mediaType api.MediaType, coverageMediaID, subPath string, variant api.Variant,
+	req *DownloadRequest, mediaType subflux.MediaType, coverageMediaID, subPath string, variant subflux.Variant,
 ) {
 	if coverageMediaID != "" {
-		if err := db.UpsertSubtitleFile(ctx, mediaType, coverageMediaID, &api.SubtitleFile{
+		if err := db.UpsertSubtitleFile(ctx, mediaType, coverageMediaID, &subflux.SubtitleFile{
 			Language: req.Language,
 			Variant:  variant,
-			Source:   api.SourceExternal,
+			Source:   subflux.SourceExternal,
 			Path:     subPath,
 		}); err != nil {
 			slog.Warn("failed to upsert subtitle file", "error", err)
 		}
 	}
 
-	if mediaType == api.MediaTypeMovie && req.ArrID > 0 && ls.Radarr != nil {
+	if mediaType == subflux.MediaTypeMovie && req.ArrID > 0 && ls.Radarr != nil {
 		if err := ls.Radarr.RescanMovie(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh movie in radarr",
 				"movie_id", req.ArrID, "error", err)
 		}
-	} else if mediaType == api.MediaTypeEpisode && req.ArrID > 0 && ls.Sonarr != nil {
+	} else if mediaType == subflux.MediaTypeEpisode && req.ArrID > 0 && ls.Sonarr != nil {
 		if err := ls.Sonarr.RescanSeries(ctx, req.ArrID); err != nil {
 			slog.Warn("failed to refresh series in sonarr",
 				"series_id", req.ArrID, "error", err)

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
-// This file holds the subtitle_state domain: the DownloadStore,
-// ManualLockStore, HistoryStore, and the state-query half of QueryStore.
+// This file holds the subtitle_state domain: the download records, the manual
+// override locks, the download-history lookup, and the state queries.
 
 // SaveDownload records (or upgrades) a subtitle download in one write
 // transaction, preserving the old SQLite store's observable behaviour while
@@ -43,14 +43,14 @@ import (
 // All mutations route through the putState / deleteAttempt index-maintenance
 // chokepoints, so the secondary indexes and the maintained meta counters are
 // updated in the same all-or-nothing transaction as the primary writes.
-func (d *DB) SaveDownload(_ context.Context, rec *api.DownloadRecord) error {
+func (d *DB) SaveDownload(_ context.Context, rec *subflux.DownloadRecord) error {
 	m := rec.Meta
 	if m == nil {
-		m = &api.DownloadMeta{}
+		m = &subflux.DownloadMeta{}
 	}
 	variant := rec.Variant
 	if variant == "" {
-		variant = api.VariantStandard
+		variant = subflux.VariantStandard
 	}
 	slog.Debug("SaveDownload",
 		"media_type", rec.MediaType, "media_id", rec.MediaID,
@@ -80,7 +80,7 @@ func (d *DB) SaveDownload(_ context.Context, rec *api.DownloadRecord) error {
 // old `UPDATE subtitle_state SET ... WHERE manual = 0` which left media_imported
 // untouched). When the quad has no auto row it inserts a fresh one with
 // media_imported = now.
-func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, variant api.Variant) error {
+func saveAutoRow(tx *bolt.Tx, rec *subflux.DownloadRecord, m *subflux.DownloadMeta, variant subflux.Variant) error {
 	rows, err := collectStateRows(tx, rec.MediaType, rec.MediaID, rec.Language, variant)
 	if err != nil {
 		return err
@@ -120,7 +120,7 @@ func saveAutoRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, vari
 // for the quad via the putState chokepoint (which maintains ix_state_quad,
 // ix_state_imported, ix_state_video and the downloads counter). manual marks the
 // row as auto (false) or a manual lock (true); imported sets media_imported.
-func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, variant api.Variant, manual bool, imported time.Time) error {
+func insertStateRow(tx *bolt.Tx, rec *subflux.DownloadRecord, m *subflux.DownloadMeta, variant subflux.Variant, manual bool, imported time.Time) error {
 	sb := tx.Bucket([]byte(bucketSubtitleState))
 	if sb == nil {
 		return errors.New("boltstore: subtitle_state bucket not found")
@@ -159,7 +159,7 @@ func insertStateRow(tx *bolt.Tx, rec *api.DownloadRecord, m *api.DownloadMeta, v
 // partition decides whether a manual lock is overwritten), so it FAILS CLOSED
 // on a primary decode error rather than tolerantly skipping. It is shared by
 // the subtitle_state domain methods (tasks 4.1-4.4).
-func collectStateRows(tx *bolt.Tx, mt api.MediaType, mid, lang string, variant api.Variant) ([]stateRec, error) {
+func collectStateRows(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, variant subflux.Variant) ([]stateRec, error) {
 	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
 		return nil, errors.New("boltstore: ix_state_quad bucket not found")
@@ -195,16 +195,16 @@ func collectStateRows(tx *bolt.Tx, mt api.MediaType, mid, lang string, variant a
 // `DELETE FROM search_attempts WHERE media_type = ? AND media_id = ? AND language = ?`.
 // Keys are collected before deletion (bbolt skips the next key if you delete
 // during cursor iteration).
-func clearTripleBackoff(tx *bolt.Tx, mt api.MediaType, mid, lang string) error {
+func clearTripleBackoff(tx *bolt.Tx, mt subflux.MediaType, mid, lang string) error {
 	b := tx.Bucket([]byte(bucketSearchAttempts))
 	if b == nil {
 		return errors.New("boltstore: search_attempts bucket not found")
 	}
 	prefix := triplePrefix(mt, mid, lang)
-	var providers []api.ProviderID
+	var providers []subflux.ProviderID
 	c := b.Cursor()
 	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-		providers = append(providers, api.ProviderID(k[len(prefix):]))
+		providers = append(providers, subflux.ProviderID(k[len(prefix):]))
 	}
 	for _, p := range providers {
 		if _, err := deleteAttempt(tx, mt, mid, lang, p); err != nil {
@@ -263,9 +263,9 @@ func parseManualOrdinal(path string) (int, bool) {
 // the shared collectStateRows helper, which dereferences each primary and
 // fails closed on a decode error. Distinctness is preserved with first-seen
 // ordering over the scan (ascending (variant, surrogate id)).
-func (d *DB) DownloadedRefs(_ context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error) {
-	var out []api.DownloadedRef
-	seen := make(map[api.DownloadedRef]struct{})
+func (d *DB) DownloadedRefs(_ context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error) {
+	var out []subflux.DownloadedRef
+	seen := make(map[subflux.DownloadedRef]struct{})
 	err := d.db.View(func(tx *bolt.Tx) error {
 		rows, err := collectStateRows(tx, mediaType, mediaID, language, "")
 		if err != nil {
@@ -276,7 +276,7 @@ func (d *DB) DownloadedRefs(_ context.Context, mediaType api.MediaType, mediaID,
 			if r.ReleaseName == "" {
 				continue // legacy/empty release name never matches a result
 			}
-			ref := api.DownloadedRef{ReleaseName: r.ReleaseName, Provider: r.Provider}
+			ref := subflux.DownloadedRef{ReleaseName: r.ReleaseName, Provider: r.Provider}
 			if _, ok := seen[ref]; ok {
 				continue // DISTINCT
 			}
@@ -304,7 +304,7 @@ func (d *DB) DownloadedRefs(_ context.Context, mediaType api.MediaType, mediaID,
 // (which fails closed on a decode error). On a score tie the first row in
 // quad-scan order (ascending surrogate id) wins, a deterministic choice the
 // contract leaves open.
-func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (score int, mediaImported time.Time, found bool, err error) {
+func (d *DB) CurrentScore(_ context.Context, mediaType subflux.MediaType, mediaID, language string, variant subflux.Variant) (score int, mediaImported time.Time, found bool, err error) {
 	err = d.db.View(func(tx *bolt.Tx) error {
 		rows, derr := collectStateRows(tx, mediaType, mediaID, language, variant)
 		if derr != nil {
@@ -342,7 +342,7 @@ func (d *DB) CurrentScore(_ context.Context, mediaType api.MediaType, mediaID, l
 // locked rather than silently dropping the entry. decodeStateProjection only
 // returns ok=false for a value shorter than the fixed manual+score prefix,
 // which a correctly maintained index can never produce.
-func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, variant api.Variant, fn func(manual bool, score int, provider api.ProviderID)) error {
+func walkStateProjection(tx *bolt.Tx, mt subflux.MediaType, mid, lang string, variant subflux.Variant, fn func(manual bool, score int, provider subflux.ProviderID)) error {
 	idx := tx.Bucket([]byte(bucketIxStateQuad))
 	if idx == nil {
 		return errors.New("boltstore: ix_state_quad bucket not found")
@@ -360,9 +360,9 @@ func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, varian
 }
 
 // IsManuallyLocked reports whether the quad has at least one manual row, so it
-// should be excluded from all automated actions. An empty variant asks whether
-// ANY variant of the language is locked (the language-level summary the manual
-// search popup shows). It mirrors the old SQLite
+// should be excluded from all automated actions. An empty key.Variant asks
+// whether ANY variant of the language is locked (the language-level summary the
+// manual search popup shows). It mirrors the old SQLite
 // `SELECT EXISTS(... WHERE ... AND manual = 1)` (Requirement 4.2), refined per
 // variant.
 //
@@ -371,14 +371,15 @@ func walkStateProjection(tx *bolt.Tx, mt api.MediaType, mid, lang string, varian
 // (Requirement 18.3). As a lock-bearing read it fails closed: if the projection
 // cannot be read the quad is reported locked AND the error is returned, so a
 // decode fault can never silently unlock an item (Requirement 13.4).
-func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (bool, error) {
+func (d *DB) IsManuallyLocked(_ context.Context, key subflux.ManualLockKey) (bool, error) {
 	locked := false
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
-			if manual {
-				locked = true
-			}
-		})
+		return walkStateProjection(tx, key.MediaType, key.MediaID, key.Language, key.Variant,
+			func(manual bool, _ int, _ subflux.ProviderID) {
+				if manual {
+					locked = true
+				}
+			})
 	})
 	if err != nil {
 		return true, err // fail closed: treat the lock as held on a read fault
@@ -387,11 +388,11 @@ func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaI
 }
 
 // ClearManualLock removes the quad's manual lock so automated scans and
-// upgrades resume; an empty variant clears the locks of EVERY variant of the
-// language (the CLI/API "unlock this item+language" default). It is
+// upgrades resume; an empty key.Variant clears the locks of EVERY variant of
+// the language (the CLI/API "unlock this item+language" default). It is
 // NON-destructive: it flips each manual row's flag to auto (manual=false) and
 // rewrites the row, preserving its id, path, score, provider, release_name,
-// and media_imported, so the rows stay visible to GetState and DownloadedRefs
+// and media_imported, so the rows stay visible to State and DownloadedRefs
 // (Requirement 4.3). This mirrors the old SQLite `UPDATE subtitle_state SET
 // manual = 0 WHERE ... AND manual = 1`, which was a flag flip, not a delete.
 //
@@ -400,11 +401,12 @@ func (d *DB) IsManuallyLocked(_ context.Context, mediaType api.MediaType, mediaI
 // with manual=false in the same transaction (the row keeps its id, so its
 // other index entries are unchanged and the downloads counter is not
 // double-counted). A quad with no manual row is a no-op.
-func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error {
+func (d *DB) ClearManualLock(_ context.Context, key subflux.ManualLockKey) error {
 	slog.Debug("ClearManualLock",
-		"media_type", mediaType, "media_id", mediaID, "lang", language, "variant", variant)
+		"media_type", key.MediaType, "media_id", key.MediaID,
+		"lang", key.Language, "variant", key.Variant)
 	return d.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -423,18 +425,19 @@ func (d *DB) ClearManualLock(_ context.Context, mediaType api.MediaType, mediaID
 }
 
 // ManualDownloadCount returns how many manual rows exist for the quad (exact
-// variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
+// key.Variant), mirroring the old SQLite `SELECT COUNT(*) ... WHERE ... AND
 // manual = 1` (Requirement 15.6). Like IsManuallyLocked it is served purely
 // from the ix_state_quad projection's manual flag via walkStateProjection,
 // with no primary dereference (Requirement 18.3).
-func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) (int, error) {
+func (d *DB) ManualDownloadCount(_ context.Context, key subflux.ManualLockKey) (int, error) {
 	count := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		return walkStateProjection(tx, mediaType, mediaID, language, variant, func(manual bool, _ int, _ api.ProviderID) {
-			if manual {
-				count++
-			}
-		})
+		return walkStateProjection(tx, key.MediaType, key.MediaID, key.Language, key.Variant,
+			func(manual bool, _ int, _ subflux.ProviderID) {
+				if manual {
+					count++
+				}
+			})
 	})
 	if err != nil {
 		return 0, err
@@ -443,7 +446,7 @@ func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, med
 }
 
 // ManualSubtitlePaths returns the subtitle file paths from every manual row for
-// the quad — or every variant of the language when variant is empty —
+// the quad — or every variant of the language when key.Variant is empty —
 // excluding rows with an empty path, mirroring the old SQLite
 // `SELECT path ... WHERE ... AND manual = 1 AND path != ”` (Requirement 15.6).
 // maybeRevertManualLock uses it (exact variant) to check which manual files
@@ -453,10 +456,10 @@ func (d *DB) ManualDownloadCount(_ context.Context, mediaType api.MediaType, med
 // (which carries only manual/score/provider), so this walks the quad via the
 // shared collectStateRows helper, which dereferences each primary and fails
 // closed on a decode error.
-func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) ([]string, error) {
+func (d *DB) ManualSubtitlePaths(_ context.Context, key subflux.ManualLockKey) ([]string, error) {
 	var paths []string
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -483,8 +486,8 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 // number and the atomic write would overwrite the top pick's file. Rows the
 // app numbered are what reserve ordinals, however they are flagged; plain
 // auto rows (movie.fr.srt) have no trailing ordinal and contribute nothing.
-// Sequences stay per variant: movie.fr.1.srt (standard) and
-// movie.fr.forced.1.srt (forced) advance independently, matching the
+// Sequences stay per variant (exact key.Variant): movie.fr.1.srt (standard)
+// and movie.fr.forced.1.srt (forced) advance independently, matching the
 // variant-aware manual file naming.
 //
 // The ordinal lives on the primary path, so this walks the quad via
@@ -495,10 +498,10 @@ func (d *DB) ManualSubtitlePaths(_ context.Context, mediaType api.MediaType, med
 // fault falls back to ManualDownloadCount + 1, and to 1 if that also fails,
 // matching the old store's degraded path (the count-based fallback cannot
 // see auto-row ordinals; it only runs on a primary decode fault).
-func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) int {
+func (d *DB) NextManualNumber(_ context.Context, key subflux.ManualLockKey) int {
 	maxOrdinal := 0
 	err := d.db.View(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mediaType, mediaID, language, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}
@@ -511,7 +514,7 @@ func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaI
 	})
 	if err != nil {
 		slog.Warn("NextManualNumber scan failed, falling back to count", "error", err)
-		count, cerr := d.ManualDownloadCount(context.Background(), mediaType, mediaID, language, variant)
+		count, cerr := d.ManualDownloadCount(context.Background(), key)
 		if cerr != nil {
 			return 1
 		}
@@ -522,7 +525,7 @@ func (d *DB) NextManualNumber(_ context.Context, mediaType api.MediaType, mediaI
 
 // defaultQueryLimit is the safety cap applied when a caller passes Limit <= 0
 // ("no explicit limit"), matching the old SQLite store's 1000-row hard cap that
-// prevents unbounded allocation on an unfiltered GetState (Requirement 15.3).
+// prevents unbounded allocation on an unfiltered State (Requirement 15.3).
 const defaultQueryLimit = 1000
 
 // preallocCap caps the result-slice capacity hint so a large requested Limit
@@ -532,19 +535,19 @@ const defaultQueryLimit = 1000
 const preallocCap = 256
 
 // stateQuadInfo is a comparable (media_type, media_id, language, variant)
-// tuple used as a grouping/map key by the index-only reads (GetManualLocks'
+// tuple used as a grouping/map key by the index-only reads (ManualLocks'
 // accumulator) and reconcile's per-quad grouping. Row-bearing reads take the
 // quad from the self-contained stateRec instead.
 type stateQuadInfo struct {
-	mt      api.MediaType
+	mt      subflux.MediaType
 	mid     string
 	lang    string
-	variant api.Variant
+	variant subflux.Variant
 }
 
 // splitStateQuadKey parses an ix_state_quad key (mt 0x00 mid 0x00 lang 0x00
 // variant 0x00 be64(id)) back into its quad components and surrogate id. It
-// serves the index-only reads (GetManualLocks, HistoryMediaIDs), which answer
+// serves the index-only reads (ManualLocks, HistoryMediaIDs), which answer
 // from the index walk without dereferencing primaries. ok is false for a key
 // too short to hold the id or missing the quad components.
 func splitStateQuadKey(key []byte) (quad stateQuadInfo, id int64, ok bool) {
@@ -563,10 +566,10 @@ func splitStateQuadKey(key []byte) (quad stateQuadInfo, id int64, ok bool) {
 		return stateQuadInfo{}, 0, false
 	}
 	quad = stateQuadInfo{
-		mt:      api.MediaType(parts[0]),
+		mt:      subflux.MediaType(parts[0]),
 		mid:     parts[1],
 		lang:    parts[2],
-		variant: api.Variant(parts[3]),
+		variant: subflux.Variant(parts[3]),
 	}
 	return quad, int64(v), true //nolint:gosec // G115: inverse of stateKey suffix
 }
@@ -616,10 +619,10 @@ func asciiHasPrefixFold(s, prefix string) bool {
 	return strings.HasPrefix(asciiLower(s), asciiLower(prefix))
 }
 
-// stateEntryFrom assembles an api.StateEntry from a decoded (self-contained)
+// stateEntryFrom assembles an subflux.StateEntry from a decoded (self-contained)
 // primary record.
-func stateEntryFrom(sr *stateRec) api.StateEntry {
-	return api.StateEntry{
+func stateEntryFrom(sr *stateRec) subflux.StateEntry {
+	return subflux.StateEntry{
 		ID:            sr.ID,
 		MediaType:     sr.MediaType,
 		MediaID:       sr.MediaID,
@@ -639,46 +642,46 @@ func stateEntryFrom(sr *stateRec) api.StateEntry {
 }
 
 // matchStateRow resolves one ix_state_imported entry (indexKey) to its
-// api.StateEntry and applies the query's filters against the decoded
+// subflux.StateEntry and applies the query's filters against the decoded
 // (self-contained) primary record. It returns matched=false to skip the row on
 // any index/primary drift, a filtered-out row, or a tolerated decode skip;
-// derr is non-nil only on a fail-closed decode error. Extracted from GetState
+// derr is non-nil only on a fail-closed decode error. Extracted from State
 // so the reverse-walk loop stays a thin offset/limit pager over the matched
 // rows.
-func (d *DB) matchStateRow(sb *bolt.Bucket, q *api.StateQuery, indexKey []byte) (entry api.StateEntry, matched bool, derr error) {
+func matchStateRow(sb *bolt.Bucket, q *subflux.StateQuery, indexKey []byte) (entry subflux.StateEntry, matched bool, derr error) {
 	_, primary, ok := kv.SplitTimeIndexKey(indexKey)
 	if !ok {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	raw := sb.Get(primary)
 	if raw == nil {
-		return api.StateEntry{}, false, nil // index/primary drift
+		return subflux.StateEntry{}, false, nil // index/primary drift
 	}
 	var sr stateRec
 	skip, err := decodeRecord(bucketDecodeMode(bucketSubtitleState), bucketSubtitleState, primary, raw, &sr)
 	if err != nil {
-		return api.StateEntry{}, false, err
+		return subflux.StateEntry{}, false, err
 	}
 	if skip {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	if q.MediaType != "" && sr.MediaType != q.MediaType {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	if q.Language != "" && sr.Language != q.Language {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	if q.Provider != "" && sr.Provider != q.Provider {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	if q.Search != "" && !asciiContainsFold(sr.Title, q.Search) {
-		return api.StateEntry{}, false, nil
+		return subflux.StateEntry{}, false, nil
 	}
 	return stateEntryFrom(&sr), true, nil
 }
 
-// GetState returns subtitle-state rows matching the query, most-recently-
-// imported first. It mirrors the old SQLite GetState (Requirement 8.4, 15.1,
+// State returns subtitle-state rows matching the query, most-recently-
+// imported first. It mirrors the old SQLite State (Requirement 8.4, 15.1,
 // 15.2, 15.3):
 //
 //   - Filters by media_type, language (both carried in the ix_state_quad key)
@@ -703,8 +706,8 @@ func (d *DB) matchStateRow(sb *bolt.Bucket, q *api.StateQuery, indexKey []byte) 
 // of table size. A row whose primary cannot be decoded is skipped with a
 // warning (subtitle_state is a derived bucket the next scan rebuilds; this is
 // not a lock-bearing read).
-func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, error) {
-	slog.Debug("GetState",
+func (d *DB) State(_ context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error) {
+	slog.Debug("State",
 		"media_type", q.MediaType, "lang", q.Language,
 		"provider", q.Provider, "search", q.Search,
 		"limit", q.Limit, "offset", q.Offset)
@@ -715,7 +718,7 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 	}
 	offset := max(q.Offset, 0)
 
-	var out []api.StateEntry
+	var out []subflux.StateEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
 		sb := tx.Bucket([]byte(bucketSubtitleState))
 		if sb == nil {
@@ -726,31 +729,31 @@ func (d *DB) GetState(_ context.Context, q *api.StateQuery) ([]api.StateEntry, e
 			return errors.New("boltstore: ix_state_imported bucket not found")
 		}
 		var err error
-		out, err = d.collectStatePage(imp, sb, q, limit, offset)
+		out, err = collectStatePage(imp, sb, q, limit, offset)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug("GetState result", "count", len(out))
+	slog.Debug("State result", "count", len(out))
 	return out, nil
 }
 
 // collectStatePage performs a REVERSE walk of ix_state_imported (which sorts
 // ascending by (media_imported, id), so Last->Prev yields media_imported DESC,
-// id DESC), resolves each entry to an api.StateEntry through matchStateRow
+// id DESC), resolves each entry to an subflux.StateEntry through matchStateRow
 // (which applies the query's filters), skips the first `offset` matched rows,
 // and collects up to `limit` entries. It preallocates a fixed, modest capacity
 // rather than one derived from the untrusted limit; append grows it as needed.
-func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *api.StateQuery, limit, offset int) ([]api.StateEntry, error) {
-	out := make([]api.StateEntry, 0, preallocCap)
+func collectStatePage(imp, sb *bolt.Bucket, q *subflux.StateQuery, limit, offset int) ([]subflux.StateEntry, error) {
+	out := make([]subflux.StateEntry, 0, preallocCap)
 	skipped := 0
 	c := imp.Cursor()
 	for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
 		if len(out) >= limit {
 			break
 		}
-		entry, matched, derr := d.matchStateRow(sb, q, k)
+		entry, matched, derr := matchStateRow(sb, q, k)
 		if derr != nil {
 			return nil, derr
 		}
@@ -767,7 +770,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *api.StateQuery, limit, of
 	return out, nil
 }
 
-// GetManualLocks returns one entry per manually locked quad (a quad with at
+// ManualLocks returns one entry per manually locked quad (a quad with at
 // least one manual row), each carrying its manual-row count, ordered by
 // media_type then media_id. It mirrors the old SQLite
 // `SELECT media_type, media_id, language, COUNT(*) ... WHERE manual = 1
@@ -782,7 +785,7 @@ func (d *DB) collectStatePage(imp, sb *bolt.Bucket, q *api.StateQuery, limit, of
 // yields groups already ordered by (media_type, media_id) — a deterministic
 // refinement of the old ORDER BY. As a lock-bearing read it FAILS CLOSED: an
 // undecodable projection aborts the read rather than silently dropping a lock.
-func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
+func (d *DB) ManualLocks(_ context.Context) ([]subflux.ManualLockEntry, error) {
 	var acc manualLockAccumulator
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateQuad))
@@ -812,11 +815,11 @@ func (d *DB) GetManualLocks(_ context.Context) ([]api.ManualLockEntry, error) {
 
 // manualLockAccumulator groups consecutive ix_state_quad entries (which are
 // sorted by (mt, mid, lang, variant, id), so a quad's rows are contiguous)
-// into one api.ManualLockEntry per quad that has at least one manual row,
+// into one subflux.ManualLockEntry per quad that has at least one manual row,
 // carrying the manual-row count.
 type manualLockAccumulator struct {
 	cur     stateQuadInfo
-	out     []api.ManualLockEntry
+	out     []subflux.ManualLockEntry
 	curCnt  int
 	haveCur bool
 }
@@ -824,9 +827,10 @@ type manualLockAccumulator struct {
 // flush emits the quad currently being accumulated, if it had any manual row.
 func (a *manualLockAccumulator) flush() {
 	if a.haveCur && a.curCnt > 0 {
-		a.out = append(a.out, api.ManualLockEntry{
-			MediaType: a.cur.mt, MediaID: a.cur.mid, Language: a.cur.lang,
-			Variant: a.cur.variant, Count: a.curCnt,
+		a.out = append(a.out, subflux.ManualLockEntry{
+			MediaType: a.cur.mt, MediaID: a.cur.mid,
+			Language: a.cur.lang, Variant: a.cur.variant,
+			Count: a.curCnt,
 		})
 	}
 }
@@ -878,7 +882,7 @@ func (d *DB) Stats(_ context.Context) (downloads, attempts int, err error) {
 // byte order, and no dedup map is needed. Measured at the 52k-episode
 // reference shape: ~8.9x faster for the later-sorting media type (movies) and
 // at parity in the single-language worst case (see query_scale_bench_test.go).
-func (d *DB) HistoryMediaIDs(_ context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]string, error) {
+func (d *DB) HistoryMediaIDs(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]string, error) {
 	var ids []string
 	err := d.db.View(func(tx *bolt.Tx) error {
 		idx := tx.Bucket([]byte(bucketIxStateQuad))

@@ -1,0 +1,462 @@
+package synthetic
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/cplieger/subflux/internal/subflux"
+)
+
+func TestFactory_defaults(t *testing.T) {
+	t.Parallel()
+	p, err := Factory(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Name() != "synthetic" {
+		t.Errorf("Name() = %q, want synthetic", p.Name())
+	}
+}
+
+func TestSearch_static_returns_results(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"result_count": "5"})
+	req := &subflux.SearchRequest{
+		Title:     "Test Movie",
+		Year:      2024,
+		MediaType: "movie",
+		Languages: []string{"en"},
+	}
+	subs, err := p.Search(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 5 {
+		t.Errorf("got %d results, want 5", len(subs))
+	}
+	for _, s := range subs {
+		if s.Language != "en" {
+			t.Errorf("language = %q, want en", s.Language)
+		}
+		if s.Provider != "synthetic" {
+			t.Errorf("provider = %q, want synthetic", s.Provider)
+		}
+	}
+}
+
+func TestSearch_modes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		config      map[string]any
+		name        string
+		errContains string
+		errType     string
+		wantCount   int
+		wantErr     bool
+	}{
+		{
+			name:        "error",
+			config:      map[string]any{"mode": "error", "error_message": "boom"},
+			wantErr:     true,
+			errContains: "boom",
+		},
+		{
+			name:    "auth_error",
+			config:  map[string]any{"mode": "auth_error"},
+			wantErr: true,
+			errType: "auth",
+		},
+		{
+			name:    "rate_limit",
+			config:  map[string]any{"mode": "rate_limit"},
+			wantErr: true,
+			errType: "rate_limit",
+		},
+		{
+			name:      "empty",
+			config:    map[string]any{"mode": "empty"},
+			wantCount: 0,
+		},
+		{
+			name:    "timeout",
+			config:  map[string]any{"mode": "timeout"},
+			wantErr: true,
+			errType: "deadline",
+		},
+		{
+			name:      "season_pack",
+			config:    map[string]any{"mode": "season_pack"},
+			wantCount: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p, _ := Factory(t.Context(), tc.config)
+			req := &subflux.SearchRequest{
+				Title:     "Breaking Bad",
+				Year:      2008,
+				Season:    1,
+				Episode:   1,
+				MediaType: "episode",
+				Languages: []string{"en"},
+			}
+			subs, err := p.Search(t.Context(), req)
+
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
+					t.Errorf("error = %q, want to contain %q", err.Error(), tc.errContains)
+				}
+				if tc.errType != "" {
+					switch tc.errType {
+					case "auth":
+						if _, ok := errors.AsType[*subflux.AuthError](err); !ok {
+							t.Errorf("expected AuthError, got %T", err)
+						}
+					case "rate_limit":
+						if _, ok := errors.AsType[*subflux.RateLimitError](err); !ok {
+							t.Errorf("expected RateLimitError, got %T", err)
+						}
+					case "deadline":
+						if !errors.Is(err, context.DeadlineExceeded) {
+							t.Errorf("error = %v, want context.DeadlineExceeded", err)
+						}
+					}
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(subs) != tc.wantCount {
+				t.Errorf("got %d results, want %d", len(subs), tc.wantCount)
+			}
+		})
+	}
+}
+
+func TestSearch_language_filter(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"languages": "fr,de"})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
+		Languages: []string{"en", "fr", "de"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range subs {
+		if s.Language != "fr" && s.Language != "de" {
+			t.Errorf("unexpected language %q", s.Language)
+		}
+	}
+}
+
+func TestSearch_hash_match(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"include_hash": true})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
+		Title:     "Test",
+		MediaType: "movie",
+		Languages: []string{"en"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) == 0 {
+		t.Fatal("no results")
+	}
+	if subs[0].MatchedBy != "hash" {
+		t.Errorf("first result MatchedBy = %q, want hash", subs[0].MatchedBy)
+	}
+}
+
+func TestDownload_returns_srt(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), nil)
+	data, err := p.Download(t.Context(), &subflux.Subtitle{
+		Language:    "en",
+		ReleaseName: "Test.2024.1080p.WEB-DL",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "Synthetic subtitle") {
+		t.Error("download data missing synthetic marker")
+	}
+}
+
+func TestDownload_error(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"download_error": "disk full"})
+	_, err := p.Download(t.Context(), &subflux.Subtitle{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("error = %q, want to contain 'disk full'", err.Error())
+	}
+}
+
+func TestSearch_episode_release_name(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"result_count": "1"})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
+		Title:     "Breaking Bad",
+		Year:      2008,
+		Season:    1,
+		Episode:   1,
+		MediaType: "episode",
+		Languages: []string{"en"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 1 {
+		t.Fatalf("got %d results, want 1", len(subs))
+	}
+	if !strings.Contains(subs[0].ReleaseName, "S01E01") {
+		t.Errorf("release name %q missing S01E01", subs[0].ReleaseName)
+	}
+}
+
+func TestSearch_slow_mode_respects_context_cancellation(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"mode": "slow"})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := p.Search(ctx, &subflux.SearchRequest{
+		Languages: []string{"en"},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("error = %v, want context.Canceled", err)
+	}
+}
+
+func TestDownload_custom_content(t *testing.T) {
+	t.Parallel()
+	content := "1\n00:00:01,000 --> 00:00:02,000\nCustom\n"
+	p, _ := Factory(t.Context(), map[string]any{"subtitle_content": content})
+	data, err := p.Download(t.Context(), &subflux.Subtitle{
+		Language:    "en",
+		ReleaseName: "Test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != content {
+		t.Errorf("Download() = %q, want %q", data, content)
+	}
+}
+
+func TestFactory_invalid_numeric_settings_use_defaults(t *testing.T) {
+	t.Parallel()
+	p, err := Factory(t.Context(), map[string]any{
+		"delay_ms":     "not-a-number",
+		"result_count": "bad",
+		"flaky_rate":   "invalid",
+		"score_base":   "nope",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := p.(*syntheticProvider)
+	if sp.delay != 0 {
+		t.Errorf("delay = %v, want 0 (default)", sp.delay)
+	}
+	if sp.resultCount != 3 {
+		t.Errorf("resultCount = %d, want 3 (default)", sp.resultCount)
+	}
+	if sp.flakyRate != 0.5 {
+		t.Errorf("flakyRate = %f, want 0.5 (default)", sp.flakyRate)
+	}
+}
+
+func TestSearch_season_pack_multiple_languages(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"mode": "season_pack"})
+	req := &subflux.SearchRequest{
+		Title:     "Test Show",
+		Season:    2,
+		MediaType: "episode",
+		Languages: []string{"en", "fr"},
+	}
+	subs, err := p.Search(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 2 {
+		t.Fatalf("Search(season_pack, 2 langs) = %d results, want 2", len(subs))
+	}
+	langs := map[string]bool{subs[0].Language: true, subs[1].Language: true}
+	if !langs["en"] || !langs["fr"] {
+		t.Errorf("languages = %v, want en and fr", langs)
+	}
+}
+
+func TestSearch_season_pack_language_filter(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"mode": "season_pack", "languages": "fr"})
+	req := &subflux.SearchRequest{
+		Title:     "Test Show",
+		Season:    1,
+		MediaType: "episode",
+		Languages: []string{"en", "fr"},
+	}
+	subs, err := p.Search(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 1 {
+		t.Fatalf("Search(season_pack, filtered) = %d results, want 1", len(subs))
+	}
+	if subs[0].Language != "fr" {
+		t.Errorf("Language = %q, want fr", subs[0].Language)
+	}
+}
+
+func TestFactory_delay_setting(t *testing.T) {
+	t.Parallel()
+	p, err := Factory(t.Context(), map[string]any{
+		"delay_ms": "100",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := p.(*syntheticProvider)
+	if sp.delay != 100*time.Millisecond {
+		t.Errorf("delay = %v, want 100ms", sp.delay)
+	}
+}
+
+func TestFactory_negative_delay_ignored(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"delay_ms": "-5"})
+	sp := p.(*syntheticProvider)
+	if sp.delay != 0 {
+		t.Errorf("delay = %v, want 0 (negative ignored)", sp.delay)
+	}
+}
+
+func TestFactory_zero_result_count(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"result_count": "0"})
+	subs, err := p.(*syntheticProvider).Search(t.Context(), &subflux.SearchRequest{
+		Title:     "Test",
+		MediaType: "movie",
+		Languages: []string{"en"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 0 {
+		t.Errorf("Search(result_count=0) = %d results, want 0", len(subs))
+	}
+}
+
+func TestSearch_hi_and_forced_flags(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{
+		"hearing_impaired": true,
+		"forced":           true,
+		"result_count":     "1",
+	})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
+		Title:     "Test",
+		MediaType: "movie",
+		Languages: []string{"en"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 1 {
+		t.Fatalf("got %d results, want 1", len(subs))
+	}
+	if !subs[0].HearingImp {
+		t.Error("HearingImp = false, want true")
+	}
+	if !subs[0].Forced {
+		t.Error("Forced = false, want true")
+	}
+}
+
+func TestSearch_result_count(t *testing.T) {
+	t.Parallel()
+	p, _ := Factory(t.Context(), map[string]any{"result_count": "3"})
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{
+		Title:     "Test",
+		MediaType: "movie",
+		Languages: []string{"en"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subs) != 3 {
+		t.Fatalf("got %d results, want 3", len(subs))
+	}
+}
+
+func TestApplyDelay_context_cancelled(t *testing.T) {
+	t.Parallel()
+	p := &syntheticProvider{delay: 5 * time.Second}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := p.applyDelay(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("applyDelay(cancelled) = %v, want context.Canceled", err)
+	}
+}
+
+func TestSchema_returns_all_fields(t *testing.T) {
+	t.Parallel()
+	fields := Schema()
+	if len(fields) != 11 {
+		t.Errorf("Schema() returned %d fields, want 11", len(fields))
+	}
+	wantKeys := []string{
+		"mode", "delay_ms", "result_count",
+		"languages", "include_hash", "hearing_impaired", "forced",
+		"error_message", "download_error", "subtitle_content", "flaky_rate",
+	}
+	for i, want := range wantKeys {
+		if i >= len(fields) {
+			break
+		}
+		if fields[i].Key != want {
+			t.Errorf("Schema()[%d].Key = %q, want %q", i, fields[i].Key, want)
+		}
+	}
+}
+
+func TestSearch_slow_mode_timer_outlasts_short_context(t *testing.T) {
+	t.Parallel()
+	p := &syntheticProvider{mode: "slow", resultCount: 1}
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	req := &subflux.SearchRequest{
+		MediaType: subflux.MediaTypeMovie,
+		Title:     "X",
+		Year:      2020,
+		Languages: []string{"en"},
+	}
+
+	subs, err := p.Search(ctx, req)
+	// Slow mode arms a multi-second timer, so a 200ms context must expire
+	// first: Search returns a context error and no results.
+	if err == nil {
+		t.Error("slow-mode Search err = nil, want a context-deadline error")
+	}
+	if subs != nil {
+		t.Errorf("slow-mode Search subs = %v, want nil", subs)
+	}
+}

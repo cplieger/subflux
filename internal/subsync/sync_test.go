@@ -10,10 +10,10 @@ func TestSyncWithOptions_empty_incorrect(t *testing.T) {
 	opts := DefaultSyncOptions()
 	result := SyncWithOptions(t.Context(), nil, nil, &opts)
 	if result.Method != MethodNone {
-		t.Fatalf("expected method 'none', got %q", result.Method)
+		t.Errorf("expected method 'none', got %q", result.Method)
 	}
 	if result.Confidence != ConfidenceNone {
-		t.Fatalf("expected no confidence, got %f", float64(result.Confidence))
+		t.Errorf("expected no confidence, got %f", float64(result.Confidence))
 	}
 }
 
@@ -39,10 +39,10 @@ func TestSyncWithOptions_constant_offset(t *testing.T) {
 	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	// Accept any method that finds the correct offset.
 	if result.Method == MethodNone {
-		t.Fatalf("expected a sync method, got %q", result.Method)
+		t.Errorf("expected a sync method, got %q", result.Method)
 	}
 	if abs64(result.Offset-(-2000)) > 100 {
-		t.Fatalf("expected offset ~-2000ms, got %d", result.Offset)
+		t.Errorf("expected offset ~-2000ms, got %d", result.Offset)
 	}
 }
 
@@ -172,10 +172,10 @@ func TestReferenceSync_prefers_higher_confidence(t *testing.T) {
 	opts := DefaultSyncOptions()
 	result := referenceSync(t.Context(), ref, inc, &opts)
 	if result.Confidence == ConfidenceNone {
-		t.Fatal("expected some confidence from reference sync")
+		t.Error("expected some confidence from reference sync")
 	}
 	if len(result.Cues) != len(inc) {
-		t.Fatalf("expected %d cues, got %d", len(inc), len(result.Cues))
+		t.Errorf("expected %d cues, got %d", len(inc), len(result.Cues))
 	}
 }
 

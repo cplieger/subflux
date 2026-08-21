@@ -3,7 +3,7 @@ package opensubtitles
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Episode Numberings ---
@@ -13,22 +13,22 @@ func TestEpisodeNumberings(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  *api.SearchRequest
+		req  *subflux.SearchRequest
 		want []numbering
 	}{
 		{
 			name: "movie returns single aired entry",
-			req:  &api.SearchRequest{MediaType: "movie", Season: 0, Episode: 0},
+			req:  &subflux.SearchRequest{MediaType: "movie", Season: 0, Episode: 0},
 			want: []numbering{{scheme: "aired", season: 0, episode: 0}},
 		},
 		{
 			name: "episode with no alternates returns single aired",
-			req:  &api.SearchRequest{MediaType: "episode", Season: 2, Episode: 5},
+			req:  &subflux.SearchRequest{MediaType: "episode", Season: 2, Episode: 5},
 			want: []numbering{{scheme: "aired", season: 2, episode: 5}},
 		},
 		{
 			name: "episode with scene numbering adds scene entry",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    2, Episode: 5,
 				SceneSeason: 3, SceneEpisode: 10,
@@ -40,7 +40,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "duplicate scene numbering deduped",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    2, Episode: 5,
 				SceneSeason: 2, SceneEpisode: 5,
@@ -51,7 +51,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "absolute episode with scene season",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    1, Episode: 3,
 				SceneSeason:     2,
@@ -64,7 +64,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "absolute episode defaults to season 1 when no scene season",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    1, Episode: 3,
 				AbsoluteEpisode: 50,
@@ -80,7 +80,7 @@ func TestEpisodeNumberings(t *testing.T) {
 			// the aired season (5). add() only substitutes req.Season for a
 			// season <= 0, and absSeason is defaulted to 1 before that.
 			name: "absolute-only defaults to season 1 not aired season",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType:       "episode",
 				Season:          5,
 				Episode:         0,
@@ -94,7 +94,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "zero episode skipped for scene",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    1, Episode: 5,
 				SceneSeason: 2, SceneEpisode: 0,
@@ -105,7 +105,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "zero season defaults to aired season",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    3, Episode: 5,
 				SceneSeason: 0, SceneEpisode: 10,
@@ -117,7 +117,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "all three numbering schemes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType: "episode",
 				Season:    1, Episode: 1,
 				SceneSeason: 2, SceneEpisode: 3,
@@ -131,12 +131,12 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "zero aired episode still included",
-			req:  &api.SearchRequest{MediaType: "episode", Season: 1, Episode: 0},
+			req:  &subflux.SearchRequest{MediaType: "episode", Season: 1, Episode: 0},
 			want: nil,
 		},
 		{
 			name: "zero aired episode but valid scene episode",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType:    "episode",
 				Season:       1,
 				Episode:      0,
@@ -149,7 +149,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "negative episode values skipped",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType:       "episode",
 				Season:          1,
 				Episode:         -1,
@@ -161,7 +161,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "negative season defaults to aired season",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType:    "episode",
 				Season:       3,
 				Episode:      5,
@@ -175,7 +175,7 @@ func TestEpisodeNumberings(t *testing.T) {
 		},
 		{
 			name: "season 0 specials skip absolute episode",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				MediaType:       "episode",
 				Season:          0,
 				Episode:         1,
@@ -251,8 +251,8 @@ func TestFilterSearchResults(t *testing.T) {
 		if len(got) != 1 {
 			t.Fatalf("filterSearchResults() = %d results, want 1", len(got))
 		}
-		if got[0].Provider != api.ProviderNameOpenSubtitles {
-			t.Errorf("Provider = %q, want %q", got[0].Provider, api.ProviderNameOpenSubtitles)
+		if got[0].Provider != subflux.ProviderNameOpenSubtitles {
+			t.Errorf("Provider = %q, want %q", got[0].Provider, subflux.ProviderNameOpenSubtitles)
 		}
 		if got[0].ID != "42" {
 			t.Errorf("ID = %q, want %q", got[0].ID, "42")

@@ -4,8 +4,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // ScanItem holds either an episode or a movie for alphabetical scanning.
@@ -82,17 +83,18 @@ func ScanItemTitle(item ScanItem) string {
 }
 
 // SkipResumed checks if a scan item was already processed recently.
-func SkipResumed(item ScanItem, recent map[string]bool, stats *api.ScanStats) bool {
+func SkipResumed(item ScanItem, recent map[string]bool, stats *subflux.ScanStats) bool {
 	if recent == nil {
 		return false
 	}
 	var mediaID string
 	if item.Ep != nil {
-		mediaID = api.BuildEpisodeID(
+		mediaID = mediaid.Episode(
 			item.Series.TvdbID, item.Series.ImdbID,
-			item.Ep.SeasonNumber, item.Ep.EpisodeNumber)
+			mediaid.SeasonEpisode{Season: item.Ep.SeasonNumber, Episode: item.Ep.EpisodeNumber},
+		)
 	} else {
-		mediaID = api.BuildMovieID(item.Movie.TmdbID, item.Movie.ImdbID)
+		mediaID = mediaid.Movie(item.Movie.TmdbID, item.Movie.ImdbID)
 		if mediaID == "" {
 			return false
 		}

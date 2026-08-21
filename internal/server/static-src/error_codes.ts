@@ -1,4 +1,4 @@
-// error_codes.ts -- TypeScript catalog mirroring internal/api/error_codes.go.
+// error_codes.ts -- TypeScript catalog mirroring internal/subflux/error_codes.go.
 // These are the machine-readable codes in the JSON error envelope.
 
 export const ErrorCode = {

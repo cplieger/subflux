@@ -5,24 +5,24 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
 // HandleStateStats returns aggregate stats for the dashboard.
 // GET /api/state/stats
 func (h *Handler) HandleStateStats(w http.ResponseWriter, r *http.Request) {
-	if !httphelpers.RequireGET(w, r) {
+	if !httpapi.RequireGET(w, r) {
 		return
 	}
 	resp := h.statsCache.get(r.Context(), h.computeStateStats)
-	api.WriteJSON(w, resp)
+	httpapi.WriteJSON(w, resp)
 }
 
 // computeStateStats does the actual stats query work.
-func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
+func (h *Handler) computeStateStats(ctx context.Context) subflux.Stats {
 	downloads, dbAttempts, err := h.queryDB.Stats(ctx)
 	if err != nil {
 		slog.Warn("Stats query failed", "error", err)
@@ -44,14 +44,14 @@ func (h *Handler) computeStateStats(ctx context.Context) api.Stats {
 	ls := h.state()
 	allSeries, allMovies, partial := fetchMediaCountsParallel(ctx, ls)
 
-	missing := h.countMissing(ctx, ls.Cfg, h.covDB, allSeries, allMovies)
+	missing := h.countMissing(ctx, ls.Cfg, allSeries, allMovies)
 
 	slog.Debug("handleStateStats",
 		"downloads", downloads, "searches", searches,
 		"total_series", len(allSeries), "total_movies", len(allMovies),
 		"missing_subs", missing, "total_subs", totalSubs)
 
-	return api.Stats{
+	return subflux.Stats{
 		Downloads:           downloads,
 		Attempts:            searches,
 		LastScan:            lastScan,
@@ -71,7 +71,7 @@ func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arra
 
 	if ls.Sonarr != nil {
 		g.Go(func() error {
-			if got, err := ls.Sonarr.GetSeries(gctx); err == nil {
+			if got, err := ls.Sonarr.Series(gctx); err == nil {
 				series = got
 			} else {
 				slog.Warn("stats: sonarr unreachable, series counts will be zero", "error", err)
@@ -82,7 +82,7 @@ func fetchMediaCountsParallel(ctx context.Context, ls *LiveState) (series []arra
 	}
 	if ls.Radarr != nil {
 		g.Go(func() error {
-			if got, err := ls.Radarr.GetMovies(gctx); err == nil {
+			if got, err := ls.Radarr.Movies(gctx); err == nil {
 				movies = got
 			} else {
 				slog.Warn("stats: radarr unreachable, movie counts will be zero", "error", err)

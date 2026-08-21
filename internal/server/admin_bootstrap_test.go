@@ -11,10 +11,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/config"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/obs"
 )
+
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. The status check before json.Unmarshal keeps
+// t.Fatalf — past it the envelope every later assertion reads is an error
+// body, so continuing would report a decode failure instead of the status
+// that caused it.
 
 // The custody trio (R1.5): the admin bootstrap channel lives exclusively on
 // the Unix-socket admin plane. (a) the TCP mux never routes it, (b) a socket
@@ -29,7 +35,7 @@ import (
 // catch-all serves HTML.
 func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 
@@ -41,7 +47,7 @@ func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 
 	ct := w.Header().Get("Content-Type")
 	if !strings.HasPrefix(ct, "text/html") {
-		t.Fatalf("TCP /api/admin/bootstrap answered Content-Type %q (status %d, body %q) — a handler ran; want the SPA fallthrough (text/html)",
+		t.Errorf("TCP /api/admin/bootstrap answered Content-Type %q (status %d, body %q) — a handler ran; want the SPA fallthrough (text/html)",
 			ct, w.Code, w.Body.String())
 	}
 	if strings.Contains(w.Body.String(), "unknown action") {
@@ -63,12 +69,9 @@ func TestAdminBootstrap_TCPFallthrough(t *testing.T) {
 func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := testAdminServer(t)
-	s.metrics = metrics.New() // AdminHandler's recover hook records panics
+	s.metrics = obs.New() // AdminHandler's recover hook records panics
 
-	hash, err := auth.HashPassword("old-password-123456")
-	if err != nil {
-		t.Fatal(err)
-	}
+	hash := auth.HashPassword("old-password-123456")
 	ctx := t.Context()
 	user := &auth.User{Username: "admin", PasswordHash: hash, Role: auth.RoleAdmin, Enabled: true}
 	if err := s.authStore.CreateUser(ctx, user); err != nil {
@@ -113,10 +116,10 @@ func TestAdminBootstrap_UnixSocketRoundTrip(t *testing.T) {
 		t.Fatalf("unmarshal response %s: %v", respBody, err)
 	}
 	if env.Status != "ok" || env.Username != "admin" {
-		t.Fatalf("response = %+v, want status ok for admin", env)
+		t.Errorf("response = %+v, want status ok for admin", env)
 	}
 
-	updated, _, err := s.authStore.GetUserByUsername(ctx, "admin")
+	updated, _, err := s.authStore.UserByUsername(ctx, "admin")
 	if err != nil || updated == nil {
 		t.Fatalf("lookup after reset: %v", err)
 	}

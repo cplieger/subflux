@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 )
 
 // This file holds the SessionPersister half of AuthStore.
@@ -20,8 +20,8 @@ import (
 // even though the backing store changed from a table to a map:
 //   - CreateSession stores by token hash; a copy is held so a caller mutating
 //     the passed struct afterwards cannot mutate stored state.
-//   - GetSessionByHash returns a copy (callers cannot mutate the stored row),
-//     and (nil, nil) when absent (matching sql.ErrNoRows -> nil).
+//   - SessionByHash returns a copy (callers cannot mutate the stored row),
+//     and reports absence through found.
 //   - UpdateSessionActivity / DeleteSession / DeleteUserSessions on an absent
 //     row are no-ops returning nil (matching an UPDATE/DELETE affecting 0 rows).
 //   - CleanupExpiredSessions evicts a session past EITHER the idle timeout
@@ -29,19 +29,19 @@ import (
 //     using the same strict (exclusive) comparison the SQLite cutoffs used.
 
 // cloneSession returns a deep copy of sess so the in-memory map never shares
-// mutable state with a caller. auth.Session is a flat struct except for the
-// OIDCExpiry *time.Time, which is copied to its own pointer so a caller cannot
-// reach through and mutate the stored expiry.
+// mutable state with a caller.
+//
+// A flat copy is now the whole job: auth.Session carries no pointers since
+// OIDCExpiry became a time.Time value, so there is no pointee left to alias. The
+// per-field deep copy this used to do for that one field is deleted rather than
+// kept "just in case" — a clone that hand-copies one field of many is the shape
+// that goes stale silently when a pointer field is added, and the compiler cannot
+// warn about it. If a pointer field ever returns, this needs revisiting.
 func cloneSession(sess *auth.Session) *auth.Session {
 	if sess == nil {
 		return nil
 	}
-	cp := *sess
-	if sess.OIDCExpiry != nil {
-		t := *sess.OIDCExpiry
-		cp.OIDCExpiry = &t
-	}
-	return &cp
+	return new(*sess)
 }
 
 // CreateSession stores a new session in memory, keyed by its token hash. A copy
@@ -58,11 +58,11 @@ func (s *Store) CreateSession(_ context.Context, sess *auth.Session) error {
 	return nil
 }
 
-// GetSessionByHash returns a copy of the session with the given token hash, or
-// (nil, nil) when none exists (matching the old store's sql.ErrNoRows -> nil
-// mapping). A copy is returned so callers cannot mutate the stored session
-// through the returned pointer.
-func (s *Store) GetSessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
+// SessionByHash returns a copy of the session with the given token hash,
+// reporting absence through found rather than a nil session with a nil error. A
+// copy is returned so callers cannot mutate the stored session through the
+// returned pointer.
+func (s *Store) SessionByHash(_ context.Context, tokenHash string) (*auth.Session, bool, error) {
 	// cloneSession reads the stored struct's fields, so it must run while the
 	// read lock is held: a concurrent UpdateSessionActivity mutates
 	// LastActivity under the write lock, and cloning after RUnlock would race
@@ -125,13 +125,13 @@ func (s *Store) deleteUserSessionsExcept(userID int64, exceptHash string) {
 
 // CleanupExpiredSessions evicts every session past its idle OR absolute timeout
 // and returns the count evicted (Requirement 10.3). A session is expired when
-// last_activity is strictly before now-idleTimeout OR created_at is strictly
-// before now-absTimeout, matching the exclusive cutoff comparison of the old
-// SQLite delete (last_activity < idleCutoff OR created_at < absCutoff). Live
-// sessions are kept.
-func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time, idleTimeout, absTimeout time.Duration) (int64, error) {
-	idleCutoff := now.Add(-idleTimeout)
-	absCutoff := now.Add(-absTimeout)
+// last_activity is strictly before now-timeouts.Idle OR created_at is strictly
+// before now-timeouts.Absolute, matching the exclusive cutoff comparison of the
+// old SQLite delete (last_activity < idleCutoff OR created_at < absCutoff).
+// Live sessions are kept.
+func (s *Store) CleanupExpiredSessions(_ context.Context, now time.Time, timeouts auth.SessionTimeouts) (int64, error) {
+	idleCutoff := now.Add(-timeouts.Idle)
+	absCutoff := now.Add(-timeouts.Absolute)
 
 	var total int64
 	s.mu.Lock()

@@ -12,21 +12,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/server/resolve"
 	"github.com/cplieger/subflux/internal/server/scanning"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 	"pgregory.net/rapid"
 )
 
 func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	// Add a recent alert and an already-expired one (a negative TTL override
 	// is elapsed the moment it is recorded, so no backdating is needed).
@@ -37,7 +36,7 @@ func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
+	activityH(s).HandleGetAlerts(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetAlerts() status = %d, want %d", rec.Code, http.StatusOK)
@@ -58,12 +57,12 @@ func TestHandleGetAlerts_returns_recent_alerts(t *testing.T) {
 
 func TestHandleGetAlerts_empty_when_no_alerts(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/alerts", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetAlerts(rec, req)
+	activityH(s).HandleGetAlerts(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetAlerts() status = %d, want %d", rec.Code, http.StatusOK)
@@ -78,7 +77,7 @@ func TestHandleGetAlerts_empty_when_no_alerts(t *testing.T) {
 
 func TestHandleGetActivity_returns_last_20(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	// Add 25 COMPLETED entries (the page cap applies to completed rows;
 	// running rows always survive it). The log's capacity is 50, so none
@@ -91,7 +90,7 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -108,7 +107,7 @@ func TestHandleGetActivity_returns_last_20(t *testing.T) {
 
 func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	// One RUNNING entry older than the 20-entry page window, buried under
 	// 25 completed rows: it must still be included (restoration and the
@@ -125,7 +124,7 @@ func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -154,7 +153,7 @@ func TestHandleGetActivity_running_entries_survive_page_cap(t *testing.T) {
 
 func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	s.activity.Start("Scan", "scan 1", "scheduled")
 	s.activity.Start("Upgrade", "upgrade 1", "manual")
@@ -162,7 +161,7 @@ func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)
@@ -180,7 +179,7 @@ func TestHandleGetActivity_returns_all_when_under_20(t *testing.T) {
 // newManualDownloadServer builds a Server whose manual handler resolves
 // MediaRefs against cfg (containment validator) and radarr, with one stub
 // provider "os" so the provider check passes and requests reach resolution.
-func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie) *Server {
+func newManualDownloadServer(cfg *config.Config, radarr resolve.RadarrMovie) *Server {
 	s := &Server{
 		db:       &qhMockStore{},
 		activity: activity.New(50),
@@ -194,11 +193,11 @@ func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie)
 	}
 	s.manualH = manualops.NewHandler(manualops.HandlerDeps{
 		DBFunc:   func() manualops.DownloadStore { return s.db.(manualops.DownloadStore) },
-		Activity: &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:   &serveradapter.AlertAdapter{A: s.alerts},
-		Events:   &serveradapter.ManualEventAdapter{E: s.events},
+		Activity: s.activity,
+		Alerts:   s.alerts,
+		Events:   s.events,
 		StateFunc: func() *manualops.LiveState {
-			return &manualops.LiveState{Providers: []api.Provider{&stubProvider{name: "os"}}}
+			return &manualops.LiveState{Providers: []provider.Provider{&stubProvider{name: "os"}}}
 		},
 		BGTracker: &s.bgWg,
 		// context.Background(): no *testing.T in scope, and ServerCtx is the server's long-lived context, not a request or test one.
@@ -213,7 +212,7 @@ func newManualDownloadServer(cfg api.ConfigProvider, radarr resolve.RadarrMovie)
 // unknown.
 type statusFakeRadarr struct{ path string }
 
-func (f statusFakeRadarr) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
+func (f statusFakeRadarr) MovieByID(_ context.Context, id int) (arrapi.Movie, error) {
 	if id != 42 {
 		return arrapi.Movie{}, errors.New("movie not found")
 	}
@@ -222,7 +221,7 @@ func (f statusFakeRadarr) GetMovieByID(_ context.Context, id int) (arrapi.Movie,
 
 func TestHandleManualDownload_unknown_media_returns_404(t *testing.T) {
 	t.Parallel()
-	s := newManualDownloadServer(&qhMockConfig{}, statusFakeRadarr{path: "/media/movie.mkv"})
+	s := newManualDownloadServer(testConfig(t), statusFakeRadarr{path: "/media/movie.mkv"})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":9999,"language":"en"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -244,7 +243,7 @@ func TestHandleManualDownload_containment_invariant_returns_500(t *testing.T) {
 	// The arr resolves the movie, but the resolved path fails the
 	// containment check: a server-derived-path invariant breach -> 500,
 	// never a 4xx (there is no client path to blame).
-	s := newManualDownloadServer(&pathValidationErrorConfig{}, statusFakeRadarr{path: "/evil/path.mkv"})
+	s := newManualDownloadServer(testConfig(t), statusFakeRadarr{path: "/evil/path.mkv"})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -258,17 +257,6 @@ func TestHandleManualDownload_containment_invariant_returns_500(t *testing.T) {
 	}
 }
 
-// pathValidationErrorConfig returns an error from ValidatePath.
-type pathValidationErrorConfig struct{ qhMockConfig }
-
-func (m *pathValidationErrorConfig) ValidatePath(_ context.Context, _ string) error {
-	return errors.New("path not under media roots")
-}
-
-func (m *pathValidationErrorConfig) RemoveUnderRoot(_ context.Context, _ string) error {
-	return config.ErrPathNotAllowed
-}
-
 // The provider-not-found download test formerly here moved to
 // internal/server/manualops/handler_http_test.go with the rest of the
 // manual download HTTP surface.
@@ -277,7 +265,7 @@ func (m *pathValidationErrorConfig) RemoveUnderRoot(_ context.Context, _ string)
 
 func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	s.alerts.Record("sonarr", "test error")
 
@@ -288,10 +276,10 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodDelete, "/api/alerts?id="+strconv.Itoa(id), http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleDismissAlert(rec, req)
+	activityH(s).HandleDismissAlert(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
+		t.Errorf("handleDismissAlert() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify the alert was dismissed: a dismissed alert leaves the visible set.
@@ -300,19 +288,17 @@ func TestHandleDismissAlert_dismisses_by_id(t *testing.T) {
 	}
 }
 
-// --- handleGetActivity method check ---
-
-// --- asyncAction conflict path ---
+// --- handleGetActivity ---
 
 func TestHandleGetActivity_empty_returns_empty_array(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	// No activities added — entries is nil.
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/activity", http.NoBody)
 	rec := httptest.NewRecorder()
-	s.handleGetActivity(rec, req)
+	activityH(s).HandleGetActivity(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("handleGetActivity() status = %d, want %d", rec.Code, http.StatusOK)

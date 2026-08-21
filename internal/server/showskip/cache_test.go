@@ -34,7 +34,7 @@ func TestCache_Get_expired(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		c := New(time.Hour)
 		c.Set("key1", true)
-		time.Sleep(time.Hour + time.Second)
+		synctest.Sleep(time.Hour + time.Second)
 		skip, ok := c.Get("key1")
 		if ok || skip {
 			t.Errorf("Get(expired) = (%v, %v), want (false, false)", skip, ok)
@@ -76,7 +76,7 @@ func TestCache_Prune_removes_expired(t *testing.T) {
 		c := New(time.Hour)
 		c.Set("a", true)
 		c.Set("b", false)
-		time.Sleep(time.Hour + time.Second)
+		synctest.Sleep(time.Hour + time.Second)
 
 		c.Prune()
 

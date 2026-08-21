@@ -1,15 +1,14 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- enabledProviders ---
@@ -19,43 +18,35 @@ func TestEnabledProviders(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		providers map[api.ProviderID]api.ProviderCfg
-		want      []api.ProviderID
+		providers map[subflux.ProviderID]subflux.ProviderCfg
+		want      []subflux.ProviderID
 	}{
-		{"all enabled", map[api.ProviderID]api.ProviderCfg{
+		{"all enabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"beta":  {Enabled: true},
 			"alpha": {Enabled: true},
-		}, []api.ProviderID{"alpha", "beta"}},
-		{"mixed enabled and disabled", map[api.ProviderID]api.ProviderCfg{
+		}, []subflux.ProviderID{"alpha", "beta"}},
+		{"mixed enabled and disabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"os":   {Enabled: true},
 			"yify": {Enabled: false},
 			"bs":   {Enabled: true},
-		}, []api.ProviderID{"bs", "os"}},
-		{"none enabled", map[api.ProviderID]api.ProviderCfg{
+		}, []subflux.ProviderID{"bs", "os"}},
+		{"none enabled", map[subflux.ProviderID]subflux.ProviderCfg{
 			"os": {Enabled: false},
 		}, nil},
-		{"empty providers", map[api.ProviderID]api.ProviderCfg{}, nil},
+		{"empty providers", map[subflux.ProviderID]subflux.ProviderCfg{}, nil},
 		{"nil providers", nil, nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mock := &epMock{providers: tt.providers}
-			got := enabledProviders(mock)
+			got := enabledProviders(tt.providers)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("enabledProviders() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
-
-// epMock satisfies the interface{ ProviderConfigs() map[api.ProviderID]api.ProviderCfg }.
-type epMock struct {
-	providers map[api.ProviderID]api.ProviderCfg
-}
-
-func (m *epMock) ProviderConfigs() map[api.ProviderID]api.ProviderCfg { return m.providers }
 
 // --- requireConfigured middleware ---
 
@@ -118,66 +109,12 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 // moved to internal/server/confighandlers/handler_test.go with the rest of
 // the config HTTP surface.
 
-// --- buildProviderSchemas ---
+// The BuildProviderSchemas tests moved to
+// internal/server/confighandlers/provider_schema_test.go with the function
+// itself, which left internal/subflux because that package implements no registry
+// and consumes no schema.
 
-func TestBuildProviderSchemas_empty_registry(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	schemas := api.BuildProviderSchemas(reg)
-	if len(schemas) != 0 {
-		t.Errorf("BuildProviderSchemas(empty) = %d schemas, want 0", len(schemas))
-	}
-}
-
-func TestBuildProviderSchemas_with_providers(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "gestdown"}, nil
-	})
-	reg.Register("opensubtitles", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "opensubtitles"}, nil
-	})
-	reg.RegisterSchema("opensubtitles", "OpenSubtitles", []api.ProviderSchemaField{
-		{Key: "api_key", Label: "API Key", Type: "secret", Secret: true},
-		{Key: "username", Label: "Username", Type: "text"},
-	})
-	// gestdown has no schema registered; label should fall back to name.
-
-	schemas := api.BuildProviderSchemas(reg)
-
-	if len(schemas) != 2 {
-		t.Fatalf("BuildProviderSchemas() = %d schemas, want 2", len(schemas))
-	}
-
-	// Schemas should be in sorted order (from ProviderNames).
-	if schemas[0].Name != "gestdown" {
-		t.Errorf("schemas[0].Name = %q, want %q", schemas[0].Name, "gestdown")
-	}
-	if schemas[1].Name != "opensubtitles" {
-		t.Errorf("schemas[1].Name = %q, want %q", schemas[1].Name, "opensubtitles")
-	}
-
-	// gestdown: label falls back to name.
-	if schemas[0].Label != "gestdown" {
-		t.Errorf("gestdown.Label = %q, want %q (fallback to name)", schemas[0].Label, "gestdown")
-	}
-
-	if schemas[1].Label != "OpenSubtitles" {
-		t.Errorf("opensubtitles.Label = %q, want %q", schemas[1].Label, "OpenSubtitles")
-	}
-	if len(schemas[1].Settings) != 2 {
-		t.Fatalf("opensubtitles.Settings = %d fields, want 2", len(schemas[1].Settings))
-	}
-	if schemas[1].Settings[0].Key != "api_key" {
-		t.Errorf("settings[0].Key = %q, want %q", schemas[1].Settings[0].Key, "api_key")
-	}
-	if !schemas[1].Settings[0].Secret {
-		t.Error("settings[0].Secret = false, want true")
-	}
-}
-
-// --- provider.ClearProviderCaches ---
+// --- provider.ClearCaches ---
 
 // mockCacheClearer tracks whether ClearCache was called.
 type mockCacheClearer struct {
@@ -188,64 +125,40 @@ type mockCacheClearer struct {
 
 func (m *mockCacheClearer) ClearCache() { m.cleared = true }
 
-func TestClearProviderCaches_calls_cache_clearers(t *testing.T) {
+func TestClearCaches_calls_cache_clearers(t *testing.T) {
 	t.Parallel()
-	cc := &mockCacheClearer{stubProvider: stubProvider{name: "hdbits"}}
+	cc := &mockCacheClearer{name: "hdbits"}
 	plain := &stubProvider{name: "os"}
 
-	provider.ClearProviderCaches([]api.Provider{plain, cc})
+	provider.ClearCaches([]provider.Provider{plain, cc})
 
 	if !cc.cleared {
 		t.Error("ClearCache not called on provider implementing cacheClearer")
 	}
 }
 
-func TestClearProviderCaches_no_clearers(t *testing.T) {
+func TestClearCaches_no_clearers(t *testing.T) {
 	t.Parallel()
 	plain := &stubProvider{name: "os"}
 	// Should not panic with no cacheClearer providers.
-	provider.ClearProviderCaches([]api.Provider{plain})
+	provider.ClearCaches([]provider.Provider{plain})
 }
 
-func TestClearProviderCaches_nil_providers(t *testing.T) {
+func TestClearCaches_nil_providers(t *testing.T) {
 	t.Parallel()
 	// Should not panic with nil slice.
-	provider.ClearProviderCaches(nil)
-}
-
-func TestBuildProviderSchemas_excludes_mock_provider(t *testing.T) {
-	t.Parallel()
-	reg := provider.NewRegistry()
-	reg.Register("mock", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "mock"}, nil
-	})
-	reg.RegisterSchema("mock", "Mock Provider", nil)
-	reg.Register("opensubtitles", func(_ context.Context, _ map[string]any) (api.Provider, error) {
-		return &stubProvider{name: "opensubtitles"}, nil
-	})
-	reg.RegisterSchema("opensubtitles", "OpenSubtitles", nil)
-
-	schemas := api.BuildProviderSchemas(reg, "mock")
-	for _, s := range schemas {
-		if s.Name == "mock" {
-			t.Error("BuildProviderSchemas should exclude 'mock' provider")
-		}
-	}
-	if len(schemas) != 1 {
-		t.Errorf("BuildProviderSchemas len = %d, want 1 (mock excluded)", len(schemas))
-	}
+	provider.ClearCaches(nil)
 }
 
 func TestEnabledProviders_output_is_sorted(t *testing.T) {
 	t.Parallel()
-	cfg := &epMock{providers: map[api.ProviderID]api.ProviderCfg{
+	got := enabledProviders(map[subflux.ProviderID]subflux.ProviderCfg{
 		"zulu":    {Enabled: true},
 		"alpha":   {Enabled: true},
 		"charlie": {Enabled: true},
 		"bravo":   {Enabled: false},
-	}}
-	got := enabledProviders(cfg)
-	want := []api.ProviderID{"alpha", "charlie", "zulu"}
+	})
+	want := []subflux.ProviderID{"alpha", "charlie", "zulu"}
 	if len(got) != len(want) {
 		t.Fatalf("enabledProviders len = %d, want %d", len(got), len(want))
 	}

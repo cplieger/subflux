@@ -146,32 +146,60 @@ func newVADInstAdapt(mode Mode, adaptScale float64) *vadInst {
 	return v
 }
 
-// Tuning holds optional GMM tuning parameters.
+// Tuning is the whole parameter set of one detection pass.
+//
+// A struct rather than positional parameters, and the reason is the two float64s.
+// Threshold and AdaptScale are the same type, so any transposition of them
+// COMPILES and simply detects differently — `125, 10, 0` and `0, 10, 125` are both
+// valid calls with wildly different behaviour and no error on either side. Mode and
+// OverhangFrames are distinct types and would be caught; those two would not. Named
+// fields make the mistake unwritable, which is the only guard available when the
+// compiler cannot help.
+//
+// The struct already existed for the two optional GMM knobs while four required
+// ones stayed loose, so a caller passed tuning both ways in the same call.
+// The two pointers lead because govet's fieldalignment counts leading pointer
+// bytes; the exported knobs follow in the order a caller thinks about them.
 type Tuning struct {
 	specWeights *[vadNumCh]int16 // nil = use default
 	minEnergy   *int16           // nil = use default
+
+	// Mode is the WebRTC aggressiveness level.
+	Mode Mode
+	// Threshold is the GMM log-likelihood ratio a frame must reach to be called
+	// speech. NOT a duration: the safe and precise passes use 250 and 125.
+	Threshold float64
+	// OverhangFrames is how many frames the speech decision is held after the
+	// ratio drops below Threshold — a frame COUNT, not a percentage.
+	OverhangFrames int
+	// AdaptScale scales noise-model adaptation; 0 freezes it, which is what movie
+	// audio wants.
+	AdaptScale float64
 }
 
 // newVADInstTuned creates a VAD instance with custom tuning.
-func newVADInstTuned(mode Mode, adaptScale float64, tuning Tuning) *vadInst {
-	v := newVADInstAdapt(mode, adaptScale)
-	if tuning.specWeights != nil {
-		v.specWeights = *tuning.specWeights
+func newVADInstTuned(t Tuning) *vadInst {
+	v := newVADInstAdapt(t.Mode, t.AdaptScale)
+	if t.specWeights != nil {
+		v.specWeights = *t.specWeights
 	}
-	if tuning.minEnergy != nil {
-		v.minEnergy = *tuning.minEnergy
+	if t.minEnergy != nil {
+		v.minEnergy = *t.minEnergy
 	}
 	return v
 }
 
-// FramesBinaryThresholdTuned returns binary {-1, +1} with custom threshold,
-// overhang, adaptation, and GMM tuning parameters. PCM must be 8kHz mono s16le.
-func FramesBinaryThresholdTuned(ctx context.Context, pcm []int16, mode Mode, threshold float64, overhangFrames int, adaptScale float64, tuning Tuning) []float64 {
+// FramesBinary returns a binary {-1, +1} speech decision per 10ms frame under the
+// given Tuning. PCM must be 8kHz mono s16le.
+//
+// Named FramesBinary rather than FramesBinaryThresholdTuned: the old name listed
+// the parameters it took, and they are all in Tuning now.
+func FramesBinary(ctx context.Context, pcm []int16, tuning Tuning) []float64 {
 	const frameSize = 80 // 10ms at 8kHz
 	// Trailing samples that don't fill a complete 80-sample frame are ignored.
 	nFrames := len(pcm) / frameSize
 	result := make([]float64, nFrames)
-	v := newVADInstTuned(mode, adaptScale, tuning)
+	v := newVADInstTuned(tuning)
 	remaining := 0
 	for i := range nFrames {
 		// Check for cancellation every 1000 frames (amortized cost: negligible).
@@ -181,9 +209,9 @@ func FramesBinaryThresholdTuned(ctx context.Context, pcm []int16, mode Mode, thr
 		frame := pcm[i*frameSize : (i+1)*frameSize]
 		_, llr := v.processFrameLLR(frame)
 		switch {
-		case llr >= threshold:
+		case llr >= tuning.Threshold:
 			result[i] = 1.0
-			remaining = overhangFrames
+			remaining = tuning.OverhangFrames
 		case remaining > 0:
 			result[i] = 1.0
 			remaining--

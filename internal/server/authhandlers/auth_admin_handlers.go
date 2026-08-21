@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/users ---
@@ -16,7 +17,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.AdminDB.ListUsers(r.Context())
 	if err != nil {
 		slog.Error("list users: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -32,14 +33,14 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // --- POST /api/auth/users ---
 
 // HandleCreateUser handles POST /api/auth/users — creates a new user account.
 func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
-	admin := api.UserFromContext(r.Context())
+	admin := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		Username string    `json:"username"`
@@ -52,18 +53,18 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username required")
 		return
 	}
 	if len([]rune(req.Username)) > maxUsernameLen {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username too long")
 		return
 	}
 	if req.Role == "" {
 		req.Role = auth.RoleUser
 	}
 	if req.Role != auth.RoleAdmin && req.Role != auth.RoleUser {
-		api.BadRequestC(w, r, api.CodeBadRequest, "role must be admin or user")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "role must be admin or user")
 		return
 	}
 
@@ -72,14 +73,19 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, req.Username, true, checkBreach, h.HTTPClient)
+	hash, userMsg, err := ValidateAndHashPassword(r.Context(), PasswordCheck{
+		Password:    req.Password,
+		Username:    req.Username,
+		SoleFactor:  true,
+		CheckBreach: checkBreach,
+	}, h.HTTPClient)
 	if userMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, userMsg)
 		return
 	}
 	if err != nil {
 		slog.Error("create user: hash password", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -87,7 +93,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	newUser := &auth.User{
 		Username:     req.Username,
 		Email:        req.Email,
-		PasswordHash: hash,
+		PasswordHash: string(hash),
 		Role:         req.Role,
 		Enabled:      true,
 		CreatedAt:    now,
@@ -96,14 +102,14 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.AdminDB.CreateUser(r.Context(), newUser); err != nil {
 		slog.Error("create user: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("admin: user created",
 		"admin", admin.Username, "new_user", req.Username, "role", req.Role)
 
-	api.WriteJSON(w, api.AdminUserCreatedResponse{
+	httpapi.WriteJSON(w, subflux.AdminUserCreatedResponse{
 		ID:       newUser.ID,
 		Username: newUser.Username,
 		Email:    newUser.Email,
@@ -116,7 +122,7 @@ func (h *Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 // HandleDeleteUser handles DELETE /api/auth/users/{id} — deletes a user account.
 // Refuses to delete the caller's own account or the last admin.
 func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
-	admin := api.UserFromContext(r.Context())
+	admin := UserFromContext(r.Context())
 
 	userID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/users/", "user id")
 	if !ok {
@@ -125,31 +131,31 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// Cannot delete self.
 	if userID == admin.ID {
-		api.ConflictC(w, r, api.CodeConflict, "cannot delete your own account")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "cannot delete your own account")
 		return
 	}
 
 	users, listErr := h.AdminDB.ListUsers(r.Context())
 	if listErr != nil {
 		slog.Error("delete user: list users", "error", listErr)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if msg := lastAdminDeletionBlock(users, userID); msg != "" {
-		api.ConflictC(w, r, api.CodeConflict, msg)
+		httpapi.ConflictC(w, r, subflux.CodeConflict, msg)
 		return
 	}
 
 	if err := h.AdminDB.DeleteUser(r.Context(), userID); err != nil {
 		slog.Error("delete user: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("admin: user deleted",
 		"admin", admin.Username, "deleted_user_id", userID, "ip", ClientIP(r))
 
-	api.Ok(w)
+	httpapi.Ok(w)
 }
 
 // lastAdminDeletionBlock reports why deleting userID must be refused by

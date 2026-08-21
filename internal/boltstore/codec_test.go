@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -17,7 +17,7 @@ func TestRecordRoundTrip(t *testing.T) {
 		roundTrip(t, &attemptRec{LastTried: time.Unix(1, 0).UTC(), NextRetry: time.Unix(2, 0).UTC(), Failures: 7})
 	})
 	t.Run("stateRec", func(t *testing.T) {
-		roundTrip(t, &stateRec{ID: 1, MediaType: api.MediaTypeEpisode, MediaID: "tt1-s02e03", Language: "fr", Variant: api.VariantStandard, Provider: api.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", ReleaseTag: "WEB", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
+		roundTrip(t, &stateRec{ID: 1, MediaType: subflux.MediaTypeEpisode, MediaID: "tt1-s02e03", Language: "fr", Variant: subflux.VariantStandard, Provider: subflux.ProviderNameSubDL, ReleaseName: "r", Path: "p", Title: "t", ImdbID: "tt1", ReleaseTag: "WEB", Score: 50, Season: 2, Episode: 3, Manual: false, VideoPath: "v", MediaImported: time.Unix(99, 0).UTC()})
 	})
 	t.Run("fileRec", func(t *testing.T) {
 		roundTrip(t, &fileRec{Codec: "ass", UpdatedAt: time.Unix(5, 0).UTC()})
@@ -31,9 +31,9 @@ func TestRecordRoundTrip(t *testing.T) {
 // asserts the re-encoded bytes are byte-identical.
 func roundTrip[T any](t *testing.T, v *T) {
 	t.Helper()
-	enc, err := encodeRecord(v)
+	enc, err := kv.Encode(v)
 	if err != nil {
-		t.Fatalf("encodeRecord: %v", err)
+		t.Fatalf("kv.Encode: %v", err)
 	}
 	var got T
 	skip, derr := decodeRecord(kv.FailClosed, "test", []byte("k"), enc, &got)
@@ -43,7 +43,7 @@ func roundTrip[T any](t *testing.T, v *T) {
 	if derr != nil {
 		t.Fatalf("decodeRecord: %v", derr)
 	}
-	reEnc, err := encodeRecord(&got)
+	reEnc, err := kv.Encode(&got)
 	if err != nil {
 		t.Fatalf("re-encode: %v", err)
 	}

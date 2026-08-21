@@ -26,7 +26,7 @@ func wirespecPattern(name, method, path string) string {
 // correcting the TABLE unless the route change itself was intended.
 func TestWirespec_matches_registerRoutes(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 

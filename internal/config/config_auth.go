@@ -3,11 +3,11 @@ package config
 import (
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/config/defaults"
 )
 
-// --- AuthConfigProvider methods ---
+// --- Authentication config accessors ---
 
 // BasicAuthEnabled returns whether password login is enabled.
 // Defaults to true if not explicitly set.
@@ -21,8 +21,8 @@ func (c *Config) BasicAuthEnabled() bool {
 // OIDCEnabled returns whether OIDC login is enabled.
 func (c *Config) OIDCEnabled() bool { return c.Auth.OIDCEnabled }
 
-// OIDCConfig returns the OIDC provider settings.
-func (c *Config) OIDCConfig() auth.OIDCConfig {
+// OIDC returns the OIDC provider settings.
+func (c *Config) OIDC() auth.OIDCConfig {
 	return auth.OIDCConfig{
 		IssuerURL:    c.Auth.OIDC.IssuerURL,
 		ClientID:     c.Auth.OIDC.ClientID,
@@ -70,5 +70,6 @@ func (c *Config) CheckBreachedPasswords() bool {
 func (c *Config) WebAuthnRPID() string { return c.Auth.WebAuthnRPID }
 
 // AuthDisabled returns whether authentication is completely bypassed.
-// This is an undocumented escape hatch; not part of the ConfigProvider interface.
+// This is an undocumented escape hatch. Read live per request by the
+// authenticator's bypass predicate, so toggling it hot-applies.
 func (c *Config) AuthDisabled() bool { return c.Auth.DisableAuth }

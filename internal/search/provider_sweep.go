@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -17,9 +19,9 @@ import (
 
 // searchProvider executes a single provider search and classifies the outcome.
 // If trackTimeout is true, failures/successes are recorded in the timeout tracker.
-func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
-	req *api.SearchRequest, trackTimeout bool,
-) ([]api.Subtitle, api.ProviderID, error) {
+func (e *Engine) searchProvider(ctx context.Context, p provider.Provider,
+	req *subflux.SearchRequest, trackTimeout bool,
+) ([]subflux.Subtitle, subflux.ProviderID, error) {
 	start := time.Now()
 	subs, err := p.Search(ctx, req)
 	dur := time.Since(start)
@@ -63,7 +65,7 @@ func (e *Engine) searchProvider(ctx context.Context, p api.Provider,
 // duplicate provider HTTP requests. The key includes VideoPath/VideoHash
 // so requests differing only by file artifact get separate calls.
 func (e *Engine) searchProvidersFiltered(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider,
+	req *subflux.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
 	key := buildSearchKey(req, providers)
 	// Use a detached context for the shared work so that a single caller's
@@ -100,7 +102,7 @@ func (e *Engine) searchProvidersFiltered(ctx context.Context,
 // nest by composition (an inner keyenc value escaped again as one outer
 // component) so a separator inside one language code cannot be read as a field
 // boundary either.
-func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
+func buildSearchKey(req *subflux.SearchRequest, providers []provider.Provider) string {
 	names := make([]string, len(providers))
 	for i, p := range providers {
 		names[i] = string(p.Name())
@@ -113,7 +115,7 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 
 	return keyenc.Join(
 		string(req.MediaType),
-		api.BuildMediaID(req),
+		mediaid.Build(req),
 		keyenc.Join(langs...),
 		req.VideoPath,
 		req.VideoHash,
@@ -124,15 +126,15 @@ func buildSearchKey(req *api.SearchRequest, providers []api.Provider) string {
 // searchProvidersFilteredInner does the actual provider sweep — wrapped by
 // searchProvidersFiltered to provide singleflight deduplication.
 func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
-	req *api.SearchRequest, providers []api.Provider,
+	req *subflux.SearchRequest, providers []provider.Provider,
 ) searchOutcome {
 	var (
 		mu          sync.Mutex
-		results     = make([]api.Subtitle, 0, len(providers)*16)
+		results     = make([]subflux.Subtitle, 0, len(providers)*16)
 		provResults = make([]providerResult, 0, len(providers))
 	)
 
-	collect := func(subs []api.Subtitle, name api.ProviderID, err error) {
+	collect := func(subs []subflux.Subtitle, name subflux.ProviderID, err error) {
 		outcome := providerSuccess
 		if err != nil {
 			outcome = providerError
@@ -181,7 +183,7 @@ func (e *Engine) searchProvidersFilteredInner(ctx context.Context,
 }
 
 // downloadFromProvider finds the named provider and downloads the subtitle.
-func (e *Engine) downloadFromProvider(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (e *Engine) downloadFromProvider(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	p, ok := e.providersByName[sub.Provider]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrProviderNotFound, sub.Provider)
@@ -202,8 +204,8 @@ func (e *Engine) downloadFromProvider(ctx context.Context, sub *api.Subtitle) ([
 }
 
 // unionProviders returns the union of providers across targets that need searching.
-func (e *Engine) unionProviders(states []targetState) []api.Provider {
-	names := make(map[api.ProviderID]bool)
+func (e *Engine) unionProviders(states []targetState) []provider.Provider {
+	names := make(map[subflux.ProviderID]bool)
 	for i := range states {
 		if !states[i].needsSearch {
 			continue
@@ -212,7 +214,7 @@ func (e *Engine) unionProviders(states []targetState) []api.Provider {
 			names[n] = true
 		}
 	}
-	var out []api.Provider
+	var out []provider.Provider
 	for _, p := range e.providers {
 		if names[p.Name()] {
 			out = append(out, p)
@@ -222,8 +224,8 @@ func (e *Engine) unionProviders(states []targetState) []api.Provider {
 }
 
 // filterByTargetProviders keeps only subtitles from providers allowed for the target.
-func (e *Engine) filterByTargetProviders(subs []api.Subtitle, allowed map[api.ProviderID]struct{}) []api.Subtitle {
-	var out []api.Subtitle
+func filterByTargetProviders(subs []subflux.Subtitle, allowed map[subflux.ProviderID]struct{}) []subflux.Subtitle {
+	var out []subflux.Subtitle
 	for i := range subs {
 		if _, ok := allowed[subs[i].Provider]; ok {
 			out = append(out, subs[i])
@@ -233,11 +235,11 @@ func (e *Engine) filterByTargetProviders(subs []api.Subtitle, allowed map[api.Pr
 }
 
 // providerConcurrency returns the configured maximum provider concurrency,
-// falling back to api.DefaultProviderConcurrency when unconfigured.
+// falling back to subflux.DefaultProviderConcurrency when unconfigured.
 func (e *Engine) providerConcurrency() int {
 	maxConc := e.cfg.Search().MaxProviderConcurrency
 	if maxConc <= 0 {
-		return api.DefaultProviderConcurrency
+		return subflux.DefaultProviderConcurrency
 	}
 	return maxConc
 }

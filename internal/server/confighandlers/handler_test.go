@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestHandleSaveConfig_response_redacts_expanded_secret pins the HTTP
@@ -29,7 +29,7 @@ func TestHandleSaveConfig_response_redacts_expanded_secret(t *testing.T) {
 	t.Setenv("SUBFLUX_TEST_SECRET", secret)
 
 	h := New(&Deps{
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
 		// Nonexistent path: a true empty baseline, MergeSecrets leaves the body as-is.
@@ -83,7 +83,7 @@ func writeTestFile(path, content string) error {
 // and validates bodies with the real config loader (as main.go wires it).
 func newPathHandler(configPath string) *Handler {
 	return New(&Deps{
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			// context.Background(): no *testing.T in scope in this helper.
 			return config.LoadFromBytes(context.Background(), data)
 		},
@@ -388,7 +388,7 @@ func TestHandleResetConfig_writes_default(t *testing.T) {
 	h.HandleResetConfig(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleResetConfig() status = %d, want %d", rec.Code, http.StatusOK)
+		t.Errorf("HandleResetConfig() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	// Verify the file was written.
@@ -403,30 +403,30 @@ func TestHandleResetConfig_writes_default(t *testing.T) {
 
 // --- HandleConfigSchema ---
 
-// schemaStubProvider implements api.Provider for schema registry setup.
+// schemaStubProvider implements provider.Provider for schema registry setup.
 type schemaStubProvider struct {
 	name string
 }
 
-func (p *schemaStubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *schemaStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *schemaStubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *schemaStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *schemaStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *schemaStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
 func TestHandleConfigSchema_returns_json(t *testing.T) {
 	t.Parallel()
 	reg := provider.NewRegistry()
-	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (api.Provider, error) {
+	reg.Register("gestdown", func(_ context.Context, _ map[string]any) (provider.Provider, error) {
 		return &schemaStubProvider{name: "gestdown"}, nil
 	})
 
 	h := New(&Deps{
-		SchemaFunc: schema.Schema,
+		SchemaFunc: schema.Sections,
 		Registry:   reg,
 	})
 
@@ -443,7 +443,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 	}
 
-	var sections []api.SchemaSection
+	var sections []subflux.SchemaSection
 	if err := json.NewDecoder(rec.Body).Decode(&sections); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -455,7 +455,7 @@ func TestHandleConfigSchema_returns_json(t *testing.T) {
 func TestHandleConfigSchema_rejects_non_get(t *testing.T) {
 	t.Parallel()
 	h := New(&Deps{
-		SchemaFunc: schema.Schema,
+		SchemaFunc: schema.Sections,
 		Registry:   provider.NewRegistry(),
 	})
 
@@ -529,7 +529,6 @@ func TestHandleValidatePath_traversal_guard(t *testing.T) {
 		{name: "relative path refused", path: "media" + sep + "tv", wantErr: "path must be absolute"},
 	}
 
-	h := New(&Deps{})
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -540,7 +539,7 @@ func TestHandleValidatePath_traversal_guard(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(),
 				http.MethodPost, "/api/config/validate-path", bytes.NewReader(body))
 			rec := httptest.NewRecorder()
-			h.HandleValidatePath(rec, req)
+			HandleValidatePath(rec, req)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("HandleValidatePath(%q) status = %d, want %d", tc.path, rec.Code, http.StatusOK)

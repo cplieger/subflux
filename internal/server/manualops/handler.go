@@ -8,10 +8,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/langcode"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // HandlerDeps holds the dependencies for the manual search/download HTTP
@@ -21,7 +25,7 @@ import (
 type HandlerDeps struct {
 	DBFunc     func() DownloadStore
 	Activity   ActivityTracker
-	Alerts     activity.WarnRecorder
+	Alerts     WarnRecorder
 	Events     EventPublisher
 	StateFunc  func() *LiveState
 	BGTracker  BGTracker
@@ -30,11 +34,13 @@ type HandlerDeps struct {
 	DecodeJSON func(w http.ResponseWriter, r *http.Request, v any, maxSize int64) bool
 }
 
-// BGTracker allows the handler to register background goroutines for
-// graceful shutdown tracking.
+// BGTracker registers a background goroutine with the server's WaitGroup for
+// graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
+// launches and counts in one call: an Add/Done pair can leak a counter (an
+// early return or a panic before the defer is installed leaves the drain
+// hung), and a one-method surface makes that unrepresentable.
 type BGTracker interface {
-	Add(delta int)
-	Done()
+	Go(f func())
 }
 
 // Handler provides HTTP handlers for manual search and download endpoints.
@@ -50,20 +56,20 @@ func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: cal
 // HandleManualSearch handles GET /api/search?imdb=tt1234567&lang=fr&type=movie
 func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
 	ls := h.deps.StateFunc()
 	req, lang, mediaType, arrID := ParseSearchQuery(r)
 
-	if !IsValidLangCode(lang) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+	if !langcode.Valid(lang) {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}
 
 	if !mediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -72,7 +78,7 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	// request must never be silently truncated: reject oversized names
 	// loudly at the HTTP boundary instead.
 	if len(req.ReleaseName) > release.MaxNameLen {
-		api.BadRequestC(w, r, api.CodeBadRequest,
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest,
 			"release exceeds "+strconv.Itoa(release.MaxNameLen)+" bytes")
 		return
 	}
@@ -106,13 +112,13 @@ func (h *Handler) HandleManualSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := RunSearch(ctx, deps, ls, &req, lang, mediaType, filePath)
-	api.WriteJSON(w, result)
+	httpapi.WriteJSON(w, result)
 }
 
 // resolveSearchVideo resolves the arr-known video path for a manual search's
 // hash computation. Returns "" when no arr reference was supplied or the
 // item cannot be resolved (logged at debug; the search proceeds hash-less).
-func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType api.MediaType, arrID, season, episode int) string {
+func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType subflux.MediaType, arrID, season, episode int) string {
 	if arrID <= 0 {
 		return ""
 	}
@@ -131,69 +137,62 @@ func (h *Handler) resolveSearchVideo(ctx context.Context, mediaType api.MediaTyp
 func (h *Handler) HandleClearLock(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
-	var req struct {
-		MediaType api.MediaType `json:"media_type"`
-		MediaID   string        `json:"media_id"`
-		Language  string        `json:"language"`
-		Variant   api.Variant   `json:"variant,omitempty"`
-	}
-	if !h.deps.DecodeJSON(w, r, &req, 0) {
+	// The request body IS the lock key: its four json names (media_type,
+	// media_id, language, variant) are the wire shape, and subflux.ManualLockKey
+	// carries exactly those.
+	var key subflux.ManualLockKey
+	if !h.deps.DecodeJSON(w, r, &key, 0) {
 		return
 	}
 
-	if req.MediaType == "" || req.MediaID == "" || req.Language == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_type, media_id, and language are required")
+	if key.MediaType == "" || key.MediaID == "" || key.Language == "" {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_type, media_id, and language are required")
 		return
 	}
 
-	if !IsValidLangCode(req.Language) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid language code")
+	if !langcode.Valid(key.Language) {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid language code")
 		return
 	}
 
-	if !req.MediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+	if !key.MediaType.Valid() {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
 	// Variant is optional: empty clears the locks of every variant of the
 	// language; a specific variant clears only that quad's lock.
-	if !isValidLockVariant(req.Variant) {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
+	if !isValidLockVariant(key.Variant) {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid variant (want standard, hi, or forced)")
 		return
 	}
 
-	deps := &SearchDeps{
-		DB:       h.deps.DBFunc(),
-		Activity: h.deps.Activity,
-		Alerts:   h.deps.Alerts,
-		Events:   h.deps.Events,
-	}
-
-	if err := RunClearLock(ctx, deps, string(req.MediaType), req.MediaID, req.Language, req.Variant); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "clear manual lock",
-			"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
-			"variant", req.Variant)
+	if err := h.deps.DBFunc().ClearManualLock(ctx, key); err != nil {
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "clear manual lock",
+			"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
+			"variant", key.Variant)
 		return
 	}
 
 	slog.Info("manual lock cleared",
-		"media_type", req.MediaType, "media_id", req.MediaID, "lang", req.Language,
-		"variant", req.Variant)
+		"media_type", key.MediaType, "media_id", key.MediaID, "lang", key.Language,
+		"variant", key.Variant)
 
-	h.deps.Events.PublishCoverageUpdate(req.MediaType, req.MediaID, req.Language, "")
+	h.deps.Events.PublishCoverageUpdate(&events.CoverageEvent{
+		MediaType: key.MediaType, MediaID: key.MediaID, Language: key.Language,
+	})
 
-	api.WriteJSON(w, map[string]string{"status": "lock cleared"})
+	httpapi.WriteJSON(w, map[string]string{"status": "lock cleared"})
 }
 
 // HandleManualDownload handles POST /api/search/download.
 func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
@@ -203,14 +202,14 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := ValidateDownloadRequest(&req); err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, err.Error())
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, err.Error())
 		return
 	}
 
 	ls := h.deps.StateFunc()
 
 	// Find the provider first (free check) so we can return 400 immediately.
-	var prov api.Provider
+	var prov provider.Provider
 	for _, p := range ls.Providers {
 		if p.Name() == req.Provider {
 			prov = p
@@ -218,7 +217,7 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if prov == nil {
-		api.BadRequestC(w, r, api.CodeSearchProviderDisabled, "provider not found")
+		httpapi.BadRequestC(w, r, subflux.CodeSearchProviderDisabled, "provider not found")
 		return
 	}
 
@@ -244,16 +243,14 @@ func (h *Handler) HandleManualDownload(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("%s %s", req.Provider, req.SubtitleID), activity.SourceManual)
 
 	// Return 202 immediately; run the download in the background.
-	api.WriteJSONStatus(w, http.StatusAccepted, DownloadAccepted{
+	httpapi.WriteJSONStatus(w, http.StatusAccepted, DownloadAccepted{
 		ActivityID: actID,
 		Status:     "accepted",
 	})
 
-	h.deps.BGTracker.Add(1)
-	go func() {
-		defer h.deps.BGTracker.Done()
+	h.deps.BGTracker.Go(func() {
 		h.runManualDownload(ls, prov, &req, actID)
-	}()
+	})
 }
 
 // DownloadAccepted is the typed 202 Accepted response for manual downloads.
@@ -263,7 +260,7 @@ type DownloadAccepted struct {
 }
 
 // runManualDownload performs the actual download in the background.
-func (h *Handler) runManualDownload(ls *LiveState, prov api.Provider,
+func (h *Handler) runManualDownload(ls *LiveState, prov provider.Provider,
 	req *DownloadRequest, actID string,
 ) {
 	serverCtx := h.deps.ServerCtx()

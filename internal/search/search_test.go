@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -19,7 +20,7 @@ import (
 
 func TestNew_creates_engine(t *testing.T) {
 	t.Parallel()
-	e := newEngine(nil, &mockStore{}, &mockConfig{}, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, &mockConfig{}, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 	if e == nil {
 		t.Fatal("New() returned nil")
 	}
@@ -29,7 +30,7 @@ func TestNew_creates_engine(t *testing.T) {
 
 func TestFilterByHI_regular_preferred_over_hi(t *testing.T) {
 	t.Parallel()
-	results := []api.Subtitle{
+	results := []subflux.Subtitle{
 		{Provider: "os", ReleaseName: "Regular", HearingImp: false, Forced: false},
 		{Provider: "os", ReleaseName: "HI-Sub", HearingImp: true, Forced: false},
 	}
@@ -47,7 +48,7 @@ func TestFilterByHI_regular_preferred_over_hi(t *testing.T) {
 
 func TestFilterByHI_hi_fallback_when_no_regular(t *testing.T) {
 	t.Parallel()
-	results := []api.Subtitle{
+	results := []subflux.Subtitle{
 		{Provider: "os", ReleaseName: "HI-Sub", HearingImp: true, Forced: false},
 	}
 	got, varFallback := filterByVariant(results, "standard")
@@ -61,7 +62,7 @@ func TestFilterByHI_hi_fallback_when_no_regular(t *testing.T) {
 
 func TestFilterByHI_forced_excluded(t *testing.T) {
 	t.Parallel()
-	results := []api.Subtitle{
+	results := []subflux.Subtitle{
 		{Provider: "os", ReleaseName: "Forced", Forced: true},
 	}
 	got, varFallback := filterByVariant(results, "standard")
@@ -90,17 +91,17 @@ func TestRecordProviderNoResults_adaptive_enabled_records(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{
+		adaptiveCfg: subflux.AdaptiveConfig{
 			Enabled:           true,
 			InitialDelay:      1,
 			MaxDelay:          1,
 			BackoffMultiplier: 1,
 		},
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []subflux.ProviderID{"prov1"})
 	if !ms.failureCalled {
 		t.Error("recordProviderNoResults() did not call RecordNoResult when adaptive enabled")
 	}
@@ -110,12 +111,12 @@ func TestRecordProviderNoResults_adaptive_disabled_noop(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: false},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: false},
+		searchCfg:   subflux.SearchConfig{},
 	}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []subflux.ProviderID{"prov1"})
 	if ms.failureCalled {
 		t.Error("recordProviderNoResults() called RecordNoResult when adaptive disabled")
 	}
@@ -129,9 +130,9 @@ func TestFilterProviders_respects_target_include(t *testing.T) {
 	mc := &mockFilterConfig{}
 	p1 := &mockProvider{name: "os"}
 	p2 := &mockProvider{name: "yify"}
-	e := newEngine([]api.Provider{p1, p2}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p1, p2}, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	target := &api.SubtitleTarget{Code: "fr", Providers: []api.ProviderID{"os"}}
+	target := &subflux.SubtitleTarget{Code: "fr", Providers: []subflux.ProviderID{"os"}}
 	got := e.filterProviders(target)
 	if len(got) != 1 {
 		t.Fatalf("filterProviders() returned %d providers, want 1", len(got))
@@ -146,9 +147,9 @@ func TestFilterProviders_respects_target_include(t *testing.T) {
 func TestFilterByScore_exact_boundary(t *testing.T) {
 	t.Parallel()
 	scored := []scoredSub{
-		{sub: api.Subtitle{Provider: "os"}, score: 100},
-		{sub: api.Subtitle{Provider: "yify"}, score: 99},
-		{sub: api.Subtitle{Provider: "test"}, score: 101},
+		{sub: subflux.Subtitle{Provider: "os"}, score: 100},
+		{sub: subflux.Subtitle{Provider: "yify"}, score: 99},
+		{sub: subflux.Subtitle{Provider: "test"}, score: 101},
 	}
 
 	// minScore=100: should include score=100 and score=101.
@@ -174,8 +175,8 @@ func TestFilterByScore_exact_boundary(t *testing.T) {
 
 func TestEngine_timeout_set_when_enabled(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: time.Hour}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	if e.timeout == nil {
 		t.Error("Engine.timeout = nil, want non-nil when ProviderTimeout > 0")
@@ -184,8 +185,8 @@ func TestEngine_timeout_set_when_enabled(t *testing.T) {
 
 func TestEngine_timeout_noop_when_disabled(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: 0}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: 0}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	if _, ok := e.timeout.(noopHealth); !ok {
 		t.Errorf("Engine.timeout = %T, want noopHealth when ProviderTimeout = 0", e.timeout)
@@ -196,8 +197,8 @@ func TestEngine_timeout_noop_when_disabled(t *testing.T) {
 
 func TestEngine_ProviderTimeouts_nil_timeout(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: 0}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: 0}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	status, ok := e.ProviderTimeouts()
 	if ok {
@@ -210,8 +211,8 @@ func TestEngine_ProviderTimeouts_nil_timeout(t *testing.T) {
 
 func TestEngine_ProviderTimeouts_enabled(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: time.Hour}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	status, ok := e.ProviderTimeouts()
 	if !ok {
@@ -226,8 +227,8 @@ func TestEngine_ProviderTimeouts_enabled(t *testing.T) {
 
 func TestEngine_ResetTimeouts_nil_timeout_noop(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: 0}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: 0}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	// Should not panic when timeout is nil.
 	e.ResetTimeouts()
@@ -235,8 +236,8 @@ func TestEngine_ResetTimeouts_nil_timeout_noop(t *testing.T) {
 
 func TestEngine_ResetTimeouts_clears_state(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{ProviderTimeout: time.Hour}}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	e.timeout.RecordFailure("prov1", nil)
 	e.ResetTimeouts()
@@ -251,15 +252,15 @@ func TestEngine_ResetTimeouts_clears_state(t *testing.T) {
 
 func TestEngine_ScoreSubtitles_returns_sorted_results(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	sc := scorer.New(&api.DefaultScores)
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	sc := scorer.New(&subflux.DefaultScores)
 	e := newEngine(nil, &mockStore{}, mc, nil, sc, Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP",
 	}
-	subs := []api.Subtitle{
+	subs := []subflux.Subtitle{
 		{ReleaseName: "Movie.2024.WEB-DL.720p-OTHER", MatchedBy: "title"},
 		{ReleaseName: "Movie.2024.BluRay.1080p.x264-GRP", MatchedBy: "hash"},
 	}
@@ -285,7 +286,7 @@ func TestEngine_ScoreSubtitles_returns_sorted_results(t *testing.T) {
 func TestEngine_SimulateScore_hash_match(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{minScore: 0}
-	sc := scorer.New(&api.DefaultScores)
+	sc := scorer.New(&subflux.DefaultScores)
 	e := newEngine(nil, &mockStore{}, mc, nil, sc, Syncer{}, noopDetector{})
 
 	result := e.SimulateScore("movie",
@@ -307,7 +308,7 @@ func TestEngine_SimulateScore_hash_match(t *testing.T) {
 func TestEngine_SimulateScore_release_attributes(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{minScore: 0}
-	sc := scorer.New(&api.DefaultScores)
+	sc := scorer.New(&subflux.DefaultScores)
 	e := newEngine(nil, &mockStore{}, mc, nil, sc, Syncer{}, noopDetector{})
 
 	result := e.SimulateScore("movie",
@@ -328,7 +329,7 @@ type mockStoreWithBackoffError struct {
 	mockStore
 }
 
-func (m *mockStoreWithBackoffError) BackedOffProviders(_ context.Context, _ api.MediaType, _, _ string, _ int) ([]api.ProviderID, error) {
+func (m *mockStoreWithBackoffError) BackedOffProviders(_ context.Context, _ subflux.MediaType, _, _ string, _ int) ([]subflux.ProviderID, error) {
 	return nil, errors.New("db error")
 }
 
@@ -345,8 +346,8 @@ func TestFilterByScore_empty_input(t *testing.T) {
 func TestFilterByScore_all_below(t *testing.T) {
 	t.Parallel()
 	scored := []scoredSub{
-		{sub: api.Subtitle{Provider: "os"}, score: 10},
-		{sub: api.Subtitle{Provider: "yify"}, score: 20},
+		{sub: subflux.Subtitle{Provider: "os"}, score: 10},
+		{sub: subflux.Subtitle{Provider: "yify"}, score: 20},
 	}
 	got := filterByScore(scored, 100)
 	if len(got) != 0 {
@@ -361,26 +362,26 @@ type mockStoreWithRecordError struct {
 	mockStore
 }
 
-func (m *mockStoreWithRecordError) RecordNoResult(_ context.Context, _ api.MediaType, _, _ string, _ api.ProviderID, _ api.BackoffParams) error {
+func (m *mockStoreWithRecordError) RecordNoResult(_ context.Context, _ subflux.MediaType, _, _ string, _ subflux.ProviderID, _ subflux.BackoffParams) error {
 	return errors.New("db write error")
 }
 
 func TestRecordProviderNoResults_store_error_continues(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{
+		adaptiveCfg: subflux.AdaptiveConfig{
 			Enabled:           true,
 			InitialDelay:      1,
 			MaxDelay:          1,
 			BackoffMultiplier: 1,
 		},
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
 	errStore := &mockStoreWithRecordError{}
-	e := newEngine(nil, errStore, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, errStore, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	// Should not panic even when store returns error.
-	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []api.ProviderID{"prov1", "prov2"})
+	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []subflux.ProviderID{"prov1", "prov2"})
 }
 
 // --- checkUpgradeEligibility ---
@@ -398,12 +399,12 @@ func TestCheckUpgradeEligibility_perfect_score_not_eligible(t *testing.T) {
 		score: 100, mediaImported: time.Now(), found: true,
 	}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{
+		searchCfg: subflux.SearchConfig{
 			UpgradeEnabled:    true,
 			UpgradeWindowDays: 7,
 		},
 	}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	existing, detErr := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if detErr != nil {
@@ -436,12 +437,12 @@ func TestCheckUpgradeEligibility_no_store_record_not_eligible(t *testing.T) {
 		score: 0, mediaImported: time.Time{}, found: false,
 	}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{
+		searchCfg: subflux.SearchConfig{
 			UpgradeEnabled:    true,
 			UpgradeWindowDays: 7,
 		},
 	}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	existing, detErr := detectExisting(t.Context(), videoPath, noopDetector{}, nil)
 	if detErr != nil {
@@ -464,9 +465,9 @@ func TestFilterByHI_never_returns_forced(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 10).Draw(t, "n")
-		subs := make([]api.Subtitle, n)
+		subs := make([]subflux.Subtitle, n)
 		for i := range n {
-			subs[i] = api.Subtitle{
+			subs[i] = subflux.Subtitle{
 				Provider:   "test",
 				HearingImp: rapid.Bool().Draw(t, "hi"),
 				Forced:     rapid.Bool().Draw(t, "forced"),
@@ -486,10 +487,10 @@ func TestFilterByHI_prefers_regular_over_hi(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(1, 10).Draw(t, "n")
-		subs := make([]api.Subtitle, n)
+		subs := make([]subflux.Subtitle, n)
 		hasRegular := false
 		for i := range n {
-			subs[i] = api.Subtitle{
+			subs[i] = subflux.Subtitle{
 				Provider:   "test",
 				HearingImp: rapid.Bool().Draw(t, "hi"),
 				Forced:     false, // No forced subs to simplify.
@@ -521,7 +522,7 @@ func TestFilterByScore_preserves_order(t *testing.T) {
 		scored := make([]scoredSub, n)
 		for i := range n {
 			scored[i] = scoredSub{
-				sub:   api.Subtitle{Provider: "test"},
+				sub:   subflux.Subtitle{Provider: "test"},
 				score: rapid.IntRange(0, 200).Draw(t, "score"),
 			}
 		}
@@ -561,7 +562,7 @@ func TestEngine_HashFile_delegates_to_hashFile(t *testing.T) {
 	}
 
 	mc := &mockConfig{}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	hash, size, err := e.HashFile(t.Context(), path)
 	if err != nil {
@@ -578,7 +579,7 @@ func TestEngine_HashFile_delegates_to_hashFile(t *testing.T) {
 func TestEngine_HashFile_error_propagates(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	_, _, err := e.HashFile(t.Context(), "/nonexistent/path/video.mkv")
 	if err == nil {
@@ -595,20 +596,20 @@ type mockStoreWithSaveError struct {
 	saveCalled bool
 }
 
-func (m *mockStoreWithSaveError) SaveDownload(_ context.Context, _ *api.DownloadRecord) error {
+func (m *mockStoreWithSaveError) SaveDownload(_ context.Context, _ *subflux.DownloadRecord) error {
 	m.saveCalled = true
 	return errors.New("db write error")
 }
 
 // --- StripHI and hash match edge cases ---
 
-// mockConfigWithStripHI enables StripHI in PostProcessConfig.
+// mockConfigWithStripHI enables StripHI in the post-processing config.
 type mockConfigWithStripHI struct {
 	mockConfig
 }
 
-func (m *mockConfigWithStripHI) PostProcessConfig() api.PostProcessConfig {
-	return api.PostProcessConfig{
+func (m *mockConfigWithStripHI) PostProcess() subflux.PostProcessConfig {
+	return subflux.PostProcessConfig{
 		NormalizeUTF8:    true,
 		NormalizeEndings: true,
 		CleanWhitespace:  true,
@@ -648,9 +649,9 @@ func TestFilterByVariant_forced_never_returns_non_forced(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 10).Draw(t, "n")
-		subs := make([]api.Subtitle, n)
+		subs := make([]subflux.Subtitle, n)
 		for i := range n {
-			subs[i] = api.Subtitle{
+			subs[i] = subflux.Subtitle{
 				Provider:   "test",
 				HearingImp: rapid.Bool().Draw(t, "hi"),
 				Forced:     rapid.Bool().Draw(t, "forced"),
@@ -670,9 +671,9 @@ func TestFilterByVariant_hi_never_returns_forced(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 10).Draw(t, "n")
-		subs := make([]api.Subtitle, n)
+		subs := make([]subflux.Subtitle, n)
 		for i := range n {
-			subs[i] = api.Subtitle{
+			subs[i] = subflux.Subtitle{
 				Provider:   "test",
 				HearingImp: rapid.Bool().Draw(t, "hi"),
 				Forced:     rapid.Bool().Draw(t, "forced"),

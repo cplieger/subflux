@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // FuzzExtractAndValidate exercises ExtractAndValidate with arbitrary data,
@@ -29,7 +29,7 @@ func FuzzExtractAndValidate(f *testing.F) {
 			if result == nil {
 				t.Fatal("ExtractAndValidate returned nil data with nil error")
 			}
-			if valErr := api.ValidateSubtitleData(result); valErr != nil {
+			if valErr := subtitlefile.Validate(result); valErr != nil {
 				t.Fatalf("ExtractAndValidate returned data that fails ValidateSubtitleData: %v", valErr)
 			}
 		}

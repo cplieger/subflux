@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/authstore"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Request authentication is the library's auth.Authenticator, assembled in the
@@ -17,10 +17,6 @@ import (
 // config). This file is the whole subflux-specific auth glue; the chain
 // runner, session verifier, API-key verifier, bypass, and activity throttling
 // all come from the library.
-
-// Compile-time assertion: the composite authstore satisfies the library's
-// Authenticator store contract (session, activity, user, and API-key lookup).
-var _ auth.AuthStore = authstore.AuthStore(nil)
 
 // Session cookie names as they appear on the wire: the bare base name over
 // plain HTTP (LAN, ip:port) and the __Host--prefixed Secure form over HTTPS.
@@ -53,7 +49,7 @@ func UnauthorizedResponse(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
 		return
 	}
-	api.UnauthorizedC(w, r, api.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
+	httpapi.UnauthorizedC(w, r, subflux.CodeAuthSessionRequired, auth.ErrUnauthenticated.Error())
 }
 
 // SanitizeForwardedProto strips the X-Forwarded-Proto header from any request

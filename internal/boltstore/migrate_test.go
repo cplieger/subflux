@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -140,11 +140,11 @@ func seedPopulatedV1Store(t *testing.T, path string) {
 		t.Fatalf("Open(%q): %v", path, err)
 	}
 	ctx := t.Context()
-	rec := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en",
-		ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Rel.A",
+	rec := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en",
+		ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "Rel.A",
 		Path: "/m/tt1.en.1.srt", Score: 80,
-		Meta: &api.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv", Manual: true},
+		Meta: &subflux.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv", Manual: true},
 	}
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
@@ -485,8 +485,8 @@ func TestOpen_runsPendingLadderSequentially(t *testing.T) {
 	}
 
 	// Migrated store stays fully usable.
-	if _, err := db.GetState(t.Context(), &api.StateQuery{}); err != nil {
-		t.Errorf("GetState after migration: %v", err)
+	if _, err := db.State(t.Context(), &subflux.StateQuery{}); err != nil {
+		t.Errorf("State after migration: %v", err)
 	}
 	if err := db.Close(t.Context()); err != nil {
 		t.Fatalf("Close: %v", err)

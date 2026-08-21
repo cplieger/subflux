@@ -31,7 +31,7 @@ func BenchmarkSyncCues(b *testing.B) {
 		inc := makeBenchCues(n, 500*time.Millisecond)
 		b.Run(cueCountLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				syncCues(b.Context(), ref, inc)
 			}
 		})
@@ -54,7 +54,7 @@ func BenchmarkAlignConstantOffset(b *testing.B) {
 		inc := makeSpans(tc.incCount, 500*time.Millisecond)
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				alignConstantOffset(b.Context(), ref, inc)
 			}
 		})

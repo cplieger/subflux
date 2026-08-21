@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,11 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/envx"
-	"github.com/cplieger/runesafe"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/envx/v2"
+	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/subflux/internal/apipaths"
 	"github.com/cplieger/subflux/internal/cliparse"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // cliClient is the shared HTTP client for the quick remote commands. Its
@@ -55,7 +56,7 @@ const (
 // empty string if SUBFLUX_URL is malformed (caller decides how to fail;
 // keeps the no-os.Exit-from-helpers contract).
 func serverURL() (string, bool) {
-	u := envx.String("SUBFLUX_URL", "http://127.0.0.1:8374")
+	u := cmp.Or(envx.String("SUBFLUX_URL"), "http://127.0.0.1:8374")
 	u = strings.TrimRight(strings.TrimSpace(u), "/")
 	parsed, err := url.Parse(u)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -105,7 +106,7 @@ func cliRequestWith(client *http.Client, timeout time.Duration, method, path str
 	// server. SUBFLUX_API_KEY (generate one with `subflux generate-api-key`)
 	// authenticates the CLI via the X-API-Key header the server's verifier
 	// reads; without it, commands against an auth-enabled instance answer 401.
-	if key := envx.String("SUBFLUX_API_KEY", ""); key != "" {
+	if key := envx.String("SUBFLUX_API_KEY"); key != "" {
 		req.Header.Set("X-API-Key", key)
 	}
 	resp, err := client.Do(req)
@@ -326,8 +327,8 @@ func rawJSONFormat(p cliparse.Params) bool {
 // (media_type, media_id) identity (arr ID) plus the stable search IDs the
 // search leg forwards.
 type cliResolvedItem struct {
-	MediaType api.MediaType `json:"media_type"`
-	Title     string        `json:"title"`
+	MediaType subflux.MediaType `json:"media_type"`
+	Title     string            `json:"title"`
 	SearchIDs struct {
 		Imdb string `json:"imdb,omitempty"`
 		Tvdb int    `json:"tvdb,omitempty"`
@@ -342,10 +343,10 @@ type cliResolvedItem struct {
 // cliResolveCandidate mirrors one ambiguity candidate (year disambiguates
 // equal titles).
 type cliResolveCandidate struct {
-	Title     string        `json:"title"`
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   int           `json:"media_id"`
-	Year      int           `json:"year,omitempty"`
+	Title     string            `json:"title"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   int               `json:"media_id"`
+	Year      int               `json:"year,omitempty"`
 }
 
 // cliResolveResponse mirrors the resolve endpoint's typed response.
@@ -414,7 +415,7 @@ func cliSearchRemote(p cliparse.Params, rc *searchRunConfig) int {
 	lang := p.String(cmdLang)
 
 	items, code := resolveSearchItems(p, rc)
-	if items == nil {
+	if code != 0 {
 		return code
 	}
 
@@ -429,10 +430,10 @@ func cliSearchRemote(p cliparse.Params, rc *searchRunConfig) int {
 }
 
 // resolveSearchItems calls the resolve endpoint and maps its outcome onto
-// the CLI contract: items to search (nil items + exit code otherwise), the
-// candidate list on ambiguity (exit 2), "no match" on an empty resolution
-// (exit 1), and a 400 (contradictory or invalid identifiers) as a usage
-// error (exit 2).
+// the CLI contract: the exit code carries the outcome and is what the caller
+// branches on — 0 with the items to search, the candidate list on ambiguity
+// (exit 2), "no match" on an empty resolution (exit 1), and a 400
+// (contradictory or invalid identifiers) as a usage error (exit 2).
 func resolveSearchItems(p cliparse.Params, rc *searchRunConfig) (items []cliResolvedItem, exit int) {
 	qv := url.Values{}
 	for _, k := range []string{"title", "imdb", "tmdb", cmdType} {
@@ -491,7 +492,7 @@ func titleWithYear(title string, year int) string {
 // itemLabel returns the human-readable heading for one resolved item,
 // matching the pre-remote CLI's labels.
 func itemLabel(item *cliResolvedItem) string {
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		return fmt.Sprintf("%s S%02dE%02d", item.Title, item.Season, item.Episode)
 	}
 	return fmt.Sprintf("%s (%d)", item.Title, item.Year)
@@ -509,7 +510,7 @@ func searchOneItem(rc *searchRunConfig, item *cliResolvedItem, lang string, down
 	// media_id (the arr ID) lets the server resolve the video path for
 	// hash-based search and release-name defaulting (S7: no client paths).
 	qv.Set(keyMediaID, strconv.Itoa(item.MediaID))
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		qv.Set(flagSeason, strconv.Itoa(item.Season))
 		qv.Set(flagEpisode, strconv.Itoa(item.Episode))
 	}
@@ -634,7 +635,7 @@ func downloadPick(rc *searchRunConfig, item *cliResolvedItem, results []cliSearc
 		"hearing_impaired": chosen.HearingImp,
 		"forced":           chosen.Forced,
 	}
-	if item.MediaType == api.MediaTypeEpisode {
+	if item.MediaType == subflux.MediaTypeEpisode {
 		payload[flagSeason] = item.Season
 		payload[flagEpisode] = item.Episode
 	}

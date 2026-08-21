@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestNewProviderRegistry_registers_all_providers(t *testing.T) {
@@ -19,10 +19,10 @@ func TestNewProviderRegistry_registers_all_providers(t *testing.T) {
 		"betaseries",
 		"gestdown",
 		"hdbits",
-		"mock",
 		"opensubtitles",
 		"subdl",
 		"subsource",
+		"synthetic",
 		"yifysubtitles",
 	}
 
@@ -56,14 +56,14 @@ func TestNewProviderRegistry_schema_labels(t *testing.T) {
 	r := newProviderRegistry()
 
 	tests := []struct {
-		name      api.ProviderID
+		name      subflux.ProviderID
 		wantLabel string
 	}{
 		{"hdbits", "HDBits"},
 		{"opensubtitles", "OpenSubtitles"},
 		{"betaseries", "BetaSeries"},
 		{"gestdown", "Gestdown"},
-		{"mock", "Mock (Testing)"},
+		{"synthetic", "Synthetic (Testing)"},
 		{"subsource", "SubSource"},
 		{"subdl", "SubDL"},
 		{"animetosho", "AnimeTosho"},
@@ -87,7 +87,7 @@ func TestNewProviderRegistry_secret_fields_marked(t *testing.T) {
 	r := newProviderRegistry()
 
 	// Providers with secret fields and their expected secret key names.
-	wantSecrets := map[api.ProviderID][]string{
+	wantSecrets := map[subflux.ProviderID][]string{
 		"hdbits":        {"passkey"},
 		"opensubtitles": {"password", "api_key"},
 		"betaseries":    {"token"},
@@ -162,8 +162,8 @@ func TestProviderDefaults_declared_once_in_schema(t *testing.T) {
 	t.Parallel()
 	r := newProviderRegistry()
 
-	_, fields := r.Schema(api.ProviderNameOpenSubtitles)
-	var declared *api.ProviderSchemaField
+	_, fields := r.Schema(subflux.ProviderNameOpenSubtitles)
+	var declared *subflux.ProviderSchemaField
 	for i := range fields {
 		if fields[i].Key == "use_hash" {
 			declared = &fields[i]
@@ -174,7 +174,7 @@ func TestProviderDefaults_declared_once_in_schema(t *testing.T) {
 		t.Fatal("opensubtitles schema no longer declares use_hash; the single-source default moved or vanished")
 	}
 	if declared.Default != "true" || declared.Type != "bool" {
-		t.Fatalf("use_hash declaration = %+v, want bool default true", declared)
+		t.Errorf("use_hash declaration = %+v, want bool default true", declared)
 	}
 
 	normalized := provider.NormalizeSettings(fields, nil)

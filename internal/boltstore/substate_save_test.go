@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -18,7 +18,7 @@ import (
 // variants) back through the shared collectStateRows helper in a View
 // transaction, projecting just the records (these cases pin record fields;
 // the variant key dimension is covered by the contract suite and keys tests).
-func readTripleRows(t *testing.T, db *DB, mt api.MediaType, mid, lang string) []stateRec {
+func readTripleRows(t *testing.T, db *DB, mt subflux.MediaType, mid, lang string) []stateRec {
 	t.Helper()
 	var rows []stateRec
 	if err := db.db.View(func(tx *bolt.Tx) error {
@@ -46,8 +46,8 @@ func partitionRows(rows []stateRec) (auto, manual []stateRec) {
 	return auto, manual
 }
 
-func autoRec(provider api.ProviderID, release, path string, score int) *api.DownloadRecord {
-	return &api.DownloadRecord{
+func autoRec(provider subflux.ProviderID, release, path string, score int) *subflux.DownloadRecord {
+	return &subflux.DownloadRecord{
 		MediaType:    testMT,
 		MediaID:      testMID,
 		Language:     testLang,
@@ -55,7 +55,7 @@ func autoRec(provider api.ProviderID, release, path string, score int) *api.Down
 		ReleaseName:  release,
 		Path:         path,
 		Score:        score,
-		Meta: &api.DownloadMeta{
+		Meta: &subflux.DownloadMeta{
 			Title:     "Test Title",
 			VideoPath: "/media/test.mkv",
 			Manual:    false,
@@ -110,7 +110,7 @@ func TestSaveDownload_autoUpgradePreservesImported(t *testing.T) {
 	origImported := first[0].MediaImported
 
 	// A later upgrade with a different provider/score/release.
-	if err := db.SaveDownload(t.Context(), autoRec(api.ProviderNameSubDL, "Release.B", "/media/test.fr.srt", 95)); err != nil {
+	if err := db.SaveDownload(t.Context(), autoRec(subflux.ProviderNameSubDL, "Release.B", "/media/test.fr.srt", 95)); err != nil {
 		t.Fatalf("second SaveDownload: %v", err)
 	}
 
@@ -125,7 +125,7 @@ func TestSaveDownload_autoUpgradePreservesImported(t *testing.T) {
 	if !r.MediaImported.Equal(origImported) {
 		t.Errorf("media_imported = %v, want preserved %v", r.MediaImported, origImported)
 	}
-	if r.Score != 95 || r.Provider != api.ProviderNameSubDL || r.ReleaseName != "Release.B" {
+	if r.Score != 95 || r.Provider != subflux.ProviderNameSubDL || r.ReleaseName != "Release.B" {
 		t.Errorf("mutable fields not upgraded: %+v", r)
 	}
 }
@@ -140,7 +140,7 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 	// triple that must survive.
 	future := time.Now().Add(time.Hour)
 	putAttemptRow(t, db, testMT, testMID, testLang, testProv, attemptRec{NextRetry: future, Failures: 2})
-	putAttemptRow(t, db, testMT, testMID, testLang, api.ProviderNameSubDL, attemptRec{NextRetry: future, Failures: 1})
+	putAttemptRow(t, db, testMT, testMID, testLang, subflux.ProviderNameSubDL, attemptRec{NextRetry: future, Failures: 1})
 	putAttemptRow(t, db, testMT, "other-id", testLang, testProv, attemptRec{NextRetry: future, Failures: 1})
 
 	if err := db.SaveDownload(t.Context(), autoRec(testProv, "Release.A", "/media/test.fr.srt", 80)); err != nil {
@@ -183,8 +183,8 @@ func TestSaveDownload_clearsBackoff(t *testing.T) {
 func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 	db, _ := openTemp(t)
 
-	manualRec := func(path string, ordinal int) *api.DownloadRecord {
-		return &api.DownloadRecord{
+	manualRec := func(path string, ordinal int) *subflux.DownloadRecord {
+		return &subflux.DownloadRecord{
 			MediaType:    testMT,
 			MediaID:      testMID,
 			Language:     testLang,
@@ -192,7 +192,7 @@ func TestSaveDownload_manualAppendsWithPathOrdinal(t *testing.T) {
 			ReleaseName:  "Manual.Release",
 			Path:         path,
 			Score:        70,
-			Meta:         &api.DownloadMeta{Title: "Test", VideoPath: "/media/test.mkv", Manual: true},
+			Meta:         &subflux.DownloadMeta{Title: "Test", VideoPath: "/media/test.mkv", Manual: true},
 		}
 	}
 
@@ -248,11 +248,11 @@ func TestSaveDownload_manualDoesNotTouchAutoRow(t *testing.T) {
 	autoBefore, _ := partitionRows(readTripleRows(t, db, testMT, testMID, testLang))
 	autoID := autoBefore[0].ID
 
-	manual := &api.DownloadRecord{
+	manual := &subflux.DownloadRecord{
 		MediaType: testMT, MediaID: testMID, Language: testLang,
-		ProviderName: api.ProviderNameSubDL, ReleaseName: "Manual.Release",
+		ProviderName: subflux.ProviderNameSubDL, ReleaseName: "Manual.Release",
 		Path: "/media/test.fr.1.srt", Score: 50,
-		Meta: &api.DownloadMeta{Manual: true},
+		Meta: &subflux.DownloadMeta{Manual: true},
 	}
 	if err := db.SaveDownload(t.Context(), manual); err != nil {
 		t.Fatalf("manual SaveDownload: %v", err)

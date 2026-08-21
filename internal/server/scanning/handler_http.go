@@ -9,11 +9,20 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
+)
+
+// The error messages the arr-scoped scan endpoints answer with when the
+// corresponding arr client is nil. Unexported: this package is the only caller
+// of either, and it is where the nil check lives.
+const (
+	errMsgSonarrNotConfigured = "sonarr not configured"
+	errMsgRadarrNotConfigured = "radarr not configured"
 )
 
 // ScanGuard serializes manual scan requests. Extracted from activity.Log
@@ -65,27 +74,25 @@ func (g *ScanGuard) Release() {
 
 // ScanHandlerSonarr is the Sonarr surface the manual scan HTTP handlers call.
 type ScanHandlerSonarr interface {
-	GetSeriesByID(ctx context.Context, id int) (arrapi.Series, error)
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	SeriesByID(ctx context.Context, id int) (arrapi.Series, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // ScanHandlerRadarr is the Radarr surface the manual scan HTTP handlers call.
 type ScanHandlerRadarr interface {
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
-
-// Compile-time assertions: the arrapi-backed role clients satisfy the handler
-// surfaces.
-var (
-	_ ScanHandlerSonarr = api.SonarrClient(nil)
-	_ ScanHandlerRadarr = api.RadarrClient(nil)
-)
 
 // HandlerState holds the runtime state needed by scan HTTP handlers.
 // Provided by the server on each request via the StateFunc callback.
+//
+// There is deliberately no engine here. These handlers do preflight (resolve
+// the arr item, validate, decide the status code) and then hand off; the scan
+// itself reads the engine from LiveState, which StateFunc returns alongside
+// this from the SAME generation. An Engine field existed here and no handler
+// ever read it.
 type HandlerState struct {
-	Cfg    api.ConfigProvider
-	Engine api.SearchEngine
+	Cfg    scanHandlerCfg
 	Sonarr ScanHandlerSonarr // nil when sonarr not configured
 	Radarr ScanHandlerRadarr // nil when radarr not configured
 }
@@ -118,11 +125,13 @@ type HandlerDeps struct {
 	BGTracker BGTracker
 }
 
-// BGTracker allows the scanning handler to register background goroutines
-// with the server's WaitGroup for graceful shutdown.
+// BGTracker registers a background goroutine with the server's WaitGroup for
+// graceful-shutdown tracking. One method, because sync.WaitGroup.Go (Go 1.25)
+// launches and counts in one call: an Add/Done pair can leak a counter (an
+// early return or a panic before the defer is installed leaves the drain
+// hung), and a one-method surface makes that unrepresentable.
 type BGTracker interface {
-	Add(delta int)
-	Done()
+	Go(f func())
 }
 
 // Handler provides HTTP handlers for the /api/scan/* endpoints.
@@ -137,10 +146,10 @@ func NewHandler(deps HandlerDeps) *Handler { //nolint:gocritic // hugeParam: cal
 
 // scanItemRequest is the JSON body for POST /api/scan/item.
 type scanItemRequest struct {
-	MediaType api.MediaType `json:"media_type"` // "episode" or "movie"
-	MediaID   int           `json:"media_id"`   // Sonarr series ID or Radarr movie ID
-	Season    int           `json:"season"`     // episode only
-	Episode   int           `json:"episode"`    // episode only
+	MediaType subflux.MediaType `json:"media_type"` // "episode" or "movie"
+	MediaID   int               `json:"media_id"`   // Sonarr series ID or Radarr movie ID
+	Season    int               `json:"season"`     // episode only
+	Episode   int               `json:"episode"`    // episode only
 }
 
 // ScanAccepted is the typed 202 Accepted response for scan starts. The scan
@@ -203,17 +212,17 @@ func (h *Handler) startBackgroundScan(w http.ResponseWriter, action, detail stri
 	if existing {
 		// Same-scope scan already running or queued: return ITS id — a
 		// re-click after a lost 202 must not double-start the work.
-		api.WriteJSONStatus(w, http.StatusAccepted,
+		httpapi.WriteJSONStatus(w, http.StatusAccepted,
 			ScanAccepted{ActivityID: actID, Status: "scan already running"})
 		return
 	}
 	stopCh := make(chan struct{})
 	unregister := h.deps.Stops.RegisterStop(actID, func() { close(stopCh) })
-	h.deps.Events.PublishScanStart(action, detail, activity.SourceManual, actID)
+	h.deps.Events.PublishScanStart(&events.ScanEvent{
+		Action: action, Detail: detail, Source: activity.SourceManual, ActivityID: actID,
+	})
 
-	h.deps.BGTracker.Add(1)
-	go func() {
-		defer h.deps.BGTracker.Done()
+	h.deps.BGTracker.Go(func() {
 		// Panic fallback only: FinishScanActivity releases the registration
 		// explicitly BEFORE the terminal transition on every normal return,
 		// so a done entry never reports cancellable. The defer covers a
@@ -222,9 +231,9 @@ func (h *Handler) startBackgroundScan(w http.ResponseWriter, action, detail stri
 		defer unregister()
 		outcome := run(h.deps.CtxFunc(), stopCh, actID)
 		h.finishScan(unregister, actID, action, detail, outcome)
-	}()
+	})
 
-	api.WriteJSONStatus(w, http.StatusAccepted,
+	httpapi.WriteJSONStatus(w, http.StatusAccepted,
 		ScanAccepted{ActivityID: actID, Status: "scan started"})
 }
 
@@ -246,13 +255,13 @@ func (h *Handler) finishScan(unregister func(), actID, action, detail string, ou
 func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 	st *HandlerState, seriesID int,
 ) (arrapi.Series, bool) {
-	series, err := st.Sonarr.GetSeriesByID(r.Context(), seriesID)
+	series, err := st.Sonarr.SeriesByID(r.Context(), seriesID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
-			api.NotFoundC(w, r, api.CodeMediaNotFound, "series not found")
+			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "series not found")
 		} else {
 			slog.Error("scan: failed to fetch series", "id", seriesID, "error", err)
-			api.BadGatewayC(w, r, api.CodeArrUnreachable, "sonarr lookup failed")
+			httpapi.BadGatewayC(w, r, subflux.CodeArrUnreachable, "sonarr lookup failed")
 		}
 		return arrapi.Series{}, false
 	}
@@ -263,13 +272,13 @@ func (h *Handler) preflightSeries(w http.ResponseWriter, r *http.Request,
 func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 	st *HandlerState, movieID int,
 ) (arrapi.Movie, bool) {
-	movie, err := st.Radarr.GetMovieByID(r.Context(), movieID)
+	movie, err := st.Radarr.MovieByID(r.Context(), movieID)
 	if err != nil {
 		if arrapi.IsNotFound(err) {
-			api.NotFoundC(w, r, api.CodeMediaNotFound, "movie not found")
+			httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "movie not found")
 		} else {
 			slog.Error("scan: failed to fetch movie", "id", movieID, "error", err)
-			api.BadGatewayC(w, r, api.CodeArrUnreachable, "radarr lookup failed")
+			httpapi.BadGatewayC(w, r, subflux.CodeArrUnreachable, "radarr lookup failed")
 		}
 		return arrapi.Movie{}, false
 	}
@@ -280,23 +289,23 @@ func (h *Handler) preflightMovie(w http.ResponseWriter, r *http.Request,
 // POST /api/scan/series/{sonarrId} — 202 + activity_id at accept time.
 func (h *Handler) HandleScanSeries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	idStr := extractSegment(r.URL.Path, "/api/scan/series/")
 	if idStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing series id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing series id")
 		return
 	}
 	seriesID, err := strconv.Atoi(idStr)
 	if err != nil || seriesID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid series id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid series id")
 		return
 	}
 
 	op := h.snapshotOp()
 	if op.st.Sonarr == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, api.ErrMsgSonarrNotConfigured)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
 	series, ok := h.preflightSeries(w, r, op.st, seriesID)
@@ -318,29 +327,29 @@ func (h *Handler) HandleScanSeries(w http.ResponseWriter, r *http.Request) {
 // POST /api/scan/season/{sonarrId}/{seasonNum} — 202 + activity_id.
 func (h *Handler) HandleScanSeason(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, "/api/scan/season/")
 	seriesStr, seasonStr, ok := strings.Cut(rest, "/")
 	if !ok {
-		api.BadRequestC(w, r, api.CodeBadRequest, "expected /api/scan/season/{seriesId}/{season}")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "expected /api/scan/season/{seriesId}/{season}")
 		return
 	}
 	seriesID, err := strconv.Atoi(seriesStr)
 	if err != nil || seriesID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid series id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid series id")
 		return
 	}
 	seasonNum, err := strconv.Atoi(seasonStr)
 	if err != nil || seasonNum < 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid season number")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid season number")
 		return
 	}
 
 	op := h.snapshotOp()
 	if op.st.Sonarr == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, api.ErrMsgSonarrNotConfigured)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
 	series, ok := h.preflightSeries(w, r, op.st, seriesID)
@@ -366,22 +375,22 @@ func (h *Handler) HandleScanSeason(w http.ResponseWriter, r *http.Request) {
 // POST /api/scan/item with JSON body — 202 + activity_id.
 func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	var req scanItemRequest
-	if !httphelpers.DecodeJSONBody(w, r, &req, 0) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 0) {
 		return
 	}
 	if req.MediaID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "media_id required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "media_id required")
 		return
 	}
 	if req.MediaType == "" {
-		req.MediaType = api.MediaTypeEpisode
+		req.MediaType = subflux.MediaTypeEpisode
 	}
 	if !req.MediaType.Valid() {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid media_type")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid media_type")
 		return
 	}
 
@@ -389,9 +398,9 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 		"media_type", req.MediaType, "media_id", req.MediaID)
 
 	op := h.snapshotOp()
-	if req.MediaType == api.MediaTypeMovie {
+	if req.MediaType == subflux.MediaTypeMovie {
 		if op.st.Radarr == nil {
-			api.BadRequestC(w, r, api.CodeBadRequest, api.ErrMsgRadarrNotConfigured)
+			httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgRadarrNotConfigured)
 			return
 		}
 		movie, ok := h.preflightMovie(w, r, op.st, req.MediaID)
@@ -400,7 +409,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 		}
 		h.startBackgroundScan(w, "Movie Search",
 			fmt.Sprintf("%s (%d)", movie.Title, movie.Year),
-			activity.ScanScope{Kind: activity.ScanKindItem, MediaType: api.MediaTypeMovie, MediaID: req.MediaID},
+			activity.ScanScope{Kind: activity.ScanKindItem, MediaType: subflux.MediaTypeMovie, MediaID: req.MediaID},
 			func(ctx context.Context, stop <-chan struct{}, actID string) activity.Outcome {
 				return h.runMovieScan(ctx, stop, actID, op, &movie)
 			})
@@ -408,7 +417,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if op.st.Sonarr == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, api.ErrMsgSonarrNotConfigured)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgSonarrNotConfigured)
 		return
 	}
 	series, ok := h.preflightSeries(w, r, op.st, req.MediaID)
@@ -419,7 +428,7 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 	h.startBackgroundScan(w, "Episode Search",
 		fmt.Sprintf("%s S%02dE%02d", series.Title, season, episode),
 		activity.ScanScope{
-			Kind: activity.ScanKindItem, MediaType: api.MediaTypeEpisode,
+			Kind: activity.ScanKindItem, MediaType: subflux.MediaTypeEpisode,
 			MediaID: req.MediaID, Season: season, Episode: episode,
 		},
 		func(ctx context.Context, stop <-chan struct{}, actID string) activity.Outcome {
@@ -431,23 +440,23 @@ func (h *Handler) HandleScanItem(w http.ResponseWriter, r *http.Request) {
 // POST /api/scan/movie/{radarrId} — 202 + activity_id.
 func (h *Handler) HandleScanMovie(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	idStr := extractSegment(r.URL.Path, "/api/scan/movie/")
 	if idStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing movie id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing movie id")
 		return
 	}
 	movieID, err := strconv.Atoi(idStr)
 	if err != nil || movieID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid movie id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid movie id")
 		return
 	}
 
 	op := h.snapshotOp()
 	if op.st.Radarr == nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, api.ErrMsgRadarrNotConfigured)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, errMsgRadarrNotConfigured)
 		return
 	}
 	movie, ok := h.preflightMovie(w, r, op.st, movieID)

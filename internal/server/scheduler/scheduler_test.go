@@ -2,17 +2,17 @@ package scheduler_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/scheduler"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -21,12 +21,10 @@ import (
 type fakeStore struct {
 	*testsupport.NopStore
 	reconcileErr error
-	reconcile    api.ReconcileResult
+	reconcile    subflux.ReconcileResult
 }
 
-var _ api.Store = (*fakeStore)(nil)
-
-func (f *fakeStore) ReconcileState(context.Context) (api.ReconcileResult, error) {
+func (f *fakeStore) ReconcileState(context.Context) (subflux.ReconcileResult, error) {
 	return f.reconcile, f.reconcileErr
 }
 
@@ -46,8 +44,8 @@ func (f *fakeReconcileMetrics) RecordReconcile(deleted int, reset int64, _ time.
 func TestRunDBMaintenance_forwardsReconciledDeletionsAndMetrics(t *testing.T) {
 	store := &fakeStore{
 		NopStore: &testsupport.NopStore{},
-		reconcile: api.ReconcileResult{
-			Deleted:    api.CleanupResult{Paths: []string{"/m/a.fr.srt", "/m/b.en.srt"}},
+		reconcile: subflux.ReconcileResult{
+			Deleted:    subflux.CleanupResult{Paths: []string{"/m/a.fr.srt", "/m/b.en.srt"}},
 			ResetCount: 3,
 		},
 	}
@@ -78,26 +76,42 @@ func TestRunDBMaintenance_forwardsReconciledDeletionsAndMetrics(t *testing.T) {
 	}
 }
 
-func TestRunDBMaintenance_diskFullReconcileError_raisesPersistentAlert(t *testing.T) {
-	// os.ErrPermission is classified as a disk/IO failure by IsDiskFullError,
-	// which must escalate to a persistent operator alert instead of a quiet log.
+func TestRunDBMaintenance_reconcileError_escalatesToStoreWriteRecorder(t *testing.T) {
+	// The scheduler does not classify the error itself — the composition root
+	// owns that (it needs the storage engine). What RunDBMaintenance owes is
+	// the hand-off: a failed reconcile must reach the injected recorder.
 	store := &fakeStore{NopStore: &testsupport.NopStore{}, reconcileErr: os.ErrPermission}
-	al := activity.NewAlertLog(10)
+	var got []error
 	deps := &scheduler.Deps{
-		DB:                  store,
-		Alerts:              &serveradapter.AlertAdapter{A: al},
-		DeleteSubtitleFiles: func([]string, string) {},
+		DB:                    store,
+		RecordStoreWriteError: func(err error) { got = append(got, err) },
+		DeleteSubtitleFiles:   func([]string, string) {},
 		// ReconcileMetrics left nil: also exercises the nil-safe metrics path.
 	}
 
 	scheduler.RunDBMaintenance(t.Context(), deps)
 
-	visible := al.VisibleAlerts()
-	if len(visible) != 1 {
-		t.Fatalf("got %d visible alerts, want exactly 1 persistent store alert", len(visible))
+	if len(got) != 1 {
+		t.Fatalf("recorder called %d times, want exactly 1", len(got))
 	}
-	if visible[0].Kind != activity.AlertPersistent || visible[0].Source != "store" {
-		t.Errorf("alert = {kind:%q source:%q}, want {persistent store}", visible[0].Kind, visible[0].Source)
+	if !errors.Is(got[0], os.ErrPermission) {
+		t.Errorf("recorder got %v, want the reconcile error %v", got[0], os.ErrPermission)
+	}
+}
+
+func TestRunDBMaintenance_successfulReconcile_doesNotEscalate(t *testing.T) {
+	store := &fakeStore{NopStore: &testsupport.NopStore{}}
+	called := false
+	deps := &scheduler.Deps{
+		DB:                    store,
+		RecordStoreWriteError: func(error) { called = true },
+		DeleteSubtitleFiles:   func([]string, string) {},
+	}
+
+	scheduler.RunDBMaintenance(t.Context(), deps)
+
+	if called {
+		t.Error("a clean reconcile escalated to the store-write recorder")
 	}
 }
 
@@ -136,12 +150,12 @@ func prepDeps(log *activity.Log, stops *activity.StopRegistry, bus *events.Event
 		DB:       &fakeStore{NopStore: &testsupport.NopStore{}},
 		ScanDB:   &testsupport.NopStore{},
 		Metrics:  nopMetrics{},
-		Events:   &serveradapter.ScanEventAdapter{E: bus},
-		Activity: &serveradapter.ActivityAdapter{A: log},
-		Alerts:   &serveradapter.AlertAdapter{A: activity.NewAlertLog(10)},
+		Events:   bus,
+		Activity: log,
+		Alerts:   activity.NewAlertLog(10),
 		Stops:    stops,
 		StateFunc: func() *scheduler.LiveState {
-			return &scheduler.LiveState{Cfg: &testsupport.NopConfig{}}
+			return &scheduler.LiveState{Cfg: &fakeScanCfg{}}
 		},
 		ScanningFlag:        &flag,
 		DeleteSubtitleFiles: func([]string, string) {},

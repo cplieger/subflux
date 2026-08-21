@@ -24,7 +24,7 @@ type correlationResult struct {
 	Peak         float64 // normalized correlation peak (0.0 to 1.0)
 }
 
-// CrossCorrelateEdges correlates two float64 signals (typically GMM VAD
+// crossCorrelateEdges correlates two float64 signals (typically GMM VAD
 // speech probability or energy envelope values) using FFT-based convolution
 // to find the offset that maximizes alignment. Input signals are expected
 // to already be in bipolar form (centered around zero) so that mismatches

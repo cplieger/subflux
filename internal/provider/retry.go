@@ -3,13 +3,14 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/search/release"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // DownloadRetryAttempts is the maximum number of download attempts per provider.
@@ -27,14 +28,14 @@ const maxRetryBackoff = 30 * time.Second
 // is not retried because the scan engine already handles partial results
 // and per-provider timeouts.
 type retryProvider struct {
-	inner       api.Provider
+	inner       Provider
 	maxAttempts int
 	initBackoff time.Duration
 }
 
 // WrapRetryAll wraps each provider with download retry logic.
-func WrapRetryAll(providers []api.Provider, maxAttempts int, initBackoff time.Duration) []api.Provider {
-	wrapped := make([]api.Provider, len(providers))
+func WrapRetryAll(providers []Provider, maxAttempts int, initBackoff time.Duration) []Provider {
+	wrapped := make([]Provider, len(providers))
 	for i, p := range providers {
 		wrapped[i] = WrapRetry(p, maxAttempts, initBackoff)
 	}
@@ -44,22 +45,22 @@ func WrapRetryAll(providers []api.Provider, maxAttempts int, initBackoff time.Du
 // WrapRetry wraps a provider with download retry logic.
 // If the inner provider implements ShowSubtitleCounter, the wrapper
 // preserves that interface.
-func WrapRetry(p api.Provider, maxAttempts int, initBackoff time.Duration) api.Provider {
+func WrapRetry(p Provider, maxAttempts int, initBackoff time.Duration) Provider {
 	rp := &retryProvider{inner: p, maxAttempts: maxAttempts, initBackoff: initBackoff}
-	if c, ok := p.(api.ShowSubtitleCounter); ok {
+	if c, ok := p.(ShowSubtitleCounter); ok {
 		return &retryCounterProvider{retryProvider: rp, counter: c}
 	}
 	return rp
 }
 
-func (r *retryProvider) Name() api.ProviderID { return r.inner.Name() }
+func (r *retryProvider) Name() subflux.ProviderID { return r.inner.Name() }
 
 // Search delegates to the inner provider and clamps each result's
 // ReleaseName to release.MaxNameLen. Both composition roots wrap every
 // provider with WrapRetryAll, making this the provider boundary where the
 // release-parsing layer's documented input bound is enforced on untrusted
 // provider responses (release package doc, "Input bound").
-func (r *retryProvider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (r *retryProvider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	subs, err := r.inner.Search(ctx, req)
 	for i := range subs {
 		subs[i].ReleaseName = release.ClampName(subs[i].ReleaseName)
@@ -67,7 +68,7 @@ func (r *retryProvider) Search(ctx context.Context, req *api.SearchRequest) ([]a
 	return subs, err
 }
 
-func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (r *retryProvider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	if r.maxAttempts <= 0 {
 		return r.inner.Download(ctx, sub)
 	}
@@ -85,7 +86,7 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 			}
 			return data, nil
 		}
-		if !httputil.IsTransient(err) {
+		if !httpwire.IsTransient(err) {
 			slog.Debug("download error is not transient, not retrying",
 				"provider", r.inner.Name(), "error", err)
 			return nil, err
@@ -104,9 +105,10 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 		backoff = httpx.SafeDouble(backoff)
 		backoff = min(backoff, maxRetryBackoff)
 	}
-	slog.Error("download failed after all attempts",
-		"provider", r.inner.Name(), "attempts", r.maxAttempts, "error", lastErr)
-	return nil, lastErr
+	// The report belongs to the caller: downloadBestCandidate logs this and
+	// tries the NEXT candidate, so an exhausted provider is often a step in a
+	// recovery. The attempt count it cannot reconstruct rides the error.
+	return nil, fmt.Errorf("after %d attempts: %w", r.maxAttempts, lastErr)
 }
 
 // retryCounterProvider extends retryProvider for providers that also
@@ -114,17 +116,17 @@ func (r *retryProvider) Download(ctx context.Context, sub *api.Subtitle) ([]byte
 type retryCounterProvider struct {
 	*retryProvider
 
-	counter api.ShowSubtitleCounter
+	counter ShowSubtitleCounter
 }
 
 // CountShowSubtitles delegates to the inner provider without retry.
-func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, imdbID, lang string) (int, error) {
-	return r.counter.CountShowSubtitles(ctx, imdbID, lang)
+func (r *retryCounterProvider) CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error) {
+	return r.counter.CountShowSubtitles(ctx, q)
 }
 
-// ClearCache forwards to the inner provider if it implements api.CacheClearer.
+// ClearCache forwards to the inner provider if it implements CacheClearer.
 func (r *retryProvider) ClearCache() {
-	if cc, ok := r.inner.(api.CacheClearer); ok {
+	if cc, ok := r.inner.(CacheClearer); ok {
 		cc.ClearCache()
 	}
 }

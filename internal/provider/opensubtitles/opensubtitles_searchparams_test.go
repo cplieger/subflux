@@ -3,7 +3,7 @@ package opensubtitles
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Search Parameter Building ---
@@ -12,7 +12,7 @@ func TestBuildSearchParams(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		req       *api.SearchRequest
+		req       *subflux.SearchRequest
 		name      string
 		wantKey   string
 		wantValue string
@@ -22,20 +22,20 @@ func TestBuildSearchParams(t *testing.T) {
 	}{
 		{
 			name:      "languages sorted and mapped",
-			req:       &api.SearchRequest{Languages: []string{"zh", "en", "pt"}},
+			req:       &subflux.SearchRequest{Languages: []string{"zh", "en", "pt"}},
 			wantKey:   "languages",
 			wantValue: "en,pt-PT,zh-CN",
 		},
 		{
 			name:      "single language",
-			req:       &api.SearchRequest{Languages: []string{"fr"}},
+			req:       &subflux.SearchRequest{Languages: []string{"fr"}},
 			wantKey:   "languages",
 			wantValue: "fr",
 		},
 		{
 			name:    "hash included when enabled and present",
 			useHash: true,
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				VideoHash: "abc123",
 			},
@@ -45,7 +45,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:    "hash omitted when disabled",
 			useHash: false,
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				VideoHash: "abc123",
 			},
@@ -55,7 +55,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:    "hash omitted when empty despite enabled",
 			useHash: true,
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				VideoHash: "",
 			},
@@ -64,7 +64,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "imdb_id sanitized",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				ImdbID:    "tt1234567",
 			},
@@ -73,7 +73,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "episode params set for episodes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				Season:    2,
@@ -84,7 +84,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "season params set for episodes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				Season:    3,
@@ -95,7 +95,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "episode params omitted for movies",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "movie",
 				Season:    1,
@@ -106,7 +106,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "season params omitted for movies",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "movie",
 				Season:    1,
@@ -117,7 +117,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "zero episode omitted",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				Season:    1,
@@ -128,7 +128,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "zero season omitted",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				Season:    0,
@@ -140,40 +140,40 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:      "ai_translated excluded by default",
 			includeAI: false,
-			req:       &api.SearchRequest{Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Languages: []string{"en"}},
 			wantKey:   "ai_translated",
 			wantValue: "exclude",
 		},
 		{
 			name:      "ai_translated not excluded when included",
 			includeAI: true,
-			req:       &api.SearchRequest{Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Languages: []string{"en"}},
 			wantKey:   "ai_translated",
 			wantValue: "", // absent
 		},
 		{
 			name:      "machine_translated absent by default",
 			includeMT: false,
-			req:       &api.SearchRequest{Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Languages: []string{"en"}},
 			wantKey:   "machine_translated",
 			wantValue: "", // absent: the API withholds them unless asked
 		},
 		{
 			name:      "machine_translated requested when included",
 			includeMT: true,
-			req:       &api.SearchRequest{Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Languages: []string{"en"}},
 			wantKey:   "machine_translated",
 			wantValue: "include",
 		},
 		{
 			name:      "empty languages",
-			req:       &api.SearchRequest{},
+			req:       &subflux.SearchRequest{},
 			wantKey:   "languages",
 			wantValue: "",
 		},
 		{
 			name: "imdb_id numeric passthrough",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				ImdbID:    "1234567",
 			},
@@ -182,7 +182,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "imdb_id omitted when empty",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				ImdbID:    "",
 			},
@@ -191,7 +191,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "imdb_id with leading zeros stripped",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				ImdbID:    "tt0012345",
 			},
@@ -200,7 +200,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "tmdb_id preferred for movies",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "movie",
 				TmdbID:    550,
@@ -211,7 +211,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "tmdb_id omitted for episodes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				TmdbID:    550,
@@ -224,7 +224,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "parent_imdb_id used for episodes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				ImdbID:    "tt5923028",
@@ -236,7 +236,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "imdb_id absent for episodes",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "episode",
 				ImdbID:    "tt5923028",
@@ -248,7 +248,7 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name: "imdb_id fallback when tmdb_id zero for movie",
-			req: &api.SearchRequest{
+			req: &subflux.SearchRequest{
 				Languages: []string{"en"},
 				MediaType: "movie",
 				ImdbID:    "tt0137523",
@@ -258,12 +258,12 @@ func TestBuildSearchParams(t *testing.T) {
 		},
 		{
 			name:    "no tmdb_id when both tmdb and imdb empty for movie",
-			req:     &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"},
+			req:     &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"},
 			wantKey: "tmdb_id",
 		},
 		{
 			name:    "no imdb_id when both tmdb and imdb empty for movie",
-			req:     &api.SearchRequest{Languages: []string{"en"}, MediaType: "movie"},
+			req:     &subflux.SearchRequest{Languages: []string{"en"}, MediaType: "movie"},
 			wantKey: "imdb_id",
 		},
 	}
@@ -293,7 +293,7 @@ func TestBuildQueryParams(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		req       *api.SearchRequest
+		req       *subflux.SearchRequest
 		name      string
 		wantKey   string
 		wantValue string
@@ -304,19 +304,19 @@ func TestBuildQueryParams(t *testing.T) {
 	}{
 		{
 			name:      "title set as query",
-			req:       &api.SearchRequest{Title: "Breaking Bad", Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Title: "Breaking Bad", Languages: []string{"en"}},
 			wantKey:   "query",
 			wantValue: "Breaking Bad",
 		},
 		{
 			name:      "languages sorted and mapped",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"zh", "en", "pt"}},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"zh", "en", "pt"}},
 			wantKey:   "languages",
 			wantValue: "en,pt-PT,zh-CN",
 		},
 		{
 			name:      "episode params set",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
 			season:    3,
 			episode:   7,
 			wantKey:   "episode_number",
@@ -324,7 +324,7 @@ func TestBuildQueryParams(t *testing.T) {
 		},
 		{
 			name:      "season params set",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
 			season:    3,
 			episode:   7,
 			wantKey:   "season_number",
@@ -332,7 +332,7 @@ func TestBuildQueryParams(t *testing.T) {
 		},
 		{
 			name:      "episode params omitted for movies",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "movie"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "movie"},
 			season:    1,
 			episode:   1,
 			wantKey:   "episode_number",
@@ -340,7 +340,7 @@ func TestBuildQueryParams(t *testing.T) {
 		},
 		{
 			name:      "zero episode omitted",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
 			season:    1,
 			episode:   0,
 			wantKey:   "episode_number",
@@ -348,7 +348,7 @@ func TestBuildQueryParams(t *testing.T) {
 		},
 		{
 			name:      "zero season omitted",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, MediaType: "episode"},
 			season:    0,
 			episode:   1,
 			wantKey:   "season_number",
@@ -356,34 +356,34 @@ func TestBuildQueryParams(t *testing.T) {
 		},
 		{
 			name:      "ai_translated excluded by default",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}},
 			includeAI: false,
 			wantKey:   "ai_translated",
 			wantValue: "exclude",
 		},
 		{
 			name:      "ai_translated not excluded when included",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}},
 			includeAI: true,
 			wantKey:   "ai_translated",
 			wantValue: "",
 		},
 		{
 			name:      "machine_translated requested when included",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}},
 			includeMT: true,
 			wantKey:   "machine_translated",
 			wantValue: "include",
 		},
 		{
 			name:      "no imdb_id or tmdb_id in query params",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, ImdbID: "tt1234567", TmdbID: 550},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, ImdbID: "tt1234567", TmdbID: 550},
 			wantKey:   "imdb_id",
 			wantValue: "",
 		},
 		{
 			name:      "no moviehash in query params",
-			req:       &api.SearchRequest{Title: "test", Languages: []string{"en"}, VideoHash: "abc123"},
+			req:       &subflux.SearchRequest{Title: "test", Languages: []string{"en"}, VideoHash: "abc123"},
 			wantKey:   "moviehash",
 			wantValue: "",
 		},
@@ -461,9 +461,9 @@ func TestBuildSearchParams_skips_empty_sanitized_imdb(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p := &Provider{}
-			req := &api.SearchRequest{
+			req := &subflux.SearchRequest{
 				ImdbID:    tt.imdb,
-				MediaType: api.MediaType(tt.mediaType),
+				MediaType: subflux.MediaType(tt.mediaType),
 				Languages: []string{"en"},
 			}
 			params := p.buildSearchParams(req, 1, 1)
@@ -478,7 +478,7 @@ func TestBuildSearchParams_skips_empty_sanitized_imdb(t *testing.T) {
 func TestBuildSearchParams_episode_with_valid_imdb_sets_parent(t *testing.T) {
 	t.Parallel()
 	p := &Provider{}
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		ImdbID:    "tt1234567",
 		MediaType: "episode",
 		Languages: []string{"en"},

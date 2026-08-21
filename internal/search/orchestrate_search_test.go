@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- SearchTargets ---
@@ -17,14 +18,14 @@ import (
 func TestSearchTargets_manually_locked_skips(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{manualLocked: true}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -39,21 +40,21 @@ func TestSearchTargets_adaptive_backoff_skips(t *testing.T) {
 	t.Parallel()
 	backedStore := &mockStoreWithBackoff{
 		mockStore: mockStore{},
-		backedOff: []api.ProviderID{"test"},
+		backedOff: []subflux.ProviderID{"test"},
 	}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, backedStore, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -71,17 +72,17 @@ func TestSearchTargets_no_results_records_failure(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -102,25 +103,25 @@ func TestSearchTargets_success_downloads_and_saves(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -144,13 +145,13 @@ func TestSearchTargets_hi_fallback(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			// Only HI subs available, no regular.
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
@@ -159,14 +160,14 @@ func TestSearchTargets_hi_fallback(t *testing.T) {
 		},
 		data: subData,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -181,13 +182,13 @@ func TestSearchTargets_forced_subs_filtered_out(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		searchCfg:   subflux.SearchConfig{},
 		minScore:    0,
 	}
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			// Only forced subs - should be filtered out.
 			{
 				Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb",
@@ -195,14 +196,14 @@ func TestSearchTargets_forced_subs_filtered_out(t *testing.T) {
 			},
 		},
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -220,24 +221,24 @@ func TestSearchTargets_below_min_score(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		searchCfg:   subflux.SearchConfig{},
 		minScore:    9999,
 	}
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "title"},
 		},
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -253,12 +254,12 @@ func TestSearchTargets_below_min_score(t *testing.T) {
 func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	metrics := &mockMetrics{}
 
 	goodProv := &mockProvider{
 		name: "good",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "good", ReleaseName: "Movie-GRP"},
 		},
 	}
@@ -266,15 +267,15 @@ func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 		name:      "bad",
 		searchErr: errors.New("provider error"),
 	}
-	e := newEngine([]api.Provider{goodProv, badProv}, ms, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{goodProv, badProv}, ms, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		Languages: []string{"fr"},
 	}
 
 	outcome := e.searchProvidersFiltered(t.Context(), req,
-		[]api.Provider{goodProv, badProv})
+		[]provider.Provider{goodProv, badProv})
 
 	if len(outcome.results) != 1 {
 		t.Errorf("searchProvidersFiltered() returned %d results, want 1", len(outcome.results))
@@ -292,20 +293,20 @@ func TestSearchProvidersFiltered_error_handling(t *testing.T) {
 
 func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	metrics := &mockMetrics{}
 
 	bad1 := &mockProvider{name: "bad1", searchErr: errors.New("timeout")}
 	bad2 := &mockProvider{name: "bad2", searchErr: errors.New("connection refused")}
-	e := newEngine([]api.Provider{bad1, bad2}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{bad1, bad2}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		Languages: []string{"fr"},
 	}
 
 	outcome := e.searchProvidersFiltered(t.Context(), req,
-		[]api.Provider{bad1, bad2})
+		[]provider.Provider{bad1, bad2})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0", len(outcome.results))
@@ -323,10 +324,10 @@ func TestSearchProvidersFiltered_all_failed(t *testing.T) {
 func TestTargetLocked_manual_lock_true(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{manualLocked: true}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", subflux.VariantStandard) {
 		t.Error("targetLocked() = false for locked quad, want true")
 	}
 }
@@ -334,10 +335,10 @@ func TestTargetLocked_manual_lock_true(t *testing.T) {
 func TestTargetLocked_not_locked_false(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{manualLocked: false}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	if e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", subflux.VariantStandard) {
 		t.Error("targetLocked() = true, want false (not locked)")
 	}
 }
@@ -347,10 +348,10 @@ func TestTargetLocked_not_locked_false(t *testing.T) {
 func TestTargetLocked_store_error_fails_closed(t *testing.T) {
 	t.Parallel()
 	ms := &mockStoreLockErr{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", api.VariantStandard) {
+	if !e.targetLocked(t.Context(), "movie", "tt123", "Test", "fr", subflux.VariantStandard) {
 		t.Error("targetLocked() = false on store error, want true (fail closed)")
 	}
 }
@@ -361,21 +362,21 @@ func TestFilterBackedOff_removes_backed_off_providers(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	metrics := &mockMetrics{}
 	// Use a mock store that returns "prov1" as backed off.
 	backedStore := &mockStoreWithBackoff{
 		mockStore: *ms,
-		backedOff: []api.ProviderID{"prov1"},
+		backedOff: []subflux.ProviderID{"prov1"},
 	}
-	e := newEngine(nil, backedStore, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, backedStore, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
 	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
-		[]api.Provider{prov1, prov2})
+		[]provider.Provider{prov1, prov2})
 
 	if len(result) != 1 {
 		t.Fatalf("filterBackedOff() returned %d providers, want 1", len(result))
@@ -403,24 +404,24 @@ func TestSearchTargets_existing_regular_subtitle_skips(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb"},
 		},
 		data: []byte("new subtitle"),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -436,24 +437,24 @@ func TestSearchTargets_download_failure_continues(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  0,
 	}
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		downloadErr: errors.New("network error"),
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -471,13 +472,13 @@ func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", searchErr: errors.New("api down")}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -498,15 +499,15 @@ func TestSearchTargets_partial_failure_records_for_succeeded_only(t *testing.T) 
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	good := &mockProvider{name: "good", results: nil} // succeeds with no results
 	bad := &mockProvider{name: "bad", searchErr: errors.New("api down")}
-	e := newEngine([]api.Provider{good, bad}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{good, bad}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -530,29 +531,29 @@ func TestSearchTargets_exact_min_score_is_accepted(t *testing.T) {
 	subData := []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n")
 	p := &mockProvider{
 		name: "test",
-		results: []api.Subtitle{
+		results: []subflux.Subtitle{
 			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"},
 		},
 		data: subData,
 	}
 
 	// Score the result to find the exact score, then set minScore to match.
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType:   "movie",
 		ImdbID:      "tt123",
 		ReleaseName: "Movie-GRP",
 	}
 	video := videoInfoFromRequest(req)
-	scored := scoreResults(scorer.New(&api.DefaultScores), &video, p.results, noPriority)
+	scored := scoreResults(scorer.New(&subflux.DefaultScores), &video, p.results, noPriority)
 	exactScore := scored[0].score
 
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 		minScore:  exactScore,
 	}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
@@ -566,18 +567,18 @@ func TestSearchTargets_context_cancelled_returns_error(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately.
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}, {Code: "en"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}, {Code: "en"}}
 
 	_, err := e.SearchTargets(ctx, req, "", targets)
 	if err == nil {
@@ -591,16 +592,16 @@ func TestSearchTargets_context_cancelled_returns_error(t *testing.T) {
 func TestFilterBackedOff_query_error_returns_all_providers(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	errStore := &mockStoreWithBackoffError{}
-	e := newEngine(nil, errStore, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, errStore, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
 	prov2 := &mockProvider{name: "prov2"}
 	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr",
-		[]api.Provider{prov1, prov2})
+		[]provider.Provider{prov1, prov2})
 
 	if len(result) != 2 {
 		t.Errorf("filterBackedOff() returned %d providers, want 2 (error fallback)", len(result))
@@ -610,13 +611,13 @@ func TestFilterBackedOff_query_error_returns_all_providers(t *testing.T) {
 func TestFilterBackedOff_adaptive_disabled_returns_all(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: false},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: false},
+		searchCfg:   subflux.SearchConfig{},
 	}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []provider.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (disabled)", len(result))
@@ -626,14 +627,14 @@ func TestFilterBackedOff_adaptive_disabled_returns_all(t *testing.T) {
 func TestFilterBackedOff_no_backed_off_returns_all(t *testing.T) {
 	t.Parallel()
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true, MaxAttempts: 5},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	// mockStore.BackedOffProviders returns nil, nil by default.
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	prov1 := &mockProvider{name: "prov1"}
-	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []api.Provider{prov1})
+	result := e.filterBackedOff(t.Context(), "movie", "tt123", "fr", []provider.Provider{prov1})
 
 	if len(result) != 1 {
 		t.Errorf("filterBackedOff() returned %d providers, want 1 (none backed off)", len(result))
@@ -644,15 +645,15 @@ func TestFilterBackedOff_no_backed_off_returns_all(t *testing.T) {
 
 func TestSearchProvidersFiltered_records_timeout_on_failure(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{
 		ProviderTimeout: time.Hour,
 	}}
 	metrics := &mockMetrics{}
 	bad := &mockProvider{name: "bad", searchErr: errors.New("timeout")}
-	e := newEngine([]api.Provider{bad}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{bad}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{bad})
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{bad})
 
 	if errored := outcome.errored(); len(errored) != 1 {
 		t.Errorf("errored = %v, want 1 entry", errored)
@@ -670,20 +671,20 @@ func TestSearchProvidersFiltered_records_timeout_on_failure(t *testing.T) {
 
 func TestSearchProvidersFiltered_records_success_clears_timeout(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{
 		ProviderTimeout: time.Hour,
 	}}
-	good := &mockProvider{name: "good", results: []api.Subtitle{
+	good := &mockProvider{name: "good", results: []subflux.Subtitle{
 		{Provider: "good", ReleaseName: "Movie-GRP"},
 	}}
-	e := newEngine([]api.Provider{good}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{good}, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	// Pre-record some failures.
 	e.timeout.RecordFailure("good", nil)
 	e.timeout.RecordFailure("good", nil)
 
-	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{good})
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{good})
 
 	if len(outcome.succeeded()) != 1 {
 		t.Errorf("succeeded = %v, want 1 entry", outcome.succeeded())
@@ -697,21 +698,21 @@ func TestSearchProvidersFiltered_records_success_clears_timeout(t *testing.T) {
 
 func TestSearchProvidersFiltered_skips_timed_out_provider(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{
 		ProviderTimeout: time.Hour,
 	}}
-	p := &mockProvider{name: "timed-out", results: []api.Subtitle{
+	p := &mockProvider{name: "timed-out", results: []subflux.Subtitle{
 		{Provider: "timed-out", ReleaseName: "Movie-GRP"},
 	}}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 	// Trip the provider timeout (threshold=5).
 	for range 5 {
 		e.timeout.RecordFailure("timed-out", nil)
 	}
 
-	req := &api.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
-	outcome := e.searchProvidersFiltered(t.Context(), req, []api.Provider{p})
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
+	outcome := e.searchProvidersFiltered(t.Context(), req, []provider.Provider{p})
 
 	if len(outcome.results) != 0 {
 		t.Errorf("results = %d, want 0 (provider timed out)", len(outcome.results))
@@ -739,17 +740,17 @@ func TestSearchTargets_computes_video_hash_when_empty(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 		// VideoHash intentionally empty — should be computed.
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	_, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
@@ -767,18 +768,18 @@ func TestSearchTargets_skips_hash_when_already_set(t *testing.T) {
 	t.Parallel()
 	ms := &mockStore{}
 	mc := &mockConfig{
-		searchCfg: api.SearchConfig{},
+		searchCfg: subflux.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{
+	req := &subflux.SearchRequest{
 		MediaType: "movie",
 		ImdbID:    "tt123",
 		VideoHash: "prehashed",
 		VideoSize: 12345,
 	}
-	targets := []api.SubtitleTarget{{Code: "fr"}}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 	_, err := e.SearchTargets(t.Context(), req, "", targets)
 	if err != nil {
@@ -804,29 +805,29 @@ func TestSearchTargets_counts_searched_and_skipped(t *testing.T) {
 
 	ms := &mockStore{}
 	mc := &mockConfig{
-		adaptiveCfg: api.AdaptiveConfig{Enabled: true},
-		searchCfg:   api.SearchConfig{},
+		adaptiveCfg: subflux.AdaptiveConfig{Enabled: true},
+		searchCfg:   subflux.SearchConfig{},
 	}
 	p := &mockProvider{name: "test", results: nil}
-	e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	req := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
-	targets := []api.SubtitleTarget{{Code: "fr"}, {Code: "en"}}
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123"}
+	targets := []subflux.SubtitleTarget{{Code: "fr"}, {Code: "en"}}
 
 	result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 	if err != nil {
 		t.Fatalf("SearchTargets() unexpected error: %v", err)
 	}
 	// "fr" should be skipped (existing sub), "en" should be searched.
-	kinds := map[string]api.LangOutcomeKind{}
+	kinds := map[string]subflux.LangOutcomeKind{}
 	for _, o := range result.Langs {
 		kinds[o.Lang] = o.Kind
 	}
-	if kinds["fr"] != api.LangSkipped {
-		t.Errorf("fr outcome = %v, want %v", kinds["fr"], api.LangSkipped)
+	if kinds["fr"] != subflux.LangSkipped {
+		t.Errorf("fr outcome = %v, want %v", kinds["fr"], subflux.LangSkipped)
 	}
-	if kinds["en"] != api.LangSearched {
-		t.Errorf("en outcome = %v, want %v", kinds["en"], api.LangSearched)
+	if kinds["en"] != subflux.LangSearched {
+		t.Errorf("en outcome = %v, want %v", kinds["en"], subflux.LangSearched)
 	}
 	if got := result.TargetsSearched(); got != 1 {
 		t.Errorf("SearchTargets().TargetsSearched() = %d, want 1", got)

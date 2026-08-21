@@ -68,7 +68,7 @@ func TestIntegration_ConstantOffset(t *testing.T) {
 			result := SyncWithOptions(t.Context(), ref, shifted, &opts)
 
 			if !result.Applied() {
-				t.Fatalf("sync not applied for offset %v", offset)
+				t.Errorf("sync not applied for offset %v", offset)
 			}
 
 			residual := maxResidualMs(ref, result.Cues)
@@ -157,7 +157,7 @@ func TestIntegration_SplitAlignment(t *testing.T) {
 	result := alignWithSplits(t.Context(), ref, modified, 0)
 
 	if result.Confidence <= ConfidenceNone {
-		t.Fatalf("split alignment failed: confidence=%.2f", float64(result.Confidence))
+		t.Errorf("split alignment failed: confidence=%.2f", float64(result.Confidence))
 	}
 	if result.Method != MethodSplit {
 		t.Errorf("method=%s, want %s", result.Method, MethodSplit)
@@ -186,7 +186,7 @@ func TestIntegration_MultiStrategy_PicksBest(t *testing.T) {
 	result := SyncWithOptions(t.Context(), ref, shifted, &opts)
 
 	if !result.Applied() {
-		t.Fatal("multi-strategy sync not applied")
+		t.Error("multi-strategy sync not applied")
 	}
 	residual := maxResidualMs(ref, result.Cues)
 	if residual > 50 {

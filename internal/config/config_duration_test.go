@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/config/defaults"
 	"pgregory.net/rapid"
 )
 
@@ -221,8 +220,8 @@ search:
 	if cfg.AdaptiveCfg.MaxDelay.D != 3*730*time.Hour {
 		t.Errorf("MaxDelay = %v, want 2190h", cfg.AdaptiveCfg.MaxDelay.D)
 	}
-	if cfg.SearchCfg.ProviderTimeout.D != 2*time.Hour {
-		t.Errorf("ProviderTimeout = %v, want 2h", cfg.SearchCfg.ProviderTimeout.D)
+	if cfg.Cfg.ProviderTimeout.D != 2*time.Hour {
+		t.Errorf("ProviderTimeout = %v, want 2h", cfg.Cfg.ProviderTimeout.D)
 	}
 }
 
@@ -263,34 +262,6 @@ func TestParseDuration_table(t *testing.T) {
 			}
 		})
 	}
-}
-
-// --- FormatDuration/ParseDuration round-trip property ---
-
-func TestFormatDuration_ParseDuration_roundtrip(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		// Generate durations that are exact multiples of their unit so
-		// FormatDuration produces a clean representation.
-		unit := rapid.SampledFrom([]time.Duration{
-			time.Second,
-			time.Minute,
-			time.Hour,
-			24 * time.Hour,  // day
-			730 * time.Hour, // month
-		}).Draw(t, "unit")
-		n := rapid.IntRange(1, 500).Draw(t, "n")
-		d := time.Duration(n) * unit
-
-		formatted := defaults.FormatDuration(d)
-		parsed, err := ParseDuration(formatted)
-		if err != nil {
-			t.Fatalf("ParseDuration(%q) error: %v (original: %v)", formatted, err, d)
-		}
-		if parsed != d {
-			t.Fatalf("round-trip failed: FormatDuration(%v) = %q, ParseDuration(%q) = %v", d, formatted, formatted, parsed)
-		}
-	})
 }
 
 // --- Coverage gap: UnmarshalYAML error paths ---

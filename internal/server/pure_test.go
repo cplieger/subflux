@@ -1,93 +1,14 @@
 package server
 
 import (
-	"context"
 	"slices"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/manualops"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"pgregory.net/rapid"
 )
-
-// --- manualops.IsValidLangCode ---
-
-func TestIsValidLangCode(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-		want  bool
-	}{
-		// Valid codes.
-		{"simple two char", "en", true},
-		{"BCP 47 with region", "pt-BR", true},
-		{"three char", "fra", true},
-		{"exactly at max length", "en-US-x-custom12long", true},
-		{"contains spaces", "en US", true},
-		{"single char", "e", true},
-		{"single dot is valid", "en.fr", true},
-
-		// Invalid codes.
-		{"empty string", "", false},
-		{"one over max length", "abcdefghijklmnopqrstu", false},
-		{"contains forward slash", "en/fr", false},
-		{"contains backslash", "en\\fr", false},
-		{"contains dot-dot traversal", "en..fr", false},
-		{"contains null byte", "en\x00fr", false},
-		{"contains newline", "en\nfr", false},
-		{"contains tab", "en\tfr", false},
-		{"contains carriage return", "en\rfr", false},
-		{"only null byte", "\x00", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := manualops.IsValidLangCode(tt.input)
-			if got != tt.want {
-				t.Errorf("manualops.IsValidLangCode(%q) = %v, want %v",
-					tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIsValidLangCode_property_accepted_codes_are_path_safe(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		lang := rapid.StringMatching(`[a-zA-Z0-9\-]{1,20}`).Draw(t, "lang")
-		if !manualops.IsValidLangCode(lang) {
-			t.Skip("generated code rejected by manualops.IsValidLangCode")
-		}
-		if strings.ContainsAny(lang, "/\\") {
-			t.Errorf("manualops.IsValidLangCode(%q) = true, but contains path separator", lang)
-		}
-		if strings.Contains(lang, "..") {
-			t.Errorf("manualops.IsValidLangCode(%q) = true, but contains '..'", lang)
-		}
-		if len(lang) > manualops.MaxLangCodeLen {
-			t.Errorf("manualops.IsValidLangCode(%q) = true, but len=%d > max=%d", lang, len(lang), manualops.MaxLangCodeLen)
-		}
-	})
-}
-
-func TestIsValidLangCode_property_rejects_dangerous_inputs(t *testing.T) {
-	t.Parallel()
-	rapid.Check(t, func(t *rapid.T) {
-		base := rapid.String().Draw(t, "base")
-		danger := rapid.SampledFrom([]string{"/", "\\", "..", "\x00", "\n", "\r"}).Draw(t, "danger")
-		pos := rapid.IntRange(0, len(base)).Draw(t, "pos")
-		input := base[:pos] + danger + base[pos:]
-		if manualops.IsValidLangCode(input) {
-			t.Errorf("manualops.IsValidLangCode(%q) = true, but contains dangerous sequence %q", input, danger)
-		}
-	})
-}
 
 // --- manualops.QueryInt ---
 
@@ -141,49 +62,6 @@ func TestQueryInt_property_result_always_non_negative(t *testing.T) {
 			t.Errorf("manualops.QueryInt(%q) = %d, want >= 0", val, got)
 		}
 	})
-}
-
-// --- sleepCtx ---
-
-func TestSleepCtx_zero_duration_returns_immediately(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, 0)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, 0) = %v, want nil", err)
-	}
-}
-
-func TestSleepCtx_negative_duration_returns_immediately(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, -1)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, -1) = %v, want nil", err)
-	}
-}
-
-func TestSleepCtx_cancelled_context_returns_error(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately.
-
-	err := sleepCtx(ctx, 10*time.Second)
-	if err == nil {
-		t.Fatal("sleepCtx(cancelled, 10s) = nil, want context error")
-	}
-	if err != context.Canceled {
-		t.Errorf("sleepCtx(cancelled, 10s) = %v, want %v", err, context.Canceled)
-	}
-}
-
-func TestSleepCtx_short_duration_completes(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	err := sleepCtx(ctx, 1*time.Millisecond)
-	if err != nil {
-		t.Errorf("sleepCtx(ctx, 1ms) = %v, want nil", err)
-	}
 }
 
 // --- extractAltTitles ---

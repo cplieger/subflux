@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // normalizeSet collects the normalized labels a format table can produce, so a
-// fuzz test can assert ParseReleaseName only ever emits known labels.
+// fuzz test can assert ParseName only ever emits known labels.
 func normalizeSet(formats []Format) map[string]bool {
 	m := make(map[string]bool, len(formats))
 	for _, ft := range formats {
@@ -17,7 +17,7 @@ func normalizeSet(formats []Format) map[string]bool {
 	return m
 }
 
-func FuzzParseReleaseName(f *testing.F) {
+func FuzzParseName(f *testing.F) {
 	f.Add("Show.S01E05.720p.WEB-DL.DDP5.1.H.264-GROUP")
 	f.Add("Movie.2024.2160p.UHD.BluRay.x265.HDR.DTS-HD.MA.7.1-RELEASE")
 	f.Add("[SubGroup] Anime Title - 25 [1080p][HEVC]")
@@ -32,25 +32,25 @@ func FuzzParseReleaseName(f *testing.F) {
 	validStreaming := normalizeSet(CompiledStreaming)
 
 	f.Fuzz(func(t *testing.T, name string) {
-		info := ParseReleaseName(name)
+		info := ParseName(name)
 		// Bounded output: every detected attribute is one of the known
 		// normalized labels for its category (or empty when nothing matched).
 		if info.Source != "" && !validSource[info.Source] {
-			t.Errorf("ParseReleaseName(%q).Source = %q, not a known source label", name, info.Source)
+			t.Errorf("ParseName(%q).Source = %q, not a known source label", name, info.Source)
 		}
 		if info.VideoCodec != "" && !validCodec[info.VideoCodec] {
-			t.Errorf("ParseReleaseName(%q).VideoCodec = %q, not a known codec label", name, info.VideoCodec)
+			t.Errorf("ParseName(%q).VideoCodec = %q, not a known codec label", name, info.VideoCodec)
 		}
 		if info.HDR != "" && !validHDR[info.HDR] {
-			t.Errorf("ParseReleaseName(%q).HDR = %q, not a known HDR label", name, info.HDR)
+			t.Errorf("ParseName(%q).HDR = %q, not a known HDR label", name, info.HDR)
 		}
 		if info.StreamingService != "" && !validStreaming[info.StreamingService] {
-			t.Errorf("ParseReleaseName(%q).StreamingService = %q, not a known streaming label", name, info.StreamingService)
+			t.Errorf("ParseName(%q).StreamingService = %q, not a known streaming label", name, info.StreamingService)
 		}
 	})
 }
 
-func FuzzParseReleaseGroup(f *testing.F) {
+func FuzzParseGroup(f *testing.F) {
 	f.Add("Movie.2024.BluRay.x264-GRP")
 	f.Add("[SubGroup] Anime - 01")
 	f.Add("Show.S01E01.720p.WEB-DL.DDP5.1.H.264-NTb")
@@ -58,7 +58,7 @@ func FuzzParseReleaseGroup(f *testing.F) {
 	f.Add("no-group-here")
 
 	f.Fuzz(func(t *testing.T, name string) {
-		group := ParseReleaseGroup(name)
+		group := ParseGroup(name)
 		if group == "" {
 			return
 		}
@@ -66,7 +66,7 @@ func FuzzParseReleaseGroup(f *testing.F) {
 		// extension-stripped input, never fabricated or transformed.
 		stripped := FileExtRe.ReplaceAllString(name, "")
 		if !strings.Contains(stripped, group) {
-			t.Errorf("ParseReleaseGroup(%q) = %q, not a substring of %q", name, group, stripped)
+			t.Errorf("ParseGroup(%q) = %q, not a substring of %q", name, group, stripped)
 		}
 	})
 }
@@ -81,10 +81,10 @@ func FuzzCompareSource(f *testing.F) {
 	f.Add("unknown", "unknown")
 
 	f.Fuzz(func(t *testing.T, a, b string) {
-		var m api.MatchSet
+		var m subflux.MatchSet
 		CompareSource(&m, a, b)
 		// Symmetry: CompareSource(a,b) agrees with CompareSource(b,a).
-		var m2 api.MatchSet
+		var m2 subflux.MatchSet
 		CompareSource(&m2, b, a)
 		if m.Source != m2.Source {
 			t.Fatalf("CompareSource not symmetric: (%q,%q)=%v vs (%q,%q)=%v", a, b, m.Source, b, a, m2.Source)

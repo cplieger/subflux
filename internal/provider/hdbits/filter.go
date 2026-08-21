@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/cplieger/jsonx"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- JSON types (hdbSubtitleItem, flexInt) ---
@@ -83,12 +83,12 @@ func keepSubtitle(s hdbSubtitleItem) bool {
 
 // filterSubtitleData converts raw HDBits subtitle data into Subtitle values,
 // applying language and commentary/extras filters. Pure function.
-func filterSubtitleData(data []hdbSubtitleItem, searchReq *api.SearchRequest) []api.Subtitle {
-	matchedBy := api.MatchByIMDB
-	if searchReq.MediaType == api.MediaTypeEpisode {
-		matchedBy = api.MatchByTVDB
+func filterSubtitleData(data []hdbSubtitleItem, searchReq *subflux.SearchRequest) []subflux.Subtitle {
+	matchedBy := subflux.MatchByIMDB
+	if searchReq.MediaType == subflux.MediaTypeEpisode {
+		matchedBy = subflux.MatchByTVDB
 	}
-	var subs []api.Subtitle
+	var subs []subflux.Subtitle
 	for _, s := range data {
 		lang := hdbLangToISO(s.Language)
 		if lang == "" || !slices.Contains(searchReq.Languages, lang) {
@@ -97,7 +97,7 @@ func filterSubtitleData(data []hdbSubtitleItem, searchReq *api.SearchRequest) []
 		if !keepSubtitle(s) {
 			continue
 		}
-		subs = append(subs, api.Subtitle{
+		subs = append(subs, subflux.Subtitle{
 			Provider:    providerName,
 			ID:          strconv.Itoa(int(s.ID)),
 			Language:    lang,

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestStatsCache(t *testing.T) {
@@ -15,8 +15,8 @@ func TestStatsCache(t *testing.T) {
 	t.Run("returns_computed_value", func(t *testing.T) {
 		t.Parallel()
 		var c statsCache
-		resp := c.get(t.Context(), func(_ context.Context) api.Stats {
-			return api.Stats{Downloads: 42}
+		resp := c.get(t.Context(), func(_ context.Context) subflux.Stats {
+			return subflux.Stats{Downloads: 42}
 		})
 		if resp.Downloads != 42 {
 			t.Errorf("Downloads = %d, want 42", resp.Downloads)
@@ -27,9 +27,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.Stats {
+		fn := func(_ context.Context) subflux.Stats {
 			calls.Add(1)
-			return api.Stats{Downloads: 10}
+			return subflux.Stats{Downloads: 10}
 		}
 		c.get(t.Context(), fn)
 		c.get(t.Context(), fn)
@@ -43,9 +43,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.Stats {
+		fn := func(_ context.Context) subflux.Stats {
 			n := calls.Add(1)
-			return api.Stats{Downloads: int(n) * 10}
+			return subflux.Stats{Downloads: int(n) * 10}
 		}
 		resp1 := c.get(t.Context(), fn)
 		c.invalidate()
@@ -62,9 +62,9 @@ func TestStatsCache(t *testing.T) {
 		t.Parallel()
 		var c statsCache
 		var calls atomic.Int32
-		fn := func(_ context.Context) api.Stats {
+		fn := func(_ context.Context) subflux.Stats {
 			calls.Add(1)
-			return api.Stats{Downloads: 5}
+			return subflux.Stats{Downloads: 5}
 		}
 		c.get(t.Context(), fn)
 		// Manually expire the entry by backdating storedAt.

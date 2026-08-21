@@ -19,13 +19,13 @@ type stream struct {
 	close  func()
 }
 
-// startStream connects an SSE client to a HandleEvents server. The client cap
+// startStream connects an SSE client to a Handle server. The client cap
 // lives on the bus itself (construct with New(cap)). The response body never
 // escapes: it is owned here and closed via t.Cleanup and/or st.close.
 func startStream(t *testing.T, bus *EventBus) stream {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		HandleEvents(bus, w, r)
+		Handle(bus, w, r)
 	}))
 	t.Cleanup(srv.Close)
 	resp, err := http.Get(srv.URL)
@@ -112,7 +112,7 @@ func TestWireFormat(t *testing.T) {
 	}
 }
 
-func TestHandleEventsClientCap(t *testing.T) {
+func TestHandleClientCap(t *testing.T) {
 	bus := New(1)
 	st := startStream(t, bus)
 	readUntil(t, st.sc, func(l string) bool { return l == ": connected" })
@@ -150,7 +150,7 @@ func TestShutdownDrainsAndRefuses(t *testing.T) {
 	nilBus.SetMaxClients(5) // must not panic
 }
 
-func TestHandleEventsHeaders(t *testing.T) {
+func TestHandleHeaders(t *testing.T) {
 	bus := New(0)
 	st := startStream(t, bus)
 	if ct := st.header.Get("Content-Type"); ct != "text/event-stream" {

@@ -3,9 +3,9 @@ package search
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/search/scoring"
 	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
@@ -21,30 +21,30 @@ func normalizeTitle(s string) string {
 // the production entry point: with no alternative titles,
 // scoring.AnyReleaseNameMatches is exactly that comparison.
 func releaseNameMatchesTitle(reqTitle, releaseName string) bool {
-	return scoring.AnyReleaseNameMatches(&api.SearchRequest{Title: reqTitle}, releaseName)
+	return scoring.AnyReleaseNameMatches(&subflux.SearchRequest{Title: reqTitle}, releaseName)
 }
 
 func titlesMatch(a, b string) bool {
 	return scoring.TitlesMatch(a, b)
 }
 
-func identityOK(sub *api.Subtitle, req *api.SearchRequest) bool {
+func identityOK(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
 	return scoring.IdentityOK(sub, req)
 }
 
-func episodeNumberMatch(subSeason, subEpisode int, req *api.SearchRequest) bool {
+func episodeNumberMatch(subSeason, subEpisode int, req *subflux.SearchRequest) bool {
 	return scoring.EpisodeNumberMatch(subSeason, subEpisode, req)
 }
 
-func identityTitleOK(sub *api.Subtitle, req *api.SearchRequest) bool {
+func identityTitleOK(sub *subflux.Subtitle, req *subflux.SearchRequest) bool {
 	return scoring.IdentityTitleOK(sub, req)
 }
 
-func anyTitleMatches(req *api.SearchRequest, candidate string) bool {
+func anyTitleMatches(req *subflux.SearchRequest, candidate string) bool {
 	return scoring.AnyTitleMatches(req, candidate)
 }
 
-func anyReleaseNameMatches(req *api.SearchRequest, releaseName string) bool {
+func anyReleaseNameMatches(req *subflux.SearchRequest, releaseName string) bool {
 	return scoring.AnyReleaseNameMatches(req, releaseName)
 }
 
@@ -53,7 +53,7 @@ func extractReleaseSeason(releaseName string) int {
 }
 
 // filterByIdentity is a test-only alias for scoring.FilterByIdentity.
-func filterByIdentity(results []api.Subtitle, req *api.SearchRequest) []api.Subtitle {
+func filterByIdentity(results []subflux.Subtitle, req *subflux.SearchRequest) []subflux.Subtitle {
 	kept, _ := scoring.FilterByIdentity(results, req)
 	return kept
 }

@@ -66,7 +66,7 @@ func (s *suite) runningProbe(id string) string {
 func (s *suite) sectionScans() {
 	s.log("=== Scan Operations (202 + activity monitor + explicit stop) ===")
 
-	s.applyMockConfig("static", `      result_count: "1"`, "", "")
+	s.applySyntheticConfig("static", `      result_count: "1"`, "", "")
 	time.Sleep(3 * time.Second)
 
 	seriesBody, _ := s.curlSF(30*time.Second, s.baseURL+"/api/media/series")
@@ -289,13 +289,13 @@ func (s *suite) sectionManualDownload() {
 	s.apiPost("/api/search/download", `{"provider":"nonexistent","subtitle_id":"x","file_path":"/media/test.mkv","language":"en"}`)
 	s.logf("Download invalid provider: HTTP %s", s.lastStatus)
 
-	s.apiPost("/api/search/download", `{"provider":"mock"}`)
+	s.apiPost("/api/search/download", `{"provider":"synthetic"}`)
 	s.logf("Download missing fields: HTTP %s", s.lastStatus)
 
-	s.apiPost("/api/search/download", `{"provider":"mock","subtitle_id":"x","file_path":"/etc/passwd","language":"en"}`)
+	s.apiPost("/api/search/download", `{"provider":"synthetic","subtitle_id":"x","file_path":"/etc/passwd","language":"en"}`)
 	s.logf("Download path traversal: HTTP %s", s.lastStatus)
 
-	s.apiPost("/api/search/download", `{"provider":"mock","subtitle_id":"x","file_path":"/media/test.mkv","language":"xx"}`)
+	s.apiPost("/api/search/download", `{"provider":"synthetic","subtitle_id":"x","file_path":"/media/test.mkv","language":"xx"}`)
 	s.logf("Download invalid lang: HTTP %s", s.lastStatus)
 }
 

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cplieger/subflux/internal/server/scheduler"
-	"github.com/cplieger/subflux/internal/server/serveradapter"
 )
 
 // authCleanupInterval is how often auth ceremonies and session debounce
@@ -21,16 +20,17 @@ func (s *Server) runScheduler(ctx context.Context) {
 // schedulerDeps builds the scheduler.Deps from Server fields.
 func (s *Server) schedulerDeps() *scheduler.Deps {
 	return &scheduler.Deps{
-		DB:               s.db,
-		ScanDB:           s.db,
-		Backoff:          s.db,
-		Metrics:          s.metrics,
-		ReconcileMetrics: s.metrics,
-		Events:           &serveradapter.ScanEventAdapter{E: s.events},
-		Activity:         &serveradapter.ActivityAdapter{A: s.activity},
-		Alerts:           &serveradapter.AlertAdapter{A: s.alerts},
-		Stops:            &s.stops,
-		ShowSkipCache:    s.showSkipCache,
+		DB:                    s.db,
+		ScanDB:                s.db,
+		Backoff:               s.db,
+		Metrics:               s.metrics,
+		ReconcileMetrics:      s.metrics,
+		Events:                s.events,
+		Activity:              s.activity,
+		Alerts:                s.alerts,
+		RecordStoreWriteError: s.recordStoreWriteError,
+		Stops:                 &s.stops,
+		ShowSkipCache:         s.showSkipCache,
 		StateFunc: func() *scheduler.LiveState {
 			ls := s.state()
 			return &scheduler.LiveState{

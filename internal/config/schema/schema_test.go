@@ -4,13 +4,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestSchema_returns_all_sections(t *testing.T) {
 	t.Parallel()
-	sections := Schema(nil)
+	sections := Sections(nil)
 
 	wantKeys := []string{
 		"sonarr", "radarr", "media_roots", "trusted_proxies", "allowed_hosts",
@@ -19,11 +19,11 @@ func TestSchema_returns_all_sections(t *testing.T) {
 		"logging",
 	}
 	if len(sections) != len(wantKeys) {
-		t.Fatalf("Schema() returned %d sections, want %d", len(sections), len(wantKeys))
+		t.Fatalf("Sections() returned %d sections, want %d", len(sections), len(wantKeys))
 	}
 	for i, want := range wantKeys {
 		if sections[i].Key != want {
-			t.Errorf("Schema()[%d].Key = %q, want %q", i, sections[i].Key, want)
+			t.Errorf("Sections()[%d].Key = %q, want %q", i, sections[i].Key, want)
 		}
 	}
 }
@@ -35,8 +35,8 @@ func TestSchema_returns_all_sections(t *testing.T) {
 // constants newWithDefaults feeds the pre-defaulted config decode.
 func TestSchema_embedded_subtitles_defaults_declared_once(t *testing.T) {
 	t.Parallel()
-	sections := Schema(nil)
-	var emb *api.SchemaSection
+	sections := Sections(nil)
+	var emb *subflux.SchemaSection
 	for i := range sections {
 		if sections[i].Key == "embedded_subtitles" {
 			emb = &sections[i]
@@ -44,7 +44,7 @@ func TestSchema_embedded_subtitles_defaults_declared_once(t *testing.T) {
 		}
 	}
 	if emb == nil {
-		t.Fatal("Schema() lacks the embedded_subtitles section")
+		t.Fatal("Sections() lacks the embedded_subtitles section")
 	}
 	if emb.Type != "fields" {
 		t.Errorf("embedded_subtitles.Type = %q, want fields (standard section renderer)", emb.Type)
@@ -74,7 +74,7 @@ func TestSchema_embedded_subtitles_defaults_declared_once(t *testing.T) {
 
 func TestSchema_sonarr_section_has_required_fields(t *testing.T) {
 	t.Parallel()
-	sections := Schema(nil)
+	sections := Sections(nil)
 	sonarr := sections[0]
 	if sonarr.Key != "sonarr" {
 		t.Fatalf("sections[0].Key = %q, want sonarr", sonarr.Key)
@@ -101,13 +101,13 @@ func TestSchema_sonarr_section_has_required_fields(t *testing.T) {
 
 func TestSchema_providers_section_passes_through(t *testing.T) {
 	t.Parallel()
-	providers := []api.ProviderSchema{
+	providers := []subflux.ProviderSchema{
 		{Name: "opensubtitles", Label: "OpenSubtitles"},
 		{Name: "yify", Label: "YIFY"},
 	}
-	sections := Schema(providers)
+	sections := Sections(providers)
 
-	var provSection *api.SchemaSection
+	var provSection *subflux.SchemaSection
 	for i := range sections {
 		if sections[i].Key == "providers" {
 			provSection = &sections[i]
@@ -115,7 +115,7 @@ func TestSchema_providers_section_passes_through(t *testing.T) {
 		}
 	}
 	if provSection == nil {
-		t.Fatal("Schema() missing providers section")
+		t.Fatal("Sections() missing providers section")
 	}
 	if len(provSection.Providers) != 2 {
 		t.Errorf("providers section has %d providers, want 2", len(provSection.Providers))

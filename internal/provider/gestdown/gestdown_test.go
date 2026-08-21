@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -31,8 +31,8 @@ func TestFactory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameGestdown {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameGestdown)
+	if p.Name() != subflux.ProviderNameGestdown {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameGestdown)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestSearch_skips_non_episode(t *testing.T) {
 	p, _ := Factory(t.Context(), nil)
 	// A movie (even with a valid TVDB ID) must be skipped before any network
 	// call; the cancelled context proves no HTTP request is attempted.
-	req := &api.SearchRequest{MediaType: api.MediaTypeMovie, TvdbID: 12345, Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, TvdbID: 12345, Languages: []string{"en"}}
 	got, err := p.Search(canceledContext(), req)
 	if err != nil {
 		t.Fatalf("Search(movie) unexpected error: %v", err)
@@ -57,7 +57,7 @@ func TestSearch_skips_zero_tvdb_id(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
 	// An episode with no TVDB ID must be skipped before any network call.
-	req := &api.SearchRequest{MediaType: api.MediaTypeEpisode, TvdbID: 0, Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, TvdbID: 0, Languages: []string{"en"}}
 	got, err := p.Search(canceledContext(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
@@ -72,15 +72,14 @@ func TestSearch_skips_zero_tvdb_id(t *testing.T) {
 func TestDownload_rejects_ssrf_url(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	sub := &api.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
+	sub := &subflux.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
 	_, err := p.Download(canceledContext(), sub)
 	if err == nil {
 		t.Fatal("Download(loopback URL) expected error, got nil")
 	}
 	// SSRF validation must run before the request: the error must wrap an
 	// *ssrf.Error, not a transport/context error from a fallthrough.
-	var se *ssrf.Error
-	if !errors.As(err, &se) {
+	if _, ok := errors.AsType[*ssrf.Error](err); !ok {
 		t.Errorf("Download(loopback URL) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }
@@ -88,13 +87,12 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 func TestDownload_rejects_internal_ip(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	sub := &api.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
+	sub := &subflux.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
 	_, err := p.Download(canceledContext(), sub)
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")
 	}
-	var se *ssrf.Error
-	if !errors.As(err, &se) {
+	if _, ok := errors.AsType[*ssrf.Error](err); !ok {
 		t.Errorf("Download(private IP) error = %v, want it to wrap *ssrf.Error", err)
 	}
 }
@@ -314,7 +312,7 @@ func TestBuildSubtitles_fields(t *testing.T) {
 func TestFilterByEpisode(t *testing.T) {
 	t.Parallel()
 
-	subs := []api.Subtitle{
+	subs := []subflux.Subtitle{
 		{ID: "a", Episode: 1},
 		{ID: "b", Episode: 2},
 		{ID: "c", Episode: 1},
@@ -495,11 +493,11 @@ func TestFilterByEpisode_invariant(t *testing.T) {
 		n := rapid.IntRange(0, 20).Draw(t, "numSubs")
 		target := rapid.IntRange(1, 10).Draw(t, "targetEpisode")
 
-		var subs []api.Subtitle
+		var subs []subflux.Subtitle
 		wantCount := 0
 		for i := range n {
 			ep := rapid.IntRange(1, 10).Draw(t, fmt.Sprintf("ep_%d", i))
-			subs = append(subs, api.Subtitle{
+			subs = append(subs, subflux.Subtitle{
 				ID:      fmt.Sprintf("s%d", i),
 				Episode: ep,
 			})

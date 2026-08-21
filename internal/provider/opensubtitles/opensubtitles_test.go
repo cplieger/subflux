@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestFactory_requires_credentials(t *testing.T) {
@@ -56,8 +56,8 @@ func TestFactory_requires_credentials(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Factory() unexpected error: %v", err)
 			}
-			if p.Name() != api.ProviderNameOpenSubtitles {
-				t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameOpenSubtitles)
+			if p.Name() != subflux.ProviderNameOpenSubtitles {
+				t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameOpenSubtitles)
 			}
 		})
 	}
@@ -110,8 +110,9 @@ func TestFactory_options(t *testing.T) {
 		// Default (the real declaration is asserted by the main package's
 		// registry tests; this pins that normalization reaches the factory).
 		{name: "normalized map carries declared default", extra: provider.NormalizeSettings(
-			[]api.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}},
-			nil), wantHash: true, wantAI: false},
+			[]subflux.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}},
+			nil,
+		), wantHash: true, wantAI: false},
 	}
 
 	for _, tt := range tests {
@@ -142,7 +143,7 @@ func TestCountShowSubtitles_short_circuits_on_empty_imdb(t *testing.T) {
 	// short-circuit happens before ensureToken/doGet.
 	p := &Provider{}
 	for _, imdb := range []string{"tt0", "tt00000", "0000", "tt"} {
-		count, err := p.CountShowSubtitles(t.Context(), imdb, "en")
+		count, err := p.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{ImdbID: imdb, Language: "en"})
 		if err != nil {
 			t.Errorf("CountShowSubtitles(%q) error = %v, want nil", imdb, err)
 		}
@@ -156,10 +157,10 @@ func TestMergeNumberingResults(t *testing.T) {
 	t.Parallel()
 	errA := errors.New("scheme A failed")
 	errB := errors.New("scheme B failed")
-	subs := func(ids ...string) []api.Subtitle {
-		out := make([]api.Subtitle, len(ids))
+	subs := func(ids ...string) []subflux.Subtitle {
+		out := make([]subflux.Subtitle, len(ids))
 		for i, id := range ids {
-			out[i] = api.Subtitle{ID: id}
+			out[i] = subflux.Subtitle{ID: id}
 		}
 		return out
 	}

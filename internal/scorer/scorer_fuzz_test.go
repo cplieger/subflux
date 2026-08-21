@@ -3,16 +3,16 @@ package scorer
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // tierRank maps tiers to ordinal values for comparison.
-var tierRank = map[api.ScoreTier]int{
-	api.TierNone:       0,
-	api.TierMinimal:    1,
-	api.TierAcceptable: 2,
-	api.TierGood:       3,
-	api.TierExcellent:  4,
+var tierRank = map[subflux.ScoreTier]int{
+	subflux.TierNone:       0,
+	subflux.TierMinimal:    1,
+	subflux.TierAcceptable: 2,
+	subflux.TierGood:       3,
+	subflux.TierExcellent:  4,
 }
 
 func FuzzScore(f *testing.F) {
@@ -20,10 +20,10 @@ func FuzzScore(f *testing.F) {
 	f.Add(false, false, false, false, false, false, false, false, false)
 	f.Add(true, false, false, false, false, false, false, false, true)
 
-	e := New(&api.DefaultScores)
+	e := New(&subflux.DefaultScores)
 
 	f.Fuzz(func(t *testing.T, hash, src, rg, ss, vc, hdr, ed, sp, verifiable bool) {
-		matches := api.MatchSet{
+		matches := subflux.MatchSet{
 			Hash:             hash,
 			Source:           src,
 			ReleaseGroup:     rg,
@@ -33,7 +33,7 @@ func FuzzScore(f *testing.F) {
 			Edition:          ed,
 			SeasonPack:       sp,
 		}
-		sub := api.SubtitleInfo{HashVerifiable: verifiable}
+		sub := subflux.SubtitleInfo{HashVerifiable: verifiable}
 		score, scoreNoHash := e.Score(sub, matches)
 
 		if score < 0 {
@@ -57,12 +57,12 @@ func FuzzScoreToTier(f *testing.F) {
 	f.Add(100)
 	f.Add(-1)
 
-	e := New(&api.DefaultScores)
+	e := New(&subflux.DefaultScores)
 
 	f.Fuzz(func(t *testing.T, score int) {
 		tier := e.ScoreToTier(score)
 		switch tier {
-		case api.TierExcellent, api.TierGood, api.TierAcceptable, api.TierMinimal, api.TierNone:
+		case subflux.TierExcellent, subflux.TierGood, subflux.TierAcceptable, subflux.TierMinimal, subflux.TierNone:
 		default:
 			t.Fatalf("ScoreToTier(%d) = %q, unknown tier", score, tier)
 		}
@@ -79,7 +79,7 @@ func FuzzScoreToTierMonotonic(f *testing.F) {
 	f.Add(100, 101)
 	f.Add(-1, 0)
 
-	e := New(&api.Scores{Hash: 100})
+	e := New(&subflux.Scores{Hash: 100})
 
 	f.Fuzz(func(t *testing.T, lo, hi int) {
 		if lo > hi {

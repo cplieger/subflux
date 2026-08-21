@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"log/slog"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // Archive-member extension acceptance comes from the subtitle-extension
@@ -31,7 +31,7 @@ func Extract(data []byte, season, episode int) []byte {
 	// Fast path: if data looks like a subtitle and has no archive magic
 	// bytes, skip archive probing entirely. Covers the common case where
 	// providers return raw SRT/ASS content.
-	if LooksLikeSubtitle(data) && !HasArchiveSignature(data) {
+	if LooksLikeSubtitle(data) && !HasSignature(data) {
 		return data
 	}
 
@@ -66,10 +66,10 @@ func Extract(data []byte, season, episode int) []byte {
 	return nil
 }
 
-// HasArchiveSignature checks whether data starts with a known archive
+// HasSignature checks whether data starts with a known archive
 // magic number (ZIP or RAR). Used to skip expensive archive probing when
 // the data is clearly plain text.
-func HasArchiveSignature(data []byte) bool {
+func HasSignature(data []byte) bool {
 	return hasZIPMagic(data) || hasRARMagic(data)
 }
 
@@ -118,7 +118,7 @@ func LooksLikeSubtitle(data []byte) bool {
 	}
 
 	// Reject data with high concentrations of non-text bytes.
-	if api.CountNonTextBytes(probe)*10 > len(probe) {
+	if subtitlefile.CountNonText(probe)*10 > len(probe) {
 		return false
 	}
 

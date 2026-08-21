@@ -17,26 +17,23 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/runesafe"
+	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v3"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// Compile-time assertion that Provider implements api.Provider.
-var _ api.Provider = (*Provider)(nil)
-
 const (
-	providerName = api.ProviderNameSubDL
+	providerName = subflux.ProviderNameSubDL
 	apiURL       = "https://api.subdl.com/api/v1"
 	dlBaseURL    = "https://dl.subdl.com"
 )
 
 // Factory creates a SubDL provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.APIKey == "" {
 		return nil, errors.New("subdl: api_key is required")
@@ -56,10 +53,10 @@ type Provider struct {
 }
 
 // Name returns the provider identifier for SubDL.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles matching the request via IMDB/TMDB ID or title.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	if req.ImdbID == "" && req.TmdbID == 0 && req.Title == "" {
 		slog.Debug("subdl: no IMDB ID, TMDB ID, or title, skipping")
 		return nil, nil
@@ -91,7 +88,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		return nil, nil
 	}
 
-	subs := filterResults(items, req.MediaType == api.MediaTypeEpisode, inferMatchedBy(params))
+	subs := filterResults(items, req.MediaType == subflux.MediaTypeEpisode, inferMatchedBy(params))
 
 	slog.Info("subdl search complete", "results", len(subs),
 		"media", req.MediaLabel())
@@ -100,21 +97,21 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 // inferMatchedBy returns the label describing which identifier the SubDL
 // request used. Mirrors the priority order in buildSearchParams.
-func inferMatchedBy(params url.Values) api.MatchMethod {
+func inferMatchedBy(params url.Values) subflux.MatchMethod {
 	switch {
 	case params.Get("film_name") != "":
-		return api.MatchByTitle
+		return subflux.MatchByTitle
 	case params.Get("tmdb_id") != "":
-		return api.MatchByTMDB
+		return subflux.MatchByTMDB
 	default:
-		return api.MatchByIMDB
+		return subflux.MatchByIMDB
 	}
 }
 
 // buildSearchParams constructs the URL query parameters for a SubDL search.
 // Pure function; all branching logic for episode vs movie and ID fallback
 // is contained here for independent testability.
-func buildSearchParams(apiKey string, req *api.SearchRequest, langs []string) url.Values {
+func buildSearchParams(apiKey string, req *subflux.SearchRequest, langs []string) url.Values {
 	params := url.Values{
 		"api_key":       {apiKey},
 		"languages":     {strings.Join(langs, ",")},
@@ -125,7 +122,7 @@ func buildSearchParams(apiKey string, req *api.SearchRequest, langs []string) ur
 		"bazarr":        {"1"},
 	}
 
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		params.Set("type", "tv")
 		params.Set("season_number", strconv.Itoa(req.Season))
 		params.Set("episode_number", strconv.Itoa(req.Episode))
@@ -189,8 +186,8 @@ func checkAPIStatus(result *apiResponse, label string) ([]subtitleItem, error) {
 
 // filterResults converts raw API items into Subtitle values, applying
 // language, forced, and season-pack filters. Pure function.
-func filterResults(items []subtitleItem, isEpisode bool, matchedBy api.MatchMethod) []api.Subtitle {
-	var subs []api.Subtitle
+func filterResults(items []subtitleItem, isEpisode bool, matchedBy subflux.MatchMethod) []subflux.Subtitle {
+	var subs []subflux.Subtitle
 	for i := range items {
 		item := &items[i]
 		// Skip season packs for episode searches.
@@ -210,7 +207,7 @@ func filterResults(items []subtitleItem, isEpisode bool, matchedBy api.MatchMeth
 
 		releaseName := strings.Join(item.Releases, " ")
 
-		subs = append(subs, api.Subtitle{
+		subs = append(subs, subflux.Subtitle{
 			Provider:    providerName,
 			ID:          item.Name,
 			Language:    isoLang,
@@ -227,7 +224,7 @@ func filterResults(items []subtitleItem, isEpisode bool, matchedBy api.MatchMeth
 
 // Download fetches the subtitle content for the given search result.
 // SubDL download URLs are relative paths; absolute URLs are rejected.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// DownloadURL from the API is a relative path (e.g. "/sd/...").
 	// Reject absolute URLs to prevent URL injection via crafted API responses.
 	if !strings.HasPrefix(sub.DownloadURL, "/") {
@@ -247,14 +244,13 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl download", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl download", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
 	data, err := handleDownloadResponse(resp, sub.Season, sub.Episode)
 	if err != nil {
-		var rateErr *api.RateLimitError
-		if errors.As(err, &rateErr) {
+		if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 			slog.Warn("subdl: download rate limited", "url", fullURL)
 		}
 		return nil, httpx.RedactSecret(err, p.apiKey)
@@ -277,16 +273,16 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "subdl search", p.apiKey)
+		return nil, httpx.RedactTransportError(err, "subdl search", httpx.Secret(p.apiKey))
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, httpx.RedactSecret(err, p.apiKey)
 	}
 
 	var result apiResponse
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxListResponseBytes)).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxListResponseBytes)).Decode(&result); err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("decode response: %w", err), p.apiKey)
 	}
 	return &result, nil
@@ -297,24 +293,24 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 // from archive responses. Testable without HTTP infrastructure.
 func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, error) {
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, &api.RateLimitError{
+		return nil, &subflux.RateLimitError{
 			Msg:        "download rate limited (429)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	// SubDL returns 500 with a tiny body when the download limit is exceeded.
 	// ContentLength is -1 when unknown; only match when explicitly small.
 	if resp.StatusCode == http.StatusInternalServerError && resp.ContentLength >= 0 && resp.ContentLength < 100 {
-		return nil, &api.RateLimitError{
+		return nil, &subflux.RateLimitError{
 			Msg:        "download limit exceeded (500)",
-			RetryAfter: httputil.ParseRetryAfter(resp),
+			RetryAfter: httpwire.ParseRetryAfter(resp),
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, &httputil.HTTPStatusError{Code: resp.StatusCode}
+		return nil, &httpwire.HTTPStatusError{Code: resp.StatusCode}
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, err
 	}

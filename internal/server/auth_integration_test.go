@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/boltstore"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // =============================================================================
@@ -71,7 +72,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	if sessHash != "" {
 		s.authStore.UpdateSessionActivity(req.Context(), sessHash, time.Now())
 	}
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("me: status = %d, want %d", rec.Code, http.StatusOK)
@@ -85,7 +86,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	// 4. Generate API key: POST /api/auth/apikeys.
 	req = httptest.NewRequest(http.MethodPost, "/api/auth/apikeys",
 		strings.NewReader(`{"label":"integration-test","password":"super-secure-password-here"}`))
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
 	s.authH.HandleGenerateAPIKey(rec, req)
 	if rec.Code != http.StatusOK {
@@ -106,7 +107,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("api key auth: %v", err)
 	}
-	req = req.WithContext(api.NewUserContext(req.Context(), apiUser))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), apiUser))
 	s.authH.HandleAuthMe(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("api key me: status = %d, want %d", rec.Code, http.StatusOK)
@@ -120,7 +121,7 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 	keyID := keys[0].ID
 	req = httptest.NewRequest(http.MethodDelete,
 		"/api/auth/apikeys/"+strconv.FormatInt(keyID, 10), http.NoBody)
-	req = req.WithContext(api.NewUserContext(req.Context(), user))
+	req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
 	rec = httptest.NewRecorder()
 	s.authH.HandleRevokeAPIKey(rec, req)
 	if rec.Code != http.StatusOK {
@@ -160,15 +161,15 @@ func TestIntegration_FullLoginFlow(t *testing.T) {
 // noopMetrics implements Metrics for integration tests.
 type noopMetrics struct{}
 
-func (noopMetrics) RecordSearch(_ api.ProviderID, _ time.Duration, _ error) {}
-func (noopMetrics) RecordHTTP(_, _ string, _ int, _ time.Duration)          {}
-func (noopMetrics) RecordPanic()                                            {}
-func (noopMetrics) RecordDownload(_ api.ProviderID, _ error)                {}
-func (noopMetrics) AdaptiveSkip()                                           {}
-func (noopMetrics) RecordEmbeddedDetectorError()                            {}
-func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                    {}
-func (noopMetrics) RecordImport(_ api.PollKey)                              {}
-func (noopMetrics) TotalSearches() int64                                    { return 0 }
+func (noopMetrics) RecordSearch(_ subflux.ProviderID, _ time.Duration, _ error) {}
+func (noopMetrics) RecordHTTP(webhttp.RequestMetric)                            {}
+func (noopMetrics) RecordPanic()                                                {}
+func (noopMetrics) RecordDownload(_ subflux.ProviderID, _ error)                {}
+func (noopMetrics) AdaptiveSkip()                                               {}
+func (noopMetrics) RecordEmbeddedDetectorError()                                {}
+func (noopMetrics) RecordScan(_, _ int, _ time.Duration)                        {}
+func (noopMetrics) RecordImport(_ subflux.PollKey)                              {}
+func (noopMetrics) TotalSearches() int64                                        { return 0 }
 func (noopMetrics) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -355,7 +356,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	defer coreDB.Close(t.Context())
 
-	db := authstore.New(coreDB.BoltDB())
+	db := authstore.New(coreDB.Bolt())
 	if err := db.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -413,14 +414,14 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 	}
 	defer coreDB.Close(t.Context())
 
-	db = authstore.New(coreDB.BoltDB())
+	db = authstore.New(coreDB.Bolt())
 	if err := db.Open(); err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
 	// Verify auth user survived re-open.
-	u, _, err := db.GetUserByUsername(ctx, "migration-test")
+	u, _, err := db.UserByUsername(ctx, "migration-test")
 	if err != nil || u == nil {
 		t.Fatal("auth user not preserved after re-open")
 	}
@@ -431,7 +432,7 @@ func TestIntegration_DatabaseMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	k, _, err := db.GetAPIKeyByHash(ctx, "migration-key-hash")
+	k, _, err := db.APIKeyByHash(ctx, "migration-key-hash")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +459,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("setup status: %d", rec.Code)
+		t.Errorf("setup status: %d", rec.Code)
 	}
 	var resp map[string]any
 	json.NewDecoder(rec.Body).Decode(&resp)
@@ -474,7 +475,7 @@ func TestIntegration_ConfiguredFlag(t *testing.T) {
 	rec = httptest.NewRecorder()
 	s.authH.HandleSetupStatus(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("setup status: %d", rec.Code)
+		t.Errorf("setup status: %d", rec.Code)
 	}
 	var resp2 map[string]any
 	json.NewDecoder(rec.Body).Decode(&resp2)

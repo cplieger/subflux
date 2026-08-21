@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. A cue-count check keeps t.Fatalf when later lines
+// index the slice it counted (got.Cues[0], got.Cues[len-1]).
+
 func TestDPAlign(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -247,7 +251,7 @@ func TestAlign_recoversConstantOffset(t *testing.T) {
 	got := Align(t.Context(), ref, inc)
 
 	if got.Confidence <= 0.3 {
-		t.Fatalf("Align confidence = %v, want > 0.3 for a clean constant offset", got.Confidence)
+		t.Errorf("Align confidence = %v, want > 0.3 for a clean constant offset", got.Confidence)
 	}
 	if got.Offset != -500 {
 		t.Errorf("Align offset = %d ms, want -500", got.Offset)

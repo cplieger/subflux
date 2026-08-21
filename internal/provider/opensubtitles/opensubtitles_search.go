@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/provider/classify"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // numbering represents one (season, episode) pair to search.
@@ -24,8 +24,8 @@ type numbering struct {
 
 // episodeNumberings returns the unique (season, episode) pairs to search.
 // For movies or episodes without alternate numbering, returns a single entry.
-func episodeNumberings(req *api.SearchRequest) []numbering {
-	if req.MediaType != api.MediaTypeEpisode {
+func episodeNumberings(req *subflux.SearchRequest) []numbering {
+	if req.MediaType != subflux.MediaTypeEpisode {
 		return []numbering{{scheme: schemeAired, season: req.Season, episode: req.Episode}}
 	}
 
@@ -66,9 +66,9 @@ func episodeNumberings(req *api.SearchRequest) []numbering {
 }
 
 // searchNumbering runs a paginated search for a specific (season, episode) pair.
-func (p *Provider) searchNumbering(ctx context.Context, req *api.SearchRequest,
+func (p *Provider) searchNumbering(ctx context.Context, req *subflux.SearchRequest,
 	season, episode int,
-) ([]api.Subtitle, error) {
+) ([]subflux.Subtitle, error) {
 	maxResults := req.MaxResults
 	if maxResults <= 0 {
 		maxResults = 60
@@ -78,7 +78,7 @@ func (p *Provider) searchNumbering(ctx context.Context, req *api.SearchRequest,
 	params := p.buildSearchParams(req, season, episode)
 	idSent := params.Has("imdb_id") || params.Has("parent_imdb_id") ||
 		params.Has("tmdb_id")
-	var results []api.Subtitle
+	var results []subflux.Subtitle
 	if idSent {
 		r, err := p.paginatedSearch(ctx, params, req.Languages, maxResults)
 		if err != nil {
@@ -118,9 +118,9 @@ func (p *Provider) searchNumbering(ctx context.Context, req *api.SearchRequest,
 // paginatedSearch runs a paginated search with the given parameters.
 func (p *Provider) paginatedSearch(ctx context.Context, params url.Values,
 	languages []string, maxResults int,
-) ([]api.Subtitle, error) {
+) ([]subflux.Subtitle, error) {
 	const maxPages = 3
-	var allResults []api.Subtitle
+	var allResults []subflux.Subtitle
 	warnPartial := func(page int, err error) {
 		if len(allResults) > 0 {
 			slog.Warn("opensubtitles: returning partial results",
@@ -191,12 +191,12 @@ func joinOSLangs(langs []string) string {
 // includes them. filterSearchResults re-checks both on the returned
 // attributes, so a server-side change of either default cannot leak results
 // past the user's choice.
-func (p *Provider) commonSearchParams(req *api.SearchRequest,
+func (p *Provider) commonSearchParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := url.Values{}
 	params.Set("languages", joinOSLangs(req.Languages))
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		if episode > 0 {
 			params.Set("episode_number", strconv.Itoa(episode))
 		}
@@ -213,7 +213,7 @@ func (p *Provider) commonSearchParams(req *api.SearchRequest,
 	return params
 }
 
-func (p *Provider) buildSearchParams(req *api.SearchRequest,
+func (p *Provider) buildSearchParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := p.commonSearchParams(req, season, episode)
@@ -232,9 +232,9 @@ func (p *Provider) buildSearchParams(req *api.SearchRequest,
 		sanitized = classify.SanitizeImdbID(req.ImdbID)
 	}
 	switch {
-	case req.MediaType == api.MediaTypeMovie && req.TmdbID != 0:
+	case req.MediaType == subflux.MediaTypeMovie && req.TmdbID != 0:
 		params.Set("tmdb_id", strconv.Itoa(req.TmdbID))
-	case req.MediaType == api.MediaTypeEpisode && sanitized != "":
+	case req.MediaType == subflux.MediaTypeEpisode && sanitized != "":
 		// For episodes, use parent_imdb_id (series IMDB ID).
 		params.Set("parent_imdb_id", sanitized)
 	case sanitized != "":
@@ -248,7 +248,7 @@ func (p *Provider) buildSearchParams(req *api.SearchRequest,
 // buildQueryParams builds search parameters using the title as a text query
 // instead of an ID. Used as a fallback when ID-based search returns no results
 // (common when Sonarr/Radarr metadata IDs don't match OpenSubtitles' catalog).
-func (p *Provider) buildQueryParams(req *api.SearchRequest,
+func (p *Provider) buildQueryParams(req *subflux.SearchRequest,
 	season, episode int,
 ) url.Values {
 	params := p.commonSearchParams(req, season, episode)
@@ -264,8 +264,8 @@ func (p *Provider) buildQueryParams(req *api.SearchRequest,
 // kind. Pure function.
 func filterSearchResults(data []searchResult, languages []string,
 	includeAI, includeMT bool,
-) []api.Subtitle {
-	var results []api.Subtitle
+) []subflux.Subtitle {
+	var results []subflux.Subtitle
 	for _, item := range data {
 		if !includeAI && item.Attributes.AITranslated {
 			continue
@@ -282,7 +282,7 @@ func filterSearchResults(data []searchResult, languages []string,
 			continue
 		}
 
-		sub := api.Subtitle{
+		sub := subflux.Subtitle{
 			Provider:    providerName,
 			ID:          strconv.Itoa(item.Attributes.Files[0].FileID),
 			Language:    lang,
@@ -297,7 +297,7 @@ func filterSearchResults(data []searchResult, languages []string,
 		}
 
 		if item.Attributes.MoviehashMatch {
-			sub.MatchedBy = api.MatchByHash
+			sub.MatchedBy = subflux.MatchByHash
 		}
 
 		results = append(results, sub)

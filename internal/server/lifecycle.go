@@ -6,17 +6,18 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	pathpkg "path"
+	"path"
 	"strings"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // serveAndWait builds the global middleware chain, binds the HTTP listener, and
@@ -39,7 +40,10 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		return
 	}
 
-	go s.runAuthCleanup(ctx)
+	// On bgWg like every other background goroutine: without it the drain below
+	// reports "all background goroutines stopped" while this one can still be
+	// inside ceremonies.Cleanup(). It was the only one not registered.
+	s.bgWg.Go(func() { s.runAuthCleanup(ctx) })
 
 	if onReady != nil {
 		s.ready.Set(true)
@@ -64,9 +68,12 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 		slog.Error("HTTP server error", "error", err)
 	}
 
-	// subflux's own background goroutines (scans, downloads, scheduler, poller)
-	// drain on a separate bounded budget OUTSIDE Run, so a stuck goroutine can't
-	// hang shutdown past 10s.
+	// subflux's own background goroutines drain on a separate bounded budget
+	// OUTSIDE Run, so a stuck goroutine can't hang shutdown past 10s. The set is
+	// whatever registered on bgWg: the four worker-set members, the worker-launch
+	// waiter, auth cleanup, the S12 full scan, and the handler-spawned scans and
+	// manual downloads that go through BGTracker (which IS &s.bgWg). Naming them
+	// individually is how the list went stale last time.
 	bgDone := make(chan struct{})
 	go func() {
 		s.bgWg.Wait()
@@ -222,11 +229,6 @@ var cacheControlMW = cacheControlFor()
 
 // --- Top-level handlers ---
 
-// keyStatus is the JSON "status" response key used by the admin-bootstrap
-// responses ({"status":"ok"}). The health envelope now comes from
-// webhttp.ReadinessHandler, which owns its own struct and key ordering.
-const keyStatus = "status"
-
 // handleHealth reports HTTP serving state via webhttp.ReadinessHandler: 200 with
 // {"status":"ok"} when s.ready is set, 503 with {"status":"unready","reason":...}
 // during startup or graceful shutdown. s.ready (a webhttp.Ready) flips true once
@@ -256,7 +258,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // can carry the activity id.
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	if !s.scanning.CompareAndSwap(false, true) {
@@ -266,7 +268,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		// clears, so this lookup misses only in two sub-microsecond
 		// windows (owner accept, owner teardown).
 		if id, ok := s.activity.ActiveScan(activity.ScanScope{Kind: activity.ScanKindFull}); ok {
-			api.WriteJSONStatus(w, http.StatusAccepted,
+			httpapi.WriteJSONStatus(w, http.StatusAccepted,
 				scanning.ScanAccepted{ActivityID: id, Status: "scan already running"})
 			return
 		}
@@ -275,16 +277,16 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		// or the owner is inside its accept instant, where conflict is the
 		// honest answer (a re-click lands after the window).
 		if !s.scanning.CompareAndSwap(false, true) {
-			api.ConflictC(w, r, api.CodeScanInProgress, "scan already in progress")
+			httpapi.ConflictC(w, r, subflux.CodeScanInProgress, "scan already in progress")
 			return
 		}
 	}
 	actID, run := scheduler.PrepareFullScan(s.schedulerDeps(), activity.SourceManual)
 	s.bgWg.Go(func() {
 		defer s.scanning.Store(false)
-		run(s.ctx)
+		run(s.lifetime)
 	})
-	api.WriteJSONStatus(w, http.StatusAccepted,
+	httpapi.WriteJSONStatus(w, http.StatusAccepted,
 		scanning.ScanAccepted{ActivityID: actID, Status: "scan started"})
 }
 
@@ -294,7 +296,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 // pre-migration .gz sibling in a dev tree is not addressable and falls
 // through to the fallbacks like any unknown path.
 func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
-	p := strings.TrimPrefix(pathpkg.Clean(r.URL.Path), "/")
+	p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 	if p == "" {
 		p = indexHTML
 	}
@@ -313,7 +315,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 			http.ServeFileFS(w, r, staticSub, loginHTML)
 			return
 		}
-		api.UnauthorizedC(w, r, api.CodeUnauthorized, auth.ErrUnauthenticated.Error())
+		httpapi.UnauthorizedC(w, r, subflux.CodeUnauthorized, auth.ErrUnauthenticated.Error())
 		return
 	}
 

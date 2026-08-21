@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 	"pgregory.net/rapid"
 )
@@ -29,12 +29,12 @@ import (
 // resetFixture records what seedResetFixture wrote, so assertions compare
 // against the seeded truth.
 type resetFixture struct {
-	users      []auth.User            // alice (admin, OIDC), bob
-	passkey    auth.PasskeyCredential // alice's
-	apiKey     auth.Key               // bob's
-	manualRows []*api.DownloadRecord  // in insertion (old-ID) order
-	autoRows   []*api.DownloadRecord  // rebuilt-as-designed rows (must NOT survive)
-	offsets    map[string]int64       // sync offsets by path
+	users      []auth.User               // alice (admin, OIDC), bob
+	passkey    auth.PasskeyCredential    // alice's
+	apiKey     auth.Key                  // bob's
+	manualRows []*subflux.DownloadRecord // in insertion (old-ID) order
+	autoRows   []*subflux.DownloadRecord // rebuilt-as-designed rows (must NOT survive)
+	offsets    map[string]int64          // sync offsets by path
 }
 
 // seedResetFixture builds the v1 fixture store of Requirement 5: 2 users +
@@ -59,12 +59,12 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 	fx := &resetFixture{offsets: map[string]int64{}}
 	seedResetAuth(t, db, fx)
 
-	dl := func(mt api.MediaType, mid, lang string, variant api.Variant, path string, score int, manual bool) *api.DownloadRecord {
-		rec := &api.DownloadRecord{
+	dl := func(mt subflux.MediaType, mid, lang string, variant subflux.Variant, path string, score int, manual bool) *subflux.DownloadRecord {
+		rec := &subflux.DownloadRecord{
 			MediaType: mt, MediaID: mid, Language: lang, Variant: variant,
-			ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Rel." + path,
+			ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "Rel." + path,
 			Path: path, Score: score,
-			Meta: &api.DownloadMeta{Title: "T-" + mid, VideoPath: "/m/" + mid + ".mkv", Manual: manual, Season: 1, Episode: 2},
+			Meta: &subflux.DownloadMeta{Title: "T-" + mid, VideoPath: "/m/" + mid + ".mkv", Manual: manual, Season: 1, Episode: 2},
 		}
 		if err := db.SaveDownload(ctx, rec); err != nil {
 			t.Fatalf("SaveDownload(%s): %v", path, err)
@@ -73,11 +73,11 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 	}
 
 	// Interleave autos and manuals so old IDs are non-contiguous for manuals.
-	fx.autoRows = append(fx.autoRows, dl(api.MediaTypeMovie, "tt1", "en", api.VariantStandard, "/m/tt1.en.srt", 70, false))
-	fx.manualRows = append(fx.manualRows, dl(api.MediaTypeMovie, "tt1", "en", api.VariantStandard, "/m/tt1.en.1.srt", 88, true))
-	fx.autoRows = append(fx.autoRows, dl(api.MediaTypeMovie, "tt1", "fr", api.VariantStandard, "/m/tt1.fr.srt", 60, false))
-	fx.manualRows = append(fx.manualRows, dl(api.MediaTypeMovie, "tt1", "en", api.VariantStandard, "/m/tt1.en.2.srt", 92, true))
-	fx.manualRows = append(fx.manualRows, dl(api.MediaTypeEpisode, "tt2", "fr", api.VariantForced, "/m/tt2.fr.forced.1.srt", 55, true))
+	fx.autoRows = append(fx.autoRows, dl(subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard, "/m/tt1.en.srt", 70, false))
+	fx.manualRows = append(fx.manualRows, dl(subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard, "/m/tt1.en.1.srt", 88, true))
+	fx.autoRows = append(fx.autoRows, dl(subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantStandard, "/m/tt1.fr.srt", 60, false))
+	fx.manualRows = append(fx.manualRows, dl(subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard, "/m/tt1.en.2.srt", 92, true))
+	fx.manualRows = append(fx.manualRows, dl(subflux.MediaTypeEpisode, "tt2", "fr", subflux.VariantForced, "/m/tt2.fr.forced.1.srt", 55, true))
 
 	fx.offsets["/m/tt1.en.1.srt"] = 250
 	fx.offsets["/m/tt1.fr.srt"] = -40
@@ -87,19 +87,19 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 		}
 	}
 
-	if _, err := db.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt1", []api.SubtitleFile{
-		{Language: "en", Variant: api.VariantStandard, Source: api.SourceExternal, Codec: "subrip", Path: "/m/tt1.en.1.srt"},
-		{Language: "fr", Variant: api.VariantStandard, Source: api.SourceExternal, Codec: "subrip", Path: "/m/tt1.fr.srt"},
+	if _, err := db.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt1", []subflux.SubtitleFile{
+		{Language: "en", Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Codec: "subrip", Path: "/m/tt1.en.1.srt"},
+		{Language: "fr", Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Codec: "subrip", Path: "/m/tt1.fr.srt"},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles: %v", err)
 	}
 
 	// Backoff on a language no download clears (SaveDownload clears its own
 	// triple), plus a scan-state row.
-	if err := db.RecordNoResult(ctx, api.MediaTypeMovie, "tt1", "de", api.ProviderNameOpenSubtitles, resetBackoffParams); err != nil {
+	if err := db.RecordNoResult(ctx, subflux.MediaTypeMovie, "tt1", "de", subflux.ProviderNameOpenSubtitles, resetBackoffParams); err != nil {
 		t.Fatalf("RecordNoResult: %v", err)
 	}
-	if err := db.RecordScanState(ctx, &api.ScanRecord{MediaType: api.MediaTypeMovie, MediaID: "tt1", Title: "T-tt1", AudioLang: "en"}); err != nil {
+	if err := db.RecordScanState(ctx, &subflux.ScanRecord{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Title: "T-tt1", AudioLang: "en"}); err != nil {
 		t.Fatalf("RecordScanState: %v", err)
 	}
 	return fx
@@ -109,7 +109,7 @@ func seedResetFixture(t *testing.T, path string) *resetFixture {
 func seedResetAuth(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 
 	alice := &auth.User{Username: "alice", Email: "alice@example.com", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true, OIDCIssuer: "https://idp", OIDCSub: "sub-alice"}
 	bob := &auth.User{Username: "bob", Role: auth.RoleUser, PasswordHash: "hash-b", Enabled: true}
@@ -136,7 +136,7 @@ func seedResetAuth(t *testing.T, db *DB, fx *resetFixture) {
 
 // resetBackoffParams are fixed backoff parameters for the fixture's
 // RecordNoResult rows; only the row's existence matters to the reset.
-var resetBackoffParams = api.BackoffParams{
+var resetBackoffParams = subflux.BackoffParams{
 	InitialDelay: time.Minute,
 	MaxDelay:     time.Hour,
 	Multiplier:   2,
@@ -206,12 +206,12 @@ func TestMigrate_coreResetPreservesIrreplaceable(t *testing.T) {
 		t.Errorf("auth stamp changed across the core reset: %x -> %x", authStampBefore, got)
 	}
 	assertAuthBucketsIdentical(t, db, authBefore)
-	as := authstore.New(db.BoltDB())
-	u, _, err := as.GetUserByUsername(ctx, "alice")
+	as := authstore.New(db.Bolt())
+	u, _, err := as.UserByUsername(ctx, "alice")
 	if err != nil || u == nil || u.ID != fx.users[0].ID || u.PasswordHash != "hash-a" {
-		t.Errorf("GetUserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
+		t.Errorf("UserByUsername(alice) after reset = (%+v, %v), want the seeded user", u, err)
 	}
-	pks, err := as.GetPasskeysByUserID(ctx, fx.users[0].ID)
+	pks, err := as.PasskeysByUserID(ctx, fx.users[0].ID)
 	if err != nil || len(pks) != 1 || pks[0].SignCount != 7 {
 		t.Errorf("passkeys after reset = (%+v, %v), want the seeded passkey", pks, err)
 	}
@@ -265,14 +265,14 @@ func assertAuthBucketsIdentical(t *testing.T, db *DB, before map[string]map[stri
 func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	entries, err := db.GetState(ctx, &api.StateQuery{})
+	entries, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	if len(entries) != len(fx.manualRows) {
 		t.Fatalf("state rows after reset = %d, want %d (manual only)", len(entries), len(fx.manualRows))
 	}
-	byPath := make(map[string]api.StateEntry, len(entries))
+	byPath := make(map[string]subflux.StateEntry, len(entries))
 	for _, e := range entries {
 		if !e.Manual {
 			t.Errorf("non-manual row %q survived the reset", e.Path)
@@ -297,7 +297,7 @@ func assertCoreResetState(t *testing.T, db *DB, fx *resetFixture) {
 	}
 
 	for _, rec := range fx.manualRows {
-		locked, err := db.IsManuallyLocked(ctx, rec.MediaType, rec.MediaID, rec.Language, rec.Variant)
+		locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: rec.MediaType, MediaID: rec.MediaID, Language: rec.Language, Variant: rec.Variant})
 		if err != nil || !locked {
 			t.Errorf("IsManuallyLocked(%s/%s/%s/%s) = (%v, %v), want locked after reset", rec.MediaType, rec.MediaID, rec.Language, rec.Variant, locked, err)
 		}
@@ -317,9 +317,9 @@ func assertCoreResetOffsets(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
 	for p, want := range fx.offsets {
-		got, err := db.GetSyncOffset(ctx, p)
+		got, err := db.SyncOffset(ctx, p)
 		if err != nil || got != want {
-			t.Errorf("GetSyncOffset(%s) = (%d, %v), want %d", p, got, err, want)
+			t.Errorf("SyncOffset(%s) = (%d, %v), want %d", p, got, err, want)
 		}
 	}
 }
@@ -330,14 +330,14 @@ func assertCoreResetOffsets(t *testing.T, db *DB, fx *resetFixture) {
 func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 	t.Helper()
 	ctx := t.Context()
-	if score, _, found, err := db.CurrentScore(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard); err != nil || found {
+	if score, _, found, err := db.CurrentScore(ctx, subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard); err != nil || found {
 		t.Errorf("CurrentScore after reset = (%d, found=%v, %v), want no auto row", score, found, err)
 	}
 	if n, err := db.TotalSubtitleFiles(ctx); err != nil || n != 0 {
 		t.Errorf("TotalSubtitleFiles after reset = (%d, %v), want 0", n, err)
 	}
-	if items, err := db.GetBackoffItems(ctx); err != nil || len(items) != 0 {
-		t.Errorf("GetBackoffItems after reset = (%v, %v), want none", items, err)
+	if items, err := db.BackoffItems(ctx); err != nil || len(items) != 0 {
+		t.Errorf("BackoffItems after reset = (%v, %v), want none", items, err)
 	}
 	err := db.db.View(func(tx *bolt.Tx) error {
 		for _, name := range []string{bucketScanState, bucketIxScanAt, bucketSubtitleFiles, bucketSearchAttempts} {
@@ -354,18 +354,18 @@ func assertCoreResetDerivedRowsGone(t *testing.T, db *DB) {
 
 // assertOffsetReattachment proves a restored (momentarily orphaned) offset
 // reattaches once the scan rebuilds the file inventory: after
-// RecordSubtitleFiles re-lists the file, GetSubtitleFiles reports the offset.
+// RecordSubtitleFiles re-lists the file, SubtitleFiles reports the offset.
 func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 	t.Helper()
 	ctx := t.Context()
-	if _, err := db.RecordSubtitleFiles(ctx, api.MediaTypeMovie, "tt1", []api.SubtitleFile{
-		{Language: "en", Variant: api.VariantStandard, Source: api.SourceExternal, Codec: "subrip", Path: "/m/tt1.en.1.srt"},
+	if _, err := db.RecordSubtitleFiles(ctx, subflux.MediaTypeMovie, "tt1", []subflux.SubtitleFile{
+		{Language: "en", Variant: subflux.VariantStandard, Source: subflux.SourceExternal, Codec: "subrip", Path: "/m/tt1.en.1.srt"},
 	}); err != nil {
 		t.Fatalf("RecordSubtitleFiles (rebuild): %v", err)
 	}
-	files, err := db.GetSubtitleFiles(ctx, api.MediaTypeMovie, "tt1")
+	files, err := db.SubtitleFiles(ctx, subflux.MediaTypeMovie, "tt1")
 	if err != nil {
-		t.Fatalf("GetSubtitleFiles: %v", err)
+		t.Fatalf("SubtitleFiles: %v", err)
 	}
 	found := false
 	for _, f := range files {
@@ -377,7 +377,7 @@ func assertOffsetReattachment(t *testing.T, db *DB, fx *resetFixture) {
 		}
 	}
 	if !found {
-		t.Error("rebuilt subtitle file missing from GetSubtitleFiles")
+		t.Error("rebuilt subtitle file missing from SubtitleFiles")
 	}
 }
 
@@ -398,18 +398,18 @@ func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	for _, rec := range []*api.DownloadRecord{
+	for _, rec := range []*subflux.DownloadRecord{
 		{
-			MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en",
-			ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Rel.A",
+			MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en",
+			ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "Rel.A",
 			Path: "/m/tt1.en.srt", Score: 70,
-			Meta: &api.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv"},
+			Meta: &subflux.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv"},
 		},
 		{
-			MediaType: api.MediaTypeMovie, MediaID: "tt1", Language: "en",
-			ProviderName: api.ProviderNameOpenSubtitles, ReleaseName: "Rel.B",
+			MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en",
+			ProviderName: subflux.ProviderNameOpenSubtitles, ReleaseName: "Rel.B",
 			Path: "/m/tt1.en.1.srt", Score: 88,
-			Meta: &api.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv", Manual: true},
+			Meta: &subflux.DownloadMeta{Title: "T", VideoPath: "/m/tt1.mkv", Manual: true},
 		},
 	} {
 		if err := db.SaveDownload(ctx, rec); err != nil {
@@ -468,13 +468,13 @@ func TestMigrate_coreResetPreservesUnknownJSONFields(t *testing.T) {
 
 	// The raw-preserved row still answers through the canonical read paths:
 	// the lock holds and the row decodes with its known fields intact.
-	locked, err := mdb.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := mdb.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after raw-preserving reset = (%v, %v), want locked", locked, err)
 	}
-	entries, err := mdb.GetState(ctx, &api.StateQuery{})
+	entries, err := mdb.State(ctx, &subflux.StateQuery{})
 	if err != nil || len(entries) != 1 {
-		t.Fatalf("GetState = (%d entries, %v), want the one manual survivor", len(entries), err)
+		t.Fatalf("State = (%d entries, %v), want the one manual survivor", len(entries), err)
 	}
 	if e := entries[0]; e.ID != 1 || !e.Manual || e.Path != "/m/tt1.en.1.srt" || e.Score != 88 {
 		t.Errorf("survivor decoded as %+v, want id 1, manual, path /m/tt1.en.1.srt, score 88", e)
@@ -514,17 +514,17 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 
 	// Auth domain functionally intact: same IDs, ownership links, uniqueness,
 	// and a live sequence.
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	for i, want := range fx.users {
-		u, _, err := as.GetUserByUsername(ctx, want.Username)
+		u, _, err := as.UserByUsername(ctx, want.Username)
 		if err != nil || u == nil || u.ID != want.ID || u.PasswordHash != want.PasswordHash {
 			t.Errorf("user %d (%s) after auth reset = (%+v, %v), want preserved", i, want.Username, u, err)
 		}
 	}
-	if u, _, err := as.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
-		t.Errorf("GetUserByOIDCSub after auth reset = (%+v, %v), want alice via ix_user_oidc", u, err)
+	if u, _, err := as.UserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != fx.users[0].ID {
+		t.Errorf("UserByOIDCSub after auth reset = (%+v, %v), want alice via ix_user_oidc", u, err)
 	}
-	pks, err := as.GetPasskeysByUserID(ctx, fx.users[0].ID)
+	pks, err := as.PasskeysByUserID(ctx, fx.users[0].ID)
 	if err != nil || len(pks) != 1 || string(pks[0].CredentialID) != string(fx.passkey.CredentialID) || pks[0].ID != fx.passkey.ID {
 		t.Errorf("passkeys after auth reset = (%+v, %v), want the seeded credential with its id", pks, err)
 	}
@@ -547,12 +547,12 @@ func TestMigrate_authResetPreservesCore(t *testing.T) {
 	}
 
 	// Core still functionally alive: locks and offsets answer as before.
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked after auth reset = (%v, %v), want locked", locked, err)
 	}
-	if got, err := db.GetSyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != fx.offsets["/m/tt1.en.1.srt"] {
-		t.Errorf("GetSyncOffset after auth reset = (%d, %v), want %d", got, err, fx.offsets["/m/tt1.en.1.srt"])
+	if got, err := db.SyncOffset(ctx, "/m/tt1.en.1.srt"); err != nil || got != fx.offsets["/m/tt1.en.1.srt"] {
+		t.Errorf("SyncOffset after auth reset = (%d, %v), want %d", got, err, fx.offsets["/m/tt1.en.1.srt"])
 	}
 }
 
@@ -608,10 +608,10 @@ func assertCoreBucketsIdentical(t *testing.T, db *DB, before map[string]map[stri
 // resetPropQuad is the property test's (media_type, media_id, language,
 // variant) draw pool element.
 type resetPropQuad struct {
-	mt      api.MediaType
+	mt      subflux.MediaType
 	mid     string
 	lang    string
-	variant api.Variant
+	variant subflux.Variant
 }
 
 // TestResetCorePreserving_property pins the destructive-core fallback against
@@ -621,9 +621,9 @@ type resetPropQuad struct {
 // state indexes and counters equal a full primary re-scan.
 func TestResetCorePreserving_property(t *testing.T) {
 	quads := []resetPropQuad{
-		{api.MediaTypeMovie, "tt1", "en", api.VariantStandard},
-		{api.MediaTypeMovie, "tt1", "fr", api.VariantStandard},
-		{api.MediaTypeEpisode, "tt2", "en", api.VariantForced},
+		{subflux.MediaTypeMovie, "tt1", "en", subflux.VariantStandard},
+		{subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantStandard},
+		{subflux.MediaTypeEpisode, "tt2", "en", subflux.VariantForced},
 	}
 	offsetPaths := []string{"/m/o1.srt", "/m/o2.srt", "/m/o3.srt"}
 
@@ -670,13 +670,13 @@ func seedPropertyStore(rt *rapid.T, db *DB, quads []resetPropQuad, offsetPaths [
 		case "auto", "manual":
 			q := rapid.SampledFrom(quads).Draw(rt, "quad")
 			manual := rapid.Bool().Draw(rt, "manual")
-			rec := &api.DownloadRecord{
+			rec := &subflux.DownloadRecord{
 				MediaType: q.mt, MediaID: q.mid, Language: q.lang, Variant: q.variant,
-				ProviderName: api.ProviderNameOpenSubtitles,
+				ProviderName: subflux.ProviderNameOpenSubtitles,
 				ReleaseName:  rapid.SampledFrom([]string{"", "Rel.A", "Rel.B"}).Draw(rt, "release"),
 				Path:         fmt.Sprintf("/m/%s.%s.%d.srt", q.mid, q.lang, i),
 				Score:        rapid.IntRange(0, 100).Draw(rt, "score"),
-				Meta:         &api.DownloadMeta{Title: "T", VideoPath: "/m/" + q.mid + ".mkv", Manual: manual},
+				Meta:         &subflux.DownloadMeta{Title: "T", VideoPath: "/m/" + q.mid + ".mkv", Manual: manual},
 			}
 			if err := db.SaveDownload(ctx, rec); err != nil {
 				rt.Fatalf("SaveDownload: %v", err)
@@ -690,7 +690,7 @@ func seedPropertyStore(rt *rapid.T, db *DB, quads []resetPropQuad, offsetPaths [
 			wantOffsets[p] = off
 		case "backoff":
 			q := rapid.SampledFrom(quads).Draw(rt, "bq")
-			if err := db.RecordNoResult(ctx, q.mt, q.mid, q.lang, api.ProviderNameGestdown, resetBackoffParams); err != nil {
+			if err := db.RecordNoResult(ctx, q.mt, q.mid, q.lang, subflux.ProviderNameGestdown, resetBackoffParams); err != nil {
 				rt.Fatalf("RecordNoResult: %v", err)
 			}
 		}
@@ -777,8 +777,8 @@ func assertPropertyReset(rt *rapid.T, db *DB, wantManual map[string]int, wantOrd
 	}
 
 	for p, want := range wantOffsets {
-		if gotOff, oerr := db.GetSyncOffset(ctx, p); oerr != nil || gotOff != want {
-			rt.Errorf("GetSyncOffset(%s) = (%d, %v), want %d", p, gotOff, oerr, want)
+		if gotOff, oerr := db.SyncOffset(ctx, p); oerr != nil || gotOff != want {
+			rt.Errorf("SyncOffset(%s) = (%d, %v), want %d", p, gotOff, oerr, want)
 		}
 	}
 	downloads, attempts, err := db.Stats(ctx)

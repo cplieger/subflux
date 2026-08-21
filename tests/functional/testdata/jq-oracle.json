@@ -1158,7 +1158,7 @@
    "args": [
     ".search"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
    "want": "{\n  \"ExcludeArrTags\": [\n    \"skip-subs\",\n    \"no-subs\"\n  ],\n  \"ScanDelay\": 7000000000,\n  \"ScanInterval\": 3600000000000,\n  \"UpgradeEnabled\": false\n}"
   },
   {
@@ -1422,8 +1422,8 @@
    "args": [
     ".providers"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
-   "want": "{\n  \"mock\": {\n    \"enabled\": true,\n    \"priority\": 1\n  }\n}"
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "want": "{\n  \"synthetic\": {\n    \"enabled\": true,\n    \"priority\": 1\n  }\n}"
   },
   {
    "id": "P01f/field-missing",
@@ -4230,7 +4230,7 @@
    "args": [
     ".search.ScanDelay"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
    "want": "7000000000"
   },
   {
@@ -6166,7 +6166,7 @@
    "args": [
     ".auth.enabled"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
    "want": ""
   },
   {
@@ -6546,104 +6546,104 @@
   },
   {
    "id": "P15/realistic-hidden",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"name\":\"gestdown\",\"enabled\":true,\"priority\":2,\"loaded\":true}]",
    "want": "0"
   },
   {
    "id": "P15/leaked",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"name\":\"mock\",\"enabled\":true}]",
+   "body": "[{\"name\":\"synthetic\",\"enabled\":true}]",
    "want": "1"
   },
   {
    "id": "P15/empty-list",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "[]",
    "want": "0"
   },
   {
    "id": "P15/elem-scalar",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "[1]",
    "want": ""
   },
   {
    "id": "P15/name-missing",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"enabled\":true}]",
    "want": "0"
   },
   {
    "id": "P15/body-object",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
-   "body": "{\"m\":{\"name\":\"mock\"}}",
+   "body": "{\"m\":{\"name\":\"synthetic\"}}",
    "want": "1"
   },
   {
    "id": "P15/body-empty",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "",
    "want": ""
   },
   {
    "id": "P15/body-malformed",
-   "prog": "[.[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "countFieldEq",
    "args": [
     "name",
-    "mock"
+    "synthetic"
    ],
    "body": "{\"results\": [{\"provider\":",
    "want": ""
@@ -6884,204 +6884,204 @@
   },
   {
    "id": "P14/realistic-hidden",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"sonarr\",\"label\":\"Sonarr\",\"fields\":[{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"api_key\",\"type\":\"string\"}]},{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"opensubtitles\",\"label\":\"OpenSubtitles\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]},{\"key\":\"embedded_subtitles\",\"label\":\"Embedded Subtitles\",\"fields\":[{\"name\":\"ignore_pgs\",\"type\":\"bool\"}]}]",
    "want": "0"
   },
   {
    "id": "P14/leaked",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"mock\",\"label\":\"Mock\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]}]",
+   "body": "[{\"key\":\"providers\",\"label\":\"Providers\",\"providers\":[{\"name\":\"synthetic\",\"label\":\"Synthetic\",\"fields\":[]},{\"name\":\"gestdown\",\"label\":\"Gestdown\",\"fields\":[]}]}]",
    "want": "1"
   },
   {
    "id": "P14/no-providers-section",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"sonarr\",\"fields\":[]}]",
    "want": "0"
   },
   {
    "id": "P14/providers-field-missing",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"providers\"}]",
    "want": ""
   },
   {
    "id": "P14/providers-null",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"providers\",\"providers\":null}]",
    "want": ""
   },
   {
    "id": "P14/providers-empty",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"providers\",\"providers\":[]}]",
    "want": "0"
   },
   {
    "id": "P14/providers-object",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":\"providers\",\"providers\":{\"a\":{\"name\":\"mock\"}}}]",
+   "body": "[{\"key\":\"providers\",\"providers\":{\"a\":{\"name\":\"synthetic\"}}}]",
    "want": "1"
   },
   {
    "id": "P14/providers-string",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":\"providers\",\"providers\":\"mock\"}]",
+   "body": "[{\"key\":\"providers\",\"providers\":\"synthetic\"}]",
    "want": ""
   },
   {
    "id": "P14/two-provider-sections",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":\"providers\",\"providers\":[{\"name\":\"mock\"}]},{\"key\":\"providers\",\"providers\":[{\"name\":\"mock\"}]}]",
+   "body": "[{\"key\":\"providers\",\"providers\":[{\"name\":\"synthetic\"}]},{\"key\":\"providers\",\"providers\":[{\"name\":\"synthetic\"}]}]",
    "want": "2"
   },
   {
    "id": "P14/provider-entry-scalar",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":\"providers\",\"providers\":[\"mock\"]}]",
+   "body": "[{\"key\":\"providers\",\"providers\":[\"synthetic\"]}]",
    "want": ""
   },
   {
    "id": "P14/provider-name-missing",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[{\"key\":\"providers\",\"providers\":[{\"label\":\"M\"}]}]",
    "want": "0"
   },
   {
    "id": "P14/section-null",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[null]",
    "want": "0"
   },
   {
    "id": "P14/section-scalar",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[5]",
    "want": ""
   },
   {
    "id": "P14/key-number",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
-   "body": "[{\"key\":1,\"providers\":[{\"name\":\"mock\"}]}]",
+   "body": "[{\"key\":1,\"providers\":[{\"name\":\"synthetic\"}]}]",
    "want": "0"
   },
   {
    "id": "P14/empty-list",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "[]",
    "want": "0"
   },
   {
    "id": "P14/body-empty",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "",
    "want": ""
   },
   {
    "id": "P14/body-malformed",
-   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"mock\")] | length",
+   "prog": "[.[] | select(.key==\"providers\") | .providers[] | select(.name==\"synthetic\")] | length",
    "mode": "json",
    "vars": {},
    "helper": "schemaProviderCount",
    "args": [
-    "mock"
+    "synthetic"
    ],
    "body": "{\"results\": [{\"provider\":",
    "want": ""
@@ -7191,7 +7191,7 @@
    "args": [
     ".providers.embedded"
    ],
-   "body": "{\"providers\":{\"mock\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
+   "body": "{\"providers\":{\"synthetic\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
    "want": "false"
   },
   {
@@ -7527,7 +7527,7 @@
    "args": [
     ".search.ExcludeArrTags"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}",
    "want": "2"
   },
   {
@@ -7695,7 +7695,7 @@
    "args": [
     ".search.ExcludeArrTags"
    ],
-   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"mock\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}\n",
+   "body": "{\"search\":{\"ScanDelay\":7000000000,\"ScanInterval\":3600000000000,\"UpgradeEnabled\":false,\"ExcludeArrTags\":[\"skip-subs\",\"no-subs\"]},\"providers\":{\"synthetic\":{\"enabled\":true,\"priority\":1}},\"auth\":{\"enabled\":false},\"adaptive\":{\"enabled\":true,\"max_attempts\":3}}\n",
    "want": "2"
   },
   {
@@ -8452,204 +8452,204 @@
   },
   {
    "id": "P27/realistic",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}}",
+   "body": "{\"synthetic\":{\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}}",
    "want": "true"
   },
   {
    "id": "P27/outer-missing",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "{\"other\":{}}",
    "want": "false"
   },
   {
    "id": "P27/outer-null",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":null}",
+   "body": "{\"synthetic\":null}",
    "want": "false"
   },
   {
    "id": "P27/outer-string",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":\"not-an-object\"}",
+   "body": "{\"synthetic\":\"not-an-object\"}",
    "want": ""
   },
   {
    "id": "P27/outer-array",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":[{\"timed_out\":1}]}",
+   "body": "{\"synthetic\":[{\"timed_out\":1}]}",
    "want": ""
   },
   {
    "id": "P27/inner-missing",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"other\":1}}",
+   "body": "{\"synthetic\":{\"other\":1}}",
    "want": "false"
   },
   {
    "id": "P27/inner-null",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"timed_out\":null}}",
+   "body": "{\"synthetic\":{\"timed_out\":null}}",
    "want": "false"
   },
   {
    "id": "P27/inner-false",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"timed_out\":false}}",
+   "body": "{\"synthetic\":{\"timed_out\":false}}",
    "want": "false"
   },
   {
    "id": "P27/inner-zero",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"timed_out\":0}}",
+   "body": "{\"synthetic\":{\"timed_out\":0}}",
    "want": "0"
   },
   {
    "id": "P27/inner-string",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"timed_out\":\"strval\"}}",
+   "body": "{\"synthetic\":{\"timed_out\":\"strval\"}}",
    "want": "\"strval\""
   },
   {
    "id": "P27/inner-object",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"mock\":{\"timed_out\":{\"k\":1}}}",
+   "body": "{\"synthetic\":{\"timed_out\":{\"k\":1}}}",
    "want": "{\n  \"k\": 1\n}"
   },
   {
    "id": "P27/body-array",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "[1,2]",
    "want": ""
   },
   {
    "id": "P27/body-null",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "null",
    "want": "false"
   },
   {
    "id": "P27/body-empty",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "",
    "want": ""
   },
   {
    "id": "P27/body-malformed",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "{\"results\": [{\"provider\":",
    "want": ""
   },
   {
    "id": "P27/realistic-nested-wire-shape",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
-   "body": "{\"providers\":{\"mock\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
+   "body": "{\"providers\":{\"synthetic\":{\"last_error\":\"search failed\",\"recent_failures\":6,\"threshold\":5,\"timed_out\":true}},\"enabled\":true}",
    "want": "false"
   },
   {
    "id": "P27/realistic-quiet",
-   "prog": ".mock.timed_out // false",
+   "prog": ".synthetic.timed_out // false",
    "mode": "json",
    "vars": {},
    "helper": "fieldJSONOrFalse",
    "args": [
-    ".mock.timed_out"
+    ".synthetic.timed_out"
    ],
    "body": "{\"providers\":{},\"enabled\":true}",
    "want": "false"

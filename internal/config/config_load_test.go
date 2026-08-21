@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/envx/yamlenv"
+	"github.com/cplieger/envx/yamlenv/v2"
 )
 
 // --- LoadFromBytes ---
@@ -20,8 +20,8 @@ func TestLoadFromBytes_minimal_valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.URL != "http://sonarr:8989" {
-		t.Errorf("Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://sonarr:8989")
+	if cfg.SonarrCfg.URL != "http://sonarr:8989" {
+		t.Errorf("Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://sonarr:8989")
 	}
 }
 
@@ -32,11 +32,11 @@ func TestLoadFromBytes_defaults_applied(t *testing.T) {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 
-	if cfg.SearchCfg.ScanInterval.D != 24*time.Hour {
-		t.Errorf("ScanInterval = %v, want 24h", cfg.SearchCfg.ScanInterval.D)
+	if cfg.Cfg.ScanInterval.D != 24*time.Hour {
+		t.Errorf("ScanInterval = %v, want 24h", cfg.Cfg.ScanInterval.D)
 	}
-	if cfg.SearchCfg.MinScore != 0 {
-		t.Errorf("MinScore = %d, want 0", cfg.SearchCfg.MinScore)
+	if cfg.Cfg.MinScore != 0 {
+		t.Errorf("MinScore = %d, want 0", cfg.Cfg.MinScore)
 	}
 	if cfg.Logging.Level != "info" {
 		t.Errorf("Logging.Level = %q, want %q", cfg.Logging.Level, "info")
@@ -56,23 +56,23 @@ func TestLoadFromBytes_defaults_applied(t *testing.T) {
 	if cfg.AdaptiveCfg.BackoffMultiplier != 2 {
 		t.Errorf("AdaptiveCfg.BackoffMultiplier = %v, want 2", cfg.AdaptiveCfg.BackoffMultiplier)
 	}
-	if !cfg.SearchCfg.UpgradeEnabled {
-		t.Error("SearchCfg.UpgradeEnabled = false, want true")
+	if !cfg.Cfg.UpgradeEnabled {
+		t.Error("Cfg.UpgradeEnabled = false, want true")
 	}
-	if cfg.SearchCfg.UpgradeWindowDays != 7 {
-		t.Errorf("SearchCfg.UpgradeWindowDays = %d, want 7", cfg.SearchCfg.UpgradeWindowDays)
+	if cfg.Cfg.UpgradeWindowDays != 7 {
+		t.Errorf("Cfg.UpgradeWindowDays = %d, want 7", cfg.Cfg.UpgradeWindowDays)
 	}
-	if cfg.SearchCfg.ProviderTimeout.D != time.Hour {
-		t.Errorf("SearchCfg.ProviderTimeout = %v, want 1h", cfg.SearchCfg.ProviderTimeout.D)
+	if cfg.Cfg.ProviderTimeout.D != time.Hour {
+		t.Errorf("Cfg.ProviderTimeout = %v, want 1h", cfg.Cfg.ProviderTimeout.D)
 	}
-	if cfg.SearchCfg.ScanDelay.D != 5*time.Second {
-		t.Errorf("SearchCfg.ScanDelay = %v, want 5s", cfg.SearchCfg.ScanDelay.D)
+	if cfg.Cfg.ScanDelay.D != 5*time.Second {
+		t.Errorf("Cfg.ScanDelay = %v, want 5s", cfg.Cfg.ScanDelay.D)
 	}
-	if cfg.SearchCfg.MaxSSEClients != 32 {
-		t.Errorf("SearchCfg.MaxSSEClients = %d, want 32", cfg.SearchCfg.MaxSSEClients)
+	if cfg.Cfg.MaxSSEClients != 32 {
+		t.Errorf("Cfg.MaxSSEClients = %d, want 32", cfg.Cfg.MaxSSEClients)
 	}
-	if len(cfg.SearchCfg.ExcludeArrTags) != 1 || cfg.SearchCfg.ExcludeArrTags[0] != "no-subflux" {
-		t.Errorf("SearchCfg.ExcludeArrTags = %v, want [no-subflux]", cfg.SearchCfg.ExcludeArrTags)
+	if len(cfg.Cfg.ExcludeArrTags) != 1 || cfg.Cfg.ExcludeArrTags[0] != "no-subflux" {
+		t.Errorf("Cfg.ExcludeArrTags = %v, want [no-subflux]", cfg.Cfg.ExcludeArrTags)
 	}
 	if cfg.PollIntervalCfg.D != 30*time.Second {
 		t.Errorf("PollIntervalCfg = %v, want 30s", cfg.PollIntervalCfg.D)
@@ -168,8 +168,8 @@ providers:
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.URL != "http://expanded:8989" {
-		t.Errorf("Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://expanded:8989")
+	if cfg.SonarrCfg.URL != "http://expanded:8989" {
+		t.Errorf("Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://expanded:8989")
 	}
 }
 
@@ -200,10 +200,10 @@ providers:
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	if cfg.Sonarr.APIKey != evil {
-		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.Sonarr.APIKey, evil)
+	if cfg.SonarrCfg.APIKey != evil {
+		t.Errorf("Sonarr.APIKey = %q, want the raw environment value %q", cfg.SonarrCfg.APIKey, evil)
 	}
-	if p := cfg.Providers["os"]; !p.Enabled {
+	if p := cfg.ProvidersCfg["os"]; !p.Enabled {
 		t.Error("providers.os.enabled flipped to false: the expanded value rewrote document structure")
 	}
 }
@@ -230,8 +230,8 @@ providers:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	// Unset env vars are preserved as literal "${VAR}".
-	if cfg.Sonarr.APIKey != "${SUBFLUX_TEST_UNSET_VAR_12345}" {
-		t.Errorf("Sonarr.APIKey = %q, want literal ${SUBFLUX_TEST_UNSET_VAR_12345}", cfg.Sonarr.APIKey)
+	if cfg.SonarrCfg.APIKey != "${SUBFLUX_TEST_UNSET_VAR_12345}" {
+		t.Errorf("Sonarr.APIKey = %q, want literal ${SUBFLUX_TEST_UNSET_VAR_12345}", cfg.SonarrCfg.APIKey)
 	}
 }
 
@@ -245,8 +245,8 @@ func TestLoad_reads_file(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(%q) unexpected error: %v", path, err)
 	}
-	if cfg.Sonarr.URL != "http://sonarr:8989" {
-		t.Errorf("Load().Sonarr.URL = %q, want %q", cfg.Sonarr.URL, "http://sonarr:8989")
+	if cfg.SonarrCfg.URL != "http://sonarr:8989" {
+		t.Errorf("Load().Sonarr.URL = %q, want %q", cfg.SonarrCfg.URL, "http://sonarr:8989")
 	}
 }
 
@@ -389,8 +389,8 @@ providers:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	// HOME is not in the allowed list, so it should be preserved as literal.
-	if cfg.Sonarr.APIKey != "${HOME}" {
-		t.Errorf("Sonarr.APIKey = %q, want literal ${HOME} (blocked)", cfg.Sonarr.APIKey)
+	if cfg.SonarrCfg.APIKey != "${HOME}" {
+		t.Errorf("Sonarr.APIKey = %q, want literal ${HOME} (blocked)", cfg.SonarrCfg.APIKey)
 	}
 }
 
@@ -472,10 +472,10 @@ func TestLoad_logs_arr_flags(t *testing.T) {
 	})
 
 	if !strings.Contains(out, "sonarr=true") {
-		t.Errorf("Load log = %q, want it to contain sonarr=true (SonarrConfig().URL != \"\")", out)
+		t.Errorf("Load log = %q, want it to contain sonarr=true (Sonarr().URL != \"\")", out)
 	}
 	if !strings.Contains(out, "radarr=false") {
-		t.Errorf("Load log = %q, want it to contain radarr=false (RadarrConfig().URL == \"\")", out)
+		t.Errorf("Load log = %q, want it to contain radarr=false (Radarr().URL == \"\")", out)
 	}
 }
 
@@ -589,8 +589,8 @@ func TestLoadFromBytes_env_var_in_duration_field_passes_probe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFromBytes(${VAR} in Duration field) unexpected error: %v", err)
 	}
-	if cfg.SearchCfg.ScanDelay.D != 6*time.Second {
-		t.Errorf("ScanDelay = %v, want 6s (expanded from ${VAR})", cfg.SearchCfg.ScanDelay.D)
+	if cfg.Cfg.ScanDelay.D != 6*time.Second {
+		t.Errorf("ScanDelay = %v, want 6s (expanded from ${VAR})", cfg.Cfg.ScanDelay.D)
 	}
 }
 

@@ -16,19 +16,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. Two shapes keep t.Fatalf — the slot acquisition
+// that stages a QUEUED scan (without it the scan runs immediately and the
+// test measures nothing), and an accept status that gates decoding the
+// ScanAccepted body the later assertions read.
 
 // --- fakes ---
 
-// fakeEngine is a controllable api.SearchEngine: SearchTargets counts calls
+// fakeEngine is a controllable ScanEngine: SearchTargets counts calls
 // and, when the gate channels are set, signals each call's ordinal on
 // `started` and blocks until `release` yields — letting tests stop a scan
 // while an item is provably IN FLIGHT.
+//
+// Two methods, because ScanEngine declares two. It used to carry all eight of
+// the old composite's methods; the six it never needed (score simulation,
+// timeout state, post-processing, hashing) went with the composite.
 type fakeEngine struct {
 	started chan int
 	release chan struct{}
@@ -36,7 +47,7 @@ type fakeEngine struct {
 	calls   int
 }
 
-func (e *fakeEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
+func (e *fakeEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
 	e.mu.Lock()
 	e.calls++
 	n := e.calls
@@ -47,7 +58,7 @@ func (e *fakeEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ st
 	if e.release != nil {
 		<-e.release
 	}
-	return api.SearchResult{}, nil
+	return subflux.SearchResult{}, nil
 }
 
 func (e *fakeEngine) callCount() int {
@@ -56,38 +67,16 @@ func (e *fakeEngine) callCount() int {
 	return e.calls
 }
 
-func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
+func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
 	return false
 }
-
-func (e *fakeEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
-	return nil, false
-}
-func (e *fakeEngine) ResetTimeouts() {}
-func (e *fakeEngine) SimulateScore(_ api.MediaType, _, _ string, _ api.MatchMethod) api.ScoreResult {
-	return api.ScoreResult{}
-}
-
-func (e *fakeEngine) ScoreSubtitles(_ *api.SearchRequest, _ []api.Subtitle) []api.ScoredResult {
-	return nil
-}
-
-func (e *fakeEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ api.Variant) ([]byte, int64) {
-	return data, 0
-}
-
-func (e *fakeEngine) HashFile(_ context.Context, _ string) (string, int64, error) {
-	return "", 0, nil
-}
-
-var _ api.SearchEngine = (*fakeEngine)(nil)
 
 // recEvents records the scan SSE publications.
 type scanEvt struct {
 	action  string
 	detail  string
 	actID   string
-	source  activity.ActivitySource
+	source  activity.Source
 	outcome activity.Outcome
 }
 
@@ -101,21 +90,26 @@ type recEvents struct {
 	dones  []scanEvt
 }
 
-func (r *recEvents) PublishCoverageUpdate(api.MediaType, string) {}
+func (r *recEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
 
-func (r *recEvents) PublishScanStart(action, detail string, source activity.ActivitySource, actID string) {
+func (r *recEvents) PublishScanStart(ev *events.ScanEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.starts = append(r.starts, scanEvt{action: action, detail: detail, source: source, actID: actID})
+	r.starts = append(r.starts, scanEvt{
+		action: ev.Action, detail: ev.Detail, source: ev.Source, actID: ev.ActivityID,
+	})
 }
 
-func (r *recEvents) PublishScanDone(action, detail string, source activity.ActivitySource, actID string, outcome activity.Outcome) {
+func (r *recEvents) PublishScanDone(ev *events.ScanEvent) {
 	if r.onDone != nil {
-		r.onDone(actID)
+		r.onDone(ev.ActivityID)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.dones = append(r.dones, scanEvt{action: action, detail: detail, source: source, actID: actID, outcome: outcome})
+	r.dones = append(r.dones, scanEvt{
+		action: ev.Action, detail: ev.Detail, source: ev.Source,
+		actID: ev.ActivityID, outcome: ev.Outcome,
+	})
 }
 
 func (r *recEvents) doneEvents() []scanEvt {
@@ -139,11 +133,11 @@ type fakeSonarr struct {
 	episodes    []arrapi.Episode
 }
 
-func (f *fakeSonarr) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+func (f *fakeSonarr) SeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
 	return f.series, f.seriesErr
 }
 
-func (f *fakeSonarr) GetEpisodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
+func (f *fakeSonarr) Episodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
 	return f.episodes, f.episodesErr
 }
 
@@ -153,7 +147,7 @@ type fakeRadarr struct {
 	movie    arrapi.Movie
 }
 
-func (f *fakeRadarr) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+func (f *fakeRadarr) MovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
 	return f.movie, f.movieErr
 }
 
@@ -200,10 +194,10 @@ func newScanRig(t *testing.T) *scanRig {
 		sonarr: &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Test Show"}, episodes: epsWithFiles(1)},
 		radarr: &fakeRadarr{movie: arrapi.Movie{ID: 7, Title: "Test Movie", Year: 2020, MovieFile: &arrapi.MovieFile{Path: "/media/m.mkv"}}},
 	}
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	rig.h = NewHandler(HandlerDeps{
 		StateFunc: func() (*HandlerState, *LiveState) {
-			st := &HandlerState{Cfg: cfg, Engine: rig.engine}
+			st := &HandlerState{Cfg: cfg}
 			if rig.sonarr != nil {
 				st.Sonarr = rig.sonarr
 			}
@@ -267,7 +261,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 		name      string
 		invoke    func(rig *scanRig) (int, ScanAccepted)
 		wantKind  activity.ScanKind
-		wantMedia api.MediaType
+		wantMedia subflux.MediaType
 	}{
 		{
 			name: "series",
@@ -297,7 +291,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 					`{"media_type":"episode","media_id":42,"season":1,"episode":1}`)
 			},
 			wantKind:  activity.ScanKindItem,
-			wantMedia: api.MediaTypeEpisode,
+			wantMedia: subflux.MediaTypeEpisode,
 		},
 		{
 			name: "item movie",
@@ -306,7 +300,7 @@ func TestScanEndpoints_return_202_with_activity_id(t *testing.T) {
 					`{"media_type":"movie","media_id":7}`)
 			},
 			wantKind:  activity.ScanKindItem,
-			wantMedia: api.MediaTypeMovie,
+			wantMedia: subflux.MediaTypeMovie,
 		},
 	}
 	for _, tc := range cases {
@@ -361,7 +355,7 @@ func TestHandleScanSeries_preflight_not_found_404(t *testing.T) {
 
 	code, _ := rig.post(t, rig.h.HandleScanSeries, "/api/scan/series/42", "")
 	if code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 (synchronous preflight)", code)
+		t.Errorf("status = %d, want 404 (synchronous preflight)", code)
 	}
 	if n := len(rig.log.Entries()); n != 0 {
 		t.Errorf("activity entries = %d after preflight failure, want 0", n)
@@ -658,7 +652,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	engine := &fakeEngine{started: make(chan int), release: make(chan struct{})}
 	ev := &recEvents{}
 	log := activity.New(10)
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
@@ -666,7 +660,7 @@ func TestProcessItems_stop_between_items(t *testing.T) {
 	}
 	queue := []ScanItem{movie(1, "A"), movie(2, "B"), movie(3, "C")}
 	stop := make(chan struct{})
-	var stats api.ScanStats
+	var stats subflux.ScanStats
 
 	type result struct {
 		resumed int
@@ -702,7 +696,7 @@ func TestRunFullScan_outcomes(t *testing.T) {
 	newDeps := func(db *fakeScanStore, ev *recEvents, log *activity.Log) *Deps {
 		return &Deps{
 			DB: db, Metrics: nopScanMetrics{}, Events: ev, Activity: log,
-			Alerts: nopAlerts{}, ClearCaches: func([]api.Provider) {},
+			Alerts: nopAlerts{}, ClearCaches: func([]provider.Provider) {},
 		}
 	}
 
@@ -711,12 +705,12 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		db := &fakeScanStore{}
 		log := activity.New(10)
 		deps := newDeps(db, &recEvents{}, log)
-		ls := &LiveState{Cfg: &testsupport.NopConfig{}, Engine: &fakeEngine{}}
+		ls := &LiveState{Cfg: &fakeScanCfg{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
 		outcome := RunFullScan(t.Context(), make(chan struct{}), deps, ls, actID)
 		if outcome != activity.OutcomeCompleted {
-			t.Fatalf("outcome = %q, want completed", outcome)
+			t.Errorf("outcome = %q, want completed", outcome)
 		}
 		if db.cleared != 1 {
 			t.Errorf("cycle mark cleared %d times, want 1", db.cleared)
@@ -728,14 +722,14 @@ func TestRunFullScan_outcomes(t *testing.T) {
 		db := &fakeScanStore{}
 		log := activity.New(10)
 		deps := newDeps(db, &recEvents{}, log)
-		ls := &LiveState{Cfg: &testsupport.NopConfig{}, Engine: &fakeEngine{}}
+		ls := &LiveState{Cfg: &fakeScanCfg{}, Engine: &fakeEngine{}}
 		actID := log.Start("Full Scan", "d", activity.SourceManual)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		outcome := RunFullScan(ctx, make(chan struct{}), deps, ls, actID)
 		if outcome != activity.OutcomeShutdown {
-			t.Fatalf("outcome = %q, want shutdown", outcome)
+			t.Errorf("outcome = %q, want shutdown", outcome)
 		}
 		if db.cleared != 0 {
 			t.Errorf("cycle mark cleared %d times on shutdown, want 0 (resume signal stays)", db.cleared)
@@ -858,7 +852,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 	engine := &fakeEngine{started: make(chan int), release: make(chan struct{})}
 	ev := &recEvents{}
 	log := activity.New(10)
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	deps := &Deps{Events: ev, Activity: log, Alerts: nopAlerts{}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	movie := func(id int, title string) ScanItem {
@@ -866,7 +860,7 @@ func TestProcessItems_stop_during_final_item(t *testing.T) {
 	}
 	queue := []ScanItem{movie(1, "A"), movie(2, "B"), movie(3, "C")}
 	stop := make(chan struct{})
-	var stats api.ScanStats
+	var stats subflux.ScanStats
 
 	res := make(chan activity.Outcome, 1)
 	go func() {
@@ -976,7 +970,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakeScanCfg{}
 	engineA := &fakeEngine{}
 	engineB := &fakeEngine{}
 	sonarrA := &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Gen A Show"}, episodes: epsWithFiles(2)}
@@ -992,7 +986,7 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 	bg := &sync.WaitGroup{}
 
 	var mu sync.Mutex
-	curState := &HandlerState{Cfg: cfg, Engine: engineA, Sonarr: sonarrA}
+	curState := &HandlerState{Cfg: cfg, Sonarr: sonarrA}
 	curLS := &LiveState{Cfg: cfg, Engine: engineA}
 	var stateCalls, depsCalls int
 	callCount := func() int {
@@ -1044,12 +1038,12 @@ func TestScan_operation_uses_one_state_snapshot(t *testing.T) {
 
 	callsAtAccept := callCount()
 	if callsAtAccept != 2 {
-		t.Fatalf("state callbacks consulted %d times at accept, want exactly 2 (one combined state read + one deps read)", callsAtAccept)
+		t.Errorf("state callbacks consulted %d times at accept, want exactly 2 (one combined state read + one deps read)", callsAtAccept)
 	}
 
 	// Hot reload while the operation is queued: swap every generation callback.
 	mu.Lock()
-	curState = &HandlerState{Cfg: cfg, Engine: engineB, Sonarr: sonarrB}
+	curState = &HandlerState{Cfg: cfg, Sonarr: sonarrB}
 	curLS = &LiveState{Cfg: cfg, Engine: engineB}
 	mu.Unlock()
 

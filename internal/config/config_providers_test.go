@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- ProvidersForTarget ---
@@ -15,58 +15,58 @@ func TestProvidersForTarget(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
-		providers []api.ProviderID
-		exclude   []api.ProviderID
-		all       []api.ProviderID
-		want      []api.ProviderID
+		providers []subflux.ProviderID
+		exclude   []subflux.ProviderID
+		all       []subflux.ProviderID
+		want      []subflux.ProviderID
 	}{
 		{
 			name:      "include_list",
-			providers: []api.ProviderID{"opensubtitles", "embedded"},
-			all:       []api.ProviderID{"opensubtitles", "embedded", "yify"},
-			want:      []api.ProviderID{"opensubtitles", "embedded"},
+			providers: []subflux.ProviderID{"opensubtitles", "embedded"},
+			all:       []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
+			want:      []subflux.ProviderID{"opensubtitles", "embedded"},
 		},
 		{
 			name:    "exclude_preserves_order",
-			exclude: []api.ProviderID{"yify"},
-			all:     []api.ProviderID{"opensubtitles", "embedded", "yify"},
-			want:    []api.ProviderID{"opensubtitles", "embedded"},
+			exclude: []subflux.ProviderID{"yify"},
+			all:     []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
+			want:    []subflux.ProviderID{"opensubtitles", "embedded"},
 		},
 		{
 			name:    "exclude_all",
-			exclude: []api.ProviderID{"opensubtitles", "yify"},
-			all:     []api.ProviderID{"opensubtitles", "yify"},
-			want:    []api.ProviderID{},
+			exclude: []subflux.ProviderID{"opensubtitles", "yify"},
+			all:     []subflux.ProviderID{"opensubtitles", "yify"},
+			want:    []subflux.ProviderID{},
 		},
 		{
 			name:    "empty_exclude_falls_through",
-			exclude: []api.ProviderID{},
-			all:     []api.ProviderID{"opensubtitles", "embedded", "yify"},
-			want:    []api.ProviderID{"opensubtitles", "embedded", "yify"},
+			exclude: []subflux.ProviderID{},
+			all:     []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
+			want:    []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
 		},
 		{
 			name: "all_providers",
-			all:  []api.ProviderID{"opensubtitles", "embedded", "yify"},
-			want: []api.ProviderID{"opensubtitles", "embedded", "yify"},
+			all:  []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
+			want: []subflux.ProviderID{"opensubtitles", "embedded", "yify"},
 		},
 		{
 			name:      "boundary_empty_providers",
-			providers: []api.ProviderID{},
-			all:       []api.ProviderID{"os", "yify", "embedded"},
-			want:      []api.ProviderID{"os", "yify", "embedded"},
+			providers: []subflux.ProviderID{},
+			all:       []subflux.ProviderID{"os", "yify", "embedded"},
+			want:      []subflux.ProviderID{"os", "yify", "embedded"},
 		},
 		{
 			name:      "non_empty_providers",
-			providers: []api.ProviderID{"os"},
-			all:       []api.ProviderID{"os", "yify", "embedded"},
-			want:      []api.ProviderID{"os"},
+			providers: []subflux.ProviderID{"os"},
+			all:       []subflux.ProviderID{"os", "yify", "embedded"},
+			want:      []subflux.ProviderID{"os"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			cfg := &Config{}
-			target := &api.SubtitleTarget{
+			target := &subflux.SubtitleTarget{
 				Code:      "fr",
 				Providers: tt.providers,
 				Exclude:   tt.exclude,
@@ -89,7 +89,7 @@ func TestLoadFromBytes_embedded_subtitles_defaults(t *testing.T) {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	defer func() { _ = cfg.Close() }()
-	want := api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: false}
+	want := subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: false}
 	if got := cfg.EmbeddedPolicy(); got != want {
 		t.Errorf("EmbeddedPolicy() = %+v, want %+v (defaults)", got, want)
 	}
@@ -108,7 +108,7 @@ embedded_subtitles:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	defer func() { _ = cfg.Close() }()
-	want := api.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: false, IgnoreASS: true}
+	want := subflux.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: false, IgnoreASS: true}
 	if got := cfg.EmbeddedPolicy(); got != want {
 		t.Errorf("EmbeddedPolicy() = %+v, want %+v", got, want)
 	}
@@ -128,7 +128,7 @@ embedded_subtitles:
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
 	defer func() { _ = cfg.Close() }()
-	want := api.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: true, IgnoreASS: false}
+	want := subflux.EmbeddedPolicy{IgnorePGS: false, IgnoreVobSub: true, IgnoreASS: false}
 	if got := cfg.EmbeddedPolicy(); got != want {
 		t.Errorf("EmbeddedPolicy() = %+v, want %+v (partial overlay)", got, want)
 	}

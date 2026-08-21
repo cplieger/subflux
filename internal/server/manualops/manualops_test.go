@@ -4,11 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 func TestValidateDownloadRequest(t *testing.T) {
@@ -16,20 +16,20 @@ func TestValidateDownloadRequest(t *testing.T) {
 	tests := []struct {
 		wantErr error
 		name    string
-		wantMT  api.MediaType
+		wantMT  subflux.MediaType
 		req     DownloadRequest
 	}{
 		{
 			name:    "valid request defaults media type to movie",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en"},
 			wantErr: nil,
-			wantMT:  api.MediaTypeMovie,
+			wantMT:  subflux.MediaTypeMovie,
 		},
 		{
 			name:    "valid episode request preserves explicit media type",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: api.MediaTypeEpisode, Season: 1, Episode: 2},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: subflux.MediaTypeEpisode, Season: 1, Episode: 2},
 			wantErr: nil,
-			wantMT:  api.MediaTypeEpisode,
+			wantMT:  subflux.MediaTypeEpisode,
 		},
 		{
 			name:    "missing provider",
@@ -57,13 +57,24 @@ func TestValidateDownloadRequest(t *testing.T) {
 			wantErr: ErrInvalidLangCode,
 		},
 		{
+			name:    "language code outside the internal space",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "eng"},
+			wantErr: ErrInvalidLangCode,
+		},
+		{
+			name:    "subflux's own Brazilian Portuguese code is accepted",
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "pb"},
+			wantErr: nil,
+			wantMT:  subflux.MediaTypeMovie,
+		},
+		{
 			name:    "invalid media type",
 			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: "invalid"},
 			wantErr: ErrInvalidMediaType,
 		},
 		{
 			name:    "episode without episode number",
-			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: api.MediaTypeEpisode},
+			req:     DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: "en", MediaType: subflux.MediaTypeEpisode},
 			wantErr: ErrMissingEpisode,
 		},
 	}
@@ -82,29 +93,34 @@ func TestValidateDownloadRequest(t *testing.T) {
 	}
 }
 
-func TestIsValidLangCode(t *testing.T) {
+// POST /api/search/download is the ONE path by which an untrusted language code
+// reaches a filename: the automated path resolves its targets from validated
+// config, but this one takes the code from the request body and hands it to
+// subtitlefile.ManualPath, which writes it as a dot segment next to the media
+// file. Those directories are shared over SMB and NFS and read by Windows
+// clients, so a character POSIX allows and Win32 does not is a portability
+// break, not a cosmetic one: ':' opens an NTFS alternate data stream, the Win32
+// name grammar bars < > " | ? *, and a trailing dot or space is stripped, which
+// collapses two codes onto one file.
+//
+// A character blocklist cannot hold this line — a trailing dot is legal on its
+// own and composes into ".." in the rendered path. The gate is the closed
+// vocabulary instead, the same one config.validateLangCode applies.
+func TestValidateDownloadRequest_rejectsLangCodesUnsafeInAFilename(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		lang string
-		want bool
-	}{
-		{"eng", true},
-		{"pt-BR", true},
-		{"zh-Hans", true},
-		{"", false},
-		{strings.Repeat("a", MaxLangCodeLen), true},    // exactly the limit is valid
-		{strings.Repeat("a", MaxLangCodeLen+1), false}, // one over the limit
-		{"en/gb", false},
-		{"en\\gb", false},
-		{"en..gb", false},
-		{"en\x00gb", false},
-		{"en\tUS", false}, // tab (0x09) is a control char
-		{"en US", true},   // space (0x20) is not a control char
-	}
-	for _, tt := range tests {
-		if got := IsValidLangCode(tt.lang); got != tt.want {
-			t.Errorf("IsValidLangCode(%q) = %v, want %v", tt.lang, got, tt.want)
-		}
+	for _, lang := range []string{
+		"a:b", "en<", "en>", `en"`, "en|", "en?", "en*",
+		"en.", ".en", "en ", " en", "en\x00", "en/fr", `en\fr`, "en..fr",
+	} {
+		t.Run(lang, func(t *testing.T) {
+			t.Parallel()
+			req := DownloadRequest{Provider: "os", SubtitleID: "1", ArrID: 42, Language: lang}
+			if err := ValidateDownloadRequest(&req); !errors.Is(err, ErrInvalidLangCode) {
+				t.Errorf("ValidateDownloadRequest(language=%q) error = %v, want ErrInvalidLangCode; "+
+					"it reaches the share as %q", lang, err,
+					subtitlefile.ManualPath("/media/movie.mkv", 1, subtitlefile.Tags{Lang: lang}))
+			}
+		})
 	}
 }
 
@@ -120,7 +136,7 @@ func TestValidMediaType(t *testing.T) {
 		{"", false},
 	}
 	for _, tt := range tests {
-		if got := api.MediaType(tt.mt).Valid(); got != tt.want {
+		if got := subflux.MediaType(tt.mt).Valid(); got != tt.want {
 			t.Errorf("MediaType(%q).Valid() = %v, want %v", tt.mt, got, tt.want)
 		}
 	}
@@ -128,9 +144,9 @@ func TestValidMediaType(t *testing.T) {
 
 func TestBuildSearchResults_caps_at_MaxResults(t *testing.T) {
 	t.Parallel()
-	scored := make([]api.ScoredResult, MaxResults+10)
+	scored := make([]subflux.ScoredResult, MaxResults+10)
 	for i := range scored {
-		scored[i] = api.ScoredResult{Sub: api.Subtitle{Provider: "p", Language: "eng"}, Score: i}
+		scored[i] = subflux.ScoredResult{Sub: subflux.Subtitle{Provider: "p", Language: "eng"}, Score: i}
 	}
 	results := BuildSearchResults(scored, nil, nil)
 	if len(results) != MaxResults {
@@ -142,17 +158,17 @@ func TestBuildSearchResults_caps_at_MaxResults(t *testing.T) {
 // injected scorer; a nil scorer (pre-wire state) leaves tiers empty.
 func TestBuildSearchResults_computes_tier(t *testing.T) {
 	t.Parallel()
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", ReleaseName: "A"}, Score: 85},
-		{Sub: api.Subtitle{Provider: "os", ReleaseName: "B"}, Score: 0},
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{Provider: "os", ReleaseName: "A"}, Score: 85},
+		{Sub: subflux.Subtitle{Provider: "os", ReleaseName: "B"}, Score: 0},
 	}
-	sc := scorer.New(&api.DefaultScores)
+	sc := scorer.New(&subflux.DefaultScores)
 	results := BuildSearchResults(scored, nil, sc)
-	if results[0].Tier != api.TierExcellent {
-		t.Errorf("Tier for score 85 = %q, want %q", results[0].Tier, api.TierExcellent)
+	if results[0].Tier != subflux.TierExcellent {
+		t.Errorf("Tier for score 85 = %q, want %q", results[0].Tier, subflux.TierExcellent)
 	}
-	if results[1].Tier != api.TierNone {
-		t.Errorf("Tier for score 0 = %q, want %q", results[1].Tier, api.TierNone)
+	if results[1].Tier != subflux.TierNone {
+		t.Errorf("Tier for score 0 = %q, want %q", results[1].Tier, subflux.TierNone)
 	}
 
 	noScorer := BuildSearchResults(scored, nil, nil)
@@ -163,11 +179,11 @@ func TestBuildSearchResults_computes_tier(t *testing.T) {
 
 func TestBuildSearchResults_marks_on_disk(t *testing.T) {
 	t.Parallel()
-	scored := []api.ScoredResult{
-		{Sub: api.Subtitle{Provider: "os", ReleaseName: "Movie.2024", Language: "eng"}, Score: 80},
-		{Sub: api.Subtitle{Provider: "os", ReleaseName: "Other.2024", Language: "eng"}, Score: 70},
+	scored := []subflux.ScoredResult{
+		{Sub: subflux.Subtitle{Provider: "os", ReleaseName: "Movie.2024", Language: "eng"}, Score: 80},
+		{Sub: subflux.Subtitle{Provider: "os", ReleaseName: "Other.2024", Language: "eng"}, Score: 70},
 	}
-	refs := []api.DownloadedRef{{Provider: "os", ReleaseName: "Movie.2024"}}
+	refs := []subflux.DownloadedRef{{Provider: "os", ReleaseName: "Movie.2024"}}
 	results := BuildSearchResults(scored, refs, nil)
 	if !results[0].OnDisk {
 		t.Error("first result should be marked OnDisk")
@@ -203,7 +219,7 @@ func TestParseSearchQuery(t *testing.T) {
 		name        string
 		query       string
 		wantLang    string
-		wantType    api.MediaType
+		wantType    subflux.MediaType
 		wantTitle   string
 		wantImdb    string
 		wantSeason  int
@@ -216,7 +232,7 @@ func TestParseSearchQuery(t *testing.T) {
 			name:        "explicit movie with all fields",
 			query:       "title=The+Matrix&imdb=tt0133093&lang=fr&type=movie&year=1999&release=Matrix.1999.1080p",
 			wantLang:    "fr",
-			wantType:    api.MediaTypeMovie,
+			wantType:    subflux.MediaTypeMovie,
 			wantTitle:   "The Matrix",
 			wantImdb:    "tt0133093",
 			wantYear:    1999,
@@ -226,14 +242,14 @@ func TestParseSearchQuery(t *testing.T) {
 			name:      "missing lang defaults to en",
 			query:     "title=X&type=movie",
 			wantLang:  "en",
-			wantType:  api.MediaTypeMovie,
+			wantType:  subflux.MediaTypeMovie,
 			wantTitle: "X",
 		},
 		{
 			name:        "no type with season and episode infers episode",
 			query:       "title=Show&season=1&episode=2",
 			wantLang:    "en",
-			wantType:    api.MediaTypeEpisode,
+			wantType:    subflux.MediaTypeEpisode,
 			wantTitle:   "Show",
 			wantSeason:  1,
 			wantEpisode: 2,
@@ -242,7 +258,7 @@ func TestParseSearchQuery(t *testing.T) {
 			name:       "no type without episode infers movie",
 			query:      "title=Show&season=1",
 			wantLang:   "en",
-			wantType:   api.MediaTypeMovie,
+			wantType:   subflux.MediaTypeMovie,
 			wantTitle:  "Show",
 			wantSeason: 1,
 		},
@@ -250,7 +266,7 @@ func TestParseSearchQuery(t *testing.T) {
 			name:      "media_id (arr id) parsed for server-side resolution",
 			query:     "type=movie&media_id=42&title=X",
 			wantLang:  "en",
-			wantType:  api.MediaTypeMovie,
+			wantType:  subflux.MediaTypeMovie,
 			wantTitle: "X",
 			wantArrID: 42,
 		},
@@ -258,14 +274,14 @@ func TestParseSearchQuery(t *testing.T) {
 			name:        "file param is gone: ignored, never a path",
 			query:       "type=movie&file=/media/Movie.mkv&release=Real.Release",
 			wantLang:    "en",
-			wantType:    api.MediaTypeMovie,
+			wantType:    subflux.MediaTypeMovie,
 			wantRelease: "Real.Release",
 		},
 		{
 			name:        "negative and non-numeric ints clamp to zero",
 			query:       "type=movie&year=-5&season=abc&episode=2",
 			wantLang:    "en",
-			wantType:    api.MediaTypeMovie,
+			wantType:    subflux.MediaTypeMovie,
 			wantYear:    0,
 			wantSeason:  0,
 			wantEpisode: 2,

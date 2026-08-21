@@ -29,7 +29,7 @@ func FuzzLoadFromBytes(f *testing.F) {
 
 		// The legacy providers.embedded section fails validation with the
 		// targeted cutover error, so it can never appear in a loaded config.
-		if _, ok := cfg.Providers[legacyEmbeddedProvider]; ok {
+		if _, ok := cfg.ProvidersCfg[legacyEmbeddedProvider]; ok {
 			t.Error("providers.embedded survived a successful load, want targeted rejection")
 		}
 

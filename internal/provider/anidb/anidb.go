@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/xmlx"
 	"golang.org/x/sync/singleflight"
@@ -86,7 +86,7 @@ type EpisodeResult struct {
 // Resolve maps a TVDB series ID + season + episode to AniDB IDs.
 // Returns nil if no mapping exists.
 func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *EpisodeResult {
-	list, err := m.getParsedMapping(ctx)
+	list, err := m.parsedMapping(ctx)
 	if err != nil {
 		slog.Warn("anidb: failed to fetch mapping", "error", err)
 		return nil
@@ -106,7 +106,7 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 
 	// If we have an API key, resolve the episode-specific ID.
 	if m.clientKey != "" && seriesID > 0 && epNo > 0 {
-		epID, epErr := m.getEpisodeID(ctx, seriesID, epNo)
+		epID, epErr := m.episodeID(ctx, seriesID, epNo)
 		if epErr != nil {
 			slog.Debug("anidb: episode ID lookup failed",
 				"series_id", seriesID, "ep_no", epNo, "error", epErr)
@@ -120,13 +120,13 @@ func (m *Mapper) Resolve(ctx context.Context, tvdbID, season, episode int) *Epis
 
 // --- Mapping XML ---
 
-// getParsedMapping returns the cached parsed anime list, fetching and
+// parsedMapping returns the cached parsed anime list, fetching and
 // parsing the XML if the cache is stale or empty. The lock is held for
 // the entire fetch to prevent thundering herd on cache expiry. Since
 // the cache refreshes every 24h and the fetch takes <2s, blocking
 // concurrent callers is acceptable. On fetch failure, returns the stale
 // cache (if any) with a warning log rather than failing the lookup.
-func (m *Mapper) getParsedMapping(ctx context.Context) (*animeList, error) {
+func (m *Mapper) parsedMapping(ctx context.Context) (*animeList, error) {
 	m.mu.Lock()
 	if m.parsedList != nil && time.Since(m.mappingTime) < 24*time.Hour {
 		list := m.parsedList
@@ -166,8 +166,8 @@ func (m *Mapper) getParsedMapping(ctx context.Context) (*animeList, error) {
 // fetchMapping downloads and parses the anime-list.xml mapping file.
 // Public raw-file fetch on raw.githubusercontent.com; any non-200 is a
 // fetch failure, not an auth/rate-limit signal, so we keep a plain error
-// here rather than calling httputil.CheckHTTPStatus (which would map 403
-// to *api.AuthError, misleading for a public blob fetch).
+// here rather than calling httpwire.CheckHTTPStatus (which would map 403
+// to *subflux.AuthError, misleading for a public blob fetch).
 func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	slog.Debug("anidb: fetching anime-list.xml")
 
@@ -175,7 +175,8 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
-		fetchCtx, http.MethodGet, mappingURL, http.NoBody)
+		fetchCtx, http.MethodGet, mappingURL, http.NoBody,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -188,12 +189,12 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes+1))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes+1))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > httputil.MaxDownloadBytes {
-		return nil, fmt.Errorf("anime-list.xml exceeded %d bytes", httputil.MaxDownloadBytes)
+	if int64(len(data)) > httpwire.MaxDownloadBytes {
+		return nil, fmt.Errorf("anime-list.xml exceeded %d bytes", httpwire.MaxDownloadBytes)
 	}
 
 	// Defensive: GitHub's CDN always auto-negotiates gzip, which net/http's
@@ -201,7 +202,7 @@ func (m *Mapper) fetchMapping(ctx context.Context) (*animeList, error) {
 	// that (Accept-Encoding override, Transport.DisableCompression=true),
 	// the body arrives as raw gzip bytes and xml.Unmarshal fails with a
 	// garbled error. Detecting the magic header surfaces the real cause.
-	data, err = decompressIfGzipped(data, httputil.MaxDownloadBytes)
+	data, err = decompressIfGzipped(data, httpwire.MaxDownloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("anidb: mapping decompress: %w", err)
 	}

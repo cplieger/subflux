@@ -8,7 +8,7 @@ import (
 
 // Property tests for asciiFold, the case-insensitive username/email normalizer.
 // Username and (issuer, sub) uniqueness are both enforced through this fold
-// (userNameIndexKey / GetUserByUsername / GetUserByEmail), so a regression that
+// (userNameIndexKey / UserByUsername / UserByEmail), so a regression that
 // folded too much, too little, or corrupted a non-ASCII byte would silently
 // merge or split distinct accounts. asciiFold operates byte-wise (it never
 // decodes runes), so arbitrary byte strings — including invalid UTF-8 and

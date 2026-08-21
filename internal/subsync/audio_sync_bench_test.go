@@ -40,7 +40,7 @@ func BenchmarkAudioSync(b *testing.B) {
 
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				audioSyncFromPCM(b.Context(), cues, pcm, AudioSyncHints{})
 			}
 		})

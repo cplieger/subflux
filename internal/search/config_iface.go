@@ -1,34 +1,36 @@
 package search
 
-import "github.com/cplieger/subflux/internal/api"
+import "github.com/cplieger/subflux/internal/subflux"
 
-// SearchCfg is the narrow configuration interface consumed by the search engine.
-// Only the methods actually called by search are declared here.
-// The concrete config.Config satisfies this via structural typing.
-//
-//nolint:revive // name is established API; renaming would break consumers
-type SearchCfg interface {
+// Cfg is what the scan engine reads out of the configuration: the scoring
+// weights and floors it ranks candidates by, the provider allow-list and
+// priority order it queries in, the concurrency and retry limits it paces
+// itself with, and the sync/post-process settings it applies to a download.
+// 9 of the 37 values the configuration offers — the widest consumer surface in
+// the app, and still short of the whole by the auth, logging, server-runtime,
+// media-path and UI halves a search never reads.
+type Cfg interface {
 	// Scores returns the scoring weights. Must return non-zero values;
 	// zero scores disable all attribute matching.
-	Scores() api.Scores
+	Scores() subflux.Scores
 	// Search returns the top-level search configuration (concurrency, etc.).
-	Search() api.SearchConfig
+	Search() subflux.SearchConfig
 	// Adaptive returns the adaptive search configuration.
-	Adaptive() api.AdaptiveConfig
-	// SyncConfig returns subtitle sync/timing configuration.
-	SyncConfig() api.SyncConfig
-	// PostProcessConfig returns post-processing settings.
-	PostProcessConfig() api.PostProcessConfig
+	Adaptive() subflux.AdaptiveConfig
+	// Sync returns subtitle sync/timing configuration.
+	Sync() subflux.SyncConfig
+	// PostProcess returns post-processing settings.
+	PostProcess() subflux.PostProcessConfig
 	// ProvidersForTarget returns provider names allowed for this target.
 	// Empty slice means no providers will be searched for this target.
-	ProvidersForTarget(t *api.SubtitleTarget, allProviders []api.ProviderID) []api.ProviderID
+	ProvidersForTarget(t *subflux.SubtitleTarget, allProviders []subflux.ProviderID) []subflux.ProviderID
 	// MinScoreForTarget returns the minimum acceptable score for a target.
 	// Returns 0 to accept any score.
-	MinScoreForTarget(t *api.SubtitleTarget, mediaType api.MediaType) int
+	MinScoreForTarget(t *subflux.SubtitleTarget, mediaType subflux.MediaType) int
 	// ProviderPriority returns the priority of a provider by name.
 	// Returns 0 for unknown providers (lowest priority = tried last in tiebreakers).
-	ProviderPriority(name api.ProviderID) int
+	ProviderPriority(name subflux.ProviderID) int
 	// EmbeddedPolicy returns the typed embedded subtitle codec policy
 	// (top-level embedded_subtitles config section).
-	EmbeddedPolicy() api.EmbeddedPolicy
+	EmbeddedPolicy() subflux.EmbeddedPolicy
 }

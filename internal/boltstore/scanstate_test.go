@@ -4,22 +4,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
 // This file covers the task-5.2 scan_state domain: RecordScanState upsert with
-// ix_scan_at maintenance (Requirement 5.3), GetScanStates listing/prefix/order
+// ix_scan_at maintenance (Requirement 5.3), ScanStates listing/prefix/order
 // (Requirement 5.2), RecentlyScanned with an INCLUSIVE cutoff served from the
 // scan index (Requirement 5.4), and LastScanTime formatting + empty-when-none
 // (Requirement 5.6).
 
-const scanMTEp = api.MediaTypeEpisode
+const scanMTEp = subflux.MediaTypeEpisode
 
 // recordScan is a context-free RecordScanState for tests.
-func recordScan(t *testing.T, db *DB, mt api.MediaType, mid, title, audio string, season, episode int) {
+func recordScan(t *testing.T, db *DB, mt subflux.MediaType, mid, title, audio string, season, episode int) {
 	t.Helper()
-	if err := db.RecordScanState(t.Context(), &api.ScanRecord{
+	if err := db.RecordScanState(t.Context(), &subflux.ScanRecord{
 		MediaType: mt, MediaID: mid, Title: title, AudioLang: audio, Season: season, Episode: episode,
 	}); err != nil {
 		t.Fatalf("RecordScanState(%q): %v", mid, err)
@@ -29,7 +29,7 @@ func recordScan(t *testing.T, db *DB, mt api.MediaType, mid, title, audio string
 // setScannedAt white-box writes a scan_state row with an explicit scanned_at
 // through the same chokepoint production uses, so the inclusive-cutoff boundary
 // can be tested at an exact instant (RecordScanState stamps now()).
-func setScannedAt(t *testing.T, db *DB, mt api.MediaType, mid, title, audio string, season, episode int, at time.Time) {
+func setScannedAt(t *testing.T, db *DB, mt subflux.MediaType, mid, title, audio string, season, episode int, at time.Time) {
 	t.Helper()
 	if err := db.db.Update(func(tx *bolt.Tx) error {
 		rec := scanRec{Title: title, AudioLang: audio, Season: season, Episode: episode, ScannedAt: at.UTC()}
@@ -79,22 +79,22 @@ func TestRecordScanState_upsert_updates_same_row(t *testing.T) {
 	}
 }
 
-// getScans is a context-free GetScanStates for tests.
-func getScans(t *testing.T, db *DB, mt api.MediaType, prefix string) []api.ScanStateRow {
+// getScans is a context-free ScanStates for tests.
+func getScans(t *testing.T, db *DB, mt subflux.MediaType, prefix string) []subflux.ScanStateRow {
 	t.Helper()
-	rows, err := db.GetScanStates(t.Context(), mt, prefix)
+	rows, err := db.ScanStates(t.Context(), mt, prefix)
 	if err != nil {
-		t.Fatalf("GetScanStates(%q, %q): %v", mt, prefix, err)
+		t.Fatalf("ScanStates(%q, %q): %v", mt, prefix, err)
 	}
 	return rows
 }
 
-// --- GetScanStates listing/prefix/order (Requirement 5.2) ---
+// --- ScanStates listing/prefix/order (Requirement 5.2) ---
 
 func TestGetScanStates_empty(t *testing.T) {
 	db, _ := openTemp(t)
 	if rows := getScans(t, db, scanMTEp, ""); len(rows) != 0 {
-		t.Errorf("empty store GetScanStates = %+v, want none", rows)
+		t.Errorf("empty store ScanStates = %+v, want none", rows)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestGetScanStates_filters_by_media_type_and_orders_by_media_id(t *testing.T
 
 	recordScan(t, db, scanMTEp, "tvdb-2-s01e01", "B", "eng", 1, 1)
 	recordScan(t, db, scanMTEp, "tvdb-1-s01e01", "A", "eng", 1, 1)
-	recordScan(t, db, api.MediaTypeMovie, "tmdb-9", "Movie", "eng", 0, 0)
+	recordScan(t, db, subflux.MediaTypeMovie, "tmdb-9", "Movie", "eng", 0, 0)
 
 	rows := getScans(t, db, scanMTEp, "")
 	if len(rows) != 2 {
@@ -153,15 +153,15 @@ func TestGetScanStates_prefix_boundary(t *testing.T) {
 func TestGetScanStates_formats_scanned_at(t *testing.T) {
 	db, _ := openTemp(t)
 	at := time.Date(2026, 6, 15, 12, 30, 45, 0, time.UTC)
-	setScannedAt(t, db, api.MediaTypeMovie, "tmdb-1", "M", "eng", 0, 0, at)
+	setScannedAt(t, db, subflux.MediaTypeMovie, "tmdb-1", "M", "eng", 0, 0, at)
 
-	rows := getScans(t, db, api.MediaTypeMovie, "")
+	rows := getScans(t, db, subflux.MediaTypeMovie, "")
 	if len(rows) != 1 || rows[0].ScannedAt != "2026-06-15 12:30:45" {
 		t.Fatalf("ScannedAt = %q, want %q", scannedAtOf(rows), "2026-06-15 12:30:45")
 	}
 }
 
-func scannedAtOf(rows []api.ScanStateRow) string {
+func scannedAtOf(rows []subflux.ScanStateRow) string {
 	if len(rows) == 0 {
 		return ""
 	}
@@ -231,7 +231,7 @@ func TestRecentlyScanned_includes_all_media_types(t *testing.T) {
 	db, _ := openTemp(t)
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	setScannedAt(t, db, scanMTEp, "tvdb-1-s01e01", "Ep", "eng", 1, 1, base.Add(time.Hour))
-	setScannedAt(t, db, api.MediaTypeMovie, "tmdb-2", "Mov", "eng", 0, 0, base.Add(2*time.Hour))
+	setScannedAt(t, db, subflux.MediaTypeMovie, "tmdb-2", "Mov", "eng", 0, 0, base.Add(2*time.Hour))
 
 	got, err := db.RecentlyScanned(t.Context(), base)
 	if err != nil {
@@ -258,7 +258,7 @@ func TestLastScanTime_empty_returns_empty(t *testing.T) {
 func TestLastScanTime_returns_most_recent_formatted(t *testing.T) {
 	db, _ := openTemp(t)
 	setScannedAt(t, db, scanMTEp, "old", "Old", "eng", 1, 1, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
-	setScannedAt(t, db, api.MediaTypeMovie, "new", "New", "fre", 0, 0, time.Date(2026, 6, 15, 12, 30, 0, 0, time.UTC))
+	setScannedAt(t, db, subflux.MediaTypeMovie, "new", "New", "fre", 0, 0, time.Date(2026, 6, 15, 12, 30, 0, 0, time.UTC))
 
 	got, err := db.LastScanTime(t.Context())
 	if err != nil {
@@ -271,7 +271,7 @@ func TestLastScanTime_returns_most_recent_formatted(t *testing.T) {
 
 func TestLastScanTime_after_record_returns_timestamp(t *testing.T) {
 	db, _ := openTemp(t)
-	recordScan(t, db, api.MediaTypeMovie, "tmdb-1", "M", "eng", 0, 0)
+	recordScan(t, db, subflux.MediaTypeMovie, "tmdb-1", "M", "eng", 0, 0)
 
 	got, err := db.LastScanTime(t.Context())
 	if err != nil {

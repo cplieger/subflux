@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -17,14 +17,14 @@ import (
 // and additively forward-compatible without a migration script. Bucket KEYS
 // stay binary and live in keys.go. The mt/mid/lang components of most records
 // live in the KEY (and in the secondary indexes), so the value structs below
-// deliberately omit them; a read reconstructs an api.* value from the key
+// deliberately omit them; a read reconstructs a subflux.* value from the key
 // components plus the decoded record.
 
 // --- Core-domain record value structs (JSON-encoded bbolt bucket values) ---
 
 // attemptRec is the search_attempts value: per-(media_type, media_id,
 // language, provider) adaptive-backoff state. The four key components plus
-// these fields reconstruct an api.BackoffEntry.
+// these fields reconstruct an subflux.BackoffEntry.
 type attemptRec struct {
 	LastTried time.Time `json:"last_tried"`
 	NextRetry time.Time `json:"next_retry"`
@@ -35,40 +35,40 @@ type attemptRec struct {
 // value is SELF-CONTAINED: it carries the (media_type, media_id, language,
 // variant) quad and the surrogate id even though both also appear in the
 // ix_state_quad index key and the primary key respectively. That duplication
-// is deliberate: reads that start from a surrogate id (GetState's reverse
+// is deliberate: reads that start from a surrogate id (State's reverse
 // ix_state_imported walk, DeleteStateByPaths' ix_state_video walk, reconcile's
 // primary scan) recover the quad from one decode instead of rebuilding an
 // id -> quad map from a full index walk, and a row dumped by the bbolt CLI is
 // meaningful on its own. The putState chokepoint derives the ix_state_quad key
 // FROM these value fields, so key and value can never disagree. Provider is
-// api.ProviderID to match api.DownloadRecord.ProviderName /
-// api.StateEntry.Provider exactly.
+// subflux.ProviderID to match subflux.DownloadRecord.ProviderName /
+// subflux.StateEntry.Provider exactly.
 type stateRec struct {
-	MediaImported time.Time      `json:"media_imported"`
-	MediaType     api.MediaType  `json:"media_type"`
-	MediaID       string         `json:"media_id"`
-	Language      string         `json:"language"`
-	Variant       api.Variant    `json:"variant"`
-	Provider      api.ProviderID `json:"provider"`
-	ReleaseName   string         `json:"release_name"`
-	Path          string         `json:"path"`
-	Title         string         `json:"title"`
-	ImdbID        string         `json:"imdb_id"`
-	ReleaseTag    string         `json:"release_tag"`
-	VideoPath     string         `json:"video_path"`
-	ID            int64          `json:"id"` // NextSequence surrogate
-	Score         int            `json:"score"`
-	Season        int            `json:"season"`
-	Episode       int            `json:"episode"`
-	Manual        bool           `json:"manual"`
+	MediaImported time.Time          `json:"media_imported"`
+	MediaType     subflux.MediaType  `json:"media_type"`
+	MediaID       string             `json:"media_id"`
+	Language      string             `json:"language"`
+	Variant       subflux.Variant    `json:"variant"`
+	Provider      subflux.ProviderID `json:"provider"`
+	ReleaseName   string             `json:"release_name"`
+	Path          string             `json:"path"`
+	Title         string             `json:"title"`
+	ImdbID        string             `json:"imdb_id"`
+	ReleaseTag    string             `json:"release_tag"`
+	VideoPath     string             `json:"video_path"`
+	ID            int64              `json:"id"` // NextSequence surrogate
+	Score         int                `json:"score"`
+	Season        int                `json:"season"`
+	Episode       int                `json:"episode"`
+	Manual        bool               `json:"manual"`
 }
 
 // fileRec is the subtitle_files value. The media_type, media_id, language,
 // variant, source, and path all live in the key (so per-media coverage is a
 // key-only prefix walk), leaving only these fields in the value. With the key
-// components they reconstruct an api.SubtitleEntry. A subtitle's cumulative
+// components they reconstruct an subflux.SubtitleEntry. A subtitle's cumulative
 // sync offset is NOT stored here: it lives solely in the sync_offsets bucket
-// (keyed by bare path), which GetSubtitleFiles joins at read time.
+// (keyed by bare path), which SubtitleFiles joins at read time.
 type fileRec struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Codec     string    `json:"codec"`
@@ -76,7 +76,7 @@ type fileRec struct {
 
 // scanRec is the scan_state value, one row per (media_type, media_id) carried
 // in the key. With the key components these fields reconstruct an
-// api.ScanStateRow / mirror an api.ScanRecord.
+// subflux.ScanStateRow / mirror an subflux.ScanRecord.
 type scanRec struct {
 	ScannedAt time.Time `json:"scanned_at"`
 	Title     string    `json:"title"`
@@ -95,15 +95,6 @@ type scanRec struct {
 // they have no struct here (see keys.go and the pollstate/subfiles domains).
 
 // --- Typed codec wrappers ---
-
-// encodeRecord serialises a core-domain record value as JSON via the shared
-// kv codec. It is a thin typed wrapper so call sites read as
-// encodeRecord(&rec) rather than threading the codec mechanism; PutIndexed
-// already encodes for index-maintained writes, so this is for the rare direct
-// put.
-func encodeRecord[T any](v *T) ([]byte, error) {
-	return kv.Encode(v)
-}
 
 // decodeRecord decodes a core-domain record value into v, applying the
 // supplied decode-failure policy. It is a thin typed wrapper over

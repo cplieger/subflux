@@ -1,9 +1,9 @@
 package search
 
-import "github.com/cplieger/subflux/internal/api"
+import "github.com/cplieger/subflux/internal/subflux"
 
 // Subtitle source identifiers for coverage tracking.
-const sourceExternal = api.SourceExternal
+const sourceExternal = subflux.SourceExternal
 
 // --- Subtitle types ---
 
@@ -42,7 +42,7 @@ type externalSub struct {
 
 // hasSubtitle checks if a usable subtitle exists for the given target.
 // Embedded tracks with codecs in IgnoredCodecs are skipped.
-func (e *existingSubs) hasSubtitle(lang string, variant api.Variant) bool {
+func (e *existingSubs) hasSubtitle(lang string, variant subflux.Variant) bool {
 	if e.hasExternalSubtitle(lang, variant) {
 		return true
 	}
@@ -59,7 +59,7 @@ func (e *existingSubs) hasSubtitle(lang string, variant api.Variant) bool {
 }
 
 // hasExternalSubtitle checks if an external subtitle file exists for the target.
-func (e *existingSubs) hasExternalSubtitle(lang string, variant api.Variant) bool {
+func (e *existingSubs) hasExternalSubtitle(lang string, variant subflux.Variant) bool {
 	for _, ext := range e.External {
 		if ext.Lang == lang && matchesVariant(ext.HI, ext.Forced, variant) {
 			return true
@@ -73,13 +73,13 @@ func (e *existingSubs) hasExternalSubtitle(lang string, variant api.Variant) boo
 // matchesVariant reports whether the hi/forced flags match the requested variant.
 // Recognized variants: "hi", "forced", and "standard" (or empty) means
 // a regular subtitle (neither HI nor forced).
-func matchesVariant(hi, forced bool, variant api.Variant) bool {
+func matchesVariant(hi, forced bool, variant subflux.Variant) bool {
 	switch variant {
-	case api.VariantHI:
+	case subflux.VariantHI:
 		return hi
-	case api.VariantForced:
+	case subflux.VariantForced:
 		return forced
-	case api.VariantStandard, "":
+	case subflux.VariantStandard, "":
 		return !hi && !forced
 	default:
 		return !hi && !forced

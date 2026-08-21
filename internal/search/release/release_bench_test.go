@@ -10,11 +10,11 @@ var benchReleaseNames = []string{
 	"The.Bear.S03E10.Forever.1080p.HULU.WEB-DL.DDP5.1.H.264-NTb",
 }
 
-func BenchmarkParseReleaseName(b *testing.B) {
+func BenchmarkParseName(b *testing.B) {
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		for _, name := range benchReleaseNames {
-			_ = ParseReleaseName(name)
+			_ = ParseName(name)
 		}
 	}
 }

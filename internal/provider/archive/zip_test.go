@@ -106,7 +106,7 @@ func TestExtractFromZip(t *testing.T) {
 	}
 }
 
-// TestextractFromZip_rejects_zip_bomb verifies that entries with a declared
+// TestExtractFromZip_rejects_zip_bomb verifies that entries with a declared
 // uncompressed size exceeding 50x the compressed size are skipped.
 func TestExtractFromZip_rejects_zip_bomb(t *testing.T) {
 	t.Parallel()
@@ -133,7 +133,7 @@ func TestExtractFromZip_rejects_zip_bomb(t *testing.T) {
 	}
 }
 
-// TestextractFromZip_rejects_zero_compressed verifies that entries with
+// TestExtractFromZip_rejects_zero_compressed verifies that entries with
 // zero compressed size but non-zero uncompressed size are rejected.
 func TestExtractFromZip_rejects_zero_compressed(t *testing.T) {
 	t.Parallel()
@@ -154,7 +154,7 @@ func TestExtractFromZip_rejects_zero_compressed(t *testing.T) {
 	}
 }
 
-// TestextractFromZip_rejects_oversized verifies that subtitle content
+// TestExtractFromZip_rejects_oversized verifies that subtitle content
 // exceeding MaxExtractSize is rejected rather than silently truncated.
 func TestExtractFromZip_rejects_oversized(t *testing.T) {
 	t.Parallel()
@@ -174,7 +174,7 @@ func TestExtractFromZip_rejects_oversized(t *testing.T) {
 	}
 }
 
-// TestextractFromZip_accepts_at_limit verifies that subtitle content
+// TestExtractFromZip_accepts_at_limit verifies that subtitle content
 // exactly at MaxExtractSize is accepted.
 func TestExtractFromZip_accepts_at_limit(t *testing.T) {
 	t.Parallel()
@@ -436,11 +436,11 @@ func TestIsValidSubtitleEntry_size_guards(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := &zip.File{FileHeader: zip.FileHeader{
+			f := &zip.File{
 				Name:               "a.srt",
 				CompressedSize64:   tc.comp,
 				UncompressedSize64: tc.uncomp,
-			}}
+			}
 			if got := IsValidSubtitleEntry(f); got != tc.want {
 				t.Errorf("IsValidSubtitleEntry(comp=%d, uncomp=%d) = %v, want %v",
 					tc.comp, tc.uncomp, got, tc.want)

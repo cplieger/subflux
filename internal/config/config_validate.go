@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/pathinside"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/pathinside/v2"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // Sentinel errors for the most common config validation failures.
@@ -86,7 +86,7 @@ func configFieldErr(field, msg string) error {
 }
 
 // hasEnabledProvider reports whether at least one provider is enabled.
-func hasEnabledProvider(providers map[api.ProviderID]yamlProviderCfg) bool {
+func hasEnabledProvider(providers map[subflux.ProviderID]yamlProviderCfg) bool {
 	for _, p := range providers {
 		if p.Enabled {
 			return true
@@ -129,13 +129,13 @@ func validate(ctx context.Context, cfg *Config) error {
 	// guard was dead code while the fake embedded provider was force-enabled
 	// pre-validation, and enforcing it after the detector separation would
 	// suddenly reject embedded-only setups.
-	if !hasEnabledProvider(cfg.Providers) {
+	if !hasEnabledProvider(cfg.ProvidersCfg) {
 		slog.Warn("no acquisition providers enabled; embedded detection and coverage only")
 	}
 	ve.Add(validateDurationConstraints([]durationConstraint{
 		{"poll_interval", cfg.PollIntervalCfg.D, defaults.MinPollInterval, false},
 	}))
-	ve.Add(validateSearch(&cfg.SearchCfg))
+	ve.Add(validateSearch(&cfg.Cfg))
 	ve.Add(validateAdaptive(&cfg.AdaptiveCfg))
 	ve.Add(validateScoring(cfg.Scoring.Weights))
 	if cfg.PostProcessing.AudioSyncFallback && !cfg.PostProcessing.SyncSubtitles {
@@ -178,7 +178,7 @@ func validate(ctx context.Context, cfg *Config) error {
 
 // legacyEmbeddedProvider is the retired provider ID of the pre-separation
 // fake embedded provider, kept only to detect legacy config shapes.
-const legacyEmbeddedProvider = api.ProviderID("embedded")
+const legacyEmbeddedProvider = subflux.ProviderID("embedded")
 
 // validateEmbeddedCutover rejects the legacy embedded-provider config shapes
 // with a targeted error naming the move (alpha hard cutover, R3.2/R3.3):
@@ -190,7 +190,7 @@ const legacyEmbeddedProvider = api.ProviderID("embedded")
 // so erroring is both safer and simpler than rewriting user config.
 func validateEmbeddedCutover(cfg *Config) error {
 	var ve ValidationErrors
-	if _, ok := cfg.Providers[legacyEmbeddedProvider]; ok {
+	if _, ok := cfg.ProvidersCfg[legacyEmbeddedProvider]; ok {
 		ve.Add(ErrEmbeddedProviderRemoved)
 	}
 	checkTargets := func(context string, targets []yamlSubtitleTarget) {
@@ -277,7 +277,7 @@ func validateBackup(c *yamlBackupConfig) error {
 }
 
 // validateScoring checks custom scoring weights against the documented
-// invariants (api.Scores / api.DefaultScores in types_scoring.go): every
+// invariants (subflux.Scores / subflux.DefaultScores in types_scoring.go): every
 // weight must be non-negative, and the hash weight — which the scorer
 // returns directly for a verified hash match, bypassing attribute
 // scoring — must not be outranked by any attribute-only match. The
@@ -287,7 +287,7 @@ func validateBackup(c *yamlBackupConfig) error {
 // validation requires hash >= sum, the minimal relation that preserves
 // the documented "hash match is authoritative" ordering. A nil weights
 // block means the defaults are in use and is always valid.
-func validateScoring(w *api.Scores) error {
+func validateScoring(w *subflux.Scores) error {
 	if w == nil {
 		return nil
 	}
@@ -362,18 +362,18 @@ func warnArrURLs(name string, y yamlArrConfig) {
 // validateArrs checks that at least one arr endpoint is configured and
 // that configured endpoints have API keys. Returns an error on failure.
 func validateArrs(cfg *Config) error {
-	sonarr := cfg.SonarrConfig()
-	radarr := cfg.RadarrConfig()
+	sonarr := cfg.Sonarr()
+	radarr := cfg.Radarr()
 	if sonarr.URL == "" && radarr.URL == "" {
 		return ErrNoArr
 	}
-	warnArrURLs("sonarr", cfg.Sonarr)
-	warnArrURLs("radarr", cfg.Radarr)
+	warnArrURLs("sonarr", cfg.SonarrCfg)
+	warnArrURLs("radarr", cfg.RadarrCfg)
 	var missing []string
-	if sonarr.URL != "" && cfg.Sonarr.APIKey == "" {
+	if sonarr.URL != "" && cfg.SonarrCfg.APIKey == "" {
 		missing = append(missing, "sonarr")
 	}
-	if radarr.URL != "" && cfg.Radarr.APIKey == "" {
+	if radarr.URL != "" && cfg.RadarrCfg.APIKey == "" {
 		missing = append(missing, "radarr")
 	}
 	if len(missing) > 0 {

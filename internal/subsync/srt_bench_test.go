@@ -23,7 +23,7 @@ func BenchmarkParseSRT(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_, err := ParseSRT(strings.NewReader(data))
 		if err != nil {
 			b.Fatal(err)

@@ -12,11 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // listEntries drives HandleListFiles and decodes the response.
@@ -72,11 +71,11 @@ func newOrphanFixture(t *testing.T) (h *Handler, storedPath, orphanPath string) 
 			t.Fatal(err)
 		}
 	}
-	store := &fakeFileStore{rows: []api.SubtitleEntry{{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}
-	return newFileHandler(store, &testsupport.NopConfig{}), storedPath, orphanPath
+	return newFileHandler(store, &fakePathGuard{}), storedPath, orphanPath
 }
 
 // TestOrphanLifecycle_mintDeleteConsume covers the design's handle
@@ -92,7 +91,7 @@ func TestOrphanLifecycle_mintDeleteConsume(t *testing.T) {
 	if orphan.Name != filepath.Base(orphanPath) {
 		t.Errorf("orphan name = %q, want %q", orphan.Name, filepath.Base(orphanPath))
 	}
-	if orphan.Source != string(api.SourceExternal) {
+	if orphan.Source != string(subflux.SourceExternal) {
 		t.Errorf("orphan source = %q, want external", orphan.Source)
 	}
 	if len(orphan.OrphanHandle) != 32 {
@@ -101,7 +100,7 @@ func TestOrphanLifecycle_mintDeleteConsume(t *testing.T) {
 
 	rec := deleteHandle(t, h, orphan.OrphanHandle)
 	if rec.Code != http.StatusNoContent {
-		t.Fatalf("orphan delete status = %d, want 204: %s", rec.Code, rec.Body.String())
+		t.Errorf("orphan delete status = %d, want 204: %s", rec.Code, rec.Body.String())
 	}
 	if _, err := os.Stat(orphanPath); !os.IsNotExist(err) {
 		t.Error("orphan file still exists after handle delete")
@@ -114,7 +113,7 @@ func TestOrphanLifecycle_mintDeleteConsume(t *testing.T) {
 	// delete answers 404 (not 410 — that is reserved for expiry).
 	rec = deleteHandle(t, h, orphan.OrphanHandle)
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("second delete with consumed handle = %d, want 404", rec.Code)
+		t.Errorf("second delete with consumed handle = %d, want 404", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "orphan_handle_unknown") {
 		t.Errorf("body = %q, want orphan_handle_unknown", rec.Body.String())
@@ -130,7 +129,7 @@ func TestOrphanLifecycle_unknownAndExpired(t *testing.T) {
 
 	rec := deleteHandle(t, h, strings.Repeat("ab", 16))
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("unknown handle delete = %d, want 404", rec.Code)
+		t.Errorf("unknown handle delete = %d, want 404", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "orphan_handle_unknown") {
 		t.Errorf("body = %q, want orphan_handle_unknown", rec.Body.String())
@@ -142,7 +141,7 @@ func TestOrphanLifecycle_unknownAndExpired(t *testing.T) {
 	h.orphans.now = func() time.Time { return time.Now().Add(orphanTTL + time.Minute) }
 	rec = deleteHandle(t, h, orphan.OrphanHandle)
 	if rec.Code != http.StatusGone {
-		t.Fatalf("expired handle delete = %d, want 410", rec.Code)
+		t.Errorf("expired handle delete = %d, want 410", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "orphan_handle_expired") {
 		t.Errorf("body = %q, want orphan_handle_expired", rec.Body.String())
@@ -165,7 +164,7 @@ func TestOrphanLifecycle_metadataMismatchRefused(t *testing.T) {
 
 	rec := deleteHandle(t, h, orphan.OrphanHandle)
 	if rec.Code != http.StatusConflict {
-		t.Fatalf("swapped-file delete = %d, want 409: %s", rec.Code, rec.Body.String())
+		t.Errorf("swapped-file delete = %d, want 409: %s", rec.Code, rec.Body.String())
 	}
 	if !strings.Contains(rec.Body.String(), "orphan_changed") {
 		t.Errorf("body = %q, want orphan_changed", rec.Body.String())
@@ -193,11 +192,11 @@ func TestOrphanListing_skipsNonSubtitleAndKnown(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &fakeFileStore{rows: []api.SubtitleEntry{{
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
 		MediaID: "tmdb-123", Language: "en", Variant: "standard",
 		Source: "external", Path: storedPath,
 	}}}
-	h := newFileHandler(store, &testsupport.NopConfig{})
+	h := newFileHandler(store, &fakePathGuard{})
 
 	entries := listEntries(t, h, "media_type=movie&media_id=tmdb-123")
 	orphan := orphanOf(t, entries)
@@ -237,11 +236,11 @@ type fakeSonarrArr struct {
 	series      arrapi.Series
 }
 
-func (f *fakeSonarrArr) GetSeriesByID(context.Context, int) (arrapi.Series, error) {
+func (f *fakeSonarrArr) SeriesByID(context.Context, int) (arrapi.Series, error) {
 	return f.series, f.seriesErr
 }
 
-func (f *fakeSonarrArr) GetEpisodes(context.Context, int) ([]arrapi.Episode, error) {
+func (f *fakeSonarrArr) Episodes(context.Context, int) ([]arrapi.Episode, error) {
 	return f.episodes, f.episodesErr
 }
 
@@ -251,14 +250,14 @@ type fakeRadarrArr struct {
 	movie arrapi.Movie
 }
 
-func (f *fakeRadarrArr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (f *fakeRadarrArr) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return f.movie, f.err
 }
 
 // newFileHandlerArr builds a Handler whose LiveState carries the given arr
 // fakes (nil-safe), over an empty store: the all-orphan edge.
 func newFileHandlerArr(store FileStore, sonarr FileSonarrClient, radarr FileRadarrClient) *Handler {
-	cfg := &testsupport.NopConfig{}
+	cfg := &fakePathGuard{}
 	return NewHandler(Deps{
 		Store: store,
 		Resolve: &resolve.Resolver{
@@ -309,7 +308,7 @@ func TestOrphanFallback_mismatchedArrIDRejected(t *testing.T) {
 
 		rec := listStatus(t, h, "media_type=movie&media_id=tmdb-123&arr_id=42")
 		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("mismatched movie arr_id status = %d, want 400: %s", rec.Code, rec.Body.String())
+			t.Errorf("mismatched movie arr_id status = %d, want 400: %s", rec.Code, rec.Body.String())
 		}
 		if !strings.Contains(rec.Body.String(), "arr_id does not correspond to media_id") {
 			t.Errorf("body = %q, want binding-mismatch message", rec.Body.String())
@@ -440,7 +439,7 @@ func TestOrphanFallback_bindingEdges(t *testing.T) {
 		h := newFileHandlerArr(&fakeFileStore{}, nil, radarr)
 		rec := listStatus(t, h, "media_type=movie&media_id=tmdb-123&arr_id=42")
 		if rec.Code != http.StatusNotFound {
-			t.Fatalf("unknown arr item status = %d, want 404: %s", rec.Code, rec.Body.String())
+			t.Errorf("unknown arr item status = %d, want 404: %s", rec.Code, rec.Body.String())
 		}
 		if !strings.Contains(rec.Body.String(), "media_not_found") {
 			t.Errorf("body = %q, want media_not_found", rec.Body.String())

@@ -347,7 +347,8 @@ func (d *migrationDomain) pendingStep(st domainState) (migration, bool, error) {
 	}
 	return migration{}, false, fmt.Errorf(
 		"boltstore: no registered %s migration from schema v%d (this build's version is v%d); restore a backup or pre-migration snapshot written by a compatible version",
-		d.name, st.stored, d.current)
+		d.name, st.stored, d.current,
+	)
 }
 
 // nextPendingStep picks the next step across both domains: the core ladder
@@ -942,6 +943,13 @@ func migrationSnapshotPath(dbPath string, coreFrom, authFrom uint64) string {
 
 // --- Destructive-core step helper ---
 
+// resetCorePreserving is reached only by tests, and that is not the same as being
+// dead:
+// BOTH migration ladders (coreMigrations, authMigrations) are empty by
+// declaration, so no step has ever asked for this strategy. It is prepared,
+// tested machinery for the first destructive core migration; deleting it would
+// make that migration build its own.
+//
 // resetCorePreserving is the reusable export -> reset -> restore routine for a
 // future core-domain ladder step where a targeted in-place transform is
 // impossible (Requirement 3.1). It runs entirely inside the step's single

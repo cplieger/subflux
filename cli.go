@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/envx/yamlenv"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/envx/yamlenv/v2"
 	"github.com/cplieger/subflux/internal/cliparse"
 	"github.com/cplieger/subflux/internal/config"
 	"go.yaml.in/yaml/v3"
@@ -57,7 +57,8 @@ func adminSocketRequest(body []byte) (data []byte, status int, err error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf(
 			"server admin socket unreachable at %s — is the server running in this container? (%w)",
-			config.AdminSocketPath, err)
+			config.AdminSocketPath, err,
+		)
 	}
 	defer resp.Body.Close()
 	data, err = io.ReadAll(io.LimitReader(resp.Body, 1<<20))

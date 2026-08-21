@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -23,7 +23,7 @@ type statsCache struct {
 // statsCacheEntry is one cached compute result.
 type statsCacheEntry struct {
 	storedAt time.Time
-	resp     api.Stats
+	resp     subflux.Stats
 }
 
 // Invalidate marks the cache stale (exported for use by polling subsystem).
@@ -33,7 +33,7 @@ func (c *statsCache) Invalidate() { c.invalid.Store(true) }
 func (c *statsCache) invalidate() { c.invalid.Store(true) }
 
 // get returns the cached response if fresh, otherwise computes via singleflight.
-func (c *statsCache) get(ctx context.Context, fn func(context.Context) api.Stats) api.Stats {
+func (c *statsCache) get(ctx context.Context, fn func(context.Context) subflux.Stats) subflux.Stats {
 	if e := c.mu.Load(); e != nil && !c.invalid.Load() && time.Since(e.storedAt) < statsCacheTTL {
 		return e.resp
 	}
@@ -47,10 +47,10 @@ func (c *statsCache) get(ctx context.Context, fn func(context.Context) api.Stats
 		return resp, nil
 	})
 	if err != nil {
-		return api.Stats{}
+		return subflux.Stats{}
 	}
-	if resp, ok := v.(api.Stats); ok {
+	if resp, ok := v.(subflux.Stats); ok {
 		return resp
 	}
-	return api.Stats{}
+	return subflux.Stats{}
 }

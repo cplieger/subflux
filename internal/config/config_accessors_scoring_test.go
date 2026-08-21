@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -226,9 +226,9 @@ func TestLanguageCodes_never_has_duplicates(t *testing.T) {
 func TestMinScoreForTarget_per_target_override(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		SearchCfg: yamlSearchConfig{MinScore: 50},
+		Cfg: yamlSearchConfig{MinScore: 50},
 	}
-	target := &api.SubtitleTarget{Code: "fr", MinScore: new(75)}
+	target := &subflux.SubtitleTarget{Code: "fr", MinScore: new(75)}
 
 	got := cfg.MinScoreForTarget(target, "episode")
 	if got != 75 {
@@ -239,9 +239,9 @@ func TestMinScoreForTarget_per_target_override(t *testing.T) {
 func TestMinScoreForTarget_falls_back_to_global(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		SearchCfg: yamlSearchConfig{MinScore: 50},
+		Cfg: yamlSearchConfig{MinScore: 50},
 	}
-	target := &api.SubtitleTarget{Code: "fr"}
+	target := &subflux.SubtitleTarget{Code: "fr"}
 
 	got := cfg.MinScoreForTarget(target, "episode")
 	if got != 50 {
@@ -255,14 +255,14 @@ func TestScores_defaults(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{}
 	got := cfg.Scores()
-	if got != api.DefaultScores {
+	if got != subflux.DefaultScores {
 		t.Errorf("Scores() = %+v, want defaults", got)
 	}
 }
 
 func TestScores_custom(t *testing.T) {
 	t.Parallel()
-	custom := api.Scores{Hash: 999}
+	custom := subflux.Scores{Hash: 999}
 	cfg := &Config{
 		Scoring: ScoringConfig{
 			Weights: &custom,
@@ -286,11 +286,11 @@ func TestLanguageRulesForUI_rules_and_defaults(t *testing.T) {
 					{Code: "fr", Variant: "forced", MinScore: new(80)},
 				}},
 				{Audio: "ja", Subtitles: []yamlSubtitleTarget{
-					{Code: "en", Providers: []api.ProviderID{"opensubtitles"}},
+					{Code: "en", Providers: []subflux.ProviderID{"opensubtitles"}},
 				}},
 			},
 			Default: []yamlSubtitleTarget{
-				{Code: "en", Exclude: []api.ProviderID{"hdbits"}},
+				{Code: "en", Exclude: []subflux.ProviderID{"hdbits"}},
 			},
 		},
 	}
@@ -373,7 +373,7 @@ func BenchmarkResolveTargetsWithFallback(b *testing.B) {
 			cfg := makeConfig(nRules)
 			audioLangs := []string{"lang0", "lang1"}
 			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				cfg.ResolveTargetsWithFallback("lang0", audioLangs)
 			}
 		})

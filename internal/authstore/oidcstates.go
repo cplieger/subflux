@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+
+	"github.com/cplieger/auth/v4"
 )
 
 // This file holds the OIDCStateStore half of AuthStore. OIDC login states are
@@ -43,7 +45,7 @@ var errOIDCStateNotFound = errors.New("authstore: oidc state not found")
 // CreateOIDCState records an in-flight OIDC login state in memory, keyed by the
 // opaque state token. The stored instant is the creation time; OIDC states
 // never touch disk (Requirement 10.1).
-func (s *Store) CreateOIDCState(_ context.Context, state, nonce, codeVerifier, redirectURI string) error {
+func (s *Store) CreateOIDCState(_ context.Context, state auth.OIDCState, nonce auth.OIDCNonce, codeVerifier auth.OIDCCodeVerifier, redirectURI string) error {
 	s.mu.Lock()
 	s.oidc[state] = &oidcRec{
 		createdAt:    time.Now().UTC(),
@@ -61,7 +63,7 @@ func (s *Store) CreateOIDCState(_ context.Context, state, nonce, codeVerifier, r
 // observes the entry and deletes it, the other sees it already gone. A second
 // consume of an already-consumed (or never-created, or swept) state returns
 // errOIDCStateNotFound (Requirement 16.3, anti-replay).
-func (s *Store) ConsumeOIDCState(_ context.Context, state string) (nonce, codeVerifier, redirectURI string, err error) {
+func (s *Store) ConsumeOIDCState(_ context.Context, state auth.OIDCState) (nonce auth.OIDCNonce, codeVerifier auth.OIDCCodeVerifier, redirectURI string, err error) {
 	s.mu.Lock()
 	rec, ok := s.oidc[state]
 	if ok {
@@ -71,7 +73,7 @@ func (s *Store) ConsumeOIDCState(_ context.Context, state string) (nonce, codeVe
 	if !ok || rec == nil {
 		return "", "", "", errOIDCStateNotFound
 	}
-	slog.Debug("oidc state consumed", "state_prefix", state[:min(8, len(state))])
+	slog.Debug("oidc state consumed", "state_prefix", string(state[:min(8, len(state))]))
 	return rec.nonce, rec.codeVerifier, rec.redirectURI, nil
 }
 

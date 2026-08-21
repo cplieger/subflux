@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 const (
@@ -13,8 +13,8 @@ const (
 	showWhenOIDC = "oidc_enabled=true"
 )
 
-func arrFields(name, defaultURL string) []api.SchemaField {
-	return []api.SchemaField{
+func arrFields(name, defaultURL string) []subflux.SchemaField {
+	return []subflux.SchemaField{
 		{
 			Key: "url", Label: "URL", Type: fieldText,
 			Placeholder: defaultURL,
@@ -34,8 +34,8 @@ func arrFields(name, defaultURL string) []api.SchemaField {
 	}
 }
 
-func sonarrSection() api.SchemaSection {
-	return api.SchemaSection{
+func sonarrSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: keySonarr, Title: "Sonarr", Type: fieldFields,
 		RequiredGroup: groupArr,
 		EnableKey:     keyEnabled,
@@ -43,8 +43,8 @@ func sonarrSection() api.SchemaSection {
 	}
 }
 
-func radarrSection() api.SchemaSection {
-	return api.SchemaSection{
+func radarrSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "radarr", Title: "Radarr", Type: fieldFields,
 		RequiredGroup: groupArr,
 		EnableKey:     keyEnabled,
@@ -52,27 +52,27 @@ func radarrSection() api.SchemaSection {
 	}
 }
 
-func pollIntervalSection() api.SchemaSection {
-	return api.SchemaSection{
+func pollIntervalSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: keyPollInterval, Title: "Polling", Type: fieldFields,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: keyPollInterval, Label: "Poll interval", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultPollInterval),
-				Placeholder: defaults.FormatDuration(defaults.DefaultPollInterval),
-				Min:         defaults.FormatDuration(defaults.MinPollInterval),
+				Default:     formatDuration(defaults.DefaultPollInterval),
+				Placeholder: formatDuration(defaults.DefaultPollInterval),
+				Min:         formatDuration(defaults.MinPollInterval),
 				Help:        "How often to check Sonarr/Radarr for new imports (minimum 10s)",
 			},
 		},
 	}
 }
 
-func authSection() api.SchemaSection {
-	return api.SchemaSection{
+func authSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key:   "auth",
 		Title: "Authentication",
 		Type:  fieldFields,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{Key: "basic_enabled", Label: "Password Login", Type: fieldBool, Default: defaultTrue},
 			{Key: "oidc_enabled", Label: "OIDC Login", Type: fieldBool, Default: defaultFalse},
 			{
@@ -112,13 +112,13 @@ func authSection() api.SchemaSection {
 				Key:     "session_idle_timeout",
 				Label:   "Session Idle Timeout",
 				Type:    fieldDuration,
-				Default: defaults.FormatDuration(defaults.DefaultSessionIdleTimeout),
+				Default: formatDuration(defaults.DefaultSessionIdleTimeout),
 			},
 			{
 				Key:     "session_absolute_timeout",
 				Label:   "Session Absolute Timeout",
 				Type:    fieldDuration,
-				Default: defaults.FormatDuration(defaults.DefaultSessionAbsoluteTimeout),
+				Default: formatDuration(defaults.DefaultSessionAbsoluteTimeout),
 			},
 			{
 				Key:     "check_breached_passwords",
@@ -136,15 +136,15 @@ func authSection() api.SchemaSection {
 	}
 }
 
-func loggingSection() api.SchemaSection {
-	return api.SchemaSection{
+func loggingSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "logging", Title: "Logging", Type: fieldFields,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "level", Label: "Level", Type: fieldSelect,
 				Default: defaults.LogLevel,
 				Help:    "Log verbosity. Use debug for troubleshooting.",
-				Options: []api.SchemaOption{
+				Options: []subflux.SchemaOption{
 					{Value: "error", Label: "error"},
 					{Value: "warn", Label: "warn"},
 					{Value: "info", Label: "info"},
@@ -155,7 +155,7 @@ func loggingSection() api.SchemaSection {
 				Key: "format", Label: "Format", Type: fieldSelect,
 				Default: defaults.LogFormat,
 				Help:    "JSON for log aggregation (Loki/Alloy), text for terminal debugging",
-				Options: []api.SchemaOption{
+				Options: []subflux.SchemaOption{
 					{Value: "json", Label: "json"},
 					{Value: "text", Label: "text"},
 				},
@@ -164,11 +164,11 @@ func loggingSection() api.SchemaSection {
 	}
 }
 
-func mediaRootsSection() api.SchemaSection {
-	return api.SchemaSection{
+func mediaRootsSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "media_roots", Title: "Media Roots", Type: fieldList,
 		Help: "Directories containing media files. Must match paths inside Sonarr/Radarr containers.",
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "path", Label: "Path", Type: fieldText,
 				Placeholder: placeholderMedia,
@@ -178,13 +178,13 @@ func mediaRootsSection() api.SchemaSection {
 	}
 }
 
-func trustedProxiesSection() api.SchemaSection {
-	return api.SchemaSection{
+func trustedProxiesSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "trusted_proxies", Title: "Trusted Proxies", Type: fieldList,
 		Help: "CIDR ranges of reverse proxies in front of subflux. When set, the real client IP is " +
 			"resolved from a trusted X-Forwarded-For for the audit log, login rate limiter, session " +
 			"records, and access log. Leave empty when subflux is directly exposed.",
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "cidr", Label: "Proxy CIDR", Type: fieldText,
 				Placeholder: "10.0.0.0/8",
@@ -194,14 +194,14 @@ func trustedProxiesSection() api.SchemaSection {
 	}
 }
 
-func allowedHostsSection() api.SchemaSection {
-	return api.SchemaSection{
+func allowedHostsSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: "allowed_hosts", Title: "Allowed Hosts", Type: fieldList,
 		Help: "Exact hostnames or IPs subflux answers for. When set, a request whose Host header is " +
 			"not listed is rejected with 403, blocking DNS-rebinding attacks against the browser " +
 			"session. Requests from localhost (e.g. the container healthcheck) always pass. Leave " +
 			"empty to accept any Host.",
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "host", Label: "Hostname or IP", Type: fieldText,
 				Placeholder: "subflux.example.com",
@@ -211,25 +211,25 @@ func allowedHostsSection() api.SchemaSection {
 	}
 }
 
-func languagesSection() api.SchemaSection {
-	return api.SchemaSection{
+func languagesSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key: keyLanguages, Title: "Languages", Type: fieldLanguages,
 		Help: "Audio-to-subtitle language mapping using ISO 639-1 codes.",
 	}
 }
 
-func backupSection() api.SchemaSection {
-	return api.SchemaSection{
+func backupSection() subflux.SchemaSection {
+	return subflux.SchemaSection{
 		Key:       "backup",
 		Title:     "Database Backups",
 		Type:      fieldFields,
 		EnableKey: keyEnabled,
-		Fields: []api.SchemaField{
+		Fields: []subflux.SchemaField{
 			{
 				Key: "frequency", Label: "Frequency", Type: fieldDuration,
-				Default:     defaults.FormatDuration(defaults.DefaultBackupFrequency),
-				Placeholder: defaults.FormatDuration(defaults.DefaultBackupFrequency),
-				Min:         defaults.FormatDuration(defaults.MinBackupFrequency),
+				Default:     formatDuration(defaults.DefaultBackupFrequency),
+				Placeholder: formatDuration(defaults.DefaultBackupFrequency),
+				Min:         formatDuration(defaults.MinBackupFrequency),
 				Help:        "How often to write a consistent database snapshot (minimum 1h).",
 			},
 			{

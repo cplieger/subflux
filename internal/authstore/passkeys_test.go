@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -59,18 +59,18 @@ func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
 	if cred.ID < 1 {
-		t.Fatalf("CreatePasskey did not set a positive ID, got %d", cred.ID)
+		t.Errorf("CreatePasskey did not set a positive ID, got %d", cred.ID)
 	}
 	if cred.CreatedAt.IsZero() {
 		t.Errorf("CreatePasskey did not stamp CreatedAt")
 	}
 
-	got, _, err := s.GetPasskeyByCredentialID(ctx, credID)
+	got, _, err := s.PasskeyByCredentialID(ctx, credID)
 	if err != nil {
-		t.Fatalf("GetPasskeyByCredentialID: %v", err)
+		t.Fatalf("PasskeyByCredentialID: %v", err)
 	}
 	if got == nil {
-		t.Fatal("GetPasskeyByCredentialID returned nil for an existing credential")
+		t.Fatal("PasskeyByCredentialID returned nil for an existing credential")
 	}
 	if got.ID != cred.ID || got.UserID != 7 {
 		t.Errorf("id/user mismatch: got id=%d user=%d", got.ID, got.UserID)
@@ -89,12 +89,12 @@ func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 
 func TestGetPasskeyByCredentialID_notFound(t *testing.T) {
 	s := newPasskeyStore(t)
-	got, _, err := s.GetPasskeyByCredentialID(t.Context(), []byte("nope"))
+	got, _, err := s.PasskeyByCredentialID(t.Context(), []byte("nope"))
 	if err != nil {
-		t.Fatalf("GetPasskeyByCredentialID: %v", err)
+		t.Fatalf("PasskeyByCredentialID: %v", err)
 	}
 	if got != nil {
-		t.Errorf("GetPasskeyByCredentialID(absent) = %+v, want nil", got)
+		t.Errorf("PasskeyByCredentialID(absent) = %+v, want nil", got)
 	}
 }
 
@@ -137,9 +137,9 @@ func TestGetPasskeysByUserID_orderedAndIsolated(t *testing.T) {
 	mk(1, "u1-c", base.Add(3*time.Hour))
 	mk(2, "u2-x", base) // different user, must not leak in
 
-	got, err := s.GetPasskeysByUserID(ctx, 1)
+	got, err := s.PasskeysByUserID(ctx, 1)
 	if err != nil {
-		t.Fatalf("GetPasskeysByUserID: %v", err)
+		t.Fatalf("PasskeysByUserID: %v", err)
 	}
 	if len(got) != 3 {
 		t.Fatalf("got %d passkeys for user 1, want 3 (isolation failure?)", len(got))
@@ -167,7 +167,7 @@ func TestUpdatePasskeyAfterLogin_monotonicAndFlags(t *testing.T) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, credID, 10, flags); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin(10): %v", err)
 	}
-	got, _, _ := s.GetPasskeyByCredentialID(ctx, credID)
+	got, _, _ := s.PasskeyByCredentialID(ctx, credID)
 	if got.SignCount != 10 {
 		t.Errorf("sign_count = %d after bump to 10, want 10", got.SignCount)
 	}
@@ -180,7 +180,7 @@ func TestUpdatePasskeyAfterLogin_monotonicAndFlags(t *testing.T) {
 	if err := s.UpdatePasskeyAfterLogin(ctx, credID, 3, auth.PasskeyFlags{UserPresent: true}); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin(3): %v", err)
 	}
-	got, _, _ = s.GetPasskeyByCredentialID(ctx, credID)
+	got, _, _ = s.PasskeyByCredentialID(ctx, credID)
 	if got.SignCount != 10 {
 		t.Errorf("sign_count regressed to %d after stale count 3, want 10 (monotonic)", got.SignCount)
 	}
@@ -227,9 +227,9 @@ func TestUpdatePasskeyAfterLogin_durableAcrossReopen(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s2.Close() })
 
-	got, _, err := s2.GetPasskeyByCredentialID(ctx, credID)
+	got, _, err := s2.PasskeyByCredentialID(ctx, credID)
 	if err != nil {
-		t.Fatalf("GetPasskeyByCredentialID after reopen: %v", err)
+		t.Fatalf("PasskeyByCredentialID after reopen: %v", err)
 	}
 	if got == nil || got.SignCount != 42 {
 		t.Fatalf("sign_count after reopen = %v, want 42 (durable)", got)
@@ -237,7 +237,7 @@ func TestUpdatePasskeyAfterLogin_durableAcrossReopen(t *testing.T) {
 	if err := s2.UpdatePasskeyAfterLogin(ctx, credID, 1, auth.PasskeyFlags{UserPresent: true}); err != nil {
 		t.Fatalf("UpdatePasskeyAfterLogin(1): %v", err)
 	}
-	got, _, _ = s2.GetPasskeyByCredentialID(ctx, credID)
+	got, _, _ = s2.PasskeyByCredentialID(ctx, credID)
 	if got.SignCount != 42 {
 		t.Errorf("sign_count regressed to %d across reopen, want 42", got.SignCount)
 	}
@@ -262,19 +262,19 @@ func TestRenamePasskey_ownershipEnforced(t *testing.T) {
 
 	// A different user attempting to rename by the same surrogate id must be a
 	// no-op (Requirement 16.4): the name is unchanged.
-	if err := s.RenamePasskey(ctx, owner.ID, 2, "hijacked"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 2}, "hijacked"); err != nil {
 		t.Fatalf("RenamePasskey(wrong owner): %v", err)
 	}
-	got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID)
+	got, _, _ := s.PasskeyByCredentialID(ctx, owner.CredentialID)
 	if got.Name != "old-name" {
 		t.Errorf("non-owner rename took effect: name = %q, want %q", got.Name, "old-name")
 	}
 
 	// The real owner can rename.
-	if err := s.RenamePasskey(ctx, owner.ID, 1, "new-name"); err != nil {
+	if err := s.RenamePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 1}, "new-name"); err != nil {
 		t.Fatalf("RenamePasskey(owner): %v", err)
 	}
-	got, _, _ = s.GetPasskeyByCredentialID(ctx, owner.CredentialID)
+	got, _, _ = s.PasskeyByCredentialID(ctx, owner.CredentialID)
 	if got.Name != "new-name" {
 		t.Errorf("owner rename did not apply: name = %q, want %q", got.Name, "new-name")
 	}
@@ -290,10 +290,10 @@ func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Wrong user cannot delete: the credential is still present afterward.
-	if err := s.DeletePasskey(ctx, owner.ID, 2); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 2}); err != nil {
 		t.Fatalf("DeletePasskey(wrong owner): %v", err)
 	}
-	if got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID); got == nil {
+	if got, _, _ := s.PasskeyByCredentialID(ctx, owner.CredentialID); got == nil {
 		t.Fatal("non-owner delete removed the credential")
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, 1); n != 1 {
@@ -301,10 +301,10 @@ func TestDeletePasskey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Real owner deletes; both the primary and its index entry go away.
-	if err := s.DeletePasskey(ctx, owner.ID, 1); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: owner.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeletePasskey(owner): %v", err)
 	}
-	if got, _, _ := s.GetPasskeyByCredentialID(ctx, owner.CredentialID); got != nil {
+	if got, _, _ := s.PasskeyByCredentialID(ctx, owner.CredentialID); got != nil {
 		t.Errorf("owner delete left the credential: %+v", got)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, 1); n != 0 {
@@ -365,14 +365,14 @@ func TestDeleteUser_cascadesRealPasskeys(t *testing.T) {
 	}
 
 	// Victim's passkey is gone from both the primary bucket and the user index.
-	if got, _, _ := s.GetPasskeyByCredentialID(ctx, vCred.CredentialID); got != nil {
+	if got, _, _ := s.PasskeyByCredentialID(ctx, vCred.CredentialID); got != nil {
 		t.Errorf("victim passkey survived user delete: %+v", got)
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, victim.ID); n != 0 {
 		t.Errorf("victim passkey index leaked: count = %d, want 0", n)
 	}
 	// Keep's passkey is untouched.
-	if got, _, _ := s.GetPasskeyByCredentialID(ctx, kCred.CredentialID); got == nil {
+	if got, _, _ := s.PasskeyByCredentialID(ctx, kCred.CredentialID); got == nil {
 		t.Errorf("keep passkey collaterally deleted")
 	}
 	if n, _ := s.PasskeyCountForUser(ctx, keep.ID); n != 1 {
@@ -422,7 +422,7 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 		t.Fatalf("CreatePasskey: %v", err)
 	}
 	logs := capture.Default(t)
-	if err := s.DeletePasskey(ctx, cred.ID, 1); err != nil {
+	if err := s.DeletePasskey(ctx, auth.PasskeyRef{ID: cred.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeletePasskey: %v", err)
 	}
 	if got := logs.CountExact("passkey deleted"); got != 1 {
@@ -436,7 +436,7 @@ func TestDeletePasskey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeletePasskey_propagatesUpdateError(t *testing.T) {
 	s := newPasskeyStore(t)
 	seedCorruptPasskey(t, s, 1, []byte("corrupt-cred"))
-	if err := s.DeletePasskey(t.Context(), 999, 1); err == nil {
+	if err := s.DeletePasskey(t.Context(), auth.PasskeyRef{ID: 999, UserID: 1}); err == nil {
 		t.Fatal("DeletePasskey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/obs"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/scheduler"
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 var errMock = errors.New("mock error")
@@ -30,7 +30,7 @@ func securityChain(h http.Handler) http.Handler {
 
 func TestHandleHealth_returns_ok(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 	s.ready.Set(true)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -58,7 +58,7 @@ func TestHandleHealth_returns_ok(t *testing.T) {
 
 func TestHandleHealth_not_ready(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/health", http.NoBody)
@@ -85,7 +85,7 @@ func TestHandleHealth_not_ready(t *testing.T) {
 
 func TestHandleScan_rejects_non_post(t *testing.T) {
 	t.Parallel()
-	s := newTestServer(&qhMockStore{}, &qhMockConfig{})
+	s := newTestServer(t, &qhMockStore{})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
@@ -173,11 +173,11 @@ func TestSecurityHeaders_passes_through_to_next_handler(t *testing.T) {
 func TestWriteJSON_sets_content_type(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	api.WriteJSON(rec, map[string]string{"key": "value"})
+	httpapi.WriteJSON(rec, map[string]string{"key": "value"})
 
 	ct := rec.Header().Get("Content-Type")
 	if ct != "application/json" {
-		t.Errorf("api.WriteJSON() Content-Type = %q, want %q", ct, "application/json")
+		t.Errorf("httpapi.WriteJSON() Content-Type = %q, want %q", ct, "application/json")
 	}
 
 	var result map[string]string
@@ -185,7 +185,7 @@ func TestWriteJSON_sets_content_type(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if result["key"] != "value" {
-		t.Errorf("api.WriteJSON() key = %q, want %q", result["key"], "value")
+		t.Errorf("httpapi.WriteJSON() key = %q, want %q", result["key"], "value")
 	}
 }
 
@@ -197,12 +197,12 @@ func TestHandleScan_post_returns_accepted_with_activity_id(t *testing.T) {
 	// scope, stop registered before the response.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
-	ls := &liveState{cfg: &qhMockConfig{}}
+	ls := &liveState{cfg: testConfig(t)}
 	s.live.Store(ls)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -248,12 +248,12 @@ func TestHandleScan_duplicate_start_returns_running_scan_id(t *testing.T) {
 	// with a SourceScheduled entry.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 
 	// Simulate a running full scan: the guard flag plus the active
 	// full-scan entry PrepareFullScan leaves while a scan runs.
@@ -299,12 +299,12 @@ func TestHandleScan_conflict_only_in_guard_window_without_entry(t *testing.T) {
 	// is the honest answer, and the handler must not steal the flag.
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 	s.scanning.Store(true)
 
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -327,12 +327,12 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 	t.Parallel()
 	s := &Server{
 		db:       &qhMockStore{},
-		metrics:  metrics.New(),
+		metrics:  obs.New(),
 		activity: activity.New(50),
 		alerts:   activity.NewAlertLog(100),
-		ctx:      t.Context(),
+		lifetime: t.Context(),
 	}
-	s.live.Store(&liveState{cfg: &qhMockConfig{}})
+	s.live.Store(&liveState{cfg: testConfig(t)})
 
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodGet, "/api/scan", http.NoBody)
@@ -365,7 +365,7 @@ func TestBuildHandler_preserves_streaming_writer(t *testing.T) {
 	for _, path := range []string{"/api/events", "/api/preview/video"} {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
-			s := &Server{metrics: metrics.New()}
+			s := &Server{metrics: obs.New()}
 			ch := make(chan probe, 1)
 
 			mux := http.NewServeMux()

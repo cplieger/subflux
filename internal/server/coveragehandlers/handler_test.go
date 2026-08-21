@@ -8,24 +8,23 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/coverage"
-	"github.com/cplieger/subflux/internal/testsupport"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // mockCoverageStore implements CoverageStore for testing.
 type mockCoverageStore struct {
 	err           error
-	subtitleFiles []api.SubtitleEntry
-	scanStates    []api.ScanStateRow
+	subtitleFiles []subflux.SubtitleEntry
+	scanStates    []subflux.ScanStateRow
 }
 
-func (m *mockCoverageStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *mockCoverageStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return m.subtitleFiles, m.err
 }
 
-func (m *mockCoverageStore) GetScanStates(_ context.Context, _ api.MediaType, _ string) ([]api.ScanStateRow, error) {
+func (m *mockCoverageStore) ScanStates(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
 	return m.scanStates, m.err
 }
 
@@ -103,14 +102,14 @@ func TestHandleCoverage(t *testing.T) {
 
 var errMock = errors.New("mock error")
 
-// trackingCoverageStore records the params passed to GetScanStates.
+// trackingCoverageStore records the params passed to ScanStates.
 type trackingCoverageStore struct {
 	mockCoverageStore
-	lastType   api.MediaType
+	lastType   subflux.MediaType
 	lastPrefix string
 }
 
-func (m *trackingCoverageStore) GetScanStates(_ context.Context, mediaType api.MediaType, prefix string) ([]api.ScanStateRow, error) {
+func (m *trackingCoverageStore) ScanStates(_ context.Context, mediaType subflux.MediaType, prefix string) ([]subflux.ScanStateRow, error) {
 	m.lastType = mediaType
 	m.lastPrefix = prefix
 	return m.scanStates, m.err
@@ -122,7 +121,7 @@ type covSonarrFake struct {
 	series []arrapi.Series
 }
 
-func (f *covSonarrFake) GetSeries(_ context.Context) ([]arrapi.Series, error) {
+func (f *covSonarrFake) Series(_ context.Context) ([]arrapi.Series, error) {
 	return f.series, f.err
 }
 
@@ -136,7 +135,7 @@ type covRadarrFake struct {
 	movies []arrapi.Movie
 }
 
-func (f *covRadarrFake) GetMovies(_ context.Context) ([]arrapi.Movie, error) {
+func (f *covRadarrFake) Movies(_ context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
 }
 
@@ -146,7 +145,7 @@ func (f *covRadarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bo
 
 // newCoverageHandler builds a Handler around the given store, config, and
 // arr clients.
-func newCoverageHandler(store CoverageStore, cfg *testsupport.NopConfig, sonarr CoverageSonarrClient, radarr CoverageRadarrClient) *Handler {
+func newCoverageHandler(store CoverageStore, cfg *fakeCoverageCfg, sonarr CoverageSonarrClient, radarr CoverageRadarrClient) *Handler {
 	return NewHandler(Deps{
 		Store: store,
 		StateFunc: func() *LiveState {
@@ -162,7 +161,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("rejects_non_get", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodPost, "/api/coverage/series/123", nil)
 		rec := httptest.NewRecorder()
 		h.HandleCoverageDetail(rec, req)
@@ -174,7 +173,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("missing_tvdb_id", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		// Path without a tvdb ID segment.
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/", nil)
 		rec := httptest.NewRecorder()
@@ -187,7 +186,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("invalid_tvdb_id", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/abc", nil)
 		rec := httptest.NewRecorder()
 		h.HandleCoverageDetail(rec, req)
@@ -199,7 +198,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("negative_tvdb_id", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/-5", nil)
 		rec := httptest.NewRecorder()
 		h.HandleCoverageDetail(rec, req)
@@ -211,7 +210,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("valid_tvdb_id_returns_files", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/81189", nil)
 		rec := httptest.NewRecorder()
 		h.HandleCoverageDetail(rec, req)
@@ -227,7 +226,7 @@ func TestHandleCoverageDetail(t *testing.T) {
 
 	t.Run("db_error_returns_500", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{err: errMock}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{err: errMock}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/81189", nil)
 		rec := httptest.NewRecorder()
 		h.HandleCoverageDetail(rec, req)
@@ -245,7 +244,7 @@ func TestHandleScanStates(t *testing.T) {
 
 	t.Run("rejects_non_get", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodPost, "/api/coverage/scan-state", nil)
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
@@ -258,41 +257,41 @@ func TestHandleScanStates(t *testing.T) {
 	t.Run("defaults_to_episode", func(t *testing.T) {
 		t.Parallel()
 		store := &trackingCoverageStore{}
-		h := newCoverageHandler(store, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(store, &fakeCoverageCfg{}, nil, nil)
 		// No type param — should default to "episode".
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/scan-state", nil)
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
+			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "episode" {
-			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "episode")
+			t.Errorf("ScanStates mediaType = %q, want %q", store.lastType, "episode")
 		}
 	})
 
 	t.Run("passes_type_and_prefix", func(t *testing.T) {
 		t.Parallel()
 		store := &trackingCoverageStore{}
-		h := newCoverageHandler(store, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(store, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet,
 			"/api/coverage/scan-state?type=movie&prefix=tmdb-123-", nil)
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
+			t.Errorf("HandleScanStates() status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		if store.lastType != "movie" {
-			t.Errorf("GetScanStates mediaType = %q, want %q", store.lastType, "movie")
+			t.Errorf("ScanStates mediaType = %q, want %q", store.lastType, "movie")
 		}
 		if store.lastPrefix != "tmdb-123-" {
-			t.Errorf("GetScanStates prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
+			t.Errorf("ScanStates prefix = %q, want %q", store.lastPrefix, "tmdb-123-")
 		}
 	})
 
 	t.Run("invalid_type_returns_400", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&trackingCoverageStore{}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&trackingCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/scan-state?type=foo", nil)
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
@@ -304,7 +303,7 @@ func TestHandleScanStates(t *testing.T) {
 
 	t.Run("db_error_returns_500", func(t *testing.T) {
 		t.Parallel()
-		h := newCoverageHandler(&mockCoverageStore{err: errMock}, &testsupport.NopConfig{}, nil, nil)
+		h := newCoverageHandler(&mockCoverageStore{err: errMock}, &fakeCoverageCfg{}, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/coverage/scan-state", nil)
 		rec := httptest.NewRecorder()
 		h.HandleScanStates(rec, req)
@@ -343,16 +342,16 @@ func coverageSeriesFixture() []arrapi.Series {
 
 func TestHandleCoverageSeries_returns_series_with_coverage(t *testing.T) {
 	t.Parallel()
-	store := &mockCoverageStore{subtitleFiles: []api.SubtitleEntry{
+	store := &mockCoverageStore{subtitleFiles: []subflux.SubtitleEntry{
 		{MediaID: "tvdb-81189-s01e01", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 		{MediaID: "tvdb-81189-s01e02", Language: "fr", Variant: "standard", Source: "embedded", Codec: "pgs"},
 	}}
-	cfg := &testsupport.NopConfig{
-		Targets: []api.SubtitleTarget{{Code: "fr"}},
+	cfg := &fakeCoverageCfg{
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 		// The typed embedded policy (embedded_subtitles section) is the
 		// server-side source for have_ignored badges: this pins the handler
 		// consumer of the ONE policy resolver, not only the engine.
-		Embedded: api.EmbeddedPolicy{IgnorePGS: true},
+		embedded: subflux.EmbeddedPolicy{IgnorePGS: true},
 	}
 	h := newCoverageHandler(store, cfg, &covSonarrFake{series: coverageSeriesFixture()}, nil)
 
@@ -411,7 +410,7 @@ func TestHandleCoverageSeries_returns_series_with_coverage(t *testing.T) {
 
 func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 	t.Parallel()
-	h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{},
+	h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{},
 		&covSonarrFake{err: errMock}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/coverage/series", nil)
@@ -419,22 +418,22 @@ func TestHandleCoverageSeries_get_series_error_returns_502(t *testing.T) {
 	h.HandleCoverageSeries(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
-		t.Errorf("HandleCoverageSeries(GetSeries error) status = %d, want %d",
+		t.Errorf("HandleCoverageSeries(Series error) status = %d, want %d",
 			rec.Code, http.StatusBadGateway)
 	}
 }
 
-// seriesDBErrorStore fails GetSubtitleFiles but not GetSeries, so the
+// seriesDBErrorStore fails SubtitleFiles but not Series, so the
 // coverage fetch surfaces the store error as a 500 (vs the arr 502).
 type seriesDBErrorStore struct{ mockCoverageStore }
 
-func (m *seriesDBErrorStore) GetSubtitleFiles(_ context.Context, _ api.MediaType, _ string) ([]api.SubtitleEntry, error) {
+func (m *seriesDBErrorStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.SubtitleEntry, error) {
 	return nil, errMock
 }
 
 func TestHandleCoverageSeries_db_error_returns_500(t *testing.T) {
 	t.Parallel()
-	h := newCoverageHandler(&seriesDBErrorStore{}, &testsupport.NopConfig{},
+	h := newCoverageHandler(&seriesDBErrorStore{}, &fakeCoverageCfg{},
 		&covSonarrFake{series: coverageSeriesFixture()}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/coverage/series", nil)
@@ -449,7 +448,7 @@ func TestHandleCoverageSeries_db_error_returns_500(t *testing.T) {
 
 func TestHandleCoverageSeries_no_targets_sets_rule_no_targets(t *testing.T) {
 	t.Parallel()
-	h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{},
+	h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{},
 		&covSonarrFake{series: coverageSeriesFixture()}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/coverage/series", nil)
@@ -475,7 +474,7 @@ func TestHandleCoverageSeries_no_targets_sets_rule_no_targets(t *testing.T) {
 func TestHandleCoverageSeries_no_original_language_uses_default_rule(t *testing.T) {
 	t.Parallel()
 	h := newCoverageHandler(&mockCoverageStore{},
-		&testsupport.NopConfig{Targets: []api.SubtitleTarget{{Code: "fr"}}},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
 		&covSonarrFake{series: []arrapi.Series{{
 			ID:         1,
 			Title:      "No Lang Show",
@@ -533,11 +532,11 @@ func coverageMoviesFixture() []arrapi.Movie {
 
 func TestHandleCoverageMovies_returns_movies_with_coverage(t *testing.T) {
 	t.Parallel()
-	store := &mockCoverageStore{subtitleFiles: []api.SubtitleEntry{
+	store := &mockCoverageStore{subtitleFiles: []subflux.SubtitleEntry{
 		{MediaID: "tmdb-12345", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
 	}}
-	cfg := &testsupport.NopConfig{
-		Targets: []api.SubtitleTarget{{Code: "fr"}},
+	cfg := &fakeCoverageCfg{
+		targets: []subflux.SubtitleTarget{{Code: "fr"}},
 	}
 	h := newCoverageHandler(store, cfg, nil, &covRadarrFake{movies: coverageMoviesFixture()})
 
@@ -590,7 +589,7 @@ func TestHandleCoverageMovies_returns_movies_with_coverage(t *testing.T) {
 
 func TestHandleCoverageMovies_get_movies_error_returns_502(t *testing.T) {
 	t.Parallel()
-	h := newCoverageHandler(&mockCoverageStore{}, &testsupport.NopConfig{},
+	h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{},
 		nil, &covRadarrFake{err: errMock})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/coverage/movies", nil)
@@ -598,14 +597,14 @@ func TestHandleCoverageMovies_get_movies_error_returns_502(t *testing.T) {
 	h.HandleCoverageMovies(rec, req)
 
 	if rec.Code != http.StatusBadGateway {
-		t.Errorf("HandleCoverageMovies(GetMovies error) status = %d, want %d",
+		t.Errorf("HandleCoverageMovies(Movies error) status = %d, want %d",
 			rec.Code, http.StatusBadGateway)
 	}
 }
 
 func TestHandleCoverageMovies_db_error_returns_500(t *testing.T) {
 	t.Parallel()
-	h := newCoverageHandler(&seriesDBErrorStore{}, &testsupport.NopConfig{},
+	h := newCoverageHandler(&seriesDBErrorStore{}, &fakeCoverageCfg{},
 		nil, &covRadarrFake{movies: coverageMoviesFixture()})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/coverage/movies", nil)
@@ -621,7 +620,7 @@ func TestHandleCoverageMovies_db_error_returns_500(t *testing.T) {
 func TestHandleCoverageMovies_nil_movie_file_omits_path(t *testing.T) {
 	t.Parallel()
 	h := newCoverageHandler(&mockCoverageStore{},
-		&testsupport.NopConfig{Targets: []api.SubtitleTarget{{Code: "fr"}}},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
 		nil, &covRadarrFake{movies: []arrapi.Movie{{
 			ID:      1,
 			Title:   "Nil File Movie",

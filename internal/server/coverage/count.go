@@ -4,14 +4,42 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// FileReader is the ONE thing the missing-count pass asks of the store: read
+// every subtitle-file row for a media type, once per type, and count against it
+// in memory. One of the twelve methods the coverage surface offers — this pass
+// records nothing, stamps nothing, and never reads scan state.
+//
+// Exported because queryhandlers names it: the CountMissing function value it
+// is handed takes this as a parameter, and naming this type is what keeps that
+// signature from drifting into a wider one.
+type FileReader interface {
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+}
+
+// CountCfg is what the missing-count pass reads out of the configuration: the
+// language targets a media item earns, and the embedded-codec policy that
+// decides which existing tracks count as usable. 2 of the 37 values the config
+// offers — counting is arithmetic over targets and rows, so it asks nothing
+// about providers, scoring, paths or the server runtime.
+//
+// Exported because queryhandlers names it: the CountMissing function value the
+// composition root binds and hands over takes this as its parameter, and naming
+// this type is what keeps that signature from drifting back to a wider one.
+type CountCfg interface {
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
+	EmbeddedPolicy() subflux.EmbeddedPolicy
+}
 
 // CountMissing returns the total number of missing subtitle targets across
 // all series and movies.
-func CountMissing(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
+func CountMissing(ctx context.Context, cfg CountCfg, db FileReader, allSeries []arrapi.Series, allMovies []arrapi.Movie) int {
 	ignoredCodecs := search.IgnoredCodecsFromConfig(cfg)
 	return CountMissingSeries(ctx, cfg, db, allSeries, ignoredCodecs) +
 		CountMissingMovies(ctx, cfg, db, allMovies, ignoredCodecs)
@@ -25,11 +53,11 @@ type langKey struct{ lang, variant string }
 type prefixCounts map[langKey]int
 
 // CountMissingSeries returns the number of missing subtitle targets for series.
-func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
+func CountMissingSeries(ctx context.Context, cfg CountCfg, db FileReader, allSeries []arrapi.Series, ignoredCodecs map[string]bool) int {
 	if len(allSeries) == 0 {
 		return 0
 	}
-	epFiles, err := db.GetSubtitleFiles(ctx, api.MediaTypeEpisode, "")
+	epFiles, err := db.SubtitleFiles(ctx, subflux.MediaTypeEpisode, "")
 	if err != nil {
 		slog.Warn("countMissingSeries: DB query failed", "error", err)
 		return 0
@@ -49,7 +77,7 @@ func CountMissingSeries(ctx context.Context, cfg api.ConfigProvider, db api.Cove
 		if epCount == 0 {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(ser.OriginalLanguage), nil)
+		targets := cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(ser.OriginalLanguage), nil)
 		missing += missingForSeries(epCount, targets, prefixIdx[prefixes[i]])
 	}
 	return missing
@@ -61,7 +89,7 @@ func seriesPrefixes(allSeries []arrapi.Series) (prefixes []string, prefixSet map
 	prefixes = make([]string, 0, len(allSeries))
 	prefixSet = make(map[string]struct{}, len(allSeries))
 	for i := range allSeries {
-		prefix := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
+		prefix := mediaid.SeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
 		prefixes = append(prefixes, prefix)
 		if prefix != "" {
 			prefixSet[prefix] = struct{}{}
@@ -105,7 +133,7 @@ func countUsableSubs(pc prefixCounts, subs map[Key]*Status) {
 // missingForSeries returns the number of missing subtitle slots for one series:
 // for each target, the number of episodes lacking a usable subtitle. pc may be
 // nil when the series has no indexed subtitles.
-func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts) int {
+func missingForSeries(epCount int, targets []subflux.SubtitleTarget, pc prefixCounts) int {
 	var missing int
 	for _, t := range targets {
 		have := 0
@@ -120,11 +148,11 @@ func missingForSeries(epCount int, targets []api.SubtitleTarget, pc prefixCounts
 }
 
 // CountMissingMovies returns the number of missing subtitle targets for movies.
-func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
+func CountMissingMovies(ctx context.Context, cfg CountCfg, db FileReader, allMovies []arrapi.Movie, ignoredCodecs map[string]bool) int {
 	if len(allMovies) == 0 {
 		return 0
 	}
-	movieFiles, err := db.GetSubtitleFiles(ctx, api.MediaTypeMovie, "")
+	movieFiles, err := db.SubtitleFiles(ctx, subflux.MediaTypeMovie, "")
 	if err != nil {
 		slog.Warn("countMissingMovies: DB query failed", "error", err)
 		return 0
@@ -136,8 +164,8 @@ func CountMissingMovies(ctx context.Context, cfg api.ConfigProvider, db api.Cove
 		if !m.HasFile {
 			continue
 		}
-		targets := cfg.ResolveTargetsWithFallback(api.OriginalLangCode(m.OriginalLanguage), nil)
-		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
+		targets := cfg.ResolveTargetsWithFallback(arrsvc.OriginalLangCode(m.OriginalLanguage), nil)
+		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue
 		}

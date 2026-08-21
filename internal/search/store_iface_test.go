@@ -5,5 +5,5 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 )
 
-// Compile-time assertion: *boltstore.DB satisfies search.SearchStore.
-var _ search.SearchStore = (*boltstore.DB)(nil)
+// Compile-time assertion: *boltstore.DB satisfies search.Store.
+var _ search.Store = (*boltstore.DB)(nil)

@@ -6,71 +6,119 @@ package queryhandlers
 import (
 	"context"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// QueryStore documents the api.Store methods used by query handlers.
+// QueryStore is the read-only introspection surface behind /api/state,
+// /api/backoff and /api/locks: 5 of the 36 methods the store offers, all of
+// them reads. Nothing on this path writes, which is why no write appears here.
 type QueryStore interface {
-	GetState(ctx context.Context, q *api.StateQuery) ([]api.StateEntry, error)
-	GetBackoffItems(ctx context.Context) ([]api.BackoffEntry, error)
-	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
-	GetManualLocks(ctx context.Context) ([]api.ManualLockEntry, error)
+	State(ctx context.Context, q *subflux.StateQuery) ([]subflux.StateEntry, error)
+	BackoffItems(ctx context.Context) ([]subflux.BackoffEntry, error)
+	BackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
+	ManualLocks(ctx context.Context) ([]subflux.ManualLockEntry, error)
 	Stats(ctx context.Context) (downloads, attempts int, err error)
 }
 
-// Compile-time assertion: api.Store satisfies QueryStore.
-var _ QueryStore = api.Store(nil)
-
 // StatsSonarrClient is the Sonarr surface the stats handler uses.
 type StatsSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
 }
 
 // StatsRadarrClient is the Radarr surface the stats handler uses.
 type StatsRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the stats
-// surfaces.
-var (
-	_ StatsSonarrClient = api.SonarrClient(nil)
-	_ StatsRadarrClient = api.RadarrClient(nil)
-)
+// StatsStore is the two aggregate reads the stats endpoint reports: how many
+// subtitle files are tracked, and when the last scan finished. 2 of the twelve
+// methods the coverage surface offers — /api/state/stats renders a summary, so
+// it never touches a per-item row.
+type StatsStore interface {
+	TotalSubtitleFiles(ctx context.Context) (int, error)
+	LastScanTime(ctx context.Context) (string, error)
+}
 
 // MetricsReader is the narrow interface for reading search metrics.
 type MetricsReader interface {
 	TotalSearches() int64
 }
 
+// queryEngine is the read-and-reset surface the introspection endpoints use:
+// simulate a score for POST /api/score, report provider-timeout state, and
+// clear it. Three of the engine's eight methods — these handlers never search,
+// never download and never post-process, so the other five stay out of reach.
+type queryEngine interface {
+	SimulateScore(mediaType subflux.MediaType, videoRelease, subRelease string, matchedBy subflux.MatchMethod) subflux.ScoreResult
+	ProviderTimeouts() (status map[subflux.ProviderID]subflux.ProviderStatus, enabled bool)
+	ResetTimeouts()
+}
+
+// queryCfg is the configuration surface the introspection endpoints render:
+// /api/config/parsed echoes the parsed settings back to the UI, /api/state/stats
+// reports the scan interval, and the per-item state view resolves targets and
+// the embedded-codec policy. 11 of the 37 values the config offers — wide for a
+// handler package because reporting the configuration IS this family's job, and
+// still short of the whole by the auth, logging, port and media-path halves it
+// never reads.
+//
+// It re-lists ResolveTargetsWithFallback and EmbeddedPolicy rather than
+// embedding coverage.CountCfg: this is what the handlers read for themselves,
+// and a consumer surface that borrows another package's interface stops
+// recording its own dependency.
+type queryCfg interface {
+	Providers() map[subflux.ProviderID]subflux.ProviderCfg
+	LanguageCodes() []string
+	LanguageRulesForUI() subflux.LanguageRulesJSON
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
+	EmbeddedPolicy() subflux.EmbeddedPolicy
+	Scores() subflux.Scores
+	Search() subflux.SearchConfig
+	Adaptive() subflux.AdaptiveConfig
+	PostProcess() subflux.PostProcessConfig
+	Sonarr() subflux.ArrConfig
+	Radarr() subflux.ArrConfig
+}
+
 // LiveState holds the hot-reloadable runtime state needed by query handlers.
 type LiveState struct {
-	Cfg       api.ConfigProvider
-	Engine    api.SearchEngine
+	Cfg       queryCfg
+	Engine    queryEngine
 	Sonarr    StatsSonarrClient
 	Radarr    StatsRadarrClient
-	Providers []api.Provider
+	Providers []provider.Provider
 }
 
 // Deps holds all dependencies for the query handler family.
 type Deps struct {
-	QueryDB      QueryStore
-	CovDB        api.CoverageStore
-	Metrics      MetricsReader
-	State        func() *LiveState
-	Configured   func() bool
-	CountMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
+	QueryDB    QueryStore
+	CovDB      StatsStore
+	Metrics    MetricsReader
+	State      func() *LiveState
+	Configured func() bool
+	// CountMissing counts missing subtitle targets. It is handed to this package
+	// ALREADY BOUND to the store: the count reads subtitle-file rows, this
+	// package never does, and taking the store as a parameter just to forward it
+	// is what made these handlers look like a store consumer twelve methods
+	// wide. cfg stays a parameter because it is hot-reloadable and arrives with
+	// each request's live snapshot — 2 of the 37 values the config offers, named
+	// from coverage for the same reason the store half named FileReader there:
+	// the contract belongs to the function, and re-listing it here is how the
+	// two halves of one signature drift apart.
+	CountMissing func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int
 }
 
 // Handler holds all dependencies for the query handler family.
 type Handler struct {
 	queryDB      QueryStore
-	covDB        api.CoverageStore
+	covDB        StatsStore
 	metrics      MetricsReader
 	state        func() *LiveState
 	configured   func() bool
-	countMissing func(ctx context.Context, cfg api.ConfigProvider, db api.CoverageStore, series []arrapi.Series, movies []arrapi.Movie) int
+	countMissing func(ctx context.Context, cfg coverage.CountCfg, series []arrapi.Series, movies []arrapi.Movie) int
 	statsCache   statsCache
 }
 
@@ -97,5 +145,3 @@ func (h *Handler) StatsInvalidator() StatsCacheInvalidator { return &h.statsCach
 type StatsCacheInvalidator interface {
 	Invalidate()
 }
-
-// --- Shared helpers (delegated to httphelpers package) ---

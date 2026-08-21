@@ -3,8 +3,10 @@ package server
 import (
 	"net/http"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/server/authhandlers"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Request middleware ---
@@ -25,7 +27,7 @@ type sessionAuthenticator interface {
 func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.configured.Load() {
-			api.ServiceUnavailableC(w, r, api.CodeServiceUnavailable, "not configured; save a valid configuration first")
+			httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable, "not configured; save a valid configuration first")
 			return
 		}
 		next(w, r)
@@ -39,8 +41,8 @@ func (s *Server) requireConfigured(next http.HandlerFunc) http.HandlerFunc {
 // Auth bypass is handled inside Authenticator.Authenticate; session-activity
 // writes happen inside the library's session verifier, throttled per session.
 //
-// Handlers downstream read the user with api.UserFromContext and the
-// session hash with api.SessionHashFromContext. The latter is empty for
+// Handlers downstream read the user with authhandlers.UserFromContext and the
+// session hash with authhandlers.SessionHashFromContext. The latter is empty for
 // API-key-authenticated requests.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -48,8 +50,8 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		ctx := api.NewUserContext(r.Context(), user)
-		ctx = api.NewSessionHashContext(ctx, sessHash)
+		ctx := authhandlers.NewUserContext(r.Context(), user)
+		ctx = authhandlers.NewSessionHashContext(ctx, sessHash)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -57,12 +59,12 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 // requireRole returns a middleware that authorizes requests based on the
 // user's role. Must be chained after requireAuth so UserFromContext is
 // populated. Admin is a superset of user (see auth.HasRole).
-func (s *Server) requireRole(role auth.Role) middleware {
+func requireRole(role auth.Role) middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user := api.UserFromContext(r.Context())
+			user := authhandlers.UserFromContext(r.Context())
 			if !auth.HasRole(user, role) {
-				api.ForbiddenC(w, r, api.CodeAuthRoleRequired, "forbidden")
+				httpapi.ForbiddenC(w, r, subflux.CodeAuthRoleRequired, "forbidden")
 				return
 			}
 			next(w, r)

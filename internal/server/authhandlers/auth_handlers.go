@@ -6,8 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- POST /api/auth/login ---
@@ -15,7 +17,7 @@ import (
 // HandleLogin handles POST /api/auth/login — authenticates with username and password.
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if cfg := h.Config(); cfg != nil && !cfg.BasicAuthEnabled() {
-		api.ForbiddenC(w, r, api.CodeForbidden, "password login is disabled")
+		httpapi.ForbiddenC(w, r, subflux.CodeForbidden, "password login is disabled")
 		return
 	}
 
@@ -27,61 +29,63 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := ClientIP(r)
+	// The limiter's two dimensions are distinctly typed, so the IP and the
+	// username cannot be transposed on the way in.
+	rlIP, rlUser := ratelimit.ClientIP(ClientIP(r)), ratelimit.Username(req.Username)
 
 	// Rate limit check.
-	allowed, retryAfter := h.RateLimiter.Allow(ip, req.Username)
+	allowed, retryAfter := h.RateLimiter.Allow(rlIP, rlUser)
 	if !allowed {
 		Audit(r, slog.LevelWarn, AuditLoginRateLimited, false, req.Username,
 			slog.Int("retry_after_seconds", int(retryAfter.Seconds())+1))
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
-		api.TooManyRequestsC(w, r, api.CodeRateLimited, "too many attempts")
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "too many attempts")
 		return
 	}
 
 	ctx := r.Context()
 	dbCtx, dbCancel := dbCtx(ctx)
-	user, found, err := h.Store.GetUserByUsername(dbCtx, req.Username)
+	user, found, err := h.Store.UserByUsername(dbCtx, req.Username)
 	dbCancel()
 	if err != nil {
 		slog.Error("login: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	if !found {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "unknown_username"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
 	if !user.Enabled {
 		_, _ = auth.VerifyPassword(req.Password, auth.DummyHash())
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "account_disabled"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
 	passOK, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !passOK {
-		h.RateLimiter.Record(ip, req.Username)
+		h.RateLimiter.Record(rlIP, rlUser)
 		Audit(r, slog.LevelWarn, AuditLoginFailure, false, req.Username,
 			slog.String("reason", "invalid_password"))
-		api.UnauthorizedC(w, r, api.CodeAuthInvalidCredentials, "invalid credentials")
+		httpapi.UnauthorizedC(w, r, subflux.CodeAuthInvalidCredentials, "invalid credentials")
 		return
 	}
 
 	// Password verified: clear failure counters (anti soft-lockout, OWASP
 	// ASVS 2.2.1) and create session directly.
-	h.RateLimiter.Reset(ip, req.Username)
+	h.RateLimiter.Reset(rlIP, rlUser)
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("login: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	Audit(r, slog.LevelInfo, AuditLoginSuccess, true, user.Username,
@@ -99,8 +103,8 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	user := ""
 	token := SessionCookie.ReadCookie(r)
 	if token != "" {
-		if sess, ok, err := h.Store.GetSessionByHash(r.Context(), auth.SessionHash(token)); err == nil && ok {
-			if u, ok, err := h.Store.GetUserByID(r.Context(), sess.UserID); err == nil && ok {
+		if sess, ok, err := h.Store.SessionByHash(r.Context(), auth.SessionHash(token)); err == nil && ok {
+			if u, ok, err := h.Store.UserByID(r.Context(), sess.UserID); err == nil && ok {
 				user = u.Username
 			}
 		}
@@ -110,7 +114,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SessionCookie.ClearCookie(w, r)
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditLogout, true, user)
 }
 
@@ -123,11 +127,11 @@ func (h *Handler) HandleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	dbCancel()
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
-	api.WriteJSON(w, api.SetupStatus{
+	httpapi.WriteJSON(w, subflux.SetupStatus{
 		SetupRequired: count == 0,
 		ConfigValid:   h.Configured(),
 	})
@@ -147,11 +151,11 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username required")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username required")
 		return
 	}
 	if len([]rune(req.Username)) > maxUsernameLen {
-		api.BadRequestC(w, r, api.CodeBadRequest, "username too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "username too long")
 		return
 	}
 
@@ -161,14 +165,19 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	if cfg != nil {
 		checkBreach = cfg.CheckBreachedPasswords()
 	}
-	hash, userMsg, err := ValidateAndHashPassword(r.Context(), req.Password, req.Username, true, checkBreach, h.HTTPClient)
+	hash, userMsg, err := ValidateAndHashPassword(r.Context(), PasswordCheck{
+		Password:    req.Password,
+		Username:    req.Username,
+		SoleFactor:  true,
+		CheckBreach: checkBreach,
+	}, h.HTTPClient)
 	if userMsg != "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, userMsg)
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, userMsg)
 		return
 	}
 	if err != nil {
 		slog.Error("setup: hash password", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -177,18 +186,18 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 	count, err := h.Store.UserCount(ctx)
 	if err != nil {
 		slog.Error("setup: user count", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 	if count > 0 {
-		api.ConflictC(w, r, api.CodeSetupAlreadyComplete, "setup already completed")
+		httpapi.ConflictC(w, r, subflux.CodeSetupAlreadyComplete, "setup already completed")
 		return
 	}
 
 	now := time.Now()
 	user := &auth.User{
 		Username:     req.Username,
-		PasswordHash: hash,
+		PasswordHash: string(hash),
 		Role:         auth.RoleAdmin,
 		Enabled:      true,
 		CreatedAt:    now,
@@ -197,7 +206,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.Store.CreateUser(ctx, user); err != nil {
 		slog.Error("setup: create user", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
@@ -205,7 +214,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.createSessionAndRespond(w, r, user, auth.MethodPassword); err != nil {
 		slog.Error("setup: create session", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 	}
 }
 
@@ -213,7 +222,7 @@ func (h *Handler) HandleSetupCreate(w http.ResponseWriter, r *http.Request) {
 
 // HandleAuthMe handles GET /api/auth/me — returns profile information for the current user.
 func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	passkeyCount, errPK := h.Store.PasskeyCountForUser(r.Context(), user.ID)
 	if errPK != nil {
@@ -229,7 +238,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 		canLinkOIDC = false
 	}
 
-	api.WriteJSON(w, api.MeResponse{
+	httpapi.WriteJSON(w, subflux.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Role:        user.Role,

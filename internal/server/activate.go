@@ -8,10 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	authoidc "github.com/cplieger/auth/v3/oidc"
-	authwebauthn "github.com/cplieger/auth/v3/webauthn"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	authoidc "github.com/cplieger/auth/v4/oidc"
+	authwebauthn "github.com/cplieger/auth/v4/webauthn"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/provider"
+	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -51,14 +55,14 @@ func (m activationMode) String() string {
 // prepare phase. Nothing in it is externally visible until publish stores it
 // in the live snapshot.
 type activationCandidate struct {
-	engine    api.SearchEngine
-	scorer    api.Scorer
-	sonarr    api.SonarrClient
-	radarr    api.RadarrClient
+	engine    *search.Engine
+	scorer    *scorer.Engine
+	sonarr    SonarrClient
+	radarr    RadarrClient
 	webauthn  *webauthn.WebAuthn
 	oidc      *oidcSlot
-	providers []api.Provider
-	drift     api.ConfigDrift
+	providers []provider.Provider
+	drift     subflux.ConfigDrift
 	// webauthnDegraded records the cold-boot degrade path so finalize keeps
 	// the persistent alert instead of dismissing it.
 	webauthnDegraded bool
@@ -80,7 +84,7 @@ type activationCandidate struct {
 // memory ahead of disk (the config-save handler documents that case).
 // Repeated activation of an identical config is harmless: the worker latch
 // absorbs duplicates and the snapshot swap is idempotent in effect.
-func (s *Server) activate(ctx context.Context, newCfg api.ConfigProvider, mode activationMode) error {
+func (s *Server) activate(ctx context.Context, newCfg *config.Config, mode activationMode) error {
 	oldState := s.state()
 
 	cand, err := s.prepare(ctx, newCfg, oldState.cfg, mode)
@@ -107,17 +111,16 @@ func (s *Server) activate(ctx context.Context, newCfg api.ConfigProvider, mode a
 // prepare builds the full activation candidate. Fallible; performs no
 // externally visible mutation, so a failure rejects the candidate config
 // while the previous snapshot keeps serving.
-func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider, mode activationMode) (*activationCandidate, error) {
+func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mode activationMode) (*activationCandidate, error) {
 	cand := &activationCandidate{}
 
 	// Detect config drift against the outgoing config before anything is
 	// swapped. Skipped when transitioning from unconfigured (no old config).
 	if oldCfg != nil {
-		cand.drift = api.DetectDrift(
-			oldCfg.LanguageCodes(), newCfg.LanguageCodes(),
-			enabledProviders(oldCfg), enabledProviders(newCfg),
-			oldCfg.Adaptive().Enabled, newCfg.Adaptive().Enabled,
-		)
+		cand.drift = detectDrift(&driftInputs{
+			Old: newDriftState(oldCfg),
+			New: newDriftState(newCfg),
+		})
 	}
 
 	engine, sc, providers, err := s.wire(ctx, newCfg, s.db, s.metrics)
@@ -129,14 +132,14 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 	// Arr clients are constructed HERE in both modes: activation owns their
 	// lifecycle (main.go builds none), so a failed construction rejects the
 	// candidate without side effects.
-	if sonarrCfg := newCfg.SonarrConfig(); sonarrCfg.URL != "" {
+	if sonarrCfg := newCfg.Sonarr(); sonarrCfg.URL != "" {
 		c, sonarrErr := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey)
 		if sonarrErr != nil {
 			return nil, fmt.Errorf("invalid sonarr config: %w", sonarrErr)
 		}
 		cand.sonarr = c
 	}
-	if radarrCfg := newCfg.RadarrConfig(); radarrCfg.URL != "" {
+	if radarrCfg := newCfg.Radarr(); radarrCfg.URL != "" {
 		c, radarrErr := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey)
 		if radarrErr != nil {
 			return nil, fmt.Errorf("invalid radarr config: %w", radarrErr)
@@ -152,7 +155,7 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 
 	// OIDC: an immutable per-config lazy slot. Static shape was validated by
 	// config validation in the load path; network discovery stays lazy at
-	// request time (getOIDC). A new config gets a FRESH slot so a stale
+	// request time (oidcProvider). A new config gets a FRESH slot so a stale
 	// cached provider can never outlive an issuer edit; disabled = nil slot.
 	cand.oidc = newOIDCSlot(newCfg)
 
@@ -163,12 +166,16 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg api.ConfigProvider,
 // An empty RP ID means WebAuthn is not configured (nil, no error, no alert).
 // Construction failure is FATAL on a hot save and DEGRADED (warn + nil +
 // persistent alert) on cold boot.
-func (s *Server) buildWebAuthn(cfg api.ConfigProvider, mode activationMode) (wa *webauthn.WebAuthn, degraded bool, err error) {
+func (s *Server) buildWebAuthn(cfg *config.Config, mode activationMode) (wa *webauthn.WebAuthn, degraded bool, err error) {
 	rpID := cfg.WebAuthnRPID()
 	if rpID == "" {
 		return nil, false, nil
 	}
-	wa, err = authwebauthn.NewWebAuthn(rpID, "Subflux", []string{"https://" + rpID})
+	wa, err = authwebauthn.New(authwebauthn.RPConfig{
+		ID:          rpID,
+		DisplayName: "Subflux",
+		Origins:     []string{"https://" + rpID},
+	})
 	if err == nil {
 		return wa, false, nil
 	}
@@ -184,7 +191,7 @@ func (s *Server) buildWebAuthn(cfg api.ConfigProvider, mode activationMode) (wa 
 
 // finalize applies the non-failing, best-effort committed effects after the
 // snapshot is published. Nothing here may fail the activation.
-func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.ConfigProvider, cand *activationCandidate, mode activationMode) {
+func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *config.Config, cand *activationCandidate, mode activationMode) {
 	// Re-run the process-global logging setup when the logging section
 	// changed (R1.5). Uniform handler re-setup; cold boot re-applies the
 	// same values main already installed, which is a no-op by comparison.
@@ -224,9 +231,12 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.C
 	// validator reads live config; a stale sweeper would hard-logout
 	// sessions early). Optional-capability pattern like backupStore.
 	if ts, ok := s.authStore.(interface {
-		SetSessionTimeouts(idle, absolute time.Duration)
+		SetSessionTimeouts(timeouts auth.SessionTimeouts)
 	}); ok {
-		ts.SetSessionTimeouts(newCfg.SessionIdleTimeout(), newCfg.SessionAbsoluteTimeout())
+		ts.SetSessionTimeouts(auth.SessionTimeouts{
+			Idle:     newCfg.SessionIdleTimeout(),
+			Absolute: newCfg.SessionAbsoluteTimeout(),
+		})
 	}
 
 	// Re-apply the SSE client cap on the running hub (admission-time
@@ -262,7 +272,7 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg api.C
 
 // applyLogging re-runs the injected process-global logging setup when the
 // logging section differs between the outgoing and incoming configs (R1.5).
-func (s *Server) applyLogging(oldCfg, newCfg api.ConfigProvider) {
+func (s *Server) applyLogging(oldCfg, newCfg *config.Config) {
 	if s.logSetup == nil {
 		return
 	}
@@ -284,25 +294,60 @@ func (s *Server) applyLogging(oldCfg, newCfg api.ConfigProvider) {
 // launch blocks in Start and hotReload and their broken "iff wasUnconfigured"
 // guard (WithConfig stores configured=true at construction, so a configured
 // cold boot computed false and launched nothing).
+//
+// It signals rather than launches, because the workers must run on the context
+// the process handed Start: the first successful activation can be a hot
+// config save, whose context belongs to the HTTP request that carried it, and
+// workers started on that context would stop the moment the operator's browser
+// received its 200.
 func (s *Server) startWorkers() {
 	s.workersOnce.Do(func() {
-		launch := s.launchWorkers
-		if launch == nil {
-			launch = s.launchWorkerSet
+		if s.launchWorkers != nil {
+			s.launchWorkers()
+			return
 		}
-		launch()
+		// Buffered by one and latched by workersOnce, so this send never
+		// blocks an activation. A Server that never Started (a handler test)
+		// simply leaves the signal unread.
+		select {
+		case s.workerLaunchSignal() <- struct{}{}:
+		default:
+		}
 	})
 }
 
-// launchWorkerSet starts the real background goroutines on the server
-// context. Reconcile is a scheduler-internal stage, not a worker.
-func (s *Server) launchWorkerSet() {
+// workerLaunchSignal returns the launch channel, creating it on first use so
+// that a Server assembled as a struct literal behaves like one from New rather
+// than dropping the signal into a nil channel.
+func (s *Server) workerLaunchSignal() chan struct{} {
+	s.workerLaunchOnce.Do(func() {
+		if s.workerLaunch == nil {
+			s.workerLaunch = make(chan struct{}, 1)
+		}
+	})
+	return s.workerLaunch
+}
+
+// awaitWorkerLaunch launches the background worker set on the context handed
+// to Start, when an activation asks for it. It is started by Start and returns
+// either once it has launched or when the process context ends, so the workers
+// take their lifetime from the process rather than from a struct field.
+func (s *Server) awaitWorkerLaunch(ctx context.Context) {
+	select {
+	case <-s.workerLaunchSignal():
+		s.launchWorkerSet(ctx)
+	case <-ctx.Done():
+	}
+}
+
+// launchWorkerSet starts the real background goroutines on the context handed
+// to Start. Reconcile is a scheduler-internal stage, not a worker.
+func (s *Server) launchWorkerSet(ctx context.Context) {
 	slog.Info("starting background workers", "workers", []string{"scheduler", "poller", "backup", "store_metrics"})
-	s.bgWg.Add(4)
-	go func() { defer s.bgWg.Done(); s.runScheduler(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runPoller(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runBackup(s.ctx) }()
-	go func() { defer s.bgWg.Done(); s.runStoreMetrics(s.ctx) }()
+	s.bgWg.Go(func() { s.runScheduler(ctx) })
+	s.bgWg.Go(func() { s.runPoller(ctx) })
+	s.bgWg.Go(func() { s.storeOps.RunBackup(ctx) })
+	s.bgWg.Go(func() { s.storeOps.RunMetrics(ctx) })
 }
 
 // --- OIDC lazy slot ---
@@ -325,11 +370,11 @@ type oidcSlot struct {
 
 // newOIDCSlot builds the slot for a config, or nil when OIDC is disabled
 // (publishing a nil slot is how "disable OIDC" takes effect immediately).
-func newOIDCSlot(cfg api.ConfigProvider) *oidcSlot {
+func newOIDCSlot(cfg *config.Config) *oidcSlot {
 	if !cfg.OIDCEnabled() {
 		return nil
 	}
-	return &oidcSlot{cfg: cfg.OIDCConfig()}
+	return &oidcSlot{cfg: cfg.OIDC()}
 }
 
 // get returns the slot's provider, performing lazy network discovery on

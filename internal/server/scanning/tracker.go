@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -28,8 +28,16 @@ type seasonKey struct {
 	Season int
 }
 
+// showCounter is the show-level pre-check: one count per show+language, used to
+// decide whether an entire series is worth scanning. ONE method, and it is
+// redeclared here rather than imported from the provider package because one
+// method is cheaper to restate than to couple to.
+type showCounter interface {
+	CountShowSubtitles(ctx context.Context, q subflux.ShowSubtitleQuery) (int, error)
+}
+
 type seasonTracker struct {
-	counter api.ShowSubtitleCounter
+	counter showCounter
 	cache   *showskip.Cache
 	seasons map[seasonKey]*seasonState
 	seed    seedDeps
@@ -44,7 +52,7 @@ type seasonState struct {
 // BackoffPrefixReader is the narrow store surface earlyStop seeding needs:
 // the season's existing adaptive-backoff rows by media-id prefix.
 type BackoffPrefixReader interface {
-	GetBackoffByPrefix(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error)
+	BackoffByPrefix(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error)
 }
 
 // seedDeps carries what earlyStop seeding reads. The seed is recomputed from
@@ -54,12 +62,12 @@ type BackoffPrefixReader interface {
 // automatically. A zero seedDeps (nil Backoff) disables seeding.
 type seedDeps struct {
 	Backoff     BackoffPrefixReader
-	Enabled     map[api.ProviderID]struct{}
+	Enabled     map[subflux.ProviderID]struct{}
 	Now         func() time.Time
 	MaxAttempts int
 }
 
-func newSeasonTracker(counter api.ShowSubtitleCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
+func newSeasonTracker(counter showCounter, cache *showskip.Cache, seed seedDeps) *seasonTracker {
 	if seed.Now == nil {
 		seed.Now = time.Now
 	}
@@ -115,7 +123,7 @@ func (st *seasonTracker) showLevelSkip(ctx context.Context, imdbID string, episo
 		slog.Debug("show skip cache hit", "imdb", imdbID, "lang", lang, "skip", skip)
 		return skip
 	}
-	count, err := st.counter.CountShowSubtitles(ctx, imdbID, lang)
+	count, err := st.counter.CountShowSubtitles(ctx, subflux.ShowSubtitleQuery{ImdbID: imdbID, Language: lang})
 	if err != nil {
 		slog.Warn("show subtitle count failed, not skipping",
 			"imdb", imdbID, "lang", lang, "error", err)
@@ -241,7 +249,7 @@ func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDP
 	if st.seed.Backoff == nil || seasonIDPrefix == "" || len(st.seed.Enabled) == 0 {
 		return 0
 	}
-	entries, err := st.seed.Backoff.GetBackoffByPrefix(ctx, api.MediaTypeEpisode, seasonIDPrefix)
+	entries, err := st.seed.Backoff.BackoffByPrefix(ctx, subflux.MediaTypeEpisode, seasonIDPrefix)
 	if err != nil {
 		slog.Warn("season tracker seed: backoff read failed, seeding 0",
 			"imdb", key.ImdbID, "season", key.Season, "lang", key.Lang, "error", err)
@@ -260,9 +268,9 @@ func (st *seasonTracker) seedCount(ctx context.Context, key seasonKey, seasonIDP
 // lang) cover every currently-enabled provider — the zero-eligible-provider
 // constraint seedCount's contract requires. Extracted verbatim from
 // seedCount's accumulation loops.
-func (st *seasonTracker) countFullySuppressed(entries []api.BackoffEntry, lang string) int {
+func (st *seasonTracker) countFullySuppressed(entries []subflux.BackoffEntry, lang string) int {
 	now := st.seed.Now()
-	activeByEpisode := make(map[string]map[api.ProviderID]struct{})
+	activeByEpisode := make(map[string]map[subflux.ProviderID]struct{})
 	for i := range entries {
 		en := &entries[i]
 		if en.Language != lang {
@@ -276,7 +284,7 @@ func (st *seasonTracker) countFullySuppressed(entries []api.BackoffEntry, lang s
 		}
 		m := activeByEpisode[en.MediaID]
 		if m == nil {
-			m = make(map[api.ProviderID]struct{})
+			m = make(map[subflux.ProviderID]struct{})
 			activeByEpisode[en.MediaID] = m
 		}
 		m[en.Provider] = struct{}{}
@@ -293,7 +301,7 @@ func (st *seasonTracker) countFullySuppressed(entries []api.BackoffEntry, lang s
 // backoffActive reports whether a backoff row currently suppresses its
 // provider: the failure count reached the adaptive max-attempts ceiling
 // (permanent until cleared) or the retry window has not yet passed.
-func backoffActive(en *api.BackoffEntry, maxAttempts int, now time.Time) bool {
+func backoffActive(en *subflux.BackoffEntry, maxAttempts int, now time.Time) bool {
 	if maxAttempts > 0 && en.Failures >= maxAttempts {
 		return true
 	}

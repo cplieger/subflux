@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"go.etcd.io/bbolt"
 )
 
@@ -64,7 +64,7 @@ func TestResetPreserving_refusesNilTransform(t *testing.T) {
 		t.Fatalf("ResetPreserving(nil) = %v, want the explicit-transform refusal", err)
 	}
 	// Nothing was touched.
-	u, _, gerr := s.GetUserByUsername(t.Context(), users[0].Username)
+	u, _, gerr := s.UserByUsername(t.Context(), users[0].Username)
 	if gerr != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("user after refused reset = (%+v, %v), want untouched", u, gerr)
 	}
@@ -83,21 +83,21 @@ func TestResetPreserving_identityRoundTrip(t *testing.T) {
 	}
 
 	for _, want := range users {
-		u, _, err := s.GetUserByUsername(ctx, want.Username)
+		u, _, err := s.UserByUsername(ctx, want.Username)
 		if err != nil || u == nil {
-			t.Fatalf("GetUserByUsername(%s) = (%v, %v), want restored", want.Username, u, err)
+			t.Fatalf("UserByUsername(%s) = (%v, %v), want restored", want.Username, u, err)
 		}
 		if u.ID != want.ID || u.PasswordHash != want.PasswordHash || u.Role != want.Role || u.Enabled != want.Enabled {
 			t.Errorf("restored user %s = %+v, want identical to %+v", want.Username, u, want)
 		}
 	}
-	if u, _, err := s.GetUserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != users[0].ID {
-		t.Errorf("GetUserByOIDCSub = (%+v, %v), want alice via the rebuilt ix_user_oidc", u, err)
+	if u, _, err := s.UserByOIDCSub(ctx, "https://idp", "sub-alice"); err != nil || u == nil || u.ID != users[0].ID {
+		t.Errorf("UserByOIDCSub = (%+v, %v), want alice via the rebuilt ix_user_oidc", u, err)
 	}
 
-	pks, err := s.GetPasskeysByUserID(ctx, users[0].ID)
+	pks, err := s.PasskeysByUserID(ctx, users[0].ID)
 	if err != nil || len(pks) != 1 {
-		t.Fatalf("GetPasskeysByUserID = (%+v, %v), want the restored passkey", pks, err)
+		t.Fatalf("PasskeysByUserID = (%+v, %v), want the restored passkey", pks, err)
 	}
 	if pks[0].ID != pk.ID || string(pks[0].CredentialID) != string(pk.CredentialID) || pks[0].SignCount != pk.SignCount {
 		t.Errorf("restored passkey = %+v, want identical to %+v", pks[0], pk)
@@ -148,10 +148,10 @@ func TestResetPreserving_appliesTransform(t *testing.T) {
 		t.Fatalf("ResetPreserving(transform): %v", err)
 	}
 
-	if u, _, err := s.GetUserByUsername(ctx, "alice"); err != nil || u != nil {
+	if u, _, err := s.UserByUsername(ctx, "alice"); err != nil || u != nil {
 		t.Errorf("old username still resolves: (%+v, %v)", u, err)
 	}
-	u, _, err := s.GetUserByUsername(ctx, "alice-v2")
+	u, _, err := s.UserByUsername(ctx, "alice-v2")
 	if err != nil || u == nil || u.ID != users[0].ID {
 		t.Errorf("renamed user = (%+v, %v), want alice's id under the new name", u, err)
 	}
@@ -180,7 +180,7 @@ func TestResetPreserving_sequenceBumpsPastTransformedIDs(t *testing.T) {
 	}
 
 	// The transformed ids are what got restored.
-	pks, err := s.GetPasskeysByUserID(ctx, users[0].ID)
+	pks, err := s.PasskeysByUserID(ctx, users[0].ID)
 	if err != nil || len(pks) != 1 || pks[0].ID != 100 {
 		t.Fatalf("restored passkeys = (%+v, %v), want the transformed id 100", pks, err)
 	}
@@ -328,11 +328,11 @@ func TestResetPreserving_failClosedGuards(t *testing.T) {
 			}
 
 			// The failed transaction rolled back: everything is still there.
-			u, _, gerr := s.GetUserByUsername(ctx, "alice")
+			u, _, gerr := s.UserByUsername(ctx, "alice")
 			if gerr != nil || u == nil || u.ID != users[0].ID {
 				t.Errorf("alice after rolled-back reset = (%+v, %v), want untouched", u, gerr)
 			}
-			pks, perr := s.GetPasskeysByUserID(ctx, users[0].ID)
+			pks, perr := s.PasskeysByUserID(ctx, users[0].ID)
 			if perr != nil || len(pks) != 1 || string(pks[0].CredentialID) != string(pk.CredentialID) {
 				t.Errorf("passkeys after rolled-back reset = (%+v, %v), want untouched", pks, perr)
 			}

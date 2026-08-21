@@ -42,11 +42,11 @@ func TestSetup_Create(t *testing.T) {
 	s.authH.HandleSetupCreate(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+		t.Errorf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
 	// Verify user was created with admin role.
-	user, _, err := db.GetUserByUsername(t.Context(), "admin")
+	user, _, err := db.UserByUsername(t.Context(), "admin")
 	if err != nil {
 		t.Fatal(err)
 	}

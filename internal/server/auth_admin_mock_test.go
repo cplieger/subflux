@@ -23,24 +23,20 @@ func testAdminServer(t *testing.T) *Server {
 	}
 	t.Cleanup(func() { db.Close(context.Background()) })
 
-	authDB := authstore.New(db.BoltDB())
+	authDB := authstore.New(db.Bolt())
 	if err := authDB.Open(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { authDB.Close() })
 
 	s := &Server{
-		authDeps: authDeps{
-			authStore:  authDB,
-			adminDB:    authDB,
-			secDB:      authDB,
-			oidcDB:     authDB,
-			ceremonies: authhandlers.NewCeremonyStore(),
-		},
-		activity: activity.New(10),
-		alerts:   activity.NewAlertLog(10),
+		authStore:  authDB,
+		ceremonies: authhandlers.NewCeremonyStore(),
+		activity:   activity.New(10),
+		alerts:     activity.NewAlertLog(10),
 	}
-	s.live.Store(&liveState{cfg: &authTestConfig{}})
+	// Breach checking off: this fixture has no HTTPClient (see testAuthServer).
+	s.live.Store(&liveState{cfg: testConfig(t, "auth:\n  check_breached_passwords: false")})
 	s.authH = &authhandlers.Handler{
 		Store:      authDB,
 		AdminDB:    authDB,

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 )
 
@@ -22,13 +23,13 @@ func newOIDCStore(t *testing.T) *Store {
 // CreateOIDCState (which stamps time.Now). It lets the cleanup test control
 // record age. White-box: the test is in-package, so it touches s.oidc under the
 // same lock the production code uses.
-func putOIDC(s *Store, state string, ts time.Time) {
+func putOIDC(s *Store, state auth.OIDCState, ts time.Time) {
 	s.mu.Lock()
 	s.oidc[state] = &oidcRec{
 		createdAt:    ts,
-		nonce:        "n-" + state,
-		codeVerifier: "v-" + state,
-		redirectURI:  "/cb/" + state,
+		nonce:        auth.OIDCNonce("n-" + state),
+		codeVerifier: auth.OIDCCodeVerifier("v-" + state),
+		redirectURI:  "/cb/" + string(state),
 	}
 	s.mu.Unlock()
 }
@@ -107,7 +108,7 @@ func TestCleanupExpiredOIDCStates(t *testing.T) {
 		t.Errorf("evicted count = %d, want 1", n)
 	}
 
-	for state, wantPresent := range map[string]bool{"live": true, "expired": false, "boundary": true} {
+	for state, wantPresent := range map[auth.OIDCState]bool{"live": true, "expired": false, "boundary": true} {
 		_, _, _, err := s.ConsumeOIDCState(ctx, state)
 		present := err == nil
 		if present != wantPresent {
@@ -131,7 +132,7 @@ func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 	var (
 		wg        sync.WaitGroup
 		successes atomic.Int64
-		gotNonce  atomic.Value // string, set by the single winner
+		gotNonce  atomic.Value // auth.OIDCNonce, set by the single winner
 	)
 	start := make(chan struct{})
 	for range workers {
@@ -150,7 +151,7 @@ func TestConsumeOIDCState_concurrentSingleUse(t *testing.T) {
 	if got := successes.Load(); got != 1 {
 		t.Fatalf("concurrent single-use: %d goroutines succeeded, want exactly 1", got)
 	}
-	if v, _ := gotNonce.Load().(string); v != "nonce-win" {
+	if v, _ := gotNonce.Load().(auth.OIDCNonce); v != "nonce-win" {
 		t.Errorf("winner nonce = %q, want %q", v, "nonce-win")
 	}
 }
@@ -172,7 +173,7 @@ func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
 		t.Fatalf("CleanupExpiredOIDCStates(none expired): %v", err)
 	}
 	if n != 0 {
-		t.Fatalf("evicted = %d, want 0", n)
+		t.Errorf("evicted = %d, want 0", n)
 	}
 	if got := logs.CountExact("expired oidc states cleaned"); got != 0 {
 		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
@@ -185,7 +186,7 @@ func TestCleanupExpiredOIDCStates_logsOnlyWhenEvicted(t *testing.T) {
 		t.Fatalf("CleanupExpiredOIDCStates(one expired): %v", err)
 	}
 	if n != 1 {
-		t.Fatalf("evicted = %d, want 1", n)
+		t.Errorf("evicted = %d, want 1", n)
 	}
 	if got := logs.CountExact("expired oidc states cleaned"); got != 1 {
 		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)

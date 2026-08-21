@@ -20,7 +20,7 @@ func loudFrame() []int16 {
 
 // cancelAfterFirstCheckCtx is a context whose Err() returns nil on the first
 // call and context.Canceled on every call thereafter. It pins how often
-// FramesBinaryThresholdTuned polls the cancellation guard.
+// FramesBinary polls the cancellation guard.
 type cancelAfterFirstCheckCtx struct{ n int }
 
 func (c *cancelAfterFirstCheckCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
@@ -197,7 +197,7 @@ func TestNewVADInstAdapt_large_scale_clamped(t *testing.T) {
 func TestNewVADInstTuned_custom_weights(t *testing.T) {
 	t.Parallel()
 	custom := [vadNumCh]int16{1, 2, 3, 4, 5, 6}
-	v := newVADInstTuned(ModeVeryAggressive, 1.0, Tuning{specWeights: &custom})
+	v := newVADInstTuned(Tuning{Mode: ModeVeryAggressive, AdaptScale: 1.0, specWeights: &custom})
 	if v.specWeights != custom {
 		t.Errorf("custom specWeights not applied: got %v, want %v", v.specWeights, custom)
 	}
@@ -206,7 +206,7 @@ func TestNewVADInstTuned_custom_weights(t *testing.T) {
 func TestNewVADInstTuned_custom_minEnergy(t *testing.T) {
 	t.Parallel()
 	minE := int16(50)
-	v := newVADInstTuned(ModeVeryAggressive, 1.0, Tuning{minEnergy: &minE})
+	v := newVADInstTuned(Tuning{Mode: ModeVeryAggressive, AdaptScale: 1.0, minEnergy: &minE})
 	if v.minEnergy != 50 {
 		t.Errorf("custom minEnergy not applied: got %d, want 50", v.minEnergy)
 	}
@@ -214,7 +214,7 @@ func TestNewVADInstTuned_custom_minEnergy(t *testing.T) {
 
 func TestNewVADInstTuned_nil_tuning_uses_defaults(t *testing.T) {
 	t.Parallel()
-	v := newVADInstTuned(ModeVeryAggressive, 1.0, Tuning{})
+	v := newVADInstTuned(Tuning{Mode: ModeVeryAggressive, AdaptScale: 1.0})
 	if v.specWeights != specWeight {
 		t.Errorf("nil tuning should use default specWeights")
 	}
@@ -326,23 +326,23 @@ func TestProcessFrameLLR_never_panics(t *testing.T) {
 	})
 }
 
-// --- FramesBinaryThresholdTuned ---
+// --- FramesBinary ---
 
-func TestFramesBinaryThresholdTuned_empty_pcm(t *testing.T) {
+func TestFramesBinary_empty_pcm(t *testing.T) {
 	t.Parallel()
-	result := FramesBinaryThresholdTuned(t.Context(), nil, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	result := FramesBinary(t.Context(), nil, Tuning{Mode: ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 	if len(result) != 0 {
-		t.Errorf("FramesBinaryThresholdTuned(nil) len = %d, want 0", len(result))
+		t.Errorf("FramesBinary(nil) len = %d, want 0", len(result))
 	}
 }
 
-func TestFramesBinaryThresholdTuned_silence(t *testing.T) {
+func TestFramesBinary_silence(t *testing.T) {
 	t.Parallel()
 	// 10 frames of silence (800 samples at 80 samples/frame).
 	pcm := make([]int16, 800)
-	result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	result := FramesBinary(t.Context(), pcm, Tuning{Mode: ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 	if len(result) != 10 {
-		t.Fatalf("FramesBinaryThresholdTuned(silence) len = %d, want 10", len(result))
+		t.Fatalf("FramesBinary(silence) len = %d, want 10", len(result))
 	}
 	// All frames should be -1 (silence).
 	for i, v := range result {
@@ -352,7 +352,7 @@ func TestFramesBinaryThresholdTuned_silence(t *testing.T) {
 	}
 }
 
-func TestFramesBinaryThresholdTuned_detects_loud_warmup(t *testing.T) {
+func TestFramesBinary_detects_loud_warmup(t *testing.T) {
 	t.Parallel()
 	// 5 loud frames warm up the GMM, then 15 silent frames. The output must be
 	// strictly bipolar and at least one loud frame must read as speech.
@@ -361,7 +361,7 @@ func TestFramesBinaryThresholdTuned_detects_loud_warmup(t *testing.T) {
 		pcm[i] = 20000
 	}
 	minE := int16(5)
-	result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 0, 3, 1.0, Tuning{minEnergy: &minE})
+	result := FramesBinary(t.Context(), pcm, Tuning{Mode: ModeQuality, Threshold: 0, OverhangFrames: 3, AdaptScale: 1.0, minEnergy: &minE})
 	if len(result) != 20 {
 		t.Fatalf("len = %d, want 20", len(result))
 	}
@@ -381,41 +381,41 @@ func TestFramesBinaryThresholdTuned_detects_loud_warmup(t *testing.T) {
 	}
 }
 
-// TestFramesBinaryThresholdTuned_cancelled_context_returns_early verifies the
+// TestFramesBinary_cancelled_context_returns_early verifies the
 // cancellation guard fires on the first frame: a pre-cancelled context yields
 // no results at all.
-func TestFramesBinaryThresholdTuned_cancelled_context_returns_early(t *testing.T) {
+func TestFramesBinary_cancelled_context_returns_early(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	pcm := make([]int16, 80*4) // 4 frames
-	got := FramesBinaryThresholdTuned(ctx, pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	got := FramesBinary(ctx, pcm, Tuning{Mode: ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 	if len(got) != 0 {
 		t.Errorf("cancelled ctx: len(result) = %d, want 0", len(got))
 	}
 }
 
-// TestFramesBinaryThresholdTuned_cancellation_polled_every_1000_frames pins the
+// TestFramesBinary_cancellation_polled_every_1000_frames pins the
 // cancellation poll cadence. The context reports OK on its first poll (frame 0)
 // then cancelled, so processing stops at the second poll (frame 1000), yielding
 // exactly 1000 results.
-func TestFramesBinaryThresholdTuned_cancellation_polled_every_1000_frames(t *testing.T) {
+func TestFramesBinary_cancellation_polled_every_1000_frames(t *testing.T) {
 	t.Parallel()
 	pcm := make([]int16, 80*1001) // 1001 frames, i in [0,1000]
-	got := FramesBinaryThresholdTuned(&cancelAfterFirstCheckCtx{}, pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+	got := FramesBinary(&cancelAfterFirstCheckCtx{}, pcm, Tuning{Mode: ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 	if len(got) != 1000 {
 		t.Errorf("len(result) = %d, want 1000", len(got))
 	}
 }
 
-// TestFramesBinaryThresholdTuned_frame_windowing verifies each frame is scored
+// TestFramesBinary_frame_windowing verifies each frame is scored
 // from its own 80-sample window. Frame 0 is loud and frame 1 is silent, so with
 // no overhang frame 1 must be silence (it must not bleed in frame 0's window).
-func TestFramesBinaryThresholdTuned_frame_windowing(t *testing.T) {
+func TestFramesBinary_frame_windowing(t *testing.T) {
 	t.Parallel()
 	pcm := make([]int16, 160)
 	copy(pcm, loudFrame()) // frame 0 loud; frame 1 stays silent
-	got := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 750, 0, 1.0, Tuning{})
+	got := FramesBinary(t.Context(), pcm, Tuning{Mode: ModeQuality, Threshold: 750, OverhangFrames: 0, AdaptScale: 1.0})
 	if len(got) != 2 {
 		t.Fatalf("len(result) = %d, want 2", len(got))
 	}
@@ -424,15 +424,15 @@ func TestFramesBinaryThresholdTuned_frame_windowing(t *testing.T) {
 	}
 }
 
-// TestFramesBinaryThresholdTuned_overhang_counts_down verifies the overhang
+// TestFramesBinary_overhang_counts_down verifies the overhang
 // extends speech for a bounded number of frames after speech ends and then
 // expires: with a 2-frame overhang, frame 4 (well past the loud frame) is
 // silence again.
-func TestFramesBinaryThresholdTuned_overhang_counts_down(t *testing.T) {
+func TestFramesBinary_overhang_counts_down(t *testing.T) {
 	t.Parallel()
 	pcm := make([]int16, 80*7) // loud frame 0, silence frames 1..6
 	copy(pcm, loudFrame())
-	got := FramesBinaryThresholdTuned(t.Context(), pcm, ModeQuality, 300, 2, 1.0, Tuning{})
+	got := FramesBinary(t.Context(), pcm, Tuning{Mode: ModeQuality, Threshold: 300, OverhangFrames: 2, AdaptScale: 1.0})
 	if len(got) != 7 {
 		t.Fatalf("len(result) = %d, want 7", len(got))
 	}
@@ -441,7 +441,7 @@ func TestFramesBinaryThresholdTuned_overhang_counts_down(t *testing.T) {
 	}
 }
 
-func TestFramesBinaryThresholdTuned_output_binary(t *testing.T) {
+func TestFramesBinary_output_binary(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		nFrames := rapid.IntRange(1, 50).Draw(t, "nFrames")
@@ -450,7 +450,7 @@ func TestFramesBinaryThresholdTuned_output_binary(t *testing.T) {
 			pcm[i] = rapid.Int16().Draw(t, "sample")
 		}
 		mode := Mode(rapid.IntRange(0, 3).Draw(t, "mode"))
-		result := FramesBinaryThresholdTuned(t.Context(), pcm, mode, 125, 10, 0, Tuning{})
+		result := FramesBinary(t.Context(), pcm, Tuning{Mode: mode, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 		// Output length must equal number of frames.
 		if len(result) != nFrames {
 			t.Fatalf("len(result) = %d, want %d", len(result), nFrames)
@@ -464,13 +464,13 @@ func TestFramesBinaryThresholdTuned_output_binary(t *testing.T) {
 	})
 }
 
-func TestFramesBinaryThresholdTuned_empty_returns_empty(t *testing.T) {
+func TestFramesBinary_empty_returns_empty(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		// Any PCM shorter than 80 samples produces zero frames.
 		n := rapid.IntRange(0, 79).Draw(t, "n")
 		pcm := make([]int16, n)
-		result := FramesBinaryThresholdTuned(t.Context(), pcm, ModeVeryAggressive, 125, 10, 0, Tuning{})
+		result := FramesBinary(t.Context(), pcm, Tuning{Mode: ModeVeryAggressive, Threshold: 125, OverhangFrames: 10, AdaptScale: 0})
 		if len(result) != 0 {
 			t.Fatalf("len(result) = %d for %d samples, want 0", len(result), n)
 		}

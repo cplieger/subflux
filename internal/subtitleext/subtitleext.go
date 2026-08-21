@@ -11,14 +11,13 @@
 //   - OnDisk: extensions recognized as standalone subtitle files beside
 //     media files during library scans.
 //   - WriterOutput: extensions subflux itself writes (every writer emits
-//     .srt today; see api.SubtitleExtSRT).
+//     .srt today; see subtitlefile.ExtSRT).
 //   - Delete: the union view — anything an accept path could have produced
 //     or recognized must be deletable through the subtitle delete gate.
 //
 // Seed evidence (2026-07-18 inventory): the table is the union of the two
-// constants it replaced — the on-disk set (.srt .ass .ssa .sub, formerly
-// api.SubtitleExtsOnDisk) and the archive set (adds .vtt, formerly
-// archive.SubtitleExts). .idx/.smi/.sami/.txt are deliberately NOT seeded:
+// constants it replaced — the on-disk set (.srt .ass .ssa .sub) and the
+// archive set (adds .vtt). .idx/.smi/.sami/.txt are deliberately NOT seeded:
 // no writer produces them and no reader recognizes them; admission requires
 // positive inventory evidence, and .idx/.sub pairing would need explicit
 // two-file delete semantics first.
@@ -69,6 +68,11 @@ func OnDisk(ext string) bool { return table[norm(ext)].onDisk }
 
 // WriterOutput reports whether ext (an extension or a path) is an extension
 // subflux's own writers emit.
+//
+// Reached only by tests today, and kept deliberately: the writerOutput capability
+// IS used in production, by Delete's union below, and these four accessors are one
+// per capability. Dropping the view whose callers happen to be absent would leave
+// an asymmetric vocabulary that the next writer path re-adds.
 func WriterOutput(ext string) bool { return table[norm(ext)].writerOutput }
 
 // Delete reports whether ext (an extension or a path) carries the delete

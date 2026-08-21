@@ -222,8 +222,8 @@ func TestMarkerRule2_assertion_in_quantified_group_rejected(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := CompilePCRE(tc.pattern)
-			var ce *CompileError
-			if !errors.As(err, &ce) {
+			ce, ok := errors.AsType[*CompileError](err)
+			if !ok {
 				t.Fatalf("CompilePCRE(%q) error = %v, want *CompileError", tc.pattern, err)
 			}
 			if ce.Offset < 0 {
@@ -264,8 +264,8 @@ func TestCompilePCRE_rejected_shapes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := CompilePCRE(tc.pattern)
-			var ce *CompileError
-			if !errors.As(err, &ce) {
+			ce, ok := errors.AsType[*CompileError](err)
+			if !ok {
 				t.Fatalf("CompilePCRE(%q) error = %v (%T), want *CompileError", tc.pattern, err, err)
 			}
 			if ce.Construct != tc.wantConstruct {
@@ -286,8 +286,7 @@ func TestCompilePCRE_re2_core_rejection_is_typed(t *testing.T) {
 	t.Parallel()
 	for _, pat := range []string{`a{2,1}`, `foo(?=\p)`, `[z-a]`} {
 		_, err := CompilePCRE(pat)
-		var ce *CompileError
-		if !errors.As(err, &ce) {
+		if _, ok := errors.AsType[*CompileError](err); !ok {
 			t.Errorf("CompilePCRE(%q) error = %v (%T), want *CompileError", pat, err, err)
 		}
 	}

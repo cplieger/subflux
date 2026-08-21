@@ -1,8 +1,8 @@
 package events
 
 import (
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // EventType is a typed string for server-sent event types.
@@ -37,11 +37,11 @@ const (
 // carries no file path (S7: no filesystem paths on the wire; the UI keys
 // refreshes on media identity alone).
 type CoverageEvent struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   string        `json:"media_id"`
-	Language  string        `json:"language"`
-	Variant   string        `json:"variant"`
-	Source    string        `json:"source"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   string            `json:"media_id"`
+	Language  string            `json:"language"`
+	Variant   string            `json:"variant"`
+	Source    string            `json:"source"`
 }
 
 func (CoverageEvent) eventData() {}
@@ -72,11 +72,11 @@ func (NotifyEvent) eventData() {}
 // (completed | failed | cancelled | shutdown) — a cancelled scan is neither
 // a success nor a failure.
 type ScanEvent struct {
-	Action     string                  `json:"action"`
-	Detail     string                  `json:"detail"`
-	Source     activity.ActivitySource `json:"source"`
-	ActivityID string                  `json:"activity_id,omitempty"`
-	Outcome    activity.Outcome        `json:"outcome,omitempty"`
+	Action     string           `json:"action"`
+	Detail     string           `json:"detail"`
+	Source     activity.Source  `json:"source"`
+	ActivityID string           `json:"activity_id,omitempty"`
+	Outcome    activity.Outcome `json:"outcome,omitempty"`
 }
 
 func (ScanEvent) eventData() {}

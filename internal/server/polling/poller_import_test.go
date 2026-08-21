@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // errStore is a PollerStore whose DeleteStateByPaths always fails, used to
 // exercise the cleanup-error WARN branch.
 type errStore struct{}
 
-func (errStore) DeleteStateByPaths(_ context.Context, _ []string) (api.CleanupResult, error) {
-	return api.CleanupResult{}, errors.New("delete boom")
+func (errStore) DeleteStateByPaths(_ context.Context, _ []string) (subflux.CleanupResult, error) {
+	return subflux.CleanupResult{}, errors.New("delete boom")
 }
 
 // tempVideo writes a throwaway video file in a fresh temp dir and returns its path.
@@ -35,7 +35,7 @@ func tempVideo(t *testing.T) string {
 
 // importPoller builds a Poller (with mock deps) and a LiveState wired to the
 // given search engine, for processPollImport tests.
-func importPoller(engine api.SearchEngine) (*Poller, *LiveState) {
+func importPoller(engine importSearcher) (*Poller, *LiveState) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	return &Poller{deps: fullDeps(&mockStore{}), stateFunc: func() *LiveState { return ls }}, ls
@@ -44,7 +44,7 @@ func importPoller(engine api.SearchEngine) (*Poller, *LiveState) {
 // movieImportResult is a minimal Radarr ImportResult builder for refresh-path tests.
 func movieImportResult() (*ImportResult, error) {
 	return &ImportResult{
-		Req:       &api.SearchRequest{MediaType: api.MediaTypeMovie, Title: "T"},
+		Req:       &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, Title: "T"},
 		Label:     "T (2024)",
 		Source:    PollSourceRadarr,
 		RefreshID: 7,
@@ -135,19 +135,19 @@ func TestProcessPollImport_search_success(t *testing.T) {
 		StatsCache: statsCache,
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
+	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 	p := &Poller{
 		deps:      deps,
 		stateFunc: func() *LiveState { return ls },
 	}
 
-	req := &api.SearchRequest{MediaType: api.MediaTypeMovie, Title: "Test"}
+	req := &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, Title: "Test"}
 	p.processPollImport(t.Context(), ls, videoPath,
 		func() (*ImportResult, error) {
 			return &ImportResult{
 				Req:       req,
-				Targets:   []api.SubtitleTarget{{Code: "en"}},
+				Targets:   []subflux.SubtitleTarget{{Code: "en"}},
 				Label:     "Test (2024)",
 				Source:    PollSourceRadarr,
 				RefreshID: 1,
@@ -170,7 +170,7 @@ func TestProcessPollImport_search_success(t *testing.T) {
 // refreshFn (arr rescan notify) runs only when subtitle paths were downloaded.
 func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
+	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	calls := 0
 	p.processPollImport(t.Context(), ls, video,
@@ -184,7 +184,7 @@ func TestProcessPollImport_calls_refreshFn_when_paths_present(t *testing.T) {
 // A coverage-only change with no downloaded paths must not notify arr.
 func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{CoverageChanged: true}}
+	engine := &mockEngine{result: subflux.SearchResult{CoverageChanged: true}}
 	p, ls := importPoller(engine)
 	calls := 0
 	p.processPollImport(t.Context(), ls, video,
@@ -199,7 +199,7 @@ func TestProcessPollImport_skips_refreshFn_when_no_paths(t *testing.T) {
 func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
+	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
@@ -213,7 +213,7 @@ func TestProcessPollImport_warns_when_refresh_errors(t *testing.T) {
 func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 	sink := capture.Default(t)
 	video := tempVideo(t)
-	engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
+	engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/x.srt"}}}, CoverageChanged: false}}
 	p, ls := importPoller(engine)
 	p.processPollImport(t.Context(), ls, video,
 		movieImportResult,
@@ -249,7 +249,7 @@ func TestProcessSonarrImport_excludeTag_gates_search(t *testing.T) {
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
 			cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-			engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
+			engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 			ls := &LiveState{Cfg: cfg, Engine: engine, Sonarr: sonarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 
@@ -286,7 +286,7 @@ func TestProcessRadarrImport_excludeTag_gates_search(t *testing.T) {
 			deps := fullDeps(&mockStore{})
 			deps.Metrics = metrics
 			cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
-			engine := &mockEngine{result: api.SearchResult{Langs: []api.LangOutcome{{Lang: "en", Kind: api.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
+			engine := &mockEngine{result: subflux.SearchResult{Langs: []subflux.LangOutcome{{Lang: "en", Kind: subflux.LangSearched, Searched: 1, Paths: []string{"/sub.srt"}}}, CoverageChanged: true}}
 			ls := &LiveState{Cfg: cfg, Engine: engine, Radarr: radarr}
 			p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
 

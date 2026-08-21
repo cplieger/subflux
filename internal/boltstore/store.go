@@ -1,6 +1,7 @@
 // Package boltstore is the bbolt-backed core store for subflux's search,
-// subtitle, scan, sync-offset, and poll domains. It fully implements the
-// composite api.Store interface.
+// subtitle, scan, sync-offset, and poll domains. It is the app's one store
+// implementation, and it declares no interface of its own: each consumer names
+// the two to seven methods it calls, and *DB satisfies all of them structurally.
 //
 // # Naming
 //
@@ -10,8 +11,8 @@
 // engine could not take the internal/store path. The SQLite engine is gone;
 // internal/store now holds only the engine-agnostic leaves this package
 // builds on (store/kv: codec, key encoders, index helpers; store/storetest:
-// the api.Store contract suite). boltstore is the permanent home of the
-// engine.
+// the engine-agnostic contract suite, which declares the 27-method surface it
+// exercises). boltstore is the permanent home of the engine.
 //
 // # Ownership
 //
@@ -27,12 +28,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"go.etcd.io/bbolt"
 )
-
-// Compile-time assertion: *DB implements the composite api.Store interface.
-var _ api.Store = (*DB)(nil)
 
 // statFunc checks a path's existence for ReconcileState's filesystem oracle. It
 // mirrors the legacy SQLite store's injectable stat function: production uses
@@ -185,16 +182,16 @@ func bootstrap(db *bbolt.DB, coreCurrent, authCurrent uint64) error {
 	})
 }
 
-// BoltDB exposes the underlying *bbolt.DB handle so the auth store
+// Bolt exposes the underlying *bbolt.DB handle so the auth store
 // (internal/authstore) can share the same file. The auth store NEVER closes
 // this handle — the core store owns it exclusively.
-func (d *DB) BoltDB() *bbolt.DB {
+func (d *DB) Bolt() *bbolt.DB {
 	return d.db
 }
 
 // Close closes the underlying bbolt handle. The core store owns the handle, so
 // this is the single place it is closed; the auth store's Close never touches
-// it. The context satisfies the api.Store contract (it bounds caller shutdown
+// it. The context satisfies the store contract (it bounds caller shutdown
 // time, e.g. a SIGTERM grace period); bbolt's own Close takes no context.
 // Close is safe to call on a zero DB.
 func (d *DB) Close(_ context.Context) error {

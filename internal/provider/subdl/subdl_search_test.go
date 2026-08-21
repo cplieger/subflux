@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/runesafe"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/runesafe/v2"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- filterResults ---
@@ -17,9 +17,9 @@ func TestFilterResults(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		check     func(t *testing.T, got []api.Subtitle)
+		check     func(t *testing.T, got []subflux.Subtitle)
 		name      string
-		matchedBy api.MatchMethod
+		matchedBy subflux.MatchMethod
 		items     []subtitleItem
 		wantCount int
 		isEpisode bool
@@ -37,9 +37,9 @@ func TestFilterResults(t *testing.T) {
 				},
 			},
 			isEpisode: true,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				s := got[0]
 				if s.Provider != "subdl" {
@@ -57,8 +57,8 @@ func TestFilterResults(t *testing.T) {
 				if s.DownloadURL != "/dl/sub1.zip" {
 					t.Errorf("DownloadURL = %q, want %q", s.DownloadURL, "/dl/sub1.zip")
 				}
-				if s.MatchedBy != api.MatchByIMDB {
-					t.Errorf("MatchedBy = %q, want %q", s.MatchedBy, api.MatchByIMDB)
+				if s.MatchedBy != subflux.MatchByIMDB {
+					t.Errorf("MatchedBy = %q, want %q", s.MatchedBy, subflux.MatchByIMDB)
 				}
 				if s.Season != 0 {
 					t.Errorf("Season = %d, want 0", s.Season)
@@ -78,9 +78,9 @@ func TestFilterResults(t *testing.T) {
 				{Name: "single.srt", Language: "EN", EpisodeFrom: 5, EpisodeEnd: 5},
 			},
 			isEpisode: true,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ID != "single.srt" {
 					t.Errorf("ID = %q, want %q", got[0].ID, "single.srt")
@@ -93,7 +93,7 @@ func TestFilterResults(t *testing.T) {
 				{Name: "pack.srt", Language: "EN", EpisodeFrom: 1, EpisodeEnd: 10},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
 		},
 		{
@@ -102,7 +102,7 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "UNKNOWN", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 0,
 		},
 		{
@@ -111,7 +111,7 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", Comment: "Forced subtitles", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 0,
 		},
 		{
@@ -120,9 +120,9 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", HI: true, EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if !got[0].HearingImp {
 					t.Error("HearingImp = false, want true")
@@ -135,9 +135,9 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", Comment: "SDH version", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if !got[0].HearingImp {
 					t.Error("HearingImp = false, want true (SDH in comment)")
@@ -150,9 +150,9 @@ func TestFilterResults(t *testing.T) {
 				{Name: "movie_hi_eng.srt", Language: "EN", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if !got[0].HearingImp {
 					t.Error("HearingImp = false, want true (_hi_ in filename)")
@@ -163,14 +163,14 @@ func TestFilterResults(t *testing.T) {
 			name:      "nil_input",
 			items:     nil,
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: -1, // signals nil check
 		},
 		{
 			name:      "empty_input",
 			items:     []subtitleItem{},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: -1, // signals nil check
 		},
 		{
@@ -179,9 +179,9 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", Releases: nil, EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ReleaseName != "" {
 					t.Errorf("ReleaseName = %q, want empty", got[0].ReleaseName)
@@ -194,12 +194,12 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
-				if got[0].MatchedBy != api.MatchByIMDB {
-					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByIMDB)
+				if got[0].MatchedBy != subflux.MatchByIMDB {
+					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByIMDB)
 				}
 			},
 		},
@@ -209,12 +209,12 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByTitle,
+			matchedBy: subflux.MatchByTitle,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
-				if got[0].MatchedBy != api.MatchByTitle {
-					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTitle)
+				if got[0].MatchedBy != subflux.MatchByTitle {
+					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTitle)
 				}
 			},
 		},
@@ -224,12 +224,12 @@ func TestFilterResults(t *testing.T) {
 				{Name: "sub.srt", Language: "EN", EpisodeFrom: 1, EpisodeEnd: 1},
 			},
 			isEpisode: false,
-			matchedBy: api.MatchByTMDB,
+			matchedBy: subflux.MatchByTMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
-				if got[0].MatchedBy != api.MatchByTMDB {
-					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, api.MatchByTMDB)
+				if got[0].MatchedBy != subflux.MatchByTMDB {
+					t.Errorf("MatchedBy = %q, want %q", got[0].MatchedBy, subflux.MatchByTMDB)
 				}
 			},
 		},
@@ -246,9 +246,9 @@ func TestFilterResults(t *testing.T) {
 				},
 			},
 			isEpisode: true,
-			matchedBy: api.MatchByIMDB,
+			matchedBy: subflux.MatchByIMDB,
 			wantCount: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].Season != 3 {
 					t.Errorf("Season = %d, want 3", got[0].Season)
@@ -288,7 +288,7 @@ func TestBuildSearchParams(t *testing.T) {
 	tests := []struct {
 		name       string
 		apiKey     string
-		req        *api.SearchRequest
+		req        *subflux.SearchRequest
 		langs      []string
 		wantParams map[string]string
 		wantAbsent []string
@@ -296,7 +296,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "episode_with_imdb",
 			apiKey: "key123",
-			req:    &api.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7},
+			req:    &subflux.SearchRequest{MediaType: "episode", ImdbID: "tt1234567", Season: 3, Episode: 7},
 			langs:  []string{"EN", "FR"},
 			wantParams: map[string]string{
 				"type":           "tv",
@@ -309,7 +309,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "episode_title_fallback",
 			apiKey: "key",
-			req:    &api.SearchRequest{MediaType: "episode", Title: "Breaking Bad", Season: 1, Episode: 1},
+			req:    &subflux.SearchRequest{MediaType: "episode", Title: "Breaking Bad", Season: 1, Episode: 1},
 			langs:  []string{"EN"},
 			wantParams: map[string]string{
 				"film_name": "Breaking Bad",
@@ -319,7 +319,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "movie_with_imdb",
 			apiKey: "key",
-			req:    &api.SearchRequest{MediaType: "movie", ImdbID: "tt0111161"},
+			req:    &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt0111161"},
 			langs:  []string{"EN"},
 			wantParams: map[string]string{
 				"type":    "movie",
@@ -329,7 +329,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "movie_tmdb_fallback",
 			apiKey: "key",
-			req:    &api.SearchRequest{MediaType: "movie", TmdbID: 550},
+			req:    &subflux.SearchRequest{MediaType: "movie", TmdbID: 550},
 			langs:  []string{"EN"},
 			wantParams: map[string]string{
 				"tmdb_id": "550",
@@ -339,7 +339,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "movie_title_fallback",
 			apiKey: "key",
-			req:    &api.SearchRequest{MediaType: "movie", Title: "Inception"},
+			req:    &subflux.SearchRequest{MediaType: "movie", Title: "Inception"},
 			langs:  []string{"EN"},
 			wantParams: map[string]string{
 				"film_name": "Inception",
@@ -348,7 +348,7 @@ func TestBuildSearchParams(t *testing.T) {
 		{
 			name:   "common_fields",
 			apiKey: "mykey",
-			req:    &api.SearchRequest{MediaType: "movie", ImdbID: "tt1"},
+			req:    &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt1"},
 			langs:  []string{"EN", "FR"},
 			wantParams: map[string]string{
 				"api_key":       "mykey",
@@ -518,12 +518,12 @@ func TestInferMatchedBy(t *testing.T) {
 	tests := []struct {
 		name   string
 		params url.Values
-		want   api.MatchMethod
+		want   subflux.MatchMethod
 	}{
-		{name: "film_name wins", params: url.Values{"film_name": {"Inception"}, "imdb_id": {"tt1"}}, want: api.MatchByTitle},
-		{name: "tmdb_id when no film_name", params: url.Values{"tmdb_id": {"550"}, "imdb_id": {"tt1"}}, want: api.MatchByTMDB},
-		{name: "imdb is default", params: url.Values{"imdb_id": {"tt1"}}, want: api.MatchByIMDB},
-		{name: "empty params defaults to imdb", params: url.Values{}, want: api.MatchByIMDB},
+		{name: "film_name wins", params: url.Values{"film_name": {"Inception"}, "imdb_id": {"tt1"}}, want: subflux.MatchByTitle},
+		{name: "tmdb_id when no film_name", params: url.Values{"tmdb_id": {"550"}, "imdb_id": {"tt1"}}, want: subflux.MatchByTMDB},
+		{name: "imdb is default", params: url.Values{"imdb_id": {"tt1"}}, want: subflux.MatchByIMDB},
+		{name: "empty params defaults to imdb", params: url.Values{}, want: subflux.MatchByIMDB},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -557,7 +557,7 @@ func TestSearch_redactsAPIKeyFromTransportError(t *testing.T) {
 		})},
 	}
 
-	_, err := p.Search(t.Context(), &api.SearchRequest{
+	_, err := p.Search(t.Context(), &subflux.SearchRequest{
 		MediaType: "movie", ImdbID: "tt1375666", Languages: []string{"en"},
 	})
 	if err == nil {

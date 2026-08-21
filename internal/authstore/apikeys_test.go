@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 	bolt "go.etcd.io/bbolt"
 )
@@ -41,24 +41,24 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 
 	exp := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
 	key := sampleKey(7, "hash-abc", "ci-token")
-	key.ExpiresAt = &exp
+	key.ExpiresAt = exp
 
 	if err := s.CreateAPIKey(ctx, key); err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
 	if key.ID < 1 {
-		t.Fatalf("CreateAPIKey did not set a positive ID, got %d", key.ID)
+		t.Errorf("CreateAPIKey did not set a positive ID, got %d", key.ID)
 	}
 	if key.CreatedAt.IsZero() {
 		t.Errorf("CreateAPIKey did not stamp CreatedAt")
 	}
 
-	got, _, err := s.GetAPIKeyByHash(ctx, "hash-abc")
+	got, _, err := s.APIKeyByHash(ctx, "hash-abc")
 	if err != nil {
-		t.Fatalf("GetAPIKeyByHash: %v", err)
+		t.Fatalf("APIKeyByHash: %v", err)
 	}
 	if got == nil {
-		t.Fatal("GetAPIKeyByHash returned nil for an existing key")
+		t.Fatal("APIKeyByHash returned nil for an existing key")
 	}
 	if got.ID != key.ID || got.UserID != 7 {
 		t.Errorf("id/user mismatch: got id=%d user=%d", got.ID, got.UserID)
@@ -66,19 +66,19 @@ func TestCreateAPIKey_setsIDAndGetByHashRoundTrips(t *testing.T) {
 	if got.KeyHash != "hash-abc" || got.KeyPrefix != "sk_pre" || got.KeySuffix != "sufx" || got.Label != "ci-token" {
 		t.Errorf("scalar fields lost on round-trip: %+v", got)
 	}
-	if got.ExpiresAt == nil || !got.ExpiresAt.Equal(exp) {
+	if !got.ExpiresAt.Equal(exp) {
 		t.Errorf("expires_at lost on round-trip: got %v, want %v", got.ExpiresAt, exp)
 	}
 }
 
 func TestGetAPIKeyByHash_notFound(t *testing.T) {
 	s := newAPIKeyStore(t)
-	got, _, err := s.GetAPIKeyByHash(t.Context(), "nope")
+	got, _, err := s.APIKeyByHash(t.Context(), "nope")
 	if err != nil {
-		t.Fatalf("GetAPIKeyByHash: %v", err)
+		t.Fatalf("APIKeyByHash: %v", err)
 	}
 	if got != nil {
-		t.Errorf("GetAPIKeyByHash(absent) = %+v, want nil", got)
+		t.Errorf("APIKeyByHash(absent) = %+v, want nil", got)
 	}
 }
 
@@ -94,7 +94,7 @@ func TestCreateAPIKey_duplicateHashRejectedNoPartialWrite(t *testing.T) {
 	}
 	// No partial write: the original key is intact and unchanged, and user 2
 	// gained nothing (the rejected create did not touch the user index).
-	got, _, _ := s.GetAPIKeyByHash(ctx, "dup-hash")
+	got, _, _ := s.APIKeyByHash(ctx, "dup-hash")
 	if got == nil || got.UserID != 1 || got.Label != "first" {
 		t.Errorf("duplicate create mutated the existing key: %+v", got)
 	}
@@ -165,10 +165,10 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 
 	// Wrong user cannot delete: the key is still present afterward
 	// (mirrors DELETE ... WHERE id=? AND user_id=? affecting zero rows).
-	if err := s.DeleteAPIKey(ctx, owner.ID, 2); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: owner.ID, UserID: 2}); err != nil {
 		t.Fatalf("DeleteAPIKey(wrong owner): %v", err)
 	}
-	if got, _, _ := s.GetAPIKeyByHash(ctx, "owner-hash"); got == nil {
+	if got, _, _ := s.APIKeyByHash(ctx, "owner-hash"); got == nil {
 		t.Fatal("non-owner delete removed the key")
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, 1); len(keys) != 1 {
@@ -176,10 +176,10 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 	}
 
 	// Real owner deletes; both the primary and its index entry go away.
-	if err := s.DeleteAPIKey(ctx, owner.ID, 1); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: owner.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeleteAPIKey(owner): %v", err)
 	}
-	if got, _, _ := s.GetAPIKeyByHash(ctx, "owner-hash"); got != nil {
+	if got, _, _ := s.APIKeyByHash(ctx, "owner-hash"); got != nil {
 		t.Errorf("owner delete left the key: %+v", got)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, 1); len(keys) != 0 {
@@ -189,7 +189,7 @@ func TestDeleteAPIKey_ownershipEnforced(t *testing.T) {
 
 func TestDeleteAPIKey_absentIsNoOp(t *testing.T) {
 	s := newAPIKeyStore(t)
-	if err := s.DeleteAPIKey(t.Context(), 12345, 1); err != nil {
+	if err := s.DeleteAPIKey(t.Context(), auth.KeyRef{ID: 12345, UserID: 1}); err != nil {
 		t.Errorf("DeleteAPIKey(absent) = %v, want nil", err)
 	}
 }
@@ -225,14 +225,14 @@ func TestDeleteUser_cascadesRealAPIKeys(t *testing.T) {
 	}
 
 	// Victim's key is gone from both the primary bucket and the user index.
-	if got, _, _ := s.GetAPIKeyByHash(ctx, "victim-key-hash"); got != nil {
+	if got, _, _ := s.APIKeyByHash(ctx, "victim-key-hash"); got != nil {
 		t.Errorf("victim api key survived user delete: %+v", got)
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, victim.ID); len(keys) != 0 {
 		t.Errorf("victim api key index leaked: count = %d, want 0", len(keys))
 	}
 	// Keep's key is untouched.
-	if got, _, _ := s.GetAPIKeyByHash(ctx, "keep-key-hash"); got == nil {
+	if got, _, _ := s.APIKeyByHash(ctx, "keep-key-hash"); got == nil {
 		t.Errorf("keep api key collaterally deleted")
 	}
 	if keys, _ := s.ListAPIKeysByUserID(ctx, keep.ID); len(keys) != 1 {
@@ -265,7 +265,7 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 		t.Fatalf("CreateAPIKey: %v", err)
 	}
 	logs := capture.Default(t)
-	if err := s.DeleteAPIKey(ctx, key.ID, 1); err != nil {
+	if err := s.DeleteAPIKey(ctx, auth.KeyRef{ID: key.ID, UserID: 1}); err != nil {
 		t.Fatalf("DeleteAPIKey: %v", err)
 	}
 	if got := logs.CountExact("api key deleted"); got != 1 {
@@ -279,7 +279,7 @@ func TestDeleteAPIKey_logsDeletionOnSuccess(t *testing.T) {
 func TestDeleteAPIKey_propagatesUpdateError(t *testing.T) {
 	s := newAPIKeyStore(t)
 	seedCorruptAPIKey(t, s, 1, "corrupt-hash")
-	if err := s.DeleteAPIKey(t.Context(), 999, 1); err == nil {
+	if err := s.DeleteAPIKey(t.Context(), auth.KeyRef{ID: 999, UserID: 1}); err == nil {
 		t.Fatal("DeleteAPIKey over a corrupt record = nil, want a non-nil decode error")
 	}
 }

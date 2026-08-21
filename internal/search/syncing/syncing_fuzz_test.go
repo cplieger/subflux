@@ -3,7 +3,7 @@ package syncing
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzPostProcess(f *testing.F) {
@@ -13,7 +13,7 @@ func FuzzPostProcess(f *testing.F) {
 	f.Add([]byte("not valid srt"), true, false, true, false, true)
 
 	f.Fuzz(func(t *testing.T, data []byte, stripHI, stripTags, normUTF8, cleanWS, removeEmpty bool) {
-		pp := api.PostProcessConfig{
+		pp := subflux.PostProcessConfig{
 			StripHI:          stripHI,
 			StripTags:        stripTags,
 			NormalizeUTF8:    normUTF8,

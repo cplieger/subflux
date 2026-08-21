@@ -17,12 +17,14 @@ locally.
 - The **server** (`internal/server/`) exposes the JSON API and the embedded
   web UI, streams live updates over SSE, and hot-reloads config saves into a
   running engine.
-- The **CLI is the same binary**, and every subcommand is a remote command
-  against a running instance over HTTP: `subflux search` resolves media and
-  drives providers through the server (`/api/search/resolve` +
+- The **CLI is the same binary**. Its read and trigger subcommands are remote
+  commands against a running instance over HTTP: `subflux search` resolves
+  media and drives providers through the server (`/api/search/resolve` +
   `/api/search`), and `subflux status`, `scan`, `locks`, and friends read or
-  trigger server state. The CLI never opens the database or constructs the
-  search engine itself.
+  trigger server state. The account bootstrap commands (`reset-password`,
+  `generate-api-key`) go through the server's private Unix admin socket
+  instead, so you run them inside the container. The CLI never opens the
+  database or constructs the search engine itself.
 - State is a single bbolt file (`/config/subflux.bolt`); subtitle files are
   written alongside the media.
 
@@ -40,34 +42,37 @@ The only files that import concrete implementations:
 - `providers.go`: table-driven provider registration (`providerEntries`
   drives both `Register` and `RegisterSchema`).
 - `internal/wiring/`: composition-root types connecting concrete
-  implementations across api/metrics/search/provider.
+  implementations across subflux/obs/search/provider.
 - `cmd/wire-codegen/`: build-time-only driver over the
   [`wiregen`](https://github.com/cplieger/wiregen) library; not a server
   runtime dependency.
 
 ### Domain packages (`internal/`)
 
-- `api/`: interface contracts and pure utility types. Every other package
-  depends only on this one. Auth domain types come directly from
-  `github.com/cplieger/auth/v2` and arr DTOs from
-  `github.com/cplieger/arrapi` (no local aliases or adapter package).
+- `subflux/`: the wire and domain types. It declares no interface and no
+  behaviour, and every other package depends only on it. The behaviour lives
+  in leaf packages instead: `httpapi` (the handler prelude and the error
+  envelope), `langcode`, `mediaid`, `subtitlefile`, and `arrsvc`. Auth domain
+  types come directly from `github.com/cplieger/auth/v4` and arr DTOs from
+  `github.com/cplieger/arrapi/v2` (no local aliases or adapter package).
 - `search/`: the scan engine (provider orchestration, retry policy, history
   polling, and the download pipeline). Subpackages: `scoring`, `syncing`
-  (sync + post-process glue), `timeout`, `release`.
+  (sync + post-process glue), `providerhealth` (per-provider health and
+  timeout state), `release`.
 - `subsync/`: the subtitle sync library (alass port, cross-language anchors,
   framerate correction, split-aware DP, audio sync). Subpackages: `ffmpeg`
   (subprocess wrappers), `fft`, `framerate`, `crosslang`, `vad` (the WebRTC
   GMM port).
 - `provider/`: shared provider primitives (registry, retry wrapper, the
   SSRF-hardened HTTP client) plus one subdirectory per provider
-  implementation, and support packages `archive`, `classify`, `dlcache`,
-  `anidb`.
+  implementation, and support packages `archive`, `classify`, `anidb`.
 - `embedded/`: the ffprobe-backed embedded subtitle track detector (local
   media inspection, deliberately not a provider); the search engine owns the
   codec-usability policy via the top-level `embedded_subtitles` config
   section.
 - `scorer/`: release scoring with configurable weights.
-- `boltstore/`: the bbolt store (implements `api.Store`); `store/kv` holds
+- `boltstore/`: the bbolt store (implements the narrow store interfaces its
+  consumers declare); `store/kv` holds
   the engine-agnostic key/codec helpers and `store/storetest` the contract
   suite. `authstore/` implements the auth store (durable bbolt + ephemeral
   in-memory).
@@ -76,13 +81,13 @@ The only files that import concrete implementations:
 - `server/`: HTTP routing, SSE, middleware, and the embedded UI, split into
   focused subpackages (`authhandlers`, `confighandlers`, `synchandlers`,
   `manualops`, `scanning`, `scheduler`, `polling`, `events`, `coverage`, …).
-- `arrsvc/`, `metrics/`, `cache/`, `httputil/`, `cliparse/`,
+- `arrsvc/`, `obs/`, `cache/`, `httpwire/`, `cliparse/`,
   `testsupport/`: focused helpers and thin wrappers over the shared
   `cplieger/*` libraries (`cliparse/` is the CLI grammar: one
   `ParseAndValidate` pass plus help rendering).
 
 Dependencies flow one way: composition roots → `internal/server/` → domain
-packages → `internal/api/`. There are no reverse imports.
+packages → `internal/subflux/`. There are no reverse imports.
 
 ### Frontend (`internal/server/static-src/`)
 
@@ -101,8 +106,10 @@ concatenated via `MANIFEST` files by the same bundle command.
 These exist because breaking them caused real bugs, or because a test fails
 CI when they drift.
 
-- **Dependencies flow one way.** New code depends on `internal/api`
-  interfaces, never sideways into another domain package's concretes.
+- **Dependencies flow one way.** New code depends on the `internal/subflux`
+  types, never sideways into another domain package's concretes. A package
+  that needs behaviour from another declares its own narrow interface and
+  takes it as a parameter.
 - **Providers are registry-driven.** No `init()`, no blank imports, no global
   state. A provider is one package plus one `providerEntries` row; the
   settings UI schema is discovered from the registry.
@@ -122,7 +129,7 @@ CI when they drift.
   through `github.com/cplieger/atomicfile` (temp → fsync → rename); writes
   refuse symlink targets. Don't reach for `os.WriteFile`.
 - **External input is bounded.** Downloads, archive extraction, and parsing
-  paths cap sizes and validate content (`api.ValidateSubtitleData`, the
+  paths cap sizes and validate content (`subtitlefile.Validate`, the
   zip-bomb guards, `maxAlignSpans`/`maxAlignEvents` in subsync). Keep new
   input paths bounded the same way.
 - **Manual locks gate automation.** Every automated search checks
@@ -137,7 +144,7 @@ CI when they drift.
   unexported by design) and registered as a plain step callback. The
   irreplaceable set (users, passkeys, API keys, manual locks/history, sync
   offsets) must survive every migration path by construction.
-- **HTTP responses go through the `api` helpers.** Don't hand-craft JSON
+- **HTTP responses go through the `httpapi` helpers.** Don't hand-craft JSON
   error strings.
 - **Logs are UTC.** The `slogx` library forces every record's timestamp to
   UTC, so the container needs no `TZ` and the binary embeds no
@@ -172,11 +179,12 @@ subflux search --title "The Wire"   # remote search through the server's provide
 ```
 
 CLI development workflow: run a server locally (`go run .` or the container),
-then point the CLI at it. All subcommands, including `search`, reach the
-instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`). When
-the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key (created
-via `subflux generate-api-key` or the web UI's Security dialog); the CLI
-sends it as `X-API-Key`. There is no local-execution search mode: the search
+then point the CLI at it. All remote subcommands, including `search`, reach
+the instance over HTTP via `SUBFLUX_URL` (default `http://127.0.0.1:8374`).
+When the instance has auth enabled, set `SUBFLUX_API_KEY` to an API key
+(created with `subflux generate-api-key` on the server's own host or
+container, or in the web UI's Security dialog); the CLI sends it as
+`X-API-Key`. There is no local-execution search mode: the search
 subcommand resolves media via `GET /api/search/resolve`, searches via
 `GET /api/search`, and downloads via the async `POST /api/search/download` +
 activity polling, so results, locks, and history are always coherent with
@@ -234,8 +242,11 @@ The one-shot option mirrors CI exactly (the same reusable-workflow logic the
 GitHub `ci.yaml` runs, Go and frontend jobs included):
 
 ```sh
-bash ci-local.sh subflux   # from a checkout of the cplieger/ci repo
+bash ../ci/ci-local.sh   # from this repo's root, with cplieger/ci checked out beside it
 ```
+
+The script takes no positional argument; it reads the workflow of the repo it
+runs in.
 
 The direct commands are the day-to-day path.
 
@@ -250,7 +261,7 @@ golangci-lint fmt          # apply gofumpt (+extra) and gci import grouping
 ```
 
 `golangci-lint run` reports unformatted files as issues, so the lint step
-also enforces formatting; `gocyclo` caps complexity at 18.
+also enforces formatting; `gocyclo` caps complexity at 15.
 
 ### Frontend (from `internal/server/static-src/`)
 
@@ -286,10 +297,10 @@ Tests live beside the code they cover:
   `fast-check` for property tests, happy-dom for DOM-dependent tests.
 - Run `go test -race ./...` on changes to concurrent code (the engine,
   scheduler, polling, SSE events, store).
-- The **mock provider** (`internal/provider/mock/`) generates realistic
-  results with configurable failure modes (errors, timeouts, rate limits,
-  flakiness, season packs) and no network calls; use it to exercise engine
-  behavior without real provider accounts.
+- The **synthetic provider** (`internal/provider/synthetic/`) generates
+  realistic results with configurable failure modes (errors, timeouts, rate
+  limits, flakiness, season packs) and no network calls; use it to exercise
+  engine behavior without real provider accounts.
 
 Add or update tests with every behavior change, and make sure the relevant
 checks above pass before opening a PR.
@@ -300,7 +311,7 @@ The Go suite under `tests/functional/` (package `functional`, build tag
 `functional`, so regular `./...` runs skip it) drives a live instance over
 the HTTP API: 26 sections covering config, providers, coverage, search
 resolution, scoring, scans, sync, manual downloads, hot reload, and the
-mock provider's failure modes. It needs a reachable subflux with auth
+synthetic provider's failure modes. It needs a reachable subflux with auth
 disabled (the suite sends no credentials), and reachable Sonarr/Radarr for
 the arr-dependent sections. It saves and restores the config around the
 run.

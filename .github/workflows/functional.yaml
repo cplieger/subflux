@@ -1,6 +1,6 @@
 # Repo-specific workflow (not synced from cplieger/ci).
 #
-# Boots the real subflux binary with a mock-provider config (no Sonarr/Radarr,
+# Boots the real subflux binary with a synthetic-provider config (no Sonarr/Radarr,
 # no media fixtures, auth disabled) and runs the arr-free subset of the
 # functional HTTP suite (the Go package under tests/functional/, build tag
 # `functional`) against it. Sections that need a live arr or media files
@@ -77,17 +77,17 @@ jobs:
           sudo mkdir -p /config /media
           sudo chown "$USER" /config
           cat > /config/config.yaml <<'EOF'
-          # CI boot config: mirrors the suite's apply_mock_config template so
+          # CI boot config: mirrors the suite's apply_synthetic_config template so
           # config saves never change the arr URL/key pair (unchanged arrs are
           # not pinged on save; validation never dials them at boot).
           sonarr:
             enabled: true
             url: "http://sonarr:8989"
-            api_key: "ci-mock-sonarr-key"
+            api_key: "ci-synthetic-sonarr-key"
           radarr:
             enabled: true
             url: "http://radarr:7878"
-            api_key: "ci-mock-radarr-key"
+            api_key: "ci-synthetic-radarr-key"
           media_roots:
             - /media
           poll_interval: 999h
@@ -99,7 +99,7 @@ jobs:
             ignore_pgs: true
             ignore_vobsub: true
           providers:
-            mock:
+            synthetic:
               enabled: true
               priority: 1
               settings:
@@ -142,7 +142,7 @@ jobs:
       - name: Run arr-free functional sections
         run: |
           for section in health auth config providers scoring backoff \
-            mock_provider provider_errors config_validation language_rules \
+            synthetic_provider provider_errors config_validation language_rules \
             adaptive_config hot_reload; do
             echo "::group::section: $section"
             if ! SUBFLUX_URL=http://127.0.0.1:8374 SECTION="$section" \

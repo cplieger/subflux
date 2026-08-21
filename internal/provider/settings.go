@@ -7,7 +7,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 const valTrue = "true"
@@ -195,7 +195,7 @@ func FromMap(settings map[string]any) Settings {
 // use_hash dual-encoding this replaces drifted exactly once already).
 // Undeclared keys pass through untouched, and a declared field the user DID
 // set is never rewritten.
-func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map[string]any {
+func NormalizeSettings(fields []subflux.ProviderSchemaField, raw map[string]any) map[string]any {
 	if len(fields) == 0 {
 		return raw
 	}
@@ -216,7 +216,7 @@ func NormalizeSettings(fields []api.ProviderSchemaField, raw map[string]any) map
 // coerceDefault converts a schema field's string Default into the native
 // type its declared Type implies, so normalized maps carry the same value
 // shapes YAML parsing produces.
-func coerceDefault(f *api.ProviderSchemaField) any {
+func coerceDefault(f *subflux.ProviderSchemaField) any {
 	switch f.Type {
 	case "bool":
 		return f.Default == valTrue

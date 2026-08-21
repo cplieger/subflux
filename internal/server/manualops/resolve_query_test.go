@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- fakes ---
@@ -25,11 +25,11 @@ type resolveFakeSonarr struct {
 	epErr     error
 }
 
-func (f *resolveFakeSonarr) GetSeries(context.Context) ([]arrapi.Series, error) {
+func (f *resolveFakeSonarr) Series(context.Context) ([]arrapi.Series, error) {
 	return f.series, f.seriesErr
 }
 
-func (f *resolveFakeSonarr) GetEpisodes(_ context.Context, seriesID int) ([]arrapi.Episode, error) {
+func (f *resolveFakeSonarr) Episodes(_ context.Context, seriesID int) ([]arrapi.Episode, error) {
 	if f.epErr != nil {
 		return nil, f.epErr
 	}
@@ -42,7 +42,7 @@ type resolveFakeRadarr struct {
 	err    error
 }
 
-func (f *resolveFakeRadarr) GetMovies(context.Context) ([]arrapi.Movie, error) {
+func (f *resolveFakeRadarr) Movies(context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
 }
 
@@ -176,7 +176,7 @@ func TestResolveQuery_movie_by_title(t *testing.T) {
 		t.Fatalf("ResolveQuery() = %+v, want one resolved item", res)
 	}
 	item := res.Items[0]
-	if item.MediaType != api.MediaTypeMovie || item.MediaID != 7 {
+	if item.MediaType != subflux.MediaTypeMovie || item.MediaID != 7 {
 		t.Errorf("item identity = (%s, %d), want (movie, 7)", item.MediaType, item.MediaID)
 	}
 	if item.SearchIDs.Imdb != "tt0137523" || item.SearchIDs.Tmdb != 550 {
@@ -318,7 +318,7 @@ func TestResolveQuery_series_expands_file_bearing_episodes(t *testing.T) {
 	}
 	for i := range res.Items {
 		item := &res.Items[i]
-		if item.MediaType != api.MediaTypeEpisode || item.MediaID != 11 {
+		if item.MediaType != subflux.MediaTypeEpisode || item.MediaID != 11 {
 			t.Errorf("item[%d] identity = (%s, %d), want (episode, 11)", i, item.MediaType, item.MediaID)
 		}
 		if item.SearchIDs.Tvdb != 81189 || item.SearchIDs.Imdb != "tt0903747" {
@@ -396,7 +396,7 @@ func TestResolveQuery_type_fallback_series_first(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode {
 		t.Fatalf("ResolveQuery() = %+v, want the series expansion to win", res)
 	}
 }
@@ -412,7 +412,7 @@ func TestResolveQuery_type_fallback_to_movie(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeMovie {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeMovie {
 		t.Fatalf("ResolveQuery() = %+v, want the movie arm to satisfy the fallback", res)
 	}
 }
@@ -471,12 +471,12 @@ func TestResolveQuery_season_zero_with_tmdb_stays_series_only(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode || res.Items[0].Season != 0 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode || res.Items[0].Season != 0 {
 		t.Fatalf("ResolveQuery(tmdb + season 0) = %+v, want the single specials episode", res)
 	}
 }
 
-// countingSonarr wraps the sonarr fake and counts GetSeries calls, so tests
+// countingSonarr wraps the sonarr fake and counts Series calls, so tests
 // can assert whether the series arm was consulted at all.
 type countingSonarr struct {
 	resolveFakeSonarr
@@ -484,9 +484,9 @@ type countingSonarr struct {
 	calls atomic.Int32
 }
 
-func (c *countingSonarr) GetSeries(ctx context.Context) ([]arrapi.Series, error) {
+func (c *countingSonarr) Series(ctx context.Context) ([]arrapi.Series, error) {
 	c.calls.Add(1)
-	return c.resolveFakeSonarr.GetSeries(ctx)
+	return c.resolveFakeSonarr.Series(ctx)
 }
 
 // A tmdb-only query resolves the movie identity FIRST: tmdb is a movie-only
@@ -494,7 +494,7 @@ func (c *countingSonarr) GetSeries(ctx context.Context) ([]arrapi.Series, error)
 // all (the pre-fix order ran the series arm first).
 func TestResolveQuery_tmdb_only_resolves_movie_first(t *testing.T) {
 	t.Parallel()
-	sonarr := &countingSonarr{resolveFakeSonarr: resolveFakeSonarr{series: testSeries()}}
+	sonarr := &countingSonarr{series: testSeries()}
 	radarr := &resolveFakeRadarr{movies: []arrapi.Movie{
 		movieWithFile(7, "Fight Club", 1999, 550, "tt0137523"),
 	}}
@@ -504,7 +504,7 @@ func TestResolveQuery_tmdb_only_resolves_movie_first(t *testing.T) {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
 	if len(res.Items) != 1 || res.Items[0].MediaID != 7 {
-		t.Fatalf("ResolveQuery(tmdb only) = %+v, want the movie", res)
+		t.Errorf("ResolveQuery(tmdb only) = %+v, want the movie", res)
 	}
 	if got := sonarr.calls.Load(); got != 0 {
 		t.Errorf("sonarr consulted %d times, want 0 (movie arm resolves the tmdb id first)", got)
@@ -529,7 +529,7 @@ func TestResolveQuery_tmdb_outranks_conflicting_series_title(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery() error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeMovie || res.Items[0].MediaID != 7 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeMovie || res.Items[0].MediaID != 7 {
 		t.Fatalf("ResolveQuery(tmdb + series title) = %+v, want the tmdb-resolved movie, not the series", res)
 	}
 }
@@ -581,7 +581,7 @@ func TestResolveQuery_unmatched_tmdb_never_title_rescued(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveQuery(unmatched tmdb + imdb) error = %v, want nil", err)
 	}
-	if len(res.Items) != 1 || res.Items[0].MediaType != api.MediaTypeEpisode || res.Items[0].MediaID != 11 {
+	if len(res.Items) != 1 || res.Items[0].MediaType != subflux.MediaTypeEpisode || res.Items[0].MediaID != 11 {
 		t.Fatalf("ResolveQuery(unmatched tmdb + imdb) = %+v, want the imdb-matched series expansion", res)
 	}
 }
@@ -602,7 +602,7 @@ func TestResolveQuery_partial_arr_failure(t *testing.T) {
 		t.Fatalf("ResolveQuery(healthy arm satisfied) error = %v, want nil", err)
 	}
 	if len(res.Items) != 1 {
-		t.Fatalf("ResolveQuery() = %+v, want the movie", res)
+		t.Errorf("ResolveQuery() = %+v, want the movie", res)
 	}
 
 	// Nothing matched and an arm was down: the emptiness is unprovable, so
@@ -689,7 +689,7 @@ func TestHandleSearchResolve_conflict_400_with_machine_code(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.HandleSearchResolve(rec, req)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("HandleSearchResolve(conflict) status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Errorf("HandleSearchResolve(conflict) status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 	if !strings.Contains(rec.Body.String(), "resolve_conflict") {
 		t.Errorf("HandleSearchResolve(conflict) body = %q, want the resolve_conflict machine code", rec.Body.String())
@@ -717,51 +717,60 @@ func TestHandleSearchResolve_happy_and_ambiguous_200(t *testing.T) {
 	}}
 	h := resolveHarness(nil, radarr)
 
-	// Happy: unique title.
-	req := httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Alien", http.NoBody)
-	rec := httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(happy) status = %d, want 200", rec.Code)
-	}
-	var happy ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &happy); err != nil {
-		t.Fatalf("decode happy response: %v", err)
-	}
-	if !happy.Resolved || len(happy.Items) != 1 || happy.Items[0].MediaID != 3 {
-		t.Fatalf("happy response = %+v, want the Alien item", happy)
+	// All three outcomes answer 200 and differ only in the body, so each is
+	// its own subtest: a failure in one still reports the other two.
+	tests := []struct {
+		name  string
+		title string
+		want  func(t *testing.T, got *ResolveResponse)
+	}{
+		{
+			name:  "unique title resolves to one item",
+			title: "Alien",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if !got.Resolved || len(got.Items) != 1 || got.Items[0].MediaID != 3 {
+					t.Errorf("response = %+v, want the Alien item", got)
+				}
+			},
+		},
+		{
+			name:  "equal titles answer a typed candidate list",
+			title: "Dune",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if got.Resolved || len(got.Candidates) != 2 {
+					t.Errorf("response = %+v, want 2 candidates", got)
+				}
+			},
+		},
+		{
+			name:  "unknown title answers an empty result",
+			title: "Nope",
+			want: func(t *testing.T, got *ResolveResponse) {
+				t.Helper()
+				if got.Resolved || len(got.Items) != 0 || len(got.Candidates) != 0 {
+					t.Errorf("response = %+v, want all-empty", got)
+				}
+			},
+		},
 	}
 
-	// Ambiguous: equal titles answer 200 with a typed candidates result.
-	req = httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Dune", http.NoBody)
-	rec = httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(ambiguous) status = %d, want 200", rec.Code)
-	}
-	var amb ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &amb); err != nil {
-		t.Fatalf("decode ambiguous response: %v", err)
-	}
-	if amb.Resolved || len(amb.Candidates) != 2 {
-		t.Fatalf("ambiguous response = %+v, want 2 candidates", amb)
-	}
-
-	// Empty: unknown title answers 200 with an empty result.
-	req = httptest.NewRequestWithContext(t.Context(),
-		http.MethodGet, "/api/search/resolve?type=movie&title=Nope", http.NoBody)
-	rec = httptest.NewRecorder()
-	h.HandleSearchResolve(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HandleSearchResolve(empty) status = %d, want 200", rec.Code)
-	}
-	var empty ResolveResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &empty); err != nil {
-		t.Fatalf("decode empty response: %v", err)
-	}
-	if empty.Resolved || len(empty.Items) != 0 || len(empty.Candidates) != 0 {
-		t.Fatalf("empty response = %+v, want all-empty", empty)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodGet, "/api/search/resolve?type=movie&title="+tt.title, http.NoBody)
+			rec := httptest.NewRecorder()
+			h.HandleSearchResolve(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("HandleSearchResolve status = %d, want 200", rec.Code)
+			}
+			var got ResolveResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			tt.want(t, &got)
+		})
 	}
 }

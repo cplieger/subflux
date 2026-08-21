@@ -13,7 +13,7 @@ export const ROUTE_TRANSITION_MS = 200;
 export const DEFAULT_VARIANT = "standard" as const;
 
 // Coverage source string for subtitles embedded in the video container
-// (mirrors Go's api.SourceEmbedded; persisted in subtitle_files rows).
+// (mirrors Go's subflux.SourceEmbedded; persisted in subtitle_files rows).
 export const EMBEDDED_PROVIDER = "embedded" as const;
 
 // Concurrency limit for season audio sync (parallel requests).

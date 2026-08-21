@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/httpx/v5"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func TestFactory_requires_api_key(t *testing.T) {
@@ -31,8 +31,8 @@ func TestFactory_with_api_key(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory() unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameSubSource {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameSubSource)
+	if p.Name() != subflux.ProviderNameSubSource {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameSubSource)
 	}
 }
 
@@ -206,7 +206,7 @@ func TestBuildSubtitles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		check   func(t *testing.T, got []api.Subtitle)
+		check   func(t *testing.T, got []subflux.Subtitle)
 		name    string
 		lang    string
 		items   []subtitleItem
@@ -221,7 +221,7 @@ func TestBuildSubtitles(t *testing.T) {
 			season:  1,
 			episode: 1,
 			wantLen: 0,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got != nil {
 					t.Errorf("buildSubtitles(nil) = %d items, want nil", len(got))
@@ -235,7 +235,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 2, ForeignParts: false, ReleaseInfo: []string{"rel"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ID != "2" {
 					t.Errorf("got[0].ID = %q, want %q", got[0].ID, "2")
@@ -249,7 +249,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 2, Commentary: "normal", ReleaseInfo: []string{"rel"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ID != "2" {
 					t.Errorf("got[0].ID = %q, want %q", got[0].ID, "2")
@@ -264,7 +264,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 3, ReleaseInfo: []string{"rel"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 3,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if !got[0].HearingImp {
 					t.Error("got[0].HearingImp = false, want true (struct field)")
@@ -283,7 +283,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 1, ReleaseInfo: []string{"SPARKS", "YIFY", "FGT"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 3,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				for i, want := range []string{"SPARKS", "YIFY", "FGT"} {
 					if got[i].ReleaseName != want {
@@ -298,7 +298,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 1, ReleaseInfo: nil},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ReleaseName != "" {
 					t.Errorf("got[0].ReleaseName = %q, want empty", got[0].ReleaseName)
@@ -311,7 +311,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 42, ReleaseInfo: []string{"rel"}},
 			},
 			lang: "fr", season: 3, episode: 7, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				s := got[0]
 				if s.Provider != providerName {
@@ -337,7 +337,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 42, ReleaseInfo: []string{"rel"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				wantURL := "https://api.subsource.net/api/v1/subtitles/42/download"
 				if got[0].DownloadURL != wantURL {
@@ -356,7 +356,7 @@ func TestBuildSubtitles(t *testing.T) {
 				{SubtitleID: 3, Commentary: "good quality", ReleaseInfo: []string{"rel"}},
 			},
 			lang: "en", season: 1, episode: 1, wantLen: 1,
-			check: func(t *testing.T, got []api.Subtitle) {
+			check: func(t *testing.T, got []subflux.Subtitle) {
 				t.Helper()
 				if got[0].ID != "3" {
 					t.Errorf("got[0].ID = %q, want %q", got[0].ID, "3")

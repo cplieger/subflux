@@ -1,0 +1,353 @@
+package langcode
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	"pgregory.net/rapid"
+)
+
+func TestCanonical(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		// --- The internal invention ---
+		{"internal pb round-trips", "pb", "pb"},
+		{"internal pb uppercase", "PB", "pb"},
+		{"internal pb padded", " pb ", "pb"},
+		{"internal alpha-3 spelling pob", "pob", "pb"},
+		{"pt-BR is the canonical tag for pb", "pt-BR", "pb"},
+		{"pt-BR lowercased", "pt-br", "pb"},
+		{"pt-BR from an alpha-3 base", "por-BR", "pb"},
+		{"pt-BR with an underscore separator", "pt_BR", "pb"},
+		{"European Portuguese is not pb", "pt", "pt"},
+		{"explicit European region is not pb", "pt-PT", "pt"},
+		{"alpha-3 Portuguese is not pb", "por", "pt"},
+
+		// --- Codes whose canonical form the space cannot hold ---
+		{"tl stays tl because fil has no two-letter form", "tl", "tl"},
+		{"tgl canonicalizes to fil and is unusable", "tgl", ""},
+		{"bh stays bh because bho has no two-letter form", "bh", "bh"},
+
+		// --- Standard canonicalization langtag owns ---
+		{"bibliographic ger", "ger", "de"},
+		{"terminological deu", "deu", "de"},
+		{"bibliographic fre", "fre", "fr"},
+		{"terminological fra", "fra", "fr"},
+		{"deprecated iw folds to he", "iw", "he"},
+		{"deprecated in folds to id", "in", "id"},
+		{"deprecated ji folds to yi", "ji", "yi"},
+		{"deprecated nb folds to no", "nb", "no"},
+		{"macrolanguage member nob reports no", "nob", "no"},
+		{"macrolanguage nor reports no", "nor", "no"},
+		{"nno is its own language", "nno", "nn"},
+		{"macrolanguage member cmn reports zh", "cmn", "zh"},
+		{"Persian bibliographic per", "per", "fa"},
+		{"Persian terminological fas", "fas", "fa"},
+		{"region discarded after being read", "en-US", "en"},
+		{"script discarded", "zh-Hant", "zh"},
+		{"mixed case", "EnG", "en"},
+
+		// --- Rejections ---
+		{"empty", "", ""},
+		{"single letter", "e", ""},
+		{"unassigned two-letter xx", "xx", ""},
+		{"unassigned two-letter zz", "zz", ""},
+		{"unknown three-letter", "xyz", ""},
+		{"digits", "00", ""},
+		{"non-letter two-char", "0x", ""},
+		{"malformed leading dash", "-en", ""},
+		{"undetermined placeholder", "und", ""},
+		{"no-linguistic-content placeholder", "zxx", ""},
+		{"multiple-languages placeholder", "mul", ""},
+		{"private-use subtag", "qaa", ""},
+		// Real languages with no ISO 639-1 assignment: admitting one would put a
+		// three-letter code in a two-letter namespace.
+		{"Cantonese", "yue", ""},
+		{"Filipino", "fil", ""},
+		{"Hawaiian", "haw", ""},
+		{"Asturian", "ast", ""},
+
+		// --- Provider-private spellings must NOT be understood here ---
+		// hdbits means Brazilian by "br" and Slovenian by "si"; subdl means
+		// Brazilian by "BR_PT". The registry reads them as Breton, Sinhala, and
+		// Breton-in-Portugal, and this function answers to the registry. Each
+		// provider translates its own dialect before reaching this point.
+		{"br is Breton", "br", "br"},
+		{"si is Sinhala", "si", "si"},
+		{"se is Northern Sami", "se", "se"},
+		{"kr is Kanuri", "kr", "kr"},
+		{"BR_PT is Breton in Portugal, which has no two-letter form here", "BR_PT", "br"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Canonical(tt.input); got != tt.want {
+				t.Errorf("Canonical(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"plain ISO 639-1", "en", true},
+		// pb is a documented user-facing config value and predates the library,
+		// so it must keep validating or every existing config breaks.
+		{"internal pb", "pb", true},
+		{"tl", "tl", true},
+		{"empty", "", false},
+		{"typo", "xx", false},
+		{"garbage", "!!", false},
+		// These name real languages but are not how the internal space spells
+		// them, and nothing canonicalizes a configured code at match time, so
+		// accepting them would promise a match that never happens.
+		{"alpha-3 is not the internal spelling", "eng", false},
+		{"uppercase is not the internal spelling", "EN", false},
+		{"pt-BR is spelled pb internally", "pt-BR", false},
+		{"deprecated iw is spelled he internally", "iw", false},
+		{"nb is spelled no internally", "nb", false},
+		{"a language with no two-letter code", "yue", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Valid(tt.input); got != tt.want {
+				t.Errorf("Valid(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// PBT: the result is always empty or exactly two lowercase ASCII letters. This
+// is the property the whole internal space rests on — the code becomes a
+// subtitle filename segment and part of the bbolt state key, so anything else
+// cannot round-trip through a scan.
+func TestCanonicalLangCode_namespaceInvariant(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		raw := rapid.OneOf(
+			rapid.StringMatching(`[a-zA-Z]{0,4}`),
+			rapid.StringMatching(`[a-zA-Z]{2,3}(-[A-Za-z0-9]{2,4}){0,2}`),
+			rapid.String(),
+		).Draw(t, "raw")
+
+		got := Canonical(raw)
+		if got == "" {
+			return
+		}
+		if len(got) != 2 {
+			t.Fatalf("Canonical(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
+		}
+		for _, r := range got {
+			if r < 'a' || r > 'z' {
+				t.Fatalf("Canonical(%q) = %q, want lowercase ASCII letters", raw, got)
+			}
+		}
+	})
+}
+
+// PBT: canonicalizing an already-canonical code does not move it. Callers
+// canonicalize defensively (LookupLangName does, and so does every provider that
+// normalizes a code that may already be internal), so a second pass has to be a
+// no-op or those call sites silently change the answer.
+func TestCanonicalLangCode_idempotent(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		raw := rapid.OneOf(
+			rapid.StringMatching(`[a-zA-Z]{0,4}`),
+			rapid.StringMatching(`[a-zA-Z]{2,3}(-[A-Za-z0-9]{2,4})?`),
+			rapid.SampledFrom([]string{
+				"pb", "pob", "pt-BR", "por-BR", "tl", "tgl", "bh", "nob", "iw",
+				"cmn", "yue", "und", "br", "BR_PT", "si",
+			}),
+		).Draw(t, "raw")
+
+		once := Canonical(raw)
+		twice := Canonical(once)
+		if once != twice {
+			t.Fatalf("Canonical not idempotent: Canonical(%q) = %q, Canonical(%q) = %q",
+				raw, once, once, twice)
+		}
+	})
+}
+
+// PBT: Valid agrees with Canonical being a fixed point. The two
+// are separate entry points and config validation trusts the pair to answer
+// consistently — a code reported valid must be one canonicalization leaves alone.
+func TestValidLangCode_agreesWithCanonical(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		raw := rapid.OneOf(
+			rapid.StringMatching(`[a-zA-Z]{0,4}`),
+			rapid.StringMatching(`[a-zA-Z]{2,3}(-[A-Za-z0-9]{2,4})?`),
+		).Draw(t, "raw")
+
+		canon := Canonical(raw)
+		want := canon != "" && canon == raw
+		if got := Valid(raw); got != want {
+			t.Fatalf("Valid(%q) = %v, want %v (Canonical(%q) = %q)",
+				raw, got, want, raw, canon)
+		}
+	})
+}
+
+// Every code the display-name registry and the arr name table produce must be
+// valid, or a language subflux advertises cannot be configured. This is the
+// check that would have caught "tl" resolving to "" during the migration.
+func TestCanonicalLangCode_internalCodesAreStable(t *testing.T) {
+	t.Parallel()
+	for name, code := range langNameMap {
+		if !Valid(code) {
+			t.Errorf("langNameMap[%q] = %q, which Valid rejects; "+
+				"Canonical(%q) = %q", name, code, code, Canonical(code))
+		}
+	}
+}
+
+func FuzzCanonical(f *testing.F) {
+	f.Add("en")
+	f.Add("eng")
+	f.Add("pb")
+	f.Add("pob")
+	f.Add("pt-BR")
+	f.Add("BR_PT")
+	f.Add("und")
+	f.Add("")
+	f.Add("tl")
+	f.Add("yue")
+	f.Add("\x00\x01")
+	f.Add("abcdefghijklmnopqrstuvwxyz")
+	f.Add("en-u-0a-0a-u-00-00")
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		got := Canonical(raw)
+		if got == "" {
+			return
+		}
+		if len(got) != 2 {
+			t.Fatalf("Canonical(%q) = %q (len %d), want len 0 or 2", raw, got, len(got))
+		}
+		for _, r := range got {
+			if r < 'a' || r > 'z' {
+				t.Fatalf("Canonical(%q) = %q, want lowercase ASCII letters", raw, got)
+			}
+		}
+		// A canonical code is valid, and canonicalizing it again is a no-op.
+		if !Valid(got) {
+			t.Fatalf("Canonical(%q) = %q, which Valid rejects", raw, got)
+		}
+		if again := Canonical(got); again != got {
+			t.Fatalf("Canonical not idempotent: %q -> %q -> %q", raw, got, again)
+		}
+	})
+}
+
+// --- the code space as a filename segment ---
+
+// maxCodeSegment bounds the language segment of a subtitle filename. The
+// internal space spells every code in two characters; the bound is what stops a
+// widening of the space from becoming a path-length problem on the network
+// shares these filenames land on.
+const maxCodeSegment = 8
+
+// unsafeInFilename reports why code cannot be a dot segment of a subtitle
+// filename, or "" when it can. The rules are the intersection of what POSIX,
+// the Win32 name grammar and SMB/NFS clients agree on, because a code accepted
+// here is written next to the media file on a share Windows clients read.
+func unsafeInFilename(code string) string {
+	switch {
+	case code == "":
+		return "it is empty"
+	case len(code) > maxCodeSegment:
+		return fmt.Sprintf("its length %d exceeds %d", len(code), maxCodeSegment)
+	case strings.ContainsAny(code, `/\`):
+		return "it contains a path separator"
+	case strings.Contains(code, ".."):
+		return "it contains a traversal sequence"
+	case strings.ContainsAny(code, `<>:"|?*`):
+		return "it contains a character the Win32 name grammar reserves"
+	case strings.HasPrefix(code, "."), strings.HasSuffix(code, "."),
+		strings.HasPrefix(code, " "), strings.HasSuffix(code, " "):
+		return "it begins or ends with a dot or space, which Win32 strips"
+	}
+	for _, r := range code {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Sprintf("it contains control char %#x", r)
+		}
+	}
+	return ""
+}
+
+// Every accepted code becomes a dot segment of the subtitle filename on disk,
+// and the manual-download boundary gates on nothing but Valid — so this is the
+// property that keeps an untrusted code out of a hostile filename. It walks the
+// short-input space exhaustively rather than sampling it: the accepted set is
+// two-letter codes plus the aliases, so three characters covers it with room to
+// spare, and the alphabet is what a caller can actually send.
+func TestValid_acceptedCodesAreSafeFilenameSegments(t *testing.T) {
+	t.Parallel()
+
+	const alphabet = `abcdefghijklmnopqrstuvwxyzABZ019-. :/\<>"|?*`
+	check := func(code string) {
+		if !Valid(code) {
+			return
+		}
+		if bad := unsafeInFilename(code); bad != "" {
+			t.Errorf("Valid(%q) = true, but as a filename segment %s", code, bad)
+		}
+	}
+
+	var buf [3]byte
+	for i := range len(alphabet) {
+		buf[0] = alphabet[i]
+		check(string(buf[:1]))
+		for j := range len(alphabet) {
+			buf[1] = alphabet[j]
+			check(string(buf[:2]))
+			for k := range len(alphabet) {
+				buf[2] = alphabet[k]
+				check(string(buf[:3]))
+			}
+		}
+	}
+}
+
+// FuzzValid_acceptedCodesAreFilenameSafe pins the same postcondition over
+// arbitrary input, which the exhaustive walk above cannot reach: multi-byte
+// runes, longer subtags and BCP 47 shapes. It replaces the manual path's own
+// character blocklist — a code Valid accepts is the only kind that reaches
+// subtitlefile.ManualPath, so an accepted ':' would open an NTFS alternate data
+// stream on the share and an accepted trailing dot would collapse two codes onto
+// one file.
+func FuzzValid_acceptedCodesAreFilenameSafe(f *testing.F) {
+	for _, seed := range []string{
+		"en", "pb", "pt-BR", "eng", "", "../../etc/passwd", "a\x00b", "en US",
+		"a:b", "en.", "en ", "CON", "en*", "en|", "zh-Hans", "yue",
+		strings.Repeat("a", 64),
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, code string) {
+		if !Valid(code) {
+			return // only accepted codes carry obligations
+		}
+		if bad := unsafeInFilename(code); bad != "" {
+			t.Fatalf("Valid(%q) = true, but as a filename segment %s", code, bad)
+		}
+	})
+}

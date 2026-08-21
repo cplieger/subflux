@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- SearchTargets upgrade behavior ---
@@ -18,7 +19,7 @@ func TestSearchTargets_upgrade(t *testing.T) {
 	type upgradeCase struct {
 		mediaImported   time.Time
 		name            string
-		providerResults []api.Subtitle
+		providerResults []subflux.Subtitle
 		providerData    []byte
 		score           int
 		upgradeWindow   int
@@ -31,24 +32,24 @@ func TestSearchTargets_upgrade(t *testing.T) {
 	}
 
 	// Pre-compute a "same score" value for the same_score_skips case.
-	sameScoreReq := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	sameScoreReq := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
 	sameScoreVideo := videoInfoFromRequest(sameScoreReq)
-	sameScoreResults := []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}}
-	sameScored := scoreResults(scorer.New(&api.DefaultScores), &sameScoreVideo, sameScoreResults, noPriority)
+	sameScoreResults := []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}}
+	sameScored := scoreResults(scorer.New(&subflux.DefaultScores), &sameScoreVideo, sameScoreResults, noPriority)
 	sameScore := sameScored[0].score
 
 	// Pre-compute a "no improvement" score.
-	noImpReq := &api.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	noImpReq := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
 	noImpVideo := videoInfoFromRequest(noImpReq)
-	noImpResults := []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "title", Language: "fr"}}
-	noImpScored := scoreResults(scorer.New(&api.DefaultScores), &noImpVideo, noImpResults, noPriority)
+	noImpResults := []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "title", Language: "fr"}}
+	noImpScored := scoreResults(scorer.New(&subflux.DefaultScores), &noImpVideo, noImpResults, noPriority)
 	noImpScore := noImpScored[0].score
 
 	tests := []upgradeCase{
 		{
 			name: "better_score_downloads", score: 10, mediaImported: time.Now(), found: true,
 			upgradeEnabled: true, upgradeWindow: 7,
-			providerResults: []api.Subtitle{{Provider: "test", ReleaseName: "Movie.2024.BluRay.x264-GRP", MatchedBy: "imdb", Language: "fr"}},
+			providerResults: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie.2024.BluRay.x264-GRP", MatchedBy: "imdb", Language: "fr"}},
 			providerData:    []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nBetter\r\n"),
 			wantPaths:       1, wantSuccess: true,
 		},
@@ -62,14 +63,14 @@ func TestSearchTargets_upgrade(t *testing.T) {
 		{
 			name: "disabled_skips", score: 50, mediaImported: time.Now(), found: true,
 			upgradeEnabled:  false,
-			providerResults: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
+			providerResults: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 			providerData:    []byte("better sub"),
 			wantPaths:       0,
 		},
 		{
 			name: "outside_window_skips", score: 50, mediaImported: time.Now().AddDate(0, 0, -30), found: true,
 			upgradeEnabled: true, upgradeWindow: 7,
-			providerResults: []api.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
+			providerResults: []subflux.Subtitle{{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: "imdb", Language: "fr"}},
 			providerData:    []byte("better sub"),
 			wantPaths:       0,
 		},
@@ -103,11 +104,11 @@ func TestSearchTargets_upgrade(t *testing.T) {
 				score: tc.score, mediaImported: tc.mediaImported, found: tc.found,
 			}
 			mc := &mockConfig{
-				searchCfg: api.SearchConfig{
+				searchCfg: subflux.SearchConfig{
 					UpgradeEnabled:    tc.upgradeEnabled,
 					UpgradeWindowDays: tc.upgradeWindow,
 				},
-				adaptiveCfg: api.AdaptiveConfig{Enabled: tc.adaptiveEnabled},
+				adaptiveCfg: subflux.AdaptiveConfig{Enabled: tc.adaptiveEnabled},
 				minScore:    0,
 			}
 			p := &mockProvider{
@@ -115,14 +116,14 @@ func TestSearchTargets_upgrade(t *testing.T) {
 				results: tc.providerResults,
 				data:    tc.providerData,
 			}
-			e := newEngine([]api.Provider{p}, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+			e := newEngine([]provider.Provider{p}, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-			req := &api.SearchRequest{
+			req := &subflux.SearchRequest{
 				MediaType:   "movie",
 				ImdbID:      "tt123",
 				ReleaseName: "Movie-GRP",
 			}
-			targets := []api.SubtitleTarget{{Code: "fr"}}
+			targets := []subflux.SubtitleTarget{{Code: "fr"}}
 
 			result, err := e.SearchTargets(t.Context(), req, videoPath, targets)
 			if err != nil {

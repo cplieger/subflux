@@ -3,21 +3,27 @@ package server
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// manualStore documents the api.Store methods used by manual search/download handlers.
+// manualStore is the two rows manual search and download touch directly from
+// the server root: what is already downloaded for a language, and releasing a
+// manual lock. Two methods, and it is embedded in Store rather than asserted
+// against a wide type, so the composite carries them by construction.
 type manualStore interface {
-	DownloadedRefs(ctx context.Context, mediaType api.MediaType, mediaID, language string) ([]api.DownloadedRef, error)
-	ClearManualLock(ctx context.Context, mediaType api.MediaType, mediaID, language string, variant api.Variant) error
+	DownloadedRefs(ctx context.Context, mediaType subflux.MediaType, mediaID, language string) ([]subflux.DownloadedRef, error)
+	ClearManualLock(ctx context.Context, key subflux.ManualLockKey) error
 }
 
-// Compile-time assertion: api.Store satisfies manualStore.
-var _ manualStore = api.Store(nil)
-
 // manualLiveState converts the server's liveState to manualops.LiveState.
-func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {
+//
+// The ONE conversion. initManualHandler used to rebuild this struct inline, field
+// for field, while four thin wrappers here called this copy — and those wrappers
+// had no production caller at all, so the converter the app actually ran was the
+// duplicate and this one existed only for tests. The wrappers are deleted and
+// StateFunc calls this.
+func manualLiveState(ls *liveState) *manualops.LiveState {
 	return &manualops.LiveState{
 		Cfg:       ls.cfg,
 		Engine:    ls.engine,
@@ -28,32 +34,4 @@ func (s *Server) manualLiveState(ls *liveState) *manualops.LiveState {
 		RadarrLib: ls.radarr,
 		Providers: ls.providers,
 	}
-}
-
-// lookupMediaTitle wraps manualops.LookupMediaTitle, adapting from the
-// server's liveState to manualops.LiveState.
-func lookupMediaTitle(ctx context.Context, ls *liveState, mediaType api.MediaType, arrID int) string {
-	return manualops.LookupMediaTitle(ctx, &manualops.LiveState{
-		Cfg: ls.cfg, Engine: ls.engine, Sonarr: ls.sonarr, Radarr: ls.radarr, Providers: ls.providers,
-	}, mediaType, arrID)
-}
-
-// lookupMovieMediaID wraps manualops.LookupMovieMediaID with the server's
-// manualLiveState adapter.
-func (s *Server) lookupMovieMediaID(ctx context.Context, ls *liveState, arrID int) string {
-	return manualops.LookupMovieMediaID(ctx, s.manualLiveState(ls), arrID)
-}
-
-// lookupEpisodeMediaID wraps manualops.LookupEpisodeMediaID with the server's
-// manualLiveState adapter.
-func (s *Server) lookupEpisodeMediaID(ctx context.Context, ls *liveState, seriesID, season, episode int) string {
-	return manualops.LookupEpisodeMediaID(ctx, s.manualLiveState(ls), seriesID, season, episode)
-}
-
-// resolveMediaIDs wraps manualops.ResolveMediaIDs with the server's
-// manualLiveState adapter.
-func (s *Server) resolveMediaIDs(ctx context.Context, ls *liveState,
-	mediaType api.MediaType, arrID, season, episode int,
-) (mediaID, title string) {
-	return manualops.ResolveMediaIDs(ctx, s.manualLiveState(ls), mediaType, arrID, season, episode)
 }

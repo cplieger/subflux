@@ -4,27 +4,28 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search/syncing"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func BenchmarkSearchProviders(b *testing.B) {
 	for _, n := range []int{1, 5, 10} {
-		providers := make([]api.Provider, n)
+		providers := make([]provider.Provider, n)
 		for i := range providers {
 			providers[i] = &mockProvider{name: fmt.Sprintf("prov%d", i)}
 		}
 		e := New(providers,
 			WithStore(&mockStore{}),
 			WithConfig(&mockConfig{}),
-			WithScorer(scorer.New(&api.DefaultScores)),
+			WithScorer(scorer.New(&subflux.DefaultScores)),
 			WithSyncer(syncing.Syncer{}),
 			WithTracks(noopDetector{}),
 			WithTimeout(noopHealth{}),
 		)
-		req := &api.SearchRequest{
-			MediaType: api.MediaTypeEpisode,
+		req := &subflux.SearchRequest{
+			MediaType: subflux.MediaTypeEpisode,
 			Title:     "Breaking Bad",
 			Season:    1,
 			Episode:   3,
@@ -44,12 +45,12 @@ func BenchmarkSearchProviders(b *testing.B) {
 
 func BenchmarkBuildSearchKey(b *testing.B) {
 	for _, n := range []int{1, 5, 10} {
-		providers := make([]api.Provider, n)
+		providers := make([]provider.Provider, n)
 		for i := range providers {
 			providers[i] = &mockProvider{name: fmt.Sprintf("prov%d", i)}
 		}
-		req := &api.SearchRequest{
-			MediaType: api.MediaTypeEpisode,
+		req := &subflux.SearchRequest{
+			MediaType: subflux.MediaTypeEpisode,
 			Title:     "Breaking Bad",
 			Season:    1,
 			Episode:   3,

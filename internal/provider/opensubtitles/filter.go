@@ -1,6 +1,6 @@
 package opensubtitles
 
-import "github.com/cplieger/runesafe"
+import "github.com/cplieger/runesafe/v2"
 
 // --- Language Mapping ---
 

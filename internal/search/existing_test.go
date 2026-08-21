@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 	"pgregory.net/rapid"
 )
 
@@ -19,7 +20,7 @@ func TestHasSubtitle(t *testing.T) {
 	tests := []struct {
 		name     string
 		lang     string
-		variant  api.Variant
+		variant  subflux.Variant
 		existing existingSubs
 		want     bool
 	}{
@@ -155,7 +156,7 @@ func TestMatchesVariant(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		variant api.Variant
+		variant subflux.Variant
 		hi      bool
 		forced  bool
 		want    bool
@@ -295,10 +296,10 @@ func TestParseExternalSubPath_empty_lang(t *testing.T) {
 
 // trackDetector returns preconfigured tracks for testing.
 type trackDetector struct {
-	tracks []api.EmbeddedTrack
+	tracks []subflux.EmbeddedTrack
 }
 
-func (d trackDetector) DetectTracks(_ context.Context, _ string) ([]api.EmbeddedTrack, error) {
+func (d trackDetector) DetectTracks(_ context.Context, _ string) ([]subflux.EmbeddedTrack, error) {
 	return d.tracks, nil
 }
 
@@ -307,7 +308,7 @@ func TestDetectExisting_embedded_tracks(t *testing.T) {
 	dir := t.TempDir()
 	videoPath := filepath.Join(dir, "movie.mkv")
 
-	detector := trackDetector{tracks: []api.EmbeddedTrack{
+	detector := trackDetector{tracks: []subflux.EmbeddedTrack{
 		{Lang: "en", Codec: "subrip", HearingImpaired: false, Forced: false},
 		{Lang: "fr", Codec: "ass", HearingImpaired: true, Forced: false},
 		{Lang: "de", Codec: "subrip", HearingImpaired: false, Forced: true},
@@ -566,7 +567,7 @@ func TestMatchesVariant_standard_is_default(t *testing.T) {
 			return // Skip known variants.
 		}
 
-		v := api.Variant(variant)
+		v := subflux.Variant(variant)
 		// Standard means: not HI and not forced.
 		if !matchesVariant(false, false, v) {
 			t.Errorf("matchesVariant(false, false, %q) = false, want true (standard)", variant)
@@ -612,7 +613,7 @@ func TestHasExternalSubtitle(t *testing.T) {
 	tests := []struct {
 		name     string
 		lang     string
-		variant  api.Variant
+		variant  subflux.Variant
 		existing existingSubs
 		want     bool
 	}{
@@ -640,10 +641,10 @@ func TestHasExternalSubtitle(t *testing.T) {
 
 // ignoredCodecConfig satisfies the resolver's minimal interface.
 type ignoredCodecConfig struct {
-	policy api.EmbeddedPolicy
+	policy subflux.EmbeddedPolicy
 }
 
-func (c *ignoredCodecConfig) EmbeddedPolicy() api.EmbeddedPolicy { return c.policy }
+func (c *ignoredCodecConfig) EmbeddedPolicy() subflux.EmbeddedPolicy { return c.policy }
 
 func TestIgnoredCodecsFromConfig(t *testing.T) {
 	t.Parallel()
@@ -651,36 +652,36 @@ func TestIgnoredCodecsFromConfig(t *testing.T) {
 	tests := []struct {
 		want   map[string]bool
 		name   string
-		policy api.EmbeddedPolicy
+		policy subflux.EmbeddedPolicy
 	}{
 		{
 			name:   "zero policy returns nil",
-			policy: api.EmbeddedPolicy{},
+			policy: subflux.EmbeddedPolicy{},
 			want:   nil,
 		},
 		{
 			name:   "ignore_pgs only",
-			policy: api.EmbeddedPolicy{IgnorePGS: true},
+			policy: subflux.EmbeddedPolicy{IgnorePGS: true},
 			want:   map[string]bool{"pgs": true},
 		},
 		{
 			name:   "ignore_vobsub only",
-			policy: api.EmbeddedPolicy{IgnoreVobSub: true},
+			policy: subflux.EmbeddedPolicy{IgnoreVobSub: true},
 			want:   map[string]bool{"vobsub": true},
 		},
 		{
 			name:   "ignore_ass adds both ass and ssa",
-			policy: api.EmbeddedPolicy{IgnoreASS: true},
+			policy: subflux.EmbeddedPolicy{IgnoreASS: true},
 			want:   map[string]bool{"ass": true, "ssa": true},
 		},
 		{
 			name:   "all ignore flags set",
-			policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true},
+			policy: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true},
 			want:   map[string]bool{"pgs": true, "vobsub": true, "ass": true, "ssa": true},
 		},
 		{
 			name:   "defaults (pgs+vobsub) reach the policy exactly as documented",
-			policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
+			policy: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true},
 			want:   map[string]bool{"pgs": true, "vobsub": true},
 		},
 	}
@@ -715,7 +716,7 @@ func TestIgnoredCodecsFromConfig(t *testing.T) {
 func TestIgnoredCodecs_never_ignore_text_codecs(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
-		cfg := &ignoredCodecConfig{policy: api.EmbeddedPolicy{
+		cfg := &ignoredCodecConfig{policy: subflux.EmbeddedPolicy{
 			IgnorePGS:    rapid.Bool().Draw(t, "ignorePGS"),
 			IgnoreVobSub: rapid.Bool().Draw(t, "ignoreVobSub"),
 			IgnoreASS:    rapid.Bool().Draw(t, "ignoreASS"),
@@ -738,19 +739,19 @@ func TestEmbeddedPolicy_satisfaction_matrix(t *testing.T) {
 	tests := []struct {
 		name      string
 		codec     string
-		policy    api.EmbeddedPolicy
+		policy    subflux.EmbeddedPolicy
 		satisfies bool
 	}{
-		{name: "pgs_ignored", codec: "pgs", policy: api.EmbeddedPolicy{IgnorePGS: true}, satisfies: false},
-		{name: "pgs_not_ignored", codec: "pgs", policy: api.EmbeddedPolicy{}, satisfies: true},
-		{name: "vobsub_ignored", codec: "vobsub", policy: api.EmbeddedPolicy{IgnoreVobSub: true}, satisfies: false},
-		{name: "vobsub_not_ignored", codec: "vobsub", policy: api.EmbeddedPolicy{}, satisfies: true},
-		{name: "ass_ignored", codec: "ass", policy: api.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
-		{name: "ssa_ignored", codec: "ssa", policy: api.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
-		{name: "ass_not_ignored", codec: "ass", policy: api.EmbeddedPolicy{}, satisfies: true},
-		{name: "srt_always_usable", codec: "srt", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true}, satisfies: true},
-		{name: "defaults_pgs_triggers_search", codec: "pgs", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: false},
-		{name: "defaults_ass_usable", codec: "ass", policy: api.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: true},
+		{name: "pgs_ignored", codec: "pgs", policy: subflux.EmbeddedPolicy{IgnorePGS: true}, satisfies: false},
+		{name: "pgs_not_ignored", codec: "pgs", policy: subflux.EmbeddedPolicy{}, satisfies: true},
+		{name: "vobsub_ignored", codec: "vobsub", policy: subflux.EmbeddedPolicy{IgnoreVobSub: true}, satisfies: false},
+		{name: "vobsub_not_ignored", codec: "vobsub", policy: subflux.EmbeddedPolicy{}, satisfies: true},
+		{name: "ass_ignored", codec: "ass", policy: subflux.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
+		{name: "ssa_ignored", codec: "ssa", policy: subflux.EmbeddedPolicy{IgnoreASS: true}, satisfies: false},
+		{name: "ass_not_ignored", codec: "ass", policy: subflux.EmbeddedPolicy{}, satisfies: true},
+		{name: "srt_always_usable", codec: "srt", policy: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true, IgnoreASS: true}, satisfies: true},
+		{name: "defaults_pgs_triggers_search", codec: "pgs", policy: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: false},
+		{name: "defaults_ass_usable", codec: "ass", policy: subflux.EmbeddedPolicy{IgnorePGS: true, IgnoreVobSub: true}, satisfies: true},
 	}
 
 	for _, tt := range tests {
@@ -760,7 +761,7 @@ func TestEmbeddedPolicy_satisfaction_matrix(t *testing.T) {
 				Embedded:      []embeddedSub{{Lang: "en", Codec: tt.codec}},
 				IgnoredCodecs: IgnoredCodecsFromConfig(&ignoredCodecConfig{policy: tt.policy}),
 			}
-			got := existing.hasSubtitle("en", api.VariantStandard)
+			got := existing.hasSubtitle("en", subflux.VariantStandard)
 			if got != tt.satisfies {
 				t.Errorf("hasSubtitle(en, standard) with codec=%q policy=%+v = %v, want %v",
 					tt.codec, tt.policy, got, tt.satisfies)
@@ -775,12 +776,12 @@ func TestVariantFromFlags_roundtrip_matchesVariant(t *testing.T) {
 		hi := rapid.Bool().Draw(t, "hi")
 		forced := rapid.Bool().Draw(t, "forced")
 
-		variant := api.VariantFromFlags(hi, forced)
+		variant := subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: hi, Forced: forced})
 
 		// VariantFromFlags picks hi over forced when both are true,
 		// so the round-trip holds for all combinations.
 		if !matchesVariant(hi, forced, variant) {
-			t.Errorf("matchesVariant(%v, %v, api.VariantFromFlags(%v, %v)=%q) = false, want true",
+			t.Errorf("matchesVariant(%v, %v, subtitlefile.VariantFromFlags(subtitlefile.Tags{HearingImpaired: %v, Forced: %v})=%q) = false, want true",
 				hi, forced, hi, forced, variant)
 		}
 	})

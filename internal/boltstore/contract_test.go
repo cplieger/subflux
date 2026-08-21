@@ -5,21 +5,21 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/storetest"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
-// TestBoltStoreContract runs the engine-agnostic api.Store behavioral contract
+// TestBoltStoreContract runs the engine-agnostic behavioral contract
 // suite (internal/store/storetest) against the bbolt *DB, proving the new
 // engine satisfies every promoted finding — the three ReconcileState branches,
 // non-destructive ClearManualLock, backoff cleared on save, DeleteStateByPaths
-// orphan cleanup, GetState filter/search/limit/offset, and both CleanupDrift
+// orphan cleanup, State filter/search/limit/offset, and both CleanupDrift
 // branches (Requirements 14.1, 14.2). The same suite runs against the legacy
 // SQLite store.DB (internal/store) for parity.
 func TestBoltStoreContract(t *testing.T) {
 	t.Parallel()
-	storetest.Suite(t, func(t *testing.T) api.Store {
+	storetest.Suite(t, func(t *testing.T) storetest.Store {
 		path := filepath.Join(t.TempDir(), "subflux.bolt")
 		db, err := Open(path)
 		if err != nil {
@@ -31,11 +31,11 @@ func TestBoltStoreContract(t *testing.T) {
 	})
 }
 
-// destructiveClearStore is a deliberately broken api.Store: it embeds a real,
+// destructiveClearStore is a deliberately broken store: it embeds a real,
 // fully-functional *DB but overrides ClearManualLock to DELETE the quad's
 // manual rows instead of flipping them to auto. That violates the promoted
 // non-destructive-ClearManualLock invariant (the rows must be preserved and
-// stay visible to GetState/DownloadedRefs, Requirement 4.3). It exists only to
+// stay visible to State/DownloadedRefs, Requirement 4.3). It exists only to
 // prove the contract suite's assertions actually catch a regression.
 type destructiveClearStore struct {
 	*DB
@@ -44,9 +44,9 @@ type destructiveClearStore struct {
 // ClearManualLock destructively deletes the manual rows for the quad. A
 // conforming implementation flips manual=false and preserves the rows; this
 // removes them, so AssertClearManualLockNonDestructive must report a failure.
-func (s destructiveClearStore) ClearManualLock(_ context.Context, mt api.MediaType, mid, lang string, variant api.Variant) error {
+func (s destructiveClearStore) ClearManualLock(_ context.Context, key subflux.ManualLockKey) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		rows, err := collectStateRows(tx, mt, mid, lang, variant)
+		rows, err := collectStateRows(tx, key.MediaType, key.MediaID, key.Language, key.Variant)
 		if err != nil {
 			return err
 		}

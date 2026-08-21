@@ -3,7 +3,7 @@ package archive
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 )
 
 // FuzzDecompressOutputCap tests that Decompress never produces output exceeding
@@ -32,9 +32,9 @@ func FuzzDecompressOutputCap(f *testing.F) {
 
 		if isGz || isXz {
 			// Compressed: output must respect the size cap.
-			if int64(len(out)) > httputil.MaxJSONResponseBytes {
+			if int64(len(out)) > httpwire.MaxJSONResponseBytes {
 				t.Errorf("Decompress produced %d bytes, exceeds cap %d",
-					len(out), httputil.MaxJSONResponseBytes)
+					len(out), httpwire.MaxJSONResponseBytes)
 			}
 		}
 	})

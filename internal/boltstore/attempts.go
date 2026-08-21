@@ -11,13 +11,13 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
 // This file holds the adaptive-backoff domain (the search_attempts bucket):
-// RecordNoResult, BackedOffProviders, GetBackoffItems, and GetBackoffByPrefix.
+// RecordNoResult, BackedOffProviders, BackoffItems, and BackoffByPrefix.
 // The bucket has no secondary index: it is bounded by the number of
 // currently-backed-off (triple, provider) pairs, so the ordered listings sort
 // in memory instead of maintaining a due-order index on every write.
@@ -33,7 +33,7 @@ import (
 // reproduces that truncation so the computed next_retry matches the old engine.
 // oldFailures is the failure count BEFORE this attempt (0 for a brand-new row),
 // matching the SQL's reference to the pre-increment search_attempts.failures.
-func computeNextRetry(now time.Time, oldFailures int, bp api.BackoffParams) time.Time {
+func computeNextRetry(now time.Time, oldFailures int, bp subflux.BackoffParams) time.Time {
 	delaySec := bp.InitialDelay.Seconds() * math.Pow(bp.Multiplier, float64(oldFailures))
 	if maxSec := bp.MaxDelay.Seconds(); delaySec > maxSec {
 		delaySec = maxSec
@@ -51,8 +51,8 @@ func computeNextRetry(now time.Time, oldFailures int, bp api.BackoffParams) time
 // A brand-new row starts at failures=1 with next_retry = now + InitialDelay,
 // matching the old SQLite INSERT branch (which used the full InitialDelay
 // duration without the integer-second truncation of the upsert path).
-func (d *DB) RecordNoResult(_ context.Context, mediaType api.MediaType, mediaID, language string, providerName api.ProviderID,
-	bp api.BackoffParams,
+func (d *DB) RecordNoResult(_ context.Context, mediaType subflux.MediaType, mediaID, language string, providerName subflux.ProviderID,
+	bp subflux.BackoffParams,
 ) error {
 	now := time.Now()
 	err := d.db.Update(func(tx *bolt.Tx) error {
@@ -100,14 +100,14 @@ func (d *DB) RecordNoResult(_ context.Context, mediaType api.MediaType, mediaID,
 //
 // Rows with an empty provider component are skipped, matching the old store's
 // `provider != ”` filter.
-func (d *DB) BackedOffProviders(_ context.Context, mediaType api.MediaType, mediaID, language string, maxAttempts int) ([]api.ProviderID, error) {
+func (d *DB) BackedOffProviders(_ context.Context, mediaType subflux.MediaType, mediaID, language string, maxAttempts int) ([]subflux.ProviderID, error) {
 	if maxAttempts < 0 {
 		maxAttempts = 0
 	}
 	now := time.Now()
 	prefix := triplePrefix(mediaType, mediaID, language)
 
-	var backed []api.ProviderID
+	var backed []subflux.ProviderID
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
@@ -129,11 +129,11 @@ func (d *DB) BackedOffProviders(_ context.Context, mediaType api.MediaType, medi
 // (the old store's `provider != ”` filter), and an undecodable derived row is
 // skipped with a warning (logged by decodeRecord) since a missing row just
 // means the provider is eligible.
-func scanBackedOffProviders(b *bolt.Bucket, prefix []byte, maxAttempts int, now time.Time) ([]api.ProviderID, error) {
-	var backed []api.ProviderID
+func scanBackedOffProviders(b *bolt.Bucket, prefix []byte, maxAttempts int, now time.Time) ([]subflux.ProviderID, error) {
+	var backed []subflux.ProviderID
 	c := b.Cursor()
 	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-		provider := api.ProviderID(k[len(prefix):])
+		provider := subflux.ProviderID(k[len(prefix):])
 		if provider == "" {
 			continue
 		}
@@ -163,32 +163,32 @@ func providerBackedOff(rec *attemptRec, maxAttempts int, now time.Time) bool {
 }
 
 // decodeAttemptEntry turns one search_attempts row (key + value) into a fully
-// populated api.BackoffEntry. It parses (mt, mid, lang, provider) out of the
+// populated subflux.BackoffEntry. It parses (mt, mid, lang, provider) out of the
 // composite primary key and decodes the value, reporting skip=true when the
 // provider component is empty (matching the old store's `provider != ”`
 // filter) or the row is an undecodable derived record (decodeRecord logs a
 // warning). A genuine decode error other than tolerant-skip is returned.
-func decodeAttemptEntry(key, raw []byte) (api.BackoffEntry, bool, error) {
+func decodeAttemptEntry(key, raw []byte) (subflux.BackoffEntry, bool, error) {
 	parts := kv.Split(key)
 	if len(parts) != 4 {
 		// Malformed key (not mt 0x00 mid 0x00 lang 0x00 provider); skip rather
 		// than surface a half-parsed entry.
-		return api.BackoffEntry{}, true, nil
+		return subflux.BackoffEntry{}, true, nil
 	}
-	provider := api.ProviderID(parts[3])
+	provider := subflux.ProviderID(parts[3])
 	if provider == "" {
-		return api.BackoffEntry{}, true, nil // provider != '' filter
+		return subflux.BackoffEntry{}, true, nil // provider != '' filter
 	}
 	var rec attemptRec
 	skip, derr := decodeRecord(bucketDecodeMode(bucketSearchAttempts), bucketSearchAttempts, key, raw, &rec)
 	if derr != nil {
-		return api.BackoffEntry{}, false, derr
+		return subflux.BackoffEntry{}, false, derr
 	}
 	if skip {
-		return api.BackoffEntry{}, true, nil
+		return subflux.BackoffEntry{}, true, nil
 	}
-	return api.BackoffEntry{
-		MediaType: api.MediaType(parts[0]),
+	return subflux.BackoffEntry{
+		MediaType: subflux.MediaType(parts[0]),
 		MediaID:   parts[1],
 		Language:  parts[2],
 		Provider:  provider,
@@ -198,15 +198,15 @@ func decodeAttemptEntry(key, raw []byte) (api.BackoffEntry, bool, error) {
 	}, false, nil
 }
 
-// GetBackoffItems returns every backed-off provider row ordered by ascending
+// BackoffItems returns every backed-off provider row ordered by ascending
 // next_retry, then by primary key for a deterministic tie order. It scans the
 // primary bucket and sorts in memory: the bucket holds only currently
 // backed-off (triple, provider) pairs, so the sort input is small and bounded,
 // and this listing is a rare introspection call (CLI `subflux backoff`, the
 // backoff API). Rows with an empty provider component are excluded, matching
 // the old store's `WHERE provider != ” ORDER BY next_retry ASC`.
-func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
-	var out []api.BackoffEntry
+func (d *DB) BackoffItems(_ context.Context) ([]subflux.BackoffEntry, error) {
+	var out []subflux.BackoffEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
@@ -226,13 +226,13 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	slices.SortStableFunc(out, func(a, b api.BackoffEntry) int {
+	slices.SortStableFunc(out, func(a, b subflux.BackoffEntry) int {
 		return a.NextRetry.Compare(b.NextRetry)
 	})
 	return out, nil
 }
 
-// GetBackoffByPrefix returns the backed-off provider rows for one media type,
+// BackoffByPrefix returns the backed-off provider rows for one media type,
 // optionally narrowed to media ids that start with mediaIDPrefix, ordered by
 // media id then ascending next_retry. It prefix-scans the search_attempts
 // primary bucket on `mediaType 0x00 mediaIDPrefix` (an empty prefix returns
@@ -244,14 +244,14 @@ func (d *DB) GetBackoffItems(_ context.Context) ([]api.BackoffEntry, error) {
 // The prefix is a media-id starts-with match (LIKE 'prefix%'): querying "tt1"
 // intentionally returns both "tt1" and "tt12", unlike the exact triple scans
 // which use a trailing separator for component-boundary isolation.
-func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.BackoffEntry, error) {
+func (d *DB) BackoffByPrefix(_ context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.BackoffEntry, error) {
 	// Build `mediaType 0x00 mediaIDPrefix`. Join with a single component yields
 	// the bare media type with no trailing separator, then the separator and
 	// the (possibly empty) media-id prefix follow.
 	prefix := append(kv.Join(string(mediaType)), kv.Sep)
 	prefix = append(prefix, mediaIDPrefix...)
 
-	var out []api.BackoffEntry
+	var out []subflux.BackoffEntry
 	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketSearchAttempts))
 		if b == nil {
@@ -277,7 +277,7 @@ func (d *DB) GetBackoffByPrefix(_ context.Context, mediaType api.MediaType, medi
 	// Order by media id, then ascending next_retry (mirrors the old
 	// `ORDER BY media_id, next_retry ASC`). The scan already groups rows by
 	// media id ascending, but next_retry within a media id is unordered.
-	slices.SortStableFunc(out, func(a, b api.BackoffEntry) int {
+	slices.SortStableFunc(out, func(a, b subflux.BackoffEntry) int {
 		return cmp.Or(
 			cmp.Compare(a.MediaID, b.MediaID),
 			a.NextRetry.Compare(b.NextRetry),

@@ -24,7 +24,7 @@ func BenchmarkPostProcess(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_ = PostProcess(cues, opts)
 	}
 }
@@ -39,7 +39,7 @@ func BenchmarkPostProcessBytes(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for range b.N {
+	for b.Loop() {
 		_ = PostProcessBytes(data, opts)
 	}
 }

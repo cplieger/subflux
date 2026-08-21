@@ -7,7 +7,7 @@ import (
 )
 
 // The EventBus transport (fan-out, replay, eviction, caps) lives in
-// github.com/cplieger/webhttp/sse and is tested there; the typed wrapper's
+// github.com/cplieger/webhttp/v2/sse and is tested there; the typed wrapper's
 // wire contract is pinned in internal/server/events. These tests keep the
 // server-level construction path honest.
 

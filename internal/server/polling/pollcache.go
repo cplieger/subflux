@@ -8,19 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
-
-// PollCacher is the interface for poll timestamp caching. Consumers depend
-// on this interface rather than the concrete *PollCache, enabling test
-// doubles and alternative implementations.
-type PollCacher interface {
-	Get(ctx context.Context, key api.PollKey) time.Time
-	Set(ctx context.Context, key api.PollKey, t time.Time)
-}
-
-// Compile-time assertion: *PollCache implements PollCacher.
-var _ PollCacher = (*PollCache)(nil)
 
 // PollCache is a write-through cache for poll timestamps. It absorbs
 // transient DB write failures: if the DB write fails, subsequent reads
@@ -35,9 +24,9 @@ var _ PollCacher = (*PollCache)(nil)
 // when it heals — so restart replay is an expected, explained event instead
 // of a silent drift.
 type PollCache struct {
-	readFn     func(ctx context.Context, key api.PollKey) (time.Time, error)
-	setFn      func(ctx context.Context, key api.PollKey, t time.Time) error
-	dirty      map[api.PollKey]time.Time
+	readFn     func(ctx context.Context, key subflux.PollKey) (time.Time, error)
+	setFn      func(ctx context.Context, key subflux.PollKey, t time.Time) error
+	dirty      map[subflux.PollKey]time.Time
 	dirtyGauge func(n int)
 	shadow     sync.Map
 	dirtyMu    sync.Mutex
@@ -45,13 +34,13 @@ type PollCache struct {
 
 // NewPollCache creates a PollCache backed by the given read/set functions.
 func NewPollCache(
-	readFn func(ctx context.Context, key api.PollKey) (time.Time, error),
-	setFn func(ctx context.Context, key api.PollKey, t time.Time) error,
+	readFn func(ctx context.Context, key subflux.PollKey) (time.Time, error),
+	setFn func(ctx context.Context, key subflux.PollKey, t time.Time) error,
 ) *PollCache {
 	return &PollCache{
 		readFn: readFn,
 		setFn:  setFn,
-		dirty:  make(map[api.PollKey]time.Time),
+		dirty:  make(map[subflux.PollKey]time.Time),
 	}
 }
 
@@ -65,7 +54,7 @@ func (c *PollCache) SetDirtyGauge(fn func(n int)) {
 
 // Get returns the cached timestamp for key, falling back to the DB on miss.
 // Uses LoadOrStore to handle the race between concurrent first-reads atomically.
-func (c *PollCache) Get(ctx context.Context, key api.PollKey) time.Time {
+func (c *PollCache) Get(ctx context.Context, key subflux.PollKey) time.Time {
 	if v, ok := c.shadow.Load(key); ok {
 		if t, ok := v.(time.Time); ok {
 			return t
@@ -90,7 +79,7 @@ func (c *PollCache) Get(ctx context.Context, key api.PollKey) time.Time {
 // Set updates both the in-memory cache and the persistent store. The cache
 // advances unconditionally so polling keeps working through disk trouble;
 // a failed durable write marks the cursor dirty (see PollCache doc).
-func (c *PollCache) Set(ctx context.Context, key api.PollKey, t time.Time) {
+func (c *PollCache) Set(ctx context.Context, key subflux.PollKey, t time.Time) {
 	c.shadow.Store(key, t)
 	if err := c.setFn(ctx, key, t); err != nil {
 		c.markDirty(key, err)
@@ -104,7 +93,7 @@ func (c *PollCache) Set(ctx context.Context, key api.PollKey, t time.Time) {
 // write failure heals within one cycle; a no-op when everything is clean.
 func (c *PollCache) RetryDirty(ctx context.Context) {
 	c.dirtyMu.Lock()
-	keys := make([]api.PollKey, 0, len(c.dirty))
+	keys := make([]subflux.PollKey, 0, len(c.dirty))
 	for k := range c.dirty {
 		keys = append(keys, k)
 	}
@@ -131,13 +120,13 @@ func (c *PollCache) RetryDirty(ctx context.Context) {
 // dirtySince returns when a cursor's persist first started failing, or the zero
 // time when the cursor is clean. The live dirty COUNT reaches production
 // through the SetDirtyGauge observer, not a separate accessor.
-func (c *PollCache) dirtySince(key api.PollKey) time.Time {
+func (c *PollCache) dirtySince(key subflux.PollKey) time.Time {
 	c.dirtyMu.Lock()
 	defer c.dirtyMu.Unlock()
 	return c.dirty[key]
 }
 
-func (c *PollCache) markDirty(key api.PollKey, err error) {
+func (c *PollCache) markDirty(key subflux.PollKey, err error) {
 	c.dirtyMu.Lock()
 	since, already := c.dirty[key]
 	if !already {
@@ -155,7 +144,7 @@ func (c *PollCache) markDirty(key api.PollKey, err error) {
 	}
 }
 
-func (c *PollCache) markClean(key api.PollKey) {
+func (c *PollCache) markClean(key subflux.PollKey) {
 	c.dirtyMu.Lock()
 	since, was := c.dirty[key]
 	if was {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/slogx/capture"
 )
 
@@ -39,29 +39,29 @@ func TestCreateSession_andGetByHash_roundTrips(t *testing.T) {
 	exp := now.Add(time.Hour)
 	want := mkSession("h1", 7, now, now)
 	want.AuthMethod = auth.MethodOIDC
-	want.OIDCExpiry = &exp
+	want.OIDCExpiry = exp
 
 	if err := s.CreateSession(ctx, want); err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
-	got, _, err := s.GetSessionByHash(ctx, "h1")
+	got, _, err := s.SessionByHash(ctx, "h1")
 	if err != nil {
-		t.Fatalf("GetSessionByHash: %v", err)
+		t.Fatalf("SessionByHash: %v", err)
 	}
 	if got == nil {
-		t.Fatal("GetSessionByHash returned nil for a stored session")
+		t.Fatal("SessionByHash returned nil for a stored session")
 	}
 	if got.TokenHash != "h1" || got.UserID != 7 || got.AuthMethod != auth.MethodOIDC || got.IPAddress != "10.0.0.1" {
 		t.Errorf("round-trip mismatch: %+v", got)
 	}
-	if got.OIDCExpiry == nil || !got.OIDCExpiry.Equal(exp) {
+	if !got.OIDCExpiry.Equal(exp) {
 		t.Errorf("OIDCExpiry round-trip = %v, want %v", got.OIDCExpiry, exp)
 	}
 }
 
 func TestGetSessionByHash_absentReturnsNilNil(t *testing.T) {
 	s := newSessionStore(t)
-	got, _, err := s.GetSessionByHash(t.Context(), "missing")
+	got, _, err := s.SessionByHash(t.Context(), "missing")
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
@@ -81,19 +81,23 @@ func TestGetSessionByHash_returnsCopy(t *testing.T) {
 	// pointer handed to CreateSession so later mutations of that pointer cannot
 	// change the expectation.
 	wantExp := now.Add(time.Hour)
-	exp := wantExp
 	in := mkSession("h1", 1, now, now)
-	in.OIDCExpiry = &exp
+	in.OIDCExpiry = wantExp
 	if err := s.CreateSession(ctx, in); err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
 	// Mutating the caller's original struct after create must not affect storage.
+	//
+	// OIDCExpiry is assigned, not mutated through a pointer: it is a time.Time
+	// value since auth v4, so there is no shared cell left to write through. The
+	// assertion is the same one and it now holds by construction rather than by
+	// the store remembering to deep-copy one field.
 	in.UserID = 999
 	in.IPAddress = "evil"
-	*in.OIDCExpiry = now.Add(100 * time.Hour)
+	in.OIDCExpiry = now.Add(100 * time.Hour)
 
-	got, _, _ := s.GetSessionByHash(ctx, "h1")
+	got, _, _ := s.SessionByHash(ctx, "h1")
 	if got.UserID != 1 || got.IPAddress != "10.0.0.1" {
 		t.Errorf("stored session was aliased to caller struct: %+v", got)
 	}
@@ -103,8 +107,8 @@ func TestGetSessionByHash_returnsCopy(t *testing.T) {
 
 	// Mutating the returned copy must not affect a subsequent read either.
 	got.UserID = 555
-	*got.OIDCExpiry = now.Add(200 * time.Hour)
-	again, _, _ := s.GetSessionByHash(ctx, "h1")
+	got.OIDCExpiry = now.Add(200 * time.Hour)
+	again, _, _ := s.SessionByHash(ctx, "h1")
 	if again.UserID != 1 || !again.OIDCExpiry.Equal(wantExp) {
 		t.Errorf("returned copy aliased stored session: %+v", again)
 	}
@@ -121,7 +125,7 @@ func TestUpdateSessionActivity_single(t *testing.T) {
 	if err := s.UpdateSessionActivity(ctx, "h1", t1); err != nil {
 		t.Fatalf("UpdateSessionActivity: %v", err)
 	}
-	got, _, _ := s.GetSessionByHash(ctx, "h1")
+	got, _, _ := s.SessionByHash(ctx, "h1")
 	if !got.LastActivity.Equal(t1) {
 		t.Errorf("LastActivity = %v, want %v", got.LastActivity, t1)
 	}
@@ -141,7 +145,7 @@ func TestDeleteSession(t *testing.T) {
 	if err := s.DeleteSession(ctx, "h1"); err != nil {
 		t.Fatalf("DeleteSession: %v", err)
 	}
-	if got, _, _ := s.GetSessionByHash(ctx, "h1"); got != nil {
+	if got, _, _ := s.SessionByHash(ctx, "h1"); got != nil {
 		t.Errorf("session still present after delete: %+v", got)
 	}
 	// Deleting an absent session is a no-op returning nil.
@@ -171,15 +175,15 @@ func TestDeleteUserSessions_keepsOneAndOnlyThatUser(t *testing.T) {
 		t.Fatalf("DeleteUserSessions: %v", err)
 	}
 
-	if got, _, _ := s.GetSessionByHash(ctx, "u1keep"); got == nil {
+	if got, _, _ := s.SessionByHash(ctx, "u1keep"); got == nil {
 		t.Error("kept session u1keep was removed")
 	}
 	for _, h := range []string{"u1a", "u1b"} {
-		if got, _, _ := s.GetSessionByHash(ctx, h); got != nil {
+		if got, _, _ := s.SessionByHash(ctx, h); got != nil {
 			t.Errorf("user-1 session %s should have been deleted", h)
 		}
 	}
-	if got, _, _ := s.GetSessionByHash(ctx, "u2a"); got == nil {
+	if got, _, _ := s.SessionByHash(ctx, "u2a"); got == nil {
 		t.Error("other user's session u2a was wrongly deleted")
 	}
 
@@ -187,10 +191,10 @@ func TestDeleteUserSessions_keepsOneAndOnlyThatUser(t *testing.T) {
 	if err := s.DeleteUserSessions(ctx, 1, ""); err != nil {
 		t.Fatalf("DeleteUserSessions(empty except): %v", err)
 	}
-	if got, _, _ := s.GetSessionByHash(ctx, "u1keep"); got != nil {
+	if got, _, _ := s.SessionByHash(ctx, "u1keep"); got != nil {
 		t.Error("empty exceptHash should have removed u1keep")
 	}
-	if got, _, _ := s.GetSessionByHash(ctx, "u2a"); got == nil {
+	if got, _, _ := s.SessionByHash(ctx, "u2a"); got == nil {
 		t.Error("user-2 session must survive a user-1 bulk delete")
 	}
 }
@@ -221,7 +225,7 @@ func TestCleanupExpiredSessions(t *testing.T) {
 		t.Fatalf("CreateSession(boundary): %v", err)
 	}
 
-	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err := s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions: %v", err)
 	}
@@ -229,7 +233,7 @@ func TestCleanupExpiredSessions(t *testing.T) {
 		t.Errorf("evicted count = %d, want 2", n)
 	}
 	for h, wantPresent := range map[string]bool{"live": true, "idle": false, "abs": false, "boundary": true} {
-		got, _, _ := s.GetSessionByHash(ctx, h)
+		got, _, _ := s.SessionByHash(ctx, h)
 		if present := got != nil; present != wantPresent {
 			t.Errorf("session %s present=%v, want %v", h, present, wantPresent)
 		}
@@ -250,35 +254,31 @@ func TestSessions_concurrentAccess(t *testing.T) {
 
 	// Creators / updaters.
 	for w := range workers {
-		wg.Add(1)
-		go func(w int) {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range iters {
 				h := fmt.Sprintf("w%d-%d", w, i)
 				_ = s.CreateSession(ctx, mkSession(h, int64(w), now, now))
 				_ = s.UpdateSessionActivity(ctx, h, now.Add(time.Duration(i)*time.Second))
-				_, _, _ = s.GetSessionByHash(ctx, h)
+				_, _, _ = s.SessionByHash(ctx, h)
 			}
-		}(w)
+		})
 	}
 	// Sweepers.
 	for range 2 {
 		wg.Go(func() {
 			for range iters {
-				_, _ = s.CleanupExpiredSessions(ctx, time.Now(), time.Hour, 24*time.Hour)
+				_, _ = s.CleanupExpiredSessions(ctx, time.Now(), auth.SessionTimeouts{Idle: time.Hour, Absolute: 24 * time.Hour})
 			}
 		})
 	}
 	// Per-user deleters.
 	for w := range workers {
-		wg.Add(1)
-		go func(w int) {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range iters {
 				_ = s.UpdateSessionActivity(ctx, fmt.Sprintf("w%d-%d", w, i), now)
 				_ = s.DeleteUserSessions(ctx, int64(w), fmt.Sprintf("w%d-0", w))
 			}
-		}(w)
+		})
 	}
 	wg.Wait()
 }
@@ -298,12 +298,12 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if err := s.CreateSession(ctx, mkSession("live", 1, now, now)); err != nil {
 		t.Fatalf("CreateSession(live): %v", err)
 	}
-	n, err := s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err := s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions(none expired): %v", err)
 	}
 	if n != 0 {
-		t.Fatalf("evicted = %d, want 0", n)
+		t.Errorf("evicted = %d, want 0", n)
 	}
 	if got := logs.CountExact("expired sessions cleaned"); got != 0 {
 		t.Errorf("nothing evicted logged the cleanup line %d times, want 0", got)
@@ -313,12 +313,12 @@ func TestCleanupExpiredSessions_logsOnlyWhenEvicted(t *testing.T) {
 	if err := s.CreateSession(ctx, mkSession("expired", 1, now.Add(-2*time.Hour), now.Add(-2*time.Hour))); err != nil {
 		t.Fatalf("CreateSession(expired): %v", err)
 	}
-	n, err = s.CleanupExpiredSessions(ctx, now, idle, abs)
+	n, err = s.CleanupExpiredSessions(ctx, now, auth.SessionTimeouts{Idle: idle, Absolute: abs})
 	if err != nil {
 		t.Fatalf("CleanupExpiredSessions(one expired): %v", err)
 	}
 	if n != 1 {
-		t.Fatalf("evicted = %d, want 1", n)
+		t.Errorf("evicted = %d, want 1", n)
 	}
 	if got := logs.CountExact("expired sessions cleaned"); got != 1 {
 		t.Errorf("after one eviction, cleanup line logged %d times total, want 1", got)

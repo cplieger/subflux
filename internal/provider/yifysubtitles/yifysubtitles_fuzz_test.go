@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func FuzzParseRow(f *testing.F) {
@@ -15,11 +15,10 @@ func FuzzParseRow(f *testing.F) {
 	f.Add(`<td>abc</td><td>Fran\xc3\xa7ais</td><td><a href="/dl">名前</a></td><td></td><td></td>`)
 	f.Add(`<td><b><i>99</i></b></td><td><span>Spanish</span></td><td>subtitle <a href="/x">rel</a></td><td></td><td></td>`)
 
-	p := &Provider{}
 	languages := []string{"en", "fr", "es", "pt", "de", "it"}
 
 	f.Fuzz(func(t *testing.T, rowHTML string) {
-		sub, ok := p.parseRow(rowHTML, languages)
+		sub, ok := parseRow(rowHTML, languages)
 		if !ok {
 			return
 		}
@@ -38,8 +37,8 @@ func FuzzParseRow(f *testing.F) {
 		if sub.ID != sub.DownloadURL {
 			t.Errorf("parseRow ID = %q, want it to equal DownloadURL %q", sub.ID, sub.DownloadURL)
 		}
-		if sub.MatchedBy != api.MatchByIMDB {
-			t.Errorf("parseRow MatchedBy = %q, want %q", sub.MatchedBy, api.MatchByIMDB)
+		if sub.MatchedBy != subflux.MatchByIMDB {
+			t.Errorf("parseRow MatchedBy = %q, want %q", sub.MatchedBy, subflux.MatchByIMDB)
 		}
 	})
 }

@@ -100,21 +100,21 @@ auth:
 	if err != nil {
 		t.Fatalf("LoadFromBytes() unexpected error: %v", err)
 	}
-	oidc := cfg.OIDCConfig()
+	oidc := cfg.OIDC()
 	if oidc.IssuerURL != "https://auth.example.com/app/o/subflux/" {
-		t.Errorf("OIDCConfig().IssuerURL = %q, want %q", oidc.IssuerURL, "https://auth.example.com/app/o/subflux/")
+		t.Errorf("OIDC().IssuerURL = %q, want %q", oidc.IssuerURL, "https://auth.example.com/app/o/subflux/")
 	}
 	if oidc.ClientID != "my-client" {
-		t.Errorf("OIDCConfig().ClientID = %q, want %q", oidc.ClientID, "my-client")
+		t.Errorf("OIDC().ClientID = %q, want %q", oidc.ClientID, "my-client")
 	}
 	if oidc.ClientSecret != "my-secret" {
-		t.Errorf("OIDCConfig().ClientSecret = %q, want %q", oidc.ClientSecret, "my-secret")
+		t.Errorf("OIDC().ClientSecret = %q, want %q", oidc.ClientSecret, "my-secret")
 	}
 	if oidc.RedirectURI != "https://subflux.example.com/api/auth/oidc/callback" {
-		t.Errorf("OIDCConfig().RedirectURI = %q, want %q", oidc.RedirectURI, "https://subflux.example.com/api/auth/oidc/callback")
+		t.Errorf("OIDC().RedirectURI = %q, want %q", oidc.RedirectURI, "https://subflux.example.com/api/auth/oidc/callback")
 	}
 	if !oidc.AutoRedirect {
-		t.Error("OIDCConfig().AutoRedirect = false, want true")
+		t.Error("OIDC().AutoRedirect = false, want true")
 	}
 }
 

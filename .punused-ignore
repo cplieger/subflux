@@ -32,7 +32,7 @@
 internal/apipaths/paths.gen.go:
 
 # --- Generated cross-language wire contract: ErrorCode catalog ---------------
-# internal/api/error_codes.go is the machine-readable error-code catalog. The
+# internal/subflux/error_codes.go is the machine-readable error-code catalog. The
 # defined type (not an alias) exists so wiregen discovers it as a TS string
 # union: every flagged constant's VALUE appears in the generated
 # wire/types.gen.ts `ErrorCode` union AND in the hand-written
@@ -43,78 +43,127 @@ internal/apipaths/paths.gen.go:
 # NOTE for maintainers: 23 catalog entries have no Go emitter at all, which
 # contradicts this file's own "3+ call sites" header rule. That is a pending
 # product decision (see the review report), not a licence to grow the catalog.
-internal/api/error_codes.go:
+internal/subflux/error_codes.go:
 
-# --- api interface members forced by interface-to-interface assignment -------
-# Consumer packages declare NARROW config/store/client interfaces and are handed
-# a value whose static type is the WIDE api interface. Go permits that
-# assignment only while the wide interface declares every method the narrow one
-# needs, so these members are load-bearing even though no call site dials them
-# through the api interface. Proven by deleting each and building:
-#   MinScoreForTarget/ProvidersForTarget/ProviderPriority
-#     main.go:520 api.ConfigProvider -> search.SearchCfg
-#   PollInterval    internal/server/polling/poller.go:64
-#                   var _ PollerCfg = api.ConfigProvider(nil)
-#   EmbeddedPolicy  internal/server/coverage/count.go:15 and
-#                   queryhandlers/query.go:181 -> search.IgnoredCodecsFromConfig
-#   Ping (SonarrClient + RadarrClient)
-#                   confighandlers/handler.go:277,279 -> newArrPinger's
-#                   anonymous interface{ Ping(context.Context) error }
-#   UpsertSubtitleFile  server_init.go:182 api.Store -> manualops.DownloadStore
-#   DeleteSubtitleFile  filehandlers/handler.go:41 api.Store -> FileStore
-method ProvidersForTarget
-method MinScoreForTarget
-method ProviderPriority
-method PollInterval
+# --- Interface members reached only through a narrow interface --------------
+# A consumer declares a narrow interface and is handed a value of a wider type,
+# so gopls attributes the call to the narrow member and the declaration on the
+# other side looks unused. ONE entry is left, and it names its dialer:
+#   EmbeddedPolicy  coverage.CountCfg declares it (count.go) and the bound
+#                   missing-count closure dials it, but only the tests construct
+#                   a CountCfg directly, so gopls sees test-only use.
+#
+# `method Ping` was removed rather than re-justified. It was listed because
+# the two arr-client unions each DECLARED Ping while the connectivity
+# check dialled it through confighandlers' anonymous one-method interface, so the
+# two nine- and seven-method declarations looked unreferenced. Both are gone: the
+# ping surface is now confighandlers.ArrPinger, the check dials Ping through the
+# interface that declares it, and the composition root's server.SonarrClient /
+# server.RadarrClient embed ArrPinger instead of re-listing Ping. Verified by
+# re-running punused over internal/server (which cascades into every handler
+# subpackage), internal/server/confighandlers and internal/arrsvc — Ping is
+# reported nowhere.
+#
+# FIVE entries were removed here rather than re-justified, because the thing
+# that forced them is gone. MinScoreForTarget, ProvidersForTarget and
+# ProviderPriority were listed for `ConfigProvider -> search.SearchCfg`, and
+# PollInterval for a `var _ PollerCfg = ConfigProvider(nil)` assertion that
+# checked the wrong direction (that a 28-method interface still carried 5, true
+# of any superset). ConfigProvider is deleted: every consumer names the
+# config surface it calls, *config.Config is handed to those names directly, and
+# all four methods are now dialed through the interface that declares them.
+# Verified by re-running punused on internal/search, internal/server/polling and
+# internal/config — none of the four is reported any more.
+#
+# The two STORE members that used to sit here went the same way when the
+# whole-store interface was deleted.
 method EmbeddedPolicy
-method Ping
-method UpsertSubtitleFile
-method DeleteSubtitleFile
 
 # --- Concrete implementations reached only through their interface -----------
 # The mirror image of the block above: production dials these through an
 # interface, so gopls attributes the reference to the interface member and the
-# implementation looks unused. Each is pinned by a compile-time assertion that
-# fails if the method is removed (verified by renaming each and building):
-#   (*Config).EmbeddedPolicy   config_load.go:22 var _ api.ConfigProvider
-#                              config_accessors.go:19 var _ api.SearchConfigProvider
-#   (*Config).Validate         config_types.go:308 var _ Validator
-#   (*NopConfig).EmbeddedPolicy testsupport/nopconfig.go:38 var _ api.ConfigProvider
-#   (*NopStore).Close          testsupport/nopstore.go:13 var _ api.Store
-#   (*panicStore).Close        testsupport/panic_store.go:11 var _ api.Store
+# implementation looks unused.
+#   (*Config).EmbeddedPolicy   Dialed through the FOUR narrow interfaces that
+#                              declare it -- queryhandlers' queryCfg,
+#                              coveragehandlers' coverageCfg, coverage.CountCfg
+#                              and search.SearchCfg -- each of which is handed a
+#                              *config.Config by name at the composition root
+#                              (server_init.go, main.go's search.WithConfig).
+#                              Those typed parameters ARE the compile-time check
+#                              that used to be a `var _ ConfigProvider`
+#                              assertion in config_load.go: removing the method
+#                              breaks every one of the four assignments.
+#   (*Config).Validate         config_types.go var _ Validator. NOTE for
+#                              maintainers: this is the only reference. Nothing
+#                              in production calls Validate -- LoadFromBytes
+#                              calls the package-level validate(ctx, cfg)
+#                              directly -- and config.Validator's only consumer
+#                              is the test that asserts the two agree. The
+#                              interface, the method and that test form a closed
+#                              loop; whether the type should carry a
+#                              self-validation method at all is a pending
+#                              decision, not a licence to keep it.
+#
+# (*NopConfig).EmbeddedPolicy was removed: internal/testsupport/nopconfig.go is
+# deleted. It existed to satisfy ConfigProvider whole, and the seven
+# packages that shared its 28 no-op methods now each carry a fixture sized to
+# the interface their own subject names.
 method (*Config).EmbeddedPolicy
 method (*Config).Validate
-method (*NopConfig).EmbeddedPolicy
-method (*NopStore).Close
-method (*panicStore).Close
 
-# --- External-library store contract (cplieger/auth/v2) ---------------------
-# internal/authstore/authdb.go:16 asserts `var _ AuthStore = (*Store)(nil)`,
-# where AuthStore is a type alias of github.com/cplieger/auth/v2/store.Composite
-# (UserStore + SessionPersister + PasskeyStore + KeyStore + OIDCStateStore).
-# All ten methods below are members of that interface, verified in the resolved
-# auth/v2@v2.1.1 store package. Their callers are the auth library's own
-# authenticator, session, passkey, and API-key paths — a different module, which
-# is exactly what punused documents it cannot see. Removing any one breaks the
-# assertion at compile time (verified for UserCount).
-method (*Store).GetUserByID
-method (*Store).GetUserByEmail
-method (*Store).UserCount
-method (*Store).CreateSession
-method (*Store).GetSessionByHash
+# --- External-library store contract (cplieger/auth/v4) ---------------------
+# internal/authstore/authdb.go:27-31 asserts *Store against the auth library's
+# persistence SPI as FIVE separate role interfaces — auth.UserStore,
+# auth.SessionPersister, auth.PasskeyStore, auth.KeyStore, auth.OIDCStateStore —
+# so a failure names the role that broke. v4 merged the store SPI into the auth
+# root package, so there is no `store.Composite` and no `AuthStore` alias here
+# any more; the union subflux does declare is server.AuthStore, at the one site
+# that fans a single concrete store out to five consumers.
+# All FIVE methods below are members of those roles, and each is reported
+# EU1001 (referenced from tests only). Their production callers are the auth
+# library's own authenticator, session, passkey, and API-key paths — a different
+# module, which is exactly what punused documents it cannot see. Removing any
+# one breaks an assertion at compile time.
+#
+# FIVE MORE entries were removed rather than re-justified, because punused does
+# not report them: GetUserByID, UserCount, CreateSession, GetSessionByHash and
+# DeleteSession. Measured with the gate's own per-directory invocation
+# (`punused 'internal/authstore/*.go'`) — it names five methods here, and those
+# are not among them. subflux's OWN production code dials all five through the
+# interfaces that declare them: authhandlers.SessionStore and AccountStore
+# (server/authhandlers/iface.go:16-24), reached from auth_handlers.go:106-186
+# and auth_oidc_handlers.go:247. A cross-module exemption for a symbol the
+# module already references in production is a claim this file cannot support,
+# and the header calls that the difference between an adjudication and an
+# amnesty. If the interface hop ever disappears, the gate fails loudly and the
+# entry comes back with a real reason.
+#
+# This header was re-verified against v4 on 2026-08-19. It previously cited
+# auth/v2, a `store.Composite` alias, `authdb.go:16` (which is the `"time"`
+# import) and "the resolved auth/v2@v2.1.1 store package", a version that no
+# longer resolves. The methods were still correctly adjudicated; only the
+# evidence had rotted, which this file's own header calls the difference between
+# an adjudication and an amnesty.
+method (*Store).UserByEmail
 method (*Store).UpdateSessionActivity
-method (*Store).DeleteSession
-method (*Store).GetPasskeyByCredentialID
+method (*Store).PasskeyByCredentialID
 method (*Store).UpdatePasskeyAfterLogin
-method (*Store).GetAPIKeyByHash
+method (*Store).APIKeyByHash
+
+# The same library callback seen from the CONSUMER side: authhandlers.AccountStore
+# declares UpdatePasskeyAfterLogin (iface.go:30) because auth's CompleteLogin
+# performs that credential-custody write through the store it is handed. Nothing
+# in subflux calls it directly, and dropping it from the interface would silently
+# stop the sign-count and flag persistence a passkey replay check depends on.
+method UpdatePasskeyAfterLogin
 
 # --- fmt.Stringer pinned by a compile-time assertion ------------------------
 # Each of these has an explicit `var _ fmt.Stringer = T(...)` next to it, so the
 # method cannot be deleted without breaking the build (verified for MatchMethod:
-# api/types_search.go:140). The assertion names the TYPE, so punused still sees
+# subflux/types_search.go:137). The assertion names the TYPE, so punused still sees
 # the method as unreferenced.
-#   MatchMethod        api/types_search.go:140
-#   RegistryErrorKind  provider/registry.go:31 (also rendered by
+#   MatchMethod        subflux/types_search.go:140
+#   RegistryErrorKind  provider/registry.go:32 (also rendered by
 #                      RegistryError.Error's "registry error: %s" fallback)
 #   SyncMethod         subsync/confidence.go:25
 method (MatchMethod).String
@@ -143,13 +192,21 @@ method (*Pattern).String
 # --- error and errors-unwrap protocol members -------------------------------
 # Satisfying `error` is what makes these types returnable, and errors.Is/As
 # reach Unwrap through an anonymous interface inside the stdlib. Verified by
-# renaming: provider/registry.go:216 appends &RegistryError{} to a []error.
-# api.RateLimitError is returned as an error from httputil.go:72 and
+# renaming: provider/registry.go:255 appends &RegistryError{} to a []error.
+# subflux.RateLimitError is returned as an error from httpwire.go:72 and
 # betaseries.go:180; RegistryError.Unwrap is what lets registry_test.go:118's
 # errors.Is(err, cause) find the provider's own failure.
+# config's two structured validation errors are the same case: configFieldErr
+# returns *ValidationError as an `error` (config_validate.go:84) and
+# config_validate_search.go:25,:54 plus config_validate.go:142 hand
+# *FieldDependencyError to ve.Add and to fmt.Errorf's %w, so the message is
+# rendered through the error interface on the startup log and the config
+# response body. Deleting either Error breaks the build at those returns.
 method (*RateLimitError).Error
 method (*RegistryError).Error
 method (*RegistryError).Unwrap
+method (*ValidationError).Error
+method (*FieldDependencyError).Error
 
 # --- Decoders dispatched by reflection --------------------------------------
 # encoding/json and go.yaml.in/yaml call these through their Unmarshaler
@@ -163,10 +220,10 @@ method (*flexInt).UnmarshalJSON
 method (*FlexInt).UnmarshalJSON
 
 # --- container/heap interface -----------------------------------------------
-# dlcache passes &dc.h to heap.Fix/Push/Pop (dlcache.go:42,73,91), which
-# requires the full heap.Interface method set. Verified: renaming Len alone
-# breaks all three call sites at compile time. Push/Pop are called by the heap
-# package, never directly.
+# hdbits' download cache passes &dc.h to heap.Fix/Push/Pop
+# (hdbits/dlcache.go:46,77,95), which requires the full heap.Interface method
+# set. Verified: renaming Len alone breaks all three call sites at compile
+# time. Push/Pop are called by the heap package, never directly.
 method (entryHeap).Len
 method (entryHeap).Less
 method (entryHeap).Swap
@@ -192,7 +249,7 @@ constant NotifyInfo
 # Both fields are json-tagged and part of the generated TS contract, and NO Go
 # site populates either. They are whitelisted only to keep the gate at zero
 # while the removal decision is open; they are NOT healthy.
-#   ProviderTemplate (api/types.go:220) — `provider_template,omitempty` on
+#   ProviderTemplate (subflux/types.go:229) — `provider_template,omitempty` on
 #     SchemaSection. Never set, so never even serialized; the generated decoder
 #     treats it as optional and no TS module reads it.
 #   Variant (server/events/types.go:43) — `variant` on CoverageEvent, and
@@ -203,8 +260,33 @@ constant NotifyInfo
 field ProviderTemplate
 field Variant is unused
 
+# --- Embedded key reached only through field promotion ----------------------
+# ManualLockEntry embeds ManualLockKey untagged so encoding/json promotes the
+# quad and the entry marshals FLAT — the five-field wire shape registered at
+# wirespec.go:91 and emitted into the generated TS decoder. The field is
+# load-bearing twice over: it is the only source of the entry's four data
+# fields, and its untagged embedding IS the flat wire contract.
+#
+# It reads as unused because Go 1.27's struct-literal field selectors let every
+# construction site name the PROMOTED fields directly — boltstore/substate.go
+# :830 builds `ManualLockEntry{MediaType: ..., MediaID: ..., Language: ...,
+# Variant: ..., Count: ...}` — so no site spells `ManualLockKey:` any more.
+# gopls attributes a promoted-field reference to the inner field, never to the
+# embedding.
+#
+# The three resolutions the gate offers are all unavailable here, which is why
+# this is an adjudication and not laziness. Deleting the field deletes the
+# entry's data. Re-nesting it under a named field breaks the flat wire shape.
+# And "wiring it up" means re-spelling `ManualLockKey:` at one arbitrary
+# literal, which go fix's embedlit modernizer immediately flags again — the two
+# gates want opposite things at this one site, and only punused has an
+# adjudication channel. Verified: the sole Go consumer of GetManualLocks
+# (queryhandlers/query.go:104) hands the slice straight to WriteJSON, so no
+# caller wants the key as a value either.
+field ManualLockKey is unused
+
 # --- ScorePreview fields populated by a struct conversion -------------------
-# queryhandlers/query.go:250 writes `api.ScorePreview(result)` — a whole-struct
+# queryhandlers/query.go:252 writes `subflux.ScorePreview(result)` — a whole-struct
 # conversion from the engine's score result. gopls attributes no per-field
 # reference to a conversion, so all three fields look unused while in fact each
 # is serialized on POST /api/score and REQUIRED by decodeScorePreview

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -17,7 +17,7 @@ func TestLoadAll_property_invariants(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		n := rapid.IntRange(1, 10).Draw(rt, "num_providers")
 		r := NewRegistry()
-		cfgs := make(map[api.ProviderID]api.ProviderCfg)
+		cfgs := make(map[subflux.ProviderID]subflux.ProviderCfg)
 
 		var enabledNames []string
 		failIdx := -1
@@ -26,27 +26,27 @@ func TestLoadAll_property_invariants(t *testing.T) {
 		}
 
 		for i := range n {
-			name := api.ProviderID(strings.Repeat("p", i+1)) // unique names: "p", "pp", "ppp"...
+			name := subflux.ProviderID(strings.Repeat("p", i+1)) // unique names: "p", "pp", "ppp"...
 			state := rapid.IntRange(0, 2).Draw(rt, "state_"+string(name))
 			switch state {
 			case 0: // enabled
 				idx := i
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+				r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 					if idx == failIdx {
 						return nil, errors.New("factory error")
 					}
 					return &fakeProvider{name: string(name)}, nil
 				})
-				cfgs[name] = api.ProviderCfg{Enabled: true}
+				cfgs[name] = subflux.ProviderCfg{Enabled: true}
 				enabledNames = append(enabledNames, string(name))
 			case 1: // disabled
-				r.Register(name, func(_ context.Context, _ map[string]any) (api.Provider, error) {
+				r.Register(name, func(_ context.Context, _ map[string]any) (Provider, error) {
 					rt.Fatalf("disabled factory called for %s", name)
 					return nil, nil
 				})
-				cfgs[name] = api.ProviderCfg{Enabled: false}
+				cfgs[name] = subflux.ProviderCfg{Enabled: false}
 			case 2: // unknown (not registered, but in config)
-				cfgs[name] = api.ProviderCfg{Enabled: true}
+				cfgs[name] = subflux.ProviderCfg{Enabled: true}
 			}
 		}
 

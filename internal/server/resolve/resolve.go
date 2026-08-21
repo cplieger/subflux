@@ -28,8 +28,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
+	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
 // Sentinel errors; see the package doc for the handler status mapping.
@@ -49,7 +51,7 @@ var (
 
 // FileRef addresses exactly one stored subtitle file: the store row identity
 // (media_type, media_id, language, variant, source) plus the manual-sibling
-// ordinal parsed from the row's filename (api.ManualOrdinal; 0 = the
+// ordinal parsed from the row's filename (subtitlefile.ManualOrdinal; 0 = the
 // unnumbered auto file). A bare quad is NOT unique — manual ordinals share a
 // quad, and sync offsets are path-keyed in the store, so ambiguous
 // resolution would corrupt offset bookkeeping.
@@ -57,12 +59,12 @@ var (
 // MediaID is the store media identifier (e.g. "tmdb-1271",
 // "tvdb-121361-s01e05"), matching the /api/files wire fields.
 type FileRef struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   string        `json:"media_id"`
-	Language  string        `json:"language"`
-	Variant   string        `json:"variant"`
-	Source    string        `json:"source"`
-	Ordinal   int           `json:"ordinal,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   string            `json:"media_id"`
+	Language  string            `json:"language"`
+	Variant   string            `json:"variant"`
+	Source    string            `json:"source"`
+	Ordinal   int               `json:"ordinal,omitempty"`
 }
 
 // Validate checks the reference's field shape (not its existence). Only
@@ -75,7 +77,7 @@ func (ref *FileRef) Validate() error {
 	if ref.MediaID == "" || ref.Language == "" {
 		return errors.New("media_id and language are required")
 	}
-	if ref.Source != string(api.SourceExternal) {
+	if ref.Source != string(subflux.SourceExternal) {
 		return errors.New("source must be external (embedded tracks are not file-addressable)")
 	}
 	if ref.Ordinal < 0 {
@@ -90,10 +92,10 @@ func (ref *FileRef) Validate() error {
 // returns a stale store path. The json field names match the existing
 // download wire contract (media_id = arr ID).
 type MediaRef struct {
-	MediaType api.MediaType `json:"media_type"`
-	MediaID   int           `json:"media_id"`
-	Season    int           `json:"season,omitempty"`
-	Episode   int           `json:"episode,omitempty"`
+	MediaType subflux.MediaType `json:"media_type"`
+	MediaID   int               `json:"media_id"`
+	Season    int               `json:"season,omitempty"`
+	Episode   int               `json:"episode,omitempty"`
 }
 
 // Validate checks the reference's field shape (not its existence).
@@ -104,38 +106,40 @@ func (ref *MediaRef) Validate() error {
 	if ref.MediaID <= 0 {
 		return errors.New("media_id (arr id) is required")
 	}
-	if ref.MediaType == api.MediaTypeEpisode && (ref.Season < 0 || ref.Episode <= 0) {
+	if ref.MediaType == subflux.MediaTypeEpisode && (ref.Season < 0 || ref.Episode <= 0) {
 		return errors.New("season and episode are required for episodes")
 	}
 	return nil
 }
 
 // FileStore is the store surface resolution needs: the per-media subtitle
-// rows (key-derived identity incl. path; satisfied by api.Store).
+// rows (key-derived identity incl. path).
 type FileStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
 }
 
-// PathValidator is the containment check run on every resolved path as
-// defense-in-depth (satisfied by api.ConfigProvider).
-type PathValidator interface {
+// pathValidator is the containment check run on every resolved path as
+// defense-in-depth. ONE of the 37 values the configuration offers — resolution
+// derives its paths from the store and the arrs, so the only thing it asks the
+// config is whether the path it produced sits under a configured media root.
+type pathValidator interface {
 	ValidatePath(ctx context.Context, path string) error
 }
 
 // SonarrEpisodes is the Sonarr surface MediaRef resolution needs.
 type SonarrEpisodes interface {
-	GetEpisodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
+	Episodes(ctx context.Context, seriesID int) ([]arrapi.Episode, error)
 }
 
 // RadarrMovie is the Radarr surface MediaRef resolution needs.
 type RadarrMovie interface {
-	GetMovieByID(ctx context.Context, id int) (arrapi.Movie, error)
+	MovieByID(ctx context.Context, id int) (arrapi.Movie, error)
 }
 
 // State is the per-request snapshot of hot-reloadable dependencies. Arr
 // clients are nil when the corresponding arr is not configured.
 type State struct {
-	Cfg    PathValidator
+	Cfg    pathValidator
 	Sonarr SonarrEpisodes
 	Radarr RadarrMovie
 }
@@ -153,15 +157,15 @@ type Resolver struct {
 // State exactly once and threads the snapshot through, so a hot reload between
 // lookup and validation can never validate an old-generation path against
 // new-generation media roots.
-func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*api.SubtitleEntry, error) {
+func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*subflux.SubtitleEntry, error) {
 	if err := ref.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSubtitleNotFound, err)
 	}
-	rows, err := r.Store.GetSubtitleFiles(ctx, ref.MediaType, ref.MediaID)
+	rows, err := r.Store.SubtitleFiles(ctx, ref.MediaType, ref.MediaID)
 	if err != nil {
 		return nil, fmt.Errorf("subtitle rows for %s/%s: %w", ref.MediaType, ref.MediaID, err)
 	}
-	var match *api.SubtitleEntry
+	var match *subflux.SubtitleEntry
 	for i := range rows {
 		row := &rows[i]
 		if row.MediaID != ref.MediaID ||
@@ -171,7 +175,7 @@ func (r *Resolver) subtitleRow(ctx context.Context, st *State, ref *FileRef) (*a
 			row.Path == "" {
 			continue
 		}
-		if api.ManualOrdinal(row.Path) != ref.Ordinal {
+		if subtitlefile.ManualOrdinal(row.Path) != ref.Ordinal {
 			continue
 		}
 		if match != nil {
@@ -218,7 +222,7 @@ func (r *Resolver) VideoPathForFile(ctx context.Context, ref *FileRef) (string, 
 		}
 		return row.VideoPath, nil
 	}
-	rows, err := r.Store.GetSubtitleFiles(ctx, ref.MediaType, ref.MediaID)
+	rows, err := r.Store.SubtitleFiles(ctx, ref.MediaType, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("subtitle rows for %s/%s: %w", ref.MediaType, ref.MediaID, err)
 	}
@@ -256,9 +260,9 @@ func (r *Resolver) VideoPath(ctx context.Context, ref *MediaRef) (string, error)
 // dispatcher over the media type.
 func arrVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, error) {
 	switch ref.MediaType {
-	case api.MediaTypeMovie:
+	case subflux.MediaTypeMovie:
 		return movieVideoPath(ctx, st, ref)
-	case api.MediaTypeEpisode:
+	case subflux.MediaTypeEpisode:
 		return episodeVideoPath(ctx, st, ref)
 	default:
 		return "", fmt.Errorf("%w: unsupported media type %q", ErrMediaNotFound, ref.MediaType)
@@ -270,7 +274,7 @@ func movieVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, erro
 	if st == nil || st.Radarr == nil {
 		return "", fmt.Errorf("%w: radarr not configured", ErrMediaNotFound)
 	}
-	m, err := st.Radarr.GetMovieByID(ctx, ref.MediaID)
+	m, err := st.Radarr.MovieByID(ctx, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("%w: movie %d: %w", ErrMediaNotFound, ref.MediaID, err)
 	}
@@ -286,7 +290,7 @@ func episodeVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, er
 	if st == nil || st.Sonarr == nil {
 		return "", fmt.Errorf("%w: sonarr not configured", ErrMediaNotFound)
 	}
-	episodes, err := st.Sonarr.GetEpisodes(ctx, ref.MediaID)
+	episodes, err := st.Sonarr.Episodes(ctx, ref.MediaID)
 	if err != nil {
 		return "", fmt.Errorf("%w: series %d: %w", ErrMediaNotFound, ref.MediaID, err)
 	}
@@ -305,17 +309,15 @@ func episodeVideoPath(ctx context.Context, st *State, ref *MediaRef) (string, er
 
 // validateResolved runs the media-roots containment check on a resolved
 // path against the resolution's one State snapshot. Server-derived paths
-// should never fail it, so a failure logs at ERROR (invariant breach) and
-// maps to a 500-class error, never a 4xx.
+// should never fail it, so a failure maps to a 500-class error, never a 4xx;
+// WriteError's InternalErrorC is where it is logged, so both failure reasons
+// travel in the error rather than being logged here as well.
 func validateResolved(ctx context.Context, st *State, path string) error {
 	if st == nil || st.Cfg == nil {
-		slog.Error("resolve: no config available for containment validation", "path", path)
-		return ErrPathInvariant
+		return fmt.Errorf("%w: no config available to validate %s", ErrPathInvariant, path)
 	}
 	if err := st.Cfg.ValidatePath(ctx, path); err != nil {
-		slog.Error("resolve: server-derived path failed containment validation (invariant breach)",
-			"path", path, "error", err)
-		return fmt.Errorf("%w: %w", ErrPathInvariant, err)
+		return fmt.Errorf("%w: server-derived path %s: %w", ErrPathInvariant, path, err)
 	}
 	return nil
 }
@@ -327,11 +329,11 @@ func validateResolved(ctx context.Context, st *State, path string) error {
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrMediaNotFound):
-		api.NotFoundC(w, r, api.CodeMediaNotFound, "media not found")
+		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "media not found")
 	case errors.Is(err, ErrSubtitleNotFound):
-		api.NotFoundC(w, r, api.CodeSubtitleNotFound, "subtitle not found")
+		httpapi.NotFoundC(w, r, subflux.CodeSubtitleNotFound, "subtitle not found")
 	default:
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reference resolution")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "reference resolution")
 	}
 }
 
@@ -341,17 +343,17 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 // Shape errors are returned for the handler's 400.
 func FileRefFromQuery(q url.Values) (*FileRef, error) {
 	ref := &FileRef{
-		MediaType: api.MediaType(q.Get("media_type")),
+		MediaType: subflux.MediaType(q.Get("media_type")),
 		MediaID:   q.Get("media_id"),
 		Language:  q.Get("language"),
 		Variant:   q.Get("variant"),
 		Source:    q.Get("source"),
 	}
 	if ref.Variant == "" {
-		ref.Variant = string(api.VariantStandard)
+		ref.Variant = string(subflux.VariantStandard)
 	}
 	if ref.Source == "" {
-		ref.Source = string(api.SourceExternal)
+		ref.Source = string(subflux.SourceExternal)
 	}
 	if o := q.Get("ordinal"); o != "" {
 		n, err := strconv.Atoi(o)
@@ -370,7 +372,7 @@ func FileRefFromQuery(q url.Values) (*FileRef, error) {
 // (media_type, media_id [arr id], season, episode). Shape errors are
 // returned for the handler's 400.
 func MediaRefFromQuery(q url.Values) (*MediaRef, error) {
-	ref := &MediaRef{MediaType: api.MediaType(q.Get("media_type"))}
+	ref := &MediaRef{MediaType: subflux.MediaType(q.Get("media_type"))}
 	var err error
 	if ref.MediaID, err = strconv.Atoi(q.Get("media_id")); err != nil {
 		return nil, errors.New("media_id (arr id) must be an integer")

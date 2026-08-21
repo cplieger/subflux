@@ -3,7 +3,7 @@ package search
 import (
 	"context"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TrackDetector detects embedded subtitle tracks in video containers.
@@ -15,7 +15,7 @@ type TrackDetector interface {
 	// the error policy: log/metric observability, fail-open search, and
 	// skipping the coverage replacement so a failed probe never deletes
 	// persisted rows. (nil, nil) means "no tracks", distinct from an error.
-	DetectTracks(ctx context.Context, videoPath string) ([]api.EmbeddedTrack, error)
+	DetectTracks(ctx context.Context, videoPath string) ([]subflux.EmbeddedTrack, error)
 }
 
 // NoopDetector is an explicit no-detection TrackDetector for callers that
@@ -24,6 +24,6 @@ type TrackDetector interface {
 type NoopDetector struct{}
 
 // DetectTracks reports no embedded tracks.
-func (NoopDetector) DetectTracks(_ context.Context, _ string) ([]api.EmbeddedTrack, error) {
+func (NoopDetector) DetectTracks(_ context.Context, _ string) ([]subflux.EmbeddedTrack, error) {
 	return nil, nil
 }

@@ -77,7 +77,7 @@ const corpusGenProcedure = "generate the manifest once on the dev box with " +
 	"go test -tags=corpus ./internal/subsync -run TestCorpusArbitration -count=1 -timeout=0" +
 	", then commit testdata/corpus-manifest.tsv"
 
-// corpusRefMarker values for the manifest reference column.
+// Reference-column values for the manifest.
 const (
 	corpusRefEmbedded = "embedded"
 	corpusRefNone     = "no-reference"

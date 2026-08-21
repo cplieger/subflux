@@ -5,25 +5,30 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- GET /api/auth/apikeys ---
 
 // HandleListAPIKeys handles GET /api/auth/apikeys — lists API keys for the current user.
 func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	keys, err := h.SecDB.ListAPIKeysByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("list api keys: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	out := make([]APIKeyInfo, 0, len(keys))
-	for _, k := range keys {
+	// Indexed rather than a value range: auth.Key crossed gocritic's copy
+	// threshold when ExpiresAt became a time.Time value, and this projection reads
+	// five fields of it.
+	for i := range keys {
+		k := &keys[i]
 		out = append(out, APIKeyInfo{
 			ID:        k.ID,
 			KeyPrefix: k.KeyPrefix,
@@ -33,14 +38,14 @@ func (h *Handler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // --- POST /api/auth/apikeys ---
 
 // HandleGenerateAPIKey handles POST /api/auth/apikeys — generates a new API key for the current user.
 func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	req, ok := decodeAuthBody[struct {
 		Label string `json:"label"`
@@ -50,17 +55,11 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len([]rune(req.Label)) > maxAPIKeyLabelLen {
-		api.BadRequestC(w, r, api.CodeBadRequest, "label too long")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "label too long")
 		return
 	}
 
-	plaintext, hash, prefix, suffix, err := auth.GenerateAPIKey("sfx_")
-	if err != nil {
-		slog.Error("generate api key: generate", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
-		return
-	}
-
+	plaintext, hash, prefix, suffix := auth.GenerateAPIKey("sfx_")
 	now := time.Now()
 	apiKey := &auth.Key{
 		UserID:    user.ID,
@@ -73,14 +72,14 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.SecDB.CreateAPIKey(r.Context(), apiKey); err != nil {
 		slog.Error("generate api key: store", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: API key generated",
 		"username", user.Username, "label", req.Label, "ip", ClientIP(r))
 
-	api.WriteJSON(w, api.KeyGenerated{
+	httpapi.WriteJSON(w, subflux.KeyGenerated{
 		ID:        apiKey.ID,
 		Key:       plaintext,
 		KeyPrefix: prefix,
@@ -97,23 +96,23 @@ func (h *Handler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 // HandleRevokeAPIKey handles DELETE /api/auth/apikeys/{id} — revokes an API key owned by the current user.
 func (h *Handler) HandleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
-	user := api.UserFromContext(r.Context())
+	user := UserFromContext(r.Context())
 
 	keyID, ok := parseIDFromPath(w, r.URL.Path, "/api/auth/apikeys/", "api key id")
 	if !ok {
 		return
 	}
 
-	if err := h.SecDB.DeleteAPIKey(r.Context(), keyID, user.ID); err != nil {
+	if err := h.SecDB.DeleteAPIKey(r.Context(), auth.KeyRef{ID: keyID, UserID: user.ID}); err != nil {
 		slog.Error("revoke api key: db error", "error", err)
-		api.InternalErrorC(w, r, nil, api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
 		return
 	}
 
 	slog.Info("security: API key revoked",
 		"username", user.Username, "key_id", keyID, "ip", ClientIP(r))
 
-	api.Ok(w)
+	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditAPIKeyRevoke, true, user.Username,
 		slog.Int64("key_id", keyID))
 }

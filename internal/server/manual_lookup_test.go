@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/manualops"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- lookupMediaTitle ---
@@ -14,25 +15,25 @@ import (
 // movieTitleArrClient returns a movie with a known title.
 type movieTitleArrClient struct{ dummyArrClient }
 
-func (movieTitleArrClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+func (movieTitleArrClient) MovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
 	return arrapi.Movie{Title: "Inception", TmdbID: 27205}, nil
 }
 
 // seriesTitleArrClient returns a series with a known title.
 type seriesTitleArrClient struct{ dummyArrClient }
 
-func (seriesTitleArrClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+func (seriesTitleArrClient) SeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
 	return arrapi.Series{Title: "Breaking Bad", TvdbID: 81189}, nil
 }
 
-// arrErrorClient returns errors from GetMovieByID and GetSeriesByID.
+// arrErrorClient returns errors from MovieByID and SeriesByID.
 type arrErrorClient struct{ dummyArrClient }
 
-func (arrErrorClient) GetMovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
+func (arrErrorClient) MovieByID(_ context.Context, _ int) (arrapi.Movie, error) {
 	return arrapi.Movie{}, errMock
 }
 
-func (arrErrorClient) GetSeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
+func (arrErrorClient) SeriesByID(_ context.Context, _ int) (arrapi.Series, error) {
 	return arrapi.Series{}, errMock
 }
 
@@ -40,10 +41,10 @@ func TestLookupMediaTitle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr    api.RadarrClient
-		sonarr    api.SonarrClient
+		radarr    RadarrClient
+		sonarr    SonarrClient
 		name      string
-		mediaType api.MediaType
+		mediaType subflux.MediaType
 		want      string
 		arrID     int
 	}{
@@ -65,7 +66,7 @@ func TestLookupMediaTitle(t *testing.T) {
 				radarr: tt.radarr,
 				sonarr: tt.sonarr,
 			}
-			got := lookupMediaTitle(t.Context(), ls, tt.mediaType, tt.arrID)
+			got := manualops.LookupMediaTitle(t.Context(), manualLiveState(ls), tt.mediaType, tt.arrID)
 			if got != tt.want {
 				t.Errorf("lookupMediaTitle(ctx, ls, %q, %d) = %q, want %q",
 					tt.mediaType, tt.arrID, got, tt.want)
@@ -80,7 +81,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr api.RadarrClient
+		radarr RadarrClient
 		name   string
 		want   string
 		arrID  int
@@ -100,7 +101,7 @@ func TestLookupMovieMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{radarr: tt.radarr})
 
-			got := s.lookupMovieMediaID(t.Context(), s.state(), tt.arrID)
+			got := manualops.LookupMovieMediaID(t.Context(), manualLiveState(s.state()), tt.arrID)
 			if got != tt.want {
 				t.Errorf("lookupMovieMediaID(ctx, ls, %d) = %q, want %q",
 					tt.arrID, got, tt.want)
@@ -115,7 +116,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		sonarr  api.SonarrClient
+		sonarr  SonarrClient
 		name    string
 		want    string
 		series  int
@@ -137,7 +138,7 @@ func TestLookupEpisodeMediaID(t *testing.T) {
 			}
 			s.live.Store(&liveState{sonarr: tt.sonarr})
 
-			got := s.lookupEpisodeMediaID(t.Context(), s.state(), tt.series, tt.season, tt.episode)
+			got := manualops.LookupEpisodeMediaID(t.Context(), manualLiveState(s.state()), tt.series, tt.season, tt.episode)
 			if got != tt.want {
 				t.Errorf("lookupEpisodeMediaID(ctx, ls, %d, %d, %d) = %q, want %q",
 					tt.series, tt.season, tt.episode, got, tt.want)
@@ -150,10 +151,10 @@ func TestResolveMediaIDs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		radarr       api.RadarrClient
-		sonarr       api.SonarrClient
+		radarr       RadarrClient
+		sonarr       SonarrClient
 		name         string
-		mediaType    api.MediaType
+		mediaType    subflux.MediaType
 		wantCoverage string
 		wantHistory  string
 		arrID        int
@@ -251,8 +252,8 @@ func TestResolveMediaIDs(t *testing.T) {
 			}
 			s.live.Store(&liveState{radarr: tt.radarr, sonarr: tt.sonarr})
 
-			coverageID, historyID := s.resolveMediaIDs(
-				t.Context(), s.state(),
+			coverageID, historyID := manualops.ResolveMediaIDs(
+				t.Context(), manualLiveState(s.state()),
 				tt.mediaType, tt.arrID, tt.season, tt.episode,
 			)
 			if coverageID != tt.wantCoverage {

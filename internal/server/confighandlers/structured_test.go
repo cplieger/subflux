@@ -10,23 +10,29 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
+	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// Abort vs report in this file: a save's status is a value mismatch and
+// reports with t.Errorf, because what the handler wrote to disk is an
+// independent fact worth seeing either way. The GET in the round-trip test
+// keeps t.Fatalf: its body is the save's INPUT, so past a failed GET the
+// save-back asserts on an error envelope.
 
 // --- test fixtures ---
 
 // structuredTestSchema is a compact stand-in for the real schema: one plain
 // section with a secret, one providers section with a secret setting.
-func structuredTestSchema() []api.SchemaSection {
-	return []api.SchemaSection{
-		{Key: "sonarr", Type: "fields", Fields: []api.SchemaField{
+func structuredTestSchema() []subflux.SchemaSection {
+	return []subflux.SchemaSection{
+		{Key: "sonarr", Type: "fields", Fields: []subflux.SchemaField{
 			{Key: "url"},
 			{Key: "api_key", Secret: true},
 		}},
-		{Key: "providers", Type: "providers", Providers: []api.ProviderSchema{
-			{Name: "opensubtitles", Settings: []api.SchemaField{
+		{Key: "providers", Type: "providers", Providers: []subflux.ProviderSchema{
+			{Name: "opensubtitles", Settings: []subflux.SchemaField{
 				{Key: "username"},
 				{Key: "password", Secret: true},
 			}},
@@ -54,34 +60,32 @@ func newStructuredHandler(t *testing.T, existingYAML string) (*Handler, string) 
 // failure tests) and an optional hot-reload hook for tests that must observe
 // whether activation happened. A nil hook succeeds silently.
 func newStructuredHandlerAt(t *testing.T, cfgPath string,
-	hotReload func(context.Context, api.ConfigProvider) error,
+	hotReload func(context.Context, *config.Config) error,
 ) *Handler {
 	t.Helper()
 	if hotReload == nil {
-		hotReload = func(context.Context, api.ConfigProvider) error { return nil }
+		hotReload = func(context.Context, *config.Config) error { return nil }
 	}
 	return New(&Deps{
-		SchemaFunc: func(_ []api.ProviderSchema) []api.SchemaSection { return structuredTestSchema() },
-		LoadConfig: func(data []byte) (api.ConfigProvider, error) {
+		SchemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection { return structuredTestSchema() },
+		LoadConfig: func(data []byte) (*config.Config, error) {
 			return config.LoadFromBytes(t.Context(), data)
 		},
 		HotReload:  hotReload,
 		State:      func() StateView { return StateView{} },
 		ConfigPath: func() string { return cfgPath },
-		NewSonarr:  func(_, _ string) (api.SonarrClient, error) { return pingOKSonarr{}, nil },
-		NewRadarr:  func(_, _ string) (api.RadarrClient, error) { return pingOKRadarr{}, nil },
+		NewSonarr:  func(_, _ string) (ArrPinger, error) { return pingOK{}, nil },
+		NewRadarr:  func(_, _ string) (ArrPinger, error) { return pingOK{}, nil },
 	})
 }
 
-// pingOKSonarr / pingOKRadarr satisfy the arr client interfaces for the
-// connectivity check only; any other method panics via the embedded nil.
-type pingOKSonarr struct{ api.SonarrClient }
+// pingOK is the whole arr surface this package's tests need, because ArrPinger
+// is the whole arr surface this package has. It replaces two fakes that each
+// embedded a nine- and seven-method interface to panic on the eight and six
+// methods no config save ever called.
+type pingOK struct{}
 
-func (pingOKSonarr) Ping(context.Context) error { return nil }
-
-type pingOKRadarr struct{ api.RadarrClient }
-
-func (pingOKRadarr) Ping(context.Context) error { return nil }
+func (pingOK) Ping(context.Context) error { return nil }
 
 func doStructuredSave(t *testing.T, h *Handler, payload string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -134,11 +138,11 @@ languages:
 	h.saveMu.Unlock()
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
+		t.Errorf("applyConfig(over-cap payload) status = %d, want 413\nbody: %s", rec.Code, rec.Body)
 	}
-	if !strings.Contains(rec.Body.String(), string(api.CodeConfigTooLarge)) {
+	if !strings.Contains(rec.Body.String(), string(subflux.CodeConfigTooLarge)) {
 		t.Errorf("applyConfig(over-cap payload) body = %q, want error code %q",
-			rec.Body, api.CodeConfigTooLarge)
+			rec.Body, subflux.CodeConfigTooLarge)
 	}
 	if _, err := os.Stat(cfgPath); err == nil {
 		t.Error("over-cap payload landed on disk, want no file")
@@ -160,8 +164,8 @@ languages:
 // does not understand.
 func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 	t.Parallel()
-	full := schema.Schema([]api.ProviderSchema{{
-		Name: "probe", Settings: []api.SchemaField{
+	full := schema.Sections([]subflux.ProviderSchema{{
+		Name: "probe", Settings: []subflux.SchemaField{
 			{Key: "api_key", Secret: true},
 			{Key: "password", Secret: true},
 		},
@@ -169,8 +173,8 @@ func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 
 	// Count Secret:true declarations by direct walk (the test's own oracle).
 	var wantCount int
-	var countFields func(fields []api.SchemaField)
-	countFields = func(fields []api.SchemaField) {
+	var countFields func(fields []subflux.SchemaField)
+	countFields = func(fields []subflux.SchemaField) {
 		for _, f := range fields {
 			if f.Secret {
 				wantCount++
@@ -187,10 +191,10 @@ func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 
 	paths := secretPaths(full)
 	if len(paths) != wantCount {
-		t.Fatalf("secretPaths found %d paths, schema declares %d Secret fields", len(paths), wantCount)
+		t.Errorf("secretPaths found %d paths, schema declares %d Secret fields", len(paths), wantCount)
 	}
 	if wantCount == 0 {
-		t.Fatal("schema declares zero secrets; the walker has nothing to protect (schema regression?)")
+		t.Error("schema declares zero secrets; the walker has nothing to protect (schema regression?)")
 	}
 }
 
@@ -207,7 +211,7 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, err := os.ReadFile(cfgPath)
@@ -219,10 +223,10 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("saved YAML does not round-trip through LoadFromBytes: %v\n%s", err, saved)
 	}
-	if got := cfg.SonarrConfig().APIKey; got != "k1" {
+	if got := cfg.Sonarr().APIKey; got != "k1" {
 		t.Errorf("round-tripped sonarr api_key = %q, want k1", got)
 	}
-	pc := cfg.ProviderConfigs()["opensubtitles"]
+	pc := cfg.Providers()["opensubtitles"]
 	if !pc.Enabled || pc.Settings["password"] != "p" {
 		t.Errorf("round-tripped provider config = %+v, want enabled with password p", pc)
 	}
@@ -255,7 +259,7 @@ languages:
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, _ := os.ReadFile(cfgPath)
@@ -300,7 +304,7 @@ languages:
 	}}`
 	rec := doStructuredSave(t, h, payload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("structured save status = %d, body %s", rec.Code, rec.Body.String())
 	}
 	saved, _ := os.ReadFile(cfgPath)
 	if strings.Contains(string(saved), "old-password") {
@@ -400,7 +404,7 @@ providers:
 
 	rec := doStructuredSave(t, h, getRec.Body.String())
 	if rec.Code != http.StatusOK {
-		t.Fatalf("save-back status = %d, body %s", rec.Code, rec.Body.String())
+		t.Errorf("save-back status = %d, body %s", rec.Code, rec.Body.String())
 	}
 
 	saved, _ := os.ReadFile(cfgPath)
@@ -412,10 +416,10 @@ providers:
 	if err != nil {
 		t.Fatalf("original config does not load: %v", err)
 	}
-	if got, want := cfg.SonarrConfig(), orig.SonarrConfig(); got != want {
+	if got, want := cfg.Sonarr(), orig.Sonarr(); got != want {
 		t.Errorf("sonarr config drifted: got %+v, want %+v", got, want)
 	}
-	gotPC, wantPC := cfg.ProviderConfigs()["opensubtitles"], orig.ProviderConfigs()["opensubtitles"]
+	gotPC, wantPC := cfg.Providers()["opensubtitles"], orig.Providers()["opensubtitles"]
 	if gotPC.Enabled != wantPC.Enabled || gotPC.Settings["password"] != wantPC.Settings["password"] {
 		t.Errorf("provider config drifted: got %+v, want %+v", gotPC, wantPC)
 	}
@@ -552,7 +556,7 @@ func TestStructuredSave_baseline_read_error_fails_closed(t *testing.T) {
 	t.Parallel()
 	reloadCalled := false
 	h := newStructuredHandlerAt(t, t.TempDir(), // a directory: open succeeds, read fails
-		func(context.Context, api.ConfigProvider) error { reloadCalled = true; return nil })
+		func(context.Context, *config.Config) error { reloadCalled = true; return nil })
 
 	rec := doStructuredSave(t, h, keepSecretsPayloadEmptyScalar)
 	if rec.Code != http.StatusInternalServerError {
@@ -595,7 +599,7 @@ func TestStructuredSave_malformed_baseline_fails_closed(t *testing.T) {
 			}
 			reloadCalled := false
 			h := newStructuredHandlerAt(t, cfgPath,
-				func(context.Context, api.ConfigProvider) error { reloadCalled = true; return nil })
+				func(context.Context, *config.Config) error { reloadCalled = true; return nil })
 
 			rec := doStructuredSave(t, h, tt.payload)
 			if rec.Code != http.StatusInternalServerError {
@@ -629,11 +633,11 @@ func TestStructuredSave_baseline_failure_with_explicit_secrets_saves(t *testing.
 	}
 	reloads := 0
 	h := newStructuredHandlerAt(t, cfgPath,
-		func(context.Context, api.ConfigProvider) error { reloads++; return nil })
+		func(context.Context, *config.Config) error { reloads++; return nil })
 
 	rec := doStructuredSave(t, h, explicitSecretsPayload)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("explicit-secrets save over corrupt baseline status = %d, body %s",
+		t.Errorf("explicit-secrets save over corrupt baseline status = %d, body %s",
 			rec.Code, rec.Body.String())
 	}
 	if reloads != 1 {
@@ -677,7 +681,7 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 
 			rec := doStructuredSave(t, h, keepSecretsPayloadEmptyScalar)
 			if rec.Code != http.StatusOK {
-				t.Fatalf("keep-semantics save over empty baseline status = %d, body %s",
+				t.Errorf("keep-semantics save over empty baseline status = %d, body %s",
 					rec.Code, rec.Body.String())
 			}
 			saved, err := os.ReadFile(cfgPath)
@@ -688,7 +692,7 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("saved config does not load: %v\n%s", err, saved)
 			}
-			if got := cfg.ProviderConfigs()["opensubtitles"].Settings["password"]; got != "" {
+			if got := cfg.Providers()["opensubtitles"].Settings["password"]; got != "" {
 				t.Errorf("password = %v, want empty (nothing to keep in an empty baseline)", got)
 			}
 		})

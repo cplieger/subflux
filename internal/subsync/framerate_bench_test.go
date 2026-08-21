@@ -14,7 +14,7 @@ func BenchmarkCorrectFramerate(b *testing.B) {
 		inc := makeFramerateDriftCues(n, 1.001)
 		b.Run(cueCountLabel(n), func(b *testing.B) {
 			b.ReportAllocs()
-			for range b.N {
+			for b.Loop() {
 				correctFramerate(b.Context(), ref, inc, "")
 			}
 		})

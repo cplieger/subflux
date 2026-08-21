@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/xmlx"
 )
 
@@ -21,7 +21,7 @@ import (
 
 // buildEpisodeCacheKey builds the episodeCache key for a series and
 // episode number string. Numeric episode numbers are normalized to their
-// integer form so lookups from getEpisodeID (which builds the same key from
+// integer form so lookups from episodeID (which builds the same key from
 // an int) match regardless of leading zeros or whitespace in the source XML.
 // Non-numeric episode numbers (S1/C1/T1 for specials, credits, trailers)
 // use the trimmed raw string.
@@ -34,7 +34,7 @@ import (
 // yields another episode's AniDB episode id, animetosho searches by that id
 // (searchByEpisodeID), and the WRONG episode's subtitle is scored and written
 // next to this video, where it then counts as covered and is never retried.
-// This key is built here (write side, from the XML) and in getEpisodeID (read
+// This key is built here (write side, from the XML) and in episodeID (read
 // side, from the resolved episode number); both must stay on this grammar or
 // every lookup misses. Ordinary epNos carry neither ':' nor '\', so the bytes
 // are unchanged.
@@ -63,7 +63,7 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 	return nil
 }
 
-// getEpisodeID returns the AniDB episode ID for a series+episode pair.
+// episodeID returns the AniDB episode ID for a series+episode pair.
 // Fetches and caches all episodes from the series on first access.
 //
 // Concurrent callers for the same seriesID coalesce via singleflight:
@@ -81,7 +81,7 @@ func (m *Mapper) rateLimitAniDB(ctx context.Context) error {
 // exactly; it is used anyway so the two sides share one encoder rather than
 // two format strings that can drift apart. See buildEpisodeCacheKey for what a
 // collision costs.
-func (m *Mapper) getEpisodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
+func (m *Mapper) episodeID(ctx context.Context, seriesID, episodeNo int) (int, error) {
 	cacheKey := keyenc.Join(strconv.Itoa(seriesID), strconv.Itoa(episodeNo))
 
 	// Fast path: already cached.
@@ -151,9 +151,11 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 
 	reqURL := fmt.Sprintf(
 		"%s?request=anime&client=%s&clientver=%d&protover=1&aid=%d",
-		apiURL, url.QueryEscape(m.clientKey), clientVer, seriesID)
+		apiURL, url.QueryEscape(m.clientKey), clientVer, seriesID,
+	)
 	req, err := http.NewRequestWithContext(
-		fetchCtx, http.MethodGet, reqURL, http.NoBody)
+		fetchCtx, http.MethodGet, reqURL, http.NoBody,
+	)
 	if err != nil {
 		return err
 	}
@@ -163,19 +165,19 @@ func (m *Mapper) cacheEpisodes(ctx context.Context, seriesID int) error {
 	}
 	defer resp.Body.Close()
 
-	if statusErr := httputil.CheckHTTPStatus(resp); statusErr != nil {
+	if statusErr := httpwire.CheckHTTPStatus(resp); statusErr != nil {
 		return statusErr
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes+1))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes+1))
 	if err != nil {
 		return err
 	}
-	if int64(len(data)) > httputil.MaxJSONResponseBytes {
-		return fmt.Errorf("anidb episode XML exceeded %d bytes", httputil.MaxJSONResponseBytes)
+	if int64(len(data)) > httpwire.MaxJSONResponseBytes {
+		return fmt.Errorf("anidb episode XML exceeded %d bytes", httpwire.MaxJSONResponseBytes)
 	}
 
-	data, err = decompressIfGzipped(data, httputil.MaxJSONResponseBytes)
+	data, err = decompressIfGzipped(data, httpwire.MaxJSONResponseBytes)
 	if err != nil {
 		return fmt.Errorf("anidb: episodes decompress: %w", err)
 	}

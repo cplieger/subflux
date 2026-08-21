@@ -1,0 +1,233 @@
+package subflux
+
+import "time"
+
+// --- Query parameter structs ---
+
+// StateQuery groups the filter parameters for Store.State.
+// Using a named struct (rather than positional string/int arguments)
+// makes call sites self-documenting and prevents silent swaps of
+// same-typed fields like Language/Provider/Search.
+type StateQuery struct {
+	MediaType MediaType
+	Language  string
+	Provider  ProviderID
+	Search    string
+	Limit     int
+	Offset    int
+}
+
+// ScanRecord groups the parameters for CoverageStore.RecordScanState.
+type ScanRecord struct {
+	MediaType MediaType
+	MediaID   string
+	Title     string
+	AudioLang string
+	Season    int
+	Episode   int
+	// Searched records whether provider work actually ran to completion for
+	// this stamp. False for inventory-only visits (scan skip paths record
+	// coverage without searching); the resume set and staleness displays can
+	// distinguish "we looked at the disk" from "we searched providers".
+	Searched bool
+}
+
+// --- Store types (canonical, moved from store package) ---
+
+// BackoffParams groups adaptive backoff configuration for RecordNoResult.
+type BackoffParams struct {
+	InitialDelay time.Duration
+	MaxDelay     time.Duration
+	Multiplier   float64
+}
+
+// DownloadRecord groups the parameters for Store.SaveDownload.
+// Using a named struct (rather than positional string arguments)
+// makes call sites self-documenting and prevents silent swaps of
+// same-typed fields like Language/ProviderName.
+type DownloadRecord struct {
+	Meta         *DownloadMeta
+	MediaType    MediaType
+	MediaID      string
+	Language     string
+	Variant      Variant // subtitle variant (standard/hi/forced); empty is normalized to standard
+	ProviderName ProviderID
+	ReleaseName  string
+	Path         string
+	Score        int
+}
+
+// DownloadMeta holds optional metadata for a subtitle state record.
+type DownloadMeta struct {
+	Title      string
+	ImdbID     string
+	ReleaseTag string
+	VideoPath  string // Path to the video file (for reconciliation and upgrades).
+	Season     int
+	Episode    int
+	Manual     bool // True if user manually selected this subtitle.
+}
+
+// DownloadedRef identifies a previously-downloaded subtitle by its
+// release name and provider. Returned by Store.DownloadedRefs to mark
+// matching entries in the manual search popup as already on disk.
+type DownloadedRef struct {
+	ReleaseName string
+	Provider    ProviderID
+}
+
+// StateEntry represents a subtitle state record for API responses.
+type StateEntry struct {
+	MediaImported time.Time  `json:"media_imported"`
+	Title         string     `json:"title"`
+	MediaID       string     `json:"media_id"`
+	Language      string     `json:"language"`
+	Variant       Variant    `json:"variant"`
+	Provider      ProviderID `json:"provider"`
+	Path          string     `json:"path"`
+	ReleaseName   string     `json:"release_name"`
+	ImdbID        string     `json:"imdb_id,omitempty"`
+	MediaType     MediaType  `json:"media_type"`
+	ID            int64      `json:"id"`
+	Score         int        `json:"score"`
+	Season        int        `json:"season,omitempty"`
+	Episode       int        `json:"episode,omitempty"`
+	Manual        bool       `json:"manual"`
+}
+
+// BackoffEntry represents an item in adaptive search backoff.
+type BackoffEntry struct {
+	LastTried time.Time  `json:"last_tried"`
+	NextRetry time.Time  `json:"next_retry"`
+	MediaType MediaType  `json:"media_type"`
+	MediaID   string     `json:"media_id"`
+	Language  string     `json:"language"`
+	Provider  ProviderID `json:"provider"`
+	Failures  int        `json:"failures"`
+}
+
+// ManualLockKey addresses one manual-override lock: the (media_type, media_id,
+// language, variant) quad the lock lives on. Passing the quad as a named
+// struct rather than four positional arguments keeps MediaID and Language —
+// two adjacent strings — from being silently transposed at a call site, which
+// would compile and address the wrong lock.
+//
+// An empty Variant is a WILDCARD, and what it means is per method, not per
+// type: IsManuallyLocked, ClearManualLock and ManualSubtitlePaths read it as
+// "any/all variants of the language", while ManualDownloadCount and
+// NextManualNumber require an exact variant (a lock count and an ordinal
+// sequence are both per variant). Each method's doc on Store states which it
+// is.
+//
+// The json tags serve ManualLockEntry, which embeds this type and must keep
+// marshalling the quad flat under its established wire names.
+type ManualLockKey struct {
+	MediaType MediaType `json:"media_type"`
+	MediaID   string    `json:"media_id"`
+	Language  string    `json:"language"`
+	Variant   Variant   `json:"variant"`
+}
+
+// ManualLockEntry represents a manually locked media+language+variant quad:
+// the quad the lock lives on plus that quad's manual-row count.
+type ManualLockEntry struct {
+	// The key is embedded untagged, so encoding/json promotes its four fields
+	// and the entry marshals FLAT — the wire shape stays the five fields it
+	// has always been (wiregen applies the same promotion rules).
+	ManualLockKey
+	Count int `json:"count"`
+}
+
+// PollKey identifies an arr-source poll-timestamp row in the store.
+// Using a typed string instead of bare string prevents typo-induced
+// silent failures (e.g. "Sonarr" capitalization or "sonar" typo would
+// silently insert a new row and force history re-fetch).
+type PollKey string
+
+// Canonical poll-key values. New arr sources should add a constant here.
+const (
+	PollKeySonarr PollKey = "sonarr"
+	PollKeyRadarr PollKey = "radarr"
+)
+
+// Valid returns true if the PollKey is one of the canonical values.
+func (k PollKey) Valid() bool {
+	switch k {
+	case PollKeySonarr, PollKeyRadarr:
+		return true
+	default:
+		return false
+	}
+}
+
+// EmbeddedTrack represents a subtitle track detected inside a video container.
+type EmbeddedTrack struct {
+	Codec           string
+	Lang            string
+	Name            string
+	Index           int
+	Forced          bool
+	HearingImpaired bool
+}
+
+// ConfigDrift describes DB cleanup actions needed after a config change.
+type ConfigDrift struct {
+	// RemovedLanguages are language codes that were in the old config
+	// but not in the new one. Their search_attempts should be cleared.
+	RemovedLanguages []string
+
+	// RemovedProviders are provider names that were enabled in the old
+	// config but disabled or removed in the new one. Their
+	// search_attempts should be cleared.
+	RemovedProviders []ProviderID
+
+	// AdaptiveDisabled is true when adaptive search was enabled in the
+	// old config but disabled in the new one. All search_attempts
+	// should be cleared.
+	AdaptiveDisabled bool
+}
+
+// Empty returns true if no cleanup is needed.
+func (d *ConfigDrift) Empty() bool {
+	return len(d.RemovedLanguages) == 0 &&
+		len(d.RemovedProviders) == 0 &&
+		!d.AdaptiveDisabled
+}
+
+// CleanupResult holds the outcome of a media cleanup operation.
+// Used by both DeleteStateByPaths and ReconcileState.
+type CleanupResult struct {
+	// Paths are subtitle file paths whose DB entries were removed.
+	// The caller is responsible for validating and deleting files from disk.
+	Paths []string
+}
+
+// ReconcileResult holds the outcome of a state reconciliation pass.
+type ReconcileResult struct {
+	// Deleted contains subtitle paths removed because the video is gone.
+	Deleted CleanupResult
+
+	// ResetCount is the number of entries reset for re-search because
+	// the subtitle file was missing but the video still exists.
+	ResetCount int64
+}
+
+// ScanStats tracks scan progress and outcomes for logging.
+type ScanStats struct {
+	// Post-scan outcomes for episodes. EpisodesSearched counts every episode
+	// the scan loop processed (it drives progress reporting); the other
+	// fields are its per-outcome buckets.
+	EpisodesSearched  int // Episodes processed by the scan loop.
+	EpisodesSkipped   int // Episodes with existing subs (no search needed).
+	EpisodesFound     int // Episodes where a subtitle was downloaded.
+	EpisodesNoResult  int // Episodes searched but no subtitle found.
+	EpisodesBackedOff int // Episodes where every needed provider was in adaptive backoff (no query ran).
+	SeriesSkipped     int // Series skipped by show-level pre-check.
+
+	// Post-scan outcomes for movies.
+	MoviesSearched  int
+	MoviesSkipped   int
+	MoviesFound     int
+	MoviesNoResult  int
+	MoviesBackedOff int
+}

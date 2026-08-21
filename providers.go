@@ -5,20 +5,20 @@
 package main
 
 import (
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/animetosho"
 	"github.com/cplieger/subflux/internal/provider/betaseries"
 	"github.com/cplieger/subflux/internal/provider/gestdown"
 	"github.com/cplieger/subflux/internal/provider/hdbits"
-	"github.com/cplieger/subflux/internal/provider/mock"
 	"github.com/cplieger/subflux/internal/provider/opensubtitles"
 	"github.com/cplieger/subflux/internal/provider/subdl"
 	"github.com/cplieger/subflux/internal/provider/subsource"
+	"github.com/cplieger/subflux/internal/provider/synthetic"
 	"github.com/cplieger/subflux/internal/provider/yifysubtitles"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// Provider name constants are sourced from api.ProviderName* (single source of truth).
+// Provider name constants are sourced from subflux.ProviderName* (single source of truth).
 
 // Provider settings field type constants.
 const (
@@ -47,17 +47,17 @@ func newProviderRegistry() *provider.Registry {
 
 // providerEntry describes a single provider for table-driven registration.
 type providerEntry struct {
-	name    api.ProviderID
+	name    subflux.ProviderID
 	label   string
 	factory provider.FactoryFunc
-	fields  []api.ProviderSchemaField
+	fields  []subflux.ProviderSchemaField
 }
 
 // providerEntries is the declarative list of all built-in providers.
 var providerEntries = []providerEntry{
 	{
-		name: api.ProviderNameHDBits, label: "HDBits", factory: hdbits.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameHDBits, label: "HDBits", factory: hdbits.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
 				Help: "hdbits.org account",
@@ -69,8 +69,8 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameOpenSubtitles, label: "OpenSubtitles", factory: opensubtitles.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameOpenSubtitles, label: "OpenSubtitles", factory: opensubtitles.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyUsername, Label: fieldLabelUsername, Type: fieldTypeText,
 				Help: "opensubtitles.com account",
@@ -100,8 +100,8 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameBetaSeries, label: "BetaSeries", factory: betaseries.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameBetaSeries, label: "BetaSeries", factory: betaseries.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: "token", Label: "Token", Type: fieldTypeSecret, Secret: true,
 				Help: "From betaseries.com/en/account/api",
@@ -109,12 +109,12 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameGestdown, label: "Gestdown", factory: gestdown.Factory,
+		name: subflux.ProviderNameGestdown, label: "Gestdown", factory: gestdown.Factory,
 		fields: nil,
 	},
 	{
-		name: api.ProviderNameSubSource, label: "SubSource", factory: subsource.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameSubSource, label: "SubSource", factory: subsource.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
 				Help: "From subsource.net API registration",
@@ -122,8 +122,8 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameSubDL, label: "SubDL", factory: subdl.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameSubDL, label: "SubDL", factory: subdl.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: fieldKeyAPIKey, Label: fieldLabelAPIKey, Type: fieldTypeSecret, Secret: true,
 				Help: "From subdl.com API registration",
@@ -131,8 +131,8 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameAnimeTosho, label: "AnimeTosho", factory: animetosho.Factory,
-		fields: []api.ProviderSchemaField{
+		name: subflux.ProviderNameAnimeTosho, label: "AnimeTosho", factory: animetosho.Factory,
+		fields: []subflux.ProviderSchemaField{
 			{
 				Key: "anidb_client_key", Label: "AniDB Client Key", Type: fieldTypeSecret,
 				Secret: true, Help: "Optional; enables AniDB episode ID search",
@@ -140,11 +140,11 @@ var providerEntries = []providerEntry{
 		},
 	},
 	{
-		name: api.ProviderNameYifySubtitles, label: "YIFY Subtitles", factory: yifysubtitles.Factory,
+		name: subflux.ProviderNameYifySubtitles, label: "YIFY Subtitles", factory: yifysubtitles.Factory,
 		fields: nil,
 	},
 	{
-		name: api.ProviderNameMock, label: "Mock (Testing)", factory: mock.Factory,
-		fields: mock.Schema(),
+		name: subflux.ProviderNameSynthetic, label: "Synthetic (Testing)", factory: synthetic.Factory,
+		fields: synthetic.Schema(),
 	},
 }

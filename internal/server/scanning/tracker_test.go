@@ -10,19 +10,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/showskip"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// mockShowCounter implements api.ShowSubtitleCounter for testing.
+// mockShowCounter implements the local showCounter seam, and carries the three
+// provider.Provider methods too so TestResolveShowCounter_picks_first can hand
+// it to provider.ResolveShowCounter as a provider.ShowSubtitleCounter.
 type mockShowCounter struct {
 	counts map[string]int
 	err    error
 	calls  atomic.Int32
 }
 
-func (m *mockShowCounter) CountShowSubtitles(_ context.Context, imdbID, lang string) (int, error) {
+func (m *mockShowCounter) CountShowSubtitles(_ context.Context, q subflux.ShowSubtitleQuery) (int, error) {
+	imdbID, lang := q.ImdbID, q.Language
 	m.calls.Add(1)
 	if m.err != nil {
 		return 0, m.err
@@ -30,12 +33,12 @@ func (m *mockShowCounter) CountShowSubtitles(_ context.Context, imdbID, lang str
 	return m.counts[imdbID+"-"+lang], nil
 }
 
-func (m *mockShowCounter) Name() api.ProviderID { return "opensubtitles" }
-func (m *mockShowCounter) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (m *mockShowCounter) Name() subflux.ProviderID { return "opensubtitles" }
+func (m *mockShowCounter) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (m *mockShowCounter) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (m *mockShowCounter) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
 }
 
@@ -241,9 +244,9 @@ func TestResolveShowCounter_picks_first(t *testing.T) {
 	t.Parallel()
 	first := &mockShowCounter{counts: map[string]int{"tt1-fr": 0}}
 	second := &mockShowCounter{counts: map[string]int{"tt1-fr": 99}}
-	counter := provider.ResolveShowCounter([]api.Provider{first, second})
+	counter := provider.ResolveShowCounter([]provider.Provider{first, second})
 	st := newSeasonTracker(counter, showskip.New(1*time.Hour), seedDeps{})
-	count, _ := st.counter.CountShowSubtitles(t.Context(), "tt1", "fr")
+	count, _ := st.counter.CountShowSubtitles(t.Context(), subflux.ShowSubtitleQuery{ImdbID: "tt1", Language: "fr"})
 	if count != 0 {
 		t.Fatalf("expected count 0 from first provider, got %d", count)
 	}

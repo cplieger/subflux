@@ -3,6 +3,7 @@ package subsync
 import (
 	"bytes"
 	"testing"
+	"unicode/utf8"
 )
 
 func FuzzNormalizeEncoding(f *testing.F) {
@@ -20,10 +21,12 @@ func FuzzNormalizeEncoding(f *testing.F) {
 	f.Add([]byte{})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// NormalizeEncoding must not panic on arbitrary input.
+		// The function's job is to produce UTF-8, so that is what is asserted:
+		// every path either passes through bytes utf8.Valid accepted or builds
+		// its output rune by rune. It must also not panic on arbitrary input.
 		result := NormalizeEncoding(data)
-		if result == nil {
-			t.Error("NormalizeEncoding returned nil")
+		if !utf8.Valid(result) {
+			t.Errorf("NormalizeEncoding(%q) = %q, which is not valid UTF-8", data, result)
 		}
 	})
 }

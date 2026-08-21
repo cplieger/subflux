@@ -9,10 +9,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/coverage"
+	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,24 +24,24 @@ var (
 	errFetchMovies = errors.New("fetch movies from arr")
 )
 
-// CoverageStore documents the api.Store methods used by coverage handlers.
+// CoverageStore is the two reads the coverage endpoints answer from: the
+// subtitle-file inventory and the scan-state rows. 2 of the 36 methods the
+// store offers, and 2 of the 12 in the coverage family — these handlers report
+// coverage, they never record it.
 type CoverageStore interface {
-	GetSubtitleFiles(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.SubtitleEntry, error)
-	GetScanStates(ctx context.Context, mediaType api.MediaType, mediaIDPrefix string) ([]api.ScanStateRow, error)
+	SubtitleFiles(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.SubtitleEntry, error)
+	ScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
 }
-
-// Compile-time assertion: api.Store satisfies CoverageStore.
-var _ CoverageStore = api.Store(nil)
 
 // CoverageSonarrClient is the Sonarr surface coverage handlers use.
 type CoverageSonarrClient interface {
-	GetSeries(ctx context.Context) ([]arrapi.Series, error)
+	Series(ctx context.Context) ([]arrapi.Series, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
 // CoverageRadarrClient is the Radarr surface coverage handlers use.
 type CoverageRadarrClient interface {
-	GetMovies(ctx context.Context) ([]arrapi.Movie, error)
+	Movies(ctx context.Context) ([]arrapi.Movie, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
@@ -48,22 +51,26 @@ type tagResolver interface {
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 }
 
-// Compile-time assertions: the arrapi-backed role clients satisfy the coverage
-// surfaces.
-var (
-	_ CoverageSonarrClient = api.SonarrClient(nil)
-	_ CoverageRadarrClient = api.RadarrClient(nil)
-)
-
 // Deps holds the dependencies for coverage handlers.
 type Deps struct {
 	Store     CoverageStore
 	StateFunc func() *LiveState
 }
 
+// coverageCfg is what the coverage endpoints read out of the configuration:
+// the language targets each media item earns, the embedded-codec policy that
+// decides which existing tracks count, and the arr exclude-tag list. 3 of the
+// 37 values the config offers — these handlers report coverage against the
+// language rules, so they ask nothing about providers, scoring or paths.
+type coverageCfg interface {
+	ResolveTargetsWithFallback(originalLang string, audioLangs []string) []subflux.SubtitleTarget
+	EmbeddedPolicy() subflux.EmbeddedPolicy
+	Search() subflux.SearchConfig
+}
+
 // LiveState holds the runtime state needed by coverage handlers.
 type LiveState struct {
-	Cfg    api.ConfigProvider
+	Cfg    coverageCfg
 	Sonarr CoverageSonarrClient // nil when sonarr not configured
 	Radarr CoverageRadarrClient // nil when radarr not configured
 }
@@ -106,7 +113,7 @@ type MovieItem struct {
 	AudioLang      string                    `json:"audio_lang"`
 	Rule           string                    `json:"rule"`
 	Targets        []coverage.TargetCoverage `json:"targets"`
-	Subs           []api.SubtitleEntry       `json:"subs"`
+	Subs           []subflux.SubtitleEntry   `json:"subs"`
 	Tags           []int                     `json:"tags,omitempty"`
 	TmdbID         int                       `json:"tmdb_id"`
 	ID             int                       `json:"id"`
@@ -120,12 +127,12 @@ type MovieItem struct {
 func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
-		api.WriteJSON(w, []SeriesItem{})
+		httpapi.WriteJSON(w, []SeriesItem{})
 		return
 	}
 
@@ -133,9 +140,9 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errFetchSeries) {
 			slog.Error("coverage: failed to fetch series", "error", err)
-			api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch series")
+			httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch series")
 		} else {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage series files")
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage series files")
 		}
 		return
 	}
@@ -155,11 +162,11 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := api.OriginalLangCode(ser.OriginalLanguage)
+		audioLang := arrsvc.OriginalLangCode(ser.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
-		tCov := coverage.CountEpisodeCoverageGrouped(grouped[i], targets, epCount)
+		tCov := coverage.CountEpisodesGrouped(grouped[i], targets, epCount)
 
 		out = append(out, SeriesItem{
 			ID:         ser.ID,
@@ -173,11 +180,11 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 			Rule:       ruleName,
 			Targets:    tCov,
 			Tags:       ser.Tags,
-			Excluded:   api.HasExcludeTag(ser.Tags, excludeIDs),
+			Excluded:   arrsvc.HasExcludeTag(ser.Tags, excludeIDs),
 		})
 	}
 	slog.Debug("coverage: series computed", "count", len(out), "series_total", len(allSeries), "episode_files", len(allFiles))
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // groupEpisodeSubsBySeries buckets indexed episode subtitle maps by their
@@ -186,7 +193,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]map[coverage.Key]*coverage.Status) [][]map[coverage.Key]*coverage.Status {
 	prefixToIdx := make(map[string]int, len(allSeries))
 	for i := range allSeries {
-		p := api.BuildSeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
+		p := mediaid.SeriesPrefix(allSeries[i].TvdbID, allSeries[i].ImdbID)
 		if p != "" {
 			prefixToIdx[p] = i
 		}
@@ -206,12 +213,12 @@ func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]
 func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
-		api.WriteJSON(w, []MovieItem{})
+		httpapi.WriteJSON(w, []MovieItem{})
 		return
 	}
 
@@ -219,16 +226,16 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errFetchMovies) {
 			slog.Error("coverage: failed to fetch movies", "error", err)
-			api.BadGatewayC(w, r, api.CodeBadGateway, "failed to fetch movies")
+			httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch movies")
 		} else {
-			api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage movies files")
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage movies files")
 		}
 		return
 	}
 
 	ignoredCodecs := search.IgnoredCodecsFromConfig(ls.Cfg)
 	movieSubs := coverage.IndexSubStatus(allFiles, ignoredCodecs)
-	movieFiles := make(map[string][]api.SubtitleEntry)
+	movieFiles := make(map[string][]subflux.SubtitleEntry)
 	for i := range allFiles {
 		movieFiles[allFiles[i].MediaID] = append(movieFiles[allFiles[i].MediaID], allFiles[i])
 	}
@@ -240,15 +247,15 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		audioLang := api.OriginalLangCode(m.OriginalLanguage)
+		audioLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
 		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
 		ruleName := coverage.ResolveRuleName(audioLang, targets)
 
-		mediaID := api.BuildMovieID(m.TmdbID, m.ImdbID)
+		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
 		if mediaID == "" {
 			continue
 		}
-		tCov := coverage.CountMovieCoverage(movieSubs[mediaID], targets)
+		tCov := coverage.CountMovies(movieSubs[mediaID], targets)
 
 		var sceneName string
 		if m.MovieFile != nil {
@@ -270,11 +277,11 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			Targets:        tCov,
 			Subs:           coverage.DeduplicateFileRows(movieFiles[mediaID]),
 			Tags:           m.Tags,
-			Excluded:       api.HasExcludeTag(m.Tags, excludeIDs),
+			Excluded:       arrsvc.HasExcludeTag(m.Tags, excludeIDs),
 		})
 	}
 	slog.Debug("coverage: movies computed", "count", len(out), "movie_total", len(allMovies), "movie_files", len(allFiles))
-	api.WriteJSON(w, out)
+	httpapi.WriteJSON(w, out)
 }
 
 // HandleCoverageDetail returns per-episode subtitle files for a series.
@@ -282,27 +289,27 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleCoverageDetail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
 	tvdbStr := extractPathSegment(r.URL.Path, "/api/coverage/series/", "")
 	if tvdbStr == "" {
-		api.BadRequestC(w, r, api.CodeBadRequest, "missing tvdb id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing tvdb id")
 		return
 	}
 	if tvdbID, err := strconv.Atoi(tvdbStr); err != nil || tvdbID <= 0 {
-		api.BadRequestC(w, r, api.CodeBadRequest, "invalid tvdb id")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "invalid tvdb id")
 		return
 	}
 
 	prefix := "tvdb-" + tvdbStr + "-"
-	files, err := h.deps.Store.GetSubtitleFiles(ctx, api.MediaTypeEpisode, prefix)
+	files, err := h.deps.Store.SubtitleFiles(ctx, subflux.MediaTypeEpisode, prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "coverage detail")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage detail")
 		return
 	}
-	api.WriteJSON(w, coverage.DeduplicateFileRows(files))
+	httpapi.WriteJSON(w, coverage.DeduplicateFileRows(files))
 }
 
 // HandleScanStates returns scan timestamps for all scanned media items.
@@ -310,31 +317,31 @@ func (h *Handler) HandleCoverageDetail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleScanStates(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 	mediaType := r.URL.Query().Get("type")
 	prefix := r.URL.Query().Get("prefix")
 	if mediaType == "" {
-		mediaType = string(api.MediaTypeEpisode)
+		mediaType = string(subflux.MediaTypeEpisode)
 	}
-	if mediaType != string(api.MediaTypeEpisode) && mediaType != string(api.MediaTypeMovie) {
-		api.BadRequestC(w, r, api.CodeQueryInvalidFilter, "invalid type parameter")
+	if mediaType != string(subflux.MediaTypeEpisode) && mediaType != string(subflux.MediaTypeMovie) {
+		httpapi.BadRequestC(w, r, subflux.CodeQueryInvalidFilter, "invalid type parameter")
 		return
 	}
-	states, err := h.deps.Store.GetScanStates(ctx, api.MediaType(mediaType), prefix)
+	states, err := h.deps.Store.ScanStates(ctx, subflux.MediaType(mediaType), prefix)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "query", "scan states")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "scan states")
 		return
 	}
-	api.WriteJSON(w, states)
+	httpapi.WriteJSON(w, states)
 }
 
 // fetchCoverageSeriesData fetches series, exclude tags, and subtitle files concurrently.
-func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (allSeries []arrapi.Series, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
-	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Sonarr, api.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
+func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (allSeries []arrapi.Series, excludeIDs map[int]struct{}, allFiles []subflux.SubtitleEntry, err error) {
+	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Sonarr, subflux.MediaTypeEpisode, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
-		allSeries, ferr = ls.Sonarr.GetSeries(gctx)
+		allSeries, ferr = ls.Sonarr.Series(gctx)
 		if ferr != nil {
 			return fmt.Errorf("%w: %w", errFetchSeries, ferr)
 		}
@@ -347,10 +354,10 @@ func (h *Handler) fetchCoverageSeriesData(ctx context.Context, ls *LiveState) (a
 }
 
 // fetchCoverageMoviesData fetches movies, exclude tags, and subtitle files concurrently.
-func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (allMovies []arrapi.Movie, excludeIDs map[int]struct{}, allFiles []api.SubtitleEntry, err error) {
-	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Radarr, api.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
+func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (allMovies []arrapi.Movie, excludeIDs map[int]struct{}, allFiles []subflux.SubtitleEntry, err error) {
+	excludeIDs, allFiles, err = h.fetchCoverageData(ctx, ls.Radarr, subflux.MediaTypeMovie, ls.Cfg.Search().ExcludeArrTags, func(gctx context.Context) error {
 		var ferr error
-		allMovies, ferr = ls.Radarr.GetMovies(gctx)
+		allMovies, ferr = ls.Radarr.Movies(gctx)
 		if ferr != nil {
 			return fmt.Errorf("%w: %w", errFetchMovies, ferr)
 		}
@@ -363,10 +370,10 @@ func (h *Handler) fetchCoverageMoviesData(ctx context.Context, ls *LiveState) (a
 }
 
 // fetchCoverageData is the shared concurrent fetch pattern for coverage handlers.
-func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, mediaType api.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []api.SubtitleEntry, error) {
+func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, mediaType subflux.MediaType, excludeTags []string, fetchMedia func(context.Context) error) (map[int]struct{}, []subflux.SubtitleEntry, error) {
 	var (
 		excludeIDs map[int]struct{}
-		allFiles   []api.SubtitleEntry
+		allFiles   []subflux.SubtitleEntry
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -379,7 +386,7 @@ func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, med
 	})
 	g.Go(func() error {
 		var err error
-		allFiles, err = h.deps.Store.GetSubtitleFiles(gctx, mediaType, "")
+		allFiles, err = h.deps.Store.SubtitleFiles(gctx, mediaType, "")
 		return err
 	})
 	if err := g.Wait(); err != nil {

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/arrapi"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/slogx/capture"
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // --- Mock implementations ---
@@ -19,7 +19,9 @@ type mockMetrics struct {
 	imports []string
 }
 
-func (m *mockMetrics) RecordImport(source api.PollKey) { m.imports = append(m.imports, string(source)) }
+func (m *mockMetrics) RecordImport(source subflux.PollKey) {
+	m.imports = append(m.imports, string(source))
+}
 
 type mockEvents struct {
 	published []events.Event
@@ -45,9 +47,9 @@ type mockStore struct {
 	deletedPaths [][]string
 }
 
-func (m *mockStore) DeleteStateByPaths(_ context.Context, paths []string) (api.CleanupResult, error) {
+func (m *mockStore) DeleteStateByPaths(_ context.Context, paths []string) (subflux.CleanupResult, error) {
 	m.deletedPaths = append(m.deletedPaths, paths)
-	return api.CleanupResult{Paths: paths}, nil
+	return subflux.CleanupResult{Paths: paths}, nil
 }
 
 type mockHistoryPoller struct {
@@ -59,19 +61,19 @@ type mockHistoryPoller struct {
 	history    []arrapi.HistoryRecord
 }
 
-func (m *mockHistoryPoller) GetHistorySince(_ context.Context, _ time.Time, _ ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
+func (m *mockHistoryPoller) HistorySince(_ context.Context, _ time.Time, _ ...arrapi.EventType) ([]arrapi.HistoryRecord, error) {
 	return m.history, m.historyErr
 }
 
-func (m *mockHistoryPoller) GetSeriesByID(_ context.Context, id int) (arrapi.Series, error) {
+func (m *mockHistoryPoller) SeriesByID(_ context.Context, id int) (arrapi.Series, error) {
 	return m.series[id], nil
 }
 
-func (m *mockHistoryPoller) GetEpisodeByID(_ context.Context, id int) (arrapi.Episode, error) {
+func (m *mockHistoryPoller) EpisodeByID(_ context.Context, id int) (arrapi.Episode, error) {
 	return m.episodes[id], nil
 }
 
-func (m *mockHistoryPoller) GetMovieByID(_ context.Context, id int) (arrapi.Movie, error) {
+func (m *mockHistoryPoller) MovieByID(_ context.Context, id int) (arrapi.Movie, error) {
 	return m.movies[id], nil
 }
 
@@ -82,57 +84,36 @@ func (m *mockHistoryPoller) RescanSeries(_ context.Context, _ int) error { retur
 func (m *mockHistoryPoller) RescanMovie(_ context.Context, _ int) error  { return nil }
 
 type mockCfg struct {
-	targets   []api.SubtitleTarget
+	targets   []subflux.SubtitleTarget
 	langs     []string
 	interval  time.Duration
 	scanDelay time.Duration
 }
 
 func (m *mockCfg) PollInterval() time.Duration                    { return m.interval }
-func (m *mockCfg) Search() api.SearchConfig                       { return api.SearchConfig{ScanDelay: m.scanDelay} }
+func (m *mockCfg) Search() subflux.SearchConfig                   { return subflux.SearchConfig{ScanDelay: m.scanDelay} }
 func (m *mockCfg) ValidatePath(_ context.Context, _ string) error { return nil }
-func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []api.SubtitleTarget {
+func (m *mockCfg) ResolveTargetsWithFallback(_ string, _ []string) []subflux.SubtitleTarget {
 	return m.targets
 }
 func (m *mockCfg) LanguageCodes() []string { return m.langs }
 
+// mockEngine is the poller's engine: one method, because importSearcher
+// declares one. It used to carry all eight of the old composite's methods and
+// seven of them were unreachable from this package.
 type mockEngine struct {
 	err    error
-	result api.SearchResult
+	result subflux.SearchResult
 }
 
-func (m *mockEngine) SearchTargets(_ context.Context, _ *api.SearchRequest, _ string, _ []api.SubtitleTarget) (api.SearchResult, error) {
+func (m *mockEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
 	return m.result, m.err
-}
-
-func (m *mockEngine) InventoryCoverage(_ context.Context, _ *api.SearchRequest, _ string) bool {
-	return false
-}
-
-func (m *mockEngine) ProviderTimeouts() (map[api.ProviderID]api.ProviderStatus, bool) {
-	return nil, false
-}
-func (m *mockEngine) ResetTimeouts() {}
-func (m *mockEngine) SimulateScore(_ api.MediaType, _, _ string, _ api.MatchMethod) api.ScoreResult {
-	return api.ScoreResult{}
-}
-
-func (m *mockEngine) ScoreSubtitles(_ *api.SearchRequest, _ []api.Subtitle) []api.ScoredResult {
-	return nil
-}
-
-func (m *mockEngine) SyncAndPostProcess(_ context.Context, data []byte, _, _ string, _ api.Variant) ([]byte, int64) {
-	return data, 0
-}
-
-func (m *mockEngine) HashFile(_ context.Context, _ string) (string, int64, error) {
-	return "", 0, nil
 }
 
 func newTestPollCache() *PollCache {
 	return NewPollCache(
-		func(_ context.Context, _ api.PollKey) (time.Time, error) { return time.Time{}, nil },
-		func(_ context.Context, _ api.PollKey, _ time.Time) error { return nil },
+		func(_ context.Context, _ subflux.PollKey) (time.Time, error) { return time.Time{}, nil },
+		func(_ context.Context, _ subflux.PollKey, _ time.Time) error { return nil },
 	)
 }
 
@@ -147,8 +128,8 @@ const ttlProbeDelay = 5 * time.Millisecond
 // test where store side effects are not asserted.
 type noopStore struct{}
 
-func (noopStore) DeleteStateByPaths(_ context.Context, paths []string) (api.CleanupResult, error) {
-	return api.CleanupResult{Paths: paths}, nil
+func (noopStore) DeleteStateByPaths(_ context.Context, paths []string) (subflux.CleanupResult, error) {
+	return subflux.CleanupResult{Paths: paths}, nil
 }
 
 // countingExcludeResolver embeds *mockHistoryPoller and counts ResolveExcludeTagIDs
@@ -263,13 +244,13 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
 	// Use NewPoller (rather than &Poller{...}) so the internal tagCache
-	// is initialized; the entries reach getExcludeTagIDs which dereferences
+	// is initialized; the entries reach excludeTagIDs which dereferences
 	// tagCache.
 	p := NewPoller(deps, func() *LiveState { return ls })
 
 	// Both entries' paths are missing on disk and will skip out of
 	// processPollImport; the count we care about is the entries-observed
-	// count from the GetHistorySince response, not the imports-applied
+	// count from the HistorySince response, not the imports-applied
 	// count. Adaptive burst keys off the former.
 	if n := p.PollOnce(t.Context()); n != 2 {
 		t.Errorf("PollOnce with 2 sonarr entries: got %d, want 2", n)
@@ -298,9 +279,9 @@ func TestNewPoller_defaultTTL_caches_tags(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
+	p.excludeTagIDs(ctx, fake, "default", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "default", nil, 0)
+	p.excludeTagIDs(ctx, fake, "default", nil, 0)
 	if got := fake.calls.Load(); got != 1 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (default-branch ttl=4m must cache)", got)
 	}
@@ -313,9 +294,9 @@ func TestNewPoller_shortInterval_TTL_expires(t *testing.T) {
 	cfg := &mockCfg{interval: time.Millisecond}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
+	p.excludeTagIDs(ctx, fake, "short", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "short", nil, 0)
+	p.excludeTagIDs(ctx, fake, "short", nil, 0)
 	if got := fake.calls.Load(); got != 2 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 2 (ttl=2ms expires before %v)", got, ttlProbeDelay)
 	}
@@ -328,9 +309,9 @@ func TestNewPoller_longInterval_TTL_caches(t *testing.T) {
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
 	ctx := t.Context()
-	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
+	p.excludeTagIDs(ctx, fake, "long", nil, 0)
 	time.Sleep(ttlProbeDelay)
-	p.getExcludeTagIDs(ctx, fake, "long", nil, 0)
+	p.excludeTagIDs(ctx, fake, "long", nil, 0)
 	if got := fake.calls.Load(); got != 1 {
 		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (ttl=2h must cache)", got)
 	}
@@ -385,19 +366,19 @@ func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	}
 }
 
-// --- getExcludeTagIDs ---
+// --- excludeTagIDs ---
 
-// getExcludeTagIDs returns the resolved IDs on a successful fetch.
+// excludeTagIDs returns the resolved IDs on a successful fetch.
 func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
 	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{42: {}}}
 	cfg := &mockCfg{interval: time.Hour}
 	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ids := p.getExcludeTagIDs(t.Context(), fake, "ok", nil, 0)
+	ids := p.excludeTagIDs(t.Context(), fake, "ok", nil, 0)
 	if ids == nil {
-		t.Fatalf("getExcludeTagIDs on success returned nil")
+		t.Fatalf("excludeTagIDs on success returned nil")
 	}
 	if _, ok := ids[42]; !ok || len(ids) != 1 {
-		t.Errorf("getExcludeTagIDs = %v, want map[42:{}]", ids)
+		t.Errorf("excludeTagIDs = %v, want map[42:{}]", ids)
 	}
 }
 
@@ -488,11 +469,11 @@ func TestDetect_queue_full_defers_batch(t *testing.T) {
 
 	// Fill the queue with placeholder batches.
 	for range cap(p.work) {
-		p.work <- sourceBatch{source: PollSourceRadarr, key: api.PollKeyRadarr}
+		p.work <- sourceBatch{source: PollSourceRadarr, key: subflux.PollKeyRadarr}
 	}
-	before := p.detectSince(t.Context(), api.PollKeySonarr)
+	before := p.detectSince(t.Context(), subflux.PollKeySonarr)
 	p.detectSonarr(t.Context(), ls)
-	after := p.detectSince(t.Context(), api.PollKeySonarr)
+	after := p.detectSince(t.Context(), subflux.PollKeySonarr)
 	if !after.Equal(before) {
 		t.Errorf("detection cursor advanced %v -> %v despite deferred batch; deferred entries would be lost", before, after)
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -15,8 +15,8 @@ func TestFactory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory(t.Context(), nil) unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameAnimeTosho {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameAnimeTosho)
+	if p.Name() != subflux.ProviderNameAnimeTosho {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameAnimeTosho)
 	}
 }
 
@@ -27,8 +27,8 @@ func TestFactory_accepts_any_settings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Factory(settings) unexpected error: %v", err)
 	}
-	if p.Name() != api.ProviderNameAnimeTosho {
-		t.Errorf("Name() = %q, want %q", p.Name(), api.ProviderNameAnimeTosho)
+	if p.Name() != subflux.ProviderNameAnimeTosho {
+		t.Errorf("Name() = %q, want %q", p.Name(), subflux.ProviderNameAnimeTosho)
 	}
 }
 
@@ -37,7 +37,7 @@ func TestFactory_accepts_any_settings(t *testing.T) {
 func TestSearch_skips_non_episode(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	req := &api.SearchRequest{MediaType: "movie", Title: "Akira", Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: "movie", Title: "Akira", Languages: []string{"en"}}
 	got, err := p.Search(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
@@ -50,7 +50,7 @@ func TestSearch_skips_non_episode(t *testing.T) {
 func TestSearch_skips_empty_title(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	req := &api.SearchRequest{MediaType: "episode", Title: "", Languages: []string{"en"}}
+	req := &subflux.SearchRequest{MediaType: "episode", Title: "", Languages: []string{"en"}}
 	got, err := p.Search(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Search() unexpected error: %v", err)
@@ -65,7 +65,7 @@ func TestSearch_skips_empty_title(t *testing.T) {
 func TestDownload_rejects_ssrf_url(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	sub := &api.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
+	sub := &subflux.Subtitle{DownloadURL: "http://127.0.0.1/evil"}
 	_, err := p.Download(t.Context(), sub)
 	if err == nil {
 		t.Fatal("Download(loopback URL) expected error, got nil")
@@ -75,7 +75,7 @@ func TestDownload_rejects_ssrf_url(t *testing.T) {
 func TestDownload_rejects_internal_ip(t *testing.T) {
 	t.Parallel()
 	p, _ := Factory(t.Context(), nil)
-	sub := &api.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
+	sub := &subflux.Subtitle{DownloadURL: "http://192.168.1.1/sub.srt"}
 	_, err := p.Download(t.Context(), sub)
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
 
@@ -58,7 +58,7 @@ func TestSrtToWebVTT(t *testing.T) {
 
 	t.Run("single cue", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 1500 * time.Millisecond, End: 4200 * time.Millisecond, Text: "Hello world"},
 		}
 		got := srtToWebVTT(cues)
@@ -70,7 +70,7 @@ func TestSrtToWebVTT(t *testing.T) {
 
 	t.Run("multiple cues numbered sequentially", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 0, End: 2 * time.Second, Text: "First"},
 			{Start: 3 * time.Second, End: 5 * time.Second, Text: "Second"},
 		}
@@ -98,7 +98,7 @@ func TestFindDialogueDenseStart(t *testing.T) {
 
 	t.Run("single cue returns start minus lead-in", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 30 * time.Second, End: 32 * time.Second, Text: "Hello world"},
 		}
 		if got := findDialogueDenseStart(cues); got != 20_000 {
@@ -108,7 +108,7 @@ func TestFindDialogueDenseStart(t *testing.T) {
 
 	t.Run("lead-in clamped to zero for early cue", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 5 * time.Second, End: 7 * time.Second, Text: "Early dialogue"},
 		}
 		if got := findDialogueDenseStart(cues); got != 0 {
@@ -118,7 +118,7 @@ func TestFindDialogueDenseStart(t *testing.T) {
 
 	t.Run("picks densest window", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 10 * time.Second, End: 12 * time.Second, Text: "Hi"},
 			{Start: 120 * time.Second, End: 125 * time.Second, Text: "This is a much longer dialogue line with many characters"},
 			{Start: 130 * time.Second, End: 135 * time.Second, Text: "Another long line of dialogue that adds character count"},
@@ -132,7 +132,7 @@ func TestFindDialogueDenseStart(t *testing.T) {
 
 	t.Run("whitespace-only cues ignored in density", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 60 * time.Second, End: 62 * time.Second, Text: "   \t  \n  "},
 			{Start: 120 * time.Second, End: 122 * time.Second, Text: "Real dialogue"},
 		}
@@ -146,7 +146,7 @@ func TestFindDialogueDenseStart(t *testing.T) {
 		// Two equally dense, non-overlapping windows 100s apart. A strict ">"
 		// keeps the FIRST anchor (20s -> start 10s). A ">=" would drift to the
 		// later anchor (120s -> start 110s), so this pins the boundary.
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: 20 * time.Second, End: 22 * time.Second, Text: "ab"},
 			{Start: 120 * time.Second, End: 122 * time.Second, Text: "ab"},
 		}
@@ -163,7 +163,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("zero shift returns cues unchanged", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 2 * time.Second, Text: "Hello"},
 		}
 		got := shiftAndFilterCues(cues, 0)
@@ -174,7 +174,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("positive shift moves start and end", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 3 * time.Second, Text: "A"},
 		}
 		got := shiftAndFilterCues(cues, 500*time.Millisecond)
@@ -191,7 +191,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("negative shift drops cues that end before zero", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 2 * time.Second, Text: "Early"},
 			{Start: 5 * time.Second, End: 7 * time.Second, Text: "Late"},
 		}
@@ -209,7 +209,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("start clamped to zero when shifted past zero", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 5 * time.Second, Text: "Overlap"},
 		}
 		got := shiftAndFilterCues(cues, -2*time.Second)
@@ -226,7 +226,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("end exactly zero is filtered, one ms past is kept", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 2 * time.Second, Text: "Exact"},
 		}
 		if got := shiftAndFilterCues(cues, -2*time.Second); len(got) != 0 {
@@ -243,7 +243,7 @@ func TestShiftAndFilterCues(t *testing.T) {
 
 	t.Run("all cues filtered when shifted far negative", func(t *testing.T) {
 		t.Parallel()
-		cues := []api.SubtitleCue{
+		cues := []subflux.SubtitleCue{
 			{Start: time.Second, End: 2 * time.Second, Text: "A"},
 			{Start: 3 * time.Second, End: 4 * time.Second, Text: "B"},
 		}
@@ -337,11 +337,11 @@ func TestSrtToWebVTT_property_cue_count_matches_input(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 30).Draw(t, "n")
-		cues := make([]api.SubtitleCue, n)
+		cues := make([]subflux.SubtitleCue, n)
 		for i := range n {
 			startMs := rapid.Int64Range(0, 600_000).Draw(t, fmt.Sprintf("start_%d", i))
 			durMs := rapid.Int64Range(1, 10_000).Draw(t, fmt.Sprintf("dur_%d", i))
-			cues[i] = api.SubtitleCue{
+			cues[i] = subflux.SubtitleCue{
 				Start: time.Duration(startMs) * time.Millisecond,
 				End:   time.Duration(startMs+durMs) * time.Millisecond,
 				Text:  "cue text",
@@ -361,12 +361,12 @@ func TestShiftAndFilterCues_property_output_bounded_and_ordered(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 20).Draw(t, "n")
-		cues := make([]api.SubtitleCue, n)
+		cues := make([]subflux.SubtitleCue, n)
 		var cursor int64
 		for i := range n {
 			cursor += rapid.Int64Range(0, 30_000).Draw(t, fmt.Sprintf("gap_%d", i))
 			durMs := rapid.Int64Range(1, 60_000).Draw(t, fmt.Sprintf("dur_%d", i))
-			cues[i] = api.SubtitleCue{
+			cues[i] = subflux.SubtitleCue{
 				Start: time.Duration(cursor) * time.Millisecond,
 				End:   time.Duration(cursor+durMs) * time.Millisecond,
 				Text:  fmt.Sprintf("cue %d", i),
@@ -400,12 +400,12 @@ func TestFindDialogueDenseStart_property_result_non_negative(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		n := rapid.IntRange(0, 50).Draw(t, "n")
-		cues := make([]api.SubtitleCue, n)
+		cues := make([]subflux.SubtitleCue, n)
 		for i := range n {
 			startMs := rapid.Int64Range(0, 7_200_000).Draw(t, fmt.Sprintf("start_%d", i))
 			durMs := rapid.Int64Range(100, 10_000).Draw(t, fmt.Sprintf("dur_%d", i))
 			textLen := rapid.IntRange(1, 200).Draw(t, fmt.Sprintf("textLen_%d", i))
-			cues[i] = api.SubtitleCue{
+			cues[i] = subflux.SubtitleCue{
 				Start: time.Duration(startMs) * time.Millisecond,
 				End:   time.Duration(startMs+durMs) * time.Millisecond,
 				Text:  strings.Repeat("x", textLen),

@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // oldTitleCacheKey is the fmt.Sprintf form titleCacheKey replaced. It is kept
 // here as the byte-identity oracle (a key built from ordinary fields must not
 // have changed) and as the collision oracle (the pairs below must collapse
 // under it and stay apart under the current form).
-func oldTitleCacheKey(req *api.SearchRequest) string {
+func oldTitleCacheKey(req *subflux.SearchRequest) string {
 	season := 0
-	if req.MediaType == api.MediaTypeEpisode {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		season = req.Season
 	}
 	return fmt.Sprintf("title:%s:%s:%d", req.ImdbID, strings.ToLower(req.Title), season)
@@ -36,11 +36,11 @@ func oldTitleCacheKey(req *api.SearchRequest) string {
 func TestTitleCacheKeyCannotBeForged(t *testing.T) {
 	t.Parallel()
 
-	req := func(imdbID, title string) *api.SearchRequest {
-		return &api.SearchRequest{MediaType: api.MediaTypeMovie, ImdbID: imdbID, Title: title}
+	req := func(imdbID, title string) *subflux.SearchRequest {
+		return &subflux.SearchRequest{MediaType: subflux.MediaTypeMovie, ImdbID: imdbID, Title: title}
 	}
 
-	cases := map[string][2]*api.SearchRequest{
+	cases := map[string][2]*subflux.SearchRequest{
 		"separator moves from the imdb id into the title": {
 			req("tt1:the wire", "s01"),
 			req("tt1", "the wire:s01"),
@@ -68,7 +68,7 @@ func TestTitleCacheKeyCannotBeForged(t *testing.T) {
 	// The escape character is the seam escaping itself introduces: these pairs
 	// were never forgeable under fmt.Sprintf (which escapes nothing), and must
 	// not become forgeable now that '\' is meaningful.
-	escapePairs := map[string][2]*api.SearchRequest{
+	escapePairs := map[string][2]*subflux.SearchRequest{
 		"escaped separator vs literal separator": {
 			req(`tt1\`, ":x"),
 			req(`tt1\:x`, ""),
@@ -97,14 +97,14 @@ func TestTitleCacheKeyCannotBeForged(t *testing.T) {
 func TestTitleCacheKeyKeepsBytesForOrdinaryInput(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]*api.SearchRequest{
-		"movie": {MediaType: api.MediaTypeMovie, ImdbID: "tt0133093", Title: "The Matrix"},
+	cases := map[string]*subflux.SearchRequest{
+		"movie": {MediaType: subflux.MediaTypeMovie, ImdbID: "tt0133093", Title: "The Matrix"},
 		"episode with season": {
-			MediaType: api.MediaTypeEpisode, ImdbID: "tt0903747",
+			MediaType: subflux.MediaTypeEpisode, ImdbID: "tt0903747",
 			Title: "Breaking Bad", Season: 2, Episode: 5,
 		},
 		"apostrophes and punctuation in the title": {
-			MediaType: api.MediaTypeMovie, ImdbID: "tt0117951", Title: "Trainspotting (1996) - Director's Cut",
+			MediaType: subflux.MediaTypeMovie, ImdbID: "tt0117951", Title: "Trainspotting (1996) - Director's Cut",
 		},
 	}
 
@@ -123,14 +123,14 @@ func TestTitleCacheKeyKeepsBytesForOrdinaryInput(t *testing.T) {
 
 	// The season must stay part of the key: SubSource serves per-season title
 	// pages, so an S01 id answering an S02 lookup is a wrong-season result.
-	s1 := titleCacheKey(&api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1", Title: "x", Season: 1})
-	s2 := titleCacheKey(&api.SearchRequest{MediaType: api.MediaTypeEpisode, ImdbID: "tt1", Title: "x", Season: 2})
+	s1 := titleCacheKey(&subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1", Title: "x", Season: 1})
+	s2 := titleCacheKey(&subflux.SearchRequest{MediaType: subflux.MediaTypeEpisode, ImdbID: "tt1", Title: "x", Season: 2})
 	if s1 == s2 {
 		t.Errorf("two seasons share the title cache key %q", s1)
 	}
 	// Case folding is part of the key, not of the caller.
-	if lower, upper := titleCacheKey(&api.SearchRequest{ImdbID: "tt1", Title: "the wire"}),
-		titleCacheKey(&api.SearchRequest{ImdbID: "tt1", Title: "The Wire"}); lower != upper {
+	if lower, upper := titleCacheKey(&subflux.SearchRequest{ImdbID: "tt1", Title: "the wire"}),
+		titleCacheKey(&subflux.SearchRequest{ImdbID: "tt1", Title: "The Wire"}); lower != upper {
 		t.Errorf("title case changed the key: %q vs %q", lower, upper)
 	}
 }

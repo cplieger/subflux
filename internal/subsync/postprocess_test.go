@@ -9,6 +9,10 @@ import (
 	"pgregory.net/rapid"
 )
 
+// Abort vs report in this file: a value mismatch reports with t.Errorf so
+// the siblings still run. A cue-count check keeps t.Fatalf when the lines
+// after it index the slice it counted (got[0], got[1]).
+
 // --- StripHI ---
 
 func TestStripHI_brackets(t *testing.T) {
@@ -199,10 +203,10 @@ func TestPostProcess_full_pipeline(t *testing.T) {
 		t.Fatalf("expected 2 cues, got %d: %v", len(got), got)
 	}
 	if got[0].Text != "Run!" {
-		t.Fatalf("cue 0: expected 'Run!', got %q", got[0].Text)
+		t.Errorf("cue 0 text = %q, want %q", got[0].Text, "Run!")
 	}
 	if got[1].Text != "Normal dialogue" {
-		t.Fatalf("cue 1: expected 'Normal dialogue', got %q", got[1].Text)
+		t.Errorf("cue 1 text = %q, want %q", got[1].Text, "Normal dialogue")
 	}
 }
 
@@ -409,10 +413,10 @@ func TestPostProcess_does_not_mutate_input(t *testing.T) {
 	origText1 := cues[1].Text
 	_ = PostProcess(cues, allPostProcess())
 	if cues[0].Text != origText0 {
-		t.Fatalf("PostProcess mutated input cue 0: %q -> %q", origText0, cues[0].Text)
+		t.Errorf("PostProcess mutated input cue 0: %q -> %q", origText0, cues[0].Text)
 	}
 	if cues[1].Text != origText1 {
-		t.Fatalf("PostProcess mutated input cue 1: %q -> %q", origText1, cues[1].Text)
+		t.Errorf("PostProcess mutated input cue 1: %q -> %q", origText1, cues[1].Text)
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestSyncSkipThreshold pins the exact formula (Source + ReleaseGroup - 1) so a
@@ -16,13 +16,13 @@ func TestSyncSkipThreshold(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name   string
-		scores api.Scores
+		scores subflux.Scores
 		want   int
 	}{
-		{"specific", api.Scores{Source: 30, ReleaseGroup: 20}, 49},
-		{"zero_group", api.Scores{Source: 10, ReleaseGroup: 0}, 9},
-		{"both_zero", api.Scores{Source: 0, ReleaseGroup: 0}, -1},
-		{"default", api.DefaultScores, api.DefaultScores.Source + api.DefaultScores.ReleaseGroup - 1},
+		{"specific", subflux.Scores{Source: 30, ReleaseGroup: 20}, 49},
+		{"zero_group", subflux.Scores{Source: 10, ReleaseGroup: 0}, 9},
+		{"both_zero", subflux.Scores{Source: 0, ReleaseGroup: 0}, -1},
+		{"default", subflux.DefaultScores, subflux.DefaultScores.Source + subflux.DefaultScores.ReleaseGroup - 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -39,8 +39,8 @@ func TestSyncSkipThreshold(t *testing.T) {
 // false) becomes observable.
 type stripHITestConfig struct{ mockConfig }
 
-func (stripHITestConfig) PostProcessConfig() api.PostProcessConfig {
-	return api.PostProcessConfig{StripHI: true, NormalizeEndings: true}
+func (stripHITestConfig) PostProcess() subflux.PostProcessConfig {
+	return subflux.PostProcessConfig{StripHI: true, NormalizeEndings: true}
 }
 
 // TestEngine_SyncAndPostProcess_HI_variant_preserves_HI asserts the variant
@@ -55,10 +55,10 @@ func TestEngine_SyncAndPostProcess_HI_variant_preserves_HI(t *testing.T) {
 		"2\n00:00:03,000 --> 00:00:04,000\nHello there\n")
 
 	e := newEngine(nil, &mockStore{}, &stripHITestConfig{}, nil,
-		scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+		scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	hiOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", api.VariantHI)
-	stdOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", api.DefaultVariant)
+	hiOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", subflux.VariantHI)
+	stdOut, _ := e.SyncAndPostProcess(t.Context(), hiCue, videoPath, "fr", subflux.DefaultVariant)
 
 	if !bytes.Contains(hiOut, []byte("door creaks")) {
 		t.Errorf("HI variant stripped the HI cue, want it preserved:\n%s", hiOut)

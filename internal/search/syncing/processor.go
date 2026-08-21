@@ -5,11 +5,11 @@ import (
 	"context"
 	"io"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
-// SubtitleProcessor implements api.SubtitleProcessor directly using subsync,
+// SubtitleProcessor implements the SRT surface synchandlers declares, using subsync,
 // without an intermediate backend interface. The lightweight operations
 // (parse/write/shift/normalize) always run in-process; the heavy audio sync
 // routes through the configured SyncExec.
@@ -25,17 +25,16 @@ func NewSubtitleProcessorWithExec(exec SyncExec) SubtitleProcessor {
 }
 
 // Compile-time check.
-var _ api.SubtitleProcessor = SubtitleProcessor{}
 
-// apiCuesFromSubsync converts []subsync.Cue to []api.SubtitleCue via
+// apiCuesFromSubsync converts []subsync.Cue to []subflux.SubtitleCue via
 // explicit field-by-field copy.
-func apiCuesFromSubsync(cues []subsync.Cue) []api.SubtitleCue {
+func apiCuesFromSubsync(cues []subsync.Cue) []subflux.SubtitleCue {
 	if len(cues) == 0 {
 		return nil
 	}
-	out := make([]api.SubtitleCue, len(cues))
+	out := make([]subflux.SubtitleCue, len(cues))
 	for i, c := range cues {
-		out[i] = api.SubtitleCue{
+		out[i] = subflux.SubtitleCue{
 			Start: c.Start,
 			End:   c.End,
 			Text:  c.Text,
@@ -44,9 +43,9 @@ func apiCuesFromSubsync(cues []subsync.Cue) []api.SubtitleCue {
 	return out
 }
 
-// subsyncCuesFromAPI converts []api.SubtitleCue to []subsync.Cue via
+// subsyncCuesFromAPI converts []subflux.SubtitleCue to []subsync.Cue via
 // explicit field-by-field copy.
-func subsyncCuesFromAPI(cues []api.SubtitleCue) []subsync.Cue {
+func subsyncCuesFromAPI(cues []subflux.SubtitleCue) []subsync.Cue {
 	if len(cues) == 0 {
 		return nil
 	}
@@ -67,7 +66,7 @@ func (SubtitleProcessor) NormalizeEncoding(data []byte) []byte {
 }
 
 // ParseSRT parses SRT subtitle data into cues.
-func (SubtitleProcessor) ParseSRT(data []byte) ([]api.SubtitleCue, error) {
+func (SubtitleProcessor) ParseSRT(data []byte) ([]subflux.SubtitleCue, error) {
 	cues, err := subsync.ParseSRT(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -76,7 +75,7 @@ func (SubtitleProcessor) ParseSRT(data []byte) ([]api.SubtitleCue, error) {
 }
 
 // WriteSRT serializes cues to SRT format.
-func (SubtitleProcessor) WriteSRT(cues []api.SubtitleCue) ([]byte, error) {
+func (SubtitleProcessor) WriteSRT(cues []subflux.SubtitleCue) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := subsync.WriteSRT(&buf, subsyncCuesFromAPI(cues)); err != nil {
 		return nil, err
@@ -85,13 +84,13 @@ func (SubtitleProcessor) WriteSRT(cues []api.SubtitleCue) ([]byte, error) {
 }
 
 // SyncFromAudio runs audio-based sync on subtitle data.
-func (p SubtitleProcessor) SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) api.AudioSyncResult {
+func (p SubtitleProcessor) SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath string) subflux.AudioSyncResult {
 	exec := p.exec
 	if exec == nil {
 		exec = InProcessExec{}
 	}
 	result := exec.Audio(ctx, data, videoPath, subtitlePath)
-	return api.AudioSyncResult{
+	return subflux.AudioSyncResult{
 		Method:     string(result.Method),
 		Cues:       apiCuesFromSubsync(result.Cues),
 		Offset:     result.Offset,

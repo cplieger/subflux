@@ -60,7 +60,7 @@ func TestIntegration_MKV_SyncFromEmbedded(t *testing.T) {
 	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
 	if !result.Applied() {
-		t.Fatal("sync not applied for MKV embedded reference")
+		t.Error("sync not applied for MKV embedded reference")
 	}
 
 	residual := maxResidualMs(ref, result.Cues)
@@ -147,7 +147,7 @@ func TestIntegration_MP4_SyncFromEmbedded(t *testing.T) {
 	result := SyncWithOptions(t.Context(), ref, shifted, &syncOpts)
 
 	if !result.Applied() {
-		t.Fatal("sync not applied for MP4 embedded reference")
+		t.Error("sync not applied for MP4 embedded reference")
 	}
 
 	residual := maxResidualMs(ref, result.Cues)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // FuzzStatsCacheGetAfterInvalidate verifies that after Invalidate(), the
@@ -19,9 +19,9 @@ func FuzzStatsCacheGetAfterInvalidate(f *testing.F) {
 		ctx := t.Context()
 
 		computeCalls := 0
-		compute := func(_ context.Context) api.Stats {
+		compute := func(_ context.Context) subflux.Stats {
 			computeCalls++
-			return api.Stats{
+			return subflux.Stats{
 				Downloads: downloads,
 				Attempts:  attempts,
 			}

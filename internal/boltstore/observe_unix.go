@@ -11,8 +11,7 @@ import (
 // left on device). On Linux this is the canonical disk-full signal from bbolt's
 // mmap grow or fdatasync.
 func isENOSPC(err error) bool {
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
+	if errno, ok := errors.AsType[syscall.Errno](err); ok {
 		return errno == syscall.ENOSPC
 	}
 	return false

@@ -35,7 +35,7 @@ package server
 // Group membership rules (enforced at read time, not compile time):
 //
 //  1. Every public-endpoint handler can access no authenticated state.
-//  2. Every non-public handler can read `api.UserFromContext(r.Context())`
+//  2. Every non-public handler can read `authhandlers.UserFromContext(r.Context())`
 //     without a nil check.
 //  3. Every admin handler can skip role checks.
 //  4. Configured handlers run only when a valid config is loaded; they may
@@ -45,7 +45,8 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 )
 
 // middleware wraps an http.HandlerFunc with additional behavior.
@@ -103,9 +104,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	record := func(reg routeReg) { s.routeRegs = append(s.routeRegs, reg) }
 	public := newRouteGroup(mux, "public", record)
 	user := newRouteGroup(mux, "user", record, s.requireAuth)
-	admin := newRouteGroup(mux, "admin", record, s.requireAuth, s.requireRole(auth.RoleAdmin))
+	admin := newRouteGroup(mux, "admin", record, s.requireAuth, requireRole(auth.RoleAdmin))
 	userConfigured := newRouteGroup(mux, "userConfigured", record, s.requireAuth, s.requireConfigured)
-	adminConfigured := newRouteGroup(mux, "adminConfigured", record, s.requireAuth, s.requireRole(auth.RoleAdmin), s.requireConfigured)
+	adminConfigured := newRouteGroup(mux, "adminConfigured", record, s.requireAuth, requireRole(auth.RoleAdmin), s.requireConfigured)
 
 	// --- public: no auth ---
 
@@ -133,7 +134,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// --- user: requires a session or valid API key ---
 
 	// Server-sent events (always available, config-independent).
-	user.Add("GET /api/events", s.handleEvents)
+	user.Add("GET /api/events", s.activityH.HandleEvents)
 
 	// Self-service account endpoints. These never delete credentials or
 	// mint long-lived tokens, so reauth is not required here. Operations
@@ -151,12 +152,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	user.Add("GET /api/config/schema", s.configH.HandleConfigSchema)
 
 	// Alerts (read + dismiss).
-	user.Add("GET /api/alerts", s.handleGetAlerts)
-	user.Add("DELETE /api/alerts", s.handleDismissAlert)
+	user.Add("GET /api/alerts", s.activityH.HandleGetAlerts)
+	user.Add("DELETE /api/alerts", s.activityH.HandleDismissAlert)
 
 	// Activity feed (user-visible history; config-independent).
-	user.Add("GET /api/activity", s.handleGetActivity)
-	user.Add("DELETE /api/activity", s.handleDismissActivity)
+	user.Add("GET /api/activity", s.activityH.HandleGetActivity)
+	user.Add("DELETE /api/activity", s.activityH.HandleDismissActivity)
 
 	// Credential management on your own account (delete own passkey, unlink
 	// own OIDC). Destructive actions are confirmed client-side. API-key
@@ -193,7 +194,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// config, so it cannot be store-resolved by construction. Admin-only —
 	// it reveals filesystem structure and belongs to the config-editing
 	// role that consumes it.
-	admin.Add("POST /api/config/validate-path", s.configH.HandleValidatePath)
+	admin.Add("POST /api/config/validate-path", confighandlers.HandleValidatePath)
 
 	// --- userConfigured: requires session + valid config ---
 
@@ -257,7 +258,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// (full scans: admin) against the entry's required_role. Distinct from
 	// the dismiss idiom (DELETE /api/activity?id=), which never stops
 	// running work.
-	userConfigured.Add("POST /api/activity/{id}/cancel", s.handleCancelActivity)
+	userConfigured.Add("POST /api/activity/{id}/cancel", s.activityH.HandleCancelActivity)
 
 	// Provider timeout reset.
 	adminConfigured.Add("POST /api/providers/timeout/reset", s.queryH.HandleProviderTimeoutReset)

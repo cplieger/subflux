@@ -4,27 +4,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // maintBP is a backoff config for seeding search_attempts in the delete tests.
-var maintBP = api.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
+var maintBP = subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
 
 // dlRec builds a DownloadRecord for the (mt, mid, lang) triple backed by
 // videoPath. manual selects an auto (false) or manual-lock (true) row.
-func dlRec(mt api.MediaType, mid, lang string, prov api.ProviderID, release, path, videoPath string, score int, manual bool) *api.DownloadRecord {
-	return &api.DownloadRecord{
+func dlRec(mt subflux.MediaType, mid, lang string, prov subflux.ProviderID, release, path, videoPath string, score int, manual bool) *subflux.DownloadRecord {
+	return &subflux.DownloadRecord{
 		MediaType: mt, MediaID: mid, Language: lang,
 		ProviderName: prov, ReleaseName: release, Path: path, Score: score,
-		Meta: &api.DownloadMeta{VideoPath: videoPath, Manual: manual},
+		Meta: &subflux.DownloadMeta{VideoPath: videoPath, Manual: manual},
 	}
 }
 
 // seedFile upserts one external subtitle_files row for a media item.
-func seedFile(t *testing.T, db *DB, mt api.MediaType, mid, lang, path string) {
+func seedFile(t *testing.T, db *DB, mt subflux.MediaType, mid, lang, path string) {
 	t.Helper()
-	if err := db.UpsertSubtitleFile(t.Context(), mt, mid, &api.SubtitleFile{
-		Language: lang, Variant: api.Variant("standard"), Source: api.SourceExternal,
+	if err := db.UpsertSubtitleFile(t.Context(), mt, mid, &subflux.SubtitleFile{
+		Language: lang, Variant: subflux.Variant("standard"), Source: subflux.SourceExternal,
 		Codec: "subrip", Path: path,
 	}); err != nil {
 		t.Fatalf("UpsertSubtitleFile(%s/%s): %v", mid, lang, err)
@@ -32,9 +32,9 @@ func seedFile(t *testing.T, db *DB, mt api.MediaType, mid, lang, path string) {
 }
 
 // seedScan records one scan_state row for a media item.
-func seedScan(t *testing.T, db *DB, mt api.MediaType, mid string) {
+func seedScan(t *testing.T, db *DB, mt subflux.MediaType, mid string) {
 	t.Helper()
-	if err := db.RecordScanState(t.Context(), &api.ScanRecord{
+	if err := db.RecordScanState(t.Context(), &subflux.ScanRecord{
 		MediaType: mt, MediaID: mid, Title: "Title " + mid,
 	}); err != nil {
 		t.Fatalf("RecordScanState(%s): %v", mid, err)
@@ -59,8 +59,8 @@ func TestDeleteStateByPaths_noMatch(t *testing.T) {
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt1", "fr",
-		api.ProviderNameOpenSubtitles, "R", "/p/tt1.fr.srt", "/media/tt1.mkv", 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "tt1", "fr",
+		subflux.ProviderNameOpenSubtitles, "R", "/p/tt1.fr.srt", "/media/tt1.mkv", 100, false)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
@@ -87,25 +87,25 @@ func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 	const video = "/media/show.s01e01.mkv"
 
 	// Auto fr + manual fr + auto en, all backed by the same video file.
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeEpisode, "ep1", "fr",
-		api.ProviderNameOpenSubtitles, "Auto.FR", "/p/ep1.fr.srt", video, 80, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeEpisode, "ep1", "fr",
+		subflux.ProviderNameOpenSubtitles, "Auto.FR", "/p/ep1.fr.srt", video, 80, false)); err != nil {
 		t.Fatalf("SaveDownload(auto fr): %v", err)
 	}
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeEpisode, "ep1", "fr",
-		api.ProviderNameSubDL, "Manual.FR", "/p/ep1.fr.1.srt", video, 50, true)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeEpisode, "ep1", "fr",
+		subflux.ProviderNameSubDL, "Manual.FR", "/p/ep1.fr.1.srt", video, 50, true)); err != nil {
 		t.Fatalf("SaveDownload(manual fr): %v", err)
 	}
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeEpisode, "ep1", "en",
-		api.ProviderNameOpenSubtitles, "Auto.EN", "/p/ep1.en.srt", video, 90, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeEpisode, "ep1", "en",
+		subflux.ProviderNameOpenSubtitles, "Auto.EN", "/p/ep1.en.srt", video, 90, false)); err != nil {
 		t.Fatalf("SaveDownload(auto en): %v", err)
 	}
 
 	// Seed backoff for both affected triples (a different provider so the save
 	// did not already clear it).
-	if err := db.RecordNoResult(ctx, api.MediaTypeEpisode, "ep1", "fr", api.ProviderNameGestdown, maintBP); err != nil {
+	if err := db.RecordNoResult(ctx, subflux.MediaTypeEpisode, "ep1", "fr", subflux.ProviderNameGestdown, maintBP); err != nil {
 		t.Fatalf("RecordNoResult(fr): %v", err)
 	}
-	if err := db.RecordNoResult(ctx, api.MediaTypeEpisode, "ep1", "en", api.ProviderNameGestdown, maintBP); err != nil {
+	if err := db.RecordNoResult(ctx, subflux.MediaTypeEpisode, "ep1", "en", subflux.ProviderNameGestdown, maintBP); err != nil {
 		t.Fatalf("RecordNoResult(en): %v", err)
 	}
 
@@ -128,10 +128,10 @@ func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 	}
 
 	// No rows remain for either triple.
-	if rows := readTripleRows(t, db, api.MediaTypeEpisode, "ep1", "fr"); len(rows) != 0 {
+	if rows := readTripleRows(t, db, subflux.MediaTypeEpisode, "ep1", "fr"); len(rows) != 0 {
 		t.Errorf("fr rows = %d, want 0", len(rows))
 	}
-	if rows := readTripleRows(t, db, api.MediaTypeEpisode, "ep1", "en"); len(rows) != 0 {
+	if rows := readTripleRows(t, db, subflux.MediaTypeEpisode, "ep1", "en"); len(rows) != 0 {
 		t.Errorf("en rows = %d, want 0", len(rows))
 	}
 }
@@ -143,10 +143,10 @@ func TestDeleteStateByPaths_cleansOrphanedCoverage(t *testing.T) {
 	ctx := t.Context()
 	const video = "/media/movie.mkv"
 
-	seedFile(t, db, api.MediaTypeMovie, "tt9", "fr", "/p/tt9.fr.srt")
-	seedScan(t, db, api.MediaTypeMovie, "tt9")
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt9", "fr",
-		api.ProviderNameOpenSubtitles, "R", "/p/tt9.fr.srt", video, 100, false)); err != nil {
+	seedFile(t, db, subflux.MediaTypeMovie, "tt9", "fr", "/p/tt9.fr.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "tt9")
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "tt9", "fr",
+		subflux.ProviderNameOpenSubtitles, "R", "/p/tt9.fr.srt", video, 100, false)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
@@ -157,12 +157,12 @@ func TestDeleteStateByPaths_cleansOrphanedCoverage(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 0 {
 		t.Errorf("TotalSubtitleFiles = %d, want 0 (orphaned files cleaned)", total)
 	}
-	states, err := db.GetScanStates(ctx, api.MediaTypeMovie, "tt9")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "tt9")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 0 {
-		t.Errorf("GetScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
+		t.Errorf("ScanStates = %d, want 0 (orphaned scan_state cleaned)", len(states))
 	}
 }
 
@@ -174,16 +174,16 @@ func TestDeleteStateByPaths_preservesCoverageWhenStateRemains(t *testing.T) {
 	ctx := t.Context()
 
 	// Same media item, two languages backed by DIFFERENT video files.
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt7", "fr",
-		api.ProviderNameOpenSubtitles, "FR", "/p/tt7.fr.srt", "/media/tt7.mkv", 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "tt7", "fr",
+		subflux.ProviderNameOpenSubtitles, "FR", "/p/tt7.fr.srt", "/media/tt7.mkv", 100, false)); err != nil {
 		t.Fatalf("SaveDownload(fr): %v", err)
 	}
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tt7", "en",
-		api.ProviderNameOpenSubtitles, "EN", "/p/tt7.en.srt", "/media/tt7-en.mkv", 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "tt7", "en",
+		subflux.ProviderNameOpenSubtitles, "EN", "/p/tt7.en.srt", "/media/tt7-en.mkv", 100, false)); err != nil {
 		t.Fatalf("SaveDownload(en): %v", err)
 	}
-	seedFile(t, db, api.MediaTypeMovie, "tt7", "fr", "/p/tt7.fr.srt")
-	seedScan(t, db, api.MediaTypeMovie, "tt7")
+	seedFile(t, db, subflux.MediaTypeMovie, "tt7", "fr", "/p/tt7.fr.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "tt7")
 
 	if _, err := db.DeleteStateByPaths(ctx, []string{"/media/tt7.mkv"}); err != nil {
 		t.Fatalf("DeleteStateByPaths: %v", err)
@@ -193,17 +193,17 @@ func TestDeleteStateByPaths_preservesCoverageWhenStateRemains(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (coverage preserved)", total)
 	}
-	states, err := db.GetScanStates(ctx, api.MediaTypeMovie, "tt7")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "tt7")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 {
-		t.Errorf("GetScanStates = %d, want 1 (scan_state preserved)", len(states))
+		t.Errorf("ScanStates = %d, want 1 (scan_state preserved)", len(states))
 	}
-	if rows := readTripleRows(t, db, api.MediaTypeMovie, "tt7", "en"); len(rows) != 1 {
+	if rows := readTripleRows(t, db, subflux.MediaTypeMovie, "tt7", "en"); len(rows) != 1 {
 		t.Errorf("en rows = %d, want 1 (preserved)", len(rows))
 	}
-	if rows := readTripleRows(t, db, api.MediaTypeMovie, "tt7", "fr"); len(rows) != 0 {
+	if rows := readTripleRows(t, db, subflux.MediaTypeMovie, "tt7", "fr"); len(rows) != 0 {
 		t.Errorf("fr rows = %d, want 0 (deleted)", len(rows))
 	}
 }
@@ -215,10 +215,10 @@ func TestDeleteStateByPaths_idempotent(t *testing.T) {
 	ctx := t.Context()
 	const video = "/media/idem.mkv"
 
-	seedFile(t, db, api.MediaTypeMovie, "tti", "fr", "/p/tti.fr.srt")
-	seedScan(t, db, api.MediaTypeMovie, "tti")
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "tti", "fr",
-		api.ProviderNameOpenSubtitles, "R", "/p/tti.fr.srt", video, 100, false)); err != nil {
+	seedFile(t, db, subflux.MediaTypeMovie, "tti", "fr", "/p/tti.fr.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "tti")
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "tti", "fr",
+		subflux.ProviderNameOpenSubtitles, "R", "/p/tti.fr.srt", video, 100, false)); err != nil {
 		t.Fatalf("SaveDownload: %v", err)
 	}
 
@@ -254,20 +254,20 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	ctx := t.Context()
 
 	// Target row.
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttDel", "fr",
-		api.ProviderNameOpenSubtitles, "Del", "/p/del.fr.srt", "/media/del.mkv", 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "ttDel", "fr",
+		subflux.ProviderNameOpenSubtitles, "Del", "/p/del.fr.srt", "/media/del.mkv", 100, false)); err != nil {
 		t.Fatalf("SaveDownload(del): %v", err)
 	}
 	// Unrelated row + backoff + coverage that must survive.
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttKeep", "en",
-		api.ProviderNameOpenSubtitles, "Keep", "/p/keep.en.srt", "/media/keep.mkv", 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "ttKeep", "en",
+		subflux.ProviderNameOpenSubtitles, "Keep", "/p/keep.en.srt", "/media/keep.mkv", 100, false)); err != nil {
 		t.Fatalf("SaveDownload(keep): %v", err)
 	}
-	if err := db.RecordNoResult(ctx, api.MediaTypeMovie, "ttKeep", "en", api.ProviderNameGestdown, maintBP); err != nil {
+	if err := db.RecordNoResult(ctx, subflux.MediaTypeMovie, "ttKeep", "en", subflux.ProviderNameGestdown, maintBP); err != nil {
 		t.Fatalf("RecordNoResult(keep): %v", err)
 	}
-	seedFile(t, db, api.MediaTypeMovie, "ttKeep", "en", "/p/keep.en.srt")
-	seedScan(t, db, api.MediaTypeMovie, "ttKeep")
+	seedFile(t, db, subflux.MediaTypeMovie, "ttKeep", "en", "/p/keep.en.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "ttKeep")
 
 	if _, err := db.DeleteStateByPaths(ctx, []string{"/media/del.mkv"}); err != nil {
 		t.Fatalf("DeleteStateByPaths: %v", err)
@@ -284,14 +284,14 @@ func TestDeleteStateByPaths_unrelatedUntouched(t *testing.T) {
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (unrelated coverage kept)", total)
 	}
-	states, err := db.GetScanStates(ctx, api.MediaTypeMovie, "ttKeep")
+	states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, "ttKeep")
 	if err != nil {
-		t.Fatalf("GetScanStates: %v", err)
+		t.Fatalf("ScanStates: %v", err)
 	}
 	if len(states) != 1 {
-		t.Errorf("GetScanStates(ttKeep) = %d, want 1", len(states))
+		t.Errorf("ScanStates(ttKeep) = %d, want 1", len(states))
 	}
-	if rows := readTripleRows(t, db, api.MediaTypeMovie, "ttKeep", "en"); len(rows) != 1 {
+	if rows := readTripleRows(t, db, subflux.MediaTypeMovie, "ttKeep", "en"); len(rows) != 1 {
 		t.Errorf("ttKeep rows = %d, want 1", len(rows))
 	}
 }
@@ -310,21 +310,21 @@ func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 	const videoB = "/media/b.mkv"
 
 	// Media A: one state row backed by videoA, but TWO coverage files (fr+en).
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttA", "fr",
-		api.ProviderNameOpenSubtitles, "A", "/p/a.fr.srt", videoA, 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "ttA", "fr",
+		subflux.ProviderNameOpenSubtitles, "A", "/p/a.fr.srt", videoA, 100, false)); err != nil {
 		t.Fatalf("SaveDownload(A): %v", err)
 	}
-	seedFile(t, db, api.MediaTypeMovie, "ttA", "fr", "/p/a.fr.srt")
-	seedFile(t, db, api.MediaTypeMovie, "ttA", "en", "/p/a.en.srt")
-	seedScan(t, db, api.MediaTypeMovie, "ttA")
+	seedFile(t, db, subflux.MediaTypeMovie, "ttA", "fr", "/p/a.fr.srt")
+	seedFile(t, db, subflux.MediaTypeMovie, "ttA", "en", "/p/a.en.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "ttA")
 
 	// Media B: a second orphaned item in the same batch, one coverage file.
-	if err := db.SaveDownload(ctx, dlRec(api.MediaTypeMovie, "ttB", "fr",
-		api.ProviderNameOpenSubtitles, "B", "/p/b.fr.srt", videoB, 100, false)); err != nil {
+	if err := db.SaveDownload(ctx, dlRec(subflux.MediaTypeMovie, "ttB", "fr",
+		subflux.ProviderNameOpenSubtitles, "B", "/p/b.fr.srt", videoB, 100, false)); err != nil {
 		t.Fatalf("SaveDownload(B): %v", err)
 	}
-	seedFile(t, db, api.MediaTypeMovie, "ttB", "fr", "/p/b.fr.srt")
-	seedScan(t, db, api.MediaTypeMovie, "ttB")
+	seedFile(t, db, subflux.MediaTypeMovie, "ttB", "fr", "/p/b.fr.srt")
+	seedScan(t, db, subflux.MediaTypeMovie, "ttB")
 
 	if total, _ := db.TotalSubtitleFiles(ctx); total != 3 {
 		t.Fatalf("seeded TotalSubtitleFiles = %d, want 3", total)
@@ -344,12 +344,12 @@ func TestDeleteStateByPaths_cleansMultipleMediaAndFiles(t *testing.T) {
 	// Both media items' scan_state gone (B proves the cleanup loop did not stop
 	// after the first media item).
 	for _, mid := range []string{"ttA", "ttB"} {
-		states, err := db.GetScanStates(ctx, api.MediaTypeMovie, mid)
+		states, err := db.ScanStates(ctx, subflux.MediaTypeMovie, mid)
 		if err != nil {
-			t.Fatalf("GetScanStates(%s): %v", mid, err)
+			t.Fatalf("ScanStates(%s): %v", mid, err)
 		}
 		if len(states) != 0 {
-			t.Errorf("GetScanStates(%s) = %d, want 0 (orphan scan_state cleaned)", mid, len(states))
+			t.Errorf("ScanStates(%s) = %d, want 0 (orphan scan_state cleaned)", mid, len(states))
 		}
 	}
 }

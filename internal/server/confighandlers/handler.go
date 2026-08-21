@@ -13,11 +13,22 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cplieger/atomicfile/v2"
-	"github.com/cplieger/pathinside"
-	"github.com/cplieger/subflux/internal/api"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/pathinside/v2"
+	"github.com/cplieger/subflux/internal/config"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// ConfigLoader parses and validates config YAML into a candidate config. It is
+// declared here because this package is the only caller: HandleSaveConfig and
+// the structured save load a candidate, then hand it to HotReload whole.
+//
+// The candidate is CONCRETE. These handlers read nothing out of it — they parse
+// it and pass it on — so the width an interface would state is zero, and a
+// zero-method interface is `any` with a name. The composition root supplies
+// config.LoadFromBytes; the server carries the func and never calls it.
+type ConfigLoader func(data []byte) (*config.Config, error)
 
 // AlertLog is the narrow interface for alert operations.
 type AlertLog interface {
@@ -30,35 +41,64 @@ type PathValidationResponse struct {
 	Valid bool   `json:"valid"`
 }
 
+// ArrPinger is the only thing this package asks of an arr client: can it be
+// reached. A config save pings Sonarr or Radarr before activating a changed
+// endpoint, so a bad URL or key is reported on the save rather than discovered
+// by the next scan. ONE method, against the 19 exported methods
+// *arrsvc.Sonarr offers and the 16 on *arrsvc.Radarr — nothing here reads a
+// series, a movie or a history event.
+//
+// Exported because the composition root embeds it: server.SonarrClient and
+// server.RadarrClient are unions of their consumers' surfaces, and Ping is the
+// one method of theirs that no scan, poll or handler path calls, so without a
+// name here that union would have to re-list it.
+type ArrPinger interface {
+	Ping(ctx context.Context) error
+}
+
 // Deps holds all dependencies for the config handler family.
 type Deps struct {
-	Registry      api.ProviderRegistry
+	Registry      SchemaRegistry
 	Alerts        AlertLog
-	LoadConfig    api.ConfigLoader
-	SchemaFunc    api.SchemaFunc
-	NewSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
-	NewRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
-	HotReload     func(ctx context.Context, cfg api.ConfigProvider) error
+	LoadConfig    ConfigLoader
+	SchemaFunc    subflux.SchemaFunc
+	NewSonarr     func(baseURL, apiKey string) (ArrPinger, error)
+	NewRadarr     func(baseURL, apiKey string) (ArrPinger, error)
+	HotReload     func(ctx context.Context, cfg *config.Config) error
 	State         func() StateView
 	ConfigPath    func() string
 	Configured    func() bool
 	DefaultConfig []byte
 }
 
+// arrEndpoints is what the config handlers read out of the LIVE configuration:
+// the two arr connection blocks, compared against the incoming ones so an
+// unchanged arr is never pinged. 2 of the 37 values a *config.Config offers.
+//
+// The candidate config these handlers load and activate is NOT this type: it
+// arrives from LoadConfig and leaves through HotReload whole and concrete,
+// because the composition root is what consumes it. Reading two values out of a
+// config and carrying a config are different jobs, and only the first one
+// belongs here.
+type arrEndpoints interface {
+	Sonarr() subflux.ArrConfig
+	Radarr() subflux.ArrConfig
+}
+
 // StateView provides the live state needed by config handlers.
 type StateView struct {
-	Cfg api.ConfigProvider
+	Cfg arrEndpoints
 }
 
 // Handler holds all dependencies for the config handler family.
 type Handler struct {
-	registry      api.ProviderRegistry
+	registry      SchemaRegistry
 	alerts        AlertLog
-	loadConfig    api.ConfigLoader
-	schemaFunc    api.SchemaFunc
-	newSonarr     func(baseURL, apiKey string) (api.SonarrClient, error)
-	newRadarr     func(baseURL, apiKey string) (api.RadarrClient, error)
-	hotReload     func(ctx context.Context, cfg api.ConfigProvider) error
+	loadConfig    ConfigLoader
+	schemaFunc    subflux.SchemaFunc
+	newSonarr     func(baseURL, apiKey string) (ArrPinger, error)
+	newRadarr     func(baseURL, apiKey string) (ArrPinger, error)
+	hotReload     func(ctx context.Context, cfg *config.Config) error
 	state         func() StateView
 	configured    func() bool
 	configPath    func() string
@@ -97,15 +137,15 @@ func New(d *Deps) *Handler {
 	}
 }
 
-// maxBodySize references the canonical constant from httphelpers.
-const maxBodySize = httphelpers.MaxDefaultBodySize
+// maxBodySize references the canonical constant from api.
+const maxBodySize = httpapi.MaxDefaultBodySize
 
 // HandleGetConfig returns the current config file with secrets redacted.
 func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	configPath := h.configPath()
 	data, err := atomicfile.ReadBounded(r.Context(), configPath, maxBodySize)
 	if err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "read config", "path", configPath)
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "read config", "path", configPath)
 		return
 	}
 	data = RedactSecrets(data)
@@ -119,12 +159,12 @@ func (h *Handler) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxBodySize+1))
 	if err != nil {
-		api.BadRequestC(w, r, api.CodeBadRequest, "failed to read body")
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "failed to read body")
 		return
 	}
 	if int64(len(data)) > maxBodySize {
 		slog.Warn("config request body too large", "size", len(data))
-		api.PayloadTooLargeC(w, r, api.CodeConfigTooLarge, "request body too large")
+		httpapi.PayloadTooLargeC(w, r, subflux.CodeConfigTooLarge, "request body too large")
 		return
 	}
 
@@ -141,7 +181,7 @@ func (h *Handler) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		// Not the client's fault: the payload relies on keep-semantics
 		// secrets and the server could not read its own existing config.
 		// Fail closed — no save, no activation; details go to the log.
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "secret merge")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "secret merge")
 		return
 	}
 
@@ -159,36 +199,36 @@ func (h *Handler) HandleResetConfig(w http.ResponseWriter, r *http.Request) {
 	defer h.saveMu.Unlock()
 
 	if h.configured() {
-		api.ConflictC(w, r, api.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
+		httpapi.ConflictC(w, r, subflux.CodeConflict, "server is already configured; reset is only available in unconfigured mode")
 		return
 	}
 	if len(h.defaultConfig) == 0 {
-		api.InternalErrorC(w, r, errors.New("no default config available"), api.CodeInternalError)
+		httpapi.InternalErrorC(w, r, errors.New("no default config available"), subflux.CodeInternalError)
 		return
 	}
 
 	configPath := h.configPath()
 	if err := atomicWriteConfig(r.Context(), configPath, h.defaultConfig); err != nil {
-		api.InternalErrorC(w, r, err, api.CodeInternalError, "stage", "reset config")
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "reset config")
 		return
 	}
 
 	slog.Info("config reset to default example")
-	api.WriteJSON(w, map[string]string{api.KeyStatus: "config reset to defaults"})
+	httpapi.WriteJSON(w, map[string]string{subflux.KeyStatus: "config reset to defaults"})
 }
 
 // HandleValidatePath checks whether a filesystem path exists inside the container.
 // POST /api/config/validate-path  body: {"path": "/media"}
-func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
+func HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
 
 	var req struct {
 		Path string `json:"path"`
 	}
-	if !httphelpers.DecodeJSONBody(w, r, &req, 4096) {
+	if !httpapi.DecodeJSONBody(w, r, &req, 4096) {
 		return
 	}
 
@@ -206,7 +246,7 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, atomicfile.ErrEmptyPath) {
 			msg = "path is empty"
 		}
-		api.WriteJSON(w, PathValidationResponse{Error: msg})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: msg})
 		return
 	}
 	// Reject traversal in the path AS WRITTEN — before cleaning — then clean
@@ -221,31 +261,31 @@ func (h *Handler) HandleValidatePath(w http.ResponseWriter, r *http.Request) {
 	// that merely begins with or contains two dots (e.g. "/media/..extras",
 	// "/media/a..b") is legitimate and stays valid.
 	if pathinside.HasDotDot(p) {
-		api.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path must not contain a '..' segment"})
 		return
 	}
 	p = filepath.Clean(p)
 
 	info, err := os.Stat(p)
 	if err != nil {
-		api.WriteJSON(w, PathValidationResponse{Error: "path does not exist"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path does not exist"})
 		return
 	}
 	if !info.IsDir() {
-		api.WriteJSON(w, PathValidationResponse{Error: "path is not a directory"})
+		httpapi.WriteJSON(w, PathValidationResponse{Error: "path is not a directory"})
 		return
 	}
 
-	api.WriteJSON(w, PathValidationResponse{Valid: true})
+	httpapi.WriteJSON(w, PathValidationResponse{Valid: true})
 }
 
 // HandleConfigSchema returns the full configuration schema for the UI.
 func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		api.MethodNotAllowedC(w, r, api.CodeMethodNotAllowed)
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
-	api.WriteJSON(w, h.schemaFunc(api.BuildProviderSchemas(h.registry, string(api.ProviderNameMock))))
+	httpapi.WriteJSON(w, h.schemaFunc(BuildProviderSchemas(h.registry, string(subflux.ProviderNameSynthetic))))
 }
 
 // --- Internal helpers ---
@@ -253,17 +293,17 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 // pingArrIfChanged pings an arr instance only when its URL or API key
 // differs from the current live config.
 func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
-	newArr api.ArrConfig, oldCfg api.ConfigProvider,
+	newArr subflux.ArrConfig, oldCfg arrEndpoints,
 ) error {
 	if newArr.URL == "" {
 		return nil
 	}
 	if oldCfg != nil {
-		var old api.ArrConfig
+		var old subflux.ArrConfig
 		if name == "sonarr" {
-			old = oldCfg.SonarrConfig()
+			old = oldCfg.Sonarr()
 		} else {
-			old = oldCfg.RadarrConfig()
+			old = oldCfg.Radarr()
 		}
 		if newArr.URL == old.URL && newArr.APIKey == old.APIKey {
 			return nil
@@ -282,10 +322,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 
 // newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a
 // connectivity check. Both role clients expose Ping.
-func (h *Handler) newArrPinger(name, baseURL, apiKey string) (interface {
-	Ping(context.Context) error
-}, error,
-) {
+func (h *Handler) newArrPinger(name, baseURL, apiKey string) (ArrPinger, error) {
 	if name == "sonarr" {
 		return h.newSonarr(baseURL, apiKey)
 	}

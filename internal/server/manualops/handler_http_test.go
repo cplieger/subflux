@@ -11,18 +11,19 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cplieger/arrapi"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/embedded"
-	"github.com/cplieger/subflux/internal/metrics"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/obs"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/release"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/cplieger/subflux/internal/server/httphelpers"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
@@ -37,38 +38,48 @@ var errHTTPFake = errors.New("mock error")
 // fakeActivity satisfies ActivityTracker with no-op lifecycle tracking.
 type fakeActivity struct{}
 
-func (fakeActivity) Start(string, string, activity.ActivitySource) string { return "act-1" }
-func (fakeActivity) End(string)                                           {}
-func (fakeActivity) Fail(string)                                          {}
-func (fakeActivity) Progress(string, int, int, string)                    {}
+func (fakeActivity) Start(string, string, activity.Source) string { return "act-1" }
+func (fakeActivity) End(string)                                   {}
+func (fakeActivity) Fail(string)                                  {}
+func (fakeActivity) Progress(string, int, int, string)            {}
 
 // fakeEvents satisfies EventPublisher with no-ops.
 type fakeEvents struct{}
 
-func (fakeEvents) PublishNotify(events.NotifyLevel, string)                    {}
-func (fakeEvents) PublishCoverageUpdate(api.MediaType, string, string, string) {}
+func (fakeEvents) PublishNotify(events.NotifyLevel, string)    {}
+func (fakeEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
 
 // httpFakeRadarr resolves any movie ID to a fixed file path, so MediaRef
 // resolution succeeds in handler tests without a live arr.
 type httpFakeRadarr struct{}
 
-func (httpFakeRadarr) GetMovieByID(context.Context, int) (arrapi.Movie, error) {
+func (httpFakeRadarr) MovieByID(context.Context, int) (arrapi.Movie, error) {
 	return arrapi.Movie{ID: 42, MovieFile: &arrapi.MovieFile{Path: "/media/movie.mkv"}}, nil
 }
 
-// httpStubProvider implements api.Provider for test setup.
+// httpStubProvider implements provider.Provider for test setup.
 type httpStubProvider struct {
 	name string
 }
 
-func (p *httpStubProvider) Name() api.ProviderID { return api.ProviderID(p.name) }
+func (p *httpStubProvider) Name() subflux.ProviderID { return subflux.ProviderID(p.name) }
 
-func (p *httpStubProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *httpStubProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, nil
 }
 
-func (p *httpStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *httpStubProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, nil
+}
+
+// harnessStore is what newHTTPHarness needs from a store: the search engine's
+// surface, this package's own download surface, and the one method the
+// reference resolver calls. Three narrow interfaces rather than a 36-method
+// composite, which is what the harness was asking for before.
+type harnessStore interface {
+	search.Store
+	DownloadStore
+	resolve.FileStore
 }
 
 // newHTTPHarness builds a Handler wired like the server's composition root:
@@ -76,12 +87,12 @@ func (p *httpStubProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte,
 // validation, and no-op activity/alert/event sinks. The returned WaitGroup
 // is the handler's BGTracker; Wait it before finishing tests that reach the
 // background download path.
-func newHTTPHarness(db api.Store, cfg api.ConfigProvider, providers []api.Provider) (*Handler, *sync.WaitGroup) {
+func newHTTPHarness(db harnessStore, cfg fakeManualCfg, providers []provider.Provider) (*Handler, *sync.WaitGroup) {
 	scores := cfg.Scores()
 	sc := scorer.New(&scores)
 	engine := search.New(nil,
 		search.WithStore(db), search.WithConfig(cfg),
-		search.WithMetrics(metrics.New()), search.WithScorer(sc),
+		search.WithMetrics(obs.New()), search.WithScorer(sc),
 		search.WithSyncer(syncing.Syncer{}),
 		search.WithTracks(embedded.Detector{}))
 	wg := &sync.WaitGroup{}
@@ -103,13 +114,13 @@ func newHTTPHarness(db api.Store, cfg api.ConfigProvider, providers []api.Provid
 			return &LiveState{Cfg: cfg, Engine: engine, Providers: providers}
 		},
 		Resolve:    resolver,
-		DecodeJSON: httphelpers.DecodeJSONBody,
+		DecodeJSON: httpapi.DecodeJSONBody,
 	})
 	return h, wg
 }
 
 func newValidationHarness() *Handler {
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{}, nil)
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{}, nil)
 	return h
 }
 
@@ -231,14 +242,14 @@ func TestHandleManualDownload_provider_not_found(t *testing.T) {
 // dlFailingProvider returns an error from Download.
 type dlFailingProvider struct{ httpStubProvider }
 
-func (p *dlFailingProvider) Download(_ context.Context, _ *api.Subtitle) ([]byte, error) {
+func (p *dlFailingProvider) Download(_ context.Context, _ *subflux.Subtitle) ([]byte, error) {
 	return nil, errHTTPFake
 }
 
 func TestHandleManualDownload_download_error_returns_202(t *testing.T) {
 	t.Parallel()
-	h, wg := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
-		[]api.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
+	h, wg := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
+		[]provider.Provider{&dlFailingProvider{httpStubProvider{name: "os"}}})
 
 	body := `{"provider":"os","subtitle_id":"1","media_id":42,"language":"en"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -368,13 +379,13 @@ func TestHandleClearLock_success(t *testing.T) {
 // clearLockErrorStore is a minimal store whose ClearManualLock fails.
 type clearLockErrorStore struct{ testsupport.NopStore }
 
-func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ api.MediaType, _, _ string, _ api.Variant) error {
+func (m *clearLockErrorStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
 	return errHTTPFake
 }
 
 func TestHandleClearLock_db_error(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&clearLockErrorStore{}, &testsupport.NopConfig{}, nil)
+	h, _ := newHTTPHarness(&clearLockErrorStore{}, fakeManualCfg{}, nil)
 
 	body := `{"media_type":"movie","media_id":"tt123","language":"fr"}`
 	req := httptest.NewRequestWithContext(t.Context(),
@@ -459,19 +470,19 @@ func TestHandleManualSearch_invalid_media_type_returns_400(t *testing.T) {
 type resultProvider struct {
 	httpStubProvider
 
-	results []api.Subtitle
+	results []subflux.Subtitle
 }
 
-func (p *resultProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *resultProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return p.results, nil
 }
 
 func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
-		[]api.Provider{&resultProvider{
-			httpStubProvider: httpStubProvider{name: "os"},
-			results: []api.Subtitle{
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
+		[]provider.Provider{&resultProvider{
+			name: "os",
+			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
 					MatchedBy: "imdb", ID: "sub-1",
@@ -511,18 +522,18 @@ func TestHandleManualSearch_with_results_returns_scored(t *testing.T) {
 // searchFailingProvider returns an error from Search.
 type searchFailingProvider struct{ httpStubProvider }
 
-func (p *searchFailingProvider) Search(_ context.Context, _ *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *searchFailingProvider) Search(_ context.Context, _ *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	return nil, errHTTPFake
 }
 
 func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 	t.Parallel()
-	h, _ := newHTTPHarness(&testsupport.NopStore{}, &testsupport.NopConfig{},
-		[]api.Provider{
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
+		[]provider.Provider{
 			&searchFailingProvider{httpStubProvider{name: "bad"}},
 			&resultProvider{
-				httpStubProvider: httpStubProvider{name: "good"},
-				results: []api.Subtitle{
+				name: "good",
+				results: []subflux.Subtitle{
 					{
 						Provider: "good", Language: "fr", ReleaseName: "Movie-GRP",
 						MatchedBy: "imdb", ID: "sub-1",
@@ -554,13 +565,13 @@ func TestHandleManualSearch_provider_error_continues(t *testing.T) {
 
 // downloadedRefsStore tracks DownloadedRefs calls and returns configured values.
 type downloadedRefsStore struct {
-	refs []api.DownloadedRef
+	refs []subflux.DownloadedRef
 	testsupport.NopStore
 
 	called bool
 }
 
-func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ api.MediaType, _, _ string) ([]api.DownloadedRef, error) {
+func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ subflux.MediaType, _, _ string) ([]subflux.DownloadedRef, error) {
 	m.called = true
 	return m.refs, nil
 }
@@ -568,16 +579,16 @@ func (m *downloadedRefsStore) DownloadedRefs(_ context.Context, _ api.MediaType,
 func TestHandleManualSearch_on_disk_detection(t *testing.T) {
 	t.Parallel()
 	db := &downloadedRefsStore{
-		refs: []api.DownloadedRef{
+		refs: []subflux.DownloadedRef{
 			{ReleaseName: "Movie.2024.BluRay-GRP", Provider: "os"},
 			// A second historical download — both should show as on-disk.
 			{ReleaseName: "Movie.2024.WEB-DL-OTHER", Provider: "subdl"},
 		},
 	}
-	h, _ := newHTTPHarness(db, &testsupport.NopConfig{},
-		[]api.Provider{&resultProvider{
-			httpStubProvider: httpStubProvider{name: "os"},
-			results: []api.Subtitle{
+	h, _ := newHTTPHarness(db, fakeManualCfg{},
+		[]provider.Provider{&resultProvider{
+			name: "os",
+			results: []subflux.Subtitle{
 				{
 					Provider: "os", Language: "fr", ReleaseName: "Movie.2024.BluRay-GRP",
 					MatchedBy: "imdb", ID: "sub-1",

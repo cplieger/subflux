@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cplieger/webhttp"
+	"github.com/cplieger/webhttp/v2"
 )
 
 // HostAllowlist returns the parsed exact-match Host allowlist built from
 // allowed_hosts. It is inactive (a safe pass-through) when allowed_hosts is
 // unset — the backward-compatible default — and active as soon as any
-// non-blank entry is configured. Not part of the ConfigProvider interface;
-// consumed directly by the server's host gate (like TrustedProxyNets).
+// non-blank entry is configured. Read by the server's host gate on every
+// activation, which re-wraps the middleware chain with the returned policy.
 func (c *Config) HostAllowlist() *webhttp.HostPolicy {
 	return c.cachedHostPolicy
 }
@@ -33,7 +33,7 @@ func (c *Config) HostAllowlist() *webhttp.HostPolicy {
 // (deny-all when nothing valid remains) rather than silently deactivate.
 func parseAllowedHosts(entries []string) (*webhttp.HostPolicy, error) {
 	policy, invalid := webhttp.ParseHostList(entries,
-		webhttp.WithLoopbackExempt(),
+		webhttp.WithLoopbackExempt(true),
 		webhttp.WithHostAllowlistError("host_not_allowed",
 			"host not allowed; add it to allowed_hosts in the server settings"))
 	if len(invalid) > 0 {

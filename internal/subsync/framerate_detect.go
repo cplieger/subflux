@@ -189,9 +189,14 @@ func matchKnownRatio(ctx context.Context, observed float64, incorrect []Cue, r2,
 
 	// Evaluate alignment quality to pick the best candidate.
 	refSpans := cuesToSpans(reference)
-	bestPair, bestCues := bestRatioCandidate(ctx, candidates, incorrect, refSpans)
+	bestPair, bestCues, err := bestRatioCandidate(ctx, candidates, incorrect, refSpans)
+	if err != nil {
+		slog.Debug("framerate correction: known-ratio scoring cancelled",
+			"candidates", len(candidates), "error", err)
+		return SyncResult{}, false
+	}
 	if bestPair == nil {
-		// Context cancelled (or no candidate scored finite); no match.
+		// No candidate scored finite; no match.
 		return SyncResult{}, false
 	}
 
@@ -250,16 +255,18 @@ func collectRatioCandidates(observed, videoFPS float64) []*framerate.RatioPair {
 
 // bestRatioCandidate scales the incorrect cues by each candidate ratio and
 // returns the pair (with its scaled cues) that produces the best alignment
-// score. Returns (nil, nil) if the context is cancelled before a candidate is
-// evaluated.
-func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, incorrect []Cue, refSpans []TimeSpan) (*framerate.RatioPair, []Cue) {
+// score. A nil pair with a nil error means no candidate scored; cancellation
+// returns ctx.Err(), so the caller can tell "we were told to stop" from "we
+// looked and found nothing" — without the error result the two are the same
+// answer, and a cancelled scan would be reported as a clean no-match.
+func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, incorrect []Cue, refSpans []TimeSpan) (*framerate.RatioPair, []Cue, error) {
 	var bestPair *framerate.RatioPair
 	var bestCues []Cue
 	bestScore := math.Inf(-1)
 
 	for _, pair := range candidates {
-		if ctx.Err() != nil {
-			return nil, nil
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
 		}
 		scaled := scaleCues(incorrect, pair.Ratio)
 		scaledSpans := cuesToSpans(scaled)
@@ -271,5 +278,5 @@ func bestRatioCandidate(ctx context.Context, candidates []*framerate.RatioPair, 
 			bestCues = scaled
 		}
 	}
-	return bestPair, bestCues
+	return bestPair, bestCues, nil
 }

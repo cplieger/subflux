@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -20,7 +20,7 @@ import (
 // store/authdb/apikeys.go behaviour exactly (Requirements 16.4, 16.6, 16.7).
 //
 // auth_api_keys is PRIMARY-keyed by the raw key_hash, so the API-auth hot path
-// — GetAPIKeyByHash — is a single point get (matching how passkeys are keyed by
+// — APIKeyByHash — is a single point get (matching how passkeys are keyed by
 // credential_id). The surrogate id allocated from bbolt's NextSequence lives in
 // the JSON value (keyRec.ID) so the id-and-owner addressed method (DeleteAPIKey)
 // can ownership-check a row; it resolves the key_hash by a user-scoped prefix
@@ -45,14 +45,19 @@ import (
 // auth.Key field — including the json:"-" KeyHash — so the API key round-trips
 // through the bbolt codec without loss.
 type keyRec struct {
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	KeyHash   string     `json:"key_hash"`
-	KeyPrefix string     `json:"key_prefix"`
-	KeySuffix string     `json:"key_suffix"`
-	Label     string     `json:"label"`
-	ID        int64      `json:"id"`
-	UserID    int64      `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	// ExpiresAt is the zero Time for a key that never expires, matching
+	// auth.Key. omitzero rather than omitempty: a zero time.Time is not
+	// "empty" to encoding/json, so omitempty would persist it in full. Records
+	// written by the *time.Time era decode unchanged — a stored null leaves the
+	// value at its zero, which is the same "never expires" it always meant.
+	ExpiresAt time.Time `json:"expires_at,omitzero"`
+	KeyHash   string    `json:"key_hash"`
+	KeyPrefix string    `json:"key_prefix"`
+	KeySuffix string    `json:"key_suffix"`
+	Label     string    `json:"label"`
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
 }
 
 // toKeyRec projects an auth.Key into its persisted form.
@@ -160,10 +165,10 @@ func insertAPIKey(tx *bbolt.Tx, kb *bbolt.Bucket, key *auth.Key, hashKey []byte)
 	return idxPut(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(key.UserID, key.KeyHash), nil)
 }
 
-// GetAPIKeyByHash looks up an API key by its hash (the API-auth hot path),
-// returning (nil, nil) when not found (matching the old store's sql.ErrNoRows
-// -> nil mapping). Decoding fails closed (auth bucket).
-func (s *Store) GetAPIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
+// APIKeyByHash looks up an API key by its hash (the API-auth hot path),
+// reporting absence through found rather than a nil key with a nil error.
+// Decoding fails closed (auth bucket).
+func (s *Store) APIKeyByHash(_ context.Context, hash string) (*auth.Key, bool, error) {
 	var out *auth.Key
 	err := s.view(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)
@@ -241,27 +246,27 @@ func collectAPIKeysByUser(tx *bbolt.Tx, userID int64) ([]auth.Key, error) {
 	return out, nil
 }
 
-// DeleteAPIKey removes the API key identified by surrogate id, but only when it
-// belongs to userID (Requirement 16.4, mirroring the SQLite
+// DeleteAPIKey removes the API key ref identifies, but only when it belongs to
+// ref.UserID (Requirement 16.4, mirroring the SQLite
 // `DELETE ... WHERE id=? AND user_id=?`). It resolves the key hash via a
 // user-scoped index walk, so it can only ever delete the supplied user's own
 // key. It deletes the primary row and its ix_apikey_user entry in one Update; a
-// non-matching (id, userID) is a no-op returning nil.
-func (s *Store) DeleteAPIKey(_ context.Context, id, userID int64) error {
+// ref matching no row is a no-op returning nil.
+func (s *Store) DeleteAPIKey(_ context.Context, ref auth.KeyRef) error {
 	var deleted bool
 	err := s.update(func(tx *bbolt.Tx) error {
 		kb, ok := authBucket(tx, bucketAuthAPIKeys)
 		if !ok {
 			return nil
 		}
-		hash, found, err := s.findUserAPIKeyByID(tx, userID, id)
+		hash, found, err := findUserAPIKeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
 		if err := kb.Delete([]byte(hash)); err != nil {
 			return fmt.Errorf("authstore: delete api key: %w", err)
 		}
-		if err := idxDelete(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(userID, hash)); err != nil {
+		if err := idxDelete(tx, bucketIxAPIKeyUser, apiKeyUserIndexKey(ref.UserID, hash)); err != nil {
 			return err
 		}
 		deleted = true
@@ -271,7 +276,7 @@ func (s *Store) DeleteAPIKey(_ context.Context, id, userID int64) error {
 		return err
 	}
 	if deleted {
-		slog.Info("api key deleted", "key_id", id, "user_id", userID)
+		slog.Info("api key deleted", "key_id", ref.ID, "user_id", ref.UserID)
 	}
 	return nil
 }
@@ -282,7 +287,7 @@ func (s *Store) DeleteAPIKey(_ context.Context, id, userID int64) error {
 // when the user has no key with that id. The returned hash is a string copy, so
 // it is safe to use for a Put/Delete after the cursor advances. Must be called
 // inside a transaction. Decoding fails closed.
-func (s *Store) findUserAPIKeyByID(tx *bbolt.Tx, userID, id int64) (hash string, found bool, err error) {
+func findUserAPIKeyByID(tx *bbolt.Tx, userID, id int64) (hash string, found bool, err error) {
 	ib, ok := authBucket(tx, bucketIxAPIKeyUser)
 	if !ok {
 		return "", false, nil

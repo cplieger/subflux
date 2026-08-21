@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 )
 
@@ -18,7 +19,7 @@ func TestSyncSubtitle(t *testing.T) {
 	type syncSubtitleCase struct {
 		name       string
 		refContent string
-		syncCfg    api.SyncConfig
+		syncCfg    subflux.SyncConfig
 		wantOffset int64
 		createRef  bool
 		wantSame   bool
@@ -30,35 +31,35 @@ func TestSyncSubtitle(t *testing.T) {
 		{
 			name:       "no_reference_returns_original",
 			createRef:  false,
-			syncCfg:    api.SyncConfig{SyncSubtitles: true},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: true},
 			wantSame:   true,
 			wantOffset: 0,
 		},
 		{
 			name:       "non_srt_reference_returns_original",
 			createRef:  false, // no .srt reference
-			syncCfg:    api.SyncConfig{SyncSubtitles: true},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: true},
 			wantSame:   true,
 			wantOffset: 0,
 		},
 		{
 			name:       "audio_fallback_when_sync_disabled",
 			createRef:  false,
-			syncCfg:    api.SyncConfig{SyncSubtitles: false, AudioSyncFallback: true},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: false, AudioSyncFallback: true},
 			wantSame:   true,
 			wantOffset: 0,
 		},
 		{
 			name:       "audio_fallback_after_sync_noop",
 			createRef:  false,
-			syncCfg:    api.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true},
 			wantSame:   true,
 			wantOffset: 0,
 		},
 		{
 			name:       "both_disabled_returns_original",
 			createRef:  false,
-			syncCfg:    api.SyncConfig{SyncSubtitles: false, AudioSyncFallback: false},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: false, AudioSyncFallback: false},
 			wantSame:   true,
 			wantOffset: 0,
 		},
@@ -70,7 +71,7 @@ func TestSyncSubtitle(t *testing.T) {
 				"3\n00:00:05,000 --> 00:00:06,000\nRef3\n\n" +
 				"4\n00:00:07,000 --> 00:00:08,000\nRef4\n\n" +
 				"5\n00:00:09,000 --> 00:00:10,000\nRef5\n\n",
-			syncCfg:    api.SyncConfig{SyncSubtitles: true},
+			syncCfg:    subflux.SyncConfig{SyncSubtitles: true},
 			wantSame:   true,
 			wantOffset: 0,
 		},
@@ -90,8 +91,8 @@ func TestSyncSubtitle(t *testing.T) {
 			}
 
 			ms := &mockStore{}
-			mc := &mockConfig{searchCfg: api.SearchConfig{}}
-			e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+			mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+			e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
 			got, offset := e.syncSubtitle(t.Context(), defaultData, videoPath, "fr", tc.syncCfg)
 
@@ -131,10 +132,10 @@ func TestSyncSubtitle_with_reference_srt(t *testing.T) {
 		"5\n00:00:23,000 --> 00:00:25,000\nInc5\n\n"
 
 	ms := &mockStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	got, _ := e.syncSubtitle(t.Context(), []byte(incSRT), videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
+	got, _ := e.syncSubtitle(t.Context(), []byte(incSRT), videoPath, "fr", subflux.SyncConfig{SyncSubtitles: true})
 	// External SRT is no longer used by auto sync (embedded-only).
 	// Data should be unchanged.
 	if string(got) != incSRT {
@@ -151,9 +152,9 @@ func TestEngine_SyncAndPostProcess_no_reference(t *testing.T) {
 	data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello")
 
 	mc := &mockConfig{}
-	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine(nil, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	got, offsetMs := e.SyncAndPostProcess(t.Context(), data, videoPath, "fr", api.DefaultVariant)
+	got, offsetMs := e.SyncAndPostProcess(t.Context(), data, videoPath, "fr", subflux.DefaultVariant)
 
 	// No reference SRT exists, so data passes through PostProcess only.
 	// PostProcess normalizes line endings to CRLF and ensures trailing CRLF.
@@ -170,11 +171,11 @@ func TestEngine_SyncAndPostProcess_no_reference(t *testing.T) {
 
 func TestDownloadFromProvider_not_found(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	p := &mockProvider{name: "os"}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	sub := &api.Subtitle{Provider: "nonexistent"}
+	sub := &subflux.Subtitle{Provider: "nonexistent"}
 	_, err := e.downloadFromProvider(t.Context(), sub)
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error for unknown provider, got nil")
@@ -186,12 +187,12 @@ func TestDownloadFromProvider_not_found(t *testing.T) {
 
 func TestDownloadFromProvider_success_with_metrics(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "os", data: []byte("subtitle data")}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	sub := &api.Subtitle{Provider: "os"}
+	sub := &subflux.Subtitle{Provider: "os"}
 	data, err := e.downloadFromProvider(t.Context(), sub)
 	if err != nil {
 		t.Fatalf("downloadFromProvider() unexpected error: %v", err)
@@ -206,12 +207,12 @@ func TestDownloadFromProvider_success_with_metrics(t *testing.T) {
 
 func TestDownloadFromProvider_error_with_metrics(t *testing.T) {
 	t.Parallel()
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
 	metrics := &mockMetrics{}
 	p := &mockProvider{name: "os", downloadErr: errors.New("timeout")}
-	e := newEngine([]api.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	e := newEngine([]provider.Provider{p}, &mockStore{}, mc, metrics, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	sub := &api.Subtitle{Provider: "os"}
+	sub := &subflux.Subtitle{Provider: "os"}
 	_, err := e.downloadFromProvider(t.Context(), sub)
 	if err == nil {
 		t.Fatal("downloadFromProvider() expected error, got nil")
@@ -434,10 +435,10 @@ func TestSyncSubtitle_reference_exists_but_already_in_sync(t *testing.T) {
 	data := []byte(srt)
 
 	ms := &mockStore{}
-	mc := &mockConfig{searchCfg: api.SearchConfig{}}
-	e := newEngine(nil, ms, mc, nil, scorer.New(&api.DefaultScores), Syncer{}, noopDetector{})
+	mc := &mockConfig{searchCfg: subflux.SearchConfig{}}
+	e := newEngine(nil, ms, mc, nil, scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
 
-	got, _ := e.syncSubtitle(t.Context(), data, videoPath, "fr", api.SyncConfig{SyncSubtitles: true})
+	got, _ := e.syncSubtitle(t.Context(), data, videoPath, "fr", subflux.SyncConfig{SyncSubtitles: true})
 
 	// Should return original data unchanged (offset == 0 path).
 	if !bytes.Equal(got, data) {

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -24,7 +24,7 @@ import (
 // (Requirement 9.5, CVE-2023-45669). The old store overwrote unconditionally.
 //
 // auth_passkeys is PRIMARY-keyed by the raw credential_id (binary), so the
-// WebAuthn login hot path — GetPasskeyByCredentialID — is a single point get.
+// WebAuthn login hot path — PasskeyByCredentialID — is a single point get.
 // The surrogate id allocated from bbolt's NextSequence lives in the JSON value
 // (pkRec.ID) so the id-and-owner addressed methods (RenamePasskey,
 // DeletePasskey) can ownership-check a row; they resolve the credential_id by a
@@ -190,11 +190,11 @@ func insertPasskey(tx *bbolt.Tx, pb *bbolt.Bucket, cred *auth.PasskeyCredential)
 	return idxPut(tx, bucketIxPasskeyUser, passkeyUserIndexKey(cred.UserID, cred.CredentialID), nil)
 }
 
-// GetPasskeysByUserID returns all of a user's passkeys, ordered by creation
+// PasskeysByUserID returns all of a user's passkeys, ordered by creation
 // time then surrogate id (matching the old store's `ORDER BY created_at`). It
 // walks ix_passkey_user for the user and dereferences each credential id;
 // decoding fails closed (auth bucket).
-func (s *Store) GetPasskeysByUserID(_ context.Context, userID int64) ([]auth.PasskeyCredential, error) {
+func (s *Store) PasskeysByUserID(_ context.Context, userID int64) ([]auth.PasskeyCredential, error) {
 	var out []auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
 		var ferr error
@@ -244,10 +244,10 @@ func collectPasskeysByUser(tx *bbolt.Tx, userID int64) ([]auth.PasskeyCredential
 	return out, nil
 }
 
-// GetPasskeyByCredentialID looks up a passkey by its credential id (the
-// WebAuthn login hot path), returning (nil, nil) when not found (matching the
-// old store's sql.ErrNoRows -> nil mapping). Decoding fails closed.
-func (s *Store) GetPasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
+// PasskeyByCredentialID looks up a passkey by its credential id (the
+// WebAuthn login hot path), reporting absence through found rather than a nil
+// credential with a nil error. Decoding fails closed.
+func (s *Store) PasskeyByCredentialID(_ context.Context, credID []byte) (*auth.PasskeyCredential, bool, error) {
 	var out *auth.PasskeyCredential
 	err := s.view(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
@@ -310,19 +310,18 @@ func (s *Store) UpdatePasskeyAfterLogin(_ context.Context, credID []byte, signCo
 	})
 }
 
-// RenamePasskey sets the friendly name of the passkey identified by surrogate
-// id, but only when it belongs to userID (Requirement 16.4). It resolves the
-// credential id by a user-scoped walk of ix_passkey_user, so a passkey owned by
-// a different user is never visited and cannot be renamed. A non-matching
-// (id, userID) is a no-op returning nil, matching the SQLite UPDATE affecting
-// zero rows.
-func (s *Store) RenamePasskey(_ context.Context, id, userID int64, name string) error {
+// RenamePasskey sets the friendly name of the passkey ref identifies, but only
+// when it belongs to ref.UserID (Requirement 16.4). It resolves the credential
+// id by a user-scoped walk of ix_passkey_user, so a passkey owned by a
+// different user is never visited and cannot be renamed. A ref matching no row
+// is a no-op returning nil, matching the SQLite UPDATE affecting zero rows.
+func (s *Store) RenamePasskey(_ context.Context, ref auth.PasskeyRef, name string) error {
 	return s.update(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
 		if !ok {
 			return nil
 		}
-		credID, rec, found, err := s.findUserPasskeyByID(tx, userID, id)
+		credID, rec, found, err := findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
@@ -338,27 +337,26 @@ func (s *Store) RenamePasskey(_ context.Context, id, userID int64, name string) 
 	})
 }
 
-// DeletePasskey removes the passkey identified by surrogate id, but only when
-// it belongs to userID (Requirement 16.4). Like RenamePasskey it resolves the
-// credential id via a user-scoped index walk, so it can only ever delete the
-// supplied user's own passkey. It deletes the primary row and its
-// ix_passkey_user entry in one Update; a non-matching (id, userID) is a no-op
-// returning nil.
-func (s *Store) DeletePasskey(_ context.Context, id, userID int64) error {
+// DeletePasskey removes the passkey ref identifies, but only when it belongs to
+// ref.UserID (Requirement 16.4). Like RenamePasskey it resolves the credential
+// id via a user-scoped index walk, so it can only ever delete the supplied
+// user's own passkey. It deletes the primary row and its ix_passkey_user entry
+// in one Update; a ref matching no row is a no-op returning nil.
+func (s *Store) DeletePasskey(_ context.Context, ref auth.PasskeyRef) error {
 	var deleted bool
 	err := s.update(func(tx *bbolt.Tx) error {
 		pb, ok := authBucket(tx, bucketAuthPasskeys)
 		if !ok {
 			return nil
 		}
-		credID, _, found, err := s.findUserPasskeyByID(tx, userID, id)
+		credID, _, found, err := findUserPasskeyByID(tx, ref.UserID, ref.ID)
 		if err != nil || !found {
 			return err
 		}
 		if err := pb.Delete(credID); err != nil {
 			return fmt.Errorf("authstore: delete passkey: %w", err)
 		}
-		if err := idxDelete(tx, bucketIxPasskeyUser, passkeyUserIndexKey(userID, credID)); err != nil {
+		if err := idxDelete(tx, bucketIxPasskeyUser, passkeyUserIndexKey(ref.UserID, credID)); err != nil {
 			return err
 		}
 		deleted = true
@@ -368,7 +366,7 @@ func (s *Store) DeletePasskey(_ context.Context, id, userID int64) error {
 		return err
 	}
 	if deleted {
-		slog.Info("passkey deleted", "passkey_id", id, "user_id", userID)
+		slog.Info("passkey deleted", "passkey_id", ref.ID, "user_id", ref.UserID)
 	}
 	return nil
 }
@@ -399,7 +397,7 @@ func (s *Store) PasskeyCountForUser(_ context.Context, userID int64) (int, error
 // returns found=false with no error when the user has no passkey with that id.
 // The returned credID is copied so it is safe to use for a Put/Delete after the
 // cursor advances. Must be called inside a transaction. Decoding fails closed.
-func (s *Store) findUserPasskeyByID(tx *bbolt.Tx, userID, id int64) (credID []byte, rec *pkRec, found bool, err error) {
+func findUserPasskeyByID(tx *bbolt.Tx, userID, id int64) (credID []byte, rec *pkRec, found bool, err error) {
 	ib, ok := authBucket(tx, bucketIxPasskeyUser)
 	if !ok {
 		return nil, nil, false, nil

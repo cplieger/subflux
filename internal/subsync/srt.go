@@ -16,7 +16,7 @@ import (
 // --- Types ---
 
 // Cue represents a single subtitle cue with timing and text content.
-// This is a local definition that mirrors api.SubtitleCue, decoupling
+// This is a local definition that mirrors subflux.SubtitleCue, decoupling
 // the subsync package from the application's domain types.
 type Cue struct {
 	Text  string
@@ -32,7 +32,7 @@ type TimeSpan struct {
 
 // --- Public API ---
 
-// CuesToSpans converts subtitle cues to time spans.
+// cuesToSpans converts subtitle cues to time spans.
 func cuesToSpans(cues []Cue) []TimeSpan {
 	spans := make([]TimeSpan, len(cues))
 	for i, c := range cues {

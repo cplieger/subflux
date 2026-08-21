@@ -16,13 +16,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cplieger/httpx/v4"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/cache"
-	"github.com/cplieger/subflux/internal/httputil"
+	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
-	"github.com/cplieger/subflux/internal/provider/dlcache"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitleext"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
@@ -54,7 +53,7 @@ var defaultHDBitsConfig = hdbitsConfig{
 	MaxTorrentsPerSearch:     50,
 }
 
-const providerName = api.ProviderNameHDBits
+const providerName = subflux.ProviderNameHDBits
 
 // hdbAcceptedExts lists filename extensions accepted as subtitle content
 // (direct files, from the extension authority's archiveInput view) or
@@ -73,7 +72,7 @@ var hdbAcceptedExts = func() map[string]bool {
 }()
 
 // Factory creates an HDBits provider from settings.
-func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
+func Factory(_ context.Context, settings map[string]any) (provider.Provider, error) {
 	ps := provider.FromMap(settings)
 	if ps.Username == "" || ps.Passkey == "" {
 		return nil, errors.New("hdbits: username and passkey required")
@@ -85,7 +84,7 @@ func Factory(_ context.Context, settings map[string]any) (api.Provider, error) {
 		passkey:      ps.Passkey,
 		cfg:          defaultHDBitsConfig,
 		torrentCache: cache.New[[]int](1 * time.Hour),
-		dlCache:      dlcache.New(defaultHDBitsConfig.MaxCacheEntries, defaultHDBitsConfig.MaxCacheItemSize),
+		dlCache:      newDownloadCache(defaultHDBitsConfig.MaxCacheEntries, defaultHDBitsConfig.MaxCacheItemSize),
 	}, nil
 }
 
@@ -97,26 +96,26 @@ type Provider struct {
 	dlSfg        singleflight.Group
 	client       *http.Client
 	torrentCache *cache.Cache[[]int]
-	dlCache      *dlcache.DownloadCache
+	dlCache      *downloadCache
 	username     string
 	passkey      string
 	cfg          hdbitsConfig
 }
 
-// Compile-time interface checks.
-var (
-	_ api.Provider     = (*Provider)(nil)
-	_ api.CacheClearer = (*Provider)(nil)
-)
+// Compile-time check on the CacheClearer opt-in: it is discovered by type
+// assertion in provider.ClearCaches, so nothing else would catch a rename.
+// The Provider contract itself needs no assertion — Factory returns this type
+// as a provider.Provider.
+var _ provider.CacheClearer = (*Provider)(nil)
 
 // --- Provider API (Name, Search, Download) ---
 
 // Name returns the provider identifier for HDBits.
-func (p *Provider) Name() api.ProviderID { return providerName }
+func (p *Provider) Name() subflux.ProviderID { return providerName }
 
 // Search finds subtitles for the given request by resolving torrent IDs via the
 // HDBits API and inspecting each torrent's subtitle metadata.
-func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits searching",
 		"media_type", req.MediaType, "title", req.Title,
 		"season", req.Season, "episode", req.Episode,
@@ -137,7 +136,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 
 	var (
 		mu      sync.Mutex
-		results []api.Subtitle
+		results []subflux.Subtitle
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -156,7 +155,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 		}
 
 		g.Go(func() error {
-			subs, err := p.getSubtitles(gctx, id, req)
+			subs, err := p.fetchSubtitles(gctx, id, req)
 			if err != nil {
 				slog.Warn("hdbits: failed to get subtitles for torrent", "error", err)
 				return nil // non-fatal; continue other goroutines
@@ -177,7 +176,7 @@ func (p *Provider) Search(ctx context.Context, req *api.SearchRequest) ([]api.Su
 // Download fetches the subtitle content for the given search result.
 // Season pack archives are cached per subtitle ID and reused across
 // episodes; the target episode is extracted by S##E## filename match.
-func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, error) {
+func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte, error) {
 	// Validate ID is numeric to prevent path injection.
 	if _, err := strconv.Atoi(sub.ID); err != nil {
 		return nil, fmt.Errorf("invalid subtitle ID %q: %w", sub.ID, err)
@@ -210,8 +209,8 @@ func (p *Provider) Download(ctx context.Context, sub *api.Subtitle) ([]byte, err
 // buildLookup constructs the HDBits API search parameters and cache key
 // from the search request. Returns nil params when the request lacks the
 // required ID for the media type.
-func (p *Provider) buildLookup(req *api.SearchRequest) (params map[string]any, cacheKey string) {
-	if req.MediaType == api.MediaTypeEpisode {
+func (p *Provider) buildLookup(req *subflux.SearchRequest) (params map[string]any, cacheKey string) {
+	if req.MediaType == subflux.MediaTypeEpisode {
 		if req.TvdbID <= 0 {
 			return nil, ""
 		}
@@ -303,21 +302,22 @@ func (p *Provider) doFetch(ctx context.Context, subID string) ([]byte, error) {
 
 	slog.Debug("hdbits downloading subtitle", "subtitle_id", subID)
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, dlURL, http.NoBody)
+		ctx, http.MethodGet, dlURL, http.NoBody,
+	)
 	if err != nil {
 		return nil, httpx.RedactSecret(fmt.Errorf("hdbits download %s: %w", subID, err), p.passkey)
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, p.passkey)
+		return nil, httpx.RedactTransportError(err, "hdbits download "+subID, httpx.Secret(p.passkey))
 	}
 	defer resp.Body.Close()
 
-	if httpErr := httputil.CheckHTTPStatus(resp); httpErr != nil {
+	if httpErr := httpwire.CheckHTTPStatus(resp); httpErr != nil {
 		return nil, httpx.RedactSecret(httpErr, p.passkey)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httputil.MaxDownloadBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpwire.MaxDownloadBytes))
 	if err != nil {
 		return nil, httpx.RedactSecret(err, p.passkey)
 	}
@@ -347,7 +347,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -355,7 +355,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, err
 	}
 
@@ -364,7 +364,7 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 			ID int `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes)).Decode(&result); err != nil { // torrent list limit
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // torrent list limit
 		return nil, err
 	}
 
@@ -375,9 +375,9 @@ func (p *Provider) findTorrentIDs(ctx context.Context, params map[string]any, de
 	return ids, nil
 }
 
-// getSubtitles fetches subtitle metadata for a single torrent and filters
+// fetchSubtitles fetches subtitle metadata for a single torrent and filters
 // by language and content type (excludes commentary/extras).
-func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *api.SearchRequest) ([]api.Subtitle, error) {
+func (p *Provider) fetchSubtitles(ctx context.Context, torrentID int, searchReq *subflux.SearchRequest) ([]subflux.Subtitle, error) {
 	slog.Debug("hdbits fetching subtitles for torrent", "torrent_id", torrentID)
 
 	params := map[string]any{
@@ -394,7 +394,7 @@ func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *a
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(httputil.HeaderContentType, httputil.ContentTypeJSON)
+	req.Header.Set(httpwire.HeaderContentType, httpwire.ContentTypeJSON)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -402,14 +402,14 @@ func (p *Provider) getSubtitles(ctx context.Context, torrentID int, searchReq *a
 	}
 	defer resp.Body.Close()
 
-	if err := httputil.CheckHTTPStatus(resp); err != nil {
+	if err := httpwire.CheckHTTPStatus(resp); err != nil {
 		return nil, err
 	}
 
 	var result struct {
 		Data []hdbSubtitleItem `json:"data"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, httputil.MaxJSONResponseBytes)).Decode(&result); err != nil { // subtitle list limit
+	if err := json.NewDecoder(io.LimitReader(resp.Body, httpwire.MaxJSONResponseBytes)).Decode(&result); err != nil { // subtitle list limit
 		return nil, err
 	}
 

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config"
 )
 
@@ -45,9 +44,9 @@ func TestSaveTransaction_concurrent_saves_keep_live_and_disk_in_sync(t *testing.
 		release     = make(chan struct{})
 		releaseOnce sync.Once
 	)
-	hotReload := func(_ context.Context, cfg api.ConfigProvider) error {
+	hotReload := func(_ context.Context, cfg *config.Config) error {
 		mu.Lock()
-		liveURL = cfg.SonarrConfig().URL
+		liveURL = cfg.Sonarr().URL
 		calls++
 		first := calls == 1
 		mu.Unlock()
@@ -92,16 +91,16 @@ languages:
 
 	a := <-recA
 	if a.Code != http.StatusOK {
-		t.Fatalf("save A status = %d, body %s", a.Code, a.Body.String())
+		t.Errorf("save A status = %d, body %s", a.Code, a.Body.String())
 	}
 	if recB.Code != http.StatusOK {
-		t.Fatalf("save B status = %d, body %s", recB.Code, recB.Body.String())
+		t.Errorf("save B status = %d, body %s", recB.Code, recB.Body.String())
 	}
 	mu.Lock()
 	gotCalls, gotLive := calls, liveURL
 	mu.Unlock()
 	if gotCalls != 2 {
-		t.Fatalf("hot reload calls = %d, want 2", gotCalls)
+		t.Errorf("hot reload calls = %d, want 2", gotCalls)
 	}
 
 	saved, err := os.ReadFile(cfgPath)
@@ -112,7 +111,7 @@ languages:
 	if err != nil {
 		t.Fatalf("persisted config does not load: %v\n%s", err, saved)
 	}
-	if diskURL := cfg.SonarrConfig().URL; diskURL != gotLive {
+	if diskURL := cfg.Sonarr().URL; diskURL != gotLive {
 		t.Errorf("live and disk generations diverged: last activated %q, on disk %q",
 			gotLive, diskURL)
 	}

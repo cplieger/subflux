@@ -122,13 +122,11 @@ func TestCache_concurrent_access(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 100 {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
+		wg.Go(func() {
 			key := "key"
-			c.Set(key, n)
+			c.Set(key, i)
 			c.Get(key)
-		}(i)
+		})
 	}
 	wg.Wait()
 	// No race detector panic = pass.
@@ -364,7 +362,6 @@ func BenchmarkCache_GetOrFetch(b *testing.B) {
 
 func TestCache_GetOrFetchCtx(t *testing.T) {
 	t.Parallel()
-	c := New[string](time.Hour)
 
 	t.Run("basic fetch", func(t *testing.T) {
 		t.Parallel()
@@ -392,11 +389,9 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 		ctxA, cancelA := context.WithCancel(context.Background())
 
 		var wg sync.WaitGroup
-		wg.Add(2)
 
 		// Start caller A.
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = c.GetOrFetchCtx(ctxA, "shared", func(ctx context.Context) (string, error) {
 				close(fetchStarted)
 				<-fetchDone
@@ -406,7 +401,7 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 				}
 				return "result", nil
 			})
-		}()
+		})
 
 		// Wait for fetch to start, then cancel caller A.
 		<-fetchStarted
@@ -416,13 +411,12 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 		ctxB := t.Context()
 		var gotB string
 		var errB error
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			gotB, errB = c.GetOrFetchCtx(ctxB, "shared", func(ctx context.Context) (string, error) {
 				t.Error("caller B should coalesce, not start a new fetch")
 				return "wrong", nil
 			})
-		}()
+		})
 
 		// Give B time to join the flight, then release A's fetch. Not a
 		// false-green risk: if B arrives late it starts its own fetch and the
@@ -444,7 +438,6 @@ func TestCache_GetOrFetchCtx(t *testing.T) {
 	// Verify caller's own context cancellation returns ctx.Err().
 	t.Run("caller context respected", func(t *testing.T) {
 		t.Parallel()
-		_ = c
 		c := New[string](time.Hour)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // pre-cancel

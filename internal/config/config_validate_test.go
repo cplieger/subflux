@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestValidate consolidates validation tests into a single table-driven test.
@@ -17,14 +17,14 @@ func TestValidate(t *testing.T) {
 	// validBase returns a minimal valid Config for boundary testing.
 	validBase := func() *Config {
 		return &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
-			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
+			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}, UpgradeWindowDays: 7},
 		}
 	}
 
@@ -39,105 +39,105 @@ func TestValidate(t *testing.T) {
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "sonarr missing api_key", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "radarr missing api_key", cfg: &Config{
-			Radarr: yamlArrConfig{URL: "http://radarr:7878"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "radarr"},
 		{name: "both arr missing api_key", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989"},
-			Radarr: yamlArrConfig{URL: "http://radarr:7878"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "sonarr"},
 		{name: "sonarr only passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "radarr only passes", cfg: &Config{
-			Radarr: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "both arr passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
-			Radarr: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			RadarrCfg: yamlArrConfig{URL: "http://radarr:7878", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 
 		// language rules
 		{name: "no default fails", cfg: &Config{
-			Sonarr:          yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			SonarrCfg:       yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "rules without default fails", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty audio in rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: ""}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty subtitle code in default", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: ""}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: ""},
 		{name: "default rules only passes", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
-			SearchCfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			Cfg: yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 		}, wantErr: false, errContains: ""},
 		{name: "duplicate audio rule", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{
 					{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}},
@@ -145,23 +145,23 @@ func TestValidate(t *testing.T) {
 				},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: true}},
 		}, wantErr: true, errContains: "duplicate"},
 
 		// providers
 		{name: "no enabled providers", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{"os": {Enabled: false}},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{"os": {Enabled: false}},
 		}, wantErr: true, errContains: ""},
 		{name: "empty providers map", cfg: &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules: []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}}, Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			PollIntervalCfg: Duration{D: 30 * time.Second}, Providers: map[api.ProviderID]yamlProviderCfg{},
+			PollIntervalCfg: Duration{D: 30 * time.Second}, ProvidersCfg: map[subflux.ProviderID]yamlProviderCfg{},
 		}, wantErr: true, errContains: ""},
 	}
 
@@ -190,55 +190,55 @@ func TestValidate(t *testing.T) {
 	}{
 		// provider_timeout boundaries
 		{name: "provider_timeout below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: 30 * time.Minute}
+			c.Cfg.ProviderTimeout = Duration{D: 30 * time.Minute}
 		}, wantErr: true, errContains: ""},
 		{name: "provider_timeout one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: time.Hour - time.Nanosecond}
+			c.Cfg.ProviderTimeout = Duration{D: time.Hour - time.Nanosecond}
 		}, wantErr: true, errContains: ""},
 		{name: "provider_timeout zero disables", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: 0}
+			c.Cfg.ProviderTimeout = Duration{D: 0}
 		}, wantErr: false, errContains: ""},
 		{name: "provider_timeout at minimum", mutate: func(c *Config) {
-			c.SearchCfg.ProviderTimeout = Duration{D: time.Hour}
+			c.Cfg.ProviderTimeout = Duration{D: time.Hour}
 		}, wantErr: false, errContains: ""},
 
 		// scan_delay boundaries
 		{name: "scan_delay below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: time.Second}
+			c.Cfg.ScanDelay = Duration{D: time.Second}
 		}, wantErr: true, errContains: ""},
 		{name: "scan_delay one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 5*time.Second - time.Nanosecond}
+			c.Cfg.ScanDelay = Duration{D: 5*time.Second - time.Nanosecond}
 		}, wantErr: true, errContains: ""},
 		{name: "scan_delay exact minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 5 * time.Second}
+			c.Cfg.ScanDelay = Duration{D: 5 * time.Second}
 		}, wantErr: false, errContains: ""},
 		{name: "scan_delay zero", mutate: func(c *Config) {
-			c.SearchCfg.ScanDelay = Duration{D: 0}
+			c.Cfg.ScanDelay = Duration{D: 0}
 		}, wantErr: true, errContains: ""},
 
 		// scan_interval boundaries
 		{name: "scan_interval below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: 30 * time.Minute}
+			c.Cfg.ScanInterval = Duration{D: 30 * time.Minute}
 		}, wantErr: true, errContains: "scan_interval"},
 		{name: "scan_interval one below minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: time.Hour - time.Nanosecond}
+			c.Cfg.ScanInterval = Duration{D: time.Hour - time.Nanosecond}
 		}, wantErr: true, errContains: "scan_interval"},
 		{name: "scan_interval at minimum", mutate: func(c *Config) {
-			c.SearchCfg.ScanInterval = Duration{D: time.Hour}
+			c.Cfg.ScanInterval = Duration{D: time.Hour}
 		}, wantErr: false, errContains: ""},
 
 		// upgrade_window_days boundaries
 		{name: "upgrade zero window_days", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = 0
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = 0
 		}, wantErr: true, errContains: ""},
 		{name: "upgrade negative window_days", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = -1
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = -1
 		}, wantErr: true, errContains: ""},
 		{name: "upgrade window_days one", mutate: func(c *Config) {
-			c.SearchCfg.UpgradeEnabled = true
-			c.SearchCfg.UpgradeWindowDays = 1
+			c.Cfg.UpgradeEnabled = true
+			c.Cfg.UpgradeWindowDays = 1
 		}, wantErr: false, errContains: ""},
 
 		// adaptive_backoff boundaries
@@ -314,10 +314,10 @@ func TestValidate(t *testing.T) {
 
 		// min_score boundaries
 		{name: "min_score negative", mutate: func(c *Config) {
-			c.SearchCfg.MinScore = -1
+			c.Cfg.MinScore = -1
 		}, wantErr: true, errContains: "min_score"},
 		{name: "min_score over 100", mutate: func(c *Config) {
-			c.SearchCfg.MinScore = 101
+			c.Cfg.MinScore = 101
 		}, wantErr: true, errContains: "min_score"},
 
 		// audio_sync_fallback boundaries
@@ -510,7 +510,7 @@ func TestValidateSearch_download_max_attempts_default(t *testing.T) {
 // --- Scoring weights (validateScoring) ---
 
 // TestValidateScoring checks the scoring-weight invariants from
-// api.Scores / api.DefaultScores: non-negative weights, and hash >= the
+// subflux.Scores / subflux.DefaultScores: non-negative weights, and hash >= the
 // maximum attribute-only sum per media type (so a verified hash match
 // always outranks attribute matches).
 func TestValidateScoring(t *testing.T) {
@@ -518,33 +518,33 @@ func TestValidateScoring(t *testing.T) {
 
 	// scoringBase returns a minimal otherwise-valid Config carrying the
 	// given scoring weights (nil = defaults in use).
-	scoringBase := func(w *api.Scores) *Config {
+	scoringBase := func(w *subflux.Scores) *Config {
 		return &Config{
-			Sonarr: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
+			SonarrCfg: yamlArrConfig{URL: "http://sonarr:8989", APIKey: "test-key"},
 			Languages: LanguageRules{
 				Rules:   []AudioRule{{Audio: "en", Subtitles: []yamlSubtitleTarget{{Code: "fr"}}}},
 				Default: []yamlSubtitleTarget{{Code: "en"}},
 			},
-			Providers:       map[api.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
+			ProvidersCfg:    map[subflux.ProviderID]yamlProviderCfg{"test": {Enabled: true}},
 			PollIntervalCfg: Duration{D: 30 * time.Second},
-			SearchCfg:       yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
+			Cfg:             yamlSearchConfig{ScanDelay: minScanDelay, ScanInterval: Duration{D: time.Hour}},
 			Scoring:         ScoringConfig{Weights: w},
 		}
 	}
 
 	// withHash returns the default weights with hash overridden.
-	withHash := func(hash int) *api.Scores {
-		w := api.DefaultScores
+	withHash := func(hash int) *subflux.Scores {
+		w := subflux.DefaultScores
 		w.Hash = hash
 		return &w
 	}
 
-	defaultsCopy := api.DefaultScores
-	negativeSource := api.DefaultScores
+	defaultsCopy := subflux.DefaultScores
+	negativeSource := subflux.DefaultScores
 	negativeSource.Source = -1
 
 	tests := []struct {
-		weights     *api.Scores
+		weights     *subflux.Scores
 		name        string
 		errContains string
 		wantErr     bool

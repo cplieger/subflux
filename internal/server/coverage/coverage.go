@@ -3,7 +3,11 @@
 // handling — they operate solely on api types.
 package coverage
 
-import "github.com/cplieger/subflux/internal/api"
+import (
+	"strings"
+
+	"github.com/cplieger/subflux/internal/subflux"
+)
 
 // Key identifies a subtitle by language and variant for coverage indexing.
 type Key struct{ Lang, Variant string }
@@ -30,7 +34,7 @@ const RuleNoTargets = "no targets"
 // IndexSubStatus builds a media_id → Key → Status index from subtitle
 // file rows. A subtitle is "usable" if it's external or embedded with a
 // non-ignored codec.
-func IndexSubStatus(files []api.SubtitleEntry, ignoredCodecs map[string]bool) map[string]map[Key]*Status {
+func IndexSubStatus(files []subflux.SubtitleEntry, ignoredCodecs map[string]bool) map[string]map[Key]*Status {
 	idx := make(map[string]map[Key]*Status, len(files))
 	for i := range files {
 		f := &files[i]
@@ -43,7 +47,7 @@ func IndexSubStatus(files []api.SubtitleEntry, ignoredCodecs map[string]bool) ma
 			st = &Status{}
 			idx[f.MediaID][k] = st
 		}
-		if f.Source == string(api.SourceEmbedded) && ignoredCodecs[f.Codec] {
+		if f.Source == string(subflux.SourceEmbedded) && ignoredCodecs[f.Codec] {
 			if !st.Usable {
 				st.IgnoredOnly = true
 			}
@@ -57,7 +61,7 @@ func IndexSubStatus(files []api.SubtitleEntry, ignoredCodecs map[string]bool) ma
 
 // ResolveRuleName returns the display rule name for coverage based on
 // the audio language and resolved targets.
-func ResolveRuleName(audioLang string, targets []api.SubtitleTarget) string {
+func ResolveRuleName(audioLang string, targets []subflux.SubtitleTarget) string {
 	if len(targets) == 0 {
 		return RuleNoTargets
 	}
@@ -71,18 +75,18 @@ func ResolveRuleName(audioLang string, targets []api.SubtitleTarget) string {
 // Episode IDs are "{prefix}s{ss}e{ee}" (e.g. "tvdb-12345-s01e01").
 // Returns the prefix including the trailing "-", or "" if the format is unrecognized.
 func ExtractSeriesPrefix(epMediaID string) string {
-	for i := len(epMediaID) - 1; i >= 1; i-- {
-		if epMediaID[i-1] == '-' && epMediaID[i] == 's' {
-			return epMediaID[:i]
-		}
+	before, _, found := strings.CutLast(epMediaID, "-s")
+	if !found {
+		return ""
 	}
-	return ""
+	// len(before)+1 re-includes the separator's "-" without allocating.
+	return epMediaID[:len(before)+1]
 }
 
-// CountEpisodeCoverageGrouped counts coverage from pre-grouped episode subtitle maps.
-func CountEpisodeCoverageGrouped(
+// CountEpisodesGrouped counts coverage from pre-grouped episode subtitle maps.
+func CountEpisodesGrouped(
 	episodes []map[Key]*Status,
-	targets []api.SubtitleTarget,
+	targets []subflux.SubtitleTarget,
 	total int,
 ) []TargetCoverage {
 	out := make([]TargetCoverage, 0, len(targets))
@@ -109,10 +113,10 @@ func CountEpisodeCoverageGrouped(
 	return out
 }
 
-// CountMovieCoverage returns target coverage for a single movie.
-func CountMovieCoverage(
+// CountMovies returns target coverage for a single movie.
+func CountMovies(
 	subs map[Key]*Status,
-	targets []api.SubtitleTarget,
+	targets []subflux.SubtitleTarget,
 ) []TargetCoverage {
 	out := make([]TargetCoverage, 0, len(targets))
 	for _, t := range targets {
@@ -138,10 +142,10 @@ func CountMovieCoverage(
 
 // DeduplicateFileRows collapses multiple rows with the same
 // (media_id, language, variant, source) into one row for display.
-func DeduplicateFileRows(rows []api.SubtitleEntry) []api.SubtitleEntry {
+func DeduplicateFileRows(rows []subflux.SubtitleEntry) []subflux.SubtitleEntry {
 	type key struct{ mediaID, lang, variant, source string }
 	seen := make(map[key]bool, len(rows))
-	out := make([]api.SubtitleEntry, 0, len(rows))
+	out := make([]subflux.SubtitleEntry, 0, len(rows))
 	for i := range rows {
 		k := key{rows[i].MediaID, rows[i].Language, rows[i].Variant, rows[i].Source}
 		if seen[k] {

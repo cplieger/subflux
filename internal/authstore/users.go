@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cplieger/auth/v3"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/store/kv"
 	"go.etcd.io/bbolt"
 )
@@ -248,9 +248,9 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 	return nil
 }
 
-// GetUserByID looks up a user by surrogate id, returning (nil, nil) when no
-// such user exists (matching the old store's sql.ErrNoRows -> nil mapping).
-func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, bool, error) {
+// UserByID looks up a user by surrogate id, reporting absence through found
+// (nil, false, nil) rather than a nil user with a nil error.
+func (s *Store) UserByID(_ context.Context, id int64) (*auth.User, bool, error) {
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
 		ub, ok := authBucket(tx, bucketAuthUsers)
@@ -272,17 +272,17 @@ func (s *Store) GetUserByID(_ context.Context, id int64) (*auth.User, bool, erro
 	return out, out != nil, err
 }
 
-// GetUserByUsername looks up a user case-insensitively by username via
-// ix_user_name, returning (nil, nil) when not found (Requirement 16.1).
-func (s *Store) GetUserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
+// UserByUsername looks up a user case-insensitively by username via
+// ix_user_name, reporting absence through found (Requirement 16.1).
+func (s *Store) UserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
 	return s.userByIndex(bucketIxUserName, userNameIndexKey(username))
 }
 
-// GetUserByEmail looks up a user case-insensitively by email, returning
-// (nil, nil) when not found (Requirement 16.1). email is not indexed (it is not
+// UserByEmail looks up a user case-insensitively by email, reporting absence
+// through found (Requirement 16.1). email is not indexed (it is not
 // unique in the schema), so this is a fail-closed scan of auth_users comparing
 // the ASCII-folded email of each row.
-func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
+func (s *Store) UserByEmail(_ context.Context, email string) (*auth.User, bool, error) {
 	target := asciiFold(email)
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
@@ -306,20 +306,33 @@ func (s *Store) GetUserByEmail(_ context.Context, email string) (*auth.User, boo
 	return out, out != nil, err
 }
 
-// GetUserByOIDCSub looks up a user by (issuer, sub) via ix_user_oidc, returning
-// (nil, nil) when not found. An empty sub never matches, mirroring the SQLite
+// UserByOIDCSub looks up a user by (issuer, sub) via ix_user_oidc, reporting
+// absence through found. An empty sub never matches, mirroring the SQLite
 // partial index keyed only on rows with oidc_sub != ”. Matching on subject
 // alone would be unsafe: a subject is unique only within its issuer.
-func (s *Store) GetUserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, bool, error) {
+func (s *Store) UserByOIDCSub(_ context.Context, issuer, sub string) (*auth.User, bool, error) {
 	if sub == "" {
 		return nil, false, nil
 	}
 	return s.userByIndex(bucketIxUserOIDC, userOIDCIndexKey(issuer, sub))
 }
 
+// errDanglingIndex is returned by userByIndex when a uniqueness index holds an
+// entry whose primary-key target is absent from auth_users. That is a store
+// integrity fault, not an answer: the index is maintained inside the same
+// transaction as the row it points at, so a live entry with no row means the
+// invariant broke. It must not read as plain absence, because absence is a
+// normal outcome the caller acts on (create the user, reject the login) while
+// this one means the store's own bookkeeping is inconsistent and the caller's
+// next write may collide with an index entry it cannot see. Like an undecodable
+// record, it fails closed (Requirement 13.4).
+var errDanglingIndex = errors.New("authstore: dangling index entry: index names a user id absent from auth_users")
+
 // userByIndex resolves a user through an index bucket whose value is the user's
-// be64(id) primary key. It returns (nil, nil) on a missing index entry or a
-// dangling reference, and fails closed on an undecodable user record.
+// be64(id) primary key. A missing index bucket or index entry is plain absence:
+// (nil, false, nil). An entry naming an absent user is an integrity fault, not
+// absence, and returns errDanglingIndex; an undecodable user record fails closed
+// the same way.
 func (s *Store) userByIndex(indexBucket string, indexKey []byte) (*auth.User, bool, error) {
 	var out *auth.User
 	err := s.view(func(tx *bbolt.Tx) error {
@@ -337,7 +350,7 @@ func (s *Store) userByIndex(indexBucket string, indexKey []byte) (*auth.User, bo
 		}
 		data := ub.Get(idv)
 		if data == nil {
-			return nil // dangling index entry; treat as not found
+			return errDanglingIndex
 		}
 		var rec userRec
 		if err := decodeAuthRecord(bucketAuthUsers, idv, data, &rec); err != nil {

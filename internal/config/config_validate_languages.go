@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/config/defaults"
+	"github.com/cplieger/subflux/internal/langcode"
 )
 
 // validateScoreRange checks that a score value is within [defaults.MinScoreValue, defaults.MaxScoreValue].
@@ -29,16 +29,18 @@ func validateScoreRange(value int, field string) error {
 // canonical spelling exists the error names it, so any rejected config is one
 // edit from working.
 func validateLangCode(code, field, ctx string) error {
-	if api.ValidLangCode(code) {
+	if langcode.Valid(code) {
 		return nil
 	}
-	if canon := api.CanonicalLangCode(code); canon != "" {
+	if canon := langcode.Canonical(code); canon != "" {
 		return configFieldErr(field, fmt.Sprintf(
 			"%s %q (%s) is not the code subflux uses for that language; use %q",
-			field, code, ctx, canon))
+			field, code, ctx, canon,
+		))
 	}
 	return configFieldErr(field, fmt.Sprintf(
-		"%s %q (%s) is not a known language code", field, code, ctx))
+		"%s %q (%s) is not a known language code", field, code, ctx,
+	))
 }
 
 // validateTarget checks a single subtitle target for validity.

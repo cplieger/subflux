@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/server/coverage"
 	"pgregory.net/rapid"
 )
@@ -23,15 +23,15 @@ func TestExtractSeriesPrefix_matchesBuildSeriesPrefix(t *testing.T) {
 
 		// TVDB-based IDs (the canonical Sonarr path).
 		tvdbID := rapid.IntRange(1, 1_000_000).Draw(rt, "tvdbID")
-		epID := api.BuildEpisodeID(tvdbID, "", season, episode)
-		if got, want := coverage.ExtractSeriesPrefix(epID), api.BuildSeriesPrefix(tvdbID, ""); got != want {
+		epID := mediaid.Episode(tvdbID, "", mediaid.SeasonEpisode{Season: season, Episode: episode})
+		if got, want := coverage.ExtractSeriesPrefix(epID), mediaid.SeriesPrefix(tvdbID, ""); got != want {
 			rt.Fatalf("ExtractSeriesPrefix(%q) = %q, want %q", epID, got, want)
 		}
 
 		// IMDB-fallback IDs (tvdbID == 0).
 		imdbID := "tt" + strconv.Itoa(rapid.IntRange(1, 99_999_999).Draw(rt, "imdbNum"))
-		epID = api.BuildEpisodeID(0, imdbID, season, episode)
-		if got, want := coverage.ExtractSeriesPrefix(epID), api.BuildSeriesPrefix(0, imdbID); got != want {
+		epID = mediaid.Episode(0, imdbID, mediaid.SeasonEpisode{Season: season, Episode: episode})
+		if got, want := coverage.ExtractSeriesPrefix(epID), mediaid.SeriesPrefix(0, imdbID); got != want {
 			rt.Fatalf("ExtractSeriesPrefix(%q) = %q, want %q", epID, got, want)
 		}
 	})

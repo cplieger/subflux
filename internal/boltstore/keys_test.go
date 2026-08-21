@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/subflux/internal/api"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // TestAttemptKey_layoutAndRoundTrip asserts the search_attempts key is exactly
 // mt 0x00 mid 0x00 lang 0x00 provider and splits back into its components.
 func TestAttemptKey_layoutAndRoundTrip(t *testing.T) {
-	key := attemptKey(api.MediaTypeEpisode, "tvdb-99-s01e02", "fr", api.ProviderNameOpenSubtitles)
+	key := attemptKey(subflux.MediaTypeEpisode, "tvdb-99-s01e02", "fr", subflux.ProviderNameOpenSubtitles)
 	want := []byte("episode\x00tvdb-99-s01e02\x00fr\x00opensubtitles")
 	if !bytes.Equal(key, want) {
 		t.Fatalf("attemptKey = %q, want %q", key, want)
@@ -50,9 +50,9 @@ func TestStateKey_orderingAndParse(t *testing.T) {
 // TestTriplePrefix_boundarySafety is the central component-boundary guard: a
 // prefix scan for media id "tt1" must NOT match a key for "tt12".
 func TestTriplePrefix_boundarySafety(t *testing.T) {
-	short := triplePrefix(api.MediaTypeEpisode, "tt1", "fr")
-	longKey := attemptKey(api.MediaTypeEpisode, "tt12", "fr", api.ProviderNameSubDL)
-	shortKey := attemptKey(api.MediaTypeEpisode, "tt1", "fr", api.ProviderNameSubDL)
+	short := triplePrefix(subflux.MediaTypeEpisode, "tt1", "fr")
+	longKey := attemptKey(subflux.MediaTypeEpisode, "tt12", "fr", subflux.ProviderNameSubDL)
+	shortKey := attemptKey(subflux.MediaTypeEpisode, "tt1", "fr", subflux.ProviderNameSubDL)
 
 	if !bytes.HasPrefix(shortKey, short) {
 		t.Errorf("expected key for tt1 %q to carry triplePrefix %q", shortKey, short)
@@ -62,7 +62,7 @@ func TestTriplePrefix_boundarySafety(t *testing.T) {
 	}
 
 	// mediaPrefix has the same boundary guarantee on the media id alone.
-	mp := mediaPrefix(api.MediaTypeEpisode, "tt1")
+	mp := mediaPrefix(subflux.MediaTypeEpisode, "tt1")
 	if !bytes.HasPrefix(shortKey, mp) {
 		t.Errorf("expected key for tt1 %q to carry mediaPrefix %q", shortKey, mp)
 	}
@@ -77,19 +77,19 @@ func TestTriplePrefix_boundarySafety(t *testing.T) {
 // the trailing surrogate id parses back.
 func TestStateQuadKey_prefixAndID(t *testing.T) {
 	const id int64 = 4242
-	key := stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, id)
+	key := stateQuadKey(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced, id)
 
-	if !bytes.HasPrefix(key, quadPrefix(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced)) {
+	if !bytes.HasPrefix(key, quadPrefix(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced)) {
 		t.Error("stateQuadKey must carry its quadPrefix")
 	}
-	if !bytes.HasPrefix(key, triplePrefix(api.MediaTypeMovie, "tmdb-27205", "en")) {
+	if !bytes.HasPrefix(key, triplePrefix(subflux.MediaTypeMovie, "tmdb-27205", "en")) {
 		t.Error("stateQuadKey must carry its triplePrefix (all-variant scans)")
 	}
-	if !bytes.HasPrefix(key, mediaPrefix(api.MediaTypeMovie, "tmdb-27205")) {
+	if !bytes.HasPrefix(key, mediaPrefix(subflux.MediaTypeMovie, "tmdb-27205")) {
 		t.Error("stateQuadKey must carry its mediaPrefix")
 	}
 	// A different variant of the same triple must not match the quadPrefix.
-	if bytes.HasPrefix(key, quadPrefix(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantStandard)) {
+	if bytes.HasPrefix(key, quadPrefix(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantStandard)) {
 		t.Error("a forced key must not match the standard quadPrefix")
 	}
 	gotID, ok := stateQuadKeyID(key)
@@ -97,15 +97,15 @@ func TestStateQuadKey_prefixAndID(t *testing.T) {
 		t.Errorf("stateQuadKeyID = (%d, %v), want (%d, true)", gotID, ok, id)
 	}
 	quad, sid, ok := splitStateQuadKey(key)
-	if !ok || quad.mt != api.MediaTypeMovie || quad.mid != "tmdb-27205" || quad.lang != "en" ||
-		quad.variant != api.VariantForced || sid != id {
+	if !ok || quad.mt != subflux.MediaTypeMovie || quad.mid != "tmdb-27205" || quad.lang != "en" ||
+		quad.variant != subflux.VariantForced || sid != id {
 		t.Errorf("splitStateQuadKey = (%+v, %d, %v), want (movie/tmdb-27205/en/forced, %d, true)",
 			quad, sid, ok, id)
 	}
 
 	// Two ids under the same quad sort by id (insertion order).
-	if bytes.Compare(stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, 1),
-		stateQuadKey(api.MediaTypeMovie, "tmdb-27205", "en", api.VariantForced, 2)) >= 0 {
+	if bytes.Compare(stateQuadKey(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced, 1),
+		stateQuadKey(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced, 2)) >= 0 {
 		t.Error("stateQuadKey id=1 should sort before id=2 under the same quad")
 	}
 }
@@ -115,14 +115,14 @@ func TestStateQuadKey_prefixAndID(t *testing.T) {
 // prefix that matches every variant's quad keys, while a concrete variant
 // yields the exact quad prefix.
 func TestStatePrefix_emptyVariantSpansAllVariants(t *testing.T) {
-	forcedKey := stateQuadKey(api.MediaTypeMovie, "tt1", "fr", api.VariantForced, 7)
-	stdKey := stateQuadKey(api.MediaTypeMovie, "tt1", "fr", api.VariantStandard, 8)
+	forcedKey := stateQuadKey(subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantForced, 7)
+	stdKey := stateQuadKey(subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantStandard, 8)
 
-	all := statePrefix(api.MediaTypeMovie, "tt1", "fr", "")
+	all := statePrefix(subflux.MediaTypeMovie, "tt1", "fr", "")
 	if !bytes.HasPrefix(forcedKey, all) || !bytes.HasPrefix(stdKey, all) {
 		t.Error("statePrefix(\"\") must match every variant of the language")
 	}
-	exact := statePrefix(api.MediaTypeMovie, "tt1", "fr", api.VariantForced)
+	exact := statePrefix(subflux.MediaTypeMovie, "tt1", "fr", subflux.VariantForced)
 	if !bytes.HasPrefix(forcedKey, exact) {
 		t.Error("statePrefix(forced) must match the forced key")
 	}
@@ -162,8 +162,8 @@ func TestStateVideoKey_roundTripAndBoundary(t *testing.T) {
 // builds in order and splits back, with lang/variant recoverable from the key
 // for key-only coverage walks.
 func TestSubtitleFileKey_roundTrip(t *testing.T) {
-	key := subtitleFileKey(api.MediaTypeEpisode, "tvdb-1-s01e01", "es", api.Variant("hi"),
-		api.SourceExternal, "/media/tv/Show/Show.S01E01.es.hi.srt")
+	key := subtitleFileKey(subflux.MediaTypeEpisode, "tvdb-1-s01e01", "es", subflux.Variant("hi"),
+		subflux.SourceExternal, "/media/tv/Show/Show.S01E01.es.hi.srt")
 	got := kv.Split(key)
 	want := []string{
 		"episode", "tvdb-1-s01e01", "es", "hi", "external",
@@ -173,14 +173,14 @@ func TestSubtitleFileKey_roundTrip(t *testing.T) {
 		t.Errorf("Split(subtitleFileKey) = %q, want %q", got, want)
 	}
 	// Per-media prefix walk must hit the file key.
-	if !bytes.HasPrefix(key, mediaPrefix(api.MediaTypeEpisode, "tvdb-1-s01e01")) {
+	if !bytes.HasPrefix(key, mediaPrefix(subflux.MediaTypeEpisode, "tvdb-1-s01e01")) {
 		t.Error("subtitleFileKey must carry its mediaPrefix for key-only coverage walks")
 	}
 }
 
 // TestScanStateKey_roundTrip asserts scan_state is keyed by mt 0x00 mid.
 func TestScanStateKey_roundTrip(t *testing.T) {
-	key := scanStateKey(api.MediaTypeMovie, "tmdb-603")
+	key := scanStateKey(subflux.MediaTypeMovie, "tmdb-603")
 	want := []string{"movie", "tmdb-603"}
 	if got := kv.Split(key); !slices.Equal(got, want) {
 		t.Errorf("Split(scanStateKey) = %q, want %q", got, want)
@@ -192,7 +192,7 @@ func TestBareKeys(t *testing.T) {
 	if got := syncOffsetKey("/media/x.fr.srt"); !bytes.Equal(got, []byte("/media/x.fr.srt")) {
 		t.Errorf("syncOffsetKey = %q, want the bare path", got)
 	}
-	if got := pollStateKey(api.PollKey("sonarr")); !bytes.Equal(got, []byte("sonarr")) {
+	if got := pollStateKey(subflux.PollKey("sonarr")); !bytes.Equal(got, []byte("sonarr")) {
 		t.Errorf("pollStateKey = %q, want %q", got, "sonarr")
 	}
 }
@@ -211,7 +211,7 @@ func TestTimeIndexKeys_chronologicalOrder(t *testing.T) {
 		t.Error("stateImportedKey: with equal time, id=1 must sort before id=2")
 	}
 
-	scanPrimary := scanStateKey(api.MediaTypeMovie, "tmdb-1")
+	scanPrimary := scanStateKey(subflux.MediaTypeMovie, "tmdb-1")
 	k1 := scanAtKey(earlier, scanPrimary)
 	k2 := scanAtKey(later, scanPrimary)
 	if bytes.Compare(k1, k2) >= 0 {

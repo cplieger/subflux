@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v3"
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/subflux/internal/authstore"
 	"github.com/cplieger/subflux/internal/store/kv"
+	"github.com/cplieger/subflux/internal/subflux"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -78,7 +78,7 @@ func seedCrashFixture(t *testing.T, path string) {
 	if err != nil {
 		t.Fatalf("Open for auth seed: %v", err)
 	}
-	as := authstore.New(db.BoltDB())
+	as := authstore.New(db.Bolt())
 	if err := as.CreateUser(t.Context(), &auth.User{Username: "alice", Role: auth.RoleAdmin, PasswordHash: "hash-a", Enabled: true}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -152,9 +152,9 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Irreplaceable fixture: the manual row, its lock, the offset, the user.
-	entries, err := db.GetState(ctx, &api.StateQuery{})
+	entries, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState: %v", err)
+		t.Fatalf("State: %v", err)
 	}
 	manuals := 0
 	var maxID int64
@@ -167,15 +167,15 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	if manuals != 1 {
 		t.Errorf("manual rows after recovery = %d, want 1", manuals)
 	}
-	locked, err := db.IsManuallyLocked(ctx, api.MediaTypeMovie, "tt1", "en", api.VariantStandard)
+	locked, err := db.IsManuallyLocked(ctx, subflux.ManualLockKey{MediaType: subflux.MediaTypeMovie, MediaID: "tt1", Language: "en", Variant: subflux.VariantStandard})
 	if err != nil || !locked {
 		t.Errorf("IsManuallyLocked = (%v, %v), want locked", locked, err)
 	}
-	if got, err := db.GetSyncOffset(ctx, crashOffsetPath); err != nil || got != wantOffset {
-		t.Errorf("GetSyncOffset = (%d, %v), want %d", got, err, wantOffset)
+	if got, err := db.SyncOffset(ctx, crashOffsetPath); err != nil || got != wantOffset {
+		t.Errorf("SyncOffset = (%d, %v), want %d", got, err, wantOffset)
 	}
-	as := authstore.New(db.BoltDB())
-	if u, _, err := as.GetUserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
+	as := authstore.New(db.Bolt())
+	if u, _, err := as.UserByUsername(ctx, "alice"); err != nil || u == nil || u.PasswordHash != "hash-a" {
 		t.Errorf("auth user after recovery = (%+v, %v), want alice intact", u, err)
 	}
 
@@ -187,17 +187,17 @@ func recoverAndAssert(t *testing.T, path, kind string, wantOffset int64) *DB {
 	}
 
 	// Sequence: a fresh insert must allocate past every surviving id.
-	rec := &api.DownloadRecord{
-		MediaType: api.MediaTypeMovie, MediaID: "tt8", Language: "en",
-		ProviderName: api.ProviderNameOpenSubtitles, Path: "/m/tt8.en.srt", Score: 5,
-		Meta: &api.DownloadMeta{Title: "T8", VideoPath: "/m/tt8.mkv"},
+	rec := &subflux.DownloadRecord{
+		MediaType: subflux.MediaTypeMovie, MediaID: "tt8", Language: "en",
+		ProviderName: subflux.ProviderNameOpenSubtitles, Path: "/m/tt8.en.srt", Score: 5,
+		Meta: &subflux.DownloadMeta{Title: "T8", VideoPath: "/m/tt8.mkv"},
 	}
 	if err := db.SaveDownload(ctx, rec); err != nil {
 		t.Fatalf("SaveDownload after recovery: %v", err)
 	}
-	after, err := db.GetState(ctx, &api.StateQuery{})
+	after, err := db.State(ctx, &subflux.StateQuery{})
 	if err != nil {
-		t.Fatalf("GetState after insert: %v", err)
+		t.Fatalf("State after insert: %v", err)
 	}
 	for _, e := range after {
 		if e.MediaID == "tt8" && e.ID <= maxID {

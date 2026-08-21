@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	"github.com/cplieger/subflux/internal/api"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // P14: NormalizeSettings makes the schema declaration the single source of
@@ -12,7 +12,7 @@ import (
 
 func TestNormalizeSettings_fills_absent_declared_defaults(t *testing.T) {
 	t.Parallel()
-	fields := []api.ProviderSchemaField{
+	fields := []subflux.ProviderSchemaField{
 		{Key: "use_hash", Type: "bool", Default: "true"},
 		{Key: "mode", Type: "text", Default: "static"},
 		{Key: "api_key", Type: "secret"}, // no default: never injected
@@ -35,7 +35,7 @@ func TestNormalizeSettings_fills_absent_declared_defaults(t *testing.T) {
 
 func TestNormalizeSettings_never_overwrites_user_values(t *testing.T) {
 	t.Parallel()
-	fields := []api.ProviderSchemaField{
+	fields := []subflux.ProviderSchemaField{
 		{Key: "use_hash", Type: "bool", Default: "true"},
 		{Key: "mode", Type: "text", Default: "static"},
 	}
@@ -67,7 +67,7 @@ func TestNormalizeSettings_typed_extraction_end_to_end(t *testing.T) {
 	// The normalized map reads back through the same typed accessors the
 	// factories use: the declared default is indistinguishable from a
 	// user-set value.
-	fields := []api.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}}
+	fields := []subflux.ProviderSchemaField{{Key: "use_hash", Type: "bool", Default: "true"}}
 	ps := FromMap(NormalizeSettings(fields, map[string]any{"username": "u"}))
 	if !ps.UseHash {
 		t.Errorf("FromMap over normalized map: UseHash = false, want declared true")
