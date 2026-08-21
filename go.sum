@@ -14,8 +14,8 @@ github.com/cplieger/health v1.6.0 h1:qgzslmEVq8asgMkEZ25arRZPazJRWsN7E8XJ6KgxMpg
 github.com/cplieger/health v1.6.0/go.mod h1:fGHTssNQpl2EjqRLxgs3n7bbj94gD5HDgi1KEk8cN0Q=
 github.com/cplieger/httpx/v5 v5.0.0 h1:S7jCBzPfOHHXZuFEsaN35UthMZpvlN/aYywP5nb1itI=
 github.com/cplieger/httpx/v5 v5.0.0/go.mod h1:3ap2CAq592k7smKhe3lWrwklthtmJ6L4cIWMTMM8O10=
-github.com/cplieger/jsonx v1.4.2 h1:D1MlKLSykUyBlN0icC+WhRuvLc3PiTWXnqvGCkc3x5g=
-github.com/cplieger/jsonx v1.4.2/go.mod h1:aEu1zSFMYKloem6nZQQ/tjyyZBfXvCRbPNJ44YlQu0o=
+github.com/cplieger/jsonx/v2 v2.0.0 h1:xZ0Mw7flnGn3NARQfXQ09tTMzFCunUT/lhve67KNinI=
+github.com/cplieger/jsonx/v2 v2.0.0/go.mod h1:v2giyFoa368vz0eN1G5lVG8wsWw+8JpEjV574r2Tv7Y=
 github.com/cplieger/keyenc v1.0.5 h1:FLyjGqdfki+3VyOJGdKmeY3VQAiu93Fsg+cJZ6H7xEc=
 github.com/cplieger/keyenc v1.0.5/go.mod h1:9l4QSTuwTtYp2KYeYkvp2PXop12G5MqXeReqCqDlHWY=
 github.com/cplieger/langtag/v2 v2.0.0 h1:G8sVCSal1PwshhceEqw40LzHph0XwuiuacXQCWeQQi8=
@@ -28,12 +28,12 @@ github.com/cplieger/runesafe/v2 v2.0.0 h1:jEkFU2dbDxKLwgHag6l3gbSLpRNfkD8mMsdiCg
 github.com/cplieger/runesafe/v2 v2.0.0/go.mod h1:X3avIOn44UaASh8QEhXDIKNWA4HLmSAZYWywNwpOYyE=
 github.com/cplieger/slogx v1.6.3 h1:1W8DxUwovnfbL1wjthdELHhw2gFH1FXaUcG34KjefIw=
 github.com/cplieger/slogx v1.6.3/go.mod h1:KW/UCGyMK3grILRvcU4Zloawb27C13cLN5HQ7ZLNS5Q=
-github.com/cplieger/ssrf/v3 v3.0.2 h1:0RkpgEAAd4lclGedVUQAEsdnUTuwY3boqZqx0tW+eds=
-github.com/cplieger/ssrf/v3 v3.0.2/go.mod h1:TQp6Slng801pKAeAVe6ardq8W+f5P/9WS+dvdNiNR5s=
+github.com/cplieger/ssrf/v4 v4.0.0 h1:FTzImwYJt306SLSD/Yjx3AeqWthzkbijZagfRiXutL8=
+github.com/cplieger/ssrf/v4 v4.0.0/go.mod h1:MxhymcOFPrio7RV9QGh118cJXHzdSzWvv+nTDs+fung=
 github.com/cplieger/webhttp/v2 v2.0.0 h1:0kZfGTUIX3ltdW5Nah95/oa9BtARePlOMP6HGy6to4o=
 github.com/cplieger/webhttp/v2 v2.0.0/go.mod h1:63pP3oJEpsk2kEAonLuxjDh6V4IR5bO06N575hvuNag=
-github.com/cplieger/wiregen/v2 v2.0.7 h1:PyMfBEJ672emswbVN/3UjXiw17EzMafoW9ncEEs3CXg=
-github.com/cplieger/wiregen/v2 v2.0.7/go.mod h1:GkUuvDVrxN7vxXO9nwvCyHxc6eH8lxAo6SfG1iQD6Jo=
+github.com/cplieger/wiregen/v3 v3.0.0 h1:xtwG9WVrDs70NHQttToplgVJNMUu4X8rBwnnftFrkbA=
+github.com/cplieger/wiregen/v3 v3.0.0/go.mod h1:a9hOV/7se9+CW9j/33bLLuKxzoeamphCr206obm23LQ=
 github.com/cplieger/xmlx v1.0.3 h1:87QKhDL+faCq91/7Z6hsgrbulzerBXV8qg+QbEiF9iA=
 github.com/cplieger/xmlx v1.0.3/go.mod h1:XHO9ocyMAcW6h9pWimId+k6DPLJmxd9YN7Q4JX1hSvA=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

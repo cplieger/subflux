@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cplieger/ssrf/v3"
+	"github.com/cplieger/ssrf/v4"
 )
 
 // posterMaxRedirects caps the complete redirect chain across both the trusted
