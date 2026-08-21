@@ -18,7 +18,7 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "25.9.5",
     "@typescript/native": "npm:typescript@7.0.2",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.8.1",
     "fast-check": "4.9.0",
     "happy-dom": "20.11.2",
@@ -29,7 +29,7 @@
     "stylelint-config-standard": "40.0.0",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.67.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "dependencies": {
     "@cplieger/actions": "3.1.1",
