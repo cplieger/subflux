@@ -116,6 +116,12 @@ func TestHandleScanSeries_zero_id(t *testing.T) {
 		t.Errorf("HandleScanSeries(zero id) status = %d, want %d",
 			rec.Code, http.StatusBadRequest)
 	}
+	// The message matters as much as the status: an unconfigured Sonarr also
+	// answers 400, so a status-only check cannot tell a rejected id from an
+	// accepted one.
+	if body := rec.Body.String(); !strings.Contains(body, "invalid series id") {
+		t.Errorf("HandleScanSeries(zero id) body = %q, want the invalid-id error", body)
+	}
 }
 
 func TestHandleScanSeries_negative_id(t *testing.T) {
@@ -211,6 +217,9 @@ func TestHandleScanSeason_zero_series_id(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("HandleScanSeason(zero series id) status = %d, want %d",
 			rec.Code, http.StatusBadRequest)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "invalid series id") {
+		t.Errorf("HandleScanSeason(zero series id) body = %q, want the invalid-id error", body)
 	}
 }
 
@@ -344,6 +353,9 @@ func TestHandleScanItem_zero_media_id(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("HandleScanItem(zero media_id) status = %d, want %d",
 			rec.Code, http.StatusBadRequest)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "media_id required") {
+		t.Errorf("HandleScanItem(zero media_id) body = %q, want the media_id error", body)
 	}
 }
 
@@ -503,6 +515,9 @@ func TestHandleScanMovie_zero_id(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("HandleScanMovie(zero id) status = %d, want %d",
 			rec.Code, http.StatusBadRequest)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "invalid movie id") {
+		t.Errorf("HandleScanMovie(zero id) body = %q, want the invalid-id error", body)
 	}
 }
 

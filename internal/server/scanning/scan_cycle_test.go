@@ -2,6 +2,8 @@ package scanning
 
 import (
 	"context"
+	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,9 +81,14 @@ func TestLoadRecentScans_cutoff_extends_to_cycle_start(t *testing.T) {
 	// Cycle started 3h ago, interval 1h: the cutoff must extend back to the
 	// cycle start so the pass's early segment stays in the resume set.
 	cycleStart := time.Now().Add(-3 * time.Hour)
-	loadRecentScans(t.Context(), db, interval, cycleStart)
+	recent := loadRecentScans(t.Context(), db, interval, cycleStart)
 	if !db.gotCutoff.Equal(cycleStart) {
 		t.Errorf("cutoff = %v, want cycle start %v (duration-aware extension)", db.gotCutoff, cycleStart)
+	}
+	// The store's answer IS the resume set: dropping it silently rescans
+	// everything the interrupted pass already did.
+	if !maps.Equal(recent, map[string]bool{"x": true}) {
+		t.Errorf("loadRecentScans() = %v, want the store's recent set map[x:true]", recent)
 	}
 
 	// Cycle started 10 minutes ago: the plain interval cutoff applies.
@@ -92,4 +99,33 @@ func TestLoadRecentScans_cutoff_extends_to_cycle_start(t *testing.T) {
 	if db.gotCutoff.Before(wantMin.Add(-time.Second)) || db.gotCutoff.After(time.Now().Add(-interval).Add(time.Second)) {
 		t.Errorf("cutoff = %v, want ~now-interval (%v)", db.gotCutoff, wantMin)
 	}
+}
+
+// The resume line claims the pass is skipping work it already did, so it must
+// appear only when the store actually returned something to skip.
+func TestLoadRecentScans_announces_a_resume_only_when_something_is_recent(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	const resumeMsg = "scan resume: skipping recently scanned items"
+
+	t.Run("recent_items", func(t *testing.T) {
+		buf := captureLogs(t)
+		db := &fakeScanStore{recent: map[string]bool{"x": true}}
+
+		loadRecentScans(t.Context(), db, time.Hour, time.Now())
+
+		if !strings.Contains(buf.String(), resumeMsg) {
+			t.Errorf("loadRecentScans(1 recent item) logged no %q; log was:\n%s", resumeMsg, buf.String())
+		}
+	})
+
+	t.Run("nothing_recent", func(t *testing.T) {
+		buf := captureLogs(t)
+		db := &fakeScanStore{recent: map[string]bool{}}
+
+		loadRecentScans(t.Context(), db, time.Hour, time.Now())
+
+		if strings.Contains(buf.String(), resumeMsg) {
+			t.Errorf("loadRecentScans(nothing recent) claimed a resume; log was:\n%s", buf.String())
+		}
+	})
 }

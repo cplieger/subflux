@@ -670,3 +670,115 @@ func TestHandleManualSearch_release_length_boundary(t *testing.T) {
 		t.Errorf("HandleManualSearch(release len == max+1) status = %d, want %d", code, http.StatusBadRequest)
 	}
 }
+
+// --- server-side video resolution and the release-name default ---
+
+// searchRecorder records the search request it was handed and, like a real
+// provider's HTTP client, makes no request at all once the context is done —
+// so a search whose deadline was already spent records nothing.
+type searchRecorder struct {
+	httpStubProvider
+
+	results  []subflux.Subtitle
+	mu       sync.Mutex
+	requests []subflux.SearchRequest
+}
+
+func (p *searchRecorder) Search(ctx context.Context, req *subflux.SearchRequest) ([]subflux.Subtitle, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requests = append(p.requests, *req)
+	return p.results, nil
+}
+
+func (p *searchRecorder) lastRequest(t *testing.T) subflux.SearchRequest {
+	t.Helper()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.requests) != 1 {
+		t.Fatalf("provider received %d searches, want exactly 1", len(p.requests))
+	}
+	return p.requests[0]
+}
+
+// The video path is resolved SERVER-side from the arr reference (media_id) and
+// only then fills in a missing release name: with no reference there is
+// nothing to resolve, and a client-supplied release name always wins.
+func TestHandleManualSearch_defaults_the_release_name_from_the_resolved_video(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name        string
+		query       string
+		wantRelease string
+	}{
+		{
+			name:        "an arr reference resolves the video and names the release",
+			query:       "/api/search?imdb=tt1234567&lang=fr&type=movie&media_id=42",
+			wantRelease: "/media/movie.mkv",
+		},
+		{
+			name:        "a client release name is never overwritten",
+			query:       "/api/search?imdb=tt1234567&lang=fr&type=movie&media_id=42&release=Movie.2024.BluRay-GRP",
+			wantRelease: "Movie.2024.BluRay-GRP",
+		},
+		{
+			name:        "without an arr reference nothing is resolved",
+			query:       "/api/search?imdb=tt1234567&lang=fr&type=movie",
+			wantRelease: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			prov := &searchRecorder{
+				name: "os",
+				results: []subflux.Subtitle{{
+					Provider: "os", Language: "fr",
+					ReleaseName: "Movie.2024.BluRay-GRP", ID: "sub-1",
+				}},
+			}
+			h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{},
+				[]provider.Provider{prov})
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.query, http.NoBody)
+			rec := httptest.NewRecorder()
+			h.HandleManualSearch(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("HandleManualSearch(%s) status = %d, want %d", tc.query, rec.Code, http.StatusOK)
+			}
+			if got := prov.lastRequest(t).ReleaseName; got != tc.wantRelease {
+				t.Errorf("HandleManualSearch(%s) searched with ReleaseName = %q, want %q",
+					tc.query, got, tc.wantRelease)
+			}
+		})
+	}
+}
+
+// A download the server abandoned because it is shutting down says so: the
+// provider error alone reads as a provider fault, which sends the operator
+// looking in the wrong place.
+func TestRunManualDownload_reports_a_shutdown_interruption(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	buf := captureLogs(t)
+	h, _ := newHTTPHarness(&testsupport.NopStore{}, fakeManualCfg{}, nil)
+	serverCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.deps.ServerCtx = func() context.Context { return serverCtx }
+
+	req := &DownloadRequest{
+		Provider: "os", SubtitleID: "sub-1", Language: "en",
+		MediaType: subflux.MediaTypeMovie, ArrID: 42,
+	}
+	req.SetVideoPath("/media/movie.mkv")
+
+	h.runManualDownload(&LiveState{Cfg: fakeManualCfg{}}, &dlFailingProvider{}, req, "act-1")
+
+	const want = "manual download interrupted by shutdown"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("a download abandoned at shutdown logged no %q; log was:\n%s", want, buf.String())
+	}
+}

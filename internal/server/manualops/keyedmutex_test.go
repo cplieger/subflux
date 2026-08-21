@@ -151,3 +151,39 @@ func TestDownloadQuadGateSerializesOnlyTheSameQuad(t *testing.T) {
 	unlockA()
 	<-blocked
 }
+
+// gateEntries reports how many keys the gate currently holds.
+func gateEntries(g *quadGate) int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return len(g.locks)
+}
+
+// The gate map is bounded by IN-FLIGHT work rather than by library size: each
+// entry is reference-counted and dropped when its last holder releases, so a
+// server that has downloaded for thousands of quads still holds none.
+func TestDownloadQuadGate_forgets_a_quad_once_its_last_holder_releases(t *testing.T) {
+	t.Parallel()
+
+	g := newQuadGate()
+	a := downloadQuadKey(subflux.MediaTypeEpisode, "tvdb-1-s01e02", "fr", subflux.VariantStandard)
+	b := downloadQuadKey(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced)
+
+	unlockA := g.lock(a)
+	if got := gateEntries(g); got != 1 {
+		t.Fatalf("gate entries after locking one quad = %d, want 1", got)
+	}
+	unlockB := g.lock(b)
+	if got := gateEntries(g); got != 2 {
+		t.Fatalf("gate entries after locking a second quad = %d, want 2", got)
+	}
+
+	unlockA()
+	if got := gateEntries(g); got != 1 {
+		t.Errorf("gate entries after releasing the first quad = %d, want 1 (its entry must be dropped)", got)
+	}
+	unlockB()
+	if got := gateEntries(g); got != 0 {
+		t.Errorf("gate entries after releasing every quad = %d, want 0 (the map must not grow with library size)", got)
+	}
+}
