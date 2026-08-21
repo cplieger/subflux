@@ -1,6 +1,7 @@
 package boltstore
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,7 @@ func TestDeleteStateByPaths_emptyInput(t *testing.T) {
 // TestDeleteStateByPaths_noMatch leaves the store untouched when no row is
 // backed by the given path.
 func TestDeleteStateByPaths_noMatch(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	ctx := t.Context()
 
@@ -75,6 +77,10 @@ func TestDeleteStateByPaths_noMatch(t *testing.T) {
 	if downloads != 1 {
 		t.Errorf("downloads = %d, want 1 (row preserved)", downloads)
 	}
+	// Nothing was deleted, so the deletion summary must not appear.
+	if got := logs.String(); strings.Contains(got, "deleted state by video paths") {
+		t.Errorf("DeleteStateByPaths(no match) logged %q, want no deletion summary", got)
+	}
 }
 
 // TestDeleteStateByPaths_removesAllRowsForVideo asserts a single video file
@@ -82,6 +88,7 @@ func TestDeleteStateByPaths_noMatch(t *testing.T) {
 // its non-empty subtitle paths returned, and the affected triples' backoff
 // cleared. Counters are consistent afterward.
 func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	ctx := t.Context()
 	const video = "/media/show.s01e01.mkv"
@@ -133,6 +140,13 @@ func TestDeleteStateByPaths_removesAllRowsForVideo(t *testing.T) {
 	}
 	if rows := readTripleRows(t, db, subflux.MediaTypeEpisode, "ep1", "en"); len(rows) != 0 {
 		t.Errorf("en rows = %d, want 0", len(rows))
+	}
+
+	// The summary an operator reads after an arr deletion: one video file, the
+	// three subtitle paths left for the disk-cleanup fallback.
+	const wantLog = `msg="deleted state by video paths" video_paths=1 subtitle_paths=3`
+	if got := logs.String(); !strings.Contains(got, wantLog) {
+		t.Errorf("DeleteStateByPaths(%q) log = %q, want it to contain %q", video, got, wantLog)
 	}
 }
 

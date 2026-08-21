@@ -1,11 +1,26 @@
 package boltstore
 
 import (
+	"bytes"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// captureLogs routes the default logger into a buffer for the rest of the test
+// and restores it afterwards. The default logger is process-global, so a test
+// that calls this must not run in parallel.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
 
 // driftBP seeds search_attempts rows through RecordNoResult in the drift tests.
 var driftBP = subflux.BackoffParams{InitialDelay: time.Hour, MaxDelay: 24 * time.Hour, Multiplier: 2}
@@ -161,6 +176,7 @@ func TestCleanupDrift_combinedLanguagesAndProviders(t *testing.T) {
 // TestCleanupDrift_noMatchingDriftIsNoop leaves backoff intact when the removed
 // languages and providers match no stored row.
 func TestCleanupDrift_noMatchingDriftIsNoop(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	ctx := t.Context()
 	seedAttempt(t, db, subflux.MediaTypeEpisode, "id1", "en", "os")
@@ -174,4 +190,66 @@ func TestCleanupDrift_noMatchingDriftIsNoop(t *testing.T) {
 		t.Fatalf("CleanupDrift(no match): %v", err)
 	}
 	assertBackoffConsistent(t, db, 2)
+	// A cleanup that deleted nothing says nothing: the summary lines exist so an
+	// operator can see real deletions, and a line per no-op call buries them.
+	if got := logs.String(); strings.Contains(got, "config drift:") {
+		t.Errorf("CleanupDrift(no match) logged %q, want no cleared-attempts summary", got)
+	}
+}
+
+// TestCleanupDrift_adaptiveDisabledOnEmptyBackoffIsSilent asserts the blanket
+// clear reports nothing when there was no backoff to clear.
+func TestCleanupDrift_adaptiveDisabledOnEmptyBackoffIsSilent(t *testing.T) {
+	logs := captureLogs(t)
+	db, _ := openTemp(t)
+
+	if err := db.CleanupDrift(t.Context(), subflux.ConfigDrift{AdaptiveDisabled: true}); err != nil {
+		t.Fatalf("CleanupDrift(adaptive disabled, empty store): %v", err)
+	}
+	if got := logs.String(); strings.Contains(got, "config drift:") {
+		t.Errorf("CleanupDrift(adaptive disabled, empty store) logged %q, want no cleared-attempts summary", got)
+	}
+}
+
+// TestCleanupDrift_logsTheClearedRowCount pins each cleanup branch's
+// operator-facing summary: the message names the branch that ran and carries
+// the number of search_attempts rows it deleted.
+func TestCleanupDrift_logsTheClearedRowCount(t *testing.T) {
+	cases := []struct {
+		name  string
+		drift subflux.ConfigDrift
+		want  string
+	}{
+		{
+			name:  "adaptive_disabled",
+			drift: subflux.ConfigDrift{AdaptiveDisabled: true},
+			want:  `msg="config drift: adaptive disabled, cleared all attempts" rows=3`,
+		},
+		{
+			name:  "removed_language",
+			drift: subflux.ConfigDrift{RemovedLanguages: []string{"fr"}},
+			want:  `msg="config drift: cleared attempts for removed language" values=[fr] rows=1`,
+		},
+		{
+			name:  "removed_provider",
+			drift: subflux.ConfigDrift{RemovedProviders: []subflux.ProviderID{"bs"}},
+			want:  `msg="config drift: cleared attempts for removed provider" values=[bs] rows=1`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			db, _ := openTemp(t)
+			seedAttempt(t, db, subflux.MediaTypeEpisode, "id1", "en", "os")
+			seedAttempt(t, db, subflux.MediaTypeEpisode, "id1", "fr", "os")
+			seedAttempt(t, db, subflux.MediaTypeMovie, "id2", "en", "bs")
+
+			if err := db.CleanupDrift(t.Context(), tc.drift); err != nil {
+				t.Fatalf("CleanupDrift(%+v): %v", tc.drift, err)
+			}
+			if got := logs.String(); !strings.Contains(got, tc.want) {
+				t.Errorf("CleanupDrift(%+v) log = %q, want it to contain %q", tc.drift, got, tc.want)
+			}
+		})
+	}
 }
