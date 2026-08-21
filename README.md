@@ -139,6 +139,71 @@ with Prometheus or the Mimir ruler; delivery is through your Alertmanager.
 groups:
   - name: subflux
     rules:
+      # The floor under every other rule here: all of them read a subflux metric,
+      # so all of them go quiet together when subflux stops being scraped.
+      #
+      # Two arms, because neither covers the other. `up == 0` catches a target
+      # that is configured and failing, and keeps its labels. `absent(up{...})`
+      # catches a target that stopped EXISTING — a dropped scrape target, a
+      # removed scrape config, a deleted Kubernetes pod or ServiceMonitor —
+      # where `up` has no series and `up == 0` cannot match. Use an EXACT job
+      # matcher: a regex absent() form asks whether ANY matching target is up,
+      # so one healthy replica masks every failed one, and its synthetic result
+      # carries no job label to route on.
+      - alert: SubfluxTargetDown
+        expr: up{job="subflux"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux is not being scraped successfully"
+          description: >
+            No successful scrape of subflux for 15m, so every rule in this group
+            is blind. Either the scrape is failing (container down, wrong port,
+            network) or the target is gone from service discovery entirely. Set
+            the job matcher to whatever your scrape config calls subflux.
+      - alert: SubfluxTargetAbsent
+        expr: absent(up{job="subflux"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux has no scrape target at all"
+          description: >
+            There is no up{job="subflux"} series, so subflux is not merely failing
+            to scrape but is no longer a configured target: a dropped scrape
+            target, a removed scrape config, or a deleted Kubernetes pod or
+            ServiceMonitor. Every other rule in this group is blind.
+      # The deadman for the scan loop. subflux can be up, scraped and answering
+      # HTTP while its scheduled scan has been wedged for days, and nothing else
+      # here notices.
+      #
+      # The uptime guard is load-bearing, not decoration. A range selector does
+      # NOT require the series to have existed for the whole range: after a
+      # restart, increase(subflux_scans_total[26h]) reads 0 as soon as there are
+      # two samples, so without the guard this fires about `for:` after every
+      # restart rather than 26h after the last scan. The guard says the process
+      # has actually been up long enough for the window to mean anything.
+      # subflux_configured keeps it quiet in unconfigured mode, where there is
+      # no engine and no scan to miss.
+      - alert: SubfluxScanStalled
+        expr: >
+          subflux_configured == 1
+          and increase(subflux_scans_total[26h]) == 0
+          and (time() - process_start_time_seconds) > 93600
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "subflux has not completed a scan in over a day"
+          description: >
+            subflux is configured, has been up for more than 26h, and no
+            scheduled full scan has completed in that window (scan_interval
+            defaults to 24h). The scheduler may be stalled, a scan may be stuck
+            mid-run, or the arrs may be unreachable. Check the subflux logs and
+            /api/activity. A scan that legitimately runs longer than the window
+            will also trip this; widen the range and the uptime guard together
+            if that is your normal.
       - alert: SubfluxHTTP5xx
         expr: sum(increase(subflux_http_requests_total{status=~"5.."}[10m])) > 5
         for: 10m
