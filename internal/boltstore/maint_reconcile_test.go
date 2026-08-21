@@ -3,6 +3,7 @@ package boltstore
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -252,6 +253,7 @@ func TestReconcileState_siblingPresentDeletesOnlyMissingRow(t *testing.T) {
 // media_imported bumped to now), the manual rows are deleted, and the triple's
 // backoff is cleared (Requirement 7.3).
 func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	ctx := t.Context()
 	dir := t.TempDir()
@@ -323,6 +325,13 @@ func TestReconcileState_allSubsGoneResetsAutoDeletesManual(t *testing.T) {
 	}
 	assertBackoffConsistent(t, db, 0)
 	assertDownloadsConsistent(t, db)
+
+	// A completed pass reports what it did, so an operator can tell a finished
+	// reconcile from one that returned early.
+	const wantLog = `msg="reconcile: complete" deleted_paths=0 reset_groups=1`
+	if got := logs.String(); !strings.Contains(got, wantLog) {
+		t.Errorf("ReconcileState log = %q, want it to contain %q", got, wantLog)
+	}
 }
 
 // TestReconcileState_allSubsGoneAutoOnlyReset covers the all-gone branch with
