@@ -61,7 +61,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Debug("handleState", "results", len(entries),
-		"type", q.Get("type"), "lang", q.Get("lang"),
+		"type", logsafe.Field(q.Get("type")), "lang", logsafe.Field(q.Get("lang")),
 		"provider", logsafe.Field(q.Get("provider")), "search", logsafe.Field(searchParam),
 		"limit", limit)
 	httpapi.WriteJSON(w, entries)
