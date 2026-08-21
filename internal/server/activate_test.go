@@ -1,10 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -749,5 +751,72 @@ func TestBackgroundGoroutines_useBgWgGo(t *testing.T) {
 				t.Errorf("%s uses %s; background goroutines register with bgWg.Go", name, form)
 			}
 		}
+	}
+}
+
+// --- what activation tells the operator it published ---
+
+// The mode label is what distinguishes a cold boot from a config save in every
+// activation log line.
+func TestActivationMode_String(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		mode activationMode
+		want string
+	}{
+		{mode: activateCold, want: "cold"},
+		{mode: activateHot, want: "hot"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.want, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.mode.String(); got != tc.want {
+				t.Errorf("activationMode(%d).String() = %q, want %q", tc.mode, got, tc.want)
+			}
+		})
+	}
+}
+
+// The completion line is the operator's record of which capabilities a save
+// actually brought up; an attribute that disagrees with the published snapshot
+// sends whoever is debugging a dead arr or a dead login to the wrong place.
+func TestActivate_logs_the_capability_set_it_published(t *testing.T) {
+	// No t.Parallel: these subtests swap the global slog default logger.
+	cases := []struct {
+		name string
+		cfg  activationCfg
+		want string
+	}{
+		{
+			name: "every_capability_configured",
+			cfg: activationCfg{
+				radarrURL:  "http://radarr:7878",
+				rpID:       "subflux.example.com",
+				oidcIssuer: "https://idp.example.com",
+			},
+			want: "sonarr=true radarr=true webauthn=true oidc=true",
+		},
+		{
+			name: "only_the_base_config",
+			cfg:  activationCfg{},
+			want: "sonarr=true radarr=false webauthn=false oidc=false",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			prev := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+			t.Cleanup(func() { slog.SetDefault(prev) })
+
+			s, _ := newActivationTestServer(t)
+			if err := s.activate(t.Context(), tc.cfg.build(t), activateHot); err != nil {
+				t.Fatalf("activate() error = %v, want nil", err)
+			}
+
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Errorf("activation log missing %q; log was:\n%s", tc.want, buf.String())
+			}
+		})
 	}
 }

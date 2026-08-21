@@ -1,11 +1,14 @@
 package manualops
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,18 +21,33 @@ import (
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 	"github.com/cplieger/subflux/internal/testsupport"
 )
 
+// captureLogs swaps the global slog default for a Debug-level text buffer.
+// The caller must not be parallel: the default logger is process-global.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
 // fakeArr is a minimal ManualArrClient for exercising the media-ID and title
-// lookups. Get* return the configured value (or error); Refresh* are unused by
-// the functions under test and are no-ops.
+// lookups. Get* return the configured value (or error); Rescan* record the arr
+// ids they were asked to refresh, which is the only observable half of the
+// post-download update.
 type fakeArr struct {
-	movie  arrapi.Movie
-	series arrapi.Series
-	getErr error
+	movie         arrapi.Movie
+	series        arrapi.Series
+	getErr        error
+	movieRescans  []int
+	seriesRescans []int
 }
 
 var (
@@ -42,8 +60,16 @@ func (f *fakeArr) MovieByID(context.Context, int) (arrapi.Movie, error) { return
 func (f *fakeArr) SeriesByID(context.Context, int) (arrapi.Series, error) {
 	return f.series, f.getErr
 }
-func (f *fakeArr) RescanMovie(context.Context, int) error  { return nil }
-func (f *fakeArr) RescanSeries(context.Context, int) error { return nil }
+
+func (f *fakeArr) RescanMovie(_ context.Context, movieID int) error {
+	f.movieRescans = append(f.movieRescans, movieID)
+	return nil
+}
+
+func (f *fakeArr) RescanSeries(_ context.Context, seriesID int) error {
+	f.seriesRescans = append(f.seriesRescans, seriesID)
+	return nil
+}
 
 func TestResolveMediaIDs(t *testing.T) {
 	t.Parallel()
@@ -104,6 +130,27 @@ func TestResolveMediaIDs(t *testing.T) {
 			name:        "episode without arr id uses build-media-id fallback",
 			mediaType:   subflux.MediaTypeEpisode,
 			arrID:       0,
+			wantCover:   "",
+			wantHistory: "s00e00",
+		},
+		{
+			// A zero arr id means the request carried no arr reference, so
+			// there is nothing to look up: resolving one anyway would key
+			// coverage to whatever movie the arr answers for id 0.
+			name:        "movie without arr id never consults radarr",
+			radarr:      &fakeArr{movie: arrapi.Movie{TmdbID: 123}},
+			mediaType:   subflux.MediaTypeMovie,
+			arrID:       0,
+			wantCover:   "",
+			wantHistory: "",
+		},
+		{
+			name:        "episode without arr id never consults sonarr",
+			sonarr:      &fakeArr{series: arrapi.Series{TvdbID: 999}},
+			mediaType:   subflux.MediaTypeEpisode,
+			arrID:       0,
+			season:      1,
+			episode:     2,
 			wantCover:   "",
 			wantHistory: "s00e00",
 		},
@@ -238,11 +285,13 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 		search.WithTracks(embedded.Detector{}))
 
 	rec := &recordingActivity{details: map[string]string{}}
+	warns := &recordingWarns{}
+	ev := &recCoverage{}
 	deps := &SearchDeps{
 		DB:       &testsupport.NopStore{},
 		Activity: rec,
-		Alerts:   activity.NewAlertLog(10),
-		Events:   fakeEvents{},
+		Alerts:   warns,
+		Events:   ev,
 	}
 	ls := &LiveState{Cfg: cfg, Engine: engine}
 
@@ -252,7 +301,8 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	}
 	req.SetVideoPath(videoPath)
 
-	if ok := RunDownload(t.Context(), deps, ls, &testsupport.NopStore{}, srtProvider{}, req, "act-9"); !ok {
+	store := &recStore{}
+	if ok := RunDownload(t.Context(), deps, ls, store, srtProvider{}, req, "act-9"); !ok {
 		t.Fatal("RunDownload() = false, want success")
 	}
 
@@ -265,6 +315,22 @@ func TestRunDownload_records_saved_path_in_activity_detail(t *testing.T) {
 	}
 	if _, err := os.Stat(detail); err != nil {
 		t.Errorf("activity detail %q does not point at the written subtitle: %v", detail, err)
+	}
+	// With no arr configured the coverage lookup resolves nothing, so the
+	// history id is what addresses the item: an empty media id would publish
+	// a coverage update nothing can apply and skip the coverage row.
+	if len(ev.events) != 1 || ev.events[0].MediaID != "radarr-42" {
+		t.Errorf("coverage updates = %+v, want one carrying the radarr-42 fallback media id", ev.events)
+	}
+	// Nothing was resynced, so no offset row belongs in the store.
+	if len(store.syncOffsets) != 0 {
+		t.Errorf("sync offsets recorded = %v, want none for a download that needed no resync",
+			store.syncOffsets)
+	}
+	// A saved download that recorded its history row cleanly must not raise an
+	// operator alert.
+	if len(warns.msgs) != 0 {
+		t.Errorf("warn alerts = %q, want none after a clean download", warns.msgs)
 	}
 }
 
@@ -597,5 +663,206 @@ func TestRunDownload_concurrentSameQuad_allocatesDistinctOrdinals(t *testing.T) 
 	c2 := readFileT(t, subtitlefile.ManualPath(videoPath, 2, subtitlefile.Tags{Lang: "en"}))
 	if c1 == c2 {
 		t.Errorf("both ordinal files hold identical content %q; one download overwrote the other", c1)
+	}
+}
+
+// --- post-download coverage upsert and arr refresh ---
+//
+// After a saved subtitle, PostDownloadUpdate writes the coverage row and asks
+// the owning arr to rescan the item. Both halves are conditional, and every
+// condition below decides whether a remote call happens at all.
+
+// upsertCall is one recorded coverage write.
+type upsertCall struct {
+	mediaID   string
+	file      subflux.SubtitleFile
+	mediaType subflux.MediaType
+}
+
+// recStore records the two writes a finished download makes beyond history —
+// the coverage row and the sync offset — and answers everything else as the
+// shared no-op store does.
+type recStore struct {
+	testsupport.NopStore
+
+	refs        []subflux.DownloadedRef
+	upserts     []upsertCall
+	syncOffsets []int64
+	refsCalls   int
+}
+
+func (s *recStore) DownloadedRefs(_ context.Context, _ subflux.MediaType, _, _ string) ([]subflux.DownloadedRef, error) {
+	s.refsCalls++
+	return s.refs, nil
+}
+
+func (s *recStore) UpsertSubtitleFile(_ context.Context, mediaType subflux.MediaType,
+	mediaID string, sf *subflux.SubtitleFile,
+) error {
+	s.upserts = append(s.upserts, upsertCall{mediaType: mediaType, mediaID: mediaID, file: *sf})
+	return nil
+}
+
+func (s *recStore) SetSyncOffset(_ context.Context, _ string, offsetMs int64) error {
+	s.syncOffsets = append(s.syncOffsets, offsetMs)
+	return nil
+}
+
+// recCoverage records the coverage events a download publishes.
+type recCoverage struct {
+	events []events.CoverageEvent
+}
+
+func (r *recCoverage) PublishNotify(events.NotifyLevel, string) {}
+
+func (r *recCoverage) PublishCoverageUpdate(ev *events.CoverageEvent) {
+	r.events = append(r.events, *ev)
+}
+
+func TestPostDownloadUpdate(t *testing.T) {
+	t.Parallel()
+	const subPath = "/media/movie.en.1.srt"
+	movieFile := subflux.SubtitleFile{
+		Language: "en", Variant: subflux.VariantStandard,
+		Source: subflux.SourceExternal, Path: subPath,
+	}
+	tests := []struct {
+		name              string
+		coverageID        string
+		mediaType         subflux.MediaType
+		arrID             int
+		withRadarr        bool
+		withSonarr        bool
+		wantUpserts       []upsertCall
+		wantMovieRescans  []int
+		wantSeriesRescans []int
+	}{
+		{
+			name:       "movie writes coverage and refreshes radarr",
+			mediaType:  subflux.MediaTypeMovie,
+			arrID:      5,
+			coverageID: "tmdb-123",
+			withRadarr: true,
+			withSonarr: true,
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeMovie, mediaID: "tmdb-123", file: movieFile},
+			},
+			wantMovieRescans: []int{5},
+		},
+		{
+			name:       "episode writes coverage and refreshes sonarr",
+			mediaType:  subflux.MediaTypeEpisode,
+			arrID:      7,
+			coverageID: "tvdb-999-s01e02",
+			withRadarr: true,
+			withSonarr: true,
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeEpisode, mediaID: "tvdb-999-s01e02", file: movieFile},
+			},
+			wantSeriesRescans: []int{7},
+		},
+		{
+			name:             "an unresolved coverage id writes no coverage row",
+			mediaType:        subflux.MediaTypeMovie,
+			arrID:            5,
+			coverageID:       "",
+			withRadarr:       true,
+			wantUpserts:      nil,
+			wantMovieRescans: []int{5},
+		},
+		{
+			name:       "movie without an arr id refreshes nothing",
+			mediaType:  subflux.MediaTypeMovie,
+			arrID:      0,
+			coverageID: "tmdb-123",
+			withRadarr: true,
+			withSonarr: true,
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeMovie, mediaID: "tmdb-123", file: movieFile},
+			},
+		},
+		{
+			name:       "episode without an arr id refreshes nothing",
+			mediaType:  subflux.MediaTypeEpisode,
+			arrID:      0,
+			coverageID: "tvdb-999-s01e02",
+			withRadarr: true,
+			withSonarr: true,
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeEpisode, mediaID: "tvdb-999-s01e02", file: movieFile},
+			},
+		},
+		{
+			name:       "movie with radarr unconfigured refreshes nothing",
+			mediaType:  subflux.MediaTypeMovie,
+			arrID:      5,
+			coverageID: "tmdb-123",
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeMovie, mediaID: "tmdb-123", file: movieFile},
+			},
+		},
+		{
+			name:       "episode with sonarr unconfigured refreshes nothing",
+			mediaType:  subflux.MediaTypeEpisode,
+			arrID:      7,
+			coverageID: "tvdb-999-s01e02",
+			wantUpserts: []upsertCall{
+				{mediaType: subflux.MediaTypeEpisode, mediaID: "tvdb-999-s01e02", file: movieFile},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			store := &recStore{}
+			radarr, sonarr := &fakeArr{}, &fakeArr{}
+			ls := &LiveState{}
+			if tt.withRadarr {
+				ls.Radarr = radarr
+			}
+			if tt.withSonarr {
+				ls.Sonarr = sonarr
+			}
+			req := &DownloadRequest{
+				Provider: "os", SubtitleID: "s1", Language: "en",
+				MediaType: tt.mediaType, ArrID: tt.arrID,
+			}
+
+			PostDownloadUpdate(t.Context(), ls, store, req, tt.mediaType,
+				tt.coverageID, subPath, subflux.VariantStandard)
+
+			if !slices.Equal(store.upserts, tt.wantUpserts) {
+				t.Errorf("PostDownloadUpdate() coverage writes =\n  %+v\nwant\n  %+v",
+					store.upserts, tt.wantUpserts)
+			}
+			if !slices.Equal(radarr.movieRescans, tt.wantMovieRescans) {
+				t.Errorf("PostDownloadUpdate() radarr rescans = %v, want %v",
+					radarr.movieRescans, tt.wantMovieRescans)
+			}
+			if !slices.Equal(sonarr.seriesRescans, tt.wantSeriesRescans) {
+				t.Errorf("PostDownloadUpdate() sonarr rescans = %v, want %v",
+					sonarr.seriesRescans, tt.wantSeriesRescans)
+			}
+		})
+	}
+}
+
+// The post-download update warns only when the store or an arr rejected the
+// call; a clean update that logs a warning trains the operator to ignore them.
+func TestPostDownloadUpdate_clean_update_logs_no_warning(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	buf := captureLogs(t)
+	radarr := &fakeArr{}
+	ls := &LiveState{Radarr: radarr}
+	req := &DownloadRequest{
+		Provider: "os", SubtitleID: "s1", Language: "en",
+		MediaType: subflux.MediaTypeMovie, ArrID: 5,
+	}
+
+	PostDownloadUpdate(t.Context(), ls, &recStore{}, req, subflux.MediaTypeMovie,
+		"tmdb-123", "/media/movie.en.1.srt", subflux.VariantStandard)
+
+	if strings.Contains(buf.String(), "level=WARN") {
+		t.Errorf("a clean post-download update logged a warning; log was:\n%s", buf.String())
 	}
 }

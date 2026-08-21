@@ -9,8 +9,10 @@ package scanning
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -40,17 +42,25 @@ import (
 // Two methods, because ScanEngine declares two. It used to carry all eight of
 // the old composite's methods; the six it never needed (score simulation,
 // timeout state, post-processing, hashing) went with the composite.
+// result is what SearchTargets answers, and requests records the requests it
+// was asked with (a copy each, so a caller mutating its own request after the
+// call cannot rewrite what the test reads). The zero value answers an empty
+// result: nothing downloaded, no target searched, no provider queried.
 type fakeEngine struct {
-	started chan int
-	release chan struct{}
-	mu      sync.Mutex
-	calls   int
+	started  chan int
+	release  chan struct{}
+	requests []subflux.SearchRequest
+	result   subflux.SearchResult
+	mu       sync.Mutex
+	calls    int
 }
 
-func (e *fakeEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
+func (e *fakeEngine) SearchTargets(_ context.Context, req *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
 	e.mu.Lock()
 	e.calls++
 	n := e.calls
+	e.requests = append(e.requests, *req)
+	result := e.result
 	e.mu.Unlock()
 	if e.started != nil {
 		e.started <- n
@@ -58,13 +68,24 @@ func (e *fakeEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, 
 	if e.release != nil {
 		<-e.release
 	}
-	return subflux.SearchResult{}, nil
+	return result, nil
 }
 
 func (e *fakeEngine) callCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.calls
+}
+
+// lastRequest returns the most recent search request, or the zero value when
+// no search ran.
+func (e *fakeEngine) lastRequest() subflux.SearchRequest {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.requests) == 0 {
+		return subflux.SearchRequest{}
+	}
+	return e.requests[len(e.requests)-1]
 }
 
 func (e *fakeEngine) InventoryCoverage(_ context.Context, _ *subflux.SearchRequest, _ string) bool {
@@ -84,13 +105,27 @@ type recEvents struct {
 	// onDone, when set BEFORE the scan starts, is invoked inside
 	// PublishScanDone — an event barrier for asserting what is observable
 	// at the exact instant the terminal event publishes.
-	onDone func(actID string)
-	mu     sync.Mutex
-	starts []scanEvt
-	dones  []scanEvt
+	onDone   func(actID string)
+	mu       sync.Mutex
+	starts   []scanEvt
+	dones    []scanEvt
+	coverage []events.CoverageEvent
 }
 
-func (r *recEvents) PublishCoverageUpdate(*events.CoverageEvent) {}
+func (r *recEvents) PublishCoverageUpdate(ev *events.CoverageEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.coverage = append(r.coverage, *ev)
+}
+
+// coverageEvents returns the coverage updates published so far.
+func (r *recEvents) coverageEvents() []events.CoverageEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]events.CoverageEvent, len(r.coverage))
+	copy(out, r.coverage)
+	return out
+}
 
 func (r *recEvents) PublishScanStart(ev *events.ScanEvent) {
 	r.mu.Lock()
@@ -164,6 +199,36 @@ func epsWithFiles(n int) []arrapi.Episode {
 	return eps
 }
 
+// recProgress delegates the whole tracker surface to a real activity.Log and
+// records every progress report the scan runners make. The log keeps only the
+// latest, so the intermediate per-item reports are observable only here.
+type recProgress struct {
+	*activity.Log
+	mu    sync.Mutex
+	steps []progressStep
+}
+
+type progressStep struct {
+	detail  string
+	current int
+	total   int
+}
+
+func (r *recProgress) Progress(id string, current, total int, detail string) {
+	r.mu.Lock()
+	r.steps = append(r.steps, progressStep{detail: detail, current: current, total: total})
+	r.mu.Unlock()
+	r.Log.Progress(id, current, total, detail)
+}
+
+func (r *recProgress) progressSteps() []progressStep {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]progressStep, len(r.steps))
+	copy(out, r.steps)
+	return out
+}
+
 // scanRig assembles a Handler over controllable fakes.
 type scanRig struct {
 	ctx    context.Context
@@ -171,6 +236,8 @@ type scanRig struct {
 	engine *fakeEngine
 	ev     *recEvents
 	log    *activity.Log
+	act    *recProgress
+	cfg    *fakeScanCfg
 	stops  *activity.StopRegistry
 	guard  *ScanGuard
 	bg     *sync.WaitGroup
@@ -188,13 +255,15 @@ func newScanRig(t *testing.T) *scanRig {
 		engine: &fakeEngine{},
 		ev:     &recEvents{},
 		log:    activity.New(50),
+		cfg:    &fakeScanCfg{},
 		stops:  &activity.StopRegistry{},
 		guard:  &ScanGuard{},
 		bg:     &sync.WaitGroup{},
 		sonarr: &fakeSonarr{series: arrapi.Series{ID: 42, Title: "Test Show"}, episodes: epsWithFiles(1)},
 		radarr: &fakeRadarr{movie: arrapi.Movie{ID: 7, Title: "Test Movie", Year: 2020, MovieFile: &arrapi.MovieFile{Path: "/media/m.mkv"}}},
 	}
-	cfg := &fakeScanCfg{}
+	rig.act = &recProgress{Log: rig.log}
+	cfg := rig.cfg
 	rig.h = NewHandler(HandlerDeps{
 		StateFunc: func() (*HandlerState, *LiveState) {
 			st := &HandlerState{Cfg: cfg}
@@ -207,8 +276,8 @@ func newScanRig(t *testing.T) *scanRig {
 			return st, &LiveState{Cfg: cfg, Engine: rig.engine}
 		},
 		CtxFunc:         func() context.Context { return rig.ctx },
-		ScanDeps:        func() *Deps { return &Deps{Events: rig.ev, Activity: rig.log, Alerts: nopAlerts{}} },
-		Activity:        rig.log,
+		ScanDeps:        func() *Deps { return &Deps{Events: rig.ev, Activity: rig.act, Alerts: nopAlerts{}} },
+		Activity:        rig.act,
 		Stops:           rig.stops,
 		ScanGuard:       rig.guard,
 		Alerts:          nopAlerts{},
@@ -743,6 +812,307 @@ type nopScanMetrics struct{}
 func (nopScanMetrics) RecordScan(int, int, time.Duration) {}
 func (nopScanMetrics) AdaptiveSkip()                      {}
 
+// --- full-pass accounting over both media kinds ---
+//
+// The completion summary, the scan metric and the activity progress counter
+// all report ONE total across episodes and movies. A scan that counts only
+// one kind, or subtracts one from the other, is invisible to a fixture with a
+// single media kind in the queue, so these run one episode and one movie.
+
+// recAlerts records what reached the UI alert list.
+type recAlerts struct {
+	mu    sync.Mutex
+	infos []string
+	msgs  []string
+}
+
+func (r *recAlerts) Record(_, msg string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.msgs = append(r.msgs, msg)
+}
+
+func (r *recAlerts) RecordInfo(msg string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.infos = append(r.infos, msg)
+}
+
+func (r *recAlerts) infoAlerts() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]string, len(r.infos))
+	copy(out, r.infos)
+	return out
+}
+
+// recScanMetrics records the scan-level metric the pass reports on completion.
+type recScanMetrics struct {
+	calls int
+	items int
+	found int
+}
+
+func (m *recScanMetrics) RecordScan(items, found int, _ time.Duration) {
+	m.calls++
+	m.items = items
+	m.found = found
+}
+
+// fullScanSonarr is the wanted-episode iteration surface of the full pass.
+// It hands out one series+episode and records the exclude-tag negotiation.
+type fullScanSonarr struct {
+	excludeIDs      map[int]struct{}
+	gotExclude      map[int]struct{}
+	series          arrapi.Series
+	episode         arrapi.Episode
+	resolveCalls    int
+	wantedCalls     int
+	rescanCallCount int
+}
+
+func (f *fullScanSonarr) WantedEpisodes(_ context.Context, excludeTagIDs map[int]struct{},
+	fn func(arrapi.Series, arrapi.Episode) error,
+) error {
+	f.wantedCalls++
+	f.gotExclude = excludeTagIDs
+	return fn(f.series, f.episode)
+}
+
+func (f *fullScanSonarr) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
+	f.resolveCalls++
+	return f.excludeIDs
+}
+
+func (f *fullScanSonarr) RescanSeries(_ context.Context, _ int) error {
+	f.rescanCallCount++
+	return nil
+}
+
+// fullScanRadarr is the wanted-movie half of the same surface.
+type fullScanRadarr struct {
+	excludeIDs      map[int]struct{}
+	gotExclude      map[int]struct{}
+	movie           arrapi.Movie
+	resolveCalls    int
+	wantedCalls     int
+	rescanCallCount int
+}
+
+func (f *fullScanRadarr) WantedMovies(_ context.Context, excludeTagIDs map[int]struct{},
+	fn func(arrapi.Movie) error,
+) error {
+	f.wantedCalls++
+	f.gotExclude = excludeTagIDs
+	return fn(f.movie)
+}
+
+func (f *fullScanRadarr) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
+	f.resolveCalls++
+	return f.excludeIDs
+}
+
+func (f *fullScanRadarr) RescanMovie(_ context.Context, _ int) error {
+	f.rescanCallCount++
+	return nil
+}
+
+// fullScanRig assembles RunFullScan over one episode and one movie. The movie
+// title sorts AFTER the series title, so the movie is the last item scanned
+// and the activity entry's final progress carries the whole-pass total.
+type fullScanRig struct {
+	db      *fakeScanStore
+	cfg     *fakeScanCfg
+	alerts  *recAlerts
+	metrics *recScanMetrics
+	log     *activity.Log
+	sonarr  *fullScanSonarr
+	radarr  *fullScanRadarr
+	deps    *Deps
+	ls      *LiveState
+	actID   string
+}
+
+func newFullScanRig(t *testing.T, result subflux.SearchResult) *fullScanRig {
+	t.Helper()
+	rig := &fullScanRig{
+		db:      &fakeScanStore{},
+		cfg:     &fakeScanCfg{languages: []string{"fr"}},
+		alerts:  &recAlerts{},
+		metrics: &recScanMetrics{},
+		log:     activity.New(10),
+		sonarr: &fullScanSonarr{
+			series: arrapi.Series{
+				ID: 42, Title: "Test Show", Year: 2019, ImdbID: "tt1",
+				OriginalLanguage: &arrapi.Language{Name: "English"},
+			},
+			episode: arrapi.Episode{
+				ID: 100, SeasonNumber: 1, EpisodeNumber: 2, HasFile: true,
+				EpisodeFile: &arrapi.EpisodeFile{Path: "/media/e.mkv"},
+			},
+		},
+		radarr: &fullScanRadarr{
+			movie: arrapi.Movie{
+				ID: 7, Title: "Zulu Movie", Year: 2020, ImdbID: "tt2", TmdbID: 27205,
+				OriginalLanguage: &arrapi.Language{Name: "English"},
+				MovieFile:        &arrapi.MovieFile{Path: "/media/m.mkv"},
+			},
+		},
+	}
+	rig.deps = &Deps{
+		DB: rig.db, Metrics: rig.metrics, Events: &recEvents{}, Activity: rig.log,
+		Alerts: rig.alerts, ClearCaches: func([]provider.Provider) {},
+	}
+	rig.ls = &LiveState{
+		Cfg: rig.cfg, Engine: &fakeEngine{result: result},
+		Sonarr: rig.sonarr, Radarr: rig.radarr,
+	}
+	rig.actID = rig.log.Start("Full Scan", "d", activity.SourceManual)
+	return rig
+}
+
+// foundOneSubtitle is an engine answer that downloaded one file.
+func foundOneSubtitle(path string) subflux.SearchResult {
+	return subflux.SearchResult{Langs: []subflux.LangOutcome{{
+		Lang: "fr", Kind: subflux.LangSearched,
+		Paths: []string{path}, Searched: 1, Queried: 1,
+	}}}
+}
+
+func TestRunFullScan_totals_span_episodes_and_movies(t *testing.T) {
+	t.Parallel()
+	rig := newFullScanRig(t, foundOneSubtitle("/media/x.fr.srt"))
+
+	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID); outcome != activity.OutcomeCompleted {
+		t.Fatalf("RunFullScan outcome = %q, want completed", outcome)
+	}
+
+	const wantSummary = "Scan complete: 2 found, 2 searched in "
+	infos := rig.alerts.infoAlerts()
+	if len(infos) != 1 {
+		t.Fatalf("RunFullScan recorded %d info alerts, want 1: %q", len(infos), infos)
+	}
+	if !strings.HasPrefix(infos[0], wantSummary) {
+		t.Errorf("RunFullScan summary = %q, want prefix %q", infos[0], wantSummary)
+	}
+	if strings.Contains(infos[0], "backed off") {
+		t.Errorf("RunFullScan summary = %q, want no backed-off suffix when nothing backed off", infos[0])
+	}
+	if rig.metrics.calls != 1 || rig.metrics.items != 2 || rig.metrics.found != 2 {
+		t.Errorf("RecordScan called %d times with (items, found) = (%d, %d), want 1 time with (2, 2)",
+			rig.metrics.calls, rig.metrics.items, rig.metrics.found)
+	}
+	entry, ok := rig.log.Get(rig.actID)
+	if !ok {
+		t.Fatalf("activity entry %q missing after the scan", rig.actID)
+	}
+	if entry.Current != 2 {
+		t.Errorf("activity progress after the last item = %d, want 2 (one episode + one movie)",
+			entry.Current)
+	}
+}
+
+func TestRunFullScan_summary_reports_the_backed_off_total(t *testing.T) {
+	t.Parallel()
+	rig := newFullScanRig(t, subflux.SearchResult{
+		Langs: []subflux.LangOutcome{{Lang: "fr", Kind: subflux.LangBackedOff}},
+	})
+
+	if outcome := RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID); outcome != activity.OutcomeCompleted {
+		t.Fatalf("RunFullScan outcome = %q, want completed", outcome)
+	}
+
+	const wantSummary = "Scan complete: 0 found, 2 searched in "
+	infos := rig.alerts.infoAlerts()
+	if len(infos) != 1 {
+		t.Fatalf("RunFullScan recorded %d info alerts, want 1: %q", len(infos), infos)
+	}
+	if !strings.HasPrefix(infos[0], wantSummary) {
+		t.Errorf("RunFullScan summary = %q, want prefix %q", infos[0], wantSummary)
+	}
+	if !strings.HasSuffix(infos[0], " (2 backed off)") {
+		t.Errorf("RunFullScan summary = %q, want suffix %q", infos[0], " (2 backed off)")
+	}
+}
+
+// Exclude tags cost one arr round trip per client, so the pass resolves them
+// only when the config names any, and the resolved IDs are what the wanted
+// queries filter on.
+func TestRunFullScan_resolves_exclude_tags_only_when_configured(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configured", func(t *testing.T) {
+		t.Parallel()
+		rig := newFullScanRig(t, foundOneSubtitle("/media/x.fr.srt"))
+		rig.cfg.searchCfg.ExcludeArrTags = []string{"ignore"}
+		rig.sonarr.excludeIDs = map[int]struct{}{7: {}}
+		rig.radarr.excludeIDs = map[int]struct{}{9: {}}
+
+		RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID)
+
+		if rig.sonarr.resolveCalls != 1 || rig.radarr.resolveCalls != 1 {
+			t.Errorf("ResolveExcludeTagIDs calls = (sonarr %d, radarr %d), want (1, 1)",
+				rig.sonarr.resolveCalls, rig.radarr.resolveCalls)
+		}
+		if !maps.Equal(rig.sonarr.gotExclude, map[int]struct{}{7: {}}) {
+			t.Errorf("WantedEpisodes exclude set = %v, want the resolved sonarr ids map[7:{}]",
+				rig.sonarr.gotExclude)
+		}
+		if !maps.Equal(rig.radarr.gotExclude, map[int]struct{}{9: {}}) {
+			t.Errorf("WantedMovies exclude set = %v, want the resolved radarr ids map[9:{}]",
+				rig.radarr.gotExclude)
+		}
+	})
+
+	t.Run("not configured", func(t *testing.T) {
+		t.Parallel()
+		rig := newFullScanRig(t, foundOneSubtitle("/media/x.fr.srt"))
+
+		RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID)
+
+		if rig.sonarr.resolveCalls != 0 || rig.radarr.resolveCalls != 0 {
+			t.Errorf("ResolveExcludeTagIDs calls = (sonarr %d, radarr %d), want (0, 0) with no exclude tags configured",
+				rig.sonarr.resolveCalls, rig.radarr.resolveCalls)
+		}
+		if rig.sonarr.gotExclude != nil || rig.radarr.gotExclude != nil {
+			t.Errorf("wanted-query exclude sets = (%v, %v), want both nil with no exclude tags configured",
+				rig.sonarr.gotExclude, rig.radarr.gotExclude)
+		}
+	})
+}
+
+// A pass whose store answers every call is silent above info: the cycle-mark
+// warnings exist to report a store that failed, and a scan that emits them on
+// every clean pass buries the one that did.
+func TestRunFullScan_healthy_store_logs_no_warning(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	buf := captureLogs(t)
+	rig := newFullScanRig(t, foundOneSubtitle("/media/x.fr.srt"))
+
+	RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID)
+
+	if strings.Contains(buf.String(), "level=WARN") {
+		t.Errorf("a clean full scan logged a warning; log was:\n%s", buf.String())
+	}
+}
+
+// The per-kind result lines are the operator's tally of what the pass did.
+// A movie the engine had nothing to search for counts as skipped, once.
+func TestRunFullScan_movie_results_line_reports_the_skipped_tally(t *testing.T) {
+	// No t.Parallel: this test swaps the global slog default logger.
+	buf := captureLogs(t)
+	rig := newFullScanRig(t, subflux.SearchResult{
+		Langs: []subflux.LangOutcome{{Lang: "fr", Kind: subflux.LangSkipped, Skipped: 1}},
+	})
+
+	RunFullScan(t.Context(), make(chan struct{}), rig.deps, rig.ls, rig.actID)
+
+	const want = `msg="scan results: movies" searched=1 found=0 skipped=1 no_result=0 backed_off=0`
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("movie results line missing %q; log was:\n%s", want, buf.String())
+	}
+}
+
 // --- graceful stop during the FINAL in-flight item (regression: stop was
 // checked before items and during delays but never after the last item
 // returned, so a stop during the final item published completed) ---
@@ -1153,5 +1523,124 @@ func TestScan_registration_released_before_scan_done_event(t *testing.T) {
 	}
 	if !p.done {
 		t.Error("entry not terminal at scan:done publication")
+	}
+}
+
+// --- per-episode progress reporting ---
+//
+// A series scan reports four steps: the queue size at accept, one step per
+// episode carrying its 1-based position, and the closing found/searched
+// tally. The UI's progress bar and the CLI's poll loop both read them.
+
+func TestHandleScanSeries_reports_each_episode_and_the_closing_tally(t *testing.T) {
+	t.Parallel()
+	rig := newScanRig(t)
+	rig.sonarr.episodes = epsWithFiles(2)
+	rig.engine.result = foundOneSubtitle("/media/e.fr.srt")
+
+	code, _ := rig.post(t, rig.h.HandleScanSeries, "/api/scan/series/42", "")
+	if code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", code)
+	}
+	rig.bg.Wait()
+
+	want := []progressStep{
+		{current: 0, total: 2, detail: "Test Show (2 episodes)"},
+		{current: 1, total: 2, detail: "Test Show S01E01 (1/2)"},
+		{current: 2, total: 2, detail: "Test Show S01E02 (2/2)"},
+		{current: 2, total: 2, detail: "Test Show: 2/2 found"},
+	}
+	if got := rig.act.progressSteps(); !slices.Equal(got, want) {
+		t.Errorf("HandleScanSeries progress steps =\n  %+v\nwant\n  %+v", got, want)
+	}
+}
+
+// The inter-item delay paces PROVIDER traffic, so it is not paid after the
+// last episode: a one-episode scan finishes immediately whatever the
+// configured delay.
+func TestHandleScanSeries_pacing_delay_is_not_paid_after_the_last_episode(t *testing.T) {
+	t.Parallel()
+	rig := newScanRig(t)
+	rig.sonarr.episodes = epsWithFiles(1)
+	rig.cfg.searchCfg.ScanDelay = 30 * time.Second
+	rig.engine.result = foundOneSubtitle("/media/e.fr.srt")
+
+	code, _ := rig.post(t, rig.h.HandleScanSeries, "/api/scan/series/42", "")
+	if code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", code)
+	}
+
+	waitFor(t, "the one-episode scan to finish without paying the inter-item delay", func() bool {
+		return len(rig.ev.doneEvents()) == 1
+	})
+}
+
+// A season scan searches the requested season and nothing else: the filter is
+// the only thing standing between a season request and a whole-series scan.
+func TestHandleScanSeason_scans_only_the_requested_season(t *testing.T) {
+	t.Parallel()
+	rig := newScanRig(t)
+	rig.sonarr.episodes = []arrapi.Episode{
+		{
+			ID: 1, SeasonNumber: 1, EpisodeNumber: 1, HasFile: true,
+			EpisodeFile: &arrapi.EpisodeFile{Path: "/media/s01e01.mkv"},
+		},
+		{
+			ID: 2, SeasonNumber: 2, EpisodeNumber: 1, HasFile: true,
+			EpisodeFile: &arrapi.EpisodeFile{Path: "/media/s02e01.mkv"},
+		},
+		{
+			ID: 3, SeasonNumber: 2, EpisodeNumber: 2, HasFile: true,
+			EpisodeFile: &arrapi.EpisodeFile{Path: "/media/s02e02.mkv"},
+		},
+	}
+
+	code, _ := rig.post(t, rig.h.HandleScanSeason, "/api/scan/season/42/2", "")
+	if code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", code)
+	}
+	rig.bg.Wait()
+
+	want := []progressStep{
+		{current: 0, total: 2, detail: "Test Show (2 episodes)"},
+		{current: 1, total: 2, detail: "Test Show S02E01 (1/2)"},
+		{current: 2, total: 2, detail: "Test Show S02E02 (2/2)"},
+		{current: 2, total: 2, detail: "Test Show: 0/2 found"},
+	}
+	if got := rig.act.progressSteps(); !slices.Equal(got, want) {
+		t.Errorf("HandleScanSeason(season 2) progress steps =\n  %+v\nwant\n  %+v", got, want)
+	}
+}
+
+// The stats cache is invalidated after a scan that changed something, and NOT
+// on shutdown: the process is exiting, and touching the cache there is work
+// nobody will read.
+func TestFinishScan_invalidates_stats_except_on_shutdown(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		outcome activity.Outcome
+		want    int
+	}{
+		{name: "completed", outcome: activity.OutcomeCompleted, want: 1},
+		{name: "cancelled", outcome: activity.OutcomeCancelled, want: 1},
+		{name: "failed", outcome: activity.OutcomeFailed, want: 1},
+		{name: "shutdown", outcome: activity.OutcomeShutdown, want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rig := newScanRig(t)
+			invalidations := 0
+			rig.h.deps.InvalidateStats = func() { invalidations++ }
+			actID := rig.log.Start("Scan", "d", activity.SourceManual)
+
+			rig.h.finishScan(func() {}, actID, "scan", "d", tc.outcome)
+
+			if invalidations != tc.want {
+				t.Errorf("finishScan(%s) invalidated the stats cache %d times, want %d",
+					tc.outcome, invalidations, tc.want)
+			}
+		})
 	}
 }

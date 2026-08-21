@@ -96,6 +96,9 @@ func TestParseResolveParams(t *testing.T) {
 		{name: "episode type is not a resolve arm", query: "title=x&type=episode", wantMsg: "type must be series or movie"},
 		{name: "garbage tmdb", query: "tmdb=abc", wantMsg: "tmdb must be a positive integer"},
 		{name: "negative tmdb", query: "tmdb=-5", wantMsg: "tmdb must be a positive integer"},
+		// tmdb=0 is not a tmdb id, and accepting it silently would make the
+		// query look identifier-less instead of malformed.
+		{name: "zero tmdb", query: "tmdb=0", wantMsg: "tmdb must be a positive integer"},
 		{name: "garbage season", query: "title=x&season=abc", wantMsg: "season must be a non-negative integer"},
 		{name: "negative episode", query: "title=x&episode=-1", wantMsg: "episode must be a non-negative integer"},
 		{name: "valid narrowing", query: "title=x&season=2&episode=5"},
@@ -338,18 +341,19 @@ func TestResolveQuery_series_season_episode_narrowing(t *testing.T) {
 		},
 	}
 	cases := []struct {
-		season  *int
-		episode *int
-		name    string
-		want    int
+		season       *int
+		episode      *int
+		name         string
+		want         int
+		wantResolved bool
 	}{
-		{name: "no narrowing expands everything", want: 6},
-		{name: "season only", season: new(2), want: 2},
-		{name: "season and episode", season: new(1), episode: new(2), want: 1},
-		{name: "episode only filters across seasons", episode: new(1), want: 3},
-		{name: "no such season", season: new(9), want: 0},
-		{name: "season zero expands only the specials", season: new(0), want: 2},
-		{name: "episode narrows within season zero", season: new(0), episode: new(2), want: 1},
+		{name: "no narrowing expands everything", want: 6, wantResolved: true},
+		{name: "season only", season: new(2), want: 2, wantResolved: true},
+		{name: "season and episode", season: new(1), episode: new(2), want: 1, wantResolved: true},
+		{name: "episode only filters across seasons", episode: new(1), want: 3, wantResolved: true},
+		{name: "no such season", season: new(9), want: 0, wantResolved: false},
+		{name: "season zero expands only the specials", season: new(0), want: 2, wantResolved: true},
+		{name: "episode narrows within season zero", season: new(0), episode: new(2), want: 1, wantResolved: true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -364,6 +368,11 @@ func TestResolveQuery_series_season_episode_narrowing(t *testing.T) {
 			}
 			if len(res.Items) != c.want {
 				t.Errorf("items = %d, want %d", len(res.Items), c.want)
+			}
+			// resolved is what the client branches on: a narrowing that
+			// matched nothing must not report a resolved query.
+			if res.Resolved != c.wantResolved {
+				t.Errorf("resolved = %t, want %t (%d items)", res.Resolved, c.wantResolved, len(res.Items))
 			}
 			for i := range res.Items {
 				item := &res.Items[i]
