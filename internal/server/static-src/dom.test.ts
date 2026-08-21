@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
 import {
-  el as _el,
   text,
   icon,
   option,
@@ -16,21 +15,14 @@ import {
 } from "./dom.js";
 import { _resetForTest as resetConfirm } from "@cplieger/ui-primitives/ask";
 
-describe("dom: el()", () => {
-  it.todo("creates element with tag name");
-
-  it.todo("sets className from attrs");
-
-  it.todo("sets on* event handlers as properties");
-
-  it.todo("sets boolean attributes (hidden, disabled, checked)");
-
-  it.todo("appends string children as text nodes");
-
-  it.todo("appends Node children directly");
-
-  it.todo("skips null/undefined children");
-});
+// `el` is not tested here: dom.ts only re-exports it from @cplieger/reactive
+// (`export { el }`), so its factory belongs to that package's suite. Every
+// branch of it is already exercised through real call sites in this package —
+// tag + className and string children by the element builders below, `on*`
+// handlers by dialogHead(), the BOOL_PROPS property path by status.test.ts
+// (`disabled`) and security.test.ts (`hidden`), and the null-child skip by
+// search.test.ts (a row's absent [HI]/on-disk spans). Adding a second,
+// dependency-facing copy here would pin another repo's internals.
 
 // confirm() now delegates to the @cplieger/ui-primitives ask primitive
 // (boolean shape), which owns a reused <dialog class="uip-ask"> appended to

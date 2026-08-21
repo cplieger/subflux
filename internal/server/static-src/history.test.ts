@@ -164,8 +164,6 @@ describe("history: renderItems", () => {
       "</div>";
   });
 
-  it.todo("renders table with thead and tbody");
-
   it("rows are keyed by unique subtitle_state id", async () => {
     // Two distinct rows that collide on media_id + language + media_imported.
     // The old key (media_id + media_imported) deduped them into ONE collection
@@ -181,14 +179,6 @@ describe("history: renderItems", () => {
 
     expect(reqTbody().children.length).toBe(2);
   });
-
-  it.todo("each row shows time, media label, language, provider, mode, release");
-
-  it.todo("series entries format season/episode in label");
-
-  it.todo("clickable rows emit NavRoute with correct href");
-
-  it.todo("non-clickable rows (no href) render plain tr");
 
   it("reconcile preserves existing rows on Show More append", async () => {
     // Page 0 must be a full page (>= PAGE_SIZE = 50) for hasMore to flip true
@@ -238,13 +228,14 @@ describe("history: renderItems", () => {
   });
 });
 
-describe("history: filters", () => {
-  it.todo("language dropdown populated from fetched entries");
-
-  it.todo("provider dropdown populated from fetched entries");
-
-  it.todo("filter change triggers reload");
-});
+// The dropdown suite is "history: filter dropdowns" below. It asserts the
+// CURRENT rule — options come from the configured languages/providers merged
+// with the values seen in loaded rows — rather than "populated from fetched
+// entries", which updateHistoryFilters' own comment records as the behavior
+// that was removed (options that depended on how many pages happened to be
+// loaded). The filter change -> reload wiring is not in this module: app.ts
+// (263-273) binds `change`/`input` on #h-type/#h-lang/#h-provider/#h-filter to
+// reloadHistory, and every suite here drives that entry point directly.
 
 describe("history: page query", () => {
   beforeEach(() => {
