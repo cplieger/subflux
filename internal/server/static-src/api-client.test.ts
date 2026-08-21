@@ -227,3 +227,288 @@ describe("fillPath", () => {
     expect(fillPath("/api/scan/series/{id}", {})).toBe("/api/scan/series/{id}");
   });
 });
+
+// --- Method dispatch, option threading, and diagnostics ---
+//
+// The switch over HttpMethod is the whole transport: an emptied case falls
+// through to the next verb, so the method that leaves the client is the only
+// thing that proves the dispatch. A fresh Response per call because a Response
+// body can only be read once.
+function captureFetch(body: BodyInit | null = "{}", init: ResponseInit = { status: 200 }) {
+  const mock = vi.fn((_url: string, _init?: RequestInit) =>
+    Promise.resolve(new Response(body, init)),
+  );
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
+function sentInit(mock: ReturnType<typeof captureFetch>, call: number): RequestInit {
+  const args = mock.mock.calls[call];
+  if (!args?.[1]) {
+    throw new Error(`fetch call ${String(call)} carried no init`);
+  }
+  return args[1];
+}
+
+describe("verb dispatch", () => {
+  it("sends each verb as its own HTTP method", async () => {
+    const mock = captureFetch();
+
+    await clientRequestRaw("GET", "/api/x");
+    await clientRequestRaw("POST", "/api/x", { a: 1 });
+    await clientRequestRaw("PUT", "/api/x", { a: 1 });
+    await clientRequestRaw("PATCH", "/api/x", { a: 1 });
+    await clientRequestRaw("DELETE", "/api/x");
+
+    expect(sentInit(mock, 0).method).toBe("GET");
+    expect(sentInit(mock, 1).method).toBe("POST");
+    expect(sentInit(mock, 2).method).toBe("PUT");
+    expect(sentInit(mock, 3).method).toBe("PATCH");
+    expect(sentInit(mock, 4).method).toBe("DELETE");
+  });
+
+  it("threads a DELETE body through the request options", async () => {
+    // DELETE takes its body via opts (only POST/PUT/PATCH get a body param), so
+    // this is the one verb where the opts.body assignment is observable.
+    const mock = captureFetch();
+
+    await clientRequestRaw("DELETE", "/api/files", { media_id: "tvdb-1" });
+
+    expect(sentInit(mock, 0).body).toBe(JSON.stringify({ media_id: "tvdb-1" }));
+  });
+
+  it("sends no body when the caller passes none", async () => {
+    const mock = captureFetch();
+
+    await clientRequestRaw("DELETE", "/api/files");
+
+    expect(sentInit(mock, 0).body).toBeUndefined();
+  });
+
+  it("threads the caller's abort signal into the request", async () => {
+    const mock = captureFetch();
+    const ctrl = new AbortController();
+
+    await clientRequestRaw("GET", "/api/x", undefined, undefined, ctrl.signal);
+    const sent = sentInit(mock, 0).signal;
+    ctrl.abort();
+
+    // The client composes the caller's signal with its timeout, so the signal
+    // that reaches fetch is a different object that must still follow ours.
+    expect(sent?.aborted).toBe(true);
+  });
+});
+
+describe("error envelope diagnostics", () => {
+  it("carries the response headers on the error envelope", async () => {
+    // login.ts reads Retry-After off a 429 to time its rate-limit countdown.
+    stubFetch(JSON.stringify({ error: "too many attempts" }), {
+      status: 429,
+      headers: { ...JSON_HEADERS, "Retry-After": "30" },
+    });
+
+    const r = await clientRequestRaw("POST", "/api/auth/login", { user: "x" });
+
+    expect(r.headers?.get("Retry-After")).toBe("30");
+  });
+
+  it("keeps the decode diagnostic off a plain HTTP error", async () => {
+    // console.error is the decode boundary's own signal; a 500 is not a decode
+    // failure and must not raise it.
+    stubFetch(JSON.stringify({ error: "boom" }), { status: 500, headers: JSON_HEADERS });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      /* noop */
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequestRaw("GET", "/api/x");
+
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it("logs one warning per failed call", async () => {
+    stubFetch(JSON.stringify({ error: "not found" }), { status: 404, headers: JSON_HEADERS });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequest("GET", "/api/missing", undefined, passthrough);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("logs no warning for a successful call", async () => {
+    stubFetch(JSON.stringify({ a: 1 }), { status: 200, headers: JSON_HEADERS });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequest("GET", "/api/x", undefined, passthrough);
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("still warns on an HTTP error when the caller's signal aborted afterwards", async () => {
+    // Only a status-0 (transport-level) cancellation is silent; a real HTTP
+    // failure keeps its diagnostic even if the caller has since given up.
+    stubFetch(JSON.stringify({ error: "gone" }), { status: 410, headers: JSON_HEADERS });
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequest("GET", "/api/x", undefined, passthrough, ctrl.signal);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("clientRequestOK warns on failure", async () => {
+    stubFetch(JSON.stringify({ error: "forbidden" }), { status: 403, headers: JSON_HEADERS });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequestOK("DELETE", "/api/item/1");
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("clientRequestOK stays quiet on success", async () => {
+    stubFetch(JSON.stringify({}), { status: 200, headers: JSON_HEADERS });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequestOK("DELETE", "/api/item/1");
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("clientRequestOK stays quiet on a caller-aborted call", async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("aborted", "AbortError")));
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    const ok = await clientRequestOK("DELETE", "/api/item/1", undefined, ctrl.signal);
+
+    expect(ok).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("clientRequestOK still warns on an HTTP error the caller later abandoned", async () => {
+    // Same rule as clientRequest: silence is for a status-0 cancellation only,
+    // so BOTH halves of the guard have to hold, not either one.
+    stubFetch(JSON.stringify({ error: "gone" }), { status: 410, headers: JSON_HEADERS });
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    await clientRequestOK("DELETE", "/api/item/1", undefined, ctrl.signal);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+});
+
+// --- Session-expiry redirect ---
+//
+// `redirectingToLogin` is a module-level one-shot latch, so each test imports a
+// FRESH module; a shared module would let the first redirect disarm the rest.
+// window.location is replaced with a plain record (vitest's unstubGlobals puts
+// the real one back after each test).
+async function freshClient() {
+  vi.resetModules();
+  return await import("./api-client.js");
+}
+
+function stubLocation(pathname: string, search = ""): { href: string } {
+  const loc = { pathname, search, href: `http://localhost${pathname}${search}` };
+  vi.stubGlobal("location", loc);
+  return loc;
+}
+
+describe("session expiry", () => {
+  it("redirects a 401 to the login page with the current view as the return target", async () => {
+    const { clientRequestRaw: freshRaw } = await freshClient();
+    const loc = stubLocation("/settings", "?tab=auth");
+    stubFetch(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
+
+    await freshRaw("GET", "/api/config");
+
+    expect(loc.href).toBe("/login?next=%2Fsettings%3Ftab%3Dauth");
+  });
+
+  it("leaves a non-401 failure on the current page", async () => {
+    const { clientRequestRaw: freshRaw } = await freshClient();
+    const loc = stubLocation("/settings");
+    stubFetch(JSON.stringify({ error: "forbidden" }), { status: 403, headers: JSON_HEADERS });
+
+    await freshRaw("GET", "/api/config");
+
+    expect(loc.href).toBe("http://localhost/settings");
+  });
+
+  it("does not redirect the login shell, whose own POSTs answer 401", async () => {
+    const { clientRequestRaw: freshRaw } = await freshClient();
+    const loc = stubLocation("/login");
+    stubFetch(JSON.stringify({ error: "bad credentials" }), {
+      status: 401,
+      headers: JSON_HEADERS,
+    });
+
+    await freshRaw("POST", "/api/auth/login", { user: "x" });
+
+    expect(loc.href).toBe("http://localhost/login");
+  });
+
+  it("does not redirect anything under the login shell either", async () => {
+    // The guard is a PREFIX test on purpose: a future sub-route of the login
+    // shell must not be able to bounce itself back to /login forever.
+    const { clientRequestRaw: freshRaw } = await freshClient();
+    const loc = stubLocation("/login/reset");
+    stubFetch(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
+
+    await freshRaw("POST", "/api/auth/login", { user: "x" });
+
+    expect(loc.href).toBe("http://localhost/login/reset");
+  });
+
+  it("redirects only once when several calls fail together", async () => {
+    const { clientRequestRaw: freshRaw } = await freshClient();
+    const loc = stubLocation("/settings");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: "unauthorized" }), {
+            status: 401,
+            headers: JSON_HEADERS,
+          }),
+        ),
+      ),
+    );
+
+    await freshRaw("GET", "/api/config");
+    loc.href = "sentinel";
+    await freshRaw("GET", "/api/status");
+
+    // The latch holds: the second 401 must not restart the navigation.
+    expect(loc.href).toBe("sentinel");
+  });
+});

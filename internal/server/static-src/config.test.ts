@@ -1,5 +1,35 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// config.ts registers its save/reset apiActions at module load. Capturing the
+// definitions is the only way in to decodeError -> configSaveError ->
+// friendlyConfigError: they are module-private and reached in production only
+// when the actions framework decodes a failed save.
+//
+// CRITICAL: vitest.config sets clearMocks/mockReset/restoreMocks, so the mock
+// factory must be a PLAIN function — a vi.fn would lose its implementation
+// before the first test and the module-load registration would vanish.
+interface MockActionDef {
+  name?: string;
+  decodeError?: (info: { status: number; body?: unknown }) => {
+    kind: string;
+    error: { message: string; status: number; code?: string };
+  };
+}
+const actionDefs = vi.hoisted(() => ({ map: new Map<string, MockActionDef>() }));
+vi.mock("@cplieger/actions", () => ({
+  apiAction: (def: MockActionDef) => {
+    if (def.name !== undefined) {
+      actionDefs.map.set(def.name, def);
+    }
+    return { dispatch: () => ({ outcome: Promise.resolve({ status: "success" }) }) };
+  },
+  defineAction: () => ({ dispatch: () => Promise.resolve(null) }),
+  bindLoadingState: () => undefined,
+  retryNetwork: (fn: unknown) => fn,
+  RETRY_STANDARD: {},
+}));
+
 import { markRequiredFields, buildSectionsFromForm } from "./config.js";
 import { fieldId } from "./config-renderers.js";
 import type { SchemaSection } from "./api-types.js";
@@ -212,6 +242,26 @@ describe("config: buildSectionsFromForm", () => {
 
     expect(buildSectionsFromForm(schema)["sonarr"]).toEqual({
       enabled: false,
+      url: "http://sonarr:8989",
+    });
+  });
+
+  it("defaults a section with no rendered toggle to enabled", () => {
+    // A section whose header toggle is missing from the DOM (collapsed, or a
+    // schema/DOM mismatch) must not silently disable the section on save.
+    const schema: SchemaSection[] = [
+      {
+        key: "sonarr",
+        title: "Sonarr",
+        type: "fields",
+        enable_key: "enabled",
+        fields: [{ key: "url", label: "URL", type: "text" }],
+      },
+    ];
+    addInput(fieldId("sonarr", "url"), "http://sonarr:8989");
+
+    expect(buildSectionsFromForm(schema)["sonarr"]).toEqual({
+      enabled: true,
       url: "http://sonarr:8989",
     });
   });
@@ -434,5 +484,343 @@ describe("config: buildSectionsFromForm", () => {
 
     inp.value = "";
     expect(buildSectionsFromForm(schema)).not.toHaveProperty("poll_interval");
+  });
+});
+
+// --- Required-field marking: the cases the required_group tests don't reach ---
+
+// One standalone section (no required_group), so updateFieldValidation runs
+// instead of the group's force-clear path.
+const SEARCH_SECTION: SchemaSection[] = [
+  {
+    key: "search",
+    title: "Search",
+    type: "fields",
+    fields: [
+      { key: "min_score", label: "Min Score", type: "number", required: true },
+      { key: "note", label: "Note", type: "text" },
+      { key: "token", label: "Token", type: "secret", required: true, secret: true },
+    ],
+  },
+];
+
+describe("config: markRequiredFields field state", () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it("flags an empty required field", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const inp = fieldInput(body, "search", "min_score", "");
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(inp.classList.contains("cfg-required")).toBe(true);
+    expect(hasError(inp)).toBe(true);
+  });
+
+  it("leaves a filled required field alone", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const inp = fieldInput(body, "search", "min_score", "75");
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(inp.classList.contains("cfg-required")).toBe(false);
+    expect(hasError(inp)).toBe(false);
+  });
+
+  it("treats a whitespace-only value as empty", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const inp = fieldInput(body, "search", "min_score", "   ");
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(inp.classList.contains("cfg-required")).toBe(true);
+  });
+
+  it("clears the Required message once the field is filled", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const inp = fieldInput(body, "search", "min_score", "");
+    markRequiredFields(SEARCH_SECTION, body);
+    expect(hasError(inp)).toBe(true);
+
+    inp.value = "75";
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(hasError(inp)).toBe(false);
+    expect(inp.classList.contains("cfg-required")).toBe(false);
+  });
+
+  it("adds one Required message however many passes run", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const inp = fieldInput(body, "search", "min_score", "");
+
+    markRequiredFields(SEARCH_SECTION, body);
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(inp.closest(".cfg-field")?.querySelectorAll(".cfg-error").length).toBe(1);
+  });
+
+  it("never flags an optional field", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const optional = fieldInput(body, "search", "note", "");
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(optional.classList.contains("cfg-required")).toBe(false);
+    expect(hasError(optional)).toBe(false);
+  });
+
+  it("accepts a redacted secret as filled outside a group", () => {
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const secret = fieldInput(body, "search", "token", "");
+    secret.placeholder = "****";
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(secret.classList.contains("cfg-required")).toBe(false);
+    expect(hasError(secret)).toBe(false);
+  });
+
+  it("still flags an empty secret with no placeholder", () => {
+    // No placeholder means the server holds no value: this one really is
+    // missing, redaction is not what makes a secret optional.
+    const body = document.createElement("div");
+    document.body.appendChild(body);
+    const secret = fieldInput(body, "search", "token", "");
+
+    markRequiredFields(SEARCH_SECTION, body);
+
+    expect(secret.classList.contains("cfg-required")).toBe(true);
+  });
+
+  it("accepts a redacted secret as filled", () => {
+    // A stored secret comes back as the "****" placeholder with an empty value;
+    // flagging it would tell the user to retype a key the server already has.
+    // The proof is the SIBLING: only a satisfied group clears radarr too.
+    const f = buildArrForm();
+    f.sonarrUrl.value = "http://sonarr:8989";
+    f.sonarrKey.placeholder = "****";
+
+    markRequiredFields(ARR_SECTIONS, f.body);
+
+    expect(f.sonarrKey.classList.contains("cfg-required")).toBe(false);
+    expect(f.radarrUrl.classList.contains("cfg-required")).toBe(false);
+    expect(hasError(f.radarrUrl)).toBe(false);
+  });
+
+  it("needs EVERY required field of a member, not just one", () => {
+    // Sonarr's URL alone does not make the arr group satisfied: without the key
+    // the connection cannot be made, so both members stay flagged.
+    const f = buildArrForm();
+    f.sonarrUrl.value = "http://sonarr:8989";
+
+    markRequiredFields(ARR_SECTIONS, f.body);
+
+    expect(f.sonarrKey.classList.contains("cfg-required")).toBe(true);
+    expect(f.radarrUrl.classList.contains("cfg-required")).toBe(true);
+  });
+
+  it("does not count a whitespace-only value towards a group", () => {
+    const f = buildArrForm();
+    f.sonarrUrl.value = "   ";
+    f.sonarrKey.value = "   ";
+
+    markRequiredFields(ARR_SECTIONS, f.body);
+
+    expect(f.radarrUrl.classList.contains("cfg-required")).toBe(true);
+  });
+
+  it("does not count a member whose inputs are absent from the form", () => {
+    // A section rendered without its inputs (collapsed, or a schema/DOM
+    // mismatch) must not satisfy the group on behalf of the others.
+    const body = document.createElement("div");
+    body.id = "configBody";
+    document.body.appendChild(body);
+    const radarrUrl = fieldInput(body, "radarr", "url", "");
+    fieldInput(body, "radarr", "api_key", "");
+
+    markRequiredFields(ARR_SECTIONS, body);
+
+    expect(radarrUrl.classList.contains("cfg-required")).toBe(true);
+  });
+});
+
+/** A `.cfg-field`-wrapped input, addressed the way the renderer addresses it. */
+function fieldInput(
+  body: HTMLElement,
+  section: string,
+  field: string,
+  value: string,
+): HTMLInputElement {
+  const wrap = document.createElement("div");
+  wrap.className = "cfg-field";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.id = fieldId(section, field);
+  inp.value = value;
+  wrap.appendChild(inp);
+  body.appendChild(wrap);
+  return inp;
+}
+
+// --- Save-error decoding ---
+//
+// The chain under test is the one a failed PUT /api/config/structured walks:
+// the action's decodeError lifts the server envelope, configSaveError maps a
+// known error code to a fixed sentence, and friendlyConfigError rewrites
+// anything else out of Go's validator vocabulary into a UI sentence.
+
+function decodeSaveError(
+  status: number,
+  body: unknown,
+): { message: string; status: number; code?: string } {
+  const def = actionDefs.map.get("config.save");
+  if (!def?.decodeError) {
+    throw new Error("config.save action has no decodeError");
+  }
+  return def.decodeError({ status, body }).error;
+}
+
+/** The user-visible message for a server error body. */
+function saveMessage(body: unknown): string {
+  return decodeSaveError(422, body).message;
+}
+
+describe("config: save-error decoding", () => {
+  it("lifts the server's error text and status onto the envelope", () => {
+    const err = decodeSaveError(422, { error: "bad key", code: "config_invalid" });
+
+    expect(err.status).toBe(422);
+    expect(err.code).toBe("config_invalid");
+  });
+
+  it("omits the code when the server sent none", () => {
+    const err = decodeSaveError(500, { error: "boom" });
+
+    expect("code" in err).toBe(false);
+  });
+
+  it("falls back to Unknown error on an empty body", () => {
+    expect(saveMessage(undefined)).toBe("Unknown error");
+  });
+
+  it("maps an unreachable-arr code to its own sentence", () => {
+    expect(
+      saveMessage({ error: "dial tcp: connection refused", code: "config_unreachable_arr" }),
+    ).toBe("Sonarr/Radarr unreachable. Check the URL and API key.");
+  });
+
+  it("maps a too-large config to its own sentence", () => {
+    expect(saveMessage({ error: "body too large", code: "config_too_large" })).toBe(
+      "Configuration is too large. Remove unused entries and try again.",
+    );
+  });
+
+  it("maps a failed reload to its own sentence", () => {
+    expect(saveMessage({ error: "activate: bad provider", code: "config_reload_failed" })).toBe(
+      "Configuration could not be applied and was not saved. Check server logs for details.",
+    );
+  });
+
+  it("keeps the server's text when the code is unmapped", () => {
+    expect(saveMessage({ error: "languages: rule 1 has no targets", code: "config_invalid" })).toBe(
+      "Languages: rule 1 has no targets",
+    );
+  });
+
+  it("strips Go's invalid-configuration prefix", () => {
+    expect(saveMessage({ error: "invalid configuration: media_roots is empty" })).toBe(
+      "Media_roots is empty",
+    );
+  });
+
+  it("strips the prefix when no space follows the colon", () => {
+    expect(saveMessage({ error: "invalid configuration:media_roots is empty" })).toBe(
+      "Media_roots is empty",
+    );
+  });
+
+  it("keeps an invalid-configuration mention that is not a prefix", () => {
+    // The anchor matters: only the leading wrapper is noise, the same words
+    // inside the message are the message.
+    expect(saveMessage({ error: "provider x: invalid configuration: bad key" })).toBe(
+      "Provider x: invalid configuration: bad key",
+    );
+  });
+
+  it("strips Go's parse-YAML prefix", () => {
+    expect(saveMessage({ error: "parse YAML: unexpected end of stream" })).toBe(
+      "Unexpected end of stream",
+    );
+  });
+
+  it("strips the parse-YAML prefix when no space follows the colon", () => {
+    expect(saveMessage({ error: "parse YAML:unexpected end of stream" })).toBe(
+      "Unexpected end of stream",
+    );
+  });
+
+  it("keeps a parse-YAML mention that is not a prefix", () => {
+    expect(saveMessage({ error: "step 2 could not parse YAML: broken" })).toBe(
+      "Step 2 could not parse YAML: broken",
+    );
+  });
+
+  it("turns a YAML line error into a line-numbered syntax message", () => {
+    expect(saveMessage({ error: "yaml: line 7: something odd" })).toBe("Syntax error on line 7");
+  });
+
+  it("keeps every digit of a multi-digit line number", () => {
+    expect(saveMessage({ error: "yaml: line 142: something odd" })).toBe(
+      "Syntax error on line 142",
+    );
+  });
+
+  it("reads a line error written without spaces", () => {
+    expect(saveMessage({ error: "yaml:line3: something odd" })).toBe("Syntax error on line 3");
+  });
+
+  it("appends the fix hint for a recognized YAML pattern", () => {
+    expect(
+      saveMessage({ error: "yaml: line 4: mapping values are not allowed in this context" }),
+    ).toBe("Syntax error on line 4: check indentation and colons");
+  });
+
+  it("hints about indentation for an unexpected key", () => {
+    expect(saveMessage({ error: "yaml: line 9: did not find expected key" })).toBe(
+      "Syntax error on line 9: unexpected value, check indentation",
+    );
+  });
+
+  it("hints about an unclosed quote", () => {
+    expect(saveMessage({ error: "yaml: line 2: could not find expected ':'" })).toBe(
+      "Syntax error on line 2: missing closing quote or bracket",
+    );
+  });
+
+  it("hints about quoting for an illegal leading character", () => {
+    expect(
+      saveMessage({ error: "yaml: line 5: found character that cannot start any token" }),
+    ).toBe("Syntax error on line 5: invalid character, try quoting the value");
+  });
+
+  it("keeps a yaml-line mention that is not a prefix as prose", () => {
+    expect(saveMessage({ error: "config rejected near yaml: line 3" })).toBe(
+      "Config rejected near yaml: line 3",
+    );
+  });
+
+  it("capitalizes the first letter and keeps the rest verbatim", () => {
+    expect(saveMessage({ error: "sonarr.url must be an absolute URL" })).toBe(
+      "Sonarr.url must be an absolute URL",
+    );
   });
 });

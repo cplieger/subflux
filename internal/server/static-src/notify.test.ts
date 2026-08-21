@@ -73,4 +73,24 @@ describe("notify", () => {
     vi.advanceTimersByTime(400);
     expect(toasts().length).toBe(0);
   });
+
+  // The info window is 3s, one second SHORTER than the library's own default.
+  // Dropping the explicit duration would silently stretch every info toast to
+  // 4s, which only a test that advances to 3s can see.
+  it("auto-dismisses an info toast after its 3s duration", async () => {
+    expect.assertions(2);
+    const { info } = await loadNotify();
+    info("note");
+    vi.advanceTimersByTime(3000);
+    document.querySelector(".uip-toast")?.dispatchEvent(new Event("transitionend"));
+    vi.advanceTimersByTime(400);
+    expect(toasts().length).toBe(0);
+    // A success toast at the same point is still up: the two windows differ.
+    const { success } = await loadNotify();
+    success("still here");
+    vi.advanceTimersByTime(3000);
+    document.querySelector(".uip-toast")?.dispatchEvent(new Event("transitionend"));
+    vi.advanceTimersByTime(400);
+    expect(toasts().length).toBe(1);
+  });
 });
