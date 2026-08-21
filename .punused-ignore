@@ -144,11 +144,11 @@ method (*Config).Validate
 # longer resolves. The methods were still correctly adjudicated; only the
 # evidence had rotted, which this file's own header calls the difference between
 # an adjudication and an amnesty.
-method (*Store).GetUserByEmail
+method (*Store).UserByEmail
 method (*Store).UpdateSessionActivity
-method (*Store).GetPasskeyByCredentialID
+method (*Store).PasskeyByCredentialID
 method (*Store).UpdatePasskeyAfterLogin
-method (*Store).GetAPIKeyByHash
+method (*Store).APIKeyByHash
 
 # The same library callback seen from the CONSUMER side: authhandlers.AccountStore
 # declares UpdatePasskeyAfterLogin (iface.go:30) because auth's CompleteLogin
