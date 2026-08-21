@@ -6,7 +6,7 @@ require (
 	github.com/cplieger/arrapi/v2 v2.0.0
 	github.com/cplieger/atomicfile/v3 v3.0.0
 	github.com/cplieger/auth/v4 v4.0.0
-	github.com/cplieger/envx/v2 v2.0.0
+	github.com/cplieger/envx/v2 v2.0.1
 	github.com/cplieger/envx/yamlenv/v2 v2.0.0
 	github.com/cplieger/health v1.6.0
 	github.com/cplieger/httpx/v5 v5.0.0
