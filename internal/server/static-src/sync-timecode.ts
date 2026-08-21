@@ -165,6 +165,12 @@ export function buildTimecodeInput(
   }
 
   function handleWheel(e: WheelEvent, delta: number): void {
+    // A horizontal trackpad swipe delivers a wheel event with deltaY 0. Adjusting
+    // on it would silently change the offset the user is about to save (and
+    // swallow their sideways scroll), so a zero delta is not an adjustment.
+    if (e.deltaY === 0) {
+      return;
+    }
     e.preventDefault();
     adjust(e.deltaY < 0 ? delta : -delta);
   }
