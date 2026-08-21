@@ -237,6 +237,40 @@ func TestMigrate_copyStepTransform(t *testing.T) {
 	}
 }
 
+// TestMigrate_copyStepCannotRewriteOtherDomainStamp proves the swap machine
+// stamps the destination itself: a step that rewrites the other domain's stamp
+// on its way through the meta bucket cannot change it, so a core format
+// rewrite can never strand the auth domain on a version that never shipped.
+func TestMigrate_copyStepCannotRewriteOtherDomainStamp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "subflux.bolt")
+	seedResetFixture(t, path)
+	authStampBefore := rawReadStamp(t, path, metaKeyAuthSchemaVersion)
+	if len(authStampBefore) == 0 {
+		t.Fatal("setup: auth stamp is absent, the fixture must be stamped for both domains")
+	}
+
+	// A step that mangles the auth stamp as the copy walks meta.
+	transform := func(bucketPath []string, k, v []byte) ([]byte, []byte, error) {
+		if len(bucketPath) == 1 && bucketPath[0] == bucketMeta && string(k) == string(metaKeyAuthSchemaVersion) {
+			return k, kv.Be64(9), nil
+		}
+		return k, v, nil
+	}
+	core, auth := copyDomains(transform)
+	db, err := openWithDomains(path, core, auth)
+	if err != nil {
+		t.Fatalf("copy migration open: %v", err)
+	}
+	// Not t.Context(): this context is used by the Cleanup call below, and t.Context() is already cancelled once cleanups run.
+	ctx := context.Background()
+	t.Cleanup(func() { _ = db.Close(ctx) })
+
+	if got := rawStampInOpenDB(t, db, metaKeyAuthSchemaVersion); string(got) != string(authStampBefore) {
+		t.Errorf("auth stamp after a core copy step = %x, want %x (the destination's stamps are the framework's, not the step's)",
+			got, authStampBefore)
+	}
+}
+
 // TestMigrate_copyStepFailureLeavesOriginal proves a pre-rename failure (a
 // failing transform) aborts the open, removes the temp file, and leaves the
 // original file byte-identical — with the error pointing at the snapshot.
