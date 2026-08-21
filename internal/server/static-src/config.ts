@@ -57,8 +57,7 @@ function cfgCtl(): DialogController {
     onClose: (): void => {
       // The close (backdrop, Escape, the X button, or programmatic) has
       // finished its fade — restore the URL if we're still parked on
-      // /settings. Replaces the old 260ms post-closeDialog timeout and the
-      // cancel-path navigate.
+      // /settings.
       if (location.pathname === "/settings") {
         history.replaceState(null, "", "/");
       }

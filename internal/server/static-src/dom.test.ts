@@ -120,9 +120,12 @@ describe("dom: closeDialog()", () => {
     return document.getElementById("dlg") as HTMLDialogElement;
   }
 
-  it("is a no-op returning undefined when the dialog is already closed", () => {
-    expect(dlg().open).toBe(false);
-    expect(closeDialog(dlg())).toBeUndefined();
+  it("leaves an already-closed dialog closed and unmarked", () => {
+    const d = dlg();
+    expect(d.open).toBe(false);
+    closeDialog(d);
+    expect(d.classList.contains("is-leaving")).toBe(false);
+    expect(d.open).toBe(false);
   });
 
   it("adds is-leaving and closes via the fallback timer when no transitionend fires", () => {
