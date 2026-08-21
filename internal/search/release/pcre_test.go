@@ -379,6 +379,15 @@ func TestRetryShrink_assertion_after_quantified_element(t *testing.T) {
 		{"floor respects a multi digit minimum", `[ab]{10,}(?!z)[cd]+(?<=a)`, "aaaaaaaaaabcd", false},
 		// Assertion not quantifier-adjacent: no retry happens.
 		{"no retry without adjacent quantifier", `(ab)(?!c)`, "abc", false},
+		// A star has minimum width zero, so the probe floor is the chain's
+		// own start and the shrink is allowed to give the element up
+		// entirely. Here width 1 already satisfies the lookbehind.
+		{"a zero minimum still gets probed", `[ab]*(?<=a)`, "ab", true},
+		// Same zero floor, driven all the way down: the negative lookbehind
+		// holds at every probed offset including the chain start, so the
+		// continuation is what rejects each one — at offset zero there is no
+		// left context to hand it.
+		{"continuation checked at the chain start", `[ab]*(?<!b)\d`, "ab1", false},
 		// The same-level pattern remainder is re-checked at the probed
 		// offset: "aa" satisfies the lookbehind but the trailing \d does
 		// not match there, so no width survives.
@@ -454,6 +463,64 @@ func TestRetryShrink_chain_adopted_from_group_tail(t *testing.T) {
 	}
 }
 
+// TestRetryShrink_clamps_captures_to_the_accepted_offset pins WHICH capture
+// spans an accepted shrink rewrites. .NET's backtracking reports the
+// captures of the width it settled on, so a group the layer adopted the
+// chain through ends at the accepted offset, a group inside the chain that
+// begins at or after that offset did not participate at all, and one
+// straddling it keeps only the part before it. Every expectation below is
+// the capture set .NET produces for the same input; only m[0] is the
+// documented greedy extent the layer keeps (divergence class (j)).
+func TestRetryShrink_clamps_captures_to_the_accepted_offset(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    []string
+	}{
+		// Both enclosing groups' greedy ends coincide with the assertion,
+		// so both are pulled back to the accepted width 1.
+		{
+			name:    "enclosing groups end at the accepted offset",
+			pattern: `(([ab]+))(?<=a)`, input: "ab",
+			want: []string{"ab", "a", "a"},
+		},
+		// The chain is the capture group itself and the accepted offset is
+		// the chain start, so the group never participated.
+		{
+			name:    "a chain group at the accepted offset is dropped",
+			pattern: `(ab)*(?<!b)`, input: "ab",
+			want: []string{"ab", ""},
+		},
+		// Outer straddles the accepted offset and is truncated to "a";
+		// the nested optional begins exactly at it and is dropped.
+		{
+			name:    "straddling group truncated and nested group dropped",
+			pattern: `(a(b?))*(?<!b)`, input: "ab",
+			want: []string{"ab", "a", ""},
+		},
+		// The release-group shape without its trailing boundary: the last
+		// legal width keeps "-E" of the optional part, so part2 is
+		// truncated rather than dropped.
+		{
+			name:    "optional tail truncated to the accepted width",
+			pattern: `-([a-z]+(-[a-z]+)?)(?<!-ES)`, input: "x264-GROUP-ES",
+			want: []string{"-GROUP-ES", "GROUP-E", "-E"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			got := p.FindStringSubmatch(tc.input)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("FindStringSubmatch(%q) for %q = %#v, want %#v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
 // --- assertion evaluation subject (window and marker offset) ---
 
 // TestLookbehind_sees_enough_of_the_prefix pins that a lookbehind is
@@ -522,6 +589,43 @@ func TestLookahead_evaluated_at_the_marker_offset(t *testing.T) {
 	}
 }
 
+// TestLookahead_dot_prefix_shortcut_respects_newlines pins that the
+// offset-threshold resolution for dot-prefixed lookaheads is confined to
+// newline-free subjects. A leading `.` cannot cross a newline, so on
+// multiline input matchability is no longer monotone in the offset and the
+// threshold would answer for offsets it never probed — accepting an
+// assertion that does not hold, or vetoing one that does. Release names do
+// not contain newlines, but the general evaluation path has to stay
+// correct when one arrives.
+func TestLookahead_dot_prefix_shortcut_respects_newlines(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    bool
+	}{
+		// The marker sits at offset 0, in front of the newline; `.+X`
+		// cannot reach the X from there, so the assertion fails even though
+		// it would hold one byte later.
+		{"leading newline blocks the inner pattern", `(?=.+X)\nb`, "\nbX", false},
+		{"leading newline with a longer tail", `(?=.+X)\nb`, "\nbaaX", false},
+		// The satisfying offset lies after the newline; a threshold derived
+		// from the whole subject would never find it.
+		{"satisfying offset lies past a newline", `(?=.+X)a+`, "ba\naX", true},
+		{"negated form on multiline input", `(?!.+X)a+`, "ba\naX", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if got := p.MatchString(tc.input); got != tc.want {
+				t.Errorf("MatchString(%q) for %q = %v, want %v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
 // --- Positional merge scan (R3.3) ---
 
 func TestPositionalMerge_scan_order(t *testing.T) {
@@ -562,18 +666,50 @@ func TestPositionalMerge_scan_order(t *testing.T) {
 	}
 }
 
-func TestPositionalMerge_zero_width_bump_along(t *testing.T) {
+// TestPositionalMerge_zero_width_selection_consumes_its_position pins how
+// the merge scan treats a zero-length selection: the cursor advances one
+// byte past it, so the position is spent. Without that bump a candidate
+// starting at the same offset in another branch would be selected as well
+// and, being later in the scan, would become the returned match — .NET's
+// Matches() advances past an empty match and never yields a second one at
+// the same position.
+func TestPositionalMerge_zero_width_selection_consumes_its_position(t *testing.T) {
 	t.Parallel()
-	// An assertion-only branch yields zero-width candidates at every
-	// position; the scan must advance and terminate, and the last selection
-	// still reflects scan order.
-	p := mustCompilePCRE(t, `(?=z)|ab`)
-	m := p.FindStringSubmatch("abz")
-	if m == nil {
-		t.Fatal("FindStringSubmatch = nil, want non-nil")
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    []string
+	}{
+		// An assertion-only branch yields zero-width candidates; the scan
+		// must advance and terminate, and the last selection still
+		// reflects scan order.
+		{
+			name: "zero width selection is positionally last",
+			// The assertion holds only in front of 'z', at offset 2.
+			pattern: `(?=z)|ab`, input: "abz",
+			want: []string{""},
+		},
+		{
+			name:    "same offset consuming branch is not selected too",
+			pattern: `(?=z)|z`, input: "z",
+			want: []string{""},
+		},
+		{
+			name:    "spent position suppresses a capturing branch",
+			pattern: `(?=z)|(z)`, input: "zab",
+			want: []string{"", ""},
+		},
 	}
-	if m[0] != "" {
-		t.Errorf("m[0] = %q, want empty (zero-width selection at z is positionally last)", m[0])
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			got := p.FindStringSubmatch(tc.input)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("FindStringSubmatch(%q) for %q = %#v, want %#v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
 	}
 }
 
