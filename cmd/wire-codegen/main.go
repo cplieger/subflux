@@ -1,6 +1,6 @@
 // Command wire-codegen generates the TypeScript wire surface and the Go path
 // constants from the single wire contract in internal/wirespec, using the
-// wiregen library (AST-based; github.com/cplieger/wiregen/v2).
+// wiregen library (AST-based; github.com/cplieger/wiregen/v3).
 //
 // Outputs:
 //   - internal/server/static-src/wire/{types,decoders,client}.gen.ts —
@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,10 +26,16 @@ import (
 )
 
 func main() {
+	// wiregen v3 bounds the package load, which it runs as a go subprocess, on
+	// this context. A plain Background is what the library documents for a
+	// generator: every exit path here is os.Exit, so a cancel-on-signal context
+	// could not run its own stop func anyway.
+	ctx := context.Background()
+
 	r := wirespec.Registry()
 
 	outDir := filepath.Join("internal", "server", "static-src", "wire")
-	if err := r.Generate(outDir); err != nil {
+	if err := r.Generate(ctx, outDir); err != nil {
 		fmt.Fprintf(os.Stderr, "wire-codegen: %v\n", err)
 		os.Exit(1)
 	}
