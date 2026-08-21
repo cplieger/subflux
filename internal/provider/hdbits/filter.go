@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cplieger/jsonx"
+	"github.com/cplieger/jsonx/v2"
 	"github.com/cplieger/subflux/internal/provider/classify"
 	"github.com/cplieger/subflux/internal/subflux"
 )

@@ -35,7 +35,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/scanning"
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/cplieger/wiregen/v2"
+	"github.com/cplieger/wiregen/v3"
 )
 
 // Auth group tags. Values match the route group names in

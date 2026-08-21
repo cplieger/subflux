@@ -18,9 +18,9 @@ import (
 	"strings"
 
 	"github.com/cplieger/httpx/v5"
-	"github.com/cplieger/jsonx"
+	"github.com/cplieger/jsonx/v2"
 	"github.com/cplieger/keyenc"
-	"github.com/cplieger/ssrf/v3"
+	"github.com/cplieger/ssrf/v4"
 	"github.com/cplieger/subflux/internal/cache"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
