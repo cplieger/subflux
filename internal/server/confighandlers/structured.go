@@ -13,6 +13,7 @@ import (
 
 	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -94,12 +95,12 @@ func (h *Handler) HandleGetConfigStructured(w http.ResponseWriter, r *http.Reque
 		keyNode, valNode := doc.Content[i], doc.Content[i+1]
 		var v any
 		if err := valNode.Decode(&v); err != nil {
-			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "decode section", "section", keyNode.Value)
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "decode section", "section", logsafe.Field(keyNode.Value))
 			return
 		}
 		raw, err := json.Marshal(v)
 		if err != nil {
-			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "encode section", "section", keyNode.Value)
+			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "stage", "encode section", "section", logsafe.Field(keyNode.Value))
 			return
 		}
 		sections[keyNode.Value] = raw

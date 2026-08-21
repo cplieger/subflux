@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/mediaid"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/search"
@@ -61,7 +62,7 @@ func (h *Handler) HandleState(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("handleState", "results", len(entries),
 		"type", q.Get("type"), "lang", q.Get("lang"),
-		"provider", q.Get("provider"), "search", searchParam,
+		"provider", logsafe.Field(q.Get("provider")), "search", logsafe.Field(searchParam),
 		"limit", limit)
 	httpapi.WriteJSON(w, entries)
 }
@@ -273,7 +274,7 @@ func (h *Handler) HandleSearchTargets(w http.ResponseWriter, r *http.Request) {
 	}
 	targets := ls.Cfg.ResolveTargetsWithFallback(origLang, audioLangs)
 	slog.Debug("handleSearchTargets",
-		"orig_lang", origLang, "audio_langs", audioLangs,
+		"orig_lang", logsafe.Field(origLang), "audio_langs", audioLangs,
 		"targets", len(targets))
 	var out []subflux.SearchTarget
 	for _, t := range targets {
@@ -358,6 +359,6 @@ func handleTypePrefixQuery(w http.ResponseWriter, r *http.Request,
 		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", label)
 		return
 	}
-	slog.Debug(label+" query completed", "media_type", mediaType, "prefix", prefix)
+	slog.Debug(label+" query completed", "media_type", logsafe.Field(mediaType), "prefix", logsafe.Field(prefix))
 	httpapi.WriteJSON(w, result)
 }

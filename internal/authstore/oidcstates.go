@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/subflux/internal/logsafe"
 )
 
 // This file holds the OIDCStateStore half of AuthStore. OIDC login states are
@@ -73,7 +74,7 @@ func (s *Store) ConsumeOIDCState(_ context.Context, state auth.OIDCState) (nonce
 	if !ok || rec == nil {
 		return "", "", "", errOIDCStateNotFound
 	}
-	slog.Debug("oidc state consumed", "state_prefix", string(state[:min(8, len(state))]))
+	slog.Debug("oidc state consumed", "state_prefix", logsafe.Field(string(state[:min(8, len(state))])))
 	return rec.nonce, rec.codeVerifier, rec.redirectURI, nil
 }
 

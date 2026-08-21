@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -73,7 +74,12 @@ func ServiceUnavailableC(w http.ResponseWriter, r *http.Request, code subflux.Er
 // to the client to avoid leaking internal details.
 func InternalErrorC(w http.ResponseWriter, r *http.Request, err error, code subflux.ErrorCode, logAttrs ...any) {
 	if err != nil {
-		attrs := append([]any{keyError, err}, logAttrs...)
+		// The error text is sanitized here because this function owns that one
+		// attribute: a wrapped error routinely interpolates a request value, so
+		// its text carries the same newline a raw field would. logAttrs stays
+		// the caller's to route through logsafe.Field — an ...any cannot say
+		// which of its members is untrusted.
+		attrs := append([]any{keyError, logsafe.Field(err.Error())}, logAttrs...)
 		slog.Error(msgInternalError, attrs...)
 	}
 	writeError(w, r, http.StatusInternalServerError, code, msgInternalError)
