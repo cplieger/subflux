@@ -407,16 +407,53 @@ func makeRow(rating, lang, href, release string, hi bool) string {
 
 // --- Download ---
 
-// statusRoundTripper answers every request with a fixed status and empty body,
+// statusRoundTripper answers every request with a fixed status and body,
 // standing in for the upstream without a network dial.
-type statusRoundTripper struct{ status int }
+type statusRoundTripper struct {
+	body   string
+	status int
+}
 
 func (rt statusRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 	return &http.Response{
 		StatusCode: rt.status,
-		Body:       io.NopCloser(strings.NewReader("")),
+		Body:       io.NopCloser(strings.NewReader(rt.body)),
 		Header:     make(http.Header),
 	}, nil
+}
+
+// TestFetchPage_bodyAndMissingPage asserts a served page comes back verbatim
+// while a 404 is reported as an empty page with no error — the two callers read
+// that differently, so the distinction is the whole contract.
+func TestFetchPage_bodyAndMissingPage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("served page returned verbatim", func(t *testing.T) {
+		t.Parallel()
+		const page = "<html><body>yify results</body></html>"
+		p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusOK, body: page}}}
+
+		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
+		if err != nil {
+			t.Fatalf("fetchPage(200) unexpected error: %v", err)
+		}
+		if got != page {
+			t.Errorf("fetchPage(200) = %q, want %q", got, page)
+		}
+	})
+
+	t.Run("missing page is empty with no error", func(t *testing.T) {
+		t.Parallel()
+		p := &Provider{client: &http.Client{Transport: statusRoundTripper{status: http.StatusNotFound, body: "nope"}}}
+
+		got, err := p.fetchPage(t.Context(), serverURL+"/search/en-movie")
+		if err != nil {
+			t.Fatalf("fetchPage(404) unexpected error: %v", err)
+		}
+		if got != "" {
+			t.Errorf("fetchPage(404) = %q, want an empty page", got)
+		}
+	})
 }
 
 // A 404 on the subtitle detail page means the upstream no longer holds the

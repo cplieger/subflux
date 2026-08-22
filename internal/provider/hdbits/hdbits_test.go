@@ -1,9 +1,11 @@
 package hdbits
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -773,6 +775,43 @@ func TestCapTorrentIDs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// captureLogs routes the default logger into a buffer for the rest of the test
+// and restores it afterwards. The default logger is process-global, so a test
+// that calls this must not run in parallel.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+// TestCapTorrentIDs_warnsOnlyWhenTruncating asserts the operator warning marks a
+// real truncation: a list exactly at the cap is complete, so warning about it
+// would be a false alarm about a pathological upstream.
+// Not parallel: it swaps the process-wide default logger.
+func TestCapTorrentIDs_warnsOnlyWhenTruncating(t *testing.T) {
+	const msg = "hdbits: torrent list exceeded cap, truncating"
+
+	t.Run("at the cap", func(t *testing.T) {
+		logs := captureLogs(t)
+		capTorrentIDs([]int{1, 2, 3, 4, 5}, 5, "torrents:imdb:tt1")
+		if got := logs.String(); strings.Contains(got, msg) {
+			t.Errorf("capTorrentIDs(5 ids, cap 5) logged %q, want no truncation warning", got)
+		}
+	})
+
+	t.Run("over the cap", func(t *testing.T) {
+		logs := captureLogs(t)
+		capTorrentIDs([]int{1, 2, 3, 4, 5, 6, 7}, 5, "torrents:imdb:tt1")
+		const want = `msg="hdbits: torrent list exceeded cap, truncating" returned=7 cap=5 cache_key=torrents:imdb:tt1`
+		if got := logs.String(); !strings.Contains(got, want) {
+			t.Errorf("capTorrentIDs(7 ids, cap 5) log = %q, want it to contain %q", got, want)
+		}
+	})
 }
 
 // --- secret redaction (provider wiring) ---

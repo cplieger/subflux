@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"testing"
@@ -331,6 +332,46 @@ func TestBuildEpisodeCacheKey_matches_getEpisodeID_format(t *testing.T) {
 	if builtKey := buildEpisodeCacheKey(seriesID, "007"); builtKey != getKey {
 		t.Errorf("leading-zero normalization broken: %q != %q", builtKey, getKey)
 	}
+}
+
+// captureLogs routes the default logger into a buffer for the rest of the test
+// and restores it afterwards. The default logger is process-global, so a test
+// that calls this must not run in parallel.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+// TestNewMapper_warnsThatAConfiguredKeyTravelsInPlaintext asserts the operator is
+// told their AniDB client key leaves the process over plaintext HTTP, and that
+// the warning appears only when a key is actually configured.
+// Not parallel: it swaps the process-wide default logger.
+func TestNewMapper_warnsThatAConfiguredKeyTravelsInPlaintext(t *testing.T) {
+	const warning = "anidb: client key configured; API requests use plaintext HTTP (no HTTPS endpoint available)"
+
+	t.Run("key configured", func(t *testing.T) {
+		logs := captureLogs(t)
+		if NewMapper("secret-key") == nil {
+			t.Fatal("NewMapper(key) = nil, want a mapper")
+		}
+		if got := logs.String(); !strings.Contains(got, warning) {
+			t.Errorf("NewMapper(key) log = %q, want it to contain %q", got, warning)
+		}
+	})
+
+	t.Run("no key", func(t *testing.T) {
+		logs := captureLogs(t)
+		if NewMapper("") == nil {
+			t.Fatal("NewMapper(\"\") = nil, want a mapper")
+		}
+		if got := logs.String(); strings.Contains(got, warning) {
+			t.Errorf("NewMapper(\"\") log = %q, want no plaintext warning", got)
+		}
+	})
 }
 
 // TestDecompressIfGzipped_passesThroughNonGzip pins the gzip-magic guard:
