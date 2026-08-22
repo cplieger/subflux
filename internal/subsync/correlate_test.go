@@ -293,3 +293,142 @@ func TestFloatEnergy_negative_values(t *testing.T) {
 		t.Errorf("floatEnergy([-3,-4]) = %v, want 25", got)
 	}
 }
+
+// The correlation peak is refined between frames, so the reported offset is
+// not restricted to whole multiples of the frame duration. Here the peak sits
+// at lag 0 (3*1 + 2*2 = 7) with unequal neighbours — the lag -1 overlap is
+// 3*2 = 6 and the lag +1 overlap is 2*1 + 1*2 = 4 — which pulls the true peak
+// a quarter of a frame towards the stronger side: 0.25 * 10ms = 3ms.
+func TestCrossCorrelateEdges_refines_the_peak_between_frames(t *testing.T) {
+	t.Parallel()
+	a := []float64{3, 2, 1, 0}
+	b := []float64{1, 2}
+
+	got := crossCorrelateEdges(t.Context(), a, b)
+
+	if got.OffsetFrames != 0 {
+		t.Errorf("crossCorrelateEdges(%v, %v).OffsetFrames = %d, want 0", a, b, got.OffsetFrames)
+	}
+	if got.OffsetMs != 3 {
+		t.Errorf("crossCorrelateEdges(%v, %v).OffsetMs = %d, want 3", a, b, got.OffsetMs)
+	}
+}
+
+// Sub-frame refinement applies strictly inside a half-frame window. A peak
+// exactly half a frame from its neighbour is equally close to both, so the
+// whole-frame lag stands rather than being nudged either way.
+func TestCrossCorrelateEdges_ignores_a_half_frame_refinement(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a, b []float64
+	}{
+		// Lag 0 and lag +1 both overlap with weight 2, so the peak is as
+		// close to the following frame as to its own.
+		{name: "tie_with_the_following_frame", a: []float64{1, 1, 1}, b: []float64{1, 1}},
+		// Lag 0 and lag -1 both overlap with weight 3.
+		{name: "tie_with_the_preceding_frame", a: []float64{1, 0}, b: []float64{3, 3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := crossCorrelateEdges(t.Context(), tt.a, tt.b)
+			if got.OffsetFrames != 0 {
+				t.Errorf("crossCorrelateEdges(%v, %v).OffsetFrames = %d, want 0",
+					tt.a, tt.b, got.OffsetFrames)
+			}
+			if got.OffsetMs != 0 {
+				t.Errorf("crossCorrelateEdges(%v, %v).OffsetMs = %d, want 0",
+					tt.a, tt.b, got.OffsetMs)
+			}
+		})
+	}
+}
+
+// The peak is normalized by the energy of both signals, so it reports how well
+// the two shapes agree and not how loud they are: a signal against itself
+// scores 1 at any amplitude. Tolerance 1e-9 covers the FFT round trip, whose
+// last bits are not portable (Go may fuse a multiply and an add).
+func TestCrossCorrelateEdges_peak_is_amplitude_invariant(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		amp  float64
+	}{
+		{name: "unit_amplitude", amp: 1.0},
+		{name: "quiet_amplitude", amp: 0.2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			signal := make([]float64, 100)
+			for i := 20; i < 40; i++ {
+				signal[i] = tt.amp
+			}
+
+			got := crossCorrelateEdges(t.Context(), signal, signal)
+
+			if math.Abs(got.Peak-1.0) > 1e-9 {
+				t.Errorf("crossCorrelateEdges(signal, signal).Peak = %v for amplitude %v, want 1",
+					got.Peak, tt.amp)
+			}
+			if got.OffsetFrames != 0 {
+				t.Errorf("crossCorrelateEdges(signal, signal).OffsetFrames = %d for amplitude %v, want 0",
+					got.OffsetFrames, tt.amp)
+			}
+		})
+	}
+}
+
+// A signal with no energy cannot agree with anything, so the peak is zero
+// rather than an undefined ratio.
+func TestCrossCorrelateEdges_silent_signal_scores_zero(t *testing.T) {
+	t.Parallel()
+	silent := make([]float64, 8)
+	loud := []float64{1, -1, 1, -1, 1, -1, 1, -1}
+	tests := []struct {
+		name string
+		a, b []float64
+	}{
+		{name: "silent_audio", a: silent, b: loud},
+		{name: "silent_reference", a: loud, b: silent},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := crossCorrelateEdges(t.Context(), tt.a, tt.b)
+			if got.Peak != 0 {
+				t.Errorf("crossCorrelateEdges(%v, %v).Peak = %v, want 0", tt.a, tt.b, got.Peak)
+			}
+		})
+	}
+}
+
+// Two equal-length signals that oppose each other at every overlapping lag
+// correlate best where they do not overlap at all. That lag is reported as a
+// forward offset of the signal length, and the peak stays zero because nothing
+// actually matched.
+func TestCrossCorrelateEdges_opposed_signals_report_a_forward_lag(t *testing.T) {
+	t.Parallel()
+	const n = 64
+	high := make([]float64, n)
+	low := make([]float64, n)
+	for i := range n {
+		high[i] = 1
+		low[i] = -1
+	}
+
+	got := crossCorrelateEdges(t.Context(), high, low)
+
+	if got.OffsetFrames != n {
+		t.Errorf("crossCorrelateEdges(+1 x %d, -1 x %d).OffsetFrames = %d, want %d",
+			n, n, got.OffsetFrames, n)
+	}
+	if got.OffsetMs != n*frameMs {
+		t.Errorf("crossCorrelateEdges(+1 x %d, -1 x %d).OffsetMs = %d, want %d",
+			n, n, got.OffsetMs, n*frameMs)
+	}
+	if got.Peak != 0 {
+		t.Errorf("crossCorrelateEdges(+1 x %d, -1 x %d).Peak = %v, want 0", n, n, got.Peak)
+	}
+}
