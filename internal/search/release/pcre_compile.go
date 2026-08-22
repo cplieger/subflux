@@ -253,15 +253,16 @@ func rejectedGroupSyntax(rest string) (construct, reason string, rejected bool) 
 }
 
 // parseNamedGroup parses (?<name>...) / (?P<name>...) captures. The name
-// is dropped: only numbering is exposed.
+// is dropped: only numbering is exposed. An empty name is rejected, as
+// both .NET and Go's own regexp reject it.
 func (ps *parser) parseNamedGroup(rest string, start, depth int) (*node, error) {
 	open := "(?<"
 	if strings.HasPrefix(rest, "(?P<") {
 		open = "(?P<"
 	}
 	nameEnd := strings.IndexByte(rest[len(open):], '>')
-	if nameEnd < 0 {
-		return nil, compileErr(open, start, "unterminated group name")
+	if nameEnd <= 0 {
+		return nil, compileErr(open, start, "empty or unterminated group name")
 	}
 	ps.pos += len(open) + nameEnd + 1
 	ps.nSrc++

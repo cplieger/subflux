@@ -273,6 +273,8 @@ func TestCompilePCRE_rejected_shapes(t *testing.T) {
 		{"unmatched closing paren", `ab)`, ")", 2},
 		{"trailing backslash", "ab\\", `\`, 2},
 		{"unterminated group name", `(?<name`, "(?<", 0},
+		{"empty group name", `(?<>a)`, "(?<", 0},
+		{"empty python group name", `(?P<>a)`, "(?P<", 0},
 		{"empty inline flag group", `(?)`, "(?)", 0},
 		{"unterminated inline flag group", `(?i`, "(?i", 0},
 	}
