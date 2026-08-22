@@ -118,4 +118,14 @@ func TestTimeIndexKey_orderingAndSplit(t *testing.T) {
 	if _, _, ok := SplitTimeIndexKey([]byte{1, 2, 3}); ok {
 		t.Error("SplitTimeIndexKey on a too-short key: ok = true, want false")
 	}
+
+	// The separator is the ninth byte, so a key with an empty primary is the
+	// shortest VALID one: only a key too short to hold the timestamp and the
+	// separator is rejected.
+	shortest := TimeIndexKey(t1, nil)
+	gotNano, gotPrimary, ok = SplitTimeIndexKey(shortest)
+	if !ok || gotNano != t1.UnixNano() || len(gotPrimary) != 0 {
+		t.Errorf("SplitTimeIndexKey(TimeIndexKey(t1, nil)) = (%d, %x, %v), want (%d, empty, true)",
+			gotNano, gotPrimary, ok, t1.UnixNano())
+	}
 }

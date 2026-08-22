@@ -199,6 +199,36 @@ func TestPutDeleteIndexed_maintainsIndexAndCounter(t *testing.T) {
 	}
 }
 
+// TestPutIndexed_failsClosedOnAMissingCounterBucket asserts a declared counter
+// whose bucket does not exist is an error rather than a silently skipped count:
+// every reader trusts the counter to match the primary, so a row that lands
+// uncounted is drift that no later write repairs.
+func TestPutIndexed_failsClosedOnAMissingCounterBucket(t *testing.T) {
+	db := openTestDB(t)
+	// The counter's meta bucket is deliberately absent.
+	mustCreateBuckets(t, db, bktPrimary, bktIndex)
+
+	rec := idxRec{Tag: "a", N: 1}
+	err := db.Update(func(tx *bolt.Tx) error {
+		return PutIndexed(tx, bktPrimary, []byte("k1"), &rec, tagIndex(), counters())
+	})
+	if err == nil {
+		t.Fatal("PutIndexed with a missing counter bucket = nil, want an error")
+	}
+
+	// The refused transaction leaves no row behind.
+	var stored []byte
+	if verr := db.View(func(tx *bolt.Tx) error {
+		stored = tx.Bucket([]byte(bktPrimary)).Get([]byte("k1"))
+		return nil
+	}); verr != nil {
+		t.Fatalf("read primary: %v", verr)
+	}
+	if stored != nil {
+		t.Errorf("primary row k1 = %q after a refused insert, want it absent", stored)
+	}
+}
+
 // TestPutIndexed_indexEqualsPrimaryRescan asserts the index is a faithful
 // derivation of the primary: every primary row has exactly one matching index
 // entry and there are no orphans, after a mixed operation sequence.

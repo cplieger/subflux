@@ -235,6 +235,52 @@ providers:
 	}
 }
 
+// TestLoadFromBytes_reportsUnresolvedEnvVars asserts an unset ${VAR} is reported
+// with the variable named: the literal is kept in the value, so without the
+// warning an operator just sees a mysterious "${VAR}" where a URL should be. A
+// config with nothing unresolved stays quiet.
+// Not parallel: captureLogs swaps the process-wide default logger.
+func TestLoadFromBytes_reportsUnresolvedEnvVars(t *testing.T) {
+	const warning = `msg="config references environment variables that are not set; the literal ${VAR} is kept" vars=SUBFLUX_TEST_UNSET_VAR_12345`
+	unset := `
+sonarr:
+  url: "http://sonarr:8989"
+  api_key: "${SUBFLUX_TEST_UNSET_VAR_12345}"
+languages:
+  rules:
+    - audio: en
+      subtitles:
+        - code: fr
+  default:
+    - code: en
+providers:
+  os:
+    enabled: true
+`
+
+	t.Run("unset_var_is_named", func(t *testing.T) {
+		var err error
+		got := captureLogs(t, func() { _, err = LoadFromBytes(t.Context(), []byte(unset)) })
+		if err != nil {
+			t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+		}
+		if !strings.Contains(got, warning) {
+			t.Errorf("LoadFromBytes(unset var) log = %q, want it to contain %q", got, warning)
+		}
+	})
+
+	t.Run("nothing_unresolved_is_silent", func(t *testing.T) {
+		var err error
+		got := captureLogs(t, func() { _, err = LoadFromBytes(t.Context(), []byte(minimalValidYAML())) })
+		if err != nil {
+			t.Fatalf("LoadFromBytes() unexpected error: %v", err)
+		}
+		if strings.Contains(got, "config references environment variables that are not set") {
+			t.Errorf("LoadFromBytes(no vars) log = %q, want no unresolved-variable warning", got)
+		}
+	})
+}
+
 // --- Load (file-based) ---
 
 func TestLoad_reads_file(t *testing.T) {
