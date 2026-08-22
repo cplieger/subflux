@@ -251,6 +251,43 @@ func TestClusterCandidates(t *testing.T) {
 			wantMembers:  []int{1, 1},
 		},
 		{
+			name: "shifts exactly at CorrectedCueAgreementMs cluster",
+			candidates: []SyncResult{
+				// 1500ms apart: the agreement threshold is inclusive, so every
+				// corrected cue start and end still counts as agreeing.
+				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
+				shiftCandidate(inc, 1500, SourceOffset, MethodOffset, 0.6),
+			},
+			wantClusters: 1,
+			wantMembers:  []int{2},
+		},
+		{
+			name: "shifts exactly at ClusterMs cluster when zero-clamping collapses them",
+			candidates: []SyncResult{
+				// Declared shifts 3000ms apart, which the pre-grouping
+				// threshold admits inclusively, and both shifts clamp every
+				// cue to zero, so the corrected cues are identical. The
+				// prefilter must defer to the corrected-cue predicate.
+				shiftCandidate(inc, -600_000, SourceCrosslang, MethodCrosslang, 0.5),
+				shiftCandidate(inc, -603_000, SourceOffset, MethodOffset, 0.6),
+			},
+			wantClusters: 1,
+			wantMembers:  []int{2},
+		},
+		{
+			name: "a split joins a shift cluster despite a distant declared shift",
+			candidates: []SyncResult{
+				// Uniform per-segment shifts leave the split's corrected cues
+				// identical to shift(4000)'s, but a split declares a headline
+				// shift of 0, putting the pair 4000ms apart on the scalar
+				// prefilter. The prefilter speaks only for pure-shift pairs.
+				shiftCandidate(inc, 4000, SourceOffset, MethodOffset, 0.5),
+				splitCandidate(inc, 15, 4*time.Second, 4*time.Second, 0.6),
+			},
+			wantClusters: 1,
+			wantMembers:  []int{2},
+		},
+		{
 			name: "two shifts beyond ClusterMs split",
 			candidates: []SyncResult{
 				shiftCandidate(inc, 0, SourceCrosslang, MethodCrosslang, 0.5),
@@ -342,6 +379,91 @@ func TestClusterCandidates_orderCanonical(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestClusterCandidates_framerateJoinsADistantShift(t *testing.T) {
+	t.Parallel()
+	// Cues in a narrow window ten minutes in, where a small framerate rescale
+	// and a constant 4s offset land on nearly the same corrected times. The
+	// framerate candidate declares a headline shift of 0, so the scalar
+	// pre-grouping shortcut sees the pair 4000ms apart — beyond ClusterMs —
+	// while the corrected cues agree to within 100ms. The shortcut is only
+	// valid for pure-shift pairs, so it must not reject this one.
+	inc := makeCues(30, 10*time.Minute, time.Second)
+	fr := framerateCandidate(inc, 0.99354, 0.6)
+	sh := shiftCandidate(inc, 4000, SourceOffset, MethodOffset, 0.5)
+	if !correctedCuesAgree(fr.Cues, sh.Cues) {
+		t.Fatalf("fixture: corrected cues must agree, first cue %v vs %v", fr.Cues[0], sh.Cues[0])
+	}
+
+	clusters := clusterCandidates([]SyncResult{fr, sh})
+	if len(clusters) != 1 {
+		t.Fatalf("clusters = %d, want 1 (agreeing corrected cues)", len(clusters))
+	}
+	if len(clusters[0].members) != 2 {
+		t.Errorf("cluster[0] members = %d, want 2", len(clusters[0].members))
+	}
+}
+
+func TestVoteOnCandidates_sourceOrderBreaksTiesBetweenClusters(t *testing.T) {
+	t.Parallel()
+	// Two candidates that disagree with each other and miss the reference
+	// entirely: two clusters of one, both rating 0. Nothing distinguishes
+	// them, so the canonical source order has to decide, or which offset
+	// gets written to the subtitle file depends on nothing at all.
+	ref := makeCues(5, 0, time.Second)
+	inc := makeCues(30, 0, 20*time.Second)
+	candidates := []SyncResult{
+		shiftCandidate(inc, 100_000, SourceOffset, MethodOffset, 0.9),
+		shiftCandidate(inc, 200_000, SourceCrosslang, MethodCrosslang, 0.5),
+	}
+	for i := range candidates {
+		if r := alignmentRating(ref, candidates[i].Cues); r != 0 {
+			t.Fatalf("fixture: candidate %d rating = %f, want 0 (no overlap with the reference)", i, r)
+		}
+	}
+
+	got := voteOnCandidates(candidates, ref, inc)
+	if got.Source != SourceCrosslang {
+		t.Errorf("voteOnCandidates(two rating-0 clusters).Source = %v, want %v (canonical order)",
+			got.Source, SourceCrosslang)
+	}
+}
+
+func TestVoteOnCandidates_plausibilityGuardStaysDisarmedAtSimilarDurationMs(t *testing.T) {
+	t.Parallel()
+	// The plausibility guard only arms on similar-duration content, and the
+	// similarity threshold is exclusive: a reference exactly SimilarDurationMs
+	// longer than the incorrect cues is NOT similar. With the guard disarmed
+	// the better-rated member represents its cluster even though its shift is
+	// past LargeOffsetMs; arming it here would hand the file to the worse
+	// correction instead.
+	inc := makeCues(30, 0, 20*time.Second)
+	ref := append(ShiftCues(inc, 30_600*time.Millisecond),
+		Cue{Start: 640 * time.Second, End: 641 * time.Second, Text: "tail"})
+	incEndMs := inc[len(inc)-1].End.Milliseconds()
+	refEndMs := ref[len(ref)-1].End.Milliseconds()
+	if refEndMs-incEndMs != defaultVoteConfig.SimilarDurationMs {
+		t.Fatalf("fixture: duration difference = %d, want exactly %d",
+			refEndMs-incEndMs, defaultVoteConfig.SimilarDurationMs)
+	}
+
+	candidates := []SyncResult{
+		// Past LargeOffsetMs, and the exact correction.
+		shiftCandidate(inc, 30_600, SourceCrosslang, MethodCrosslang, 0.5),
+		// Inside LargeOffsetMs, 600ms short of the reference.
+		shiftCandidate(inc, 30_000, SourceOffset, MethodOffset, 0.9),
+	}
+	clusters := clusterCandidates(candidates)
+	if len(clusters) != 1 {
+		t.Fatalf("fixture: clusters = %d, want 1 (the two members must share a cluster)", len(clusters))
+	}
+
+	got := voteOnCandidates(candidates, ref, inc)
+	if got.Transform.Shift != 30_600 {
+		t.Errorf("voteOnCandidates(reference exactly %dms longer).Transform.Shift = %d, want 30600",
+			defaultVoteConfig.SimilarDurationMs, got.Transform.Shift)
 	}
 }
 
