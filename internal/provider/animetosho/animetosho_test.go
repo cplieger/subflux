@@ -88,12 +88,10 @@ func TestDownload_rejects_internal_ip(t *testing.T) {
 	}
 	// The refusal must come from the URL validation, not from the transport
 	// blocking the dial: a hostile URL in an API response never gets dialled.
-	var transportErr *url.Error
-	if errors.As(err, &transportErr) {
+	if _, isTransport := errors.AsType[*url.Error](err); isTransport {
 		t.Errorf("Download(private IP) error = %v, want a pre-dial refusal, not a transport error", err)
 	}
-	var ssrfErr *ssrf.Error
-	if !errors.As(err, &ssrfErr) {
+	if _, isSSRF := errors.AsType[*ssrf.Error](err); !isSSRF {
 		t.Errorf("Download(private IP) error = %v, want an *ssrf.Error from the URL validation", err)
 	}
 }
