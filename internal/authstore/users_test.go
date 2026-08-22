@@ -124,20 +124,26 @@ func TestGetUserByEmail_caseInsensitive(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	got, _, err := s.UserByEmail(ctx, "carol@example.COM")
+	got, found, err := s.UserByEmail(ctx, "carol@example.COM")
 	if err != nil {
 		t.Fatalf("UserByEmail: %v", err)
 	}
 	if got == nil || got.ID != u.ID {
 		t.Errorf("UserByEmail(case-insensitive) = %v, want user id %d", got, u.ID)
 	}
+	if !found {
+		t.Errorf("UserByEmail(%q) found = false, want true", "carol@example.COM")
+	}
 
-	none, _, err := s.UserByEmail(ctx, "nobody@example.com")
+	none, found, err := s.UserByEmail(ctx, "nobody@example.com")
 	if err != nil {
 		t.Fatalf("UserByEmail(absent): %v", err)
 	}
 	if none != nil {
 		t.Errorf("UserByEmail(absent) = %+v, want nil", none)
+	}
+	if found {
+		t.Errorf("UserByEmail(%q) found = true, want false", "nobody@example.com")
 	}
 }
 

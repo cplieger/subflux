@@ -270,6 +270,16 @@ func TestResetPreserving_failClosedGuards(t *testing.T) {
 			wantErr: "restore api key \"cli\" (user 2): invalid surrogate id",
 		},
 		{
+			// Zero is as unusable as a negative id: the id-addressed delete and
+			// the sequence bump both need a positive preserved id.
+			name: "zero-key-id",
+			transform: func(rs *Rowset) error {
+				rs.Keys[0].ID = 0
+				return nil
+			},
+			wantErr: "restore api key \"cli\" (user 2): invalid surrogate id",
+		},
+		{
 			name: "duplicate-key-id",
 			transform: func(rs *Rowset) error {
 				dup := rs.Keys[0]
