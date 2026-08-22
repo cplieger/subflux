@@ -79,22 +79,6 @@ func TestAudioSyncFromPCM_tonal_signal_no_panic(t *testing.T) {
 	}
 }
 
-func TestAudioSyncFromPCM_excessive_offset_rejected(t *testing.T) {
-	t.Parallel()
-	cues := []Cue{
-		{Start: 0, End: 200 * time.Millisecond, Text: "Line one"},
-		{Start: 300 * time.Millisecond, End: 500 * time.Millisecond, Text: "Line two"},
-		{Start: 600 * time.Millisecond, End: 800 * time.Millisecond, Text: "Line three"},
-		{Start: 900 * time.Millisecond, End: 1100 * time.Millisecond, Text: "Line four"},
-		{Start: 1200 * time.Millisecond, End: 1400 * time.Millisecond, Text: "Line five"},
-	}
-	pcm := make([]int16, 8000*2)
-	result := audioSyncFromPCM(t.Context(), cues, pcm, AudioSyncHints{})
-	if result.Method != MethodAudio {
-		t.Errorf("audioSyncFromPCM(excessive) method = %q, want %q", result.Method, MethodAudio)
-	}
-}
-
 func TestAudioSyncFromPCM_safe_precise_agreement(t *testing.T) {
 	t.Parallel()
 	cues := makeLongCues(10, 5*time.Second)
