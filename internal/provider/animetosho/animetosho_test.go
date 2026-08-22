@@ -1,9 +1,15 @@
 package animetosho
 
 import (
+	"bytes"
+	"errors"
+	"log/slog"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/subflux"
 	"pgregory.net/rapid"
 )
@@ -79,6 +85,78 @@ func TestDownload_rejects_internal_ip(t *testing.T) {
 	_, err := p.Download(t.Context(), sub)
 	if err == nil {
 		t.Fatal("Download(private IP) expected error, got nil")
+	}
+	// The refusal must come from the URL validation, not from the transport
+	// blocking the dial: a hostile URL in an API response never gets dialled.
+	var transportErr *url.Error
+	if errors.As(err, &transportErr) {
+		t.Errorf("Download(private IP) error = %v, want a pre-dial refusal, not a transport error", err)
+	}
+	var ssrfErr *ssrf.Error
+	if !errors.As(err, &ssrfErr) {
+		t.Errorf("Download(private IP) error = %v, want an *ssrf.Error from the URL validation", err)
+	}
+}
+
+// --- Diagnostics ---
+
+// captureLogs routes the default logger into a buffer for the rest of the test
+// and restores it afterwards. The default logger is process-global, so a test
+// that calls this must not run in parallel.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+// TestFactory_reportsDisabledEpisodeIDResolution asserts the missing-key notice
+// is emitted only when no anidb_client_key is configured — it is how an operator
+// finds out episode ID resolution is off, so a copy on every start would be
+// noise and silence on a keyless start would hide it.
+// Not parallel: it swaps the process-wide default logger.
+func TestFactory_reportsDisabledEpisodeIDResolution(t *testing.T) {
+	const notice = "animetosho: no anidb_client_key, episode ID resolution disabled"
+
+	t.Run("no key", func(t *testing.T) {
+		logs := captureLogs(t)
+		if _, err := Factory(t.Context(), nil); err != nil {
+			t.Fatalf("Factory(nil): %v", err)
+		}
+		if got := logs.String(); !strings.Contains(got, notice) {
+			t.Errorf("Factory(no key) log = %q, want it to contain %q", got, notice)
+		}
+	})
+
+	t.Run("key configured", func(t *testing.T) {
+		logs := captureLogs(t)
+		if _, err := Factory(t.Context(), map[string]any{
+			string(provider.KeyAniDBClientKey): "abc123",
+		}); err != nil {
+			t.Fatalf("Factory(with key): %v", err)
+		}
+		if got := logs.String(); strings.Contains(got, notice) {
+			t.Errorf("Factory(with key) log = %q, want no disabled notice", got)
+		}
+	})
+}
+
+// TestMatchFiles_reportsAnUnmatchedPack asserts a season pack whose filenames
+// carry no recognizable episode marker says so: the entry is skipped, and the
+// line is the only trace of why nothing was downloaded.
+// Not parallel: it swaps the process-wide default logger.
+func TestMatchFiles_reportsAnUnmatchedPack(t *testing.T) {
+	logs := captureLogs(t)
+	files := []entryFile{{Filename: "pack disc a.mkv"}, {Filename: "pack disc b.mkv"}}
+
+	if got := matchFiles(files, 1, 3, 0); got != nil {
+		t.Errorf("matchFiles(unmatched pack) = %+v, want nil", got)
+	}
+	const want = `msg="animetosho: no file matched target episode in pack" season=1 episode=3 files=2`
+	if got := logs.String(); !strings.Contains(got, want) {
+		t.Errorf("matchFiles(unmatched pack) log = %q, want it to contain %q", got, want)
 	}
 }
 
@@ -472,6 +550,13 @@ func TestFileMatchesEpisode(t *testing.T) {
 		{"absolute no false positive", "Show - 100.mkv", 1, 1, false},
 		{"e-prefix inside word", "Release01.mkv", 1, 1, false},
 		{"e-prefix inside word premiere", "Premiere08.mkv", 1, 8, false},
+		// The letter test is a range: 'a' and 'z' are both letters, so an e##
+		// directly after either is still inside a word.
+		{"e-prefix after the letter a", "Sae08.mkv", 1, 8, false},
+		{"e-prefix after the letter z", "Blaze08.mkv", 1, 8, false},
+		// A multibyte title character is not a letter as far as the ASCII range
+		// test goes, so it is a word boundary like a space or a dot.
+		{"e-prefix after a multibyte character", "日e08.mkv", 1, 8, true},
 		{"e-prefix at filename start", "e08 - Show Title.mkv", 1, 8, true},
 		{"padded number match", "Show 08 [720p].mkv", 1, 8, true},
 		{"padded number wrong episode", "Show 03 [720p].mkv", 1, 8, false},
