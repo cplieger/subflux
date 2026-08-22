@@ -79,6 +79,45 @@ func TestProvidersForTarget(t *testing.T) {
 	}
 }
 
+// TestProvidersForTarget_namesTheSelectionPathTaken asserts each of the three
+// selection paths is traceable: an include list, an exclude list and "all
+// providers" are different decisions, and the log line is where an operator sees
+// which one a language went down.
+// Not parallel: captureLogs swaps the process-wide default logger.
+func TestProvidersForTarget_namesTheSelectionPathTaken(t *testing.T) {
+	all := []subflux.ProviderID{"opensubtitles", "yify"}
+	cases := []struct {
+		target *subflux.SubtitleTarget
+		name   string
+		want   string
+	}{
+		{
+			name:   "include_list",
+			target: &subflux.SubtitleTarget{Code: "fr", Providers: []subflux.ProviderID{"yify"}},
+			want:   `msg="ProvidersForTarget: using include list" lang=fr providers=[yify]`,
+		},
+		{
+			name:   "exclude_list",
+			target: &subflux.SubtitleTarget{Code: "fr", Exclude: []subflux.ProviderID{"yify"}},
+			want:   `msg="ProvidersForTarget: applied exclude list" lang=fr excluded=[yify] remaining=[opensubtitles]`,
+		},
+		{
+			name:   "neither_list",
+			target: &subflux.SubtitleTarget{Code: "fr"},
+			want:   `msg="ProvidersForTarget: using all providers" lang=fr count=2`,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{}
+			got := captureLogs(t, func() { cfg.ProvidersForTarget(tt.target, all) })
+			if !strings.Contains(got, tt.want) {
+				t.Errorf("ProvidersForTarget(%+v) log = %q, want it to contain %q", tt.target, got, tt.want)
+			}
+		})
+	}
+}
+
 // --- embedded_subtitles section (typed policy) ---
 
 func TestLoadFromBytes_embedded_subtitles_defaults(t *testing.T) {

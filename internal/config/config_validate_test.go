@@ -566,6 +566,21 @@ func TestValidateScoring(t *testing.T) {
 			name: "negative weight fails", weights: &negativeSource,
 			wantErr: true, errContains: "scoring.source must be non-negative",
 		},
+		// Zero is a legal weight: an operator turning an attribute off writes 0,
+		// and with every weight off there is nothing for hash to outrank.
+		{name: "all-zero weights pass", weights: &subflux.Scores{}, wantErr: false},
+		// The two per-media sums are checked independently, and the message
+		// names both so an operator can see which one it violated.
+		{
+			name:    "hash below the movie-only sum fails",
+			weights: &subflux.Scores{Hash: 15, Source: 10, Edition: 10},
+			wantErr: true, errContains: "(movies 20, episodes 10)",
+		},
+		{
+			name:    "hash below the episode-only sum fails",
+			weights: &subflux.Scores{Hash: 15, Source: 10, SeasonPack: 10},
+			wantErr: true, errContains: "(movies 10, episodes 20)",
+		},
 	}
 
 	for _, tt := range tests {
