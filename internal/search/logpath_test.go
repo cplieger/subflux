@@ -81,6 +81,18 @@ func TestBoundLogPathNeverSplitsARune(t *testing.T) {
 	}
 }
 
+// A path whose whole over-cap tail is continuation bytes offers the forward
+// walk no rune start to stop on, so the walk ends at the end of the string and
+// the marker is all that is left. Such a path is already invalid UTF-8 on disk
+// — bounding it for a log attribute must terminate, not read past it.
+func TestBoundLogPathTailOfContinuationBytesKeepsNothing(t *testing.T) {
+	t.Parallel()
+	p := strings.Repeat("\x80", maxLogPathLen+44)
+	if got, want := boundLogPath(p), "..."; got != want {
+		t.Errorf("boundLogPath(%d continuation bytes) = %q, want %q", len(p), got, want)
+	}
+}
+
 // TestBoundLogPathCutOnRuneStartKeepsTheRune pins the exact-boundary case: when
 // len-maxLogPathLen already lands on the rune's first byte, the forward walk
 // must not advance and the rune survives.

@@ -434,9 +434,21 @@ func TestScoreResults_hash_flag_exact_values(t *testing.T) {
 	hashScored := scoreResults(sc, video, hashSubs, noPriority)
 	titleScored := scoreResults(sc, video, titleSubs, noPriority)
 
-	// If the negation mutant flips == to !=, hash-matched would get
-	// HashVerifiable=false and title-matched would get HashVerifiable=true,
-	// reversing the score relationship.
+	// A verifiable hash match short-circuits to the hash weight ALONE: the
+	// file is the one the subtitle was timed for, so release attributes add
+	// nothing. Anything else here means the hash flag reached the scorer
+	// wrong, and the relation below would still hold with the release
+	// attributes stacked on top.
+	if got, want := hashScored[0].score, subflux.DefaultScores.Hash; got != want {
+		t.Errorf("scoreResults(hash-matched, %q) score = %d, want %d (the hash weight alone)",
+			release, got, want)
+	}
+	// A title match scores its release attributes and nothing else.
+	if got, want := titleScored[0].score,
+		subflux.DefaultScores.Source+subflux.DefaultScores.ReleaseGroup+subflux.DefaultScores.VideoCodec; got != want {
+		t.Errorf("scoreResults(title-matched, %q) score = %d, want %d (source+group+codec)",
+			release, got, want)
+	}
 	if hashScored[0].score <= titleScored[0].score {
 		t.Errorf("hash score (%d) must be > title score (%d); "+
 			"hash flag may be inverted", hashScored[0].score, titleScored[0].score)

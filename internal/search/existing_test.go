@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 	"pgregory.net/rapid"
@@ -852,4 +853,65 @@ func TestParseExternalSubPath_edge(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- detection logging ---
+
+// The two "found" lines are the only record an operator has of what a visit
+// saw beside the video, so each must fire when that half found something and
+// stay silent when it did not: a line reporting zero tracks on every video
+// with no subtitles is noise that hides the real ones.
+//
+// capture.Default swaps the process-global logger, so this test must not run
+// in parallel with anything that logs.
+func TestDetectExisting_logs_only_what_it_found(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
+		recs := capture.Default(t)
+		dir := t.TempDir()
+		videoPath := filepath.Join(dir, "movie.mkv")
+		if err := os.WriteFile(filepath.Join(dir, "movie.fr.srt"), []byte("sub"), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		detector := trackDetector{tracks: []subflux.EmbeddedTrack{
+			{Lang: "en", Codec: "subrip"},
+			{Lang: "de", Codec: "subrip", HearingImpaired: true, Forced: true},
+		}}
+
+		if _, err := detectExisting(t.Context(), videoPath, detector, nil); err != nil {
+			t.Fatalf("detectExisting() unexpected error: %v", err)
+		}
+
+		if got, ok := recs.AttrValueExact("embedded tracks found", "count"); !ok || got != "2" {
+			t.Errorf(`detectExisting(2 tracks) logged msg="embedded tracks found" count=%q (present=%v), want "2"`,
+				got, ok)
+		}
+		if got, ok := recs.AttrValueExact("embedded tracks found", "langs"); !ok || got != "[en de(hi)(forced)]" {
+			t.Errorf(`detectExisting(2 tracks) logged msg="embedded tracks found" langs=%q (present=%v), want "[en de(hi)(forced)]"`,
+				got, ok)
+		}
+		if got, ok := recs.AttrValueExact("external subtitles found", "count"); !ok || got != "1" {
+			t.Errorf(`detectExisting(1 external sub) logged msg="external subtitles found" count=%q (present=%v), want "1"`,
+				got, ok)
+		}
+		if got, ok := recs.AttrValueExact("external subtitles found", "langs"); !ok || got != "[fr]" {
+			t.Errorf(`detectExisting(1 external sub) logged msg="external subtitles found" langs=%q (present=%v), want "[fr]"`,
+				got, ok)
+		}
+	})
+
+	t.Run("nothing_found", func(t *testing.T) {
+		recs := capture.Default(t)
+		videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+
+		if _, err := detectExisting(t.Context(), videoPath, noopDetector{}, nil); err != nil {
+			t.Fatalf("detectExisting() unexpected error: %v", err)
+		}
+
+		if n := recs.CountExact("embedded tracks found"); n != 0 {
+			t.Errorf(`detectExisting(no tracks) logged msg="embedded tracks found" %d times, want 0`, n)
+		}
+		if n := recs.CountExact("external subtitles found"); n != 0 {
+			t.Errorf(`detectExisting(no external subs) logged msg="external subtitles found" %d times, want 0`, n)
+		}
+	})
 }

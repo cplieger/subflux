@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -235,8 +236,13 @@ func TestSearchTargets_empty_data_rejected(t *testing.T) {
 
 // --- SearchTargets: ForceUpgrade paths ---
 
+// A forced upgrade bypasses the eligibility check but still carries the score
+// the store has on record: that number is what the new candidate must beat,
+// and it is reported to the operator on the upgrade line.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
 func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
-	t.Parallel()
+	recs := capture.Default(t)
 	dir := t.TempDir()
 	videoPath := filepath.Join(dir, "movie.mkv")
 
@@ -279,6 +285,13 @@ func TestSearchTargets_force_upgrade_with_external_sub(t *testing.T) {
 	}
 	if len(result.Paths()) != 1 {
 		t.Errorf("SearchTargets(ForceUpgrade) returned %d paths, want 1", len(result.Paths()))
+	}
+	if n := recs.CountExact("CurrentScore failed during force upgrade"); n != 0 {
+		t.Errorf(`SearchTargets(ForceUpgrade, store answering) logged msg="CurrentScore failed during force upgrade" %d times, want 0`, n)
+	}
+	if got, ok := recs.AttrValueExact("upgrade: better subtitle found", "current_score"); !ok || got != "30" {
+		t.Errorf(`SearchTargets(ForceUpgrade, stored score 30) logged msg="upgrade: better subtitle found" current_score=%q (present=%v), want "30"`,
+			got, ok)
 	}
 }
 

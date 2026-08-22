@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -87,8 +88,10 @@ func TestFilterByHI_empty_input(t *testing.T) {
 
 // --- recordProviderNoResults ---
 
+// capture.Default swaps the process-global logger, so this test must not run
+// in parallel with anything that logs.
 func TestRecordProviderNoResults_adaptive_enabled_records(t *testing.T) {
-	t.Parallel()
+	recs := capture.Default(t)
 	ms := &mockStore{}
 	mc := &mockConfig{
 		adaptiveCfg: subflux.AdaptiveConfig{
@@ -104,6 +107,15 @@ func TestRecordProviderNoResults_adaptive_enabled_records(t *testing.T) {
 	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []subflux.ProviderID{"prov1"})
 	if !ms.failureCalled {
 		t.Error("recordProviderNoResults() did not call RecordNoResult when adaptive enabled")
+	}
+	// A store that accepted the write is a silent one, and the recorded set
+	// names the provider that was actually penalized.
+	if n := recs.CountExact("failed to record no-result backoff"); n != 0 {
+		t.Errorf(`recordProviderNoResults(store ok) logged msg="failed to record no-result backoff" %d times, want 0`, n)
+	}
+	if got, ok := recs.AttrValueExact("no result, backoff recorded", "providers"); !ok || got != "[prov1]" {
+		t.Errorf(`recordProviderNoResults(store ok) logged msg="no result, backoff recorded" providers=%q (present=%v), want "[prov1]"`,
+			got, ok)
 	}
 }
 
@@ -366,8 +378,12 @@ func (m *mockStoreWithRecordError) RecordNoResult(_ context.Context, _ subflux.M
 	return errors.New("db write error")
 }
 
+// A store that rejects every write leaves nothing recorded, so the summary
+// line must not claim a backoff was taken — and each rejection is reported.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
 func TestRecordProviderNoResults_store_error_continues(t *testing.T) {
-	t.Parallel()
+	recs := capture.Default(t)
 	mc := &mockConfig{
 		adaptiveCfg: subflux.AdaptiveConfig{
 			Enabled:           true,
@@ -382,6 +398,66 @@ func TestRecordProviderNoResults_store_error_continues(t *testing.T) {
 
 	// Should not panic even when store returns error.
 	e.recordProviderNoResults(t.Context(), "movie", "tt123", "fr", "Test Movie", []subflux.ProviderID{"prov1", "prov2"})
+
+	if n := recs.CountExact("failed to record no-result backoff"); n != 2 {
+		t.Errorf(`recordProviderNoResults(2 providers, store failing) logged msg="failed to record no-result backoff" %d times, want 2`, n)
+	}
+	if n := recs.CountExact("no result, backoff recorded"); n != 0 {
+		t.Errorf(`recordProviderNoResults(store failing) logged msg="no result, backoff recorded" %d times, want 0`, n)
+	}
+}
+
+// --- logNoResults ---
+
+// The "best" attribute is the operator's evidence of how close the search got
+// to the minimum score, so it carries the top candidate's score — and 0 when
+// there was no candidate at all.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestLogNoResults_reports_the_best_candidate_score(t *testing.T) {
+	t.Run("with_candidates", func(t *testing.T) {
+		recs := capture.Default(t)
+		state := &targetState{variant: subflux.DefaultVariant}
+		scored := []scoredSub{
+			{sub: subflux.Subtitle{Provider: "a"}, score: 42},
+			{sub: subflux.Subtitle{Provider: "b"}, score: 7},
+		}
+
+		if noResult := logNoResults(state, scored, "fr", "Test Movie", 50); !noResult {
+			t.Error("logNoResults(non-upgrade) = false, want true (a genuine no-result)")
+		}
+		if got, ok := recs.AttrValueExact("no results above min score", "best"); !ok || got != "42" {
+			t.Errorf(`logNoResults(top score 42) logged msg="no results above min score" best=%q (present=%v), want "42"`,
+				got, ok)
+		}
+	})
+
+	t.Run("without_candidates", func(t *testing.T) {
+		recs := capture.Default(t)
+		state := &targetState{variant: subflux.DefaultVariant}
+
+		if noResult := logNoResults(state, nil, "fr", "Test Movie", 50); !noResult {
+			t.Error("logNoResults(non-upgrade) = false, want true (a genuine no-result)")
+		}
+		if got, ok := recs.AttrValueExact("no results above min score", "best"); !ok || got != "0" {
+			t.Errorf(`logNoResults(no candidates) logged msg="no results above min score" best=%q (present=%v), want "0"`,
+				got, ok)
+		}
+	})
+
+	t.Run("upgrade_reports_current_and_best", func(t *testing.T) {
+		recs := capture.Default(t)
+		state := &targetState{variant: subflux.DefaultVariant, isUpgrade: true, currentScore: 60}
+		scored := []scoredSub{{sub: subflux.Subtitle{Provider: "a"}, score: 55}}
+
+		if noResult := logNoResults(state, scored, "fr", "Test Movie", 61); noResult {
+			t.Error("logNoResults(upgrade) = true, want false (an upgrade miss is not a no-result)")
+		}
+		if got, ok := recs.AttrValueExact("upgrade: no improvement", "best"); !ok || got != "55" {
+			t.Errorf(`logNoResults(upgrade, top score 55) logged msg="upgrade: no improvement" best=%q (present=%v), want "55"`,
+				got, ok)
+		}
+	})
 }
 
 // --- checkUpgradeEligibility ---
