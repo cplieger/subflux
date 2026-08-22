@@ -240,7 +240,8 @@ func helperClient(t *testing.T, mode string) *Client {
 }
 
 func TestClient_real_process_roundtrip(t *testing.T) {
-	t.Parallel()
+	// Not parallel: capture.Default swaps the process-wide default logger.
+	sink := capture.Default(t)
 	c := helperClient(t, "worker")
 	// No video file: the reference strategy finds no reference and reports
 	// no-change — proving the exec + JSON plumbing end to end.
@@ -248,10 +249,20 @@ func TestClient_real_process_roundtrip(t *testing.T) {
 	if result.Applied() || result.Method != subsync.MethodNone {
 		t.Errorf("real-process result = %+v, want clean no-change", result)
 	}
+	// Every failure mode also reports no-change, so the result alone cannot
+	// tell a completed round trip from a broken one: the degradation warnings
+	// must be absent for this to be evidence the plumbing worked.
+	if n := sink.Count("sync worker failed"); n != 0 {
+		t.Errorf("real-process run logged %d spawn-failure warnings, want 0 (the round trip must complete)", n)
+	}
+	if n := sink.Count("sync worker job errored"); n != 0 {
+		t.Errorf("real-process run logged %d job-error warnings, want 0", n)
+	}
 }
 
 func TestClient_kill_on_cancel(t *testing.T) {
-	t.Parallel()
+	// Not parallel: capture.Default swaps the process-wide default logger.
+	sink := capture.Default(t)
 	c := helperClient(t, "hang")
 	ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	defer cancel()
@@ -267,5 +278,11 @@ func TestClient_kill_on_cancel(t *testing.T) {
 	// hang was not killed.
 	if elapsed > 10*time.Second {
 		t.Errorf("cancelled worker took %v to return; kill-on-cancel not working", elapsed)
+	}
+	// The diagnosis must name the cancellation: an operator reading a "worker
+	// process: signal: killed" line cannot tell a timeout from a crashing child.
+	const wantErr = "cancelled: context deadline exceeded"
+	if got, ok := sink.AttrValue("sync worker failed", "error"); !ok || got != wantErr {
+		t.Errorf("cancelled worker warning error = (%q, %v), want %q", got, ok, wantErr)
 	}
 }
