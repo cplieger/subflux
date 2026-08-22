@@ -104,9 +104,13 @@ func (m *mockCfg) LanguageCodes() []string { return m.langs }
 type mockEngine struct {
 	err    error
 	result subflux.SearchResult
+	// searches counts SearchTargets calls, so a test can tell "the batch
+	// paced itself" from "the batch stopped after the first entry".
+	searches atomic.Int64
 }
 
 func (m *mockEngine) SearchTargets(_ context.Context, _ *subflux.SearchRequest, _ string, _ []subflux.SubtitleTarget) (subflux.SearchResult, error) {
+	m.searches.Add(1)
 	return m.result, m.err
 }
 

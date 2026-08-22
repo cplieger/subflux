@@ -1,10 +1,13 @@
 package storeops
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/atomicfile/v3"
@@ -44,6 +47,32 @@ func TestPruneBackups_keepsNewestAndSkipsLiveDB(t *testing.T) {
 	}
 	if _, err := os.Stat(live); err != nil {
 		t.Errorf("live subflux.bolt must not be pruned: %v", err)
+	}
+}
+
+// TestPruneBackups_successful_prune_is_silent: the prune-failed warning names
+// a backup the operator still has to deal with, so a prune that removed
+// everything it meant to must say nothing. Serial (default logger).
+func TestPruneBackups_successful_prune_is_silent(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	dir := t.TempDir()
+	for _, n := range []string{
+		"subflux-20260101-000000.bolt",
+		"subflux-20260102-000000.bolt",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pruneBackups(dir, 1)
+
+	if strings.Contains(buf.String(), `msg="backup: prune failed"`) {
+		t.Errorf("a successful prune reported a failure; log: %s", buf.String())
 	}
 }
 

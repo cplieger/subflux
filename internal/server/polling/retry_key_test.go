@@ -79,6 +79,32 @@ func TestRetryKeyIsInjectiveAndUnchanged(t *testing.T) {
 	}
 }
 
+// TestImportRetryBudget_abandons_the_entry_on_its_last_attempt: an entry is
+// retried while its budget lasts and abandoned exactly ON attempt
+// maxImportRetries, with its counter cleared. Giving up one attempt late
+// would keep holding the poll watermark on an entry already reported as
+// abandoned, so the two must agree.
+func TestImportRetryBudget_abandons_the_entry_on_its_last_attempt(t *testing.T) {
+	t.Parallel()
+
+	p := &Poller{importRetries: make(map[string]int)}
+	key := retryKey(PollSourceSonarr, 7)
+
+	for attempt := 1; attempt < maxImportRetries; attempt++ {
+		if !p.noteImportFailure(key, "/media/a.mkv") {
+			t.Fatalf("noteImportFailure(attempt %d of %d) = false, want a retry",
+				attempt, maxImportRetries)
+		}
+	}
+	if p.noteImportFailure(key, "/media/a.mkv") {
+		t.Errorf("noteImportFailure(attempt %d of %d) = true, want the entry abandoned",
+			maxImportRetries, maxImportRetries)
+	}
+	if _, held := p.importRetries[key]; held {
+		t.Error("retry counter still held after giving up; the watermark cannot move past the entry")
+	}
+}
+
 // TestImportRetryCounterIsPerEntry drives the counter the key feeds: each
 // (source, entry) pair must burn its own retry budget, and clearing one must not
 // release another's watermark hold.

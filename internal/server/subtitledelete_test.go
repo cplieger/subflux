@@ -1,8 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +67,40 @@ func TestDeleteSubtitleFiles_removesThroughTheConfinedRoot(t *testing.T) {
 	}
 	if _, err := os.Lstat(linkTarget); err != nil {
 		t.Errorf("the delete followed a symlink out of the media root: %v", err)
+	}
+}
+
+// TestDeleteSubtitleFiles_reports_the_outcome_it_had: the sweep's log is the
+// only report the operator gets, so a deleted file must be reported as
+// deleted and a refused path as refused. Getting them the wrong way round
+// sends someone hunting for a permission problem that never happened.
+// Serial: asserts on the default logger.
+func TestDeleteSubtitleFiles_reports_the_outcome_it_had(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	base := t.TempDir()
+	root := filepath.Join(base, "media")
+	if err := os.MkdirAll(root, 0o750); err != nil {
+		t.Fatalf("mkdir %s: %v", root, err)
+	}
+	inRoot := filepath.Join(root, "movie.en.srt")
+	if err := os.WriteFile(inRoot, []byte("subtitle"), 0o600); err != nil {
+		t.Fatalf("write %s: %v", inRoot, err)
+	}
+
+	s := &Server{}
+	s.live.Store(&liveState{cfg: testConfigInRoot(t, root)})
+
+	s.deleteSubtitleFiles([]string{inRoot}, "reconcile")
+
+	got := buf.String()
+	if !strings.Contains(got, `msg="reconcile: deleted subtitle"`) {
+		t.Errorf("a deleted subtitle was not reported as deleted; log: %s", got)
+	}
+	if strings.Contains(got, `msg="reconcile: failed to delete subtitle"`) {
+		t.Errorf("a deleted subtitle was reported as a failure; log: %s", got)
 	}
 }

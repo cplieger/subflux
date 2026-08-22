@@ -223,6 +223,30 @@ func TestProcessPollImport_silent_when_refresh_ok(t *testing.T) {
 	}
 }
 
+// A search that downloaded nothing and changed no coverage announces
+// nothing: the browser would refresh a row that did not change, and the stats
+// cache would be dropped for no reason.
+func TestProcessPollImport_no_change_publishes_nothing(t *testing.T) {
+	video := tempVideo(t)
+	deps := fullDeps(&mockStore{})
+	evts, cache := &mockEvents{}, &mockStatsCache{}
+	deps.Events, deps.StatsCache = evts, cache
+	ls := &LiveState{
+		Cfg:    &mockCfg{interval: time.Second, langs: []string{"en"}},
+		Engine: &mockEngine{result: subflux.SearchResult{}},
+	}
+	p := &Poller{deps: deps, stateFunc: func() *LiveState { return ls }}
+
+	p.processPollImport(t.Context(), ls, video, movieImportResult, nil)
+
+	if len(evts.published) != 0 {
+		t.Errorf("published %+v, want no coverage event for an empty search result", evts.published)
+	}
+	if cache.invalidated != 0 {
+		t.Errorf("stats cache invalidations = %d, want 0", cache.invalidated)
+	}
+}
+
 // --- processSonarrImport / processRadarrImport wiring + exclude-tag gating ---
 
 // processSonarrImport fetches series+episode by the entry's IDs, applies

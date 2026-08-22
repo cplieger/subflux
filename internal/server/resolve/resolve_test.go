@@ -410,6 +410,12 @@ func TestFileRefFromQuery(t *testing.T) {
 		t.Fatalf("explicit values not parsed: %+v err %v", ref, err)
 	}
 
+	q.Set("ordinal", "0")
+	if ref, err := resolve.FileRefFromQuery(q); err != nil || ref.Ordinal != 0 {
+		// Ordinal 0 is the primary file, not an out-of-range value.
+		t.Fatalf("explicit ordinal 0 rejected: %+v err %v", ref, err)
+	}
+
 	q.Set("ordinal", "-1")
 	if _, err := resolve.FileRefFromQuery(q); err == nil {
 		t.Fatal("negative ordinal accepted")
@@ -434,6 +440,13 @@ func TestMediaRefFromQuery(t *testing.T) {
 	}
 	if ref.MediaID != 7 || ref.Season != 1 || ref.Episode != 5 {
 		t.Errorf("parsed %+v", ref)
+	}
+	// Season 0 is the specials season: only the episode number has to be
+	// positive, so a specials episode is a valid reference.
+	if ref, err := resolve.MediaRefFromQuery(url.Values{
+		"media_type": {"episode"}, "media_id": {"7"}, "season": {"0"}, "episode": {"3"},
+	}); err != nil || ref.Season != 0 || ref.Episode != 3 {
+		t.Fatalf("specials episode rejected: %+v err %v", ref, err)
 	}
 	if _, err := resolve.MediaRefFromQuery(url.Values{"media_type": {"episode"}, "media_id": {"7"}}); err == nil {
 		t.Fatal("episode without season/episode accepted")
