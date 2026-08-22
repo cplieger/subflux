@@ -108,6 +108,15 @@ func TestStateQuadKey_prefixAndID(t *testing.T) {
 		stateQuadKey(subflux.MediaTypeMovie, "tmdb-27205", "en", subflux.VariantForced, 2)) >= 0 {
 		t.Error("stateQuadKey id=1 should sort before id=2 under the same quad")
 	}
+
+	// The id is the trailing 8 bytes, so a bare 8-byte suffix still yields its
+	// id: only a SHORTER key cannot hold one.
+	if gotID, ok := stateQuadKeyID(stateKey(id)); !ok || gotID != id {
+		t.Errorf("stateQuadKeyID(stateKey(%d)) = (%d, %v), want (%d, true)", id, gotID, ok, id)
+	}
+	if gotID, ok := stateQuadKeyID(stateKey(id)[:7]); ok || gotID != 0 {
+		t.Errorf("stateQuadKeyID(7-byte key) = (%d, %v), want (0, false)", gotID, ok)
+	}
 }
 
 // TestStatePrefix_emptyVariantSpansAllVariants asserts the statePrefix helper

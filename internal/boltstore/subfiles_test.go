@@ -2,6 +2,7 @@ package boltstore
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subflux"
@@ -131,6 +132,7 @@ func TestRecordSubtitleFiles_no_change_returns_false(t *testing.T) {
 }
 
 func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1",
 		[]subflux.SubtitleFile{subFile("en", vStd, srcExt, "srt", "/m/x.en.srt")}); err != nil {
@@ -160,6 +162,11 @@ func TestRecordSubtitleFiles_codec_change_updates_and_preserves_offset(t *testin
 	}
 	if totalFiles(t, db) != 1 {
 		t.Errorf("TotalSubtitleFiles = %d, want 1 (update keeps count)", totalFiles(t, db))
+	}
+	// Reading a row the store wrote itself is never a corruption report: the
+	// tolerate-and-rewrite warning must stay quiet on a healthy bucket.
+	if got := logs.String(); strings.Contains(got, "undecodable subtitle_files value") {
+		t.Errorf("RecordSubtitleFiles over a healthy bucket logged %q, want no undecodable-value warning", got)
 	}
 }
 
@@ -286,6 +293,62 @@ func TestDeleteSubtitleFile_removes_and_noop(t *testing.T) {
 	}
 	if totalFiles(t, db) != 1 {
 		t.Errorf("count after no-op delete = %d, want 1", totalFiles(t, db))
+	}
+}
+
+// TestDeleteSubtitleFile_dropsTheStoredSyncOffset asserts removing a row also
+// removes the file's stored sync offset, so sync_offsets never accumulates keys
+// for subtitles that are gone and a file re-created at the same path starts at
+// offset 0 instead of inheriting the old one's shift.
+func TestDeleteSubtitleFile_dropsTheStoredSyncOffset(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := t.Context()
+	if _, err := db.RecordSubtitleFiles(ctx, covMT, "tmdb-1", []subflux.SubtitleFile{
+		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
+		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.srt"),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	setFileOffset(t, db, "/m/x.en.srt", 1500)
+	setFileOffset(t, db, "/m/x.fr.srt", 900)
+
+	if err := db.DeleteSubtitleFile(ctx, covMT, "tmdb-1", "en", vStd, srcExt, "/m/x.en.srt"); err != nil {
+		t.Fatalf("DeleteSubtitleFile: %v", err)
+	}
+
+	if got, err := db.SyncOffset(ctx, "/m/x.en.srt"); err != nil || got != 0 {
+		t.Errorf("SyncOffset(%q) after the row was deleted = (%d, %v), want (0, nil)", "/m/x.en.srt", got, err)
+	}
+	// The surviving row keeps its own offset.
+	if got, err := db.SyncOffset(ctx, "/m/x.fr.srt"); err != nil || got != 900 {
+		t.Errorf("SyncOffset(%q) = (%d, %v), want (900, nil)", "/m/x.fr.srt", got, err)
+	}
+}
+
+// TestGetSubtitleFiles_ordinalComesFromTheManualSiblingFilename asserts the
+// listed entry carries the numbered manual sibling's ordinal, the wire identity
+// that keeps such a file addressable without exposing its path. A file with no
+// numeric segment is ordinal 0.
+func TestGetSubtitleFiles_ordinalComesFromTheManualSiblingFilename(t *testing.T) {
+	db, _ := openTemp(t)
+	if _, err := db.RecordSubtitleFiles(t.Context(), covMT, "tmdb-1", []subflux.SubtitleFile{
+		subFile("en", vStd, srcExt, "srt", "/m/x.en.srt"),
+		subFile("fr", vStd, srcExt, "srt", "/m/x.fr.2.srt"),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	rows := listFiles(t, db, covMT, "tmdb-1")
+	if len(rows) != 2 {
+		t.Fatalf("listed %d rows, want 2", len(rows))
+	}
+	if rows[0].Language != "en" || rows[0].Ordinal != 0 {
+		t.Errorf("SubtitleFiles()[0] = {lang:%q ordinal:%d}, want {en 0} for /m/x.en.srt",
+			rows[0].Language, rows[0].Ordinal)
+	}
+	if rows[1].Language != "fr" || rows[1].Ordinal != 2 {
+		t.Errorf("SubtitleFiles()[1] = {lang:%q ordinal:%d}, want {fr 2} for /m/x.fr.2.srt",
+			rows[1].Language, rows[1].Ordinal)
 	}
 }
 

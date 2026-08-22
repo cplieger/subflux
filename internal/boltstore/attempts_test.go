@@ -3,6 +3,7 @@ package boltstore
 import (
 	"math"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,6 +72,7 @@ func defaultParams() subflux.BackoffParams {
 // failures=1, next_retry = now + InitialDelay, and bumps the attempts counter
 // (Requirement 2.1).
 func TestRecordNoResult_newRow(t *testing.T) {
+	logs := captureLogs(t)
 	db, _ := openTemp(t)
 	bp := defaultParams()
 
@@ -102,6 +104,13 @@ func TestRecordNoResult_newRow(t *testing.T) {
 	_ = db.db.View(func(tx *bolt.Tx) error { attempts = readAttemptCount(tx); return nil })
 	if attempts != 1 {
 		t.Errorf("attempts counter = %d, want 1", attempts)
+	}
+
+	// A recorded backoff is traceable: the line names the triple that is now
+	// being skipped, which is how an operator sees why a provider went quiet.
+	wantLog := `msg="recorded no-result backoff" media_id=` + testMID + ` lang=` + testLang + ` provider=` + string(testProv)
+	if got := logs.String(); !strings.Contains(got, wantLog) {
+		t.Errorf("RecordNoResult log = %q, want it to contain %q", got, wantLog)
 	}
 }
 
