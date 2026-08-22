@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Capture every action's dispatch mock, run() implementation, and full
 // definition by name so tests can drive and assert specific actions
@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // strip them between tests — several suites below vi.resetModules() and
 // re-import status.js mid-test.
 const dispatchers = vi.hoisted(() => new Map<string, ReturnType<typeof vi.fn>>());
+const cancellers = vi.hoisted(() => new Map<string, ReturnType<typeof vi.fn>>());
 const actionRuns = vi.hoisted(
   () => new Map<string, (args: unknown, signal: AbortSignal) => Promise<unknown>>(),
 );
@@ -18,12 +19,14 @@ function registerAction(cfg: {
   run?: (args: unknown, signal: AbortSignal) => Promise<unknown>;
 }): { dispatch: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> } {
   const dispatch = vi.fn().mockResolvedValue(undefined);
+  const cancel = vi.fn();
   dispatchers.set(cfg.name, dispatch);
+  cancellers.set(cfg.name, cancel);
   actionConfigs.set(cfg.name, cfg as unknown as Record<string, unknown>);
   if (cfg.run) {
     actionRuns.set(cfg.name, cfg.run);
   }
-  return { dispatch, cancel: vi.fn() };
+  return { dispatch, cancel };
 }
 
 // Wire client fns used by the status poll; implementations are set per test
@@ -75,9 +78,17 @@ vi.mock("./popover-menu.js", () => ({
 }));
 
 import * as store from "./store.js";
-import { buildActivityItem } from "./status.js";
+import { buildActivityItem, updateLiveTimers } from "./status.js";
 import type * as StatusModule from "./status.js";
+import type * as BusModule from "./bus.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
+import type {
+  Alert,
+  ParsedConfig,
+  ProviderStatus,
+  ProvidersResponse,
+  Stats,
+} from "./wire/types.gen.js";
 
 function entry(partial: Partial<ActivityEntry>): ActivityEntry {
   return {
@@ -89,6 +100,66 @@ function entry(partial: Partial<ActivityEntry>): ActivityEntry {
     done: false,
     ...partial,
   };
+}
+
+function alertEntry(partial: Partial<Alert>): Alert {
+  return {
+    time: "2026-07-19T10:00:00Z",
+    level: "warn",
+    message: "m",
+    source: "scanner",
+    kind: "transient",
+    id: 1,
+    dismissed: false,
+    ...partial,
+  };
+}
+
+function statsOf(partial: Partial<Stats>): Stats {
+  return {
+    last_scan: "",
+    downloads: 0,
+    attempts: 0,
+    scan_interval_seconds: 0,
+    total_subs: 0,
+    total_series: 0,
+    total_movies: 0,
+    missing_subs: 0,
+    partial: false,
+    ...partial,
+  };
+}
+
+function providersRes(providers: Record<string, ProviderStatus>): ProvidersResponse {
+  return { enabled: true, providers };
+}
+
+// buildStatsSummary reads only cfg.providers off the store's config; the rest
+// of ParsedConfig is irrelevant here, so one localized cast keeps the fixture
+// to the fields under test.
+function configWithProviders(providers: Record<string, boolean>): ParsedConfig {
+  return { providers } as unknown as ParsedConfig;
+}
+
+/** The status button, or a hard failure if the harness DOM is missing. */
+function statusBtnEl(): HTMLElement {
+  const b = document.getElementById("statusBtn");
+  if (!b) {
+    throw new Error("statusBtn not mounted");
+  }
+  return b;
+}
+
+function statusLabelText(): string {
+  return statusBtnEl().querySelector(".nav-label")?.textContent ?? "";
+}
+
+function statusIconEl(): HTMLElement {
+  const i = document.getElementById("statusIcon");
+  if (!i) {
+    throw new Error("statusIcon not mounted");
+  }
+  return i;
 }
 
 /** Flush the microtask queue (dispatch().then chains). */
@@ -204,40 +275,137 @@ describe("status: stop control", () => {
   });
 });
 
-describe("status: renderPopup", () => {
+describe("status: buildActivityItem elapsed-time rendering", () => {
   beforeEach(() => {
-    document.body.innerHTML = `
-      <button id="statusBtn"></button>
-      <div id="statusPopup" hidden></div>
-    `;
-    store.set("config", null);
-    store.set("configChecked", true);
-    store.set("isUnconfigured", false);
+    document.body.innerHTML = "";
+    store.set("isAdmin", false);
   });
 
-  it.todo("renders 'All clear' when no activities, alerts, or provider issues");
+  function timerFor(startedAt: string, endedAt: string): string {
+    const item = buildActivityItem(
+      entry({ id: `dur-${endedAt}`, done: true, started_at: startedAt, ended_at: endedAt }),
+    );
+    return item.querySelector(".live-timer")?.textContent ?? "";
+  }
 
-  it.todo("renders activity items keyed by act-{id}");
+  it("renders a sub-minute run in whole seconds", () => {
+    expect(timerFor("2026-07-19T10:00:00Z", "2026-07-19T10:00:45Z")).toBe(" \u00B7 45s");
+  });
 
-  it.todo("filters out Manual Search and Manual Download activities");
+  it("switches to minutes and seconds at exactly one minute", () => {
+    expect(timerFor("2026-07-19T10:00:00Z", "2026-07-19T10:01:00Z")).toBe(" \u00B7 1m 0s");
+  });
 
-  it.todo("renders provider error items for timed-out providers");
+  it("renders a sub-hour run as minutes plus remainder seconds", () => {
+    expect(timerFor("2026-07-19T10:00:00Z", "2026-07-19T10:03:05Z")).toBe(" \u00B7 3m 5s");
+  });
 
-  it.todo("renders embedded detection error when present");
+  it("switches to hours and minutes at exactly one hour", () => {
+    expect(timerFor("2026-07-19T10:00:00Z", "2026-07-19T11:00:00Z")).toBe(" \u00B7 1h 0m");
+  });
 
-  it.todo("renders alert items with dismiss button");
+  it("renders a multi-hour run as hours plus remainder minutes", () => {
+    expect(timerFor("2026-07-19T10:00:00Z", "2026-07-19T12:05:30Z")).toBe(" \u00B7 2h 5m");
+  });
 
-  it.todo("renders scan timing when not active and last_scan exists");
-
-  it.todo("reconcile preserves existing activity DOM nodes on re-render");
+  it("clamps a backwards span to zero instead of reporting negative time", () => {
+    expect(timerFor("2026-07-19T10:05:00Z", "2026-07-19T10:00:00Z")).toBe(" \u00B7 0s");
+  });
 });
 
-describe("status: updateStatusButton", () => {
-  it.todo("shows warning icon when alerts exist");
+describe("status: buildActivityItem running and queued renders", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    store.set("isAdmin", false);
+  });
 
-  it.todo("shows dot icon when activities are in progress");
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it.todo("clears icon when no alerts and no activities");
+  it("queued entries render the hourglass and a queued timer", () => {
+    const item = buildActivityItem(entry({ id: "q9", queued: true }));
+    expect(item.querySelector(".act-queued .icon-hourglass")).not.toBeNull();
+    expect(item.querySelector(".live-timer")?.textContent).toBe(" \u00B7 queued");
+  });
+
+  it("running entries render the spinner and a live elapsed timer", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T10:00:20Z"));
+    const item = buildActivityItem(entry({ id: "a9", started_at: "2026-07-19T10:00:00Z" }));
+    expect(item.querySelector(".act-active .spinner")).not.toBeNull();
+    expect(item.querySelector(".live-timer")?.getAttribute("data-started")).toBe(
+      "2026-07-19T10:00:00Z",
+    );
+    expect(item.querySelector(".live-timer")?.textContent).toBe(" \u00B7 20s");
+  });
+
+  it("scheduled runs are titled apart from manual ones", () => {
+    expect(
+      buildActivityItem(entry({ id: "s9", source: "scheduled" })).querySelector(".act-title")
+        ?.textContent,
+    ).toContain("Scheduled search");
+    expect(
+      buildActivityItem(entry({ id: "m9", source: "manual" })).querySelector(".act-title")
+        ?.textContent,
+    ).toContain("Manual search");
+  });
+
+  it("a completed entry the server gave no end time renders no timer at all", () => {
+    const item = buildActivityItem(entry({ id: "d9", done: true }));
+    expect(item.querySelector(".act-done")).not.toBeNull();
+    expect(item.querySelector(".live-timer")).toBeNull();
+  });
+
+  it("terminal and queued rows carry the done row class, running rows do not", () => {
+    expect(
+      buildActivityItem(entry({ id: "t9", done: true, ended_at: "2026-07-19T10:01:00Z" }))
+        .className,
+    ).toBe("pop-item pop-act pop-done");
+    expect(buildActivityItem(entry({ id: "u9", queued: true })).className).toBe(
+      "pop-item pop-act pop-done",
+    );
+    expect(buildActivityItem(entry({ id: "v9" })).className).toBe("pop-item pop-act");
+  });
+
+  it("renders the server-supplied detail in its own cell", () => {
+    const item = buildActivityItem(entry({ id: "x9", detail: "Searched 12 items" }));
+    expect(item.querySelector(".act-detail")?.textContent).toBe("Searched 12 items");
+  });
+});
+
+describe("status: updateLiveTimers", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    store.set("isAdmin", false);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("re-renders every running row's elapsed time and leaves terminal rows frozen", () => {
+    vi.setSystemTime(new Date("2026-07-19T10:00:30Z"));
+    const running = buildActivityItem(entry({ id: "lt1", started_at: "2026-07-19T10:00:00Z" }));
+    const finished = buildActivityItem(
+      entry({
+        id: "lt2",
+        done: true,
+        started_at: "2026-07-19T09:00:00Z",
+        ended_at: "2026-07-19T09:00:10Z",
+      }),
+    );
+    document.body.append(running, finished);
+    expect(running.querySelector(".live-timer")?.textContent).toBe(" \u00B7 30s");
+
+    vi.setSystemTime(new Date("2026-07-19T10:02:10Z"));
+    updateLiveTimers();
+
+    expect(running.querySelector(".live-timer")?.textContent).toBe(" \u00B7 2m 10s");
+    // Terminal rows carry no data-started, so their frozen duration stays put.
+    expect(finished.querySelector(".live-timer")?.textContent).toBe(" \u00B7 10s");
+  });
 });
 
 // --- Poll-driven suites -----------------------------------------------------
@@ -250,14 +418,27 @@ describe("status: updateStatusButton", () => {
 // re-imported dynamically (the file-top static bindings would point at the
 // previous instances).
 
+interface PollWire {
+  activities?: ActivityEntry[];
+  alerts?: { ok: boolean; status: number; data?: Alert[] | null };
+  providers?: ProvidersResponse | null;
+  stats?: Stats | null;
+  signal?: AbortSignal;
+}
+
 interface PollHarness {
   runPoll: (activities: ActivityEntry[]) => Promise<void>;
+  /** Drive one poll with an explicit wire snapshot (alerts flavour, provider
+   *  health, stats and the abort signal all under the test's control). */
+  runPollWith: (w: PollWire) => Promise<void>;
   notifyM: {
     success: ReturnType<typeof vi.fn>;
     error: ReturnType<typeof vi.fn>;
     info: ReturnType<typeof vi.fn>;
   };
   status: typeof StatusModule;
+  store: typeof store;
+  bus: typeof BusModule;
 }
 
 async function freshPollHarness(): Promise<PollHarness> {
@@ -269,17 +450,23 @@ async function freshPollHarness(): Promise<PollHarness> {
   st.set("isUnconfigured", true);
   st.set("isAdmin", false);
   const notifyM = (await import("./notify.js")) as unknown as PollHarness["notifyM"];
+  const bus = await import("./bus.js");
   const status = await import("./status.js");
   const run = actionRuns.get("status.poll");
   if (!run) {
     throw new Error("status.poll run not captured");
   }
-  const runPoll = async (activities: ActivityEntry[]): Promise<void> => {
-    wire.listAlertsRaw.mockResolvedValue({ ok: true, status: 200, data: [] });
-    wire.listActivity.mockResolvedValue(activities);
-    await run(undefined, new AbortController().signal);
+  const runPollWith = async (w: PollWire): Promise<void> => {
+    wire.listAlertsRaw.mockResolvedValue(w.alerts ?? { ok: true, status: 200, data: [] });
+    wire.listActivity.mockResolvedValue(w.activities ?? []);
+    wire.providerTimeouts.mockResolvedValue(w.providers ?? null);
+    wire.stateStats.mockResolvedValue(w.stats ?? null);
+    await run(undefined, w.signal ?? new AbortController().signal);
   };
-  return { runPoll, notifyM, status };
+  const runPoll = async (activities: ActivityEntry[]): Promise<void> => {
+    await runPollWith({ activities });
+  };
+  return { runPoll, runPollWith, notifyM, status, store: st, bus };
 }
 
 describe("status: toast seeding across polls", () => {
@@ -380,5 +567,682 @@ describe("status: dismissActivity success and rollback", () => {
     // The action definition carries the error spec (the framework renders
     // it); silent-`false` would swallow terminal failures.
     expect(actionConfigs.get("activity.dismiss")?.["error"]).toBe("Dismiss failed");
+  });
+});
+
+describe("status: unreachable server", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("a network-level alerts failure shows the offline state, not a healthy one", async () => {
+    await h.runPollWith({ alerts: { ok: false, status: 0 } });
+    expect(statusBtnEl().dataset["status"]).toBe("offline");
+    expect(statusLabelText()).toBe("Offline");
+    expect(statusIconEl().querySelector(".icon-warning")).not.toBeNull();
+  });
+
+  it("an HTTP error carrying a real status code polls on and reports health", async () => {
+    await h.runPollWith({ alerts: { ok: false, status: 500 } });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+    expect(statusLabelText()).toBe("Healthy");
+  });
+
+  it("going offline abandons the poll before the activity fetch", async () => {
+    await h.runPollWith({ alerts: { ok: false, status: 0 } });
+    expect(wire.listActivity).not.toHaveBeenCalled();
+  });
+
+  it("a poll aborted mid-flight does not paint the offline state", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    await h.runPollWith({ alerts: { ok: false, status: 0 }, signal: ac.signal });
+    expect(statusBtnEl().dataset["status"]).toBeUndefined();
+  });
+
+  it("leaves a closed popup untouched when the server is unreachable", async () => {
+    const popup = document.getElementById("statusPopup");
+    popup?.appendChild(document.createElement("hr"));
+    await h.runPollWith({ alerts: { ok: false, status: 0 } });
+    expect(popup?.querySelector("hr")).not.toBeNull();
+  });
+
+  it("replaces an open popup's content with the unreachable-server row", async () => {
+    h.status.initStatusPopover();
+    await h.runPollWith({ alerts: { ok: false, status: 0 } });
+    const row = document.querySelector("#statusPopup .pop-item.muted");
+    expect(row?.textContent).toContain("Server unreachable");
+  });
+});
+
+describe("status: status button severity", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.store.set("isUnconfigured", false);
+  });
+
+  it("reports healthy with the dot icon when nothing is wrong", async () => {
+    await h.runPollWith({});
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+    expect(statusLabelText()).toBe("Healthy");
+    expect(statusIconEl().querySelector(".icon-dot")).not.toBeNull();
+  });
+
+  it("an error-level alert outranks a running scan", async () => {
+    await h.runPollWith({
+      alerts: {
+        ok: true,
+        status: 200,
+        data: [alertEntry({ id: 1 }), alertEntry({ id: 2, level: "error" })],
+      },
+      activities: [entry({ id: "run1" })],
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("error");
+    expect(statusLabelText()).toBe("Error");
+    expect(statusIconEl().querySelector(".icon-warning")).not.toBeNull();
+  });
+
+  it("a persistent alert reports error even when no alert is error-level", async () => {
+    await h.runPollWith({
+      alerts: {
+        ok: true,
+        status: 200,
+        data: [alertEntry({ id: 1 }), alertEntry({ id: 2, kind: "persistent" })],
+      },
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("error");
+    expect(statusLabelText()).toBe("Error");
+  });
+
+  it("a transient warn alert reports warning, not error", async () => {
+    await h.runPollWith({ alerts: { ok: true, status: 200, data: [alertEntry({ id: 1 })] } });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+    expect(statusLabelText()).toBe("Warning");
+  });
+
+  it("a timed-out provider reports warning with no alerts at all", async () => {
+    await h.runPollWith({
+      providers: providersRes({
+        opensubtitles: { timed_out: true, recent_failures: 3, threshold: 5 },
+      }),
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("warn");
+    expect(statusLabelText()).toBe("Warning");
+  });
+
+  it("a running activity with nothing wrong reports scanning", async () => {
+    await h.runPollWith({ activities: [entry({ id: "r1" })] });
+    expect(statusBtnEl().dataset["status"]).toBe("scanning");
+    expect(statusLabelText()).toBe("Searching");
+  });
+
+  it("a finished activity beside a running one still reports scanning", async () => {
+    await h.runPollWith({
+      activities: [
+        entry({ id: "d1", done: true, ended_at: "2026-07-19T10:01:00Z" }),
+        entry({ id: "r1" }),
+      ],
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("scanning");
+  });
+
+  it("only-finished activities report healthy", async () => {
+    await h.runPollWith({
+      activities: [entry({ id: "d1", done: true, ended_at: "2026-07-19T10:01:00Z" })],
+    });
+    expect(statusBtnEl().dataset["status"]).toBe("idle");
+  });
+
+  it("the scanning state clears the warning icon an earlier poll left behind", async () => {
+    await h.runPollWith({ alerts: { ok: true, status: 200, data: [alertEntry({ id: 1 })] } });
+    expect(statusIconEl().querySelector(".icon-warning")).not.toBeNull();
+
+    await h.runPollWith({ activities: [entry({ id: "r1" })] });
+
+    expect(statusIconEl().childElementCount).toBe(0);
+  });
+});
+
+describe("status: what the poll fetches", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("an unconfigured server is asked for neither provider health nor stats", async () => {
+    h.status.initStatusPopover();
+    await h.runPollWith({});
+    expect(wire.providerTimeouts).not.toHaveBeenCalled();
+    expect(wire.stateStats).not.toHaveBeenCalled();
+  });
+
+  it("a closed popup fetches provider health but not the popup-only stats", async () => {
+    h.store.set("isUnconfigured", false);
+    await h.runPollWith({});
+    expect(wire.providerTimeouts).toHaveBeenCalled();
+    expect(wire.stateStats).not.toHaveBeenCalled();
+  });
+
+  it("an open popup fetches both", async () => {
+    h.store.set("isUnconfigured", false);
+    h.status.initStatusPopover();
+    await h.runPollWith({});
+    expect(wire.providerTimeouts).toHaveBeenCalled();
+    expect(wire.stateStats).toHaveBeenCalled();
+  });
+
+  it("a closed popup is never painted", async () => {
+    h.store.set("isUnconfigured", false);
+    await h.runPollWith({ activities: [entry({ id: "r1" })] });
+    expect(document.getElementById("statusPopup")?.childElementCount).toBe(0);
+  });
+});
+
+describe("status: poll side effects", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("publishes the running scans by scope from every poll", async () => {
+    await h.runPollWith({
+      activities: [
+        entry({ id: "sc1", kind: "series", media_id: 42, cancellable: true }),
+        entry({ id: "done1", kind: "movie", media_id: 7, done: true }),
+      ],
+    });
+    const scans = h.store.get("runningScansByScope");
+    expect([...scans.values()]).toEqual([{ activityId: "sc1", cancellable: true }]);
+  });
+
+  it("invalidates cached data only when the last running scan finishes", async () => {
+    const invalidated = vi.fn();
+    h.bus.on(h.bus.BusEvent.DataInvalidate, invalidated);
+
+    await h.runPollWith({ activities: [] });
+    expect(invalidated).not.toHaveBeenCalled();
+
+    await h.runPollWith({ activities: [entry({ id: "r1" })] });
+    expect(invalidated).not.toHaveBeenCalled();
+
+    await h.runPollWith({
+      activities: [entry({ id: "r1", done: true, ended_at: "2026-07-19T10:01:00Z" })],
+    });
+    expect(invalidated).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the optimistic stopping overlay while the scan is still running", async () => {
+    h.status.initStatusPopover();
+    dispatchers.get("activity.cancel")?.mockResolvedValue(undefined);
+    const running = entry({ id: "st1", cancellable: true, kind: "series", media_id: 3 });
+    await h.runPollWith({ activities: [running] });
+    document
+      .querySelector('[data-act-id="st1"]')
+      ?.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')
+      ?.click();
+    await flush();
+
+    await h.runPollWith({ activities: [running] });
+
+    expect(h.status.buildActivityItem(running).querySelector(".live-timer")?.textContent).toContain(
+      "stopping",
+    );
+  });
+
+  it("drops the stopping overlay once the entry stops running", async () => {
+    h.status.initStatusPopover();
+    dispatchers.get("activity.cancel")?.mockResolvedValue(undefined);
+    const running = entry({ id: "st2", cancellable: true, kind: "series", media_id: 4 });
+    await h.runPollWith({ activities: [running] });
+    document
+      .querySelector('[data-act-id="st2"]')
+      ?.querySelector<HTMLButtonElement>('button[aria-label="Stop scan"]')
+      ?.click();
+    await flush();
+
+    await h.runPollWith({
+      activities: [
+        entry({ id: "st2", done: true, cancelled: true, ended_at: "2026-07-19T10:01:00Z" }),
+      ],
+    });
+
+    expect(
+      h.status.buildActivityItem(running).querySelector(".live-timer")?.textContent,
+    ).not.toContain("stopping");
+  });
+});
+
+describe("status: popup content", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.store.set("isUnconfigured", false);
+    h.store.set("config", null);
+    h.status.initStatusPopover();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function popupRows(): string[] {
+    return [...document.querySelectorAll("#statusPopup > *")].map((n) => n.textContent ?? "");
+  }
+
+  function header(): Element | null {
+    return document.querySelector("#statusPopup .pop-header");
+  }
+
+  function mutedRow(): Element | null {
+    return document.querySelector("#statusPopup .pop-item.muted");
+  }
+
+  it("summarises media, downloads and missing counts in one header row", async () => {
+    await h.runPollWith({
+      stats: statsOf({ total_series: 3, total_movies: 4, downloads: 9, missing_subs: 2 }),
+    });
+    expect(header()?.textContent).toBe("Media: 7 \u00B7 Downloads: 9 \u00B7 Missing: 2");
+    expect(popupRows()).toEqual(["Media: 7 \u00B7 Downloads: 9 \u00B7 Missing: 2"]);
+  });
+
+  it("omits the media, missing and provider parts when there is nothing to say", async () => {
+    h.store.set("config", configWithProviders({ opensubtitles: true }));
+    await h.runPollWith({ stats: statsOf({}) });
+    expect(header()?.textContent).toBe("Downloads: 0");
+  });
+
+  it("counts a series-only library", async () => {
+    await h.runPollWith({ stats: statsOf({ total_series: 3, total_movies: 0 }) });
+    expect(header()?.textContent).toBe("Media: 3 \u00B7 Downloads: 0");
+  });
+
+  it("counts a movies-only library", async () => {
+    await h.runPollWith({ stats: statsOf({ total_series: 0, total_movies: 4 }) });
+    expect(header()?.textContent).toBe("Media: 4 \u00B7 Downloads: 0");
+  });
+
+  it("counts enabled providers against the timed-out ones", async () => {
+    h.store.set("config", configWithProviders({ a: true, b: true, c: false }));
+    await h.runPollWith({
+      stats: statsOf({ downloads: 1 }),
+      providers: providersRes({
+        a: { timed_out: true, recent_failures: 2, threshold: 5 },
+        b: { timed_out: false, recent_failures: 0, threshold: 5 },
+      }),
+    });
+    expect(header()?.textContent).toBe("Downloads: 1 \u00B7 1/2 providers");
+  });
+
+  it("renders no header and an all-clear row when there is nothing to report", async () => {
+    await h.runPollWith({ providers: { enabled: true, providers: {} } });
+    expect(header()).toBeNull();
+    expect(mutedRow()?.textContent).toBe("All clear");
+    expect(popupRows()).toEqual(["All clear"]);
+  });
+
+  it("keys activity rows so a repeat poll reuses the mounted node", async () => {
+    const running = entry({ id: "a1", detail: "Scanning A" });
+    await h.runPollWith({ activities: [running] });
+    const first = document.querySelector('[data-act-id="a1"]');
+    expect(first).not.toBeNull();
+
+    await h.runPollWith({ activities: [running] });
+
+    expect(document.querySelector('[data-act-id="a1"]')).toBe(first);
+  });
+
+  it("hides manual search and manual download activities from the popup", async () => {
+    await h.runPollWith({
+      activities: [
+        entry({ id: "m1", action: "Manual Search" }),
+        entry({ id: "m2", action: "Manual Download" }),
+        entry({ id: "s1", action: "Series Search" }),
+      ],
+    });
+    expect(document.querySelector('[data-act-id="m1"]')).toBeNull();
+    expect(document.querySelector('[data-act-id="m2"]')).toBeNull();
+    expect(document.querySelector('[data-act-id="s1"]')).not.toBeNull();
+  });
+
+  it("renders one warning row per timed-out provider carrying its last error", async () => {
+    await h.runPollWith({
+      providers: providersRes({
+        subdl: {
+          timed_out: true,
+          recent_failures: 4,
+          threshold: 5,
+          last_error: "429 too many requests",
+        },
+        gestdown: { timed_out: false, recent_failures: 0, threshold: 5 },
+      }),
+    });
+    expect(document.querySelectorAll("#statusPopup .pop-item").length).toBe(1);
+    const row = document.querySelector("#statusPopup .pop-item");
+    expect(row?.textContent).toBe("subdl: 429 too many requests");
+    expect(row?.querySelector(".level-warn")?.textContent).toBe("subdl: ");
+  });
+
+  it("reports no timeouts at all when provider health tracking is switched off", async () => {
+    await h.runPollWith({
+      providers: {
+        enabled: false,
+        providers: { subdl: { timed_out: true, recent_failures: 4, threshold: 5 } },
+      },
+    });
+    expect(mutedRow()?.textContent).toBe("All clear");
+  });
+
+  it("falls back to a failure count when the provider reported no error text", async () => {
+    await h.runPollWith({
+      providers: providersRes({ subdl: { timed_out: true, recent_failures: 4, threshold: 5 } }),
+    });
+    expect(document.querySelector("#statusPopup .pop-item")?.textContent).toBe("subdl: 4 failures");
+  });
+
+  it("renders a transient alert with its level, message and dismiss control", async () => {
+    await h.runPollWith({
+      alerts: {
+        ok: true,
+        status: 200,
+        data: [alertEntry({ id: 7, message: "disk almost full", source: "scanner" })],
+      },
+    });
+    const row = document.querySelector("#statusPopup .pop-item");
+    expect(row?.querySelector(".level-warn")?.textContent).toBe("[warn]");
+    expect(row?.textContent).toContain("disk almost full");
+    expect(row?.querySelector('button[aria-label="Dismiss alert"]')).not.toBeNull();
+    expect(row?.querySelector(".pop-time")).not.toBeNull();
+  });
+
+  it("marks a persistent alert persistent and labels it by source, not level", async () => {
+    await h.runPollWith({
+      alerts: {
+        ok: true,
+        status: 200,
+        data: [
+          alertEntry({
+            id: 8,
+            kind: "persistent",
+            message: "no providers enabled",
+            source: "config",
+          }),
+        ],
+      },
+    });
+    const row = document.querySelector("#statusPopup .pop-item.persistent");
+    expect(row?.querySelector(".level-warn")?.textContent).toBe("[config]");
+    expect(row?.textContent).toContain("no providers enabled");
+    expect(row?.querySelector(".pop-time")).not.toBeNull();
+  });
+
+  it("dates the last scan from the newest completed full scan, not any activity", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({
+      stats: statsOf({ last_scan: "2026-07-19T09:00:00Z" }),
+      activities: [
+        entry({
+          id: "fs1",
+          action: "Full Scan",
+          done: true,
+          ended_at: "2026-07-19T11:00:00Z",
+        }),
+        entry({
+          id: "ss1",
+          action: "Series Search",
+          done: true,
+          ended_at: "2026-07-19T11:30:00Z",
+        }),
+      ],
+    });
+    expect(mutedRow()?.textContent).toBe("Last scan: 1h ago");
+  });
+
+  it("falls back to the stats timestamp when no full scan has completed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-19T09:00:00Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: 3h ago");
+  });
+
+  it("adds the countdown to the next scheduled scan", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({
+      stats: statsOf({ last_scan: "2026-07-19T11:00:00Z", scan_interval_seconds: 7200 }),
+      activities: [
+        entry({ id: "fs1", action: "Full Scan", done: true, ended_at: "2026-07-19T11:00:00Z" }),
+      ],
+    });
+    expect(mutedRow()?.textContent).toBe("Last scan: 1h ago \u00B7 Next scan: in 1h 0m");
+  });
+
+  it("omits the countdown once the next scan is already overdue", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({
+      stats: statsOf({ last_scan: "2026-07-19T03:00:00Z", scan_interval_seconds: 7200 }),
+      activities: [
+        entry({ id: "fs1", action: "Full Scan", done: true, ended_at: "2026-07-19T03:00:00Z" }),
+      ],
+    });
+    expect(mutedRow()?.textContent).toBe("Last scan: 9h ago");
+  });
+
+  it("omits the countdown for a scan due exactly now", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({
+      stats: statsOf({ last_scan: "2026-07-19T10:00:00Z", scan_interval_seconds: 7200 }),
+      activities: [
+        entry({ id: "fs1", action: "Full Scan", done: true, ended_at: "2026-07-19T10:00:00Z" }),
+      ],
+    });
+    expect(mutedRow()?.textContent).toBe("Last scan: 2h ago");
+  });
+
+  it("shows no scan timing at all while a scan is running", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({
+      stats: statsOf({ last_scan: "2026-07-19T09:00:00Z" }),
+      activities: [entry({ id: "r1" })],
+    });
+    expect(mutedRow()).toBeNull();
+  });
+
+  it("calls a scan from the last minute just now", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-19T11:59:30Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: just now");
+  });
+
+  it("switches from just-now to minutes at exactly one minute", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-19T11:59:00Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: 1m ago");
+  });
+
+  it("reports a sub-hour gap in minutes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-19T11:30:00Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: 30m ago");
+  });
+
+  it("switches from hours to days at exactly one day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-18T12:00:00Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: 1d ago");
+  });
+
+  it("reports a multi-day gap in whole days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00Z"));
+    await h.runPollWith({ stats: statsOf({ last_scan: "2026-07-16T06:00:00Z" }) });
+    expect(mutedRow()?.textContent).toBe("Last scan: 3d ago");
+  });
+});
+
+describe("status: toast suppression and de-duplication", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("never toasts a manual search, manual download or audio sync", async () => {
+    await h.runPollWith({
+      activities: [
+        entry({ id: "m1", action: "Manual Search" }),
+        entry({ id: "m2", action: "Manual Download" }),
+        entry({ id: "m3", action: "Audio Sync" }),
+      ],
+    });
+
+    await h.runPollWith({
+      activities: [
+        entry({ id: "m1", action: "Manual Search", done: true, detail: "a" }),
+        entry({ id: "m2", action: "Manual Download", done: true, detail: "b" }),
+        entry({ id: "m3", action: "Audio Sync", done: true, detail: "c" }),
+      ],
+    });
+
+    expect(h.notifyM.success).not.toHaveBeenCalled();
+  });
+
+  it("toasts a completion once, not again on every later poll", async () => {
+    await h.runPollWith({ activities: [entry({ id: "t1" })] });
+    const done = entry({ id: "t1", done: true, detail: "done once" });
+
+    await h.runPollWith({ activities: [done] });
+    await h.runPollWith({ activities: [done] });
+
+    expect(h.notifyM.success).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("status: activity dismissal animation", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.status.initStatusPopover();
+    dispatchers.get("activity.dismiss")?.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function dismissRow(id: string): Promise<Element> {
+    await h.runPollWith({
+      activities: [entry({ id, done: true, ended_at: "2026-07-19T10:01:00Z" })],
+    });
+    const row = document.querySelector(`[data-act-id="${id}"]`);
+    if (!row) {
+      throw new Error(`row ${id} not rendered`);
+    }
+    row.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')?.click();
+    return row;
+  }
+
+  it("disables the button, starts the exit animation and removes the row on transition end", async () => {
+    const row = await dismissRow("z1");
+    expect(row.querySelector<HTMLButtonElement>(".close-btn")?.disabled).toBe(true);
+    expect(row.classList.contains("pop-dismissing")).toBe(true);
+    expect(row.isConnected).toBe(true);
+
+    row.dispatchEvent(new Event("transitionend"));
+
+    expect(row.isConnected).toBe(false);
+  });
+
+  it("removes the row on the fallback timer when no transition ever fires", async () => {
+    vi.useFakeTimers();
+    const row = await dismissRow("z2");
+    expect(row.isConnected).toBe(true);
+
+    vi.advanceTimersByTime(300);
+
+    expect(row.isConnected).toBe(false);
+  });
+});
+
+describe("status: alert dismissal", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+    h.status.initStatusPopover();
+  });
+
+  async function alertRow(): Promise<Element> {
+    await h.runPollWith({ alerts: { ok: true, status: 200, data: [alertEntry({ id: 7 })] } });
+    const row = document.querySelector("#statusPopup .pop-item");
+    if (!row) {
+      throw new Error("alert row not rendered");
+    }
+    return row;
+  }
+
+  it("asks the server to delete the alert and animates the row out", async () => {
+    dispatchers.get("alerts.dismiss")?.mockResolvedValue(undefined);
+    const row = await alertRow();
+
+    row.querySelector<HTMLButtonElement>('button[aria-label="Dismiss alert"]')?.click();
+
+    expect(dispatchers.get("alerts.dismiss")).toHaveBeenCalledWith(7);
+    expect(row.classList.contains("pop-dismissing")).toBe(true);
+  });
+
+  it("refreshes the status once the alert is gone server-side", async () => {
+    dispatchers.get("alerts.dismiss")?.mockResolvedValue(undefined);
+    const row = await alertRow();
+
+    row.querySelector<HTMLButtonElement>('button[aria-label="Dismiss alert"]')?.click();
+    await flush();
+
+    expect(dispatchers.get("status.poll")).toHaveBeenCalled();
+  });
+
+  it("does not refresh when the alert dismissal failed", async () => {
+    dispatchers.get("alerts.dismiss")?.mockResolvedValue(null);
+    const row = await alertRow();
+
+    row.querySelector<HTMLButtonElement>('button[aria-label="Dismiss alert"]')?.click();
+    await flush();
+
+    expect(dispatchers.get("status.poll")).not.toHaveBeenCalled();
+  });
+});
+
+describe("status: poll action contract", () => {
+  let h: PollHarness;
+
+  beforeEach(async () => {
+    h = await freshPollHarness();
+  });
+
+  it("aborting cancels the in-flight poll", () => {
+    h.status.abortPoll();
+
+    expect(cancellers.get("status.poll")).toHaveBeenCalled();
+  });
+
+  it("collapses overlapping polls and stays silent on transient failures", () => {
+    // Background polling must neither pile up requests nor toast blips.
+    expect(actionConfigs.get("status.poll")?.["dedupe"]).toBe(true);
+    expect(actionConfigs.get("status.poll")?.["error"]).toBe(false);
   });
 });

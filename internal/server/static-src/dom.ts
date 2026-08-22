@@ -5,7 +5,7 @@
 // reconcile/patch). Re-export it so existing `import { el } from "./dom.js"`
 // call sites are unchanged.
 import { el } from "@cplieger/reactive";
-import { closeDialog as uipCloseDialog, wireBackdropDismiss } from "@cplieger/ui-primitives/dialog";
+import { wireBackdropDismiss } from "@cplieger/ui-primitives/dialog";
 import { ask } from "@cplieger/ui-primitives/ask";
 
 export { el };
@@ -42,18 +42,13 @@ export function pad(n: number): string {
 // `is-leaving` class, waits for the CSS transition (or a fallback), then
 // close()s. The subflux skin maps `dialog.is-leaving` to the exact
 // opacity + `translate: 0 0.5rem` exit the old inline-style version produced,
-// so the animation is unchanged. Returns a truthy force-close fn when the
-// dialog was open (preserved for the one caller — config.ts — that checks it),
-// or undefined when already closed.
-export function closeDialog(dlg: HTMLDialogElement): (() => void) | undefined {
-  if (!dlg.open) {
-    return undefined;
-  }
-  uipCloseDialog(dlg);
-  return () => {
-    uipCloseDialog(dlg);
-  };
-}
+// so the animation is unchanged. An already-closed dialog is a no-op: the
+// primitive checks `open` itself before it touches the class list.
+//
+// Re-exported rather than wrapped: the local wrapper was a pass-through that
+// also narrowed away the primitive's optional `onClosed` argument. dom.ts stays
+// the facade the five call sites import from, so none of them change.
+export { closeDialog } from "@cplieger/ui-primitives/dialog";
 
 // Drag-safe backdrop dismissal via the library's wireBackdropDismiss (a press
 // must both start and end on the dialog element itself, so a drag-select ending

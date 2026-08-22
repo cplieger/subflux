@@ -162,6 +162,8 @@ async function runSeasonAudioSync(
   if (startBtn) {
     startBtn.textContent = "Close";
     startBtn.disabled = false;
-    startBtn.onclick = () => closeDialog(dlg);
+    startBtn.onclick = () => {
+      closeDialog(dlg);
+    };
   }
 }

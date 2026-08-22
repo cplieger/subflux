@@ -80,6 +80,13 @@ class FakeEventSource {
     this.dispatch("error", "");
   }
 
+  /** A transient error the browser retries on its own: it stays OPEN (or
+   *  CONNECTING) and the module must not schedule a reconnect of its own. */
+  errorWhileOpen(): void {
+    this.readyState = FakeEventSource.OPEN;
+    this.dispatch("error", "");
+  }
+
   private dispatch(type: string, data: string): void {
     const e = new MessageEvent(type, { data });
     for (const fn of this.listeners.get(type) ?? new Set<(e: MessageEvent) => void>()) {
@@ -213,6 +220,74 @@ describe("events: SSE connection", () => {
     vi.advanceTimersByTime(1);
     expect(FakeEventSource.instances).toHaveLength(count + 1);
   });
+
+  it("a reconnect after a gap refetches the pull state", () => {
+    events.connect();
+    // First open of this page load; a later open is a reconnect after a gap.
+    lastES().open();
+    lastES().fail();
+    vi.advanceTimersByTime(SSE_RECONNECT_MS);
+    // Clear only the assertion targets: clearing registerCleanup too would
+    // lose the disconnect the afterEach hook needs.
+    vi.mocked(emit).mockClear();
+    vi.mocked(pollStatus).mockClear();
+
+    lastES().open();
+
+    // A fresh EventSource never replays the gap (no Last-Event-ID), so the
+    // pull state is refetched rather than trusted.
+    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+    expect(pollStatus).toHaveBeenCalled();
+  });
+
+  it("a transient error while the connection is open schedules no reconnect", () => {
+    events.connect();
+    lastES().open();
+
+    // readyState stays OPEN: the browser retries this one itself.
+    lastES().errorWhileOpen();
+    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it("disconnect cancels a pending reconnect", () => {
+    events.connect();
+    lastES().fail(); // schedules the backoff reconnect
+
+    capturedDisconnect()?.();
+    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it("backoff jitter is additive, so the delay never falls below the base", () => {
+    vi.spyOn(Math, "random").mockReturnValue(1); // maximum jitter
+    events.connect();
+
+    lastES().fail();
+    // base + jitter = 2x SSE_RECONNECT_MS at attempt 0 with jitter pinned high.
+    vi.advanceTimersByTime(2 * SSE_RECONNECT_MS - 1);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(FakeEventSource.instances).toHaveLength(2);
+  });
+
+  it("a second visibilitychange restarts the reconnect debounce", () => {
+    events.connect();
+    setHidden(true);
+    const count = FakeEventSource.instances.length;
+
+    setHidden(false);
+    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS - 1);
+    setHidden(false); // flapped back before the first debounce elapsed
+    vi.advanceTimersByTime(1);
+
+    // The first debounce was cancelled, so its deadline passes with no connect.
+    expect(FakeEventSource.instances).toHaveLength(count);
+    vi.advanceTimersByTime(VISIBILITY_DEBOUNCE_MS - 1);
+    expect(FakeEventSource.instances).toHaveLength(count + 1);
+  });
 });
 
 describe("events: SSE handlers", () => {
@@ -284,12 +359,80 @@ describe("events: SSE handlers", () => {
     expect(notify.info).toHaveBeenCalledWith("Scan started: Breaking Bad");
   });
 
+  it("coverage event off the library page invalidates instead of refetching", () => {
+    // The row-level refetch only pays off where the rows are; any other page
+    // reloads through DataInvalidate.
+    vi.mocked(store.get).mockImplementation((key: string) =>
+      key === "currentPage" ? "files" : undefined,
+    );
+    events.connect();
+
+    lastES().frame("coverage", {
+      media_type: "episode",
+      media_id: "tvdb-81189-s01e01",
+      language: "en",
+      variant: "standard",
+      source: "opensubtitles",
+    });
+
+    expect(fetchAndMergeCoverage).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+  });
+
+  it("coverage event without a media id invalidates instead of refetching", () => {
+    vi.mocked(store.get).mockImplementation((key: string) =>
+      key === "currentPage" ? "library" : undefined,
+    );
+    events.connect();
+
+    lastES().frame("coverage", {
+      media_type: "episode",
+      media_id: "",
+      language: "en",
+      variant: "standard",
+      source: "opensubtitles",
+    });
+
+    expect(fetchAndMergeCoverage).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+  });
+
+  it("coverage refetch failure falls back to invalidating the page", async () => {
+    vi.mocked(store.get).mockImplementation((key: string) =>
+      key === "currentPage" ? "library" : undefined,
+    );
+    vi.mocked(fetchAndMergeCoverage).mockRejectedValue(new Error("network down"));
+    events.connect();
+
+    lastES().frame("coverage", {
+      media_type: "episode",
+      media_id: "tvdb-81189-s01e01",
+      language: "en",
+      variant: "standard",
+      source: "opensubtitles",
+    });
+    await vi.waitFor(() => {
+      expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+    });
+  });
+
+  it("notify event calls notify.success for success level", () => {
+    events.connect();
+
+    lastES().frame("notify", { level: "success", text: "subtitle saved" });
+
+    expect(notify.success).toHaveBeenCalledWith("subtitle saved");
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
   it("scan:done triggers pollStatus", () => {
     events.connect();
 
     lastES().frame("scan:done", { action: "scan", detail: "", source: "scheduler" });
 
     expect(pollStatus).toHaveBeenCalled();
+    // Coverage counts reconcile after any terminal outcome.
+    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
   });
 
   it("malformed frames are dropped without side effects", () => {
