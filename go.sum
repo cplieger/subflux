@@ -12,12 +12,12 @@ github.com/cplieger/envx/yamlenv/v2 v2.0.0 h1:YNznn50HfSIJMBWzcAtqPw4SWAyHtjU3zC
 github.com/cplieger/envx/yamlenv/v2 v2.0.0/go.mod h1:5wXZtzDzSl/zu+GPd5b76f5qpBVLW0AdbTFAaDy1aXQ=
 github.com/cplieger/health v1.6.0 h1:qgzslmEVq8asgMkEZ25arRZPazJRWsN7E8XJ6KgxMpg=
 github.com/cplieger/health v1.6.0/go.mod h1:fGHTssNQpl2EjqRLxgs3n7bbj94gD5HDgi1KEk8cN0Q=
-github.com/cplieger/httpx/v5 v5.0.0 h1:S7jCBzPfOHHXZuFEsaN35UthMZpvlN/aYywP5nb1itI=
-github.com/cplieger/httpx/v5 v5.0.0/go.mod h1:3ap2CAq592k7smKhe3lWrwklthtmJ6L4cIWMTMM8O10=
+github.com/cplieger/httpx/v5 v5.0.1 h1:MAqJPMJ/esh877C5Y2yVFqm08Xpjxnt67qIZn/fL3Fk=
+github.com/cplieger/httpx/v5 v5.0.1/go.mod h1:3ap2CAq592k7smKhe3lWrwklthtmJ6L4cIWMTMM8O10=
 github.com/cplieger/jsonx/v2 v2.0.0 h1:xZ0Mw7flnGn3NARQfXQ09tTMzFCunUT/lhve67KNinI=
 github.com/cplieger/jsonx/v2 v2.0.0/go.mod h1:v2giyFoa368vz0eN1G5lVG8wsWw+8JpEjV574r2Tv7Y=
-github.com/cplieger/keyenc v1.0.5 h1:FLyjGqdfki+3VyOJGdKmeY3VQAiu93Fsg+cJZ6H7xEc=
-github.com/cplieger/keyenc v1.0.5/go.mod h1:9l4QSTuwTtYp2KYeYkvp2PXop12G5MqXeReqCqDlHWY=
+github.com/cplieger/keyenc v1.0.6 h1:Ac/EoEY8Lgy4ZyTi9I4G4s00RBWGoOlI3RdsjGwHLRo=
+github.com/cplieger/keyenc v1.0.6/go.mod h1:9l4QSTuwTtYp2KYeYkvp2PXop12G5MqXeReqCqDlHWY=
 github.com/cplieger/langtag/v2 v2.0.0 h1:G8sVCSal1PwshhceEqw40LzHph0XwuiuacXQCWeQQi8=
 github.com/cplieger/langtag/v2 v2.0.0/go.mod h1:jZhwdy6hULahd8+mXOU9KGKPjC8s01yJGBiuCIco0Jw=
 github.com/cplieger/metrics/v4 v4.0.0 h1:Ps4p3iDwEK9FsxNs94KfPeLBJrpN0xDaQi7hmahVq8I=
@@ -28,8 +28,8 @@ github.com/cplieger/runesafe/v2 v2.0.0 h1:jEkFU2dbDxKLwgHag6l3gbSLpRNfkD8mMsdiCg
 github.com/cplieger/runesafe/v2 v2.0.0/go.mod h1:X3avIOn44UaASh8QEhXDIKNWA4HLmSAZYWywNwpOYyE=
 github.com/cplieger/slogx v1.6.3 h1:1W8DxUwovnfbL1wjthdELHhw2gFH1FXaUcG34KjefIw=
 github.com/cplieger/slogx v1.6.3/go.mod h1:KW/UCGyMK3grILRvcU4Zloawb27C13cLN5HQ7ZLNS5Q=
-github.com/cplieger/ssrf/v4 v4.0.0 h1:FTzImwYJt306SLSD/Yjx3AeqWthzkbijZagfRiXutL8=
-github.com/cplieger/ssrf/v4 v4.0.0/go.mod h1:MxhymcOFPrio7RV9QGh118cJXHzdSzWvv+nTDs+fung=
+github.com/cplieger/ssrf/v4 v4.1.0 h1:7GqcqAEuZcRBMgfGYxcIWaDe2ikqrOMGBHwLve4MTjE=
+github.com/cplieger/ssrf/v4 v4.1.0/go.mod h1:Nq8CsFwZcpYNpzDpgqyLV9IRM8XiYTfR1V4Bm93YSFU=
 github.com/cplieger/webhttp/v2 v2.0.0 h1:0kZfGTUIX3ltdW5Nah95/oa9BtARePlOMP6HGy6to4o=
 github.com/cplieger/webhttp/v2 v2.0.0/go.mod h1:63pP3oJEpsk2kEAonLuxjDh6V4IR5bO06N575hvuNag=
 github.com/cplieger/wiregen/v3 v3.0.0 h1:xtwG9WVrDs70NHQttToplgVJNMUu4X8rBwnnftFrkbA=
