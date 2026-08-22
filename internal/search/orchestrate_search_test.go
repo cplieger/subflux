@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -465,8 +466,14 @@ func TestSearchTargets_download_failure_continues(t *testing.T) {
 	}
 }
 
+// A sweep in which every provider errored has no successful provider to blame
+// for the empty result, so the no-result line must not fire: it would report
+// a content miss for what was an infrastructure failure, and feed the same
+// evidence into the season tracker.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
 func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
-	t.Parallel()
+	recs := capture.Default(t)
 	dir := t.TempDir()
 	videoPath := filepath.Join(dir, "movie.mkv")
 
@@ -489,6 +496,9 @@ func TestSearchTargets_all_providers_failed_skips_backoff(t *testing.T) {
 	}
 	if ms.failureCalled {
 		t.Error("RecordNoResult called, want no backoff for errored providers")
+	}
+	if n := recs.CountExact("no results"); n != 0 {
+		t.Errorf(`SearchTargets(every provider errored) logged msg="no results" %d times, want 0`, n)
 	}
 }
 
@@ -723,6 +733,141 @@ func TestSearchProvidersFiltered_skips_timed_out_provider(t *testing.T) {
 	if errored := outcome.errored(); len(errored) != 0 {
 		t.Errorf("errored = %v, want empty (skipped, not errored)", errored)
 	}
+}
+
+// A provider skipped by the health timeout is named in the skip line, and a
+// sweep that skipped nobody says nothing: an empty "providers timed out" line
+// on every healthy sweep is noise that hides the real ones.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestSearchProvidersFiltered_names_the_skipped_providers(t *testing.T) {
+	newSweep := func(t *testing.T) (*Engine, []provider.Provider) {
+		t.Helper()
+		mc := &mockConfig{searchCfg: subflux.SearchConfig{ProviderTimeout: time.Hour}}
+		sick := &mockProvider{name: "sick", results: []subflux.Subtitle{
+			{Provider: "sick", ReleaseName: "Movie-GRP"},
+		}}
+		healthy := &mockProvider{name: "healthy", results: []subflux.Subtitle{
+			{Provider: "healthy", ReleaseName: "Movie-GRP"},
+		}}
+		provs := []provider.Provider{sick, healthy}
+		return newEngine(provs, &mockStore{}, mc, nil,
+			scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{}), provs
+	}
+	req := &subflux.SearchRequest{MediaType: "movie", Languages: []string{"fr"}}
+
+	t.Run("one_timed_out", func(t *testing.T) {
+		recs := capture.Default(t)
+		e, provs := newSweep(t)
+		// Trip the timeout for "sick" only (threshold 5).
+		for range 5 {
+			e.timeout.RecordFailure("sick", nil)
+		}
+
+		outcome := e.searchProvidersFiltered(t.Context(), req, provs)
+
+		if got := outcome.succeeded(); len(got) != 1 || got[0] != "healthy" {
+			t.Errorf("searchProvidersFiltered() succeeded = %v, want [healthy]", got)
+		}
+		if got, ok := recs.AttrValueExact("providers timed out, skipping", "providers"); !ok || got != "[sick]" {
+			t.Errorf(`searchProvidersFiltered(1 of 2 timed out) logged msg="providers timed out, skipping" providers=%q (present=%v), want "[sick]"`,
+				got, ok)
+		}
+	})
+
+	t.Run("none_timed_out", func(t *testing.T) {
+		recs := capture.Default(t)
+		e, provs := newSweep(t)
+
+		outcome := e.searchProvidersFiltered(t.Context(), req, provs)
+		if got := outcome.succeeded(); len(got) != 2 {
+			t.Errorf("searchProvidersFiltered() succeeded = %v, want both providers", got)
+		}
+		if n := recs.CountExact("providers timed out, skipping"); n != 0 {
+			t.Errorf(`searchProvidersFiltered(none timed out) logged msg="providers timed out, skipping" %d times, want 0`, n)
+		}
+	})
+}
+
+// --- identity filtering ---
+
+// The identity filter's drop count is how an operator learns why provider
+// results vanished before scoring, so it is reported when results were
+// dropped — at INFO when nothing survived — and not at all when the filter
+// kept everything.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestSearchTargets_reports_identity_filter_drops(t *testing.T) {
+	// A movie request plus a subtitle carrying episode metadata: the filter
+	// drops the mismatch, whatever its release name.
+	episodeSub := subflux.Subtitle{
+		Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: subflux.MatchByIMDB,
+		Language: "fr", Season: 1, Episode: 2,
+	}
+	movieSub := subflux.Subtitle{
+		Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: subflux.MatchByIMDB,
+		Language: "fr",
+	}
+	run := func(t *testing.T, results []subflux.Subtitle) *capture.Recorder {
+		t.Helper()
+		recs := capture.Default(t)
+		p := &mockProvider{
+			name:    "test",
+			results: results,
+			data:    []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n"),
+		}
+		e := newEngine([]provider.Provider{p}, &mockStore{},
+			&mockConfig{searchCfg: subflux.SearchConfig{}, minScore: 0}, nil,
+			scorer.New(&subflux.DefaultScores), Syncer{}, noopDetector{})
+		req := &subflux.SearchRequest{
+			MediaType: "movie", ImdbID: "tt123",
+			Title: "Movie", ReleaseName: "Movie-GRP",
+		}
+		if _, err := e.SearchTargets(t.Context(), req,
+			filepath.Join(t.TempDir(), "movie.mkv"),
+			[]subflux.SubtitleTarget{{Code: "fr"}}); err != nil {
+			t.Fatalf("SearchTargets() unexpected error: %v", err)
+		}
+		return recs
+	}
+
+	t.Run("some_dropped", func(t *testing.T) {
+		recs := run(t, []subflux.Subtitle{movieSub, episodeSub})
+		if got, ok := recs.AttrValueExact("identity filter dropped results", "dropped"); !ok || got != "1" {
+			t.Errorf(`SearchTargets(1 of 2 failing identity) logged msg="identity filter dropped results" dropped=%q (present=%v), want "1"`,
+				got, ok)
+		}
+		if got, ok := recs.AttrValueExact("identity filter dropped results", "kept"); !ok || got != "1" {
+			t.Errorf(`SearchTargets(1 of 2 failing identity) logged msg="identity filter dropped results" kept=%q (present=%v), want "1"`,
+				got, ok)
+		}
+		if n := recs.CountExact("identity filter dropped all results"); n != 0 {
+			t.Errorf(`SearchTargets(1 survivor) logged msg="identity filter dropped all results" %d times, want 0`, n)
+		}
+	})
+
+	t.Run("all_dropped", func(t *testing.T) {
+		recs := run(t, []subflux.Subtitle{episodeSub})
+		if got, ok := recs.AttrValueExact("identity filter dropped all results", "dropped"); !ok || got != "1" {
+			t.Errorf(`SearchTargets(every result failing identity) logged msg="identity filter dropped all results" dropped=%q (present=%v), want "1"`,
+				got, ok)
+		}
+		if n := recs.CountExact("identity filter dropped results"); n != 0 {
+			t.Errorf(`SearchTargets(no survivor) logged msg="identity filter dropped results" %d times, want 0`, n)
+		}
+	})
+
+	t.Run("none_dropped", func(t *testing.T) {
+		recs := run(t, []subflux.Subtitle{movieSub})
+		for _, msg := range []string{
+			"identity filter dropped results",
+			"identity filter dropped all results",
+		} {
+			if n := recs.CountExact(msg); n != 0 {
+				t.Errorf("SearchTargets(every result passing identity) logged msg=%q %d times, want 0", msg, n)
+			}
+		}
+	})
 }
 
 // --- SearchTargets video hash computation ---

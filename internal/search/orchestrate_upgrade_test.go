@@ -22,6 +22,7 @@ func TestSearchTargets_upgrade(t *testing.T) {
 		providerResults []subflux.Subtitle
 		providerData    []byte
 		score           int
+		minScore        int
 		upgradeWindow   int
 		wantPaths       int
 		found           bool
@@ -55,6 +56,18 @@ func TestSearchTargets_upgrade(t *testing.T) {
 		},
 		{
 			name: "same_score_skips", score: sameScore, mediaImported: time.Now(), found: true,
+			upgradeEnabled: true, upgradeWindow: 7,
+			providerResults: sameScoreResults,
+			providerData:    []byte("sub data"),
+			wantPaths:       0,
+		},
+		{
+			// The existing subtitle sits exactly on the configured minimum, so
+			// the minimum alone would accept an equal-scoring candidate: an
+			// upgrade must clear the CURRENT score, not merely reach the floor,
+			// or every scan re-downloads the same subtitle.
+			name: "same_score_at_min_score_skips", score: sameScore, minScore: sameScore,
+			mediaImported: time.Now(), found: true,
 			upgradeEnabled: true, upgradeWindow: 7,
 			providerResults: sameScoreResults,
 			providerData:    []byte("sub data"),
@@ -109,7 +122,7 @@ func TestSearchTargets_upgrade(t *testing.T) {
 					UpgradeWindowDays: tc.upgradeWindow,
 				},
 				adaptiveCfg: subflux.AdaptiveConfig{Enabled: tc.adaptiveEnabled},
-				minScore:    0,
+				minScore:    tc.minScore,
 			}
 			p := &mockProvider{
 				name:    "test",

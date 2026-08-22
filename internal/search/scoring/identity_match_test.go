@@ -191,6 +191,12 @@ func TestReleaseNameMatchesTitle(t *testing.T) {
 		// "Show" against a release for a different show.
 		{"zero-padded marker still cuts the title", "Show", "Other.Show.S001E01.720p", false},
 		{"zero-padded marker keeps the real title", "Other Show", "Other.Show.S001E01.720p", true},
+
+		// A release named by its marker alone has no title portion at all, so
+		// there is nothing to contradict the request: the cut leaves an empty
+		// candidate, which matches for the same reason an empty release does.
+		// Treating it as a mismatch instead would drop a usable subtitle.
+		{"marker at the start leaves no title to contradict", "Breaking Bad", "S01E01.1080p.WEB-DL-GRP", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

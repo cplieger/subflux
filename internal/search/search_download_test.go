@@ -2,11 +2,17 @@ package search
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/cplieger/slogx/capture"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -443,5 +449,287 @@ func TestSyncSubtitle_reference_exists_but_already_in_sync(t *testing.T) {
 	// Should return original data unchanged (offset == 0 path).
 	if !bytes.Equal(got, data) {
 		t.Error("syncSubtitle() modified data when already in sync, want original")
+	}
+}
+
+// --- audio fallback ---
+
+// fixedAudioExec answers the audio-sync call with a prepared result, so the
+// fallback's own decision path is reachable without ffmpeg, a PCM extraction
+// or a VAD pass. The reference half is left to the engine's syncer.
+type fixedAudioExec struct{ result subsync.SyncResult }
+
+func (fixedAudioExec) Reference(context.Context, []byte, string, string, float64) subsync.SyncResult {
+	return subsync.SyncResult{}
+}
+
+func (x fixedAudioExec) Audio(context.Context, []byte, string, string) subsync.SyncResult {
+	return x.result
+}
+
+// When reference sync changes nothing, the audio fallback's cues are what the
+// caller gets back, with the audio offset: a confident audio result that the
+// engine discards is a sync silently thrown away.
+func TestSyncSubtitle_audio_fallback_result_is_applied(t *testing.T) {
+	t.Parallel()
+	videoPath := filepath.Join(t.TempDir(), "movie.mkv") // no reference => sync is a no-op
+	data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n\n")
+	audio := subsync.SyncResult{
+		Method:     subsync.MethodAudio,
+		Offset:     4000,
+		Confidence: 0.9,
+		Cues: []subsync.Cue{
+			{Start: 5 * time.Second, End: 6 * time.Second, Text: "Hello"},
+		},
+	}
+
+	e := New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
+		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}),
+		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}))
+
+	got, offsetMs := e.syncSubtitle(t.Context(), data, videoPath, "fr",
+		subflux.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true})
+
+	if want := []byte("1\n00:00:05,000 --> 00:00:06,000\nHello\n\n"); !bytes.Equal(got, want) {
+		t.Errorf("syncSubtitle(reference no-op, audio applies) = %q, want %q", got, want)
+	}
+	if offsetMs != 4000 {
+		t.Errorf("syncSubtitle(reference no-op, audio applies) offset = %d, want 4000", offsetMs)
+	}
+}
+
+// A low-confidence audio result is not applied: the data and offset come back
+// untouched rather than half-corrected.
+func TestSyncSubtitle_audio_fallback_low_confidence_is_ignored(t *testing.T) {
+	t.Parallel()
+	videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+	data := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n\n")
+	audio := subsync.SyncResult{
+		Method:     subsync.MethodAudio,
+		Offset:     4000,
+		Confidence: 0.2,
+		Cues: []subsync.Cue{
+			{Start: 5 * time.Second, End: 6 * time.Second, Text: "Hello"},
+		},
+	}
+
+	e := New(nil, WithStore(&mockStore{}), WithConfig(&mockConfig{}),
+		WithScorer(scorer.New(&subflux.DefaultScores)), WithSyncer(Syncer{}),
+		WithTracks(noopDetector{}), WithSyncExec(fixedAudioExec{result: audio}))
+
+	got, offsetMs := e.syncSubtitle(t.Context(), data, videoPath, "fr",
+		subflux.SyncConfig{SyncSubtitles: true, AudioSyncFallback: true})
+
+	if !bytes.Equal(got, data) {
+		t.Errorf("syncSubtitle(low-confidence audio) = %q, want the original %q", got, data)
+	}
+	if offsetMs != 0 {
+		t.Errorf("syncSubtitle(low-confidence audio) offset = %d, want 0", offsetMs)
+	}
+}
+
+// --- which candidates skip timing sync ---
+
+// recordingSyncer counts the timing-sync calls the download path makes and
+// reports a fixed offset, so both "was this candidate synced" and "was its
+// offset persisted" are observable.
+type recordingSyncer struct{ syncCalls atomic.Int32 }
+
+func (s *recordingSyncer) Sync(_ context.Context, data []byte, _, _ string) (synced []byte, offsetMs int64) {
+	s.syncCalls.Add(1)
+	return append(bytes.Clone(data), []byte("2\n00:00:09,000 --> 00:00:10,000\nShifted\n\n")...), 4000
+}
+
+func (s *recordingSyncer) PostProcess(data []byte, _ subflux.PostProcessConfig) []byte { return data }
+
+// fixedScorer gives every candidate the same score, which is how a test puts a
+// candidate exactly on a threshold the download path reads.
+type fixedScorer struct{ score int }
+
+func (s fixedScorer) Score(subflux.SubtitleInfo, subflux.MatchSet) (score, scoreNoHash int) {
+	return s.score, s.score
+}
+
+func (fixedScorer) ScoreToTier(int) subflux.ScoreTier { return subflux.TierGood }
+
+// offsetStore records the timing offsets the download path persists.
+type offsetStore struct {
+	offsets []int64
+	mockStore
+
+	mu sync.Mutex
+}
+
+func (s *offsetStore) SetSyncOffset(_ context.Context, _ string, offsetMs int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.offsets = append(s.offsets, offsetMs)
+	return nil
+}
+
+func (s *offsetStore) recorded() []int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]int64(nil), s.offsets...)
+}
+
+// Timing sync is skipped for a match that is already known to be timed for
+// this file: a hash match, or a release match good enough that sync could
+// introduce drift rather than fix it. The threshold is inclusive — a
+// candidate exactly on it is already close enough — and a skipped sync
+// persists no offset.
+func TestDownloadAndSave_syncs_only_candidates_that_need_it(t *testing.T) {
+	t.Parallel()
+	threshold := syncSkipThreshold(subflux.DefaultScores)
+
+	tests := []struct {
+		name      string
+		matchedBy subflux.MatchMethod
+		score     int
+		wantSyncs int32
+	}{
+		{name: "below_threshold_syncs", matchedBy: subflux.MatchByIMDB, score: threshold - 1, wantSyncs: 1},
+		{name: "exactly_on_threshold_skips", matchedBy: subflux.MatchByIMDB, score: threshold, wantSyncs: 0},
+		{name: "hash_match_skips", matchedBy: subflux.MatchByHash, score: threshold - 1, wantSyncs: 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+			ms := &offsetStore{}
+			syncer := &recordingSyncer{}
+			p := &mockProvider{
+				name: "test",
+				results: []subflux.Subtitle{
+					{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: tc.matchedBy, Language: "fr"},
+				},
+				data: []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n"),
+			}
+			e := newEngine([]provider.Provider{p}, ms,
+				&mockConfig{searchCfg: subflux.SearchConfig{}, minScore: 0},
+				nil, fixedScorer{score: tc.score}, syncer, noopDetector{})
+
+			req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+			result, err := e.SearchTargets(t.Context(), req, videoPath,
+				[]subflux.SubtitleTarget{{Code: "fr"}})
+			if err != nil {
+				t.Fatalf("SearchTargets() unexpected error: %v", err)
+			}
+			if len(result.Paths()) != 1 {
+				t.Fatalf("SearchTargets(score %d) returned %d paths, want 1",
+					tc.score, len(result.Paths()))
+			}
+
+			if got := syncer.syncCalls.Load(); got != tc.wantSyncs {
+				t.Errorf("SearchTargets(matched_by %q, score %d) ran timing sync %d times, want %d (skip threshold %d)",
+					tc.matchedBy, tc.score, got, tc.wantSyncs, threshold)
+			}
+			// The offset is persisted exactly when a sync produced one.
+			var wantOffsets []int64
+			if tc.wantSyncs > 0 {
+				wantOffsets = []int64{4000}
+			}
+			if got := ms.recorded(); !slices.Equal(got, wantOffsets) {
+				t.Errorf("SearchTargets(matched_by %q, score %d) persisted offsets %v, want %v",
+					tc.matchedBy, tc.score, got, wantOffsets)
+			}
+		})
+	}
+}
+
+// --- persistence logging on the ordinary path ---
+
+// Every store write on the save path is WARN-logged when it fails, so a
+// successful save must produce none of those lines: an error line on the
+// ordinary path is indistinguishable from a real failure in Loki.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestSearchTargets_successful_save_logs_no_failures(t *testing.T) {
+	recs := capture.Default(t)
+	videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+	p := &mockProvider{
+		name: "test",
+		results: []subflux.Subtitle{
+			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: subflux.MatchByIMDB, Language: "fr"},
+		},
+		data: []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n"),
+	}
+	// A score below the skip threshold so the sync — and therefore the
+	// sync-offset write — is part of the path under test.
+	e := newEngine([]provider.Provider{p}, &mockStore{},
+		&mockConfig{searchCfg: subflux.SearchConfig{}, minScore: 0}, nil,
+		fixedScorer{score: syncSkipThreshold(subflux.DefaultScores) - 1},
+		&recordingSyncer{}, noopDetector{})
+
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath,
+		[]subflux.SubtitleTarget{{Code: "fr"}})
+	if err != nil {
+		t.Fatalf("SearchTargets() unexpected error: %v", err)
+	}
+	if len(result.Paths()) != 1 {
+		t.Fatalf("SearchTargets() returned %d paths, want 1", len(result.Paths()))
+	}
+	if n := recs.CountExact("subtitle saved"); n != 1 {
+		t.Errorf(`SearchTargets(success) logged msg="subtitle saved" %d times, want 1`, n)
+	}
+	for _, msg := range []string{
+		"failed to record subtitle files",
+		"failed to upsert subtitle file",
+		"failed to record sync offset",
+		"failed to record success",
+		"failed to record scan state",
+	} {
+		if n := recs.CountExact(msg); n != 0 {
+			t.Errorf("SearchTargets(success, store accepting every write) logged msg=%q %d times, want 0",
+				msg, n)
+		}
+	}
+}
+
+// The attempt counter and the remaining count are how an operator reads a
+// retry sequence, so they are pinned per record: 1 of 2 with one left, then
+// 2 of 2 with none.
+//
+// capture.Default swaps the process-global logger: no t.Parallel.
+func TestDownloadBestCandidate_numbers_each_failed_attempt(t *testing.T) {
+	recs := capture.Default(t)
+	videoPath := filepath.Join(t.TempDir(), "movie.mkv")
+	p := &mockProvider{
+		name: "test",
+		results: []subflux.Subtitle{
+			{Provider: "test", ReleaseName: "Movie-GRP", MatchedBy: subflux.MatchByIMDB, Language: "fr"},
+			{Provider: "test", ReleaseName: "Movie-OTHER", MatchedBy: subflux.MatchByIMDB, Language: "fr"},
+		},
+		downloadErr: errors.New("provider down"),
+	}
+	e := newEngine([]provider.Provider{p}, &mockStore{},
+		&mockConfig{searchCfg: subflux.SearchConfig{}, minScore: 0}, nil,
+		fixedScorer{score: 10}, &recordingSyncer{}, noopDetector{})
+
+	req := &subflux.SearchRequest{MediaType: "movie", ImdbID: "tt123", ReleaseName: "Movie-GRP"}
+	result, err := e.SearchTargets(t.Context(), req, videoPath,
+		[]subflux.SubtitleTarget{{Code: "fr"}})
+	if err != nil {
+		t.Fatalf("SearchTargets() unexpected error: %v", err)
+	}
+	if len(result.Paths()) != 0 {
+		t.Fatalf("SearchTargets(every download failing) = %v, want no paths", result.Paths())
+	}
+
+	if got, want := recs.AttrValuesExact("download attempt failed, trying next", "attempt"),
+		[]string{"1", "2"}; !slices.Equal(got, want) {
+		t.Errorf(`SearchTargets(2 failing candidates) logged msg="download attempt failed, trying next" attempt=%v, want %v`,
+			got, want)
+	}
+	if got, want := recs.AttrValuesExact("download attempt failed, trying next", "remaining"),
+		[]string{"1", "0"}; !slices.Equal(got, want) {
+		t.Errorf(`SearchTargets(2 failing candidates) logged msg="download attempt failed, trying next" remaining=%v, want %v`,
+			got, want)
+	}
+	if got, ok := recs.AttrValueExact("all download attempts failed", "attempted"); !ok || got != "2" {
+		t.Errorf(`SearchTargets(2 failing candidates) logged msg="all download attempts failed" attempted=%q (present=%v), want "2"`,
+			got, ok)
 	}
 }
