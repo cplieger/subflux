@@ -182,3 +182,23 @@ func TestAudit_accepts_raw_key_value_pairs(t *testing.T) {
 		t.Errorf("raw kv pair: reason = %v, want \"locked_out\"", got)
 	}
 }
+
+// TestAudit_dangling_key_records_a_nil_value: a caller that passes a key with
+// no value is a schema mistake, and an audit line is the last place to answer
+// a mistake with a panic. The key is recorded with a nil value so the error is
+// visible in the log instead of taking the request down.
+func TestAudit_dangling_key_records_a_nil_value(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req.RemoteAddr = "10.0.0.2:4444"
+
+	records := captureSlog(t, func() {
+		Audit(req, slog.LevelWarn, AuditLoginFailure, false, "bob", "reason", "locked_out", "dangling")
+	})
+
+	if got := len(records); got != 1 {
+		t.Fatalf("want 1 audit record, got %d", got)
+	}
+	if got, ok := records[0]["dangling"]; !ok || got != nil {
+		t.Errorf("dangling key: got %v (present=%v), want a nil value", got, ok)
+	}
+}

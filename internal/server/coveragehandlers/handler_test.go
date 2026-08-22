@@ -208,6 +208,20 @@ func TestHandleCoverageDetail(t *testing.T) {
 		}
 	})
 
+	t.Run("zero_tvdb_id", func(t *testing.T) {
+		t.Parallel()
+		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)
+		// Zero is not a tvdb ID any series can have, so it is refused with
+		// the negatives rather than sent to the store as a prefix.
+		req := httptest.NewRequest(http.MethodGet, "/api/coverage/series/0", nil)
+		rec := httptest.NewRecorder()
+		h.HandleCoverageDetail(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("HandleCoverageDetail(zero id) status = %d, want %d",
+				rec.Code, http.StatusBadRequest)
+		}
+	})
+
 	t.Run("valid_tvdb_id_returns_files", func(t *testing.T) {
 		t.Parallel()
 		h := newCoverageHandler(&mockCoverageStore{}, &fakeCoverageCfg{}, nil, nil)

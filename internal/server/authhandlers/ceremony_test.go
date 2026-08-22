@@ -117,6 +117,32 @@ func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 	}
 }
 
+// TestShardedCeremonyMap_Cleanup_frees_capacity: the sweep of expired
+// entries must return their slots to the live counter, like LoadAndDelete
+// does. A counter that drifts up instead would refuse every later ceremony
+// while the map itself sat empty, locking users out of the login flow.
+func TestShardedCeremonyMap_Cleanup_frees_capacity(t *testing.T) {
+	t.Parallel()
+	sm := NewShardedCeremonyMap[*WebAuthnSession]()
+	expired := time.Now().Add(-time.Hour)
+	for i := range MaxCeremonySessions {
+		if !sm.Store(fmt.Sprintf("k%d", i), &WebAuthnSession{CreatedAt: expired}) {
+			t.Fatalf("Store failed at %d, want success up to capacity %d", i, MaxCeremonySessions)
+		}
+	}
+	if sm.Store("overflow", &WebAuthnSession{CreatedAt: time.Now()}) {
+		t.Fatal("Store at capacity should fail")
+	}
+
+	sm.Cleanup(func(v *WebAuthnSession) bool {
+		return time.Since(v.CreatedAt) > time.Minute
+	})
+
+	if !sm.Store("after-cleanup", &WebAuthnSession{CreatedAt: time.Now()}) {
+		t.Error("Store after Cleanup should succeed: the swept slots were not reclaimed")
+	}
+}
+
 func TestClientIP(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

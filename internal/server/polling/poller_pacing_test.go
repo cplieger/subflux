@@ -97,8 +97,9 @@ func TestExecuteBatch_skip_entries_pay_no_delay(t *testing.T) {
 }
 
 // Entries that actually query providers ARE paced: two working entries incur
-// (at least) one inter-entry delay. Lower-bound only, so a loaded runner
-// cannot flake it.
+// (at least) one inter-entry delay, and the pacing sleep must not cost the
+// batch its remaining entries. Lower-bound on the delay only, so a loaded
+// runner cannot flake it.
 func TestExecuteBatch_paces_between_querying_entries(t *testing.T) {
 	const delay = 60 * time.Millisecond
 	store := &mockStore{}
@@ -107,7 +108,8 @@ func TestExecuteBatch_paces_between_querying_entries(t *testing.T) {
 		histEntry(tempVideo(t)),
 		histEntry(tempVideo(t)),
 	}}
-	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Engine: &mockEngine{result: queriedResult(1)}}
+	engine := &mockEngine{result: queriedResult(1)}
+	ls := &LiveState{Cfg: cfg, Sonarr: sonarr, Engine: engine}
 	p := NewPoller(fullDeps(store), func() *LiveState { return ls })
 
 	if got := p.detectSonarr(t.Context(), ls); got != 2 {
@@ -117,5 +119,8 @@ func TestExecuteBatch_paces_between_querying_entries(t *testing.T) {
 	drainOne(t, p)
 	if elapsed := time.Since(start); elapsed < delay {
 		t.Errorf("executeBatch of querying entries took %v, want >= %v (one pacing sleep)", elapsed, delay)
+	}
+	if got := engine.searches.Load(); got != 2 {
+		t.Errorf("engine searches = %d, want 2 (the batch must survive the pacing sleep)", got)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -188,6 +190,68 @@ func TestPosterClient_hopCap(t *testing.T) {
 	}
 }
 
+// TestPosterClient_publicLegKeepsItsGuards: the public leg carries the same
+// two guards as the arr leg — the shared hop counter and the SSRF policy. A
+// chain that crosses to the CDN and keeps redirecting must stop at the cap,
+// and a public redirect aimed back at a private address must be refused
+// before the public transport dials it.
+func TestPosterClient_publicLegKeepsItsGuards(t *testing.T) {
+	t.Run("hop cap covers the public leg", func(t *testing.T) {
+		arr := posterRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return posterTestResponse(req, http.StatusFound, "https://images.example/0.jpg"), nil
+		})
+		publicCalls := 0
+		public := posterRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			publicCalls++
+			// More redirects than the cap allows, then a terminal 200: with
+			// the cap gone the chain would finish instead of failing.
+			if publicCalls <= posterMaxRedirects+2 {
+				return posterTestResponse(req, http.StatusFound,
+					"https://images.example/"+strconv.Itoa(publicCalls)+".jpg"), nil
+			}
+			return posterTestResponse(req, http.StatusOK, ""), nil
+		})
+
+		resp, err := testPosterClient(arr, public).Do(posterRequest(t))
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		if err == nil {
+			t.Fatalf("Do() after %d public requests = nil, want redirect-cap error", publicCalls)
+		}
+		if publicCalls != posterMaxRedirects {
+			t.Errorf("public requests = %d, want %d (one arr hop already spent)",
+				publicCalls, posterMaxRedirects)
+		}
+	})
+
+	t.Run("private target on the public leg is refused", func(t *testing.T) {
+		arr := posterRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return posterTestResponse(req, http.StatusFound, "https://images.example/0.jpg"), nil
+		})
+		var publicTargets []string
+		public := posterRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			publicTargets = append(publicTargets, req.URL.Host)
+			if len(publicTargets) == 1 {
+				return posterTestResponse(req, http.StatusFound,
+					"https://169.254.169.254/latest/meta-data/"), nil
+			}
+			return posterTestResponse(req, http.StatusOK, ""), nil
+		})
+
+		resp, err := testPosterClient(arr, public).Do(posterRequest(t))
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		if err == nil {
+			t.Fatalf("Do() = nil error, want the public redirect refused")
+		}
+		if slices.Contains(publicTargets, "169.254.169.254") {
+			t.Errorf("public transport dialed the private target; requests = %v", publicTargets)
+		}
+	})
+}
+
 // TestSamePosterOrigin_foldsASCIIOnly pins the fold width of the same-origin
 // gate. The two hosts differ only in U+FB05 / U+FB06, a pair Unicode 17 folds
 // together: on go1.27.0 strings.EqualFold answers true for them (go1.26
@@ -202,6 +266,7 @@ func TestSamePosterOrigin_foldsASCIIOnly(t *testing.T) {
 		want       bool
 	}{
 		{"ascii case differs", "https://Sonarr.LAN:8989", "https://sonarr.lan:8989", true},
+		{"ascii case differs at the end of the range", "https://XYZ.lan", "https://xyz.lan", true},
 		{"scheme case differs", "HTTPS://sonarr.lan", "https://sonarr.lan", true},
 		{"unicode 17 st-ligature pair", "https://\uFB05.lan", "https://\uFB06.lan", false},
 		{"unicode 17 greek pair", "https://\u0390.lan", "https://\u1FD3.lan", false},

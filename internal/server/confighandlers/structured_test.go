@@ -11,11 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	yaml "go.yaml.in/yaml/v3"
-
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
 	"github.com/cplieger/subflux/internal/subflux"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // Abort vs report in this file: a save's status is a value mismatch and
