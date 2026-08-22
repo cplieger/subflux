@@ -28,6 +28,25 @@ func TestFactory_with_api_key(t *testing.T) {
 	}
 }
 
+// TestSearch_skipsWithoutAnIdentifier asserts a request carrying no IMDB id, no
+// TMDB id and no title is skipped locally: with nothing to search for there is
+// no query to send, so the provider answers "no results" without a request.
+func TestSearch_skipsWithoutAnIdentifier(t *testing.T) {
+	t.Parallel()
+	p, err := Factory(t.Context(), map[string]any{"api_key": "test"})
+	if err != nil {
+		t.Fatalf("Factory() unexpected error: %v", err)
+	}
+
+	subs, err := p.Search(t.Context(), &subflux.SearchRequest{Languages: []string{"en"}})
+	if err != nil {
+		t.Fatalf("Search(no identifiers) unexpected error: %v", err)
+	}
+	if subs != nil {
+		t.Errorf("Search(no identifiers) = %+v, want nil", subs)
+	}
+}
+
 // --- language mapping ---
 
 func TestIso2ToSubDL(t *testing.T) {
