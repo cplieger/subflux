@@ -115,6 +115,51 @@ func TestRunWorker_garbage_stdin_errors(t *testing.T) {
 	}
 }
 
+// --- request size bound ---
+
+// minimalRequestJSON is a valid request whose own length is the size bound the
+// two tests below sit on, so neither hand-counts a byte total.
+const minimalRequestJSON = `{"version":1,"op":"reference"}`
+
+// A payload filling the bound exactly is a valid request: the bound is
+// inclusive, and the reader must not stop one byte short of it.
+func TestReadRequest_accepts_a_payload_filling_the_bound_exactly(t *testing.T) {
+	t.Parallel()
+	atBound := len(minimalRequestJSON)
+
+	req, err := readRequest(strings.NewReader(minimalRequestJSON), atBound)
+	if err != nil {
+		t.Fatalf("readRequest(%d-byte payload, maxBytes=%d) error = %v, want nil",
+			len(minimalRequestJSON), atBound, err)
+	}
+	if req.Version != ProtocolVersion {
+		t.Errorf("readRequest(%d-byte payload, maxBytes=%d) version = %d, want %d",
+			len(minimalRequestJSON), atBound, req.Version, ProtocolVersion)
+	}
+	if req.Op != OpReference {
+		t.Errorf("readRequest(%d-byte payload, maxBytes=%d) op = %q, want %q",
+			len(minimalRequestJSON), atBound, req.Op, OpReference)
+	}
+}
+
+// A payload one byte past the bound is refused for its SIZE. Reading only up to
+// the bound would truncate it instead, and the parent would be told its request
+// was malformed rather than too large.
+func TestReadRequest_refuses_a_payload_one_byte_past_the_bound(t *testing.T) {
+	t.Parallel()
+	pastBound := len(minimalRequestJSON) - 1
+
+	_, err := readRequest(strings.NewReader(minimalRequestJSON), pastBound)
+	if err == nil {
+		t.Fatalf("readRequest(%d-byte payload, maxBytes=%d) error = nil, want an oversize refusal",
+			len(minimalRequestJSON), pastBound)
+	}
+	if !strings.Contains(err.Error(), "request exceeds") {
+		t.Errorf("readRequest(%d-byte payload, maxBytes=%d) error = %v, want an oversize refusal",
+			len(minimalRequestJSON), pastBound, err)
+	}
+}
+
 // --- client behavior (spawn seam) ---
 
 func newSeamClient(spawn func(ctx context.Context, req *Request) (*Response, error)) *Client {
