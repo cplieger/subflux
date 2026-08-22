@@ -1,9 +1,11 @@
 package filehandlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,10 +25,15 @@ var errMock = errors.New("mock error")
 type fakeFileStore struct {
 	getErr      error
 	histErr     error
+	dbDeleteErr error
+	manualErr   error
+	clearErr    error
 	deletedPath string
 	histPrefix  string
 	rows        []subflux.SubtitleEntry
 	histIDs     []string
+	manualPaths []string
+	clearCalls  int
 	variant     subflux.Variant
 	histType    subflux.MediaType
 }
@@ -38,15 +45,16 @@ func (m *fakeFileStore) SubtitleFiles(_ context.Context, _ subflux.MediaType, _ 
 func (m *fakeFileStore) DeleteSubtitleFile(_ context.Context, _ subflux.MediaType, _, _ string, variant subflux.Variant, _ subflux.SubtitleSource, path string) error {
 	m.variant = variant
 	m.deletedPath = path
-	return nil
+	return m.dbDeleteErr
 }
 
 func (m *fakeFileStore) ManualSubtitlePaths(_ context.Context, _ subflux.ManualLockKey) ([]string, error) {
-	return nil, nil
+	return m.manualPaths, m.manualErr
 }
 
 func (m *fakeFileStore) ClearManualLock(_ context.Context, _ subflux.ManualLockKey) error {
-	return nil
+	m.clearCalls++
+	return m.clearErr
 }
 
 func (m *fakeFileStore) HistoryMediaIDs(_ context.Context, mediaType subflux.MediaType, prefix string) ([]string, error) {
@@ -627,6 +635,136 @@ func TestHandleDeleteFile_resolved_ref_deletes(t *testing.T) {
 	}
 }
 
+// --- manual lock revert after a delete ---
+
+// TestHandleDeleteFile_manual_lock_revert pins what happens to a quad's
+// manual lock once its files are gone, and what gets said about it. The lock
+// must be cleared when no manual file survives on disk, must survive when
+// one does, and the confirmation line belongs only to the case where there
+// were manual paths to lose. A store that cannot answer must not silently
+// clear the lock. Serial: asserts on the default logger.
+func TestHandleDeleteFile_manual_lock_revert(t *testing.T) {
+	tests := []struct {
+		name           string
+		manualOnDisk   bool // the recorded manual path still exists
+		manualRecorded bool // the store knows of a manual path at all
+		manualErr      error
+		wantClears     int
+		wantCleared    bool // the "lock cleared" confirmation is expected
+	}{
+		{
+			name: "gone_from_disk_clears_and_says_so", manualRecorded: true,
+			wantClears: 1, wantCleared: true,
+		},
+		{
+			name: "still_on_disk_keeps_the_lock", manualRecorded: true, manualOnDisk: true,
+			wantClears: 0,
+		},
+		{
+			name:       "nothing_recorded_clears_quietly",
+			wantClears: 1, wantCleared: false,
+		},
+		{
+			name: "store_error_leaves_the_lock_alone", manualRecorded: true,
+			manualErr: errMock, wantClears: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := captureSlog(t)
+			dir := t.TempDir()
+			victim := filepath.Join(dir, "movie.en.srt")
+			if err := os.WriteFile(victim, []byte("x"), 0o644); err != nil {
+				t.Fatalf("WriteFile() unexpected error: %v", err)
+			}
+			manualPath := filepath.Join(dir, "movie.en.1.srt")
+			if tt.manualOnDisk {
+				if err := os.WriteFile(manualPath, []byte("x"), 0o644); err != nil {
+					t.Fatalf("WriteFile() unexpected error: %v", err)
+				}
+			}
+			store := &fakeFileStore{
+				rows: []subflux.SubtitleEntry{{
+					MediaID: "tmdb-123", Language: "en", Variant: "standard",
+					Source: "external", Path: victim,
+				}},
+				manualErr: tt.manualErr,
+			}
+			if tt.manualRecorded {
+				store.manualPaths = []string{manualPath}
+			}
+			h := newFileHandler(store, &fakePathGuard{})
+
+			req := httptest.NewRequest(http.MethodDelete, "/api/files",
+				strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
+			rec := httptest.NewRecorder()
+			h.HandleDeleteFile(rec, req)
+
+			if rec.Code != http.StatusNoContent {
+				t.Errorf("HandleDeleteFile() status = %d, want %d: %s",
+					rec.Code, http.StatusNoContent, rec.Body.String())
+			}
+			if store.clearCalls != tt.wantClears {
+				t.Errorf("ClearManualLock calls = %d, want %d", store.clearCalls, tt.wantClears)
+			}
+			logged := strings.Contains(buf.String(),
+				`msg="manual lock cleared (no manual files remain on disk)"`)
+			if logged != tt.wantCleared {
+				t.Errorf("lock-cleared line logged = %v, want %v; log: %s",
+					logged, tt.wantCleared, buf.String())
+			}
+		})
+	}
+}
+
+// TestHandleDeleteFile_success_reports_no_cleanup_failure pins the two
+// diagnostics a successful delete must NOT emit: the DB cleanup and the
+// manual-lock clear both succeeded, so a failure line for either would send
+// an operator after a problem that does not exist. Serial (default logger).
+func TestHandleDeleteFile_success_reports_no_cleanup_failure(t *testing.T) {
+	buf := captureSlog(t)
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "movie.en.srt")
+	if err := os.WriteFile(victim, []byte("x"), 0o644); err != nil {
+		t.Fatalf("WriteFile() unexpected error: %v", err)
+	}
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
+		MediaID: "tmdb-123", Language: "en", Variant: "standard",
+		Source: "external", Path: victim,
+	}}}
+	h := newFileHandler(store, &fakePathGuard{})
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/files",
+		strings.NewReader(deleteBody("movie", "tmdb-123", "en", "", 0)))
+	rec := httptest.NewRecorder()
+	h.HandleDeleteFile(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("HandleDeleteFile() status = %d, want %d: %s",
+			rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+	for _, msg := range []string{
+		`msg="delete file: db cleanup failed"`,
+		`msg="failed to clear manual lock after delete"`,
+	} {
+		if strings.Contains(buf.String(), msg) {
+			t.Errorf("successful delete logged %s; log: %s", msg, buf.String())
+		}
+	}
+}
+
+// captureSlog redirects the default logger into a buffer for the duration of
+// the test. A test using it must NOT call t.Parallel: the default logger is
+// process-wide, so a parallel sibling's lines would land in this buffer.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
 // A stored row whose path has a non-subtitle extension is refused with 409
 // subtitle_extension_not_allowed (S16 loud refusal, never a silent skip).
 func TestHandleDeleteFile_extension_refused_returns_409(t *testing.T) {
@@ -949,4 +1087,29 @@ func TestDeleteExternalFile(t *testing.T) {
 				store.deletedPath, "/nonexistent/movie.en.srt")
 		}
 	})
+}
+
+// TestDeleteExternalFile_success_reports_no_cleanup_failure pins the bulk
+// sweep's DB-cleanup diagnostic to an actual failure: the row was removed
+// from the store without error, so a warning here would send an operator
+// looking for an inconsistency that does not exist. Serial (default logger).
+func TestDeleteExternalFile_success_reports_no_cleanup_failure(t *testing.T) {
+	buf := captureSlog(t)
+	victim := filepath.Join(t.TempDir(), "movie.en.srt")
+	if err := os.WriteFile(victim, []byte("x"), 0o644); err != nil {
+		t.Fatalf("WriteFile() unexpected error: %v", err)
+	}
+	store := &fakeFileStore{}
+	h := newFileHandler(store, &fakePathGuard{})
+	row := &subflux.SubtitleEntry{
+		MediaID: "tmdb-123", Language: "en", Variant: "standard",
+		Source: "external", Path: victim,
+	}
+
+	if !h.deleteExternalFile(t.Context(), &fakePathGuard{}, subflux.MediaTypeMovie, row) {
+		t.Fatal("deleteExternalFile(existing external file) = false, want true")
+	}
+	if strings.Contains(buf.String(), `msg="bulk delete: db cleanup failed"`) {
+		t.Errorf("successful bulk delete logged a DB cleanup failure; log: %s", buf.String())
+	}
 }

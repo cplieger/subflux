@@ -205,6 +205,113 @@ func TestOrphanListing_skipsNonSubtitleAndKnown(t *testing.T) {
 	}
 }
 
+// TestOrphanListing_walks_the_video_directory_too: walk roots come from BOTH
+// path columns of the item's rows, so a subtitle library kept beside the
+// video rather than beside the stored subtitle still surfaces its orphans.
+func TestOrphanListing_walks_the_video_directory_too(t *testing.T) {
+	t.Parallel()
+	subDir, videoDir := t.TempDir(), t.TempDir()
+	storedPath := filepath.Join(subDir, "movie.en.srt")
+	if err := os.WriteFile(storedPath, []byte("stored subtitle"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStray(t, videoDir, "stray.de.srt")
+	if err := os.WriteFile(filepath.Join(videoDir, "movie.mkv"), []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeFileStore{rows: []subflux.SubtitleEntry{{
+		MediaID: "tmdb-123", Language: "en", Variant: "standard",
+		Source: "external", Path: storedPath,
+		VideoPath: filepath.Join(videoDir, "movie.mkv"),
+	}}}
+	h := newFileHandler(store, &fakePathGuard{})
+
+	entries := listEntries(t, h, "media_type=movie&media_id=tmdb-123")
+	orphan := orphanOf(t, entries)
+	if orphan.Name != "stray.de.srt" {
+		t.Errorf("orphan = %q, want stray.de.srt from the video's directory", orphan.Name)
+	}
+}
+
+// TestOrphanFallback_without_arr_id_no_walk_happens: the arr-derived walk is
+// opt-in on an explicit arr_id. Without one there is no verified identity to
+// bind the walk to, so an item with no store-derivable directory lists
+// nothing at all — even when the arr would have answered.
+func TestOrphanFallback_without_arr_id_no_walk_happens(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeStray(t, dir, "stray.de.srt")
+	radarr := &fakeRadarrArr{movie: arrapi.Movie{
+		ID: 42, TmdbID: 123, // would bind to tmdb-123
+		MovieFile: &arrapi.MovieFile{Path: filepath.Join(dir, "movie.mkv")},
+	}}
+	h := newFileHandlerArr(&fakeFileStore{}, nil, radarr)
+
+	entries := listEntries(t, h, "media_type=movie&media_id=tmdb-123")
+	if len(entries) != 0 {
+		t.Errorf("listing without arr_id = %+v, want empty (no fallback walk)", entries)
+	}
+}
+
+// TestBindingMatches_external_identities pins both arr binding checks: a
+// media_id binds to an arr item only through an identity the arr item
+// actually carries. The empty-vs-empty row is the one that matters most —
+// an arr item with no IMDB ID must not bind to a caller's empty media_id,
+// or an unidentified item would match anything.
+func TestBindingMatches_external_identities(t *testing.T) {
+	t.Parallel()
+
+	t.Run("movie", func(t *testing.T) {
+		t.Parallel()
+		tests := []struct {
+			name    string
+			mediaID string
+			movie   arrapi.Movie
+			want    bool
+		}{
+			{name: "tmdb_id_matches", mediaID: "tmdb-5", movie: arrapi.Movie{TmdbID: 5}, want: true},
+			{name: "tmdb_id_differs", mediaID: "tmdb-9", movie: arrapi.Movie{TmdbID: 5}, want: false},
+			{name: "imdb_id_matches", mediaID: "tt42", movie: arrapi.Movie{ImdbID: "tt42"}, want: true},
+			{name: "imdb_id_differs", mediaID: "tt99", movie: arrapi.Movie{ImdbID: "tt42"}, want: false},
+			{name: "no_identity_at_all", mediaID: "", movie: arrapi.Movie{}, want: false},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				if got := movieBindingMatches(tt.mediaID, &tt.movie); got != tt.want {
+					t.Errorf("movieBindingMatches(%q, %+v) = %v, want %v",
+						tt.mediaID, tt.movie, got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("series", func(t *testing.T) {
+		t.Parallel()
+		tests := []struct {
+			name   string
+			base   string
+			series arrapi.Series
+			want   bool
+		}{
+			{name: "tvdb_id_matches", base: "tvdb-5", series: arrapi.Series{TvdbID: 5}, want: true},
+			{name: "tvdb_id_differs", base: "tvdb-9", series: arrapi.Series{TvdbID: 5}, want: false},
+			{name: "imdb_id_matches", base: "tt42", series: arrapi.Series{ImdbID: "tt42"}, want: true},
+			{name: "imdb_id_differs", base: "tt99", series: arrapi.Series{ImdbID: "tt42"}, want: false},
+			{name: "no_identity_at_all", base: "", series: arrapi.Series{}, want: false},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				if got := seriesBindingMatches(tt.base, &tt.series); got != tt.want {
+					t.Errorf("seriesBindingMatches(%q, %+v) = %v, want %v",
+						tt.base, tt.series, got, tt.want)
+				}
+			})
+		}
+	})
+}
+
 // TestOrphanTable_capEviction pins the bounded-table guarantee: the table
 // never exceeds its cap; at capacity the oldest-expiring entries fall out.
 func TestOrphanTable_capEviction(t *testing.T) {

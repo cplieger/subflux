@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -307,26 +310,216 @@ func TestHandleSaveConfig_post_method_accepted(t *testing.T) {
 	}
 }
 
-func TestHandleSaveConfig_oversized_body_returns_413(t *testing.T) {
+// TestHandleSaveConfig_body_size_gate pins both sides of the request-body
+// cap: a body exactly at the cap must reach validation, and one byte over
+// must be refused before anything is parsed. The at-cap body is not valid
+// config, so it can only be asserted to have got PAST the size gate.
+func TestHandleSaveConfig_body_size_gate(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.yaml")
-	if err := writeTestFile(configPath, "key: old\n"); err != nil {
-		t.Fatalf("write: %v", err)
+	tests := []struct {
+		name         string
+		size         int
+		wantTooLarge bool
+		want         string
+	}{
+		{name: "exactly_at_cap", size: 1 << 20, wantTooLarge: false, want: "any status but 413"},
+		{name: "one_byte_over_cap", size: (1 << 20) + 1, wantTooLarge: true, want: "413"},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			configPath := filepath.Join(t.TempDir(), "config.yaml")
+			if err := writeTestFile(configPath, "key: old\n"); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+			h := newPathHandler(configPath)
 
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodPost, "/api/config", bytes.NewReader(make([]byte, tt.size)))
+			rec := httptest.NewRecorder()
+			h.HandleSaveConfig(rec, req)
+
+			if got := rec.Code == http.StatusRequestEntityTooLarge; got != tt.wantTooLarge {
+				t.Errorf("HandleSaveConfig(%d-byte body) status = %d, want %s",
+					tt.size, rec.Code, tt.want)
+			}
+		})
+	}
+}
+
+// TestHandleGetConfig_successful_write_is_silent pins the guard on the
+// response write: the diagnostic belongs to a FAILED write, so an ordinary
+// GET must log nothing at all. Serial (swaps the default logger).
+func TestHandleGetConfig_successful_write_is_silent(t *testing.T) {
+	buf := captureSlog(t)
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	if err := writeTestFile(configPath, "search:\n  scan_interval: 24h\n"); err != nil {
+		t.Fatalf("write test config: %v", err)
+	}
 	h := newPathHandler(configPath)
 
-	// Body exactly 1 byte over maxBodySize (1 MB + 1).
-	body := bytes.NewReader(make([]byte, (1<<20)+1))
-	req := httptest.NewRequest(http.MethodPost, "/api/config", body)
+	req := httptest.NewRequestWithContext(t.Context(),
+		http.MethodGet, "/api/config", http.NoBody)
 	rec := httptest.NewRecorder()
+	h.HandleGetConfig(rec, req)
 
-	h.HandleSaveConfig(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleGetConfig() status = %d, want 200", rec.Code)
+	}
+	if got := buf.String(); strings.Contains(got, `msg="write response failed"`) {
+		t.Errorf("HandleGetConfig() logged a write failure on a successful write: %s", got)
+	}
+}
 
-	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("HandleSaveConfig(oversized body) status = %d, want %d",
-			rec.Code, http.StatusRequestEntityTooLarge)
+// captureSlog redirects the default logger into a buffer for the duration of
+// the test. A test using it must NOT call t.Parallel: the default logger is
+// process-wide, so a parallel sibling's lines would land in this buffer.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+// --- arr connectivity gate ---
+
+// recordingPinger records every Ping and answers with a fixed error.
+type recordingPinger struct {
+	pings *int
+	err   error
+}
+
+func (p recordingPinger) Ping(context.Context) error {
+	*p.pings++
+	return p.err
+}
+
+// arrPair is the live-config view the connectivity check compares against.
+type arrPair struct{ sonarr, radarr subflux.ArrConfig }
+
+func (a arrPair) Sonarr() subflux.ArrConfig { return a.sonarr }
+func (a arrPair) Radarr() subflux.ArrConfig { return a.radarr }
+
+// TestHandleSaveConfig_arr_connectivity_gate pins the whole connectivity
+// gate: which instance is pinged, with which credentials, whether the save
+// survives the answer, and the cases that must not ping at all (an arr with
+// no URL, and one whose URL and key are unchanged from the live config). A
+// save that pings the wrong instance would validate the operator's new
+// sonarr credentials against radarr, so the recorded constructor arguments
+// are asserted per role, not just counted.
+func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
+	t.Parallel()
+	const validTail = "languages:\n  default:\n    - code: en\n"
+	tests := []struct {
+		name       string
+		body       string
+		live       arrPair
+		pingErr    error
+		newErr     error
+		wantStatus int
+		wantSonarr []string // constructor arguments, "url|apikey" per call
+		wantRadarr []string
+		wantPings  int
+	}{
+		{
+			name:       "changed_sonarr_is_pinged_with_the_new_credentials",
+			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
+			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			wantStatus: http.StatusOK,
+			wantSonarr: []string{"http://new:8989|k-new"},
+			wantPings:  1,
+		},
+		{
+			name:       "changed_radarr_is_pinged_with_the_new_credentials",
+			body:       "radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" + validTail,
+			live:       arrPair{radarr: subflux.ArrConfig{URL: "http://old:7878", APIKey: "r-old"}},
+			wantStatus: http.StatusOK,
+			wantRadarr: []string{"http://new:7878|r-new"},
+			wantPings:  1,
+		},
+		{
+			name:       "unreachable_arr_rejects_the_save",
+			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
+			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			pingErr:    errors.New("connection refused"),
+			wantStatus: http.StatusBadRequest,
+			wantSonarr: []string{"http://new:8989|k-new"},
+			wantPings:  1,
+		},
+		{
+			name:       "unbuildable_arr_client_rejects_the_save",
+			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
+			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			newErr:     errors.New("bad base url"),
+			wantStatus: http.StatusBadRequest,
+			wantSonarr: []string{"http://new:8989|k-new"},
+			wantPings:  0,
+		},
+		{
+			name:       "arr_without_a_url_is_not_pinged",
+			body:       "radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" + validTail,
+			live:       arrPair{},
+			pingErr:    errors.New("must not be reached"),
+			wantStatus: http.StatusBadRequest, // the radarr ping fails; sonarr was skipped
+			wantRadarr: []string{"http://new:7878|r-new"},
+			wantPings:  1,
+		},
+		{
+			name:       "unchanged_arr_is_not_pinged",
+			body:       "sonarr:\n  url: \"http://same:8989\"\n  api_key: \"k-same\"\n" + validTail,
+			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://same:8989", APIKey: "k-same"}},
+			pingErr:    errors.New("must not be reached"),
+			wantStatus: http.StatusOK,
+			wantPings:  0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			configPath := filepath.Join(t.TempDir(), "config.yaml")
+			pings := 0
+			var gotSonarr, gotRadarr []string
+			record := func(dst *[]string) func(string, string) (ArrPinger, error) {
+				return func(baseURL, apiKey string) (ArrPinger, error) {
+					*dst = append(*dst, baseURL+"|"+apiKey)
+					if tt.newErr != nil {
+						return nil, tt.newErr
+					}
+					return recordingPinger{pings: &pings, err: tt.pingErr}, nil
+				}
+			}
+			h := New(&Deps{
+				LoadConfig: func(data []byte) (*config.Config, error) {
+					return config.LoadFromBytes(t.Context(), data)
+				},
+				NewSonarr:  record(&gotSonarr),
+				NewRadarr:  record(&gotRadarr),
+				HotReload:  func(context.Context, *config.Config) error { return nil },
+				State:      func() StateView { return StateView{Cfg: tt.live} },
+				ConfigPath: func() string { return configPath },
+			})
+
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodPut, "/api/config", strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+			h.HandleSaveConfig(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("HandleSaveConfig() status = %d, want %d; body %s",
+					rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if !slices.Equal(gotSonarr, tt.wantSonarr) {
+				t.Errorf("sonarr client built with %v, want %v", gotSonarr, tt.wantSonarr)
+			}
+			if !slices.Equal(gotRadarr, tt.wantRadarr) {
+				t.Errorf("radarr client built with %v, want %v", gotRadarr, tt.wantRadarr)
+			}
+			if pings != tt.wantPings {
+				t.Errorf("Ping calls = %d, want %d", pings, tt.wantPings)
+			}
+		})
 	}
 }
 

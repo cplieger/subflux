@@ -29,6 +29,10 @@ func TestStripYAMLComment(t *testing.T) {
 	}{
 		{"comment_after_quoted_value", `"abc" # x`, `"abc"`},
 		{"comment_immediately_after_closing_quote", `"abc" #x`, `"abc"`},
+		// Padding between the closing quote and the comment: the value ends
+		// at the quote, so the extra spaces are dropped and nothing of the
+		// quoted value is cut off with them.
+		{"comment_after_padded_quoted_value", `"abc"   # x`, `"abc"`},
 		{"comment_after_single_quoted_value", `'a' # c`, `'a'`},
 		{"unquoted_value_with_comment", "value # comment", "value"},
 		{"unquoted_value_without_comment", "value", "value"},
@@ -340,8 +344,11 @@ func TestMergeSecrets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MergeSecrets() error = %v", err)
 		}
-		if !strings.Contains(string(got), "real-secret-key") {
-			t.Errorf("MergeSecrets() = %q, want to contain %q", string(got), "real-secret-key")
+		// The whole document, not just the value: the rewritten line has to
+		// keep its original indentation or the merged YAML changes shape.
+		want := "sonarr:\n  api_key: real-secret-key\n"
+		if string(got) != want {
+			t.Errorf("MergeSecrets() = %q, want %q", got, want)
 		}
 	})
 

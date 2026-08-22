@@ -7,8 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	yaml "go.yaml.in/yaml/v3"
 
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/config/schema"
@@ -198,6 +201,32 @@ func TestSecretPaths_cover_every_schema_secret(t *testing.T) {
 	}
 }
 
+// TestSecretPaths_derives_nested_field_paths pins the walker's recursion into
+// nested field groups (SchemaField.Fields is part of the schema wire type):
+// a secret declared one level down must still yield a full document path, or
+// its value would silently stop being redacted on GET and stop being kept
+// across a save that omits it.
+func TestSecretPaths_derives_nested_field_paths(t *testing.T) {
+	t.Parallel()
+	var got []string
+	for _, p := range secretPaths([]subflux.SchemaSection{
+		{Key: "outer", Type: "fields", Fields: []subflux.SchemaField{
+			{Key: "plain"},
+			{Key: "group", Fields: []subflux.SchemaField{
+				{Key: "visible"},
+				{Key: "token", Secret: true},
+			}},
+			{Key: "top_secret", Secret: true},
+		}},
+	}) {
+		got = append(got, strings.Join(p, "."))
+	}
+	want := []string{"outer.group.token", "outer.top_secret"}
+	if !slices.Equal(got, want) {
+		t.Errorf("secretPaths(nested schema) = %v, want %v", got, want)
+	}
+}
+
 // --- structured save behavior ---
 
 func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
@@ -229,6 +258,95 @@ func TestStructuredSave_canonicalizes_and_persists(t *testing.T) {
 	pc := cfg.Providers()["opensubtitles"]
 	if !pc.Enabled || pc.Settings["password"] != "p" {
 		t.Errorf("round-tripped provider config = %+v, want enabled with password p", pc)
+	}
+}
+
+// TestStructuredSave_orders_sections_schema_first_then_sorted pins the
+// canonical section order the save promises: every section the schema
+// declares, in schema order, then every other submitted section in sorted
+// order. The compact test schema declares only sonarr and providers, so the
+// four remaining sections take the extra-section path. Order is the whole
+// point of regenerating the file server-side — two saves of the same values
+// must produce byte-identical output, and Go randomizes map iteration.
+func TestStructuredSave_orders_sections_schema_first_then_sorted(t *testing.T) {
+	t.Parallel()
+	h, cfgPath := newStructuredHandler(t, "")
+
+	// Submitted in reverse of the order the extras must come out in.
+	payload := `{"sections": {
+		"sonarr": {"url": "http://sonarr:8989", "api_key": "k1"},
+		"providers": {"opensubtitles": {"enabled": true, "settings": {"username": "u", "password": "p"}}},
+		"radarr": {"url": "http://radarr:7878", "api_key": "k2"},
+		"poll_interval": "15m",
+		"languages": {"default": [{"code": "en"}]},
+		"allowed_hosts": ["subflux.test"]
+	}}`
+	rec := doStructuredSave(t, h, payload)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("structured save status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	saved, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+
+	got := topLevelYAMLKeys(t, saved)
+	want := []string{"sonarr", "providers", "allowed_hosts", "languages", "poll_interval", "radarr"}
+	if !slices.Equal(got, want) {
+		t.Errorf("saved section order = %v, want %v\n%s", got, want, saved)
+	}
+}
+
+// topLevelYAMLKeys reads the top-level mapping keys of a YAML document in
+// document order. A document that does not parse to a single mapping is a
+// broken fixture, not a value mismatch, so it aborts.
+func topLevelYAMLKeys(t *testing.T, data []byte) []string {
+	t.Helper()
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("parse saved YAML: %v\n%s", err, data)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 {
+		t.Fatalf("saved YAML is not a single document:\n%s", data)
+	}
+	body := doc.Content[0]
+	if body.Kind != yaml.MappingNode {
+		t.Fatalf("saved YAML top level is not a mapping:\n%s", data)
+	}
+	keys := make([]string, 0, len(body.Content)/2)
+	for i := 0; i+1 < len(body.Content); i += 2 {
+		keys = append(keys, body.Content[i].Value)
+	}
+	return keys
+}
+
+// TestStructuredSave_payload_exactly_at_cap_is_accepted pins the far side of
+// the request-body cap the oversized pre-check owns: a payload of exactly
+// maxBodySize bytes is legal and must save. JSON whitespace pads it to the
+// exact size, so a read bound that stops one byte short truncates the
+// closing brace and the payload stops being JSON at all.
+func TestStructuredSave_payload_exactly_at_cap_is_accepted(t *testing.T) {
+	t.Parallel()
+	h, cfgPath := newStructuredHandler(t, "")
+
+	head := `{"sections": {` +
+		`"sonarr": {"url": "http://sonarr:8989", "api_key": "k1"},` +
+		`"languages": {"default": [{"code": "en"}]}}`
+	payload := head + strings.Repeat(" ", int(maxBodySize)-len(head)-1) + "}"
+	if int64(len(payload)) != maxBodySize {
+		t.Fatalf("fixture is %d bytes, want exactly %d", len(payload), maxBodySize)
+	}
+
+	rec := doStructuredSave(t, h, payload)
+	if rec.Code != http.StatusOK {
+		t.Errorf("at-cap structured save status = %d, want 200; body %s", rec.Code, rec.Body.String())
+	}
+	saved, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if !strings.Contains(string(saved), "k1") {
+		t.Errorf("at-cap save did not persist the submitted values:\n%s", saved)
 	}
 }
 
@@ -667,6 +785,10 @@ func TestStructuredSave_missing_and_empty_baseline_proceed(t *testing.T) {
 		{name: "missing_file", write: false},
 		{name: "zero_byte_file", write: true, content: ""},
 		{name: "comments_only_file", write: true, content: "# fresh volume, nothing here yet\n"},
+		// An explicit null document parses to a document holding one null
+		// scalar rather than to a zero node, so it is a distinct shape from
+		// the two above and the only one that reaches the null-scalar arm.
+		{name: "explicit_null_document", write: true, content: "null\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
