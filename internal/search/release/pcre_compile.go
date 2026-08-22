@@ -938,16 +938,24 @@ func buildRetryPlan(an *node, src string) *retryPlan {
 		plan.legalRe = re
 	}
 
-	// Same-level continuation: only when assertion- and top-anchor-free
-	// (a lookaround inside the remainder cannot compile raw; a ^/\A would
-	// be misplaced on a suffix subject). contMid carries one consumed rune
-	// of left context so a leading \b in the remainder sees its real
-	// neighbor; contAt0 covers offset 0.
-	if an.contOK && an.contSrc != "" && !hasTopLevelStartAnchor(an.contSrc) {
+	// Same-level continuation: only when assertion-free (a lookaround
+	// inside the remainder cannot compile raw). contMid carries one
+	// consumed rune of left context so a leading \b in the remainder sees
+	// its real neighbor; contAt0 covers offset 0.
+	//
+	// A top-level ^ or \A in the remainder is position-sensitive, so it is
+	// honored only at offset 0: contAt0 runs on the whole subject, where
+	// the anchor is truthful, and contMid can never satisfy it because a
+	// rune is already consumed — which is exactly what .NET does when it
+	// re-matches the remainder at a non-zero offset. contAnchored marks
+	// the case for the one probe shape neither form covers (see
+	// continuationHolds).
+	if an.contOK && an.contSrc != "" {
 		at0, err0 := regexp.Compile("(?i)^(?:" + an.contSrc + ")")
 		mid, err1 := regexp.Compile("(?i)(?s)^.(?:" + an.contSrc + ")")
 		if err0 == nil && err1 == nil {
 			plan.contAt0, plan.contMid = at0, mid
+			plan.contAnchored = hasTopLevelStartAnchor(an.contSrc)
 		}
 	}
 
@@ -979,8 +987,8 @@ func collectCaptureGroups(n *node, out *[]int) {
 }
 
 // hasTopLevelStartAnchor scans raw regex text for ^ or \A outside
-// character classes (constructs a suffix-subject continuation check would
-// misplace).
+// character classes (anchors whose truth depends on the subject's start,
+// so a suffix-subject continuation check would misplace them).
 func hasTopLevelStartAnchor(s string) bool {
 	for i := 0; i < len(s); i++ {
 		switch s[i] {

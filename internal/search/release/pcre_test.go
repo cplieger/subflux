@@ -463,6 +463,67 @@ func TestRetryShrink_chain_adopted_from_group_tail(t *testing.T) {
 	}
 }
 
+// TestRetryShrink_start_anchor_in_the_remainder_holds_only_at_offset_zero
+// pins WHERE a ^ or \A in the same-level pattern remainder may be
+// satisfied when a shrink probes a new offset. .NET re-matches the
+// remainder at the probed position, so the anchor is true only at position
+// 0 and false at every other offset — an alternation carrying it
+// ((?:^|b)) is then satisfiable only through its other branch. Accepting
+// the anchor at a shrunken offset would let an unsatisfiable alternative
+// CREATE a match the anchor-free control does not have, which for this
+// package means grabbing the wrong release.
+func TestRetryShrink_start_anchor_in_the_remainder_holds_only_at_offset_zero(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pattern string
+		input   string
+		want    bool
+	}{
+		// No width satisfies the remainder: at width 2 the lookbehind sees
+		// 'b', and at width 1 (where it sees 'a') the remainder needs "ba"
+		// but the text holds "bb". The anchored alternative cannot rescue
+		// width 1 — offset 1 is not the start of the subject — so all three
+		// spellings agree with the anchor-free control.
+		{"anchored alternative does not rescue a failing width", `[ab]+(?<=a)(?:^|b)a`, "abba", false},
+		{"escaped anchor spelling behaves the same", `[ab]+(?<=a)(?:\A|b)a`, "abba", false},
+		{"anchor free control", `[ab]+(?<=a)(?:b)a`, "abba", false},
+		// Width 4 fails the lookbehind; width 1 passes it and the
+		// remainder's non-anchored branch matches "ba" there, so the
+		// candidate survives exactly as it does without the alternation.
+		{"non anchored branch still satisfies a shrunken offset", `[ab]+(?<=a)(?:^|b)a`, "ababba", true},
+		{"escaped anchor spelling still shrinks", `[ab]+(?<=a)(?:\A|b)a`, "ababba", true},
+		{"anchor free control shrinks", `[ab]+(?<=a)(?:b)a`, "ababba", true},
+		// The shrink reaches offset 0, where the anchor IS true: the
+		// remainder matches "a" at the start of the subject. The
+		// anchor-free control has no branch left at that offset, so this
+		// pair is what proves the anchor is honored rather than ignored.
+		{"anchor is satisfied at the chain start", `[ab]*(?<!a)(?:^|b)a`, "aba", true},
+		{"escaped anchor is satisfied at the chain start", `[ab]*(?<!a)(?:\A|b)a`, "aba", true},
+		{"anchor free control has nothing at the chain start", `[ab]*(?<!a)(?:b)a`, "aba", false},
+		// An anchored remainder with no alternation at all still matches
+		// when the whole candidate sits at offset 0.
+		{"anchored remainder at offset zero", `[ab]*(?<!b)^\d`, "1", true},
+		// A multi-byte rune immediately before the probed offset leaves the
+		// check no single-byte left context to work from, and the fallback
+		// form cannot tell the subject's start from the offset. The probe
+		// is refused: 'a' at offset 2 is not the start of "éaba", so .NET
+		// finds no match either.
+		{"multi byte left context does not place the anchor", `[éab]+(?<=é)(?:^|b)a`, "éaba", false},
+		{"multi byte left context does not place the escaped anchor", `[éab]+(?<=é)(?:\A|b)a`, "éaba", false},
+		{"multi byte left context anchor free control", `[éab]+(?<=é)(?:b)a`, "éaba", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := mustCompilePCRE(t, tc.pattern)
+			if got := p.MatchString(tc.input); got != tc.want {
+				t.Errorf("MatchString(%q) for %q = %v, want %v", tc.input, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestRetryShrink_clamps_captures_to_the_accepted_offset pins WHICH capture
 // spans an accepted shrink rewrites. .NET's backtracking reports the
 // captures of the width it settled on, so a group the layer adopted the

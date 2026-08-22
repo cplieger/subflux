@@ -113,6 +113,12 @@ type retryPlan struct {
 	// the chain span. Both are clamped when a shrink is accepted.
 	pathGroups  []int
 	chainGroups []int
+	// contAnchored marks a remainder carrying a top-level ^ or \A, whose
+	// truth depends on the subject's start. contAt0 and contMid place such
+	// an anchor correctly at offset 0 and at any offset with single-byte
+	// left context; contAnchored refuses the remaining probe shape rather
+	// than let the offset-0 form satisfy the anchor at a false position.
+	contAnchored bool
 }
 
 // assertion is a compiled lookaround with its positional marker.
@@ -438,6 +444,12 @@ func (ev *branchEval) continuationHolds(plan *retryPlan, off int) bool {
 	// slice-boundary approximation, ASCII release names unaffected).
 	if off > 0 && ev.s[off-1] < 0x80 {
 		return plan.contMid.MatchString(ev.s[off-1:])
+	}
+	if off > 0 && plan.contAnchored {
+		// The offset-0 form would let the remainder's ^ or \A match at the
+		// start of the SUFFIX, accepting a candidate .NET rejects. Refuse
+		// the probe: a wrong acceptance costs a wrong release.
+		return false
 	}
 	return plan.contAt0.MatchString(ev.s[off:])
 }
