@@ -140,3 +140,65 @@ func TestBuildKnownRatios_ratioIsToOverFrom(t *testing.T) {
 		t.Errorf("ratio(25->50) = %v, want 2.0 (tol %v)", p2.Ratio, tol)
 	}
 }
+
+// Drift carries two independent axes: a constant offset (the intercept) and a
+// rate error (the slope). Adding a constant to every drift sample must move the
+// intercept by exactly that constant and leave the slope and R² alone, however
+// large the constant is — a track that is ten minutes late and drifting slowly
+// is still drifting at the same rate.
+//
+// The fixture is a sample per minute with 3 ms of drift per minute and a
+// millisecond of quantisation jitter, so the exact fit is
+//
+//	slope     = 83/1650000
+//	R²        = 6889/6952
+//
+// Both are exact rationals from the fixture, not values captured from this
+// implementation, and each row asserts against them rather than against the
+// offset-free row, so a row cannot pass by agreeing with an equally wrong
+// sibling.
+func TestLinearRegression_slope_and_r2_ignore_a_constant_drift_offset(t *testing.T) {
+	const (
+		wantSlope = 83.0 / 1650000.0
+		wantR2    = 6889.0 / 6952.0
+	)
+	jitter := []float64{1, -1, 0, 1, -1, 0, 1, -1, 0, 1}
+
+	cases := []struct {
+		name   string
+		offset float64
+	}{
+		{"no_offset", 0},
+		{"half_a_second", 500},
+		{"one_hundred_seconds", 100_000},
+		{"ten_minutes", 600_000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			points := make([]DriftPoint, len(jitter))
+			for i := range points {
+				points[i] = DriftPoint{
+					TimeMs:  float64(i) * 60_000,
+					DriftMs: float64(i)*3 + jitter[i] + tc.offset,
+				}
+			}
+
+			slope, intercept, r2 := LinearRegression(points)
+
+			if !approxEq(slope, wantSlope) {
+				t.Errorf("LinearRegression(drift + %g ms) slope = %v, want %v (tol %v)",
+					tc.offset, slope, wantSlope, tol)
+			}
+			if !approxEq(r2, wantR2) {
+				t.Errorf("LinearRegression(drift + %g ms) r2 = %v, want %v (tol %v)",
+					tc.offset, r2, wantR2, tol)
+			}
+			// The intercept is the one result that must follow the offset.
+			wantIntercept := 1.0/55.0 + tc.offset
+			if !approxEq(intercept, wantIntercept) {
+				t.Errorf("LinearRegression(drift + %g ms) intercept = %v, want %v (tol %v)",
+					tc.offset, intercept, wantIntercept, tol)
+			}
+		})
+	}
+}
