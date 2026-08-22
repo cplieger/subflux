@@ -2,6 +2,7 @@ package subsync
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -125,6 +126,27 @@ func TestClassifyStyles(t *testing.T) {
 			styles:   []string{"Default", "Subtitle", "Subtitle-2", "Song", "Song-2", "Caption", "Caption-2"},
 			wantDlg:  []string{"Default", "Subtitle", "Subtitle-2"},
 			wantSkip: []string{"Song", "Song-2", "Caption", "Caption-2"},
+		},
+		{
+			// Exactly three unrecognized styles is still "few": they are kept
+			// as dialogue variants rather than dropped to the whitelist.
+			name:     "three unknown kept",
+			styles:   []string{"Default", "End Card", "B1", "On Top"},
+			wantDlg:  []string{"Default", "End Card", "B1", "On Top"},
+			wantSkip: []string{},
+		},
+		{
+			// Two opaque styles carry the same number of cues and nothing
+			// else separates them, so the fallback takes the one defined
+			// first: the choice decides which cues drive correlation, and it
+			// must not depend on where the tie sits in the style list.
+			name:   "most-used fallback tie takes the first style defined",
+			styles: []string{"Default", "aGB", "bXQ", "kMz", "nWp"},
+			counts: map[string]int{
+				"Default": 0, "aGB": 500, "bXQ": 500, "kMz": 12, "nWp": 3,
+			},
+			wantDlg:  []string{"Default", "aGB"},
+			wantSkip: []string{"bXQ", "kMz", "nWp"},
 		},
 		{
 			name:   "goldenboy opaque abbreviation fallback",
@@ -544,6 +566,66 @@ func TestParseASSDialogue_malformed_style_lines(t *testing.T) {
 	}
 	if len(mask) != 2 {
 		t.Errorf("ParseASSDialogue() mask cues = %d, want 2", len(mask))
+	}
+}
+
+func TestParseASSDialogue_falls_back_to_the_most_used_opaque_style(t *testing.T) {
+	t.Parallel()
+	// A file whose only whitelisted style is defined but never used, plus
+	// four opaque style names. Too many unknowns to keep them all, so the
+	// per-style cue counts collected in the first pass are the only thing
+	// left to identify dialogue: the most-used opaque style wins and its
+	// cues become the correlation signal.
+	data := []byte("[V4+ Styles]\n" +
+		"Style: Default,Arial,20,&H00FFFFFF\n" +
+		"Style: aGB,Arial,20,&H00FFFFFF\n" +
+		"Style: bXQ,Arial,20,&H00FFFFFF\n" +
+		"Style: kMz,Arial,20,&H00FFFFFF\n" +
+		"Style: nWp,Arial,20,&H00FFFFFF\n\n" +
+		"[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
+		"Dialogue: 0,0:00:01.00,0:00:03.00,aGB,,0,0,0,,First\n" +
+		"Dialogue: 0,0:00:04.00,0:00:06.00,aGB,,0,0,0,,Second\n" +
+		"Dialogue: 0,0:00:07.00,0:00:09.00,aGB,,0,0,0,,Third\n" +
+		"Dialogue: 0,0:00:10.00,0:00:12.00,bXQ,,0,0,0,,Sign\n" +
+		"Dialogue: 0,0:00:13.00,0:00:15.00,kMz,,0,0,0,,Note\n")
+
+	dlg, mask, err := ParseASSDialogue(data)
+	if err != nil {
+		t.Fatalf("ParseASSDialogue() error = %v, want nil", err)
+	}
+	if len(mask) != 5 {
+		t.Errorf("ParseASSDialogue() mask cues = %d, want 5 (every cue marks a time region)", len(mask))
+	}
+	want := []string{"First", "Second", "Third"}
+	got := make([]string, len(dlg))
+	for i, c := range dlg {
+		got[i] = c.Text
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("ParseASSDialogue() dialogue texts = %q, want %q (the three aGB cues)", got, want)
+	}
+}
+
+func TestParseASSDialogue_counts_only_named_styles(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	// A style definition with no name is not a style, so it must not inflate
+	// the style total the classifier reports — that total is what an operator
+	// reads to judge whether classification had anything to work with.
+	data := []byte("[V4+ Styles]\n" +
+		"Style: NoCommaHere\n" +
+		"Style: ,Arial,20,&H00FFFFFF\n" +
+		"Style: Default,Arial,20,&H00FFFFFF\n\n" +
+		"[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
+		"Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Hello\n")
+
+	logs := captureAlignLogs(t, func() {
+		if _, _, err := ParseASSDialogue(data); err != nil {
+			t.Errorf("ParseASSDialogue() error = %v, want nil", err)
+		}
+	})
+	got := syncLogAttr(logs, `msg="ASS style classification"`, "total_styles")
+	if got != "1" {
+		t.Errorf("ParseASSDialogue(one named style, two malformed) reported total_styles=%q, want %q", got, "1")
 	}
 }
 
