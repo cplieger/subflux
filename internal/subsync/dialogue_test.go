@@ -491,9 +491,125 @@ func TestDetectDialogueFont_tiebreaker_alphabetical(t *testing.T) {
 			Text:  `<font face="` + font + `">Text</font>`,
 		}
 	}
+	// Fonts with identical screen time resolve to the alphabetically first
+	// one, and they resolve there on every call: the winner decides which
+	// cues survive filtering, so two runs over the same subtitle file must
+	// not disagree. Repeated because the candidates are collected in a map.
+	for range 300 {
+		got := detectDialogueFont(cues)
+		if got != "Alpha" {
+			t.Fatalf("detectDialogueFont(20 Alpha and 20 Bravo cues, 48s of screen time each) = %q, want %q (alphabetical)",
+				got, "Alpha")
+		}
+	}
+}
+
+func TestDetectDialogueFont_accepts_exactly_twenty_cues(t *testing.T) {
+	t.Parallel()
+	// Twenty cues is the smallest sample font detection will analyze.
+	cues := make([]Cue, 20)
+	for i := range cues {
+		font, dur := "Arial", 3*time.Second
+		if i%2 == 1 {
+			font, dur = "Impact", time.Second
+		}
+		cues[i] = Cue{
+			Start: time.Duration(i) * time.Second,
+			End:   time.Duration(i)*time.Second + dur,
+			Text:  `<font face="` + font + `">Text</font>`,
+		}
+	}
+	got := detectDialogueFont(cues)
+	if got != "Arial" {
+		t.Errorf("detectDialogueFont(20 cues, Arial dominant) = %q, want %q", got, "Arial")
+	}
+}
+
+func TestDetectDialogueFont_accepts_half_second_average_cue(t *testing.T) {
+	t.Parallel()
+	// A 500ms average is the shortest cue length still counted as dialogue.
+	cues := make([]Cue, 30)
+	for i := range cues {
+		font, dur := "Alpha", 500*time.Millisecond
+		if i%2 == 1 {
+			font, dur = "Bravo", 400*time.Millisecond
+		}
+		cues[i] = Cue{
+			Start: time.Duration(i) * time.Second,
+			End:   time.Duration(i)*time.Second + dur,
+			Text:  `<font face="` + font + `">Text</font>`,
+		}
+	}
 	got := detectDialogueFont(cues)
 	if got != "Alpha" {
-		t.Errorf("detectDialogueFont(tiebreaker) = %q, want %q (alphabetical)", got, "Alpha")
+		t.Errorf("detectDialogueFont(Alpha at 500ms/cue, Bravo at 400ms/cue) = %q, want %q", got, "Alpha")
+	}
+}
+
+func TestDetectDialogueFont_accepts_fifteen_second_average_cue(t *testing.T) {
+	t.Parallel()
+	// A 15s average is the longest cue length still counted as dialogue.
+	cues := make([]Cue, 30)
+	for i := range cues {
+		font, dur := "Alpha", 15*time.Second
+		if i%2 == 1 {
+			font, dur = "Bravo", 16*time.Second
+		}
+		cues[i] = Cue{
+			Start: time.Duration(i) * 20 * time.Second,
+			End:   time.Duration(i)*20*time.Second + dur,
+			Text:  `<font face="` + font + `">Text</font>`,
+		}
+	}
+	got := detectDialogueFont(cues)
+	if got != "Alpha" {
+		t.Errorf("detectDialogueFont(Alpha at 15s/cue, Bravo at 16s/cue) = %q, want %q", got, "Alpha")
+	}
+}
+
+func TestDetectDialogueFont_skips_rare_font_with_the_most_screen_time(t *testing.T) {
+	t.Parallel()
+	// A font carrying the most total screen time is still rejected when it
+	// appears in under 10% of the sample: long cues are how typesetting and
+	// sign work show up, not dialogue.
+	cues := make([]Cue, 100)
+	for i := range cues {
+		font, dur := "DominantFont", time.Second
+		if i >= 40 && i < 46 {
+			font, dur = "MinorFont", 14*time.Second
+		}
+		cues[i] = Cue{
+			Start: time.Duration(i) * 20 * time.Second,
+			End:   time.Duration(i)*20*time.Second + dur,
+			Text:  `<font face="` + font + `">Text</font>`,
+		}
+	}
+	got := detectDialogueFont(cues)
+	if got != "DominantFont" {
+		t.Errorf("detectDialogueFont(MinorFont 6/80 cues at 14s, DominantFont 74/80 at 1s) = %q, want %q",
+			got, "DominantFont")
+	}
+}
+
+func TestDetectDialogueFont_accepts_font_at_exactly_ten_percent(t *testing.T) {
+	t.Parallel()
+	// A font in exactly 10% of the sample clears the frequency filter, so it
+	// wins on screen time: 5 of the 50 analyzed cues, 60s against 45s.
+	cues := make([]Cue, 62)
+	for i := range cues {
+		font, dur := "Bravo", time.Second
+		if i >= 10 && i < 15 {
+			font, dur = "Alpha", 12*time.Second
+		}
+		cues[i] = Cue{
+			Start: time.Duration(i) * 20 * time.Second,
+			End:   time.Duration(i)*20*time.Second + dur,
+			Text:  `<font face="` + font + `">Text</font>`,
+		}
+	}
+	got := detectDialogueFont(cues)
+	if got != "Alpha" {
+		t.Errorf("detectDialogueFont(Alpha 5/50 cues at 12s, Bravo 45/50 at 1s) = %q, want %q", got, "Alpha")
 	}
 }
 
