@@ -93,6 +93,12 @@ func TestNewVADInst_out_of_range_mode_defaults_to_3(t *testing.T) {
 	if v2.localThresh != vadModes[3].local {
 		t.Errorf("newVADInst(99).localThresh = %d, want %d", v2.localThresh, vadModes[3].local)
 	}
+	// 4 is the first mode past the end of the table, so it is where an
+	// off-by-one range check would index out of bounds instead of falling back.
+	v3 := newVADInst(Mode(4))
+	if v3.localThresh != vadModes[3].local {
+		t.Errorf("newVADInst(4).localThresh = %d, want %d", v3.localThresh, vadModes[3].local)
+	}
 }
 
 func TestNewVADInst_initial_means_copied(t *testing.T) {
