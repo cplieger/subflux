@@ -8,7 +8,9 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/cplieger/atomicfile/v3"
@@ -504,16 +506,8 @@ func mergeSecretPath(incoming, existing *yaml.Node, path secretPath) {
 	parent.Content = append(parent.Content, keyNode, valNode)
 }
 
-// sortedKeys returns the map's keys in sorted order for deterministic output.
+// sortedKeys returns the map's keys in sorted order (nil when the map is
+// empty) for deterministic output.
 func sortedKeys(m map[string]json.RawMessage) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	for i := 1; i < len(keys); i++ {
-		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
-			keys[j], keys[j-1] = keys[j-1], keys[j]
-		}
-	}
-	return keys
+	return slices.Sorted(maps.Keys(m))
 }
