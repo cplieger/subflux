@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -12,6 +13,31 @@ import (
 // accessors were removed so no caller can bypass the Log's invariants.
 // States only internal mutation could produce (backdated EndedAt) are
 // covered by the activity package's own tests.
+
+// --- activity.Log capacity ---
+
+// TestActivityLog_eviction_trims_to_the_cap_and_stops: crossing the cap
+// evicts the oldest COMPLETED entry and stops there. Trimming further would
+// discard history nobody asked it to discard, and the entries that survive
+// are the newest ones.
+func TestActivityLog_eviction_trims_to_the_cap_and_stops(t *testing.T) {
+	t.Parallel()
+	al := activity.New(3)
+	for range 3 {
+		al.End(al.Start("Scan", "detail", "manual"))
+	}
+	al.Start("Scan", "the one that crosses the cap", "manual")
+
+	entries := al.Entries()
+	got := make([]string, 0, len(entries))
+	for i := range entries {
+		got = append(got, entries[i].ID)
+	}
+	want := []string{"2", "3", "4"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Entries() IDs after crossing a cap of 3 = %v, want %v", got, want)
+	}
+}
 
 // --- activity.Log.setQueued ---
 

@@ -109,25 +109,38 @@ func TestHandleScore_media_type_variations(t *testing.T) {
 		t.Parallel()
 		h := newEngineHandler(&fakeQueryCfg{})
 
-		body := `{"release_name":"Test","sub_release":"Test","matched_by":"title"}`
-		req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader(body))
-		rec := httptest.NewRecorder()
-		h.HandleScore(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Fatalf("HandleScore() status = %d, want %d", rec.Code, http.StatusOK)
+		// A season-pack release is what makes the default observable: the
+		// season_pack attribute is only matched for episodes, so the same
+		// request scores higher as an episode than as a movie.
+		const pack = "Show.S02.1080p.WEB-DL-GRP"
+		scoreFor := func(mediaTypeField string) int {
+			body := `{` + mediaTypeField +
+				`"release_name":"` + pack + `","sub_release":"` + pack + `","matched_by":"title"}`
+			req := httptest.NewRequest(http.MethodPost, "/api/score", strings.NewReader(body))
+			rec := httptest.NewRecorder()
+			h.HandleScore(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("HandleScore(%s) status = %d", mediaTypeField, rec.Code)
+			}
+			var result map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if _, ok := result["tier"]; !ok {
+				t.Error("response missing 'tier' field")
+			}
+			return int(result["score"].(float64))
 		}
 
-		var result map[string]any
-		if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
-			t.Fatalf("decode: %v", err)
+		omitted := scoreFor("")
+		episode := scoreFor(`"media_type":"episode",`)
+		movie := scoreFor(`"media_type":"movie",`)
+		if omitted != episode {
+			t.Errorf("omitted media_type scored %d, want the episode score %d", omitted, episode)
 		}
-		// Empty media_type defaults to "episode"; score and tier should be present.
-		if _, ok := result["score"]; !ok {
-			t.Error("response missing 'score' field")
-		}
-		if _, ok := result["tier"]; !ok {
-			t.Error("response missing 'tier' field")
+		if episode <= movie {
+			t.Errorf("episode score (%d) must exceed movie score (%d) for a season pack; "+
+				"without that the default cannot be observed", episode, movie)
 		}
 	})
 

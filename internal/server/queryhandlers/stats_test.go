@@ -1,10 +1,13 @@
 package queryhandlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,6 +80,54 @@ func TestHandleStateStats_returns_counts(t *testing.T) {
 	if int(result["missing_subs"].(float64)) != 0 {
 		t.Errorf("missing_subs = %v, want 0", result["missing_subs"])
 	}
+}
+
+// TestHandleStateStats_successful_queries_report_no_failure pins the stats
+// diagnostics to actual failures: every store query answered, so a warning
+// for any of them would send an operator after a database problem that does
+// not exist. Serial: asserts on the default logger.
+func TestHandleStateStats_successful_queries_report_no_failure(t *testing.T) {
+	buf := captureSlog(t)
+	cfg := &fakeQueryCfg{searchCfg: subflux.SearchConfig{ScanInterval: 30 * time.Minute}}
+	h := New(Deps{
+		QueryDB: &mockQueryStore{downloads: 42, attempts: 100},
+		CovDB:   &testsupport.NopStore{},
+		Metrics: &fakeMetrics{},
+		State:   func() *LiveState { return &LiveState{Cfg: cfg} },
+		CountMissing: func(_ context.Context, _ coverage.CountCfg, _ []arrapi.Series, _ []arrapi.Movie) int {
+			return 0
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/state/stats", nil)
+	rec := httptest.NewRecorder()
+	h.HandleStateStats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleStateStats() status = %d, want 200", rec.Code)
+	}
+	for _, msg := range []string{
+		`msg="Stats query failed"`,
+		`msg="LastScanTime query failed"`,
+		`msg="TotalSubtitleFiles query failed"`,
+		`msg="stats: fetch error"`,
+	} {
+		if strings.Contains(buf.String(), msg) {
+			t.Errorf("all-successful stats computation logged %s; log: %s", msg, buf.String())
+		}
+	}
+}
+
+// captureSlog redirects the default logger into a buffer for the duration of
+// the test. A test using it must NOT call t.Parallel: the default logger is
+// process-wide, so a parallel sibling's lines would land in this buffer.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
 }
 
 func TestHandleStateStats_rejects_non_get(t *testing.T) {
