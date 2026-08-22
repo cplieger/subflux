@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -317,9 +318,9 @@ func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 	}
 	h := newStateHandler(cfg, nil)
 
-	// Send audio_langs with empty segments.
+	// Empty and whitespace-only segments, plus one padded code.
 	req := httptest.NewRequest(http.MethodGet,
-		"/api/search/targets?orig_lang=en&audio_langs=en,,fr,", nil)
+		"/api/search/targets?orig_lang=en&audio_langs=en,,fr,+de+,", nil)
 	rec := httptest.NewRecorder()
 	h.HandleSearchTargets(rec, req)
 
@@ -327,17 +328,15 @@ func TestHandleSearchTargets_filters_empty_audio_langs(t *testing.T) {
 		t.Fatalf("HandleSearchTargets() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var result map[string]any
+	var result subflux.SearchTargets
 	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// Empty segments should be filtered out, leaving only "en" and "fr".
-	audioLangs, ok := result["audio_langs"].([]any)
-	if !ok {
-		t.Fatal("audio_langs not an array")
-	}
-	if len(audioLangs) != 2 {
-		t.Errorf("audio_langs count = %d, want 2 (empty segments filtered)", len(audioLangs))
+	// The values, not just the count: an empty segment kept as "" would
+	// leave the count right and the language list wrong.
+	want := []string{"en", "fr", "de"}
+	if !slices.Equal(result.AudioLangs, want) {
+		t.Errorf("audio_langs = %q, want %q", result.AudioLangs, want)
 	}
 }
 

@@ -123,11 +123,17 @@ func TestHandleClientCap(t *testing.T) {
 		t.Errorf("second client status = %d, want 503", st2.status)
 	}
 
-	// Hot reload raises the cap on the live hub: the next client is admitted.
+	// Hot reload raises the cap on the live hub: the next client is admitted,
+	// and the one after that is refused — the new cap is the value passed,
+	// not an unlimited hub.
 	bus.SetMaxClients(2)
 	st3 := startStream(t, bus)
 	readUntil(t, st3.sc, func(l string) bool { return l == ": connected" })
 	waitClients(t, bus, 2)
+
+	if st4 := startStream(t, bus); st4.status != http.StatusServiceUnavailable {
+		t.Errorf("third client status = %d, want 503 (cap raised to 2, not lifted)", st4.status)
+	}
 }
 
 func TestShutdownDrainsAndRefuses(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subflux"
@@ -210,6 +211,30 @@ func TestHandleState_limit_boundary_values(t *testing.T) {
 				t.Errorf("limit = %d, want %d", store.lastState.Limit, tt.wantLimit)
 			}
 		})
+	}
+}
+
+// TestHandleState_limit_at_the_cap_is_not_reported_as_capped: the "limit
+// capped" line means the caller asked for more than it got, so a request for
+// exactly the cap must pass through without it. The clamp itself is a no-op
+// at the boundary, which makes the diagnostic the only observable.
+// Serial: asserts on the default logger.
+func TestHandleState_limit_at_the_cap_is_not_reported_as_capped(t *testing.T) {
+	buf := captureSlog(t)
+	store := &mockQueryStore{}
+	h := New(Deps{QueryDB: store})
+	req := httptest.NewRequest(http.MethodGet, "/api/state?limit=10000", nil)
+	w := httptest.NewRecorder()
+	h.HandleState(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	if store.lastState.Limit != 10000 {
+		t.Errorf("limit = %d, want 10000", store.lastState.Limit)
+	}
+	if strings.Contains(buf.String(), `msg="handleState: limit capped"`) {
+		t.Errorf("limit=10000 was reported as capped; log: %s", buf.String())
 	}
 }
 
