@@ -1,9 +1,28 @@
 package subsync
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
+
+// syncLogAttr returns the value of a key=value attribute on the first captured
+// log line matching anchor, or "" when the line or the attribute is absent.
+// Whole-field matching keeps a value from matching a longer one that starts
+// with the same digits.
+func syncLogAttr(logs, anchor, key string) string {
+	for line := range strings.SplitSeq(logs, "\n") {
+		if !strings.Contains(line, anchor) {
+			continue
+		}
+		for field := range strings.SplitSeq(line, " ") {
+			if after, ok := strings.CutPrefix(field, key+"="); ok {
+				return after
+			}
+		}
+	}
+	return ""
+}
 
 func TestSyncWithOptions_empty_incorrect(t *testing.T) {
 	t.Parallel()
@@ -143,6 +162,31 @@ func TestConstantOffsetConfidence(t *testing.T) {
 			wantMax: 0.9,
 		},
 		{
+			// Half the reference cue is covered, and the confidence is the
+			// overlap fraction scaled by the offset cap (0.9) — not the cap
+			// itself, which is what a fully covered reference earns.
+			name:    "half-covered reference earns half the offset cap",
+			ref:     []Cue{{Start: 0, End: time.Second, Text: "ref"}},
+			inc:     []Cue{{Start: 500 * time.Millisecond, End: 1500 * time.Millisecond, Text: "inc"}},
+			offset:  0,
+			wantMin: 0.44,
+			wantMax: 0.46,
+		},
+		{
+			// The first incorrect cue ends exactly where the reference cue
+			// starts, so it contributes nothing and must be stepped over:
+			// the overlap belongs to the second cue, 60% of the reference.
+			name: "a cue ending exactly at the reference start is stepped over",
+			ref:  []Cue{{Start: 10 * time.Second, End: 20 * time.Second, Text: "ref"}},
+			inc: []Cue{
+				{Start: 0, End: 10 * time.Second, Text: "touching"},
+				{Start: 12 * time.Second, End: 18 * time.Second, Text: "overlapping"},
+			},
+			offset:  0,
+			wantMin: 0.53,
+			wantMax: 0.55,
+		},
+		{
 			name:    "ratio capped at 0.9",
 			ref:     longCues,
 			inc:     longCues,
@@ -223,6 +267,73 @@ func TestSyncWithOptions_negative_min_confidence_defaults(t *testing.T) {
 	result := SyncWithOptions(t.Context(), ref, inc, &opts)
 	if result.Method == MethodNone {
 		t.Errorf("expected a sync method, got %q", result.Method)
+	}
+}
+
+func TestSyncWithOptions_zero_min_confidence_gates_at_the_default(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	// An unset MinConfidence has to become the default gate, not a gate of
+	// zero that accepts whatever the first strategy produced.
+	ref := makeLongCues(30, 10*time.Minute)
+	inc := ShiftCues(ref, 2*time.Second)
+	opts := SyncOptions{MinConfidence: 0}
+	logs := captureAlignLogs(t, func() {
+		SyncWithOptions(t.Context(), ref, inc, &opts)
+	})
+	got := syncLogAttr(logs, `msg="sync: starting"`, "min_confidence")
+	if got != "0.5" {
+		t.Errorf("SyncWithOptions(MinConfidence: 0) gated at min_confidence=%q, want %q", got, "0.5")
+	}
+}
+
+func TestSyncWithOptions_without_a_reference_runs_no_reference_strategy(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	// Reference strategies are the expensive half of the pipeline (one of
+	// them shells out to ffprobe), so an absent reference must skip them
+	// outright rather than run them against nothing.
+	inc := makeLongCues(30, 10*time.Minute)
+	opts := SyncOptions{MinConfidence: 0.5}
+	logs := captureAlignLogs(t, func() {
+		SyncWithOptions(t.Context(), nil, inc, &opts)
+	})
+	for _, msg := range []string{
+		`msg="reference sync: all strategies returned zero confidence"`,
+		`msg="sync voting complete"`,
+	} {
+		if n := strings.Count(logs, msg); n != 0 {
+			t.Errorf("SyncWithOptions(nil reference) logged %s %d times, want 0", msg, n)
+		}
+	}
+}
+
+func TestSyncWithOptions_reports_a_result_below_the_gate(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	// A result that misses the gate is the case an operator needs told
+	// about: the caller gets cues back that were deliberately not applied.
+	ref := makeLongCues(30, 10*time.Minute)
+	inc := ShiftCues(ref, 2*time.Second)
+	opts := SyncOptions{MinConfidence: 0.99}
+	logs := captureAlignLogs(t, func() {
+		SyncWithOptions(t.Context(), ref, inc, &opts)
+	})
+	const msg = `msg="sync: no strategy met confidence threshold"`
+	if n := strings.Count(logs, msg); n != 1 {
+		t.Errorf("SyncWithOptions(MinConfidence: 0.99) logged %s %d times, want 1", msg, n)
+	}
+}
+
+func TestSyncWithOptions_audio_needs_a_video_path(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	// Audio sync extracts PCM from the video file, so an empty path has
+	// nothing to work on and the strategy must not be entered at all.
+	inc := makeCues(4, 0, 2*time.Second) // below MinCuesForSync
+	opts := SyncOptions{EnableAudio: true, VideoPath: "", MinConfidence: 0.5}
+	logs := captureAlignLogs(t, func() {
+		SyncWithOptions(t.Context(), nil, inc, &opts)
+	})
+	const msg = `msg="audio sync: skipped, too few cues"`
+	if n := strings.Count(logs, msg); n != 0 {
+		t.Errorf("SyncWithOptions(EnableAudio, empty VideoPath) logged %s %d times, want 0", msg, n)
 	}
 }
 
