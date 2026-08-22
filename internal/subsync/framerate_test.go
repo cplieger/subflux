@@ -1,7 +1,9 @@
 package subsync
 
 import (
+	"fmt"
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -307,16 +309,23 @@ func TestLinearRegression_two_points(t *testing.T) {
 
 func TestMatchKnownRatio(t *testing.T) {
 	t.Parallel()
+	// r2 is deliberately above the known-ratio cap (0.95) and below the
+	// FPS-confirmed cap (0.98), so the confidence a match reports says which
+	// ceiling was applied: without a probed FPS the known-ratio cap binds,
+	// with one the higher FPS cap does.
 	tests := []struct {
 		name     string
 		ratio    float64
 		videoFPS float64
+		r2       float64
 		wantOK   bool
+		wantConf Confidence
 	}{
-		{"no_match", 1.5, 0, false},
-		{"with_video_fps", 25.0 / 23.976, 25.0, true},
-		{"video_fps_filters_candidates", 25.0 / 23.976, 60.0, false},
-		{"exact_match", 25.0 / 23.976, 0, true},
+		{"no_match", 1.5, 0, 0.97, false, ConfidenceNone},
+		{"with_video_fps", 25.0 / 23.976, 25.0, 0.97, true, 0.97},
+		{"video_fps_caps_the_confidence", 25.0 / 23.976, 25.0, 0.99, true, 0.98},
+		{"video_fps_filters_candidates", 25.0 / 23.976, 60.0, 0.97, false, ConfidenceNone},
+		{"exact_match", 25.0 / 23.976, 0, 0.97, true, 0.95},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -329,12 +338,67 @@ func TestMatchKnownRatio(t *testing.T) {
 				ref = makeCues(5, 0, time.Second)
 				cues = ref
 			}
-			result, ok := matchKnownRatio(t.Context(), tc.ratio, cues, 0.95, tc.videoFPS, ref)
+			result, ok := matchKnownRatio(t.Context(), tc.ratio, cues, tc.r2, tc.videoFPS, ref)
 			if ok != tc.wantOK {
 				t.Fatalf("matchKnownRatio(%v, videoFPS=%v) ok = %v, want %v", tc.ratio, tc.videoFPS, ok, tc.wantOK)
 			}
+			if result.Confidence != tc.wantConf {
+				t.Errorf("matchKnownRatio(%v, r2=%v, videoFPS=%v) confidence = %v, want %v",
+					tc.ratio, tc.r2, tc.videoFPS, float64(result.Confidence), float64(tc.wantConf))
+			}
 			if ok && result.Method != MethodFramerate {
 				t.Errorf("expected method 'framerate', got %q", result.Method)
+			}
+		})
+	}
+}
+
+func TestCollectRatioCandidates(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		observed float64
+		videoFPS float64
+		want     []string
+	}{
+		{
+			name:     "one_known_pair_within_tolerance",
+			observed: 25.0 / 23.976,
+			want:     []string{"23.976->25"},
+		},
+		{
+			name:     "video_fps_matching_only_the_source_rate_keeps_the_pair",
+			observed: 48.0 / 50.0,
+			videoFPS: 50,
+			want:     []string{"50->48"},
+		},
+		{
+			name:     "video_fps_matching_neither_rate_drops_every_pair",
+			observed: 25.0 / 23.976,
+			videoFPS: 60,
+		},
+		{
+			// 2.001 sits 0.05% below the 2.0 pairs and 0.05% above the
+			// 2.002002 pairs, so both clusters are inside the 0.1% window.
+			name:     "every_pair_within_tolerance_is_collected",
+			observed: 2.001,
+			want: []string{
+				"23.976->48", "24->48", "25->50",
+				"29.97->59.94", "29.97->60", "30->60",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := collectRatioCandidates(tc.observed, tc.videoFPS)
+			names := make([]string, len(got))
+			for i, p := range got {
+				names[i] = fmt.Sprintf("%g->%g", p.From, p.To)
+			}
+			if !slices.Equal(names, tc.want) {
+				t.Errorf("collectRatioCandidates(%v, videoFPS=%v) = %v, want %v",
+					tc.observed, tc.videoFPS, names, tc.want)
 			}
 		})
 	}
@@ -438,18 +502,288 @@ func TestCorrectFramerate_cue_count_mismatch_too_large(t *testing.T) {
 
 func TestCorrectFramerate_cue_count_mismatch_at_boundary(t *testing.T) {
 	t.Parallel()
-	// 25% difference exactly: 100 ref, 75 inc → (100-75)/100 = 0.25, not > 0.25.
-	// Should NOT trigger the early return (passes through to drift analysis).
-	ref := makeLongCues(100, 30*time.Minute)
-	inc := makeLongCues(75, 30*time.Minute)
+	// 25% difference exactly: 28 ref, 21 inc → (28-21)/28 = 0.25, and the guard
+	// skips only above 0.25, so this pair is still analysed for drift. The
+	// incorrect track is the scaled reference truncated to 21 cues, so cue N
+	// still corresponds to cue N and the drift is genuinely linear.
+	ref := makeLongCues(28, 30*time.Minute)
+	inc := scaleCuesForTest(ref, 25.0/23.976)[:21]
+
 	result := correctFramerate(t.Context(), ref, inc, "")
-	// At exactly 25%, the check is > 0.25, so it should NOT bail out.
-	// The result depends on drift analysis, but confidence should not be
-	// ConfidenceNone due to the cue count check specifically.
-	// We just verify the function doesn't panic and returns a valid result.
-	if result.Method != MethodFramerate {
-		t.Logf("CorrectFramerate(100 ref, 75 inc) method = %q (boundary case, drift analysis ran)", result.Method)
+
+	if result.Confidence != DefaultConfidenceCaps.FramerateGSS {
+		t.Errorf("CorrectFramerate(28 ref, 21 inc) confidence = %v, want %v",
+			float64(result.Confidence), float64(DefaultConfidenceCaps.FramerateGSS))
 	}
+	if relErr := math.Abs(result.Rate-25.0/23.976) / (25.0 / 23.976); relErr > 1e-6 {
+		t.Errorf("CorrectFramerate(28 ref, 21 inc) rate = %v, want %v (rel err %g > 1e-6)",
+			result.Rate, 25.0/23.976, relErr)
+	}
+}
+
+func TestCorrectFramerate_accepts_the_minimum_cue_count(t *testing.T) {
+	t.Parallel()
+	// Exactly MinCues (20) cues on both sides: the guard rejects fewer than 20,
+	// so 20 must still be analysed.
+	ref := makeLongCues(20, 30*time.Minute)
+	inc := scaleCuesForTest(ref, 25.0/23.976)
+
+	result := correctFramerate(t.Context(), ref, inc, "")
+
+	if result.Confidence != DefaultConfidenceCaps.FramerateGSS {
+		t.Errorf("CorrectFramerate(20 ref, 20 inc) confidence = %v, want %v",
+			float64(result.Confidence), float64(DefaultConfidenceCaps.FramerateGSS))
+	}
+	// The recovered ratio is the exact NTSC-film-to-PAL ratio, not a captured
+	// magnitude: a track authored at 23.976 fps and played at 25 runs
+	// 25/23.976 fast, and the search must find that number back.
+	if relErr := math.Abs(result.Rate-25.0/23.976) / (25.0 / 23.976); relErr > 1e-6 {
+		t.Errorf("CorrectFramerate(20 ref, 20 inc) rate = %v, want %v (rel err %g > 1e-6)",
+			result.Rate, 25.0/23.976, relErr)
+	}
+}
+
+func TestCorrectFramerate_rejects_below_the_minimum_cue_count(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		nRef     int
+		nInc     int
+		wantConf Confidence
+	}{
+		{"one_reference_cue_short", 19, 20, ConfidenceNone},
+		{"one_incorrect_cue_short", 20, 19, ConfidenceNone},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ref := makeLongCues(tc.nRef, 30*time.Minute)
+			inc := scaleCuesForTest(makeLongCues(tc.nInc, 30*time.Minute), 25.0/23.976)
+			result := correctFramerate(t.Context(), ref, inc, "")
+			if result.Confidence != tc.wantConf {
+				t.Errorf("CorrectFramerate(%d ref, %d inc) confidence = %v, want %v",
+					tc.nRef, tc.nInc, float64(result.Confidence), float64(tc.wantConf))
+			}
+			if result.Rate != 1.0 {
+				t.Errorf("CorrectFramerate(%d ref, %d inc) rate = %v, want 1.0",
+					tc.nRef, tc.nInc, result.Rate)
+			}
+		})
+	}
+}
+
+func TestCorrectFramerate_accepts_the_minimum_duration(t *testing.T) {
+	t.Parallel()
+	// A track ending exactly at MinDuration (2 minutes) is long enough: the
+	// guard rejects shorter than 2 minutes. Each row puts one side of the pair
+	// exactly on that floor and stretches the other, so both halves of the
+	// duration guard are held at their boundary.
+	atFloor := make([]Cue, 20)
+	for i := range atFloor {
+		start := time.Duration(i) * 6 * time.Second
+		atFloor[i] = Cue{Start: start, End: start + 6*time.Second, Text: "line"}
+	}
+	tests := []struct {
+		name     string
+		ref      []Cue
+		inc      []Cue
+		wantConf Confidence
+		wantRate float64
+	}{
+		{
+			name:     "reference_at_the_floor",
+			ref:      atFloor,
+			inc:      scaleCuesForTest(atFloor, 25.0/23.976),
+			wantConf: DefaultConfidenceCaps.FramerateKnown,
+			wantRate: 25.0 / 24.0,
+		},
+		{
+			name:     "incorrect_at_the_floor",
+			ref:      scaleCuesForTest(atFloor, 25.0/23.976),
+			inc:      atFloor,
+			wantConf: DefaultConfidenceCaps.FramerateGSS,
+			wantRate: 23.976 / 25.0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.ref[len(tc.ref)-1].End; got < 2*time.Minute {
+				t.Fatalf("fixture: reference ends at %v, want >= 2m", got)
+			}
+			if got := tc.inc[len(tc.inc)-1].End; got < 2*time.Minute {
+				t.Fatalf("fixture: incorrect ends at %v, want >= 2m", got)
+			}
+			result := correctFramerate(t.Context(), tc.ref, tc.inc, "")
+			if result.Confidence != tc.wantConf {
+				t.Errorf("CorrectFramerate(%s) confidence = %v, want %v",
+					tc.name, float64(result.Confidence), float64(tc.wantConf))
+			}
+			if relErr := math.Abs(result.Rate-tc.wantRate) / tc.wantRate; relErr > 1e-6 {
+				t.Errorf("CorrectFramerate(%s) rate = %v, want %v (rel err %g > 1e-6)",
+					tc.name, result.Rate, tc.wantRate, relErr)
+			}
+		})
+	}
+}
+
+func TestCorrectFramerate_drift_at_the_linearity_floor_is_corrected(t *testing.T) {
+	t.Parallel()
+	// Drift whose R² lands exactly on MinLinearR2 counts as linear: the guard
+	// rejects only below the floor. The confidence doubles as the assertion on
+	// R² itself, because the golden-section cap (0.85) is above 0.8 and the
+	// result carries min(r2, cap).
+	ref, inc := linearityFloorCues()
+
+	result := correctFramerate(t.Context(), ref, inc, "")
+
+	if result.Confidence != 0.8 {
+		t.Errorf("CorrectFramerate(drift at the R² floor) confidence = %v, want 0.8",
+			float64(result.Confidence))
+	}
+	if !result.Applied() {
+		t.Errorf("CorrectFramerate(drift at the R² floor) applied no correction (rate %v)", result.Rate)
+	}
+}
+
+func TestVerifyFramerateCorrection(t *testing.T) {
+	t.Parallel()
+	base := makeLongCues(20, 10*time.Minute)
+	tests := []struct {
+		name string
+		ref  []Cue
+		corr []Cue
+		want bool
+	}{
+		{
+			name: "identical_timings",
+			ref:  base,
+			corr: base,
+			want: true,
+		},
+		{
+			// MaxResidualMs is 200 and the check is inclusive.
+			name: "residual_exactly_at_the_ceiling",
+			ref:  base,
+			corr: shiftCueForTest(base, 10, 200*time.Millisecond),
+			want: true,
+		},
+		{
+			name: "residual_one_millisecond_over_the_ceiling",
+			ref:  base,
+			corr: shiftCueForTest(base, 10, 201*time.Millisecond),
+			want: false,
+		},
+		{
+			// skip = n/10 = 2, so indices 18 and 19 are outside the measured
+			// window and a residual there cannot fail the check.
+			name: "residual_inside_the_trimmed_tail",
+			ref:  base,
+			corr: shiftCueForTest(base, 18, time.Second),
+			want: true,
+		},
+		{
+			// A whole-track shift is what alignConstantOffset is there to
+			// remove: the residual is measured after it, so it is zero.
+			name: "late_track_offset_is_removed_before_measuring",
+			ref:  base,
+			corr: shiftAllCuesForTest(base, 5*time.Second),
+			want: true,
+		},
+		{
+			name: "early_track_offset_is_removed_before_measuring",
+			ref:  base,
+			corr: shiftAllCuesForTest(base, -5*time.Second),
+			want: true,
+		},
+		{
+			name: "short_track_residual_over_the_ceiling",
+			ref:  base[:8],
+			corr: shiftCueForTest(base[:8], 4, time.Second),
+			want: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := verifyFramerateCorrection(t.Context(), tc.ref, tc.corr); got != tc.want {
+				t.Errorf("verifyFramerateCorrection(%s) = %v, want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestScaleCues_nonpositive_ratio_leaves_timings_untouched(t *testing.T) {
+	t.Parallel()
+	cues := []Cue{
+		{Start: time.Second, End: 3 * time.Second, Text: "first"},
+		{Start: 5 * time.Second, End: 7 * time.Second, Text: "second"},
+	}
+	for _, ratio := range []float64{0, -0.5, -1} {
+		t.Run(fmt.Sprintf("ratio_%g", ratio), func(t *testing.T) {
+			t.Parallel()
+			got := scaleCues(cues, ratio)
+			if !slices.Equal(got, cues) {
+				t.Errorf("scaleCues(cues, %v) = %v, want the input unchanged %v", ratio, got, cues)
+			}
+		})
+	}
+}
+
+// shiftCueForTest returns cues with a single cue moved by by.
+func shiftCueForTest(cues []Cue, idx int, by time.Duration) []Cue {
+	out := make([]Cue, len(cues))
+	copy(out, cues)
+	out[idx] = Cue{Start: cues[idx].Start + by, End: cues[idx].End + by, Text: cues[idx].Text}
+	return out
+}
+
+// shiftAllCuesForTest returns cues with every cue moved by by.
+func shiftAllCuesForTest(cues []Cue, by time.Duration) []Cue {
+	out := make([]Cue, len(cues))
+	for i, c := range cues {
+		out[i] = Cue{Start: c.Start + by, End: c.End + by, Text: c.Text}
+	}
+	return out
+}
+
+// linearityFloorCues returns a 20-cue reference/incorrect pair whose ten
+// sampled drift points sit exactly on the R² linearity floor (0.8), with no
+// rounding anywhere in the regression.
+//
+// measureDrifts samples the midpoints of cues 0, 2, … 18, so sample j sits at
+// x_j = 8192*(2j+1) ms and carries drift y_j = x_j*5/512 + d_j. The deviation
+// vector d sums to zero and is orthogonal to the sample index, which makes the
+// fitted line exactly slope 5/512, intercept 0, and therefore
+//
+//	ssRes = Σd²                    = 528000
+//	ssTot = (5/512)²·Σ(x-x̄)² + ssRes = 2640000
+//
+// so ssRes/ssTot is exactly 1/5 and R² is exactly 1 - 1/5.
+func linearityFloorCues() (reference, incorrect []Cue) {
+	dev := [20]int64{0: -360, 2: 80, 4: 320, 16: 360, 18: -400}
+	refMids := make([]int64, 20)
+	incMids := make([]int64, 20)
+	for i := range 20 {
+		inc := int64(8192 * (i + 1))
+		incMids[i] = inc
+		refMids[i] = inc - (int64(80*(i+1)) + dev[i])
+	}
+	return cuesAtMidsForTest(refMids), cuesAtMidsForTest(incMids)
+}
+
+// cuesAtMidsForTest builds two-second cues centred on the given midpoints (ms),
+// which is the position measureDrifts samples.
+func cuesAtMidsForTest(mids []int64) []Cue {
+	cues := make([]Cue, len(mids))
+	for i, m := range mids {
+		cues[i] = Cue{
+			Start: time.Duration(m-1000) * time.Millisecond,
+			End:   time.Duration(m+1000) * time.Millisecond,
+			Text:  "line",
+		}
+	}
+	return cues
 }
 
 func TestLinearRegression_perfect_fit_property(t *testing.T) {
