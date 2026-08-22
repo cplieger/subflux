@@ -26,7 +26,7 @@ func RunWorker(ctx context.Context, stdin io.Reader, stdout io.Writer) int {
 	var resp Response
 	resp.Version = ProtocolVersion
 
-	req, err := readRequest(stdin)
+	req, err := readRequest(stdin, maxRequestBytes)
 	if err != nil {
 		resp.Error = err.Error()
 		return writeResponse(stdout, &resp, 2)
@@ -41,13 +41,19 @@ func RunWorker(ctx context.Context, stdin io.Reader, stdout io.Writer) int {
 	return writeResponse(stdout, &resp, 0)
 }
 
-func readRequest(stdin io.Reader) (*Request, error) {
-	raw, err := io.ReadAll(io.LimitReader(stdin, maxRequestBytes+1))
+// readRequest decodes one request from stdin. A payload of exactly maxBytes is
+// accepted and anything larger is refused as oversized; the reader takes one
+// byte more than the bound so those two cases stay distinguishable instead of
+// arriving as a truncated decode failure. Every production read passes
+// maxRequestBytes — the parent marshals the request without a size check of
+// its own, so this is the protocol's only bound and nothing negotiates it.
+func readRequest(stdin io.Reader, maxBytes int) (*Request, error) {
+	raw, err := io.ReadAll(io.LimitReader(stdin, int64(maxBytes)+1))
 	if err != nil {
 		return nil, fmt.Errorf("read request: %w", err)
 	}
-	if len(raw) > maxRequestBytes {
-		return nil, fmt.Errorf("request exceeds %d bytes", maxRequestBytes)
+	if len(raw) > maxBytes {
+		return nil, fmt.Errorf("request exceeds %d bytes", maxBytes)
 	}
 	var req Request
 	if err := json.Unmarshal(raw, &req); err != nil {
