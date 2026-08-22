@@ -148,3 +148,34 @@ func TestAlignMergeSort_first_peak_wins_on_tie(t *testing.T) {
 		t.Errorf("alignMergeSort(symmetric peaks) = %d, want <= 0 (first peak wins)", got)
 	}
 }
+
+// An empty side produces no rating breakpoints, so the sweep never runs and the
+// search floor is the only offset that can be reported.
+func TestAlignMergeSort_an_empty_side_returns_the_search_floor(t *testing.T) {
+	t.Parallel()
+	spans := []TimeSpan{
+		{Start: 0, End: 20},
+		{Start: 40, End: 60},
+		{Start: 80, End: 100},
+	}
+	tests := []struct {
+		name      string
+		ref, inc  []TimeSpan
+		minOffset int64
+		want      int64
+	}{
+		{name: "no_incorrect_spans", ref: spans, minOffset: -7, want: -7},
+		{name: "no_reference_spans", inc: spans, minOffset: -7, want: -7},
+		{name: "neither_side_has_spans", minOffset: 12, want: 12},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := alignMergeSort(t.Context(), tt.ref, tt.inc, tt.minOffset)
+			if got != tt.want {
+				t.Errorf("alignMergeSort(ref=%v, inc=%v, minOffset=%d) = %d, want %d",
+					tt.ref, tt.inc, tt.minOffset, got, tt.want)
+			}
+		})
+	}
+}

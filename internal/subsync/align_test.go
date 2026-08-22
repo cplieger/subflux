@@ -1,6 +1,9 @@
 package subsync
 
 import (
+	"context"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -562,4 +565,173 @@ func TestSpanScore_equal_length_is_one(t *testing.T) {
 			t.Errorf("spanScore(len=%d, len=%d) = %v, want 1.0", dur, dur, score)
 		}
 	})
+}
+
+// captureAlignLogs collects everything written to the default logger, at Debug
+// level and above, while fn runs. The default logger is process-global, so a
+// caller must not be parallel. Timestamps are dropped so lines are stable.
+func captureAlignLogs(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	fn()
+	return buf.String()
+}
+
+// tightSpans returns n spans of 1ms at 2ms intervals starting at base. Packing
+// them keeps the offset range small enough that span-count tests stay cheap.
+func tightSpans(n int, base int64) []TimeSpan {
+	out := make([]TimeSpan, n)
+	for i := range out {
+		out[i] = TimeSpan{Start: base + int64(i)*2, End: base + int64(i)*2 + 1}
+	}
+	return out
+}
+
+// The capping warning tells an operator that alignment silently dropped part of
+// the input, so a track exactly at the limit must not produce one.
+func TestAlignConstantOffset_warns_only_past_the_reference_span_limit(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	tests := []struct {
+		name     string
+		spans    int
+		wantWarn int
+	}{
+		{name: "at_the_limit", spans: maxAlignSpans, wantWarn: 0},
+		{name: "one_past_the_limit", spans: maxAlignSpans + 1, wantWarn: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := tightSpans(tt.spans, 0)
+			inc := []TimeSpan{{Start: 100, End: 101}}
+			logs := captureAlignLogs(t, func() {
+				alignConstantOffset(t.Context(), ref, inc)
+			})
+			got := strings.Count(logs, "capping reference spans")
+			if got != tt.wantWarn {
+				t.Errorf("alignConstantOffset(%d reference spans) logged %d capping warnings, want %d",
+					tt.spans, got, tt.wantWarn)
+			}
+		})
+	}
+}
+
+func TestAlignConstantOffset_warns_only_past_the_incorrect_span_limit(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	tests := []struct {
+		name     string
+		spans    int
+		wantWarn int
+	}{
+		{name: "at_the_limit", spans: maxAlignSpans, wantWarn: 0},
+		{name: "one_past_the_limit", spans: maxAlignSpans + 1, wantWarn: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := []TimeSpan{{Start: 100, End: 101}}
+			inc := tightSpans(tt.spans, 0)
+			logs := captureAlignLogs(t, func() {
+				alignConstantOffset(t.Context(), ref, inc)
+			})
+			got := strings.Count(logs, "capping incorrect spans")
+			if got != tt.wantWarn {
+				t.Errorf("alignConstantOffset(%d incorrect spans) logged %d capping warnings, want %d",
+					tt.spans, got, tt.wantWarn)
+			}
+		})
+	}
+}
+
+// The dense delta array is chosen when the offset range is small relative to the
+// number of span pairs. Both quantities that decision rests on are reported, so
+// an operator diagnosing a slow or memory-hungry align can see why the path was
+// taken: the range spans minOffset..maxOffset inclusive, and each span pair
+// contributes four rating breakpoints.
+func TestAlignConstantOffset_reports_the_range_and_pair_count_it_chose_on(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	ref := []TimeSpan{
+		{Start: 0, End: 20},
+		{Start: 25, End: 45},
+		{Start: 50, End: 70},
+		{Start: 75, End: 95},
+	}
+	inc := []TimeSpan{
+		{Start: 200, End: 220},
+		{Start: 225, End: 245},
+		{Start: 250, End: 270},
+		{Start: 275, End: 295},
+	}
+	var got int64
+	logs := captureAlignLogs(t, func() {
+		got = alignConstantOffset(t.Context(), ref, inc)
+	})
+	if got != -201 {
+		t.Errorf("alignConstantOffset(4 reference, 4 incorrect spans) = %d, want -201", got)
+	}
+	// maxOffset 95-200 = -105, minOffset 0-295 = -295, so the range is 191ms.
+	if !strings.Contains(logs, "range_ms=191") {
+		t.Errorf("alignConstantOffset did not report range_ms=191; logged:\n%s", logs)
+	}
+	// 4 reference spans * 4 incorrect spans * 4 breakpoints.
+	if !strings.Contains(logs, "num_entries=64") {
+		t.Errorf("alignConstantOffset did not report num_entries=64; logged:\n%s", logs)
+	}
+	// 64 entries over a 191ms range clears the threshold, so the dense array wins.
+	if !strings.Contains(logs, "chose bucket sort") {
+		t.Errorf("alignConstantOffset did not choose the dense array; logged:\n%s", logs)
+	}
+}
+
+// Cancellation is sampled every few thousand span pairs rather than checked per
+// pair, so an alignment big enough to reach a sample abandons and reports no
+// offset while a small one runs to completion. A caller cannot read a non-zero
+// offset as proof the context was still live.
+func TestAlignConstantOffset_abandons_a_large_alignment_on_a_cancelled_context(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		spans    int
+		wantLive int64
+		wantDead int64
+	}{
+		{name: "too_small_to_reach_a_sample", spans: 4, wantLive: -61, wantDead: -61},
+		{name: "large_enough_to_reach_a_sample", spans: 110, wantLive: -61, wantDead: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ref := spacedSpans(tt.spans, 0)
+			inc := spacedSpans(tt.spans, 60)
+			if live := alignConstantOffset(t.Context(), ref, inc); live != tt.wantLive {
+				t.Errorf("alignConstantOffset(%d spans, live context) = %d, want %d",
+					tt.spans, live, tt.wantLive)
+			}
+			dead, cancel := context.WithCancel(t.Context())
+			cancel()
+			if got := alignConstantOffset(dead, ref, inc); got != tt.wantDead {
+				t.Errorf("alignConstantOffset(%d spans, cancelled context) = %d, want %d",
+					tt.spans, got, tt.wantDead)
+			}
+		})
+	}
+}
+
+// spacedSpans returns n spans of 20ms at 40ms intervals starting at base.
+func spacedSpans(n int, base int64) []TimeSpan {
+	out := make([]TimeSpan, n)
+	for i := range out {
+		s := base + int64(i)*40
+		out[i] = TimeSpan{Start: s, End: s + 20}
+	}
+	return out
 }
