@@ -181,7 +181,7 @@ COPY internal/server/static-src/ ./
 # renovate: datasource=npm depName=@cplieger/actions
 ARG CPLIEGER_ACTIONS_VERSION=3.1.2
 # renovate: datasource=npm depName=@cplieger/reactive
-ARG CPLIEGER_REACTIVE_VERSION=1.2.5
+ARG CPLIEGER_REACTIVE_VERSION=1.3.0
 # renovate: datasource=npm depName=@cplieger/ui-primitives
 ARG CPLIEGER_UI_PRIMITIVES_VERSION=3.0.2
 # renovate: datasource=npm depName=@cplieger/fetch
