@@ -32,7 +32,7 @@
     "vitest": "4.1.11"
   },
   "dependencies": {
-    "@cplieger/actions": "3.1.1",
+    "@cplieger/actions": "3.1.2",
     "@cplieger/fetch": "2.1.0",
     "@cplieger/keyenc": "1.0.5",
     "@cplieger/reactive": "1.2.5",
