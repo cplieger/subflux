@@ -325,7 +325,7 @@ func TestAudioSyncFromPCM_offset_follows_the_audio(t *testing.T) {
 			got, early.Offset, late.Offset)
 	}
 	if early.Offset == 0 {
-		t.Errorf("audioSyncFromPCM(audio 5s late).Offset = 0, want a nonzero correction")
+		t.Errorf("audioSyncFromPCM(bursts from 6s, cues from 2s).Offset = 0, want a nonzero correction")
 	}
 }
 
@@ -335,12 +335,12 @@ func TestAudioSyncFromPCM_offset_follows_the_audio(t *testing.T) {
 func TestAudioSyncFromPCM_discards_an_offset_past_the_duration_ceiling(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		frames     int
-		wantOffset int64
-		wantConf   bool
+		name        string
+		frames      int
+		wantOffset  int64
+		wantApplied bool
 	}{
-		{name: "offset_exactly_at_the_ceiling_is_applied", frames: 32885, wantOffset: -32885, wantConf: true},
+		{name: "offset_exactly_at_the_ceiling_is_applied", frames: 32885, wantOffset: -32885, wantApplied: true},
 		{name: "offset_one_ms_past_the_ceiling_is_discarded", frames: 32884, wantOffset: 0},
 	}
 	for _, tt := range tests {
@@ -355,11 +355,11 @@ func TestAudioSyncFromPCM_discards_an_offset_past_the_duration_ceiling(t *testin
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Offset = %d, want %d (+/-%d)",
 					tt.frames, got.Offset, tt.wantOffset, audioOffsetToleranceMs)
 			}
-			if tt.wantConf && got.Confidence <= ConfidenceNone {
+			if tt.wantApplied && got.Confidence <= ConfidenceNone {
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Confidence = %v, want > 0",
 					tt.frames, got.Confidence)
 			}
-			if !tt.wantConf && got.Confidence != ConfidenceNone {
+			if !tt.wantApplied && got.Confidence != ConfidenceNone {
 				t.Errorf("audioSyncFromPCM(%d frames, cues 33000ms late).Confidence = %v, want 0",
 					tt.frames, got.Confidence)
 			}
@@ -367,7 +367,7 @@ func TestAudioSyncFromPCM_discards_an_offset_past_the_duration_ceiling(t *testin
 				t.Fatalf("audioSyncFromPCM(%d frames) returned %d cues, want %d",
 					tt.frames, len(got.Cues), len(cues))
 			}
-			if !tt.wantConf && got.Cues[0].Start != cues[0].Start {
+			if !tt.wantApplied && got.Cues[0].Start != cues[0].Start {
 				t.Errorf("audioSyncFromPCM(%d frames, discarded).Cues[0].Start = %v, want the input %v",
 					tt.frames, got.Cues[0].Start, cues[0].Start)
 			}
