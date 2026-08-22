@@ -31,10 +31,36 @@ func TestNormalizeEncoding(t *testing.T) {
 		{name: "UTF16BE_BOM", input: []byte{0xFE, 0xFF, 0x00, 'H', 0x00, 'i'}, wantExact: "Hi"},
 		{name: "UTF16LE_no_BOM", input: []byte{'A', 0x00, 'B', 0x00}, wantExact: "AB"},
 		{name: "UTF16BE_no_BOM", input: []byte{0x00, 'A', 0x00, 'B'}, wantExact: "AB"},
+		// Four bytes is the shortest input the BOM-less heuristic accepts, and a
+		// C1 code unit is where UTF-16 and the Windows-1252 fallback disagree:
+		// 0x80 is U+0080 as a UTF-16 code unit but the euro sign as a lone byte.
+		{name: "UTF16LE_no_BOM_minimum_length", input: []byte{0x80, 0x00, '!', 0x00}, wantExact: "\u0080!"},
+		{name: "UTF16BE_no_BOM_minimum_length", input: []byte{0x00, 0x80, 0x00, '!'}, wantExact: "\u0080!"},
+		// One code unit is a whole UTF-16 payload.
+		{name: "UTF16LE_BOM_one_code_unit", input: []byte{0xFF, 0xFE, 'A', 0x00}, wantExact: "A"},
+		{name: "UTF16BE_BOM_one_code_unit", input: []byte{0xFE, 0xFF, 0x00, 'A'}, wantExact: "A"},
+		// A high surrogate followed by a single stray byte has no low surrogate
+		// to pair with: the truncated pair becomes U+FFFD and the odd byte is
+		// dropped, rather than the decoder reading past the end of the payload.
+		{name: "UTF16BE_truncated_surrogate_pair", input: []byte{0xFE, 0xFF, 0xD8, 0x00, 0x41}, wantExact: "\uFFFD"},
+		{name: "UTF16LE_truncated_surrogate_pair", input: []byte{0xFF, 0xFE, 0x00, 0xD8, 0x41}, wantExact: "\uFFFD"},
 		{name: "Windows1252", input: []byte{'c', 'a', 'f', 0xE9}, wantExact: "café"},
 		{name: "Windows1252_special_range", input: []byte{0x80}, wantExact: "€"},
+		// 0x9F is the last byte the Windows-1252 table covers; 0xA0 is the first
+		// one that falls through to its ISO-8859-1 code point.
+		{name: "Windows1252_special_range_end", input: []byte{0x9F}, wantExact: "Ÿ"},
+		{name: "Windows1252_first_latin1_byte", input: []byte{0xA0}, wantExact: "\u00a0"},
+		// A NUL never appears in legitimate subtitle text, so it is dropped and
+		// the surrounding text is kept.
+		{name: "embedded_NUL_in_valid_UTF8", input: []byte("He\x00llo"), wantExact: "Hello"},
 		{name: "UTF16LE_surrogate_pair", input: []byte{0xFF, 0xFE, 0x3D, 0xD8, 0x00, 0xDE}, wantExact: "😀"},
 		{name: "UTF16BE_surrogate_pair", input: []byte{0xFE, 0xFF, 0xD8, 0x3D, 0xDE, 0x00}, wantExact: "😀"},
+		// The two ends of the surrogate range are still surrogates: D800/DC00
+		// pairs to the first supplementary code point and DBFF/DFFF to the last.
+		{name: "UTF16LE_lowest_surrogate_pair", input: []byte{0xFF, 0xFE, 0x00, 0xD8, 0x00, 0xDC}, wantExact: "\U00010000"},
+		{name: "UTF16BE_lowest_surrogate_pair", input: []byte{0xFE, 0xFF, 0xD8, 0x00, 0xDC, 0x00}, wantExact: "\U00010000"},
+		{name: "UTF16LE_highest_surrogate_pair", input: []byte{0xFF, 0xFE, 0xFF, 0xDB, 0xFF, 0xDF}, wantExact: "\U0010FFFF"},
+		{name: "UTF16BE_highest_surrogate_pair", input: []byte{0xFE, 0xFF, 0xDB, 0xFF, 0xDF, 0xFF}, wantExact: "\U0010FFFF"},
 		{name: "UTF16LE_odd_byte_count", input: []byte{0xFF, 0xFE, 'H', 0x00, 0x42}, wantExact: "H"},
 		{name: "UTF16BE_odd_byte_count", input: []byte{0xFE, 0xFF, 0x00, 'H', 0x42}, wantExact: "H"},
 		{name: "UTF16LE_lone_high_surrogate", input: []byte{0xFF, 0xFE, 0x00, 0xD8, 'A', 0x00}, wantValidUTF: true, wantContains: "A"},
