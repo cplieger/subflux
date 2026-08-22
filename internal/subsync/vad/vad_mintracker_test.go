@@ -33,6 +33,31 @@ func expectSortedInsert(sv [16]int16, fv int16) [16]int16 {
 	return out
 }
 
+// expectSortedInsertWithAges is the same independent linear-scan oracle as
+// expectSortedInsert, extended to the parallel age list: the entry written to
+// takes age 1 and the ages above it shift right with their values. It takes the
+// ages as they stand after the aging step, not before.
+func expectSortedInsertWithAges(sv, age [16]int16, fv int16) (svOut, ageOut [16]int16) {
+	pos := -1
+	for i := range 16 {
+		if fv < sv[i] {
+			pos = i
+			break
+		}
+	}
+	if pos < 0 {
+		return sv, age
+	}
+	svOut, ageOut = sv, age
+	for i := 15; i > pos; i-- {
+		svOut[i] = svOut[i-1]
+		ageOut[i] = ageOut[i-1]
+	}
+	svOut[pos] = fv
+	ageOut[pos] = 1
+	return svOut, ageOut
+}
+
 // medianSmoothReference mirrors findMinimum's median-selection + fixed-point
 // smoothing tail, so the expected smoothed output is readable instead of a
 // hand-traced magic constant. The constants match the production locals.
@@ -163,6 +188,38 @@ func TestFindMinimum_sorted_insert(t *testing.T) {
 		copy(got[:], v.lowValue[:16])
 		if want := expectSortedInsert(seed, fv); got != want {
 			t.Errorf("findMinimum(%d): lowValue = %v, want %v", fv, got, want)
+		}
+	}
+}
+
+// TestFindMinimum_equal_value_inserts_above_the_match feeds a value that EQUALS
+// an existing tracker entry, once for each of the sixteen slots. A tie lands in
+// the slot above the entry it matches, because the list stays ascending and
+// every comparison in the search is strict; a value tying with the largest entry
+// is not inserted at all.
+//
+// The value list alone cannot witness this: a duplicate placed on either side of
+// the entry it ties with leaves the same sixteen values in the same order. The
+// ages are what differ, so both lists are compared.
+func TestFindMinimum_equal_value_inserts_above_the_match(t *testing.T) {
+	t.Parallel()
+	seed := mintrackerSeed()
+	// Every age starts at 5 and the aging step lifts it to 6, which is below the
+	// 100-frame eviction limit, so nothing is evicted before the insert.
+	aged := [16]int16{6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}
+	for _, fv := range seed {
+		v := newVADInst(ModeVeryAggressive)
+		copy(v.lowValue[:16], seed[:])
+		for i := range 16 {
+			v.indexVec[i] = 5
+		}
+		v.findMinimum(fv, 0)
+		wantValues, wantAges := expectSortedInsertWithAges(seed, aged, fv)
+		if got := low16(v.lowValue[:16]); got != wantValues {
+			t.Errorf("findMinimum(%d) on %v: lowValue = %v, want %v", fv, seed, got, wantValues)
+		}
+		if got := low16(v.indexVec[:16]); got != wantAges {
+			t.Errorf("findMinimum(%d) on %v: indexVec = %v, want %v", fv, seed, got, wantAges)
 		}
 	}
 }
