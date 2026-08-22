@@ -1,14 +1,28 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/cplieger/subflux/internal/subflux"
 )
+
+// captureRegistryLogs routes the default logger into a buffer for the rest of
+// the test and restores it afterwards. The default logger is process-global, so
+// a test that calls this must not run in parallel.
+func captureRegistryLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
 
 func TestRegister_and_LoadAll(t *testing.T) {
 	t.Parallel()
@@ -163,6 +177,34 @@ func TestLoadAll_no_providers_loaded(t *testing.T) {
 	}
 	if len(providers) != 0 {
 		t.Errorf("LoadAll() returned %d providers, want 0", len(providers))
+	}
+}
+
+// TestLoadAll_warnsWithTheClassificationCountsWhenNothingLoads asserts the
+// embedded-only outcome is reported with the counts that let an operator tell a
+// config typo (unknown > 0) from a deliberate all-disabled setup.
+// Not parallel: it swaps the process-wide default logger.
+func TestLoadAll_warnsWithTheClassificationCountsWhenNothingLoads(t *testing.T) {
+	logs := captureRegistryLogs(t)
+	r := NewRegistry()
+	r.Register("known", func(_ context.Context, _ map[string]any) (Provider, error) {
+		return &fakeProvider{name: "known"}, nil
+	})
+
+	providers, err := r.LoadAll(t.Context(), map[subflux.ProviderID]subflux.ProviderCfg{
+		"known":   {Enabled: false},
+		"missing": {Enabled: true},
+	})
+	if err != nil {
+		t.Fatalf("LoadAll() unexpected error: %v", err)
+	}
+	if len(providers) != 0 {
+		t.Fatalf("LoadAll() returned %d providers, want 0", len(providers))
+	}
+
+	const want = `msg="no acquisition providers loaded; embedded detection and coverage only" configured=2 disabled=1 unknown=1`
+	if got := logs.String(); !strings.Contains(got, want) {
+		t.Errorf("LoadAll() log = %q, want it to contain %q", got, want)
 	}
 }
 
