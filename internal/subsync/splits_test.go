@@ -1,6 +1,9 @@
 package subsync
 
 import (
+	"math"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -139,8 +142,10 @@ func TestDetectSplits_two_segments(t *testing.T) {
 	}
 	// Low penalty should detect the split.
 	splits := detectSplits(offsets, 1)
-	if len(splits) < 2 {
-		t.Fatalf("expected at least 2 split points, got %d", len(splits))
+	// The offsets change exactly once, at index 10, so that is the only split
+	// worth making: any extra one costs the penalty and saves nothing.
+	if want := []int{0, 10}; !slices.Equal(splits, want) {
+		t.Errorf("detectSplits(two offset blocks of 10, penalty 1) = %v, want %v", splits, want)
 	}
 }
 
@@ -306,8 +311,11 @@ func TestDetectSplits_many_segments_capped(t *testing.T) {
 		offsets[i] = perCueOffset{offsetMs: int64(i/5) * 10000}
 	}
 	splits := detectSplits(offsets, 1) // very low penalty → many splits
-	if len(splits) > maxSplits+1 {
-		t.Errorf("detectSplits returned %d splits, want <= %d", len(splits), maxSplits+1)
+	// 40 groups are available, so the cap is what decides the count: it must be
+	// reached exactly, neither exceeded nor undershot.
+	if len(splits) != maxSplits+1 {
+		t.Errorf("detectSplits(40 offset groups, penalty 1) returned %d splits, want %d",
+			len(splits), maxSplits+1)
 	}
 }
 
@@ -624,5 +632,252 @@ func TestBuildSegments_empty_splits(t *testing.T) {
 	segs := buildSegments(t.Context(), ref, inc, nil)
 	if len(segs) != 0 {
 		t.Errorf("buildSegments(nil splits) returned %d segments, want 0", len(segs))
+	}
+}
+
+// jitteredPair returns a reference track and a copy shifted by 2s whose
+// per-cue best offsets differ by at most 3ms. Each span has a distinct
+// duration, so every cue's best-scoring reference span is its positional
+// counterpart and the resulting offsets carry only that millisecond jitter —
+// a total squared deviation far below defaultSplitPenalty.
+func jitteredPair() (reference, incorrect []Cue) {
+	const n = 30
+	reference = make([]Cue, n)
+	incorrect = make([]Cue, n)
+	for i := range n {
+		dur := time.Duration(100+i*7) * time.Millisecond
+		refStart := time.Duration(i*1000) * time.Millisecond
+		incStart := refStart + 2*time.Second + time.Duration(i%4)*time.Millisecond
+		reference[i] = Cue{Start: refStart, End: refStart + dur, Text: "ref"}
+		incorrect[i] = Cue{Start: incStart, End: incStart + dur, Text: "inc"}
+	}
+	return reference, incorrect
+}
+
+// A penalty of zero means "use the default", not "splits are free". On a track
+// whose offsets wander by only a few milliseconds the default suppresses every
+// split, so the generator emits no candidate and hands the cues back untouched;
+// a literal zero penalty would instead split at nearly every cue.
+func TestAlignWithSplits_non_positive_penalty_falls_back_to_the_default(t *testing.T) {
+	t.Parallel()
+	ref, inc := jitteredPair()
+	tests := []struct {
+		name    string
+		penalty float64
+	}{
+		{name: "zero", penalty: 0},
+		{name: "negative", penalty: -5},
+		{name: "the_default_stated_explicitly", penalty: defaultSplitPenalty},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := alignWithSplits(t.Context(), ref, inc, tt.penalty)
+			if got.Confidence != ConfidenceNone {
+				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v).Confidence = %v, want %v",
+					tt.penalty, float64(got.Confidence), float64(ConfidenceNone))
+			}
+			if len(got.Transform.Segments) != 0 {
+				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v) produced %d segments, want 0: %+v",
+					tt.penalty, len(got.Transform.Segments), got.Transform.Segments)
+			}
+			if !slices.Equal(got.Cues, inc) {
+				t.Errorf("alignWithSplits(millisecond jitter, penalty=%v) altered the cues; want them returned verbatim",
+					tt.penalty)
+			}
+		})
+	}
+}
+
+// twoBlockPair returns a reference track and a copy whose second half carries a
+// different shift, so split detection finds exactly one split point.
+func twoBlockPair() (reference, incorrect []Cue) {
+	const n = 40
+	reference = make([]Cue, n)
+	incorrect = make([]Cue, n)
+	for i := range n {
+		start := time.Duration(i*2000) * time.Millisecond
+		dur := time.Duration(300+i*11) * time.Millisecond
+		reference[i] = Cue{Start: start, End: start + dur, Text: "ref"}
+		shift := 3 * time.Second
+		if i >= n/2 {
+			shift = 12 * time.Second
+		}
+		incorrect[i] = Cue{Start: start + shift, End: start + dur + shift, Text: "inc"}
+	}
+	return reference, incorrect
+}
+
+// The completion line reports split POINTS, one fewer than the segment count:
+// two segments are separated by a single split. An operator reading the line
+// compares it against the segment count, so the two must agree.
+func TestAlignWithSplits_logs_one_fewer_split_than_segments(t *testing.T) {
+	// slog's default logger is process-global: this test must stay serial.
+	ref, inc := twoBlockPair()
+	var got SyncResult
+	logs := captureAlignLogs(t, func() {
+		got = alignWithSplits(t.Context(), ref, inc, 0)
+	})
+	if len(got.Transform.Segments) != 2 {
+		t.Fatalf("alignWithSplits(two-block track) produced %d segments, want 2: %+v",
+			len(got.Transform.Segments), got.Transform.Segments)
+	}
+	if !strings.Contains(logs, "segments=2") {
+		t.Errorf("alignWithSplits(two-block track) did not report segments=2; logged:\n%s", logs)
+	}
+	if !strings.Contains(logs, "splits=1") {
+		t.Errorf("alignWithSplits(two-block track) did not report splits=1; logged:\n%s", logs)
+	}
+}
+
+// Two reference spans of equal length score identically against a cue, and the
+// incumbent is only replaced by a strictly better score, so the earlier span
+// wins. The choice decides the cue's offset, so the direction is load-bearing.
+func TestPerCueOffsets_keeps_the_first_of_two_equally_scoring_spans(t *testing.T) {
+	t.Parallel()
+	// Both reference spans are 1000ms, as is the cue, so both score 1.0.
+	refSpans := []TimeSpan{
+		{Start: 0, End: 1000},
+		{Start: 5000, End: 6000},
+	}
+	inc := []Cue{{Start: 2 * time.Second, End: 3 * time.Second, Text: "cue"}}
+	got := perCueOffsets(t.Context(), refSpans, inc)
+	if len(got) != 1 {
+		t.Fatalf("perCueOffsets(2 reference spans, 1 cue) returned %d offsets, want 1", len(got))
+	}
+	if got[0].offsetMs != -2000 {
+		t.Errorf("perCueOffsets(equal-length reference spans at 0 and 5000) = %d, want -2000 (the earlier span)",
+			got[0].offsetMs)
+	}
+}
+
+// A zero-length reference span cannot overlap anything, so it scores zero and
+// must never become a cue's chosen offset — a cue with no usable reference is
+// reported as needing no shift.
+func TestPerCueOffsets_ignores_a_reference_span_that_cannot_overlap(t *testing.T) {
+	t.Parallel()
+	refSpans := []TimeSpan{{Start: 4000, End: 4000}}
+	inc := []Cue{{Start: 2 * time.Second, End: 3 * time.Second, Text: "cue"}}
+	got := perCueOffsets(t.Context(), refSpans, inc)
+	if len(got) != 1 {
+		t.Fatalf("perCueOffsets(1 zero-length reference span, 1 cue) returned %d offsets, want 1", len(got))
+	}
+	if got[0].offsetMs != 0 {
+		t.Errorf("perCueOffsets(zero-length reference span at 4000) = %d, want 0", got[0].offsetMs)
+	}
+}
+
+// A segment holding exactly minSegmentCues cues is large enough to keep its own
+// offset; only a shorter one folds into its neighbour. Getting this boundary
+// wrong merges a genuine timing change away, which shows up as a visibly
+// mistimed tail.
+func TestBuildSegments_keeps_a_trailing_segment_of_exactly_the_minimum_size(t *testing.T) {
+	t.Parallel()
+	inc := make([]Cue, 20)
+	for i := range inc {
+		start := time.Duration(i*1000) * time.Millisecond
+		inc[i] = Cue{Start: start, End: start + 400*time.Millisecond, Text: "cue"}
+	}
+	refSpans := cuesToSpans(inc)
+	tests := []struct {
+		name        string
+		trailing    int
+		wantCount   int
+		wantFirstTo int
+	}{
+		{name: "one_below_the_minimum", trailing: minSegmentCues - 1, wantCount: 1, wantFirstTo: 20},
+		{name: "exactly_the_minimum", trailing: minSegmentCues, wantCount: 2, wantFirstTo: 15},
+		{name: "one_above_the_minimum", trailing: minSegmentCues + 1, wantCount: 2, wantFirstTo: 14},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := buildSegments(t.Context(), refSpans, inc, []int{0, len(inc) - tt.trailing})
+			if len(got) != tt.wantCount {
+				t.Fatalf("buildSegments(20 cues, trailing segment of %d) returned %d segments, want %d: %+v",
+					tt.trailing, len(got), tt.wantCount, got)
+			}
+			if got[0].endIdx != tt.wantFirstTo {
+				t.Errorf("buildSegments(20 cues, trailing segment of %d) first segment ends at %d, want %d",
+					tt.trailing, got[0].endIdx, tt.wantFirstTo)
+			}
+		})
+	}
+}
+
+// Confidence is the measured overlap ratio scaled by a ceiling that drops by
+// SplitPenaltyPerSegment for every segment beyond the first. Half the reference
+// time covered across two segments therefore rates 0.5 * (0.85 - 0.05).
+func TestSegmentConfidence_scales_the_overlap_ratio_by_the_segment_ceiling(t *testing.T) {
+	t.Parallel()
+	// Four 1s cues, left in place by two zero-offset segments.
+	inc := []Cue{
+		{Start: 0, End: time.Second, Text: "a"},
+		{Start: 2 * time.Second, End: 3 * time.Second, Text: "b"},
+		{Start: 4 * time.Second, End: 5 * time.Second, Text: "c"},
+		{Start: 6 * time.Second, End: 7 * time.Second, Text: "d"},
+	}
+	// 4000ms of reference time, of which the cues cover 2000ms.
+	refSpans := []TimeSpan{
+		{Start: 0, End: 1000},
+		{Start: 2000, End: 3000},
+		{Start: 20000, End: 22000},
+	}
+	tests := []struct {
+		name     string
+		segments []segment
+		want     float64
+	}{
+		{
+			name:     "one_segment_pays_no_penalty",
+			segments: []segment{{startIdx: 0, endIdx: 4}},
+			want:     0.5 * 0.85,
+		},
+		{
+			name:     "two_segments_pay_one_penalty",
+			segments: []segment{{startIdx: 0, endIdx: 2}, {startIdx: 2, endIdx: 4}},
+			want:     0.5 * (0.85 - 0.05),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Tolerance covers only the ordering of the same float64 operations;
+			// every mutation of this arithmetic moves the result by >= 0.05.
+			const tolerance = 1e-9
+			got := float64(segmentConfidence(tt.segments, inc, refSpans))
+			if math.Abs(got-tt.want) > tolerance {
+				t.Errorf("segmentConfidence(%d segments, half the reference covered) = %v, want %v (+/- %v)",
+					len(tt.segments), got, tt.want, tolerance)
+			}
+		})
+	}
+}
+
+// A split must pay for itself: when segmenting costs exactly what it saves, the
+// coarser answer wins. Preferring the finer one on a tie splits a track that has
+// no real timing change in it.
+func TestDetectSplits_prefers_the_coarser_segmentation_on_a_tie(t *testing.T) {
+	t.Parallel()
+	// Total squared deviation of [0 0 10 10] as one segment is exactly 100;
+	// split at index 2 it is 0, so a penalty of 100 makes the two equal.
+	offsets := []perCueOffset{{offsetMs: 0}, {offsetMs: 0}, {offsetMs: 10}, {offsetMs: 10}}
+	tests := []struct {
+		name    string
+		penalty float64
+		want    []int
+	}{
+		{name: "the_split_pays_for_itself", penalty: 99, want: []int{0, 2}},
+		{name: "the_split_exactly_breaks_even", penalty: 100, want: []int{0}},
+		{name: "the_split_costs_more_than_it_saves", penalty: 101, want: []int{0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := detectSplits(offsets, tt.penalty)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("detectSplits([0 0 10 10], penalty=%v) = %v, want %v", tt.penalty, got, tt.want)
+			}
+		})
 	}
 }
