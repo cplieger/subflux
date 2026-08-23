@@ -325,12 +325,17 @@ describe("draft resume", () => {
     // A reload mid-setup must not restart the walk; the draft carries the step
     // and the fingerprint of the config it was started against.
     const sections = { sonarr: { enabled: true, url: "http://sonarr:8989", api_key: "" } };
-    const secrets = ["sonarr.api_key"];
+    // Dotted PATHS marking which secrets the server holds, never their values —
+    // the shape `secrets_present` carries. They reach storage only through
+    // fingerprintBoot, which returns a djb2 hash, so no secret and no path name
+    // is recoverable from the draft. Named for what it holds: a bare `secrets`
+    // reads as values, and CodeQL's clear-text-storage rule agrees.
+    const secretPaths = ["sonarr.api_key"];
     localStorage.setItem(
       "subflux-setup-draft",
       JSON.stringify({
         v: 2,
-        fingerprint: fingerprintBoot(sections, secrets),
+        fingerprint: fingerprintBoot(sections, secretPaths),
         stepId: "providers",
         touched: ["arr"],
         model: {
@@ -343,7 +348,7 @@ describe("draft resume", () => {
       }),
     );
 
-    await boot({ configValid: false, sections, secretsPresent: secrets });
+    await boot({ configValid: false, sections, secretsPresent: secretPaths });
 
     expect(stepTitle()).toBe("Providers");
   });
