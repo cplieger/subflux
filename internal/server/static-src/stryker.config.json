@@ -13,7 +13,6 @@
   "mutate": [
     "api-client.ts",
     "config.ts",
-    "config-yaml.ts",
     "coverage.ts",
     "detail.ts",
     "dom.ts",
@@ -24,7 +23,6 @@
     "notify.ts",
     "search.ts",
     "security.ts",
-    "skeleton-timing.ts",
     "status.ts",
     "store.ts",
     "sync-timecode.ts",
