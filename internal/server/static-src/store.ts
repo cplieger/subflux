@@ -52,11 +52,21 @@ export interface StoreMap {
   [key: string]: unknown;
 }
 
-const store = createStore<StoreMap>();
-
 export { batch, effect } from "@cplieger/reactive";
 
-export const get = store.get.bind(store);
-export const set = store.set.bind(store);
-export const subscribe = store.subscribe.bind(store);
-export const computed = store.computed.bind(store);
+// Destructured, which is the shape createStore's own doc comment documents
+// (`const { get, set, subscribe, computed } = createStore<MyMap>()`): the four
+// methods are closures over the factory's private signal map and never read
+// `this`, so the `.bind(store)` this replaced was a no-op wrapper. Dropping it
+// also fixed a coverage artifact — v8 attributed the four `bind()` initializer
+// expressions by byte offset into @cplieger/reactive and reported two of the
+// five module-scope statements as never run, which read as 60.00% against a
+// per-file threshold of 60 on a file whose every statement runs at import.
+//
+// unbound-method cannot see that the members are closures (it reads the
+// declared `Store<M>` interface, whose method signatures imply a `this`), so it
+// flags the documented usage. The fix belongs upstream — declaring the members
+// with `this: void` would sanction destructuring for every consumer — and until
+// then this is the one honest place to say so.
+// eslint-disable-next-line @typescript-eslint/unbound-method -- closures, not methods; see above
+export const { get, set, subscribe, computed } = createStore<StoreMap>();
