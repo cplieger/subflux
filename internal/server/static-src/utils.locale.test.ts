@@ -42,10 +42,30 @@ function pinLocaleWithoutResolvedOptions(locale: string): void {
   vi.stubGlobal("Intl", { DateTimeFormat: NoResolvedOptions });
 }
 
-/** Re-execute utils.ts so its module-scope locale detection runs again. */
+/** Re-execute utils.ts so its module-scope locale detection runs again.
+ *
+ *  The `?boot=` query is what makes the re-execution happen, and it is not
+ *  decoration. Browser Mode resolves a dynamic import through the browser's own
+ *  module map, which is keyed by URL and holds evaluated modules for the life of
+ *  the page: `vi.resetModules()` clears the runner's registry but cannot evict an
+ *  entry from that map, so a bare `import("./utils.js")` returns the instance an
+ *  earlier test already evaluated and the locale detection never re-runs. A
+ *  distinct query is a distinct URL and therefore a fresh evaluation.
+ *  `@vite-ignore` opts out of Vite's variable-dynamic-import rewrite, which
+ *  otherwise resolves the specifier against a generated glob map no query
+ *  matches.
+ *
+ *  The `.ts` extension is load-bearing too, and it is the one thing here that
+ *  looks like a typo and is not. A statically-analyzable `import("./utils.js")`
+ *  is rewritten to the resolved `utils.ts` id at transform time, but this
+ *  specifier is built at runtime, so the URL the browser requests is the one
+ *  written here -- and that URL is what v8 coverage reports against. Written
+ *  `./utils.js` every evaluation is attributed to a file that does not exist and
+ *  utils.ts reports 0% coverage while this suite stays green. */
+let bootCount = 0;
 async function freshUtils(): Promise<typeof UtilsModule> {
   vi.resetModules();
-  return import("./utils.js");
+  return (await import(/* @vite-ignore */ `./utils.ts?boot=${++bootCount}`)) as typeof UtilsModule;
 }
 
 describe("fmtTime: the clock the locale asks for", () => {

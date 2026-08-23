@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // Property-based tests for config-renderers.ts pure helpers, ported from
 // the former config-yaml.property.test.ts (formatDurationCfg moved here
 // when the YAML text helpers were deleted).

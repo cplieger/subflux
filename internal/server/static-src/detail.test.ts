@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, vi, beforeEach, expect } from "vitest";
 
 // CRITICAL: vitest.config has clearMocks/mockReset/restoreMocks=true, which

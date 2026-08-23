@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, vi, beforeEach, afterEach, expect } from "vitest";
 
 // One controllable mock backs the generated listState function history.ts

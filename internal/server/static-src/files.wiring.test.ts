@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // files.wiring.test.ts — the parts of files.ts files.test.ts cannot reach with
 // its immediate-resolve listing: the anti-flicker skeleton (which needs fake

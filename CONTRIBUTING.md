@@ -294,7 +294,9 @@ Tests live beside the code they cover:
   `authstore/contract_test.go`). A new store method means a new contract
   case.
 - **TypeScript**: `foo.ts` → `foo.test.ts`, co-located; vitest with
-  `fast-check` for property tests, happy-dom for DOM-dependent tests.
+  `fast-check` for property tests. Tests run in a real headless Chromium by
+  default; `foo.node.test.ts` opts a file into the Node project for genuine
+  filesystem work.
 - Run `go test -race ./...` on changes to concurrent code (the engine,
   scheduler, polling, SSE events, store).
 - The **synthetic provider** (`internal/provider/synthetic/`) generates

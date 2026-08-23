@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Capture every action's dispatch mock, run() implementation, and full
@@ -441,6 +440,27 @@ interface PollHarness {
   bus: typeof BusModule;
 }
 
+// Only the module under test carries the `?boot=` query, and it is what makes
+// this harness fresh. Browser Mode resolves a dynamic import through the
+// browser's own URL-keyed module map, which vi.resetModules() cannot evict, so a
+// bare import("./status.js") hands back the instance an earlier test evaluated --
+// its toasted-activity sets and paint state included, which is what makes the
+// first-poll-seeding and closed-popup assertions below observe a previous test's
+// work. A distinct query is a distinct URL and therefore a fresh evaluation, and
+// its top-level apiAction() calls re-register status.poll over the stale one.
+// `@vite-ignore` opts out of Vite's variable-dynamic-import rewrite.
+//
+// The `.ts` extension is load-bearing: this specifier is built at runtime, so the
+// URL the browser requests is the one written here, and that URL is what v8
+// coverage attributes the evaluation to. Written `./status.js` it names a file
+// that does not exist and status.ts reports 0% coverage while this suite stays
+// green.
+//
+// ./store.js, ./notify.js and ./bus.js are imported plainly on purpose: a busted
+// specifier mints a DUPLICATE instance, so busting those would hand this harness
+// different objects than the status instance reads, and both the seeded store
+// values and the notify spies would be invisible to it.
+let bootCount = 0;
 async function freshPollHarness(): Promise<PollHarness> {
   vi.resetModules();
   document.body.innerHTML =
@@ -451,7 +471,9 @@ async function freshPollHarness(): Promise<PollHarness> {
   st.set("isAdmin", false);
   const notifyM = (await import("./notify.js")) as unknown as PollHarness["notifyM"];
   const bus = await import("./bus.js");
-  const status = await import("./status.js");
+  const status = (await import(
+    /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
+  )) as typeof StatusModule;
   const run = actionRuns.get("status.poll");
   if (!run) {
     throw new Error("status.poll run not captured");

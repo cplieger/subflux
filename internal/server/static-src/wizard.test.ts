@@ -7,10 +7,9 @@
 //  - the localStorage draft is schema-sanitized: secret values and their
 //    keys never reach storage, and a legacy (v1, pre-sanitization) draft is
 //    removed at boot.
-// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SchemaSection } from "./api-types.js";
-import type * as WizardModule from "./wizard.js";
+import * as wizard from "./wizard.js";
 
 // Hoisted mock state: dispatch mocks by action name (so tests can assert
 // "no save dispatch happened") and the wire client fns (impls set per test;
@@ -34,8 +33,10 @@ vi.mock("./wire/client.gen.js", () => ({
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
 }));
 
-// Plain-function factory (immune to mockReset): each module (re-)import
-// registers fresh dispatch mocks under the action's name.
+// Plain-function factory (immune to mockReset). wizard.ts is imported ONCE
+// here, so this registers the dispatch mocks once, at that import; mockReset
+// clears their call history before each test, which is all these assertions
+// need (no test dispatches the save action).
 vi.mock("@cplieger/actions", () => ({
   apiAction: (cfg: { name: string }) => {
     const dispatch = vi.fn(() => {
@@ -98,9 +99,23 @@ function hiddenOf(id: string): boolean {
   return (document.getElementById(id) as HTMLElement).hidden === true;
 }
 
-async function importWizard(): Promise<typeof WizardModule> {
-  return import("./wizard.js");
-}
+// This file imports wizard.ts ONCE, statically, and resets it between tests
+// through its own `_resetForTest` export. Neither of the two module-freshness
+// routes is available here:
+//   - `vi.resetModules()` does not re-evaluate a module in Browser Mode (the
+//     module map is URL-keyed), so it hands back the cached instance;
+//   - `./wizard.ts?boot=N` -- the fix the other files in this package use --
+//     mints a DUPLICATE instance, and wizard.ts is in a circular import with
+//     wizard-steps.ts and wizard-providers.ts, which import `schemaByKey`,
+//     `wizardValues`, `secretSaved` and `mediaRoots` back from "./wizard.js".
+//     The copy sets `fullSchema` on itself while the single shared step
+//     modules keep reading the original's, which stays empty. Measured: the
+//     busted arr step renders its <h3> and no fields at all.
+// The explicit reset is the fleet's pattern for exactly this (see
+// `_resetForTest` in @cplieger/ui-primitives, `resetActionFramework` in
+// @cplieger/actions). `navWired` is the binding that made the leak visible:
+// left true from a previous test, `wireWizardNav()` no-ops and the freshly
+// mounted page gets no nav listeners, so clicking Next never saves a draft.
 
 /** Wait past the 150ms step fade-in used when wizardSection already holds
  *  content (the init-error UI) at render time. */
@@ -109,7 +124,7 @@ async function waitForFade(): Promise<void> {
 }
 
 beforeEach(() => {
-  vi.resetModules();
+  wizard._resetForTest();
   mountWizardPage();
   localStorage.clear();
 });
@@ -118,7 +133,6 @@ describe("wizard: initialization failure (retryable, no partial boot)", () => {
   it("renders the retry UI when the structured config fetch fails (schema OK)", async () => {
     wire.configSchema.mockResolvedValue(schemaFixture());
     wire.configStructured.mockResolvedValue(null);
-    const wizard = await importWizard();
 
     await wizard.startConfigWizard({ configValid: false });
 
@@ -141,7 +155,6 @@ describe("wizard: initialization failure (retryable, no partial boot)", () => {
   it("renders the same retry UI when the schema fetch fails (structured OK)", async () => {
     wire.configSchema.mockResolvedValue(null);
     wire.configStructured.mockResolvedValue({ sections: {}, secrets_present: [] });
-    const wizard = await importWizard();
 
     await wizard.startConfigWizard({ configValid: false });
 
@@ -161,7 +174,6 @@ describe("wizard: initialization failure (retryable, no partial boot)", () => {
     localStorage.setItem(DRAFT_KEY, stray);
     wire.configSchema.mockResolvedValue(schemaFixture());
     wire.configStructured.mockResolvedValue(null);
-    const wizard = await importWizard();
 
     await wizard.startConfigWizard({ configValid: false });
 
@@ -175,7 +187,6 @@ describe("wizard: initialization failure (retryable, no partial boot)", () => {
       sections: {},
       secrets_present: [],
     });
-    const wizard = await importWizard();
 
     await wizard.startConfigWizard({ configValid: false });
     const retry = document.getElementById("wizardInitRetry") as HTMLButtonElement;
@@ -196,7 +207,6 @@ describe("wizard: draft persistence is secret-sanitized", () => {
   it("saveDraft stores neither secret values nor secret-bearing keys", async () => {
     wire.configSchema.mockResolvedValue(schemaFixture());
     wire.configStructured.mockResolvedValue({ sections: {}, secrets_present: [] });
-    const wizard = await importWizard();
     await wizard.startConfigWizard({ configValid: false });
 
     // Fill the arr step, secrets included, then advance (Next collects the
@@ -230,7 +240,6 @@ describe("wizard: draft persistence is secret-sanitized", () => {
     );
     wire.configSchema.mockResolvedValue(schemaFixture());
     wire.configStructured.mockResolvedValue({ sections: {}, secrets_present: [] });
-    const wizard = await importWizard();
 
     await wizard.startConfigWizard({ configValid: false });
 

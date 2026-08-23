@@ -1,4 +1,3 @@
-// @vitest-environment node
 //
 // Table-driven tests for the runtime-validation helpers in validators.ts.
 //

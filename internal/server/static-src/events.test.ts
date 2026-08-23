@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SSE_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
 // Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
@@ -96,7 +95,7 @@ class FakeEventSource {
 }
 
 // events.js is imported ONCE (its visibilitychange listener registers on the
-// shared happy-dom document at import time); tests share the module state and
+// document at import time); tests share the module state and
 // reset the connection between tests via the registerCleanup-captured
 // disconnect. EventSource is stubbed per test (vitest.config has
 // unstubGlobals: true, which clears module-scope stubs).

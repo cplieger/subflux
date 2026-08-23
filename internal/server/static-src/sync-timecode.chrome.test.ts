@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // The timecode widget's chrome, which sync-timecode.test.ts (values, keyboard,
 // wheel, hold-repeat, touch drag) does not look at: the composition the
 // stylesheet styles, and whether a touch on a chevron is swallowed.

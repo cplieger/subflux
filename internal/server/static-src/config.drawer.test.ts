@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // The settings drawer's lifecycle: the dialog controller's dismissal policy,
 // open/close, the config load, the save (including the WebAuthn RP ID guard),
@@ -239,7 +238,31 @@ function parsedConfig(opts: { configured?: boolean; ignoredCodecs?: string[] } =
   return pc;
 }
 
-/** Rebuild the settings DOM, arm the doubles and import config.ts fresh. */
+/** Rebuild the settings DOM, arm the doubles and import config.ts fresh.
+ *
+ *  The `?boot=` query on the config specifier is what makes "fresh" true, and it
+ *  is not decoration. Browser Mode resolves a dynamic import through the
+ *  browser's own module map, which is keyed by URL and holds evaluated modules
+ *  for the life of the page: `vi.resetModules()` clears the runner's registry but
+ *  cannot evict an entry from that map. A bare `import("./config.js")` therefore
+ *  returns the instance the FIRST boot evaluated, its drawer state and top-level
+ *  action registrations frozen there, and since `actions.reset()` just cleared the
+ *  registry every test after the first drives a stale graph. A distinct query is
+ *  a distinct URL and therefore a fresh evaluation. `@vite-ignore` opts out of
+ *  Vite's variable-dynamic-import rewrite.
+ *
+ *  The `.ts` extension is load-bearing: this specifier is built at runtime, so
+ *  the URL the browser requests is the one written here, and that URL is what v8
+ *  coverage attributes the evaluation to. Written `./config.js` it names a file
+ *  that does not exist and config.ts reports 0% coverage while this suite stays
+ *  green.
+ *
+ *  Only the module under test is busted. `./store.js` and `./bus.js` are imported
+ *  plainly on purpose: a busted specifier mints a DUPLICATE instance, so busting
+ *  those would hand this harness a different store and bus than the config
+ *  instance reads, and neither the seeded values nor the published events would
+ *  reach it. */
+let bootCount = 0;
 async function boot(opts: BootOpts = {}): Promise<Harness> {
   vi.resetModules();
   wire.reset();
@@ -285,7 +308,9 @@ async function boot(opts: BootOpts = {}): Promise<Harness> {
   store.computed("isUnconfigured", () => store.get("config")?.configured === false);
 
   const bus = await import("./bus.js");
-  const config = await import("./config.js");
+  const config = (await import(
+    /* @vite-ignore */ `./config.ts?boot=${++bootCount}`
+  )) as typeof ConfigModule;
   return { config, store, bus, dlg, body, saveBtn };
 }
 

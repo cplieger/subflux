@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, vi, beforeEach, expect } from "vitest";
 
 // The apiAction mock mirrors the parts of the real contract files.ts depends

@@ -1,5 +1,5 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type * as NotifyModule from "./notify.js";
 
 // notify.ts wraps a @cplieger/ui-primitives toaster created at module load, so
 // re-import fresh per test (vi.resetModules) to get an isolated toaster + stack.
@@ -24,8 +24,25 @@ function toasts(): NodeListOf<Element> {
   return document.querySelectorAll(".uip-toast");
 }
 
-async function loadNotify() {
-  return await import("./notify.js");
+// The `?boot=` query is what makes the re-import build a fresh toaster, and it is
+// not decoration. Browser Mode resolves a dynamic import through the browser's
+// own module map, which is keyed by URL and holds evaluated modules for the life
+// of the page: vi.resetModules() clears the runner's registry but cannot evict an
+// entry from that map, so a bare import("./notify.js") returns the toaster an
+// earlier test already created and the stack is never isolated. A distinct query
+// is a distinct URL and therefore a fresh evaluation. `@vite-ignore` opts out of
+// Vite's variable-dynamic-import rewrite.
+//
+// The `.ts` extension is load-bearing: this specifier is built at runtime, so the
+// URL the browser requests is the one written here, and that URL is what v8
+// coverage attributes the evaluation to. Written `./notify.js` it names a file
+// that does not exist, and notify.ts reports 0% coverage while this suite stays
+// green.
+let bootCount = 0;
+async function loadNotify(): Promise<typeof NotifyModule> {
+  return (await import(
+    /* @vite-ignore */ `./notify.ts?boot=${++bootCount}`
+  )) as typeof NotifyModule;
 }
 
 describe("notify", () => {

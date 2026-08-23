@@ -1,20 +1,52 @@
-// @vitest-environment happy-dom
 // The DOM-building half of utils.ts, which utils.test.ts deliberately skips
 // ("DOM-dependent functions are excluded"): the view-transition wrapper, the
 // empty-state placeholder and the language <select>.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { viewTransition, emptyState, langSelect } from "./utils.js";
 import { LANGUAGES } from "./languages.js";
 
 /** The ui-primitives view-transition wrapper always runs through a promise
- *  chain, even on the no-startViewTransition path, so the callback lands a
- *  macrotask later at the earliest. */
+ *  chain, so the callback lands a macrotask later at the earliest. */
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("viewTransition", () => {
+  // These two tests are about the wrapper's API-ABSENT path -- the branch
+  // @cplieger/ui-primitives takes when `document.startViewTransition` is missing,
+  // where it awaits `fn()` directly and the callback lands within the macrotask
+  // settle() waits for. Chromium PROVIDES startViewTransition, so left alone the
+  // library drives its real transition instead, whose update callback needs a
+  // rendering opportunity; utils.ts's viewTransition() is declared `(fn) => void`
+  // and intentionally discards the promise, so there is nothing for a test to
+  // await and any wait would be a guessed frame count.
+  //
+  // So the premise is made explicit here instead of being inherited from the
+  // environment: remove the one capability for the duration of this suite.
+  // Assignment cannot do it -- the method lives on Document.prototype, so an
+  // OWN-property shadow is what creates the absence, and deleting that shadow
+  // afterwards is what restores the real method (there is no own descriptor to
+  // put back, which is why the restore is a delete rather than a defineProperty).
+  let savedDescriptor: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    savedDescriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
+    Object.defineProperty(document, "startViewTransition", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    if (savedDescriptor) {
+      Object.defineProperty(document, "startViewTransition", savedDescriptor);
+    } else {
+      Reflect.deleteProperty(document, "startViewTransition");
+    }
+  });
+
   it("runs the DOM update it is given", async () => {
     let ran = false;
 
