@@ -269,6 +269,43 @@ describe("openSearchPopup: the dialog and its URL", () => {
     expect(req(".dlg-title").textContent).toBe("Breaking Bad");
   });
 
+  it("still titles a movie with its bare name when an episode is handed in", async () => {
+    // The media TYPE decides whether an episode number belongs in the title;
+    // a stray episode argument on a movie must not add one.
+    openSearchPopup("movie", media(), 1, episode(), "en");
+    await settle();
+
+    expect(req(".dlg-title").textContent).toBe("Breaking Bad");
+  });
+
+  it("puts the title inside the dialog's header", async () => {
+    await openEpisodePopup();
+
+    expect(req(".dlg-head .dlg-title").textContent).toBe("Breaking Bad S01E01");
+  });
+
+  it("groups the language picker and the close button in the header controls", async () => {
+    await openEpisodePopup();
+
+    expect([...req(".dlg-controls").children].map((c) => c.tagName)).toEqual(["SELECT", "BUTTON"]);
+  });
+
+  it("re-shows the dialog on a reopen instead of leaving the open one in place", async () => {
+    await openEpisodePopup();
+    const dlg = req<HTMLDialogElement>("#searchResultPopup");
+    let closes = 0;
+    dlg.addEventListener("close", () => {
+      closes += 1;
+    });
+
+    // A modal dialog that is already open cannot be re-shown, so it has to be
+    // closed first — otherwise a reopen leaves it wherever it already sat in
+    // the top layer, underneath anything opened over it.
+    await openEpisodePopup();
+
+    expect(closes).toBe(1);
+  });
+
   it("offers every configured language in the picker", async () => {
     storeState.config = { languages: ["en", "fr"] };
 
@@ -404,6 +441,49 @@ describe("closeSearchPopup", () => {
 
     expect(location.pathname).toBe("/history");
   });
+
+  it("touches no history entry at all when the URL is not a search URL", async () => {
+    history.replaceState(null, "", "/series/81189/search/en");
+    await openEpisodePopup();
+    history.replaceState(null, "", "/history");
+    const replace = vi.spyOn(history, "replaceState");
+
+    closeSearchPopup();
+
+    // Rewriting the entry would discard whatever state the view that owns this
+    // URL had stored on it, even though the path came out the same.
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("does not cut a /search/<lang> segment out of the middle of a deeper URL", async () => {
+    history.replaceState(null, "", "/series/81189/search/en");
+    await openEpisodePopup();
+    history.replaceState(null, "", "/series/81189/search/en/extra");
+
+    closeSearchPopup();
+
+    // Only a TRAILING language segment makes a search URL; a deeper path is
+    // some other view, and inventing a parent for it navigates somewhere
+    // nobody asked for.
+    expect(location.pathname).toBe("/series/81189/search/en/extra");
+  });
+
+  it("stops treating the popup as history-pushing once it has gone back", async () => {
+    history.replaceState(null, "", "/library");
+    await openEpisodePopup();
+
+    closeSearchPopup();
+    await settle();
+
+    // Now sitting on a search URL the popup did NOT push: the close must
+    // rewrite the URL rather than pop another entry off the user's history.
+    history.replaceState(null, "", "/series/81189/search/en");
+    const back = vi.spyOn(history, "back");
+
+    closeSearchPopup();
+
+    expect(back).not.toHaveBeenCalled();
+  });
 });
 
 describe("runPopupSearch: what the server is asked", () => {
@@ -528,6 +608,14 @@ describe("runPopupSearch: what the server is asked", () => {
 
     expect(results().textContent).toContain("Searching providers");
   });
+
+  it("spins beside that placeholder so the wait reads as progress", async () => {
+    openSearchPopup("episode", media(), 1, episode(), "en");
+
+    // css/09-search.css animates `.spinner` and centres `.empty`; without both
+    // classes the wait renders as a bare line of text.
+    expect(results().querySelector(".empty .spinner")).not.toBeNull();
+  });
 });
 
 describe("runPopupSearch: how failures are shown", () => {
@@ -632,6 +720,22 @@ describe("renderPopupResults", () => {
     await openEpisodePopup();
 
     expect(rows()).toHaveLength(2);
+  });
+
+  it("heads each result column with its own label", async () => {
+    wire.searchResult = { ok: true, status: 200, data: { results: [result()] } };
+
+    await openEpisodePopup();
+
+    // The header row is a grid whose columns are addressed by these class
+    // names in css/09-search.css: a label without its class lands in whatever
+    // column the browser puts it in, so the header stops matching the rows.
+    const header = req<HTMLElement>(".result-row");
+    expect(
+      [".result-score", ".result-provider", ".result-match", ".result-release", ".result-dl"].map(
+        (sel) => header.querySelector(sel)?.textContent,
+      ),
+    ).toEqual(["Score", "Provider", "Match", "Release", "Download"]);
   });
 
   it("counts a single result in the singular", async () => {
@@ -980,6 +1084,19 @@ describe("downloadFromPopup", () => {
 
     window.dispatchEvent(new Event("beforeunload"));
 
+    expect(wire.activitySignals.at(-1)?.aborted).toBe(true);
+  });
+
+  it("releases the poll's signal once the download completes", async () => {
+    vi.useFakeTimers();
+    wire.activity = [[activityEntry({ done: true })]];
+    await clickDownload();
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    // That signal composes a five-minute download deadline. Leaving it live
+    // after the poll has finished keeps the deadline's timer armed for every
+    // download the session ever runs.
     expect(wire.activitySignals.at(-1)?.aborted).toBe(true);
   });
 

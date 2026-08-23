@@ -212,6 +212,12 @@ function credential(rk: boolean | undefined): Record<string, unknown> {
 const net = vi.hoisted(() => ({
   oidcStatus: 404,
   oidcThrows: false,
+  // When set, the OIDC probe answers a FILTERED response of this type instead
+  // of a constructed one. A cross-origin redirect under `redirect: "manual"`
+  // reaches the caller as an opaque-redirect response — status 0, type
+  // "opaqueredirect" — which the Response constructor cannot express (it
+  // rejects status 0), so the probe's two readable fields are supplied directly.
+  oidcType: null as string | null,
   finishStatus: 200,
   finishBody: {} as unknown,
   finishNotJSON: false,
@@ -243,6 +249,9 @@ function installBoundaries(): void {
     if (String(url) === "/api/auth/oidc") {
       if (net.oidcThrows) {
         return Promise.reject(new TypeError("probe failed"));
+      }
+      if (net.oidcType !== null) {
+        return Promise.resolve({ status: net.oidcStatus, type: net.oidcType } as Response);
       }
       return Promise.resolve(new Response(null, { status: net.oidcStatus }));
     }
@@ -380,6 +389,7 @@ beforeEach(() => {
   busState.handlers.clear();
   net.oidcStatus = 404;
   net.oidcThrows = false;
+  net.oidcType = null;
   net.finishStatus = 200;
   net.finishBody = {};
   net.finishNotJSON = false;
@@ -1399,6 +1409,19 @@ describe("security dialog: single sign-on", () => {
     expect(sectionTitles()).toContain("Single Sign-On");
   });
 
+  it("offers the section when the probe answers an opaque cross-origin redirect", async () => {
+    // What a browser actually hands back for `redirect: "manual"` when the
+    // server bounces to an external identity provider: the redirect is opaque,
+    // so the status reads 0 and only the response TYPE says what happened.
+    client.me = user({ role: "admin", oidc_linked: false, can_link_oidc: true });
+    net.oidcStatus = 0;
+    net.oidcType = "opaqueredirect";
+
+    await openSecurity();
+
+    expect(sectionTitles()).toContain("Single Sign-On");
+  });
+
   it("probes the OIDC entry point without following its redirect", async () => {
     client.me = user({ role: "admin" });
     net.oidcStatus = 302;
@@ -1566,5 +1589,128 @@ describe("security dialog: single sign-on", () => {
     await settle();
 
     expect(toasts.errors).toEqual(["Failed to disconnect single sign-on"]);
+  });
+});
+
+// The dialog's chrome: the structure css/15-security.css styles. Every class
+// name below has a live rule there — `.sec-section` (the bordered block per
+// concern), `.sec-fields` (the label/input grid), `.sec-actions` (the trailing
+// button row), `.sec-list` + `.sec-row` (the passkey/key table), `.muted` (the
+// secondary text) and `.sec-key-value` (the code + copy pairing). Losing one
+// leaves the markup readable to a test that only looks at text, and unusable
+// on screen.
+describe("security dialog: the chrome the stylesheet styles", () => {
+  it("renders every concern as its own section", async () => {
+    client.me = user({ role: "admin", has_password: true, oidc_linked: true });
+
+    await openSecurity();
+
+    expect(
+      [...document.querySelectorAll("#securityDialog .sec-section")].map(
+        (s) => s.querySelector("h3")?.textContent,
+      ),
+    ).toEqual(["Change Password", "Passkeys", "API Keys", "Single Sign-On"]);
+  });
+
+  it("announces the loading placeholder as secondary text", async () => {
+    client.me = user({ role: "admin" });
+    initSecurity();
+    const handler = busState.handlers.get("open:security");
+    if (handler === undefined) {
+      throw new Error("no handler");
+    }
+    handler();
+
+    expect(req("#securityDialog .dlg-body .muted").textContent).toBe("Loading\u2026");
+  });
+
+  it("lays the password inputs out in a fields grid", async () => {
+    await openSecurity();
+
+    expect([...req(".sec-fields").querySelectorAll("input")].map((i) => i.id)).toEqual([
+      "sec-current-pw",
+      "sec-new-pw",
+    ]);
+  });
+
+  it("puts each section's controls in a trailing actions row", async () => {
+    client.me = user({ role: "admin", has_password: true, oidc_linked: true });
+
+    await openSecurity();
+
+    expect(
+      [...document.querySelectorAll("#securityDialog .sec-actions button")].map((b) =>
+        b.textContent?.trim(),
+      ),
+    ).toEqual(["Change Password", "Add passkey", "Generate API key", "Disconnect"]);
+  });
+
+  it("puts the connect control in an actions row too", async () => {
+    client.me = user({ role: "admin", oidc_linked: false, can_link_oidc: true });
+    net.oidcStatus = 200;
+
+    await openSecurity();
+
+    expect(
+      [...document.querySelectorAll("#securityDialog .sec-actions button")].map((b) =>
+        b.textContent?.trim(),
+      ),
+    ).toEqual(["Change Password", "Add passkey", "Generate API key", "Connect"]);
+  });
+
+  it("renders the passkeys as a list of rows", async () => {
+    client.passkeys = [passkey(1, "Phone"), passkey(2, "Laptop")];
+
+    await openSecurity();
+
+    expect([...req(".sec-list").querySelectorAll(".sec-row")]).toHaveLength(2);
+  });
+
+  it("shows a passkey's creation date as secondary text beside its name", async () => {
+    client.passkeys = [passkey(1, "Phone")];
+
+    await openSecurity();
+
+    expect(req(".sec-row .muted").textContent).toContain("2026");
+  });
+
+  it("shows an API key's creation date as secondary text", async () => {
+    client.apikeys = [apiKey(1, "CI runner")];
+
+    await openSecurity();
+
+    expect(req(".sec-row .muted").textContent).toContain("2026");
+  });
+
+  it("pairs the new key with its copy button", async () => {
+    asks.answers = ["CI runner"];
+    await openSecurity();
+
+    button("Generate API key").click();
+    await settle();
+
+    expect([...req(".sec-key-value").children].map((c) => c.tagName)).toEqual(["CODE", "BUTTON"]);
+  });
+
+  it("puts the Done control in an actions row under the new key", async () => {
+    asks.answers = ["CI runner"];
+    await openSecurity();
+
+    button("Generate API key").click();
+    await settle();
+
+    expect(req(".sec-new-key + .sec-actions button").textContent).toBe("Done");
+  });
+
+  it("drops the dialog skin once the close has finished", async () => {
+    await openSecurity();
+    const dlg = req<HTMLDialogElement>("#securityDialog");
+
+    button("Close").click();
+    // The fade-out finalizes on the dialog's own transitionend (or a 400ms
+    // fallback); the close event it then fires is what disposes the controller.
+    dlg.dispatchEvent(new Event("transitionend"));
+
+    expect(dlg.classList.contains("uip-dialog")).toBe(false);
   });
 });
