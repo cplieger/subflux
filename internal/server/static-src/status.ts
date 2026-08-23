@@ -649,6 +649,12 @@ function renderPopup(
     const s = popupSkeleton;
     popupSkeleton = null;
     s.commit(() => {
+      // Detach the skeleton before the first reconcile: reconcile() removes
+      // only children carrying its key attribute, so the unkeyed placeholder
+      // rows would survive this paint and every later one, with the live rows
+      // inserted below them. detail.ts clears its container in the commit for
+      // the same reason; the table views get it from their shell patch.
+      $.statusPopup.replaceChildren();
       deferredPaint?.();
       deferredPaint = null;
     });
