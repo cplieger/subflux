@@ -14,14 +14,23 @@ import {
 } from "./wire/client.gen.js";
 import { bindLoadingState, registerCleanup } from "@cplieger/actions";
 import { langName } from "./utils.js";
-import { DEFAULT_VARIANT } from "./constants.js";
 import { buildTimecodeInput, formatOffsetMs, updateTimecodeDisplay } from "./sync-timecode.js";
 import type { TimecodeInput } from "./sync-timecode.js";
+import { buildSyncSubLabels, parseSeasonEpisode } from "./sync-entries.js";
 import type { SubtitleEntry, MediaType } from "./api-types.js";
 
 // --- Subtitle Sync Dialog ---
 
-const syncDlg: HTMLDialogElement = dialog("syncDialog");
+// Resolved on first use, not at import. `dialog()` is a getElementById, so
+// reading it at module scope made merely IMPORTING this module require a
+// document already containing #syncDialog — which is why nothing could test it.
+// Cached because the element is never replaced once the page is built.
+let syncDlgCache: HTMLDialogElement | null = null;
+
+function syncDialogEl(): HTMLDialogElement {
+  syncDlgCache ??= dialog("syncDialog");
+  return syncDlgCache;
+}
 
 // Common fields shared across all sync states. Subtitles are addressed by
 // FileRef (built from the selected entry via subtitleRef) and the video by
@@ -53,11 +62,6 @@ type SyncState =
     })
   | (SyncStateBase & { status: "syncing"; previewStart: number; previewBuffered: boolean });
 
-interface LabeledEntry {
-  sub: SubtitleEntry;
-  label: string;
-}
-
 let syncState: SyncState = {
   status: "idle",
   selIdx: 0,
@@ -84,15 +88,6 @@ function currentRef(): FileRefArgs | null {
     return null;
   }
   return subtitleRef(syncState.fileMediaType, sub);
-}
-
-/** Parse aired season/episode from a series media_id (`...s01e05`). */
-function parseSeasonEpisode(mediaID: string): { season: number; episode: number } {
-  const m = /s(\d+)e(\d+)$/.exec(mediaID);
-  if (!m) {
-    return { season: 0, episode: 0 };
-  }
-  return { season: Number(m[1]), episode: Number(m[2]) };
 }
 
 // Single source of truth for the current manual offset (ms). Recreated per
@@ -136,50 +131,13 @@ export function consumeSyncClosing(): boolean {
   return true;
 }
 
-// buildSyncSubLabel creates display labels for subtitle entries.
-// Groups by language+variant, numbers duplicates: "English", "English #1", "English #2",
-// "English SDH", "French".
-function buildSyncSubLabels(entries: SubtitleEntry[]): LabeledEntry[] {
-  // Count how many entries share the same language+variant.
-  const counts: Record<string, number> = {};
-  for (const sub of entries) {
-    const key = `${sub.language || ""}|${sub.variant || DEFAULT_VARIANT}`;
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-
-  // Assign labels with numbering only when duplicates exist.
-  const seen: Record<string, number> = {};
-  const labels: LabeledEntry[] = [];
-  for (const sub of entries) {
-    const lang = langName(sub.language || "??");
-    const v = sub.variant || DEFAULT_VARIANT;
-    const key = `${sub.language || ""}|${v}`;
-    const total = counts[key] ?? 0;
-
-    let label = lang;
-    if (v === "hi") {
-      label += " SDH";
-    } else if (v === "forced") {
-      label += " Forced";
-    }
-
-    if (total > 1) {
-      seen[key] = (seen[key] ?? 0) + 1;
-      label += ` #${seen[key]}`;
-    }
-
-    labels.push({ sub, label });
-  }
-  return labels;
-}
-
 export function openSyncDialog(
   entries: SubtitleEntry[],
   mediaType: MediaType,
   mediaId: number,
   mediaLabel: string,
 ): void {
-  const dlg = syncDlg;
+  const dlg = syncDialogEl();
 
   // Push sync URL (mirrors search popup pattern).
   const currentPath = location.pathname.replace(/\/sync$/, "");
@@ -464,13 +422,13 @@ function closeSyncDialog(): void {
   const tc = document.getElementById("sync-offset-val") as TimecodeInput | null;
   tc?.dispose();
   // Clean up video before closing.
-  const video = syncDlg.querySelector("video");
+  const video = syncDialogEl().querySelector("video");
   if (video) {
     video.pause();
     video.removeAttribute("src");
     video.load();
   }
-  closeDialog(syncDlg);
+  closeDialog(syncDialogEl());
   // Remove the /sync history entry. history.back() fires popstate
   // which calls applyRoute(); the popstate handler checks
   // syncClosing to skip the redundant re-render.
