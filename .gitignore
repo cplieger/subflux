@@ -1,5 +1,8 @@
 node_modules/
 .vitest-cache/
+# `npm run test:coverage` output (lcov + html into vitest's default
+# reportsDirectory, internal/server/static-src/coverage/).
+coverage/
 /subflux
 /subsync
 *.log
