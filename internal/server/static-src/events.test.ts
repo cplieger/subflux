@@ -261,6 +261,23 @@ describe("events: SSE connection", () => {
     expect(FakeEventSource.instances).toHaveLength(1);
   });
 
+  it("schedules no second reconnect while one is already pending", () => {
+    events.connect();
+    lastES().fail(); // schedules reconnect A
+
+    // A connect() while A is still pending, and that connection drops too.
+    events.connect();
+    lastES().fail();
+
+    // Only ONE timer handle is tracked, so a second scheduled reconnect would
+    // be untracked — and would survive the disconnect that cancels the
+    // tracked one, reconnecting a torn-down module.
+    capturedDisconnect()?.();
+    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
+
+    expect(FakeEventSource.instances).toHaveLength(2);
+  });
+
   it("backoff jitter is additive, so the delay never falls below the base", () => {
     vi.spyOn(Math, "random").mockReturnValue(1); // maximum jitter
     events.connect();
