@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // Unit tests for providerFieldValue, the settings-dialog value resolver for
 // provider setting fields. The rule it encodes is server parity: absent means
 // "use the schema default" (provider.NormalizeSettings does the same before a

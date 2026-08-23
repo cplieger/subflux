@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // Unit tests for config-renderers.ts pure helpers. The formatDurationCfg
 // table is ported from the former config-yaml.test.ts (the function moved
 // here when the YAML text helpers were deleted).

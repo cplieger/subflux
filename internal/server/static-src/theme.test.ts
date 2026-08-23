@@ -1,5 +1,5 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type * as ThemeModule from "./theme.js";
 
 // theme.ts holds ONE lazily-created controller for the module's lifetime, so
 // each test re-imports the module fresh (vi.resetModules) to get a controller
@@ -17,8 +17,22 @@ beforeEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
-async function loadTheme() {
-  return await import("./theme.js");
+// The `?boot=` query is what makes the re-import re-execute theme.ts, and it is
+// not decoration. Browser Mode resolves a dynamic import through the browser's
+// own module map, which is keyed by URL and holds evaluated modules for the life
+// of the page: vi.resetModules() clears the runner's registry but cannot evict an
+// entry from that map, so a bare import("./theme.js") returns the controller an
+// earlier test already created and every test after the first reads storage it
+// never seeded. A distinct query is a distinct URL and therefore a fresh
+// evaluation. `@vite-ignore` opts out of Vite's variable-dynamic-import rewrite.
+//
+// The `.ts` extension is load-bearing: this specifier is built at runtime, so the
+// URL the browser requests is the one written here, and that URL is what v8
+// coverage attributes the evaluation to. Written `./theme.js` it names a file that
+// does not exist, and theme.ts reports 0% coverage while this suite stays green.
+let bootCount = 0;
+async function loadTheme(): Promise<typeof ThemeModule> {
+  return (await import(/* @vite-ignore */ `./theme.ts?boot=${++bootCount}`)) as typeof ThemeModule;
 }
 
 function applied(): string | null {
@@ -31,8 +45,9 @@ describe("theme", () => {
 
     init();
 
-    // Nothing stored resolves to the OS preference, which happy-dom reports as
-    // light — the point is that SOMETHING is applied, before any click.
+    // Nothing stored resolves to the OS preference, which headless Chromium
+    // reports as light — the point is that SOMETHING is applied, before any
+    // click.
     expect(applied()).toBe("light");
   });
 

@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { buildTimecodeInput, updateTimecodeDisplay, type TimecodeInput } from "./sync-timecode.js";
@@ -63,12 +62,12 @@ function wheel(target: HTMLElement, deltaY: number): Event {
   return ev;
 }
 
-/** happy-dom has no TouchEvent constructor with a touches list, so the touch
- *  point is attached to a plain cancelable Event — the handlers only read
- *  e.touches[0].clientY and e.preventDefault(). */
 function touch(target: HTMLElement, type: string, clientY: number): Event {
-  const ev = new Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(ev, "touches", { value: [{ clientY }] });
+  const ev = new TouchEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    touches: [new Touch({ identifier: 0, target, clientY })],
+  });
   target.dispatchEvent(ev);
   return ev;
 }

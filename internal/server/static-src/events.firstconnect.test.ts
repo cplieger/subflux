@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // What the FIRST SSE connection of a page load must not do.
 //
 // `everConnected` is module state that is never reset, so the first-open case

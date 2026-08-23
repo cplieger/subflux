@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // coverage.wiring.test.ts — the parts of coverage.ts coverage.test.ts cannot
 // reach with its immediately-resolving client: the anti-flicker skeleton (which

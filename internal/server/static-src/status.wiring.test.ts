@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // status.wiring.test.ts — the popover-driven half of status.ts, which
 // status.test.ts cannot reach: its popover double drops the options object, so
@@ -246,7 +245,32 @@ interface Harness {
 
 /** Rebuild the status-bar DOM, arm the doubles and import status.ts fresh:
  *  initStatusPopover, the skeleton controller and the toasted-activity sets are
- *  all module state, so a shared instance would leak across tests. */
+ *  all module state, so a shared instance would leak across tests.
+ *
+ *  The `?boot=` query on the status specifier is what makes "fresh" true, and it
+ *  is not decoration. Browser Mode resolves a dynamic import through the
+ *  browser's own module map, which is keyed by URL and holds evaluated modules
+ *  for the life of the page: `vi.resetModules()` clears the runner's registry but
+ *  cannot evict an entry from that map. A bare `import("./status.js")` therefore
+ *  returns the instance the FIRST boot evaluated, its top-level apiAction() calls
+ *  never run again, and since `actions.reset()` just cleared the registry the
+ *  lookup below throws "status.poll run not captured" for every test after the
+ *  first. A distinct query is a distinct URL and therefore a fresh evaluation.
+ *  `@vite-ignore` opts out of Vite's variable-dynamic-import rewrite.
+ *
+ *  The `.ts` extension is load-bearing: this specifier is built at runtime, so
+ *  the URL the browser requests is the one written here, and that URL is what v8
+ *  coverage attributes the evaluation to. Written `./status.js` it names a file
+ *  that does not exist and status.ts reports 0% coverage while this suite stays
+ *  green.
+ *
+ *  Only the module under test is busted. `./store.js` is imported plainly on
+ *  purpose: a busted specifier mints a DUPLICATE instance, so busting the store
+ *  too would hand the test a different store object than the one the status
+ *  instance reads, and every seeded value would be invisible to it. The mocked
+ *  modules are unaffected either way -- they resolve through the mock registry
+ *  whatever query the importer carries. */
+let bootCount = 0;
 async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
   vi.resetModules();
   actions.reset();
@@ -260,7 +284,9 @@ async function boot(opts: { unconfigured?: boolean } = {}): Promise<Harness> {
   store.set("isAdmin", false);
   store.set("config", null);
 
-  const status = await import("./status.js");
+  const status = (await import(
+    /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
+  )) as typeof StatusModule;
   status.initStatusPopover();
 
   const run = actions.runs.get("status.poll");

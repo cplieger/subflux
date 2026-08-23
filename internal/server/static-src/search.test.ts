@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // search.ts resolves #searchResultPopup at MODULE scope, so the dialog has to
@@ -297,11 +296,17 @@ describe("openSearchPopup: the dialog and its URL", () => {
     dlg.addEventListener("close", () => {
       closes += 1;
     });
+    // <dialog>.close() QUEUES its close event rather than dispatching it
+    // synchronously, so the reopen's close has to be awaited before it counts.
+    const closed = new Promise<void>((resolve) => {
+      dlg.addEventListener("close", () => resolve(), { once: true });
+    });
 
     // A modal dialog that is already open cannot be re-shown, so it has to be
     // closed first — otherwise a reopen leaves it wherever it already sat in
     // the top layer, underneath anything opened over it.
     await openEpisodePopup();
+    await closed;
 
     expect(closes).toBe(1);
   });
@@ -395,8 +400,14 @@ describe("closeSearchPopup", () => {
   it("returns to the previous view when the popup pushed a history entry", async () => {
     history.replaceState(null, "", "/");
     await openEpisodePopup();
+    // history.back() is an asynchronous traversal in a real browser: the URL
+    // changes when the browser processes the entry, signalled by popstate.
+    const popped = new Promise<void>((resolve) => {
+      window.addEventListener("popstate", () => resolve(), { once: true });
+    });
 
     closeSearchPopup();
+    await popped;
     await settle();
 
     expect(location.pathname).toBe("/");

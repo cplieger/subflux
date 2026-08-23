@@ -1,5 +1,5 @@
-// @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, onTestFinished } from "vitest";
+import type * as ApiClientModule from "./api-client.js";
 import { clientRequest, clientRequestOK, clientRequestRaw, fillPath } from "./api-client.js";
 
 // The client's request core is @cplieger/fetch, which reads a response body
@@ -430,43 +430,93 @@ describe("error envelope diagnostics", () => {
 //
 // `redirectingToLogin` is a module-level one-shot latch, so each test imports a
 // FRESH module; a shared module would let the first redirect disarm the rest.
-// window.location is replaced with a plain record (vitest's unstubGlobals puts
-// the real one back after each test).
-async function freshClient() {
+//
+// The `?boot=` query is what makes "fresh" true, and it is not decoration.
+// Browser Mode resolves a dynamic import through the browser's own module map,
+// which is keyed by URL and holds evaluated modules for the life of the page:
+// vi.resetModules() clears the runner's registry but cannot evict an entry from
+// that map, so a bare import("./api-client.js") returns the instance whose latch
+// an earlier test already tripped. A distinct query is a distinct URL and
+// therefore a fresh evaluation. `@vite-ignore` opts out of Vite's
+// variable-dynamic-import rewrite.
+//
+// The `.ts` extension is load-bearing: this specifier is built at runtime, so the
+// URL the browser requests is the one written here, and that URL is what v8
+// coverage attributes the evaluation to. Written `./api-client.js` it names a file
+// that does not exist and api-client.ts reports 0% coverage while this suite stays
+// green.
+let bootCount = 0;
+async function freshClient(): Promise<typeof ApiClientModule> {
   vi.resetModules();
-  return await import("./api-client.js");
+  return (await import(
+    /* @vite-ignore */ `./api-client.ts?boot=${++bootCount}`
+  )) as typeof ApiClientModule;
 }
 
-function stubLocation(pathname: string, search = ""): { href: string } {
-  const loc = { pathname, search, href: `http://localhost${pathname}${search}` };
-  vi.stubGlobal("location", loc);
-  return loc;
+/** Put the real `window.location` on the view under test and record every
+ *  navigation the client attempts, without letting one carry the test page away.
+ *
+ *  `window.location` is `[LegacyUnforgeable]` in a real browser: `location`,
+ *  `location.href`, `location.assign` and `window` ITSELF are all
+ *  non-configurable, so `vi.stubGlobal("location", ...)` throws "Cannot redefine
+ *  property: location" -- measured, along with the same error for `window`,
+ *  `href` and `assign`. The DOM emulator this suite used to run under allowed the
+ *  redefine; a browser does not, and there is no `Location.prototype` member to
+ *  spy on either.
+ *
+ *  So neither half is faked. The view api-client.ts reads for its `next` target
+ *  is set for REAL with history.replaceState, and the redirect is observed
+ *  through the platform's own Navigation API: a scripted `location.href`
+ *  assignment fires a cancelable `navigate` event carrying the resolved
+ *  destination, and preventDefault is what stops it from navigating the runner
+ *  away. That makes these assertions strictly stronger than the stub's -- they
+ *  now pin that the browser actually began the navigation production asked for,
+ *  rather than that a property was written on a plain object. */
+function watchRedirects(pathname: string, search = ""): { targets: string[] } {
+  const restore = location.pathname + location.search + location.hash;
+  history.replaceState(null, "", pathname + search);
+  const targets: string[] = [];
+  const onNavigate = (ev: NavigateEvent): void => {
+    const url = new URL(ev.destination.url);
+    targets.push(url.pathname + url.search);
+    if (ev.cancelable) {
+      ev.preventDefault();
+    }
+  };
+  navigation.addEventListener("navigate", onNavigate);
+  onTestFinished(() => {
+    // Remove BEFORE restoring: replaceState fires navigate too, and a restore
+    // recorded as a target would corrupt the next test's expectations.
+    navigation.removeEventListener("navigate", onNavigate);
+    history.replaceState(null, "", restore);
+  });
+  return { targets };
 }
 
 describe("session expiry", () => {
   it("redirects a 401 to the login page with the current view as the return target", async () => {
     const { clientRequestRaw: freshRaw } = await freshClient();
-    const loc = stubLocation("/settings", "?tab=auth");
+    const nav = watchRedirects("/settings", "?tab=auth");
     stubFetch(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
 
     await freshRaw("GET", "/api/config");
 
-    expect(loc.href).toBe("/login?next=%2Fsettings%3Ftab%3Dauth");
+    expect(nav.targets).toEqual(["/login?next=%2Fsettings%3Ftab%3Dauth"]);
   });
 
   it("leaves a non-401 failure on the current page", async () => {
     const { clientRequestRaw: freshRaw } = await freshClient();
-    const loc = stubLocation("/settings");
+    const nav = watchRedirects("/settings");
     stubFetch(JSON.stringify({ error: "forbidden" }), { status: 403, headers: JSON_HEADERS });
 
     await freshRaw("GET", "/api/config");
 
-    expect(loc.href).toBe("http://localhost/settings");
+    expect(nav.targets).toEqual([]);
   });
 
   it("does not redirect the login shell, whose own POSTs answer 401", async () => {
     const { clientRequestRaw: freshRaw } = await freshClient();
-    const loc = stubLocation("/login");
+    const nav = watchRedirects("/login");
     stubFetch(JSON.stringify({ error: "bad credentials" }), {
       status: 401,
       headers: JSON_HEADERS,
@@ -474,24 +524,24 @@ describe("session expiry", () => {
 
     await freshRaw("POST", "/api/auth/login", { user: "x" });
 
-    expect(loc.href).toBe("http://localhost/login");
+    expect(nav.targets).toEqual([]);
   });
 
   it("does not redirect anything under the login shell either", async () => {
     // The guard is a PREFIX test on purpose: a future sub-route of the login
     // shell must not be able to bounce itself back to /login forever.
     const { clientRequestRaw: freshRaw } = await freshClient();
-    const loc = stubLocation("/login/reset");
+    const nav = watchRedirects("/login/reset");
     stubFetch(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: JSON_HEADERS });
 
     await freshRaw("POST", "/api/auth/login", { user: "x" });
 
-    expect(loc.href).toBe("http://localhost/login/reset");
+    expect(nav.targets).toEqual([]);
   });
 
   it("redirects only once when several calls fail together", async () => {
     const { clientRequestRaw: freshRaw } = await freshClient();
-    const loc = stubLocation("/settings");
+    const nav = watchRedirects("/settings");
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -505,10 +555,10 @@ describe("session expiry", () => {
     );
 
     await freshRaw("GET", "/api/config");
-    loc.href = "sentinel";
     await freshRaw("GET", "/api/status");
 
-    // The latch holds: the second 401 must not restart the navigation.
-    expect(loc.href).toBe("sentinel");
+    // The latch holds: the second 401 must not restart the navigation, so the
+    // recorded list is exactly one entry long.
+    expect(nav.targets).toEqual(["/login?next=%2Fsettings"]);
   });
 });

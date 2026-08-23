@@ -1,5 +1,4 @@
-// @vitest-environment happy-dom
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, onTestFinished } from "vitest";
 
 // security.ts exports ONE symbol (initSecurity); every section builder, the
 // password validator, the passkey/API-key rows and the OIDC probe are
@@ -90,8 +89,11 @@ vi.mock("./wire/client.gen.js", () => ({
     return Promise.resolve(client.begin);
   },
   // Pulled in by the REAL webauthn-utils.js (kept real so the finish request
-  // carries genuine base64url encoding); window.PublicKeyCredential is absent
-  // under happy-dom, so sendWebAuthnSignals returns before it is called.
+  // carries genuine base64url encoding). Chromium DOES provide
+  // window.PublicKeyCredential, so sendWebAuthnSignals gets past its feature
+  // check and calls this; answering null takes its "nothing to signal" return
+  // before any PublicKeyCredential.signal* call, and keeps the stub off the
+  // network.
   webauthnSignalData: () => Promise.resolve(null),
   PATH_OIDC_REDIRECT: "/api/auth/oidc",
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
@@ -359,6 +361,37 @@ function releaseChange(result: { ok: boolean; error?: string }): void {
     throw new Error("no deferred change-password request to release");
   }
   resolve(result);
+}
+
+/** Record every navigation the page attempts, without letting one carry the test
+ *  page away.
+ *
+ *  `window.location` is `[LegacyUnforgeable]` in a real browser: `location`,
+ *  `location.href`, `location.assign` and `window` ITSELF are all
+ *  non-configurable, so `vi.stubGlobal("location", ...)` throws "Cannot redefine
+ *  property: location", and there is no `Location.prototype` member to spy on.
+ *  The DOM emulator this suite used to run under allowed the redefine; a browser
+ *  does not. So nothing is faked: security.ts's real `window.location.href`
+ *  assignment is observed through the platform's own Navigation API, whose
+ *  `navigate` event is cancelable for a scripted assignment and carries the
+ *  resolved destination. preventDefault is what keeps it from navigating the
+ *  runner away. The assertion is stronger for it -- it pins that the browser
+ *  really began the navigation, not that a property was written on a plain
+ *  object. */
+function watchNavigations(): { targets: string[] } {
+  const targets: string[] = [];
+  const onNavigate = (ev: NavigateEvent): void => {
+    const url = new URL(ev.destination.url);
+    targets.push(url.pathname + url.search);
+    if (ev.cancelable) {
+      ev.preventDefault();
+    }
+  };
+  navigation.addEventListener("navigate", onNavigate);
+  onTestFinished(() => {
+    navigation.removeEventListener("navigate", onNavigate);
+  });
+  return { targets };
 }
 
 beforeEach(() => {
@@ -1496,12 +1529,11 @@ describe("security dialog: single sign-on", () => {
     client.me = user({ role: "admin", oidc_linked: false, can_link_oidc: true });
     net.oidcStatus = 200;
     await openSecurity();
-    const loc = { pathname: "/", href: "http://localhost/" };
-    vi.stubGlobal("location", loc);
+    const nav = watchNavigations();
 
     button("Connect").click();
 
-    expect(loc.href).toBe("/api/auth/oidc");
+    expect(nav.targets).toEqual(["/api/auth/oidc"]);
   });
 
   it("explains why an account that may not link has no connect control", async () => {
@@ -1705,11 +1737,18 @@ describe("security dialog: the chrome the stylesheet styles", () => {
   it("drops the dialog skin once the close has finished", async () => {
     await openSecurity();
     const dlg = req<HTMLDialogElement>("#securityDialog");
+    // <dialog>.close() QUEUES its close event, so the disposal that event
+    // triggers has to be awaited rather than asserted on the next line.
+    const closed = new Promise<void>((resolve) => {
+      dlg.addEventListener("close", () => resolve(), { once: true });
+    });
 
     button("Close").click();
     // The fade-out finalizes on the dialog's own transitionend (or a 400ms
     // fallback); the close event it then fires is what disposes the controller.
     dlg.dispatchEvent(new Event("transitionend"));
+    await closed;
+    await settle();
 
     expect(dlg.classList.contains("uip-dialog")).toBe(false);
   });

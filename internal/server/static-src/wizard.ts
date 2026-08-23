@@ -88,6 +88,43 @@ export let langRules: { audio: string; code: string; variant: string }[] = [];
 export let langDefault: { code: string; variant: string }[] = [];
 export let mediaRoots: string[] = [];
 
+/** _resetForTest returns every module-scope binding to its initial value.
+ *
+ *  This module cannot be re-evaluated to get a fresh graph. Browser Mode keys
+ *  its module map by URL, so `vi.resetModules()` hands back the CACHED
+ *  instance, and the `./wizard.ts?boot=N` specifier that works for the other
+ *  modules in this package is closed here: wizard-steps.ts and
+ *  wizard-providers.ts import `schemaByKey`/`wizardValues`/`secretSaved`/
+ *  `mediaRoots` back from "./wizard.js", so a busted specifier mints a
+ *  DUPLICATE instance that sets `fullSchema` on itself while the single shared
+ *  step modules keep reading the original's, which stays empty. Measured: the
+ *  busted arr step renders its heading and not one field. An explicit reset is
+ *  what the rest of the fleet uses for this -- `_resetForTest` in
+ *  @cplieger/ui-primitives, `resetActionFramework` in @cplieger/actions.
+ *
+ *  EVERY module-scope `let` in this file must be listed here, including
+ *  `navWired`/`validationAbort` further down. `navWired` is the one whose
+ *  staleness actually bites: left true, `wireWizardNav()` no-ops and a
+ *  freshly mounted page gets no nav listeners at all, so nothing a test
+ *  clicks does anything. */
+export function _resetForTest(): void {
+  abortValidation(); // aborts and nulls validationAbort
+  fullSchema = [];
+  boot = { sections: {}, secretsPresent: new Set(), configValid: false };
+  bootFingerprint = "";
+  allSteps = [];
+  activeSteps = [];
+  wizardIndex = 0;
+  touched = new Set();
+  setupPassword = "";
+  wizardValues = {};
+  providerEnabled = {};
+  langRules = [];
+  langDefault = [];
+  mediaRoots = [];
+  navWired = false;
+}
+
 /** secretSaved reports whether the config file already holds a value for a
  *  schema secret (dotted path, e.g. "sonarr.api_key"): the steps render a
  *  saved placeholder and count the credential as present. */
@@ -434,6 +471,7 @@ function markTouched(step: WizardStep): void {
   }
 }
 
+// Both are module-scope state: keep them listed in `_resetForTest` above.
 let navWired = false;
 let validationAbort: AbortController | null = null;
 

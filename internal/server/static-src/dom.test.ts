@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
 import {
   text,

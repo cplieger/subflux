@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // detail.wiring.test.ts — the parts of detail.ts that detail.test.ts cannot
 // reach with its mock set: the action buttons' click wiring (which needs the

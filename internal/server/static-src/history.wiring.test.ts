@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 //
 // history.wiring.test.ts — the parts of history.ts history.test.ts cannot
 // reach: the first-mount skeleton (which needs fake timers plus a page that
