@@ -1344,3 +1344,371 @@ describe("detail: openMovieDetail", () => {
     expect(openConfig).toHaveBeenCalled();
   });
 });
+
+describe("detail: renderSeriesDetail table chrome", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("frames the table with a four-column layout, column headers and a season gap", () => {
+    renderSeriesDetail(
+      makeSeries(335, "Show AJ"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [],
+      new Set(),
+    );
+
+    // The <colgroup> is the whole column layout: without it every column
+    // negotiates its own width and the action column collapses.
+    const widths = [...document.querySelectorAll("table.series-detail colgroup col")].map((c) =>
+      c.getAttribute("style"),
+    );
+    expect(widths).toEqual(["width: 8%", "width: 34%", "width: 34%", "width: 24%"]);
+
+    const tbody = seriesTbody();
+    // S1 -> head(0), cols(1), ep01(2), ep02(3) ; S2 -> gap(4), head(5), ...
+    const colHead = reqRow(tbody.children.item(1));
+    expect(colHead.className).toBe("season-head");
+    expect([...colHead.querySelectorAll("th")].map((th) => th.textContent)).toEqual([
+      "Ep",
+      "Title",
+      "Subtitles",
+      "",
+    ]);
+
+    const gap = reqRow(tbody.children.item(4));
+    expect(gap.className).toBe("season-gap");
+    const gapCell = gap.children.item(0) as HTMLTableCellElement | null;
+    // A spacer must span every column, however many the layout grows to.
+    expect(gapCell?.colSpan).toBe(999);
+  });
+
+  it("labels the episode cells with the aired number, the title and the episode key", () => {
+    renderSeriesDetail(
+      makeSeries(334, "Show AI"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [],
+      new Set(),
+    );
+
+    const row = reqRow(seriesTbody().children.item(2));
+    const numCell = row.children.item(0);
+    expect(numCell?.className).toBe("ep-num");
+    expect(numCell?.textContent).toBe("E01");
+    const titleCell = row.children.item(1);
+    expect(titleCell?.className).toBe("ep-title");
+    // data-ep is how the CSS labels a narrow-viewport row with its episode.
+    expect(titleCell?.getAttribute("data-ep")).toBe("E01");
+    expect(titleCell?.textContent).toBe("Pilot");
+  });
+
+  it("keeps the aired number beside an absolute label as its own element", () => {
+    const seasons: SeasonGroup[] = [
+      {
+        season: 1,
+        episodes: [
+          { id: 11, season: 1, episode: 1, title: "A", has_file: true, absolute_episode: 1 },
+        ],
+      },
+      {
+        season: 2,
+        episodes: [
+          { id: 21, season: 2, episode: 1, title: "C", has_file: true, absolute_episode: 27 },
+        ],
+      },
+    ];
+
+    renderSeriesDetail(makeSeries(336, "Show AK"), seasons, [], new Set());
+
+    // S1 -> head(0), cols(1), ep(2) ; S2 -> gap(3), head(4), cols(5), ep(6).
+    const numCell = reqRow(seriesTbody().children.item(6)).children.item(0);
+    expect(numCell?.className).toBe("ep-num");
+    const aired = numCell?.querySelector("span");
+    // Its own class so the aired number can be de-emphasised beside the
+    // absolute one instead of reading as part of the same label.
+    expect(aired?.className).toBe("ep-aired");
+    expect(aired?.textContent).toBe(" E01");
+  });
+
+  it("adds no absolute-order chrome when the absolute number just counts up", () => {
+    // Sonarr sets absolute_episode on every multi-season show, so a running
+    // count must not turn every row into a two-number cell with a tooltip.
+    const seasons: SeasonGroup[] = [
+      {
+        season: 1,
+        episodes: [
+          { id: 11, season: 1, episode: 1, title: "A", has_file: true, absolute_episode: 1 },
+          { id: 12, season: 1, episode: 2, title: "B", has_file: true, absolute_episode: 2 },
+        ],
+      },
+    ];
+
+    renderSeriesDetail(makeSeries(337, "Show AL"), seasons, [], new Set());
+
+    const numCell = reqRow(seriesTbody().children.item(2)).children.item(0);
+    expect(numCell?.textContent).toBe("E01");
+    expect(numCell?.getAttribute("data-tip")).toBeNull();
+    expect(numCell?.querySelector("span.ep-aired")).toBeNull();
+  });
+
+  it("marks the subtitle-count badge ok and the empty badge err with no language rule", () => {
+    const series: SeriesItem = { ...makeSeries(338, "Show AM"), targets: [] };
+
+    renderSeriesDetail(
+      series,
+      makeSeasons("Pilot", "Second", "Return"),
+      [epSub("tvdb-338-s01e01", 80)],
+      new Set(),
+    );
+
+    const counted = reqRow(seriesTbody().children.item(2)).querySelector("td.ep-coverage span");
+    expect(counted?.className).toBe("badge");
+    expect(counted?.getAttribute("data-status")).toBe("ok");
+    expect(counted?.textContent).toBe("1 subs");
+    const empty = reqRow(seriesTbody().children.item(3)).querySelector("td.ep-coverage span");
+    expect(empty?.className).toBe("badge");
+    expect(empty?.getAttribute("data-status")).toBe("err");
+    expect(empty?.textContent).toBe(DASH);
+  });
+
+  it("reads an embedded track in a codec nobody ignores as ordinary coverage", () => {
+    // "Ignored codec" needs BOTH halves: an embedded track AND an ignored
+    // codec. An embedded ass track with only pgs ignored is usable.
+    storeState.ignoredCodecs = new Set(["pgs"]);
+    const embedded: SubtitleEntry = {
+      media_id: "tvdb-339-s01e01",
+      language: "en",
+      variant: "standard",
+      source: EMBEDDED,
+      codec: "ass",
+      score: 0,
+      ordinal: 0,
+    };
+
+    renderSeriesDetail(
+      makeSeries(339, "Show AN"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [embedded],
+      new Set(),
+    );
+
+    const badge = reqRow(seriesTbody().children.item(2)).querySelector("td.ep-coverage span.badge");
+    expect(badge?.getAttribute("data-status")).toBe("ok");
+    expect(badge?.getAttribute("data-tip")).toBeNull();
+  });
+
+  it("reads a downloaded subtitle as ordinary coverage even in an ignored codec", () => {
+    // The ignore settings filter EMBEDDED tracks; a file subflux downloaded
+    // itself is coverage whatever its codec.
+    storeState.ignoredCodecs = new Set(["srt"]);
+
+    renderSeriesDetail(
+      makeSeries(340, "Show AO"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [epSub("tvdb-340-s01e01", 80)],
+      new Set(),
+    );
+
+    const badge = reqRow(seriesTbody().children.item(2)).querySelector("td.ep-coverage span.badge");
+    expect(badge?.getAttribute("data-status")).toBe("ok");
+    expect(badge?.getAttribute("data-tip")).toBeNull();
+  });
+
+  it("leaves a fileless episode's subtitles out of the season sync set", () => {
+    // Audio sync aligns a subtitle against the video's audio track, so an
+    // episode Sonarr has not imported has nothing to sync against.
+    const seasons: SeasonGroup[] = [
+      {
+        season: 1,
+        episodes: [
+          { id: 11, season: 1, episode: 1, title: "Imported", has_file: true },
+          { id: 12, season: 1, episode: 2, title: "Not imported", has_file: false },
+        ],
+      },
+    ];
+
+    renderSeriesDetail(
+      makeSeries(330, "Show AE"),
+      seasons,
+      [epSub("tvdb-330-s01e02", 80)],
+      new Set(),
+    );
+
+    expect(seriesTbody().children.length).toBe(3); // head, cols, the imported ep
+    expect(
+      document.querySelector("tr.season-head [data-tip='Audio sync all subtitles in this season']"),
+    ).toBeNull();
+  });
+
+  it("leaves embedded tracks out of the season sync set", () => {
+    // An embedded track lives inside the container; there is no sidecar file
+    // to retime, so a season of them offers no season sync.
+    const embedded: SubtitleEntry = {
+      media_id: "tvdb-331-s01e01",
+      language: "en",
+      variant: "standard",
+      source: EMBEDDED,
+      codec: "ass",
+      score: 0,
+      ordinal: 0,
+    };
+
+    renderSeriesDetail(
+      makeSeries(331, "Show AF"),
+      makeSeasons("Pilot", "Second", "Return"),
+      [embedded],
+      new Set(),
+    );
+
+    expect(
+      document.querySelector("tr.season-head [data-tip='Audio sync all subtitles in this season']"),
+    ).toBeNull();
+  });
+
+  it("replaces the Files button on a re-render instead of adding a second one", () => {
+    storeState.isAdmin = true;
+    const series = makeSeries(332, "Show AG");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    const subs = [epSub("tvdb-332-s01e01", 80)];
+
+    renderSeriesDetail(series, seasons, subs, new Set());
+    expect(document.querySelectorAll('[data-nav="files"]')).toHaveLength(1);
+
+    // A coverage refresh runs the whole header path again.
+    renderSeriesDetail(series, seasons, subs, new Set());
+    expect(document.querySelectorAll('[data-nav="files"]')).toHaveLength(1);
+  });
+
+  it("leaves an unchanged row's own element untouched across a coverage refresh", () => {
+    // The refresh contract is an IN-PLACE row update, not a table re-render.
+    // A marker attribute is the probe: a re-render patches the live table and
+    // equalises attributes against freshly-built rows, which strips an
+    // attribute those rows do not carry, while an in-place update whose
+    // signature matched never touches the row at all.
+    const series = makeSeries(333, "Show AH");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    renderSeriesDetail(series, seasons, [epSub("tvdb-333-s01e01", 80)], new Set());
+
+    reqRow(seriesTbody().children.item(2)).setAttribute("data-probe", "kept");
+
+    renderSeriesDetail(
+      series,
+      seasons,
+      [epSub("tvdb-333-s01e01", 80), epSub("tvdb-333-s01e02", 70)],
+      new Set(),
+    );
+
+    expect(covText(seriesTbody().children.item(3))).toBe(`ensrt: ext ${STAR}70`);
+    expect(reqRow(seriesTbody().children.item(2)).getAttribute("data-probe")).toBe("kept");
+  });
+});
+
+describe("detail: openSeriesDetail panel", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    storeState.sets = [];
+    clientState.stateIDs = null;
+    clientState.seasons = null;
+    clientState.seasonsError = null;
+    clientState.defer = false;
+    clientState.pending = [];
+    history.replaceState(null, "", "/");
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("configures the panel for a detail view with the library controls hidden", () => {
+    openSeriesViaBus(makeSeries(410, "Show AP"));
+
+    // `visible: false` is what hides the library's filter row: a detail view
+    // has nothing to filter, and leaving it up offers controls that do nothing.
+    expect(emit).toHaveBeenCalledWith(BusEvent.PanelConfigure, {
+      visible: false,
+      detail: {
+        title: "Show AP",
+        info: "3 ep \u00B7 audio: English \u00B7 subs: en",
+        backPath: "/",
+        arrLink: null,
+        arrName: "Sonarr",
+      },
+    });
+  });
+
+  it("collapses each run of non-alphanumerics in the Sonarr slug to one dash", () => {
+    storeState.config = { sonarr_url: "http://sonarr:8989" };
+
+    openSeriesViaBus(makeSeries(411, "Law & Order: Special Victims Unit"));
+
+    // " & " and ": " are runs of three and two non-alphanumerics; Sonarr's
+    // slug carries one dash per run, so a per-character replacement would
+    // produce a URL that resolves to nothing.
+    expect(panelDetail()["arrLink"]).toBe(
+      "http://sonarr:8989/series/law-order-special-victims-unit",
+    );
+  });
+});
+
+describe("detail: openMovieDetail chrome", () => {
+  beforeEach(() => {
+    storeState.ignoredCodecs = new Set<string>();
+    storeState.isAdmin = false;
+    storeState.config = null;
+    storeState.sets = [];
+    clientState.stateIDs = null;
+    history.replaceState(null, "", "/");
+    document.body.innerHTML =
+      '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
+      '<div id="coverageContent"></div></div>';
+  });
+
+  it("offers the files action when only SOME subtitles are embedded tracks", () => {
+    // The file manager lists sidecar files; one downloaded subtitle among
+    // embedded tracks is enough for there to be something to manage.
+    const embedded: SubtitleEntry = {
+      media_id: "tmdb-95",
+      language: "en",
+      variant: "standard",
+      source: EMBEDDED,
+      codec: "ass",
+      score: 0,
+      ordinal: 0,
+    };
+
+    openMovieDetail(makeMovie(95, [embedded, movieSub("fr", 70)]));
+
+    expect(typeof panelDetail()["filesAction"]).toBe("function");
+  });
+
+  it("renders the movie table for the bus event coverage.ts publishes", () => {
+    const handler = busHandlers.map.get("open:movie");
+    if (!handler) {
+      throw new Error("open:movie handler not registered");
+    }
+
+    (handler as (p: { item: MovieDetail }) => void)({ item: makeMovie(96, [movieSub("en", 90)]) });
+
+    expect(movieTbody().children.length).toBe(2); // en, fr (target order)
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}90`);
+  });
+
+  it("leaves an unchanged language row's own element untouched across a refresh", () => {
+    // Same probe as the series table: a marker attribute survives an in-place
+    // row update and is equalised away by a table re-render.
+    openMovieDetail(makeMovie(97, [movieSub("en", 90)]));
+
+    reqRow(movieTbody().children.item(0)).setAttribute("data-probe", "kept");
+
+    openMovieDetail(makeMovie(97, [movieSub("en", 90), movieSub("fr", 85)]), true);
+
+    expect(covText(movieTbody().children.item(1))).toBe(`srt: ext ${STAR}85`);
+    expect(reqRow(movieTbody().children.item(0)).getAttribute("data-probe")).toBe("kept");
+  });
+});
