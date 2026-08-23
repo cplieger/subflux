@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/cplieger/arrapi/v2 v2.0.3
 	github.com/cplieger/atomicfile/v3 v3.0.0
-	github.com/cplieger/auth/v4 v4.0.0
+	github.com/cplieger/auth/v4 v4.0.1
 	github.com/cplieger/envx/v2 v2.0.1
 	github.com/cplieger/envx/yamlenv/v2 v2.0.0
 	github.com/cplieger/health v1.6.0
@@ -18,12 +18,12 @@ require (
 	github.com/cplieger/runesafe/v2 v2.0.0
 	github.com/cplieger/slogx v1.6.3
 	github.com/cplieger/ssrf/v4 v4.1.0
-	github.com/cplieger/webhttp/v2 v2.0.1
+	github.com/cplieger/webhttp/v2 v2.0.2
 	github.com/cplieger/wiregen/v3 v3.0.0
 	github.com/cplieger/xmlx v1.0.3
 	github.com/evanw/esbuild v0.28.2
 	github.com/go-webauthn/webauthn v0.17.4
-	github.com/nwaples/rardecode/v2 v2.3.0
+	github.com/nwaples/rardecode/v2 v2.4.0
 	github.com/ulikunitz/xz v0.5.16
 	go.etcd.io/bbolt v1.5.0
 	go.yaml.in/yaml/v3 v3.0.5
