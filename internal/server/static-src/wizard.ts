@@ -103,12 +103,17 @@ export let mediaRoots: string[] = [];
  *  @cplieger/ui-primitives, `resetActionFramework` in @cplieger/actions.
  *
  *  EVERY module-scope `let` in this file must be listed here, including
- *  `navWired`/`validationAbort` further down. `navWired` is the one whose
- *  staleness actually bites: left true, `wireWizardNav()` no-ops and a
- *  freshly mounted page gets no nav listeners at all, so nothing a test
- *  clicks does anything. */
+ *  `navWired`/`validationAbort`/`stepFadeTimer` further down. `navWired` is
+ *  the one whose staleness actually bites: left true, `wireWizardNav()`
+ *  no-ops and a freshly mounted page gets no nav listeners at all, so nothing
+ *  a test clicks does anything. `stepFadeTimer` is the one that bit the
+ *  COVERAGE number: a pending step render outlived the test that scheduled
+ *  it, rendered into the next test's page, and made wizard-steps.ts read
+ *  43/50/57 covered statements across runs of one commit. */
 export function _resetForTest(): void {
   abortValidation(); // aborts and nulls validationAbort
+  clearTimeout(stepFadeTimer ?? undefined);
+  stepFadeTimer = null;
   fullSchema = [];
   boot = { sections: {}, secretsPresent: new Set(), configValid: false };
   bootFingerprint = "";
@@ -407,7 +412,9 @@ function renderCurrentStep(): void {
 
   container.classList.add("fade-out");
   container.classList.remove("fade-in");
-  setTimeout(() => {
+  clearTimeout(stepFadeTimer ?? undefined);
+  stepFadeTimer = setTimeout(() => {
+    stepFadeTimer = null;
     populateStep(container, step);
     container.classList.remove("fade-out");
     container.classList.add("fade-in");
@@ -471,9 +478,14 @@ function markTouched(step: WizardStep): void {
   }
 }
 
-// Both are module-scope state: keep them listed in `_resetForTest` above.
+// All three are module-scope state: keep them listed in `_resetForTest` above.
 let navWired = false;
 let validationAbort: AbortController | null = null;
+// The pending step-render timer from renderCurrentStep's fade path. Held so a
+// second advance cancels the first, and so `_resetForTest` can cancel one that
+// would otherwise fire into a torn-down page — the same reason the reset aborts
+// an in-flight validation.
+let stepFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function abortValidation(): void {
   if (validationAbort) {

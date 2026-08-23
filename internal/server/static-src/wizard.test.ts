@@ -225,6 +225,15 @@ describe("wizard: draft persistence is secret-sanitized", () => {
     // Non-secret values persist, and the draft is the sanitized v2 format.
     expect(raw).toContain("http://sonarr:8989");
     expect((JSON.parse(raw ?? "") as { v: number }).v).toBe(2);
+
+    // Then let the click's own work finish inside this test: a valid arr step
+    // advances the walk, and that render sits behind the 150ms fade. Left
+    // unawaited the timer fired at an arbitrary later point in the file — it
+    // rendered the media-roots step into the NEXT test under load, which is
+    // what made wizard-steps.ts report 43, 50 or 57 covered statements across
+    // runs of one commit.
+    await waitForFade();
+    expect(document.querySelector(".wizard-section-title")?.textContent).toBe("Media Roots");
   });
 
   it("removes a legacy v1 draft (pre-sanitization, may hold plaintext secrets) at boot", async () => {

@@ -481,15 +481,20 @@ describe("files: renderFiles", () => {
   });
 
   it("pushes the files URL and marks the page in the store", async () => {
-    const depth = history.length;
     openFileManager("movie", "tmdb-37", "Movie", "/");
     await tick();
     expect(location.pathname).toBe("/movie/37/files");
 
-    // Re-opening the same view must not stack a duplicate history entry.
+    // Re-opening the same view must not stack a duplicate history entry. The
+    // baseline is read AFTER the first open, not before it: every test iframe
+    // shares the runner page's joint session history, Chromium caps that at 50
+    // entries, and at the cap a push stops incrementing history.length — so a
+    // `depth + 1` assertion is a flake whose trigger is how many entries the
+    // rest of the suite happened to add first.
+    const stacked = history.length;
     openFileManager("movie", "tmdb-37", "Movie", "/");
     await tick();
-    expect(history.length).toBe(depth + 1);
+    expect(history.length).toBe(stacked);
 
     openFileManager("episode", "tvdb-81189-", "Breaking Bad", "/series/81189", 7);
     await tick();
