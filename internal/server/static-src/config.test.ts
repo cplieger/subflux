@@ -129,6 +129,55 @@ describe("config: markRequiredFields required_group", () => {
     expect(hasError(f.radarrKey)).toBe(false);
   });
 
+  it("ignores an optional field when deciding whether a member is filled", () => {
+    // Only `required: true` fields gate the group. Counting an optional field
+    // would leave both arrs flagged red for a blank tag filter.
+    const sections: SchemaSection[] = [
+      {
+        key: "sonarr",
+        title: "Sonarr",
+        type: "fields",
+        required_group: "arr",
+        fields: [
+          { key: "url", label: "URL", type: "text", required: true },
+          { key: "exclude_arr_tags", label: "Exclude Arr Tags", type: "text" },
+        ],
+      },
+      {
+        key: "radarr",
+        title: "Radarr",
+        type: "fields",
+        required_group: "arr",
+        fields: [{ key: "url", label: "URL", type: "text", required: true }],
+      },
+    ];
+    const body = document.createElement("div");
+    body.id = "configBody";
+    document.body.appendChild(body);
+    fieldInput(body, "sonarr", "url", "http://sonarr:8989");
+    fieldInput(body, "sonarr", "exclude_arr_tags", "");
+    const radarrUrl = fieldInput(body, "radarr", "url", "");
+
+    markRequiredFields(sections, body);
+
+    expect(radarrUrl.classList.contains("cfg-required")).toBe(false);
+    expect(hasError(radarrUrl)).toBe(false);
+  });
+
+  it("wires each input's listener once however many marking passes run", () => {
+    // Re-rendering the form (or typing) runs the pass again; without the
+    // data-required-wired guard every pass would stack another listener, and
+    // each of those re-runs the pass, so the count compounds per keystroke.
+    const f = buildArrForm();
+    const listeners = vi.spyOn(f.sonarrUrl, "addEventListener");
+
+    markRequiredFields(ARR_SECTIONS, f.body);
+    markRequiredFields(ARR_SECTIONS, f.body);
+    f.sonarrUrl.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(listeners.mock.calls.filter(([type]) => type === "input")).toHaveLength(1);
+  });
+
   it("a satisfied required_group does not re-flag an empty member on input", () => {
     const f = buildArrForm();
 
