@@ -21,7 +21,7 @@
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.8.1",
     "fast-check": "4.9.0",
-    "happy-dom": "20.11.4",
+    "happy-dom": "20.11.6",
     "html-validate": "11.8.0",
     "knip": "6.32.2",
     "prettier": "3.9.6",
