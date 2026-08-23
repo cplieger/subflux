@@ -321,6 +321,23 @@ describe("status: first-open skeleton", () => {
     expect(rows[1]?.querySelector("div.skeleton")).not.toBeNull();
   });
 
+  it("the first data paint removes the skeleton rows it replaces", async () => {
+    const h = await boot();
+    vi.useFakeTimers();
+    h.openPanel();
+    vi.advanceTimersByTime(1);
+    expect(skeletonRows()).toHaveLength(2);
+
+    await h.poll({ activities: [entry({ id: "a1", detail: "Scanning A" })] });
+    vi.advanceTimersByTime(300);
+
+    // The rows arrive through reconcile(), which owns only children carrying
+    // its key attribute — an unkeyed placeholder survives every later paint, so
+    // the two bars would sit above the live rows for the lifetime of the page.
+    expect(skeletonRows()).toHaveLength(0);
+    expect(document.querySelector('[data-act-id="a1"]')).not.toBeNull();
+  });
+
   it("re-opening a panel that already holds rows never wipes them with a skeleton", async () => {
     const h = await boot();
     // Paint real content first (nothing armed, so this paints straight).
