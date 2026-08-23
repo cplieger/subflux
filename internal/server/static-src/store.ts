@@ -1,5 +1,10 @@
 // Reactive state container — backed by @cplieger/reactive store.
-// API is unchanged: get, set, batch, subscribe, effect, computed.
+// API is unchanged for consumers: get, set, batch, subscribe, effect, computed.
+// `batch` and `effect` come straight from the package rather than off the Store:
+// they are the engine's own functions, and reactive v2 stopped re-exposing them
+// on the Store because `store.batch(…)` read as "batch this store's writes" while
+// batching the whole graph. Re-exporting them here keeps every call site here
+// unchanged.
 
 import type { SeriesItem, SeasonGroup } from "./api-types.js";
 import type { ParsedConfig } from "./wire/types.gen.js";
@@ -49,9 +54,9 @@ export interface StoreMap {
 
 const store = createStore<StoreMap>();
 
+export { batch, effect } from "@cplieger/reactive";
+
 export const get = store.get.bind(store);
 export const set = store.set.bind(store);
-export const batch = store.batch.bind(store);
 export const subscribe = store.subscribe.bind(store);
-export const effect = store.effect.bind(store);
 export const computed = store.computed.bind(store);
