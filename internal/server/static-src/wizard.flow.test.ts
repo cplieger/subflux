@@ -327,9 +327,14 @@ describe("draft resume", () => {
     const sections = { sonarr: { enabled: true, url: "http://sonarr:8989", api_key: "" } };
     // Dotted PATHS marking which secrets the server holds, never their values —
     // the shape `secrets_present` carries. They reach storage only through
-    // fingerprintBoot, which returns a djb2 hash, so no secret and no path name
-    // is recoverable from the draft. Named for what it holds: a bare `secrets`
-    // reads as values, and CodeQL's clear-text-storage rule agrees.
+    // fingerprintBoot, which returns a djb2 hash plus a length suffix, so no
+    // secret and no path name is recoverable from the draft.
+    //
+    // CodeQL flags this line anyway (js/clear-text-storage-of-sensitive-data,
+    // dismissed as a false positive): the taint starts at fingerprintBoot's
+    // `secretsPresent` parameter and rides its return value into setItem, and a
+    // hand-rolled hash is not a sanitizer the query models. Renaming the local
+    // does not clear it — the source is the callee's parameter, not this name.
     const secretPaths = ["sonarr.api_key"];
     localStorage.setItem(
       "subflux-setup-draft",
