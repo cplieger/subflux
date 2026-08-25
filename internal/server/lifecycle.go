@@ -310,6 +310,17 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The wizard's own address, served for either auth state: setup starts
+	// before any user exists and continues on the session that creating the
+	// admin issued, so neither branch below can be the one that answers here.
+	// An authenticated request would otherwise fall through to index.html and
+	// land the operator in the app's unconfigured settings dialog instead of
+	// back in the wizard they were halfway through.
+	if p == setupPath {
+		http.ServeFileFS(w, r, staticSub, loginHTML)
+		return
+	}
+
 	if _, _, err := s.authenticator.Authenticate(r); err != nil {
 		if auth.IsBrowserRequest(r) {
 			http.ServeFileFS(w, r, staticSub, loginHTML)

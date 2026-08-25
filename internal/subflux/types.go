@@ -228,6 +228,12 @@ type SchemaSection struct {
 	Fields           []SchemaField    `json:"fields,omitempty"`
 	ProviderTemplate []SchemaField    `json:"provider_template,omitempty"`
 	Providers        []ProviderSchema `json:"providers,omitempty"`
+	// ConnTest marks a section that reaches a remote service and can be
+	// tested before saving: the settings dialog and the setup wizard render a
+	// "Test connection" control for it, keyed by the section's own Key. It is
+	// schema data for the same reason EnableKey is — which sections get which
+	// controls is the schema's job, not a key comparison inside a renderer.
+	ConnTest bool `json:"conn_test,omitempty"`
 }
 
 // ProviderSchema describes a single provider's settings fields.

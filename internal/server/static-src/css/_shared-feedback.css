@@ -1,0 +1,91 @@
+/* Inline action feedback, shared by style.css and login.css.
+ *
+ * "Did the thing I just clicked work?" is asked identically on both pages, so
+ * the vocabulary for answering it lives here rather than in the app-only
+ * layers. The button-state rules moved out of 02-base.css when the connection
+ * test gave the login bundle its first inline async action — their comment
+ * already claimed "consistent everywhere" and this is what makes that true.
+ * Depends only on _shared-tokens.css, which both manifests include
+ * immediately above.
+ *
+ * The .conn-test rules are deliberately self-contained rather than composing an
+ * existing button class: .ghost exists in 02-base.css but the login bundle only
+ * ever declares it scoped to one wizard screen, so a shared control that leaned
+ * on it would render unstyled on the page that needs it most. Two-class
+ * selectors (.conn-test .conn-test-btn) keep the rules order-independent — this
+ * file loads before both .auth-card :where(button) and 02-base.css's bare
+ * button, and a single class would only tie with the former.
+ */
+
+/* Button feedback states (data-status driven, consistent everywhere) */
+button[data-status="ok"] {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+button[data-status="err"] {
+  background: var(--err-dim);
+  color: var(--err);
+}
+
+/* --- Connection test control (settings dialog + wizard; the sections that
+   carry it declare it via SchemaSection.ConnTest) --- */
+
+.conn-test {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
+  margin-block-start: var(--sp-3);
+}
+
+/* A secondary action beside its fields, not a submit: both hosts stretch a bare
+ * button to the form width, so width and flex are pinned here. */
+.conn-test .conn-test-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  height: 1.75rem;
+  padding: 0 var(--sp-5);
+  background: var(--ghost);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+/* Hover applies only while there is no verdict to hide. The status arms below
+ * carry two classes and an attribute; a naive `:hover:not(:disabled)` carries
+ * two classes and two pseudo-classes, which outranks them — so hovering a
+ * settled button repainted it ghost-grey and threw away the answer the operator
+ * had just asked for. Excluding [data-status] states that as a rule rather than
+ * fixing it with a specificity race. Any edit in either field clears the
+ * verdict, which restores the hover response along with it. */
+.conn-test .conn-test-btn:hover:not(:disabled, [data-status]) {
+  background: var(--ghost-hover);
+  color: var(--text);
+}
+
+.conn-test .conn-test-btn[data-status="ok"] {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+.conn-test .conn-test-btn[data-status="err"] {
+  background: var(--err-dim);
+  color: var(--err);
+}
+
+.conn-test-status {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.conn-test-status[data-status="ok"] {
+  color: var(--ok);
+}
+
+.conn-test-status[data-status="err"] {
+  color: var(--err);
+}

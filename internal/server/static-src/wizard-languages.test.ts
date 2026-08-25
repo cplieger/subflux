@@ -27,6 +27,9 @@ vi.mock("./wire/client.gen.js", () => ({
   validateConfigPath: () => Promise.resolve(null),
   webauthnRegisterBegin: () => Promise.resolve(null),
   webauthnSignalData: () => Promise.resolve(null),
+  // Reached only by a section's Test-connection button, which these
+  // tests do not click; shaped like a real answer so a future one can.
+  testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
   PATH_SAVE_CONFIG_STRUCTURED: "/api/config/structured",
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
 }));

@@ -59,6 +59,14 @@ const (
 	loginHTML = "login.html"
 )
 
+// setupPath is the setup wizard's own address (cleaned, so no leading slash).
+// The wizard is a page-state of login.html rather than a document of its own,
+// so without an address a reload mid-setup resolves to whichever bundle the
+// session state implies — which, once the admin exists, is the app. handleUI
+// serves login.html here for either auth state and login.ts re-enters the
+// wizard from it. Mirrored client-side as SETUP_PATH in static-src/constants.ts.
+const setupPath = "setup"
+
 // mustSub extracts a subdirectory from an embedded FS, panicking on failure.
 func mustSub(fsys embed.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)

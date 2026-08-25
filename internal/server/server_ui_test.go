@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/cplieger/auth/v4"
 )
 
 // --- handleUI tests ---
@@ -99,5 +101,83 @@ func TestHandleUI_gz_sibling_not_addressable(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
 		t.Errorf("handleUI(/app.js.gz) Content-Type = %q, want text/html (fallback)", ct)
+	}
+}
+
+// rejectingAuthenticator is bypassAuthenticator's opposite: a
+// sessionAuthenticator double that authenticates nothing, for the handleUI
+// branches that turn on the request being anonymous.
+type rejectingAuthenticator struct{}
+
+func (rejectingAuthenticator) Authenticate(*http.Request) (*auth.User, string, error) {
+	return nil, "", auth.ErrUnauthenticated
+}
+
+func (rejectingAuthenticator) RequireAuth(http.ResponseWriter, *http.Request) (*auth.User, string, bool) {
+	return nil, "", false
+}
+
+// TestHandleUI_setup_path_serves_the_login_bundle pins the wizard's address in
+// BOTH auth states, which is the whole point of it having one: creating the
+// admin is step one of setup and it issues a session, so from step two onward a
+// reload is an authenticated request. Before this path existed such a request
+// fell through to index.html and dropped the operator into the app's
+// unconfigured settings dialog with the half-finished wizard gone.
+//
+// Neither case carries an Accept header, so both also pin that the branch sits
+// ABOVE the auth check and answers without consulting it or auth.IsBrowserRequest
+// — the same public reachability /login.html already has for a browser, over a
+// static shell that carries nothing a caller could not get from the login page.
+//
+// Asserted by which bundle the document loads rather than by Content-Type: both
+// entrypoints are text/html, so a status-and-type check passes on the wrong one.
+func TestHandleUI_setup_path_serves_the_login_bundle(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		auth sessionAuthenticator
+	}{
+		{name: "authenticated", auth: bypassAuthenticator{}},
+		{name: "anonymous", auth: rejectingAuthenticator{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newTestServer(t, &qhMockStore{})
+			s.authenticator = tt.auth
+
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodGet, "/setup", http.NoBody)
+			rec := httptest.NewRecorder()
+			s.handleUI(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("handleUI(/setup) status = %d, want %d", rec.Code, http.StatusOK)
+			}
+			body := rec.Body.String()
+			if !strings.Contains(body, "/login.js") {
+				t.Errorf("handleUI(/setup) served a document without /login.js, want the login bundle")
+			}
+			if strings.Contains(body, "/app.js") {
+				t.Errorf("handleUI(/setup) served the app bundle, want the login bundle")
+			}
+		})
+	}
+}
+
+// TestHandleUI_root_still_serves_the_app_bundle is the control for the test
+// above: the setup path must not have generalized into "authenticated
+// navigations get login.html".
+func TestHandleUI_root_still_serves_the_app_bundle(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, &qhMockStore{})
+
+	req := httptest.NewRequestWithContext(t.Context(),
+		http.MethodGet, "/", http.NoBody)
+	rec := httptest.NewRecorder()
+	s.handleUI(rec, req)
+
+	if !strings.Contains(rec.Body.String(), "/app.js") {
+		t.Errorf("handleUI(/) served a document without /app.js, want the app bundle")
 	}
 }

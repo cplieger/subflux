@@ -124,6 +124,24 @@ export interface BulkDeleteRequest {
 }
 
 /**
+ * ConnTestResponse is the JSON response for a connection test. It is shaped like
+ * PathValidationResponse, and for the same reason: a failed test is the normal
+ * answer to the question being asked, not an HTTP error, so the status stays 200
+ * and Valid carries the verdict.
+ */
+export interface ConnTestResponse {
+  /**
+ * Error is the failure, sanitized and capped for display. Where it is not
+ * one of the named HTTP answers (describeArrFailure) it is the client's own
+ * text, because an operator needs to tell "HTTP 401" from "connection
+ * refused" and a vocabulary in front of those two would hide the
+ * distinction that makes the test useful.
+ */
+  error?: string;
+  valid: boolean;
+}
+
+/**
  * CoverageEvent is the data payload for coverage updates. It deliberately
  * carries no file path (S7: no filesystem paths on the wire; the UI keys
  * refreshes on media identity alone).
@@ -520,6 +538,14 @@ export interface SchemaSection {
   fields?: SchemaField[];
   provider_template?: SchemaField[];
   providers?: ProviderSchema[];
+  /**
+ * ConnTest marks a section that reaches a remote service and can be
+ * tested before saving: the settings dialog and the setup wizard render a
+ * "Test connection" control for it, keyed by the section's own Key. It is
+ * schema data for the same reason EnableKey is — which sections get which
+ * controls is the schema's job, not a key comparison inside a renderer.
+ */
+  conn_test?: boolean;
 }
 
 /** ScorePreview is the JSON response for POST /api/score/preview. */

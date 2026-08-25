@@ -169,17 +169,6 @@ input[type="date"]:invalid {
   }
 }
 
-/* Button feedback states (data-status driven, consistent everywhere) */
-button[data-status="ok"] {
-  background: var(--ok-dim);
-  color: var(--ok);
-}
-
-button[data-status="err"] {
-  background: var(--err-dim);
-  color: var(--err);
-}
-
 /* Mobile: standardize all interactive elements to 44px touch targets */
 @container card (width < 700px) {
   /* Mobile type scale (Apple HIG aligned) — override tokens on all card content */

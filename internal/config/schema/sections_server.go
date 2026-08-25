@@ -39,6 +39,7 @@ func sonarrSection() subflux.SchemaSection {
 		Key: keySonarr, Title: "Sonarr", Type: fieldFields,
 		RequiredGroup: groupArr,
 		EnableKey:     keyEnabled,
+		ConnTest:      true,
 		Fields:        arrFields("Sonarr", "http://sonarr:8989"),
 	}
 }
@@ -48,6 +49,7 @@ func radarrSection() subflux.SchemaSection {
 		Key: "radarr", Title: "Radarr", Type: fieldFields,
 		RequiredGroup: groupArr,
 		EnableKey:     keyEnabled,
+		ConnTest:      true,
 		Fields:        arrFields("Radarr", "http://radarr:7878"),
 	}
 }

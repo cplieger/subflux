@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeDownloadAccepted, decodeFileEntry, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignalData, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAudioResponse, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, SignalData, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignalData, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAudioResponse, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, SignalData, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -52,6 +52,7 @@ export const PATH_WEBAUTHN_REGISTER_FINISH = "/api/auth/webauthn/register/finish
 export const PATH_RENAME_PASSKEY = "/api/auth/passkeys/{id}";
 export const PATH_CONFIG_SCHEMA = "/api/config/schema";
 export const PATH_VALIDATE_CONFIG_PATH = "/api/config/validate-path";
+export const PATH_TEST_CONNECTION = "/api/config/test-connection";
 export const PATH_LIST_ALERTS = "/api/alerts";
 export const PATH_DISMISS_ALERT = "/api/alerts";
 export const PATH_LIST_ACTIVITY = "/api/activity";
@@ -230,6 +231,15 @@ export function validateConfigPath(body: unknown, opts?: ClientOpts): Promise<Pa
 
 export function validateConfigPathRaw(body: unknown, opts?: ClientOpts): Promise<ApiResult<PathValidationResponse>> {
   return clientRequestRaw("POST", "/api/config/validate-path", body, decodePathValidationResponse, opts?.signal);
+}
+
+/** Live Sonarr/Radarr reachability + API-key check; a failed test is 200 with valid=false. */
+export function testConnection(body: unknown, opts?: ClientOpts): Promise<ConnTestResponse | null> {
+  return clientRequest("POST", "/api/config/test-connection", body, decodeConnTestResponse, opts?.signal);
+}
+
+export function testConnectionRaw(body: unknown, opts?: ClientOpts): Promise<ApiResult<ConnTestResponse>> {
+  return clientRequestRaw("POST", "/api/config/test-connection", body, decodeConnTestResponse, opts?.signal);
 }
 
 export function listAlerts(opts?: ClientOpts): Promise<Alert[] | null> {

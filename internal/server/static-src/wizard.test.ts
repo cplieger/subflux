@@ -29,6 +29,9 @@ vi.mock("./wire/client.gen.js", () => ({
   validateConfigPath: wire.validateConfigPath,
   webauthnRegisterBegin: wire.webauthnRegisterBegin,
   webauthnSignalData: wire.webauthnSignalData,
+  // Reached only by a section's Test-connection button, which these
+  // tests do not click; shaped like a real answer so a future one can.
+  testConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
   PATH_SAVE_CONFIG_STRUCTURED: "/api/config/structured",
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
 }));
@@ -236,7 +239,7 @@ describe("wizard: draft persistence is secret-sanitized", () => {
     expect(document.querySelector(".wizard-section-title")?.textContent).toBe("Media Roots");
   });
 
-  it("removes a legacy v1 draft (pre-sanitization, may hold plaintext secrets) at boot", async () => {
+  it("drops a legacy v1 draft (pre-sanitization, may hold plaintext secrets) at boot", async () => {
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -252,6 +255,38 @@ describe("wizard: draft persistence is secret-sanitized", () => {
 
     await wizard.startConfigWizard({ configValid: false });
 
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    // The v1 payload is gone, not merely unread. Asserted on the CONTENT
+    // rather than on the key being absent: boot clears the unusable draft and
+    // then immediately persists a fresh sanitized one for the step it opened,
+    // so that the wizard survives a reload from its very first step.
+    const raw = localStorage.getItem(DRAFT_KEY);
+    expect(raw).not.toContain("LEAKED-PLAINTEXT");
+    expect(raw).not.toContain("legacy");
+    expect((JSON.parse(raw ?? "") as { v: number }).v).toBe(2);
+  });
+
+  it("persists the step it opened, so a reload resumes there", async () => {
+    wire.configSchema.mockResolvedValue(schemaFixture());
+    wire.configStructured.mockResolvedValue({ sections: {}, secrets_present: [] });
+    await wizard.startConfigWizard({ configValid: false });
+
+    // Entry, before any navigation: the draft records the first step. Without
+    // this the wizard's address could be reloaded with nothing to restore, and
+    // the operator would land back on step one from wherever they were.
+    expect((JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "") as { stepId: string }).stepId).toBe(
+      "arr",
+    );
+
+    (document.getElementById("wiz-sonarr-url") as HTMLInputElement).value = "http://sonarr:8989";
+    (document.getElementById("wiz-sonarr-api_key") as HTMLInputElement).value = "k";
+    (document.getElementById("wizardNext") as HTMLButtonElement).click();
+    await waitForFade();
+
+    // The step now ON SCREEN, not the one just left: the nav handler's own
+    // save runs before the index moves, which resumed one step back.
+    expect(document.querySelector(".wizard-section-title")?.textContent).toBe("Media Roots");
+    expect((JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "") as { stepId: string }).stepId).toBe(
+      "media_roots",
+    );
   });
 });

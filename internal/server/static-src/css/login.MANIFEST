@@ -2,13 +2,15 @@
 # Files concatenated in declared order at Docker build time.
 #
 # Login shares the full design-token set with style.css via
-# _shared-tokens.css; only layout, forms, wizard, and a11y rules are
+# _shared-tokens.css, and the inline-action feedback vocabulary via
+# _shared-feedback.css; only layout, forms, wizard, and a11y rules are
 # login-specific. The login bundle gains a few unused app tokens
-# (--raised, --ok, --info, --shadow), which cost nothing
+# (--raised, --info, --shadow), which cost nothing
 # at runtime and keep the two bundles in sync automatically when
 # tokens change.
 login-00-header.css
 _shared-tokens.css
+_shared-feedback.css
 login-01-base.css
 login-02-layout.css
 login-03-forms.css

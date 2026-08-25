@@ -340,11 +340,11 @@ func (h *Handler) applyConfig(w http.ResponseWriter, r *http.Request, data []byt
 	}
 
 	oldCfg := h.state().Cfg
-	if pingErr := h.pingArrIfChanged(r.Context(), "sonarr", newCfg.Sonarr(), oldCfg); pingErr != nil {
+	if pingErr := h.pingArrIfChanged(r.Context(), arrSonarr, newCfg.Sonarr(), oldCfg); pingErr != nil {
 		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "sonarr unreachable: "+pingErr.Error())
 		return
 	}
-	if pingErr := h.pingArrIfChanged(r.Context(), "radarr", newCfg.Radarr(), oldCfg); pingErr != nil {
+	if pingErr := h.pingArrIfChanged(r.Context(), arrRadarr, newCfg.Radarr(), oldCfg); pingErr != nil {
 		httpapi.BadRequestC(w, r, subflux.CodeConfigUnreachableArr, "radarr unreachable: "+pingErr.Error())
 		return
 	}

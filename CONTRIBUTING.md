@@ -124,7 +124,12 @@ CI when they drift.
   responses or logs.
 - **Config is schema-driven.** Adding a config field means adding a schema
   entry (`internal/config/schema`); the UI renders from
-  `GET /api/config/schema`, never from a hardcoded form.
+  `GET /api/config/schema`, never from a hardcoded form. Per-section UI
+  behavior is schema data too, not a key comparison inside a renderer:
+  `EnableKey` gives a section its enable toggle, `ConnTest` gives it a
+  "Test connection" button. `ConnTest` also needs a probe arm server-side
+  (`confighandlers.HandleTestConnection` dispatches on the section key), since
+  what "connected" means differs per service.
 - **File writes are crash-safe.** Subtitle, config, and backup writes go
   through `github.com/cplieger/atomicfile` (temp → fsync → rename); writes
   refuse symlink targets. Don't reach for `os.WriteFile`.

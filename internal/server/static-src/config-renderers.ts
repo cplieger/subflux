@@ -1,5 +1,6 @@
 import { el, option, icon } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
+import { connTestControl } from "./conn-test.js";
 import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
 import { prettyLabel } from "./utils.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -125,12 +126,27 @@ export function renderFieldsSection(schema: SchemaSection, pc: ParsedConfig | nu
       });
     }
     renderFieldsInto(content, schema, pc);
+    appendConnTest(content, schema);
     sec.appendChild(content);
   } else {
     sec.appendChild(el("div", { className: "cfg-title" }, schema.title));
     renderFieldsInto(sec, schema, pc);
+    appendConnTest(sec, schema);
   }
   return sec;
+}
+
+// appendConnTest adds the "Test connection" control to a section that declares
+// one. It goes at the END of the collapsible body rather than in the header, so
+// a disabled section collapses its test along with its fields — testing an arr
+// you have switched off answers nothing.
+function appendConnTest(container: HTMLElement, schema: SchemaSection): void {
+  if (!schema.conn_test) {
+    return;
+  }
+  const find = (key: string): HTMLInputElement | null =>
+    container.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, key))}`);
+  container.appendChild(connTestControl(schema.key, { url: find("url"), apiKey: find("api_key") }));
 }
 
 // wireShowWhen sets up show_when visibility toggling for fields.
