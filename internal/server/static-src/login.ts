@@ -15,6 +15,7 @@ import type { LoginSuccess } from "./wire/types.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
+import { storePasswordCredential } from "./password-credential.js";
 import { startConfigWizard } from "./wizard.js";
 import { postLoginDestination } from "./wizard-state.js";
 import { SETUP_PATH } from "./constants.js";
@@ -64,8 +65,10 @@ async function init(): Promise<void> {
   // redirects here with ?oidc_link=<token>; prove the password to link it.
   const linkToken = new URLSearchParams(window.location.search).get("oidc_link");
   if (linkToken) {
-    showPage("loginPage");
+    // Wire before reveal: this flow HIDES the username field, and showPage
+    // focuses the first visible field of the page it reveals.
     wireOIDCLinkForm(linkToken);
+    showPage("loginPage");
     return;
   }
 
@@ -388,7 +391,15 @@ function wireOIDCLinkForm(linkToken: string): void {
   const userInput = form.querySelector<HTMLInputElement>('input[name="username"]');
   if (userInput) {
     userInput.removeAttribute("required");
-    ((userInput.closest("label") as HTMLElement | null) ?? userInput).hidden = true;
+    // Hide the field AND every label bound to it. login.html's labels are
+    // SIBLINGS of their inputs (`<label for>`), never wrappers, so the old
+    // closest("label") always found nothing and fell through to the input
+    // alone — leaving a "Username" caption over a field that was no longer
+    // there. `labels` resolves both the for= and wrapping shapes.
+    userInput.hidden = true;
+    for (const label of userInput.labels ?? []) {
+      label.hidden = true;
+    }
   }
   showError(
     "loginError",
@@ -443,6 +454,12 @@ function wireSetupForm(configValid: boolean): void {
     // config wizard, prefilled and accelerated by whatever the config file
     // already answers; the password (memory-only) funds the post-activation
     // passkey offer.
+    //
+    // Offer the credential for saving here, while this form is still the page.
+    // Not awaited: the wizard must not wait behind a save prompt, and the call
+    // never rejects. See password-credential.ts for why the browser cannot
+    // work this out on its own.
+    void storePasswordCredential(username, password);
     await startConfigWizard({ configValid, password });
   });
 }
