@@ -51,13 +51,18 @@ button[data-status="err"] {
   font-size: var(--text-sm);
 }
 
-.arr-test .arr-test-btn:hover:not(:disabled) {
+/* Hover applies only while there is no verdict to hide. The status arms below
+ * carry two classes and an attribute; a naive `:hover:not(:disabled)` carries
+ * two classes and two pseudo-classes, which outranks them — so hovering a
+ * settled button repainted it ghost-grey and threw away the answer the operator
+ * had just asked for. Excluding [data-status] states that as a rule rather than
+ * fixing it with a specificity race. Any edit in either field clears the
+ * verdict, which restores the hover response along with it. */
+.arr-test .arr-test-btn:hover:not(:disabled, [data-status]) {
   background: var(--ghost-hover);
   color: var(--text);
 }
 
-/* Beats the two rules above on order (same specificity) so a settled verdict
- * keeps its colour. */
 .arr-test .arr-test-btn[data-status="ok"] {
   background: var(--ok-dim);
   color: var(--ok);

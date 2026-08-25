@@ -3,6 +3,7 @@ package confighandlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -75,9 +77,9 @@ func TestHandleTestArr(t *testing.T) {
 		{
 			name:       "unreachable arr is a 200 verdict carrying the reason",
 			body:       `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`,
-			pingErr:    errors.New("HTTP 401"),
+			pingErr:    &arrapi.StatusError{Code: http.StatusUnauthorized},
 			wantStatus: http.StatusOK,
-			wantErrIs:  "HTTP 401",
+			wantErrIs:  "the API key was rejected",
 			wantSonarr: []string{"http://sonarr:8989|k1"},
 			wantPings:  1,
 		},
@@ -256,9 +258,62 @@ func TestStoredArrAPIKey(t *testing.T) {
 	}
 }
 
+// TestDescribeArrFailure pins which failures get named and which keep the
+// client's own words. The three named arms are three different fixes — the key,
+// the URL's base path, and neither — and the unnamed ones are the failures whose
+// raw text already IS the diagnosis.
+func TestDescribeArrFailure(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "401 names the credential",
+			err:  &arrapi.StatusError{Code: http.StatusUnauthorized, Path: "/api/v3/system/status"},
+			want: "HTTP 401: the API key was rejected",
+		},
+		{
+			name: "403 names the credential too",
+			err:  &arrapi.StatusError{Code: http.StatusForbidden},
+			want: "HTTP 403: the API key was rejected",
+		},
+		{
+			name: "404 names the base path",
+			err:  &arrapi.StatusError{Code: http.StatusNotFound},
+			want: "HTTP 404: no arr API at this URL — check for a missing or extra base path",
+		},
+		{
+			name: "any other status is reported without a claim about the cause",
+			err:  &arrapi.StatusError{Code: http.StatusBadGateway},
+			want: "the server at this URL answered HTTP 502",
+		},
+		{
+			name: "a wrapped status error is still recognized",
+			err:  fmt.Errorf("ping: %w", &arrapi.StatusError{Code: http.StatusUnauthorized}),
+			want: "HTTP 401: the API key was rejected",
+		},
+		{
+			name: "a transport failure keeps its own text, which is already the diagnosis",
+			err:  errors.New("dial tcp 10.0.0.5:8989: connect: connection refused"),
+			want: "dial tcp 10.0.0.5:8989: connect: connection refused",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := describeArrFailure(tt.err); got != tt.want {
+				t.Errorf("describeArrFailure(%v) = %q, want %q", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestHandleTestArr_sanitizes_the_upstream_error pins the display bound on the
-// one field that carries text subflux did not write. arrapi caps a captured
-// error body at 64 KiB, so an arr answering with a newline-bearing wall of text
+// one field that carries text subflux did not write. A body arrapi captured is
+// bounded at 64 KiB and reaches this endpoint through the unnamed arm of
+// describeArrFailure, so an arr answering with a newline-bearing wall of text
 // would otherwise put it verbatim into a JSON field the browser renders.
 func TestHandleTestArr_sanitizes_the_upstream_error(t *testing.T) {
 	t.Parallel()

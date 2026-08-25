@@ -74,7 +74,10 @@ export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement
   };
 
   btn.addEventListener("click", () => {
-    pending?.abort();
+    // No abort of an in-flight request here: the button is disabled for the
+    // duration, so a second click cannot land. `pending` is aborted only by
+    // invalidate(), which re-enables the button — and a click after THAT still
+    // cannot report over the new one, because the old run checks its own signal.
     const ctl = new AbortController();
     pending = ctl;
 

@@ -68,6 +68,9 @@ vi.mock("./wire/client.gen.js", () => ({
   },
   // Reached by renderProvidersSection's health-badge pass.
   providerTimeouts: (): Promise<unknown> => Promise.resolve(null),
+  // Reached only by the arr sections' Test-connection button, which these
+  // tests do not click; shaped like a real answer so a future one can.
+  testArrConnectionRaw: () => Promise.resolve({ ok: true, status: 200, data: { valid: true } }),
   PATH_RESET_CONFIG: "/api/config/reset",
   PATH_SAVE_CONFIG_STRUCTURED: "/api/config/structured",
 }));

@@ -2,9 +2,12 @@ package confighandlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/cplieger/arrapi/v2"
 	"github.com/cplieger/atomicfile/v3"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/logsafe"
@@ -97,11 +100,39 @@ func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := pinger.Ping(r.Context()); err != nil {
-		httpapi.WriteJSON(w, ArrTestResponse{Error: logsafe.Field(err.Error())})
+		httpapi.WriteJSON(w, ArrTestResponse{Error: describeArrFailure(err)})
 		return
 	}
 
 	httpapi.WriteJSON(w, ArrTestResponse{Valid: true})
+}
+
+// describeArrFailure renders a failed ping as one line an operator can act on.
+//
+// An HTTP answer is named, because the raw text buries the only part that
+// matters: arrapi leads with its own package name and repeats the status path, so
+// a rejected credential reads as "arrapi: /api/v3/system/status: HTTP 401" where
+// what the operator needs is which field to go fix. The three arms are the three
+// different fixes — the key, the URL's base path, and neither.
+//
+// Everything else (a dial failure, a timeout, a TLS error) keeps the client's own
+// text: "connection refused" and "no such host" are already the diagnosis, and
+// paraphrasing them would only lose detail. Classification is on the published
+// error TYPE, so a client whose errors this package cannot recognize — including
+// a test double — degrades to that same raw text rather than to a wrong claim.
+func describeArrFailure(err error) string {
+	var status *arrapi.StatusError
+	if errors.As(err, &status) {
+		switch status.Code {
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return fmt.Sprintf("HTTP %d: the API key was rejected", status.Code)
+		case http.StatusNotFound:
+			return fmt.Sprintf("HTTP %d: no arr API at this URL — check for a missing or extra base path", status.Code)
+		default:
+			return fmt.Sprintf("the server at this URL answered HTTP %d", status.Code)
+		}
+	}
+	return logsafe.Field(err.Error())
 }
 
 // storedArrAPIKey reads an arr's API key out of the config file on disk, or ""
