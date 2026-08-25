@@ -92,7 +92,7 @@ func (h *Handler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
 	// closed HERE rather than derived from the schema, because a kind is only
 	// testable once this handler knows how to probe it.
 	kind := strings.TrimSpace(req.Kind)
-	if kind != "sonarr" && kind != "radarr" {
+	if kind != arrSonarr && kind != arrRadarr {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, `kind must be "sonarr" or "radarr"`)
 		return
 	}
@@ -143,8 +143,7 @@ func (h *Handler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
 // error TYPE, so a client whose errors this package cannot recognize — including
 // a test double — degrades to that same raw text rather than to a wrong claim.
 func describeArrFailure(err error) string {
-	var status *arrapi.StatusError
-	if errors.As(err, &status) {
+	if status, ok := errors.AsType[*arrapi.StatusError](err); ok {
 		switch status.Code {
 		case http.StatusUnauthorized, http.StatusForbidden:
 			return fmt.Sprintf("HTTP %d: the API key was rejected", status.Code)

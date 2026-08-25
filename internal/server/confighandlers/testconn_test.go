@@ -20,11 +20,13 @@ import (
 // secret api_key, so secretPaths can address the stored key on disk.
 func testArrSchema() []subflux.SchemaSection {
 	arr := func(key string) subflux.SchemaSection {
-		return subflux.SchemaSection{Key: key, Type: "fields", ConnTest: true,
+		return subflux.SchemaSection{
+			Key: key, Type: "fields", ConnTest: true,
 			Fields: []subflux.SchemaField{
 				{Key: "url"},
 				{Key: "api_key", Secret: true},
-			}}
+			},
+		}
 	}
 	return []subflux.SchemaSection{arr("sonarr"), arr("radarr")}
 }
@@ -208,7 +210,7 @@ func TestHandleTestConnection(t *testing.T) {
 func TestHandleTestConnection_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := New(&Deps{ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") }})
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/config/test-arr", http.NoBody)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/config/test-connection", http.NoBody)
 	rec := httptest.NewRecorder()
 	h.HandleTestConnection(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
@@ -227,19 +229,29 @@ func TestStoredArrAPIKey(t *testing.T) {
 		kind     string
 		want     string
 	}{
-		{name: "reads the section's key", kind: "sonarr", want: "k1",
-			existing: "sonarr:\n  api_key: \"k1\"\n"},
+		{
+			name: "reads the section's key", kind: "sonarr", want: "k1",
+			existing: "sonarr:\n  api_key: \"k1\"\n",
+		},
 		{name: "missing file", kind: "sonarr", want: ""},
 		{name: "unparseable file", kind: "sonarr", want: "", existing: "\tnot: yaml\n"},
 		{name: "scalar document", kind: "sonarr", want: "", existing: "just-a-string\n"},
-		{name: "section absent", kind: "radarr", want: "",
-			existing: "sonarr:\n  api_key: \"k1\"\n"},
-		{name: "key absent", kind: "sonarr", want: "",
-			existing: "sonarr:\n  url: \"http://sonarr:8989\"\n"},
-		{name: "key is a mapping, not a scalar", kind: "sonarr", want: "",
-			existing: "sonarr:\n  api_key:\n    nested: no\n"},
-		{name: "surrounding whitespace is trimmed", kind: "sonarr", want: "k1",
-			existing: "sonarr:\n  api_key: \"  k1  \"\n"},
+		{
+			name: "section absent", kind: "radarr", want: "",
+			existing: "sonarr:\n  api_key: \"k1\"\n",
+		},
+		{
+			name: "key absent", kind: "sonarr", want: "",
+			existing: "sonarr:\n  url: \"http://sonarr:8989\"\n",
+		},
+		{
+			name: "key is a mapping, not a scalar", kind: "sonarr", want: "",
+			existing: "sonarr:\n  api_key:\n    nested: no\n",
+		},
+		{
+			name: "surrounding whitespace is trimmed", kind: "sonarr", want: "k1",
+			existing: "sonarr:\n  api_key: \"  k1  \"\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -341,7 +353,7 @@ func TestHandleTestConnection_sanitizes_the_upstream_error(t *testing.T) {
 func doArrTest(t *testing.T, h *Handler, payload string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequestWithContext(t.Context(),
-		http.MethodPost, "/api/config/test-arr", strings.NewReader(payload))
+		http.MethodPost, "/api/config/test-connection", strings.NewReader(payload))
 	rec := httptest.NewRecorder()
 	h.HandleTestConnection(rec, req)
 	return rec

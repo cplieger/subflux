@@ -72,7 +72,7 @@ beforeEach(() => {
   document.body.replaceChildren();
 });
 
-describe("arr-test: what it sends", () => {
+describe("conn-test: what it sends", () => {
   it("sends the section kind with the trimmed URL and the key as typed", async () => {
     const m = mount("radarr");
     m.url.value = "  http://radarr:7878  ";
@@ -96,7 +96,7 @@ describe("arr-test: what it sends", () => {
   });
 });
 
-describe("arr-test: what it reports", () => {
+describe("conn-test: what it reports", () => {
   it("reports a reachable service on both the button and the status line", async () => {
     const m = mount();
     m.btn.click();
@@ -158,7 +158,7 @@ describe("arr-test: what it reports", () => {
   });
 });
 
-describe("arr-test: a verdict does not outlive its values", () => {
+describe("conn-test: a verdict does not outlive its values", () => {
   it("retires the verdict when the URL is edited", async () => {
     const m = mount();
     m.btn.click();
@@ -240,7 +240,7 @@ describe("arr-test: a verdict does not outlive its values", () => {
   });
 });
 
-describe("arr-test: missing fields", () => {
+describe("conn-test: missing fields", () => {
   it("still sends, so the server answers what is required", async () => {
     // Both hosts resolve the inputs by id and may find neither; the control
     // must not throw, and the server owns the "URL is required" wording so the

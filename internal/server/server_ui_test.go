@@ -104,7 +104,6 @@ func TestHandleUI_gz_sibling_not_addressable(t *testing.T) {
 	}
 }
 
-
 // rejectingAuthenticator is bypassAuthenticator's opposite: a
 // sessionAuthenticator double that authenticates nothing, for the handleUI
 // branches that turn on the request being anonymous.

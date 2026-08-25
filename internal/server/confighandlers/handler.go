@@ -41,6 +41,15 @@ type PathValidationResponse struct {
 	Valid bool   `json:"valid"`
 }
 
+// arrSonarr and arrRadarr are the config section keys of the two arr instances,
+// which double as the `kind` the connection-test endpoint dispatches on. Named
+// because the literals recur across the save-time ping and the on-demand test
+// (goconst).
+const (
+	arrSonarr = "sonarr"
+	arrRadarr = "radarr"
+)
+
 // ArrPinger is the only thing this package asks of an arr client: can it be
 // reached. A config save pings Sonarr or Radarr before activating a changed
 // endpoint, so a bad URL or key is reported on the save rather than discovered
@@ -300,7 +309,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 	}
 	if oldCfg != nil {
 		var old subflux.ArrConfig
-		if name == "sonarr" {
+		if name == arrSonarr {
 			old = oldCfg.Sonarr()
 		} else {
 			old = oldCfg.Radarr()
@@ -323,7 +332,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 // newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a
 // connectivity check. Both role clients expose Ping.
 func (h *Handler) newArrPinger(name, baseURL, apiKey string) (ArrPinger, error) {
-	if name == "sonarr" {
+	if name == arrSonarr {
 		return h.newSonarr(baseURL, apiKey)
 	}
 	return h.newRadarr(baseURL, apiKey)
