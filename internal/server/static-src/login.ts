@@ -5,6 +5,7 @@ import {
   authSetupCreateRaw,
   authSetupStatus,
   loginRaw,
+  me,
   oidcLinkRaw,
   webauthnLoginBegin,
   PATH_OIDC_REDIRECT,
@@ -16,6 +17,7 @@ import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { $, show, showPage, showError, hideError } from "./dom-core.js";
 import { startConfigWizard } from "./wizard.js";
 import { postLoginDestination } from "./wizard-state.js";
+import { SETUP_PATH } from "./constants.js";
 import {
   bufferToBase64url,
   requestOptionsFromJSON,
@@ -78,6 +80,39 @@ async function init(): Promise<void> {
     showPage("setupPage");
     wireSetupForm(data.config_valid);
     return;
+  }
+
+  // A reload of the wizard's own address. setup_required is already false —
+  // creating the admin is step one of setup, not the end of it — so the only
+  // remaining question is whether setup finished.
+  if (window.location.pathname === SETUP_PATH) {
+    if (data.config_valid) {
+      // It finished (here or in another tab). Hand the URL back to the server,
+      // which answers with the app or the login page per the session.
+      window.location.replace("/");
+      return;
+    }
+    // Creating the admin issued a session, so the usual case is that we are
+    // still authenticated and can re-enter without asking for the password
+    // again. Its only cost is the passkey offer, which already declines with
+    // that exact reason when it has no password to confirm with.
+    //
+    // Without a session (cookie cleared, a server restart — sessions are
+    // in-memory — or a much later return) this probe answers 401, and the
+    // transport's session-expiry chokepoint navigates to /login?next=/setup.
+    // That is the right landing: the resume-setup form there funds the wizard
+    // with a fresh password and postLoginDestination sends it straight back.
+    const who = await me();
+    if (who) {
+      if (postLoginDestination(who.role, false) === "wizard") {
+        await startConfigWizard({ configValid: false });
+      } else {
+        showPage("setupNoticePage");
+      }
+      return;
+    }
+    // Reached only if that redirect did not happen (a transport failure rather
+    // than a 401): show the resume-setup login rather than an empty page.
   }
 
   if (!data.config_valid) {

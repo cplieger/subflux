@@ -21,7 +21,7 @@ import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplie
 import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
 import { el, option } from "./dom.js";
-import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT } from "./constants.js";
+import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT, SETUP_PATH } from "./constants.js";
 import type { SchemaSection } from "./api-types.js";
 import type { StructuredConfig } from "./wire/types.gen.js";
 import {
@@ -270,6 +270,16 @@ export function variantSelect(id: string, value: string): HTMLElement {
 export async function startConfigWizard(entry: WizardEntry): Promise<void> {
   setupPassword = entry.password ?? "";
 
+  // Give the wizard an address before anything can fail. A reload then comes
+  // back here — including out of the init-error state, where a refresh is the
+  // retry — instead of resolving to the app shell, which is what an
+  // authenticated request for "/" gets once the admin exists. replaceState
+  // rather than pushState: the wizard is where the operator IS, not somewhere
+  // Back should return to, and login.html is already the served document.
+  if (window.location.pathname !== SETUP_PATH) {
+    history.replaceState(null, "", SETUP_PATH);
+  }
+
   // BOTH fetches must succeed before any wizard state initializes. A failed
   // structured fetch must never be substituted with {}: Finish PUTs the FULL
   // section map from the boot snapshot, so an empty baseline would DELETE
@@ -401,6 +411,13 @@ function renderCurrentStep(): void {
   if (!step) {
     return;
   }
+
+  // Persist against the step now on screen. The nav handlers also save before
+  // validating (so a rejected Next keeps what was typed), but they run BEFORE
+  // the index moves, which recorded the step being LEFT — a reload resumed one
+  // step back. Saving here also covers the first step, which no nav handler has
+  // reached yet.
+  saveDraft();
 
   const isEmpty = container.children.length === 0;
 

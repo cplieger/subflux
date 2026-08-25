@@ -22,6 +22,16 @@ export const SEASON_SYNC_CONCURRENCY = 3;
 // Debounce delay for SSE reconnect on visibility change.
 export const VISIBILITY_DEBOUNCE_MS = 2_000;
 
+// The setup wizard's own address. The wizard is a page-state of login.html
+// rather than a document of its own, so without an address a reload mid-setup
+// resolves to whichever bundle the session state implies — and once the admin
+// exists (creating them issues a session) that is the app, whose unconfigured
+// settings dialog is not where the operator left off. wizard.ts replaces the
+// URL with this on entry, login.ts re-enters from it, and finishing navigates
+// away to "/". Mirrored server-side as setupPath in internal/server/server.go,
+// which must serve login.html here for either auth state.
+export const SETUP_PATH = "/setup";
+
 // Subtitle variant options — single source of truth for config, wizard, and badge logic.
 export const SUBTITLE_VARIANTS = [
   { value: DEFAULT_VARIANT, label: "standard" },
