@@ -90,6 +90,10 @@ Open `http://localhost:8374`. Every first boot runs ONE guided flow: create the 
 - **From scratch:** subflux wrote a placeholder config on first boot, so the wizard walks every step with sensible defaults prefilled.
 - **Pre-authored `config.yaml`:** every step the file already answers is prefilled and collapsed (saved secrets show as present without exposing values); a fully valid config fast-forwards straight to a review screen with a "Finish" button. Collapsed steps stay reviewable and editable before finishing.
 
+The Sonarr and Radarr step carries a **Test connection** button that checks the URL and API key against the live instance and reports the answer at the field. It is optional — leave it alone and Next moves on — but using it catches a wrong URL or a rejected key on the first step rather than at the final save. The same button is on both sections of the settings dialog afterwards; where a key is already saved, testing uses the stored one, so there is nothing to retype.
+
+Reloading the page mid-setup returns you to the step you were on rather than dropping you into the app.
+
 Finishing saves the config and activates everything in place (providers, arr clients, background scans, and auth capabilities) with no restart. The same holds for later edits in the settings dialog: saving a valid config hot-activates it, including WebAuthn/OIDC and logging changes.
 
 ## Configuration reference
