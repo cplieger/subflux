@@ -1,24 +1,24 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1787700634298,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/subflux",
   "entries": {
     "Benchmark": [
       {
         "commit": {
           "author": {
-            "name": "Christopher Plieger",
+            "name": "cplieger",
             "username": "cplieger",
             "email": "917744+cplieger@users.noreply.github.com"
           },
           "committer": {
-            "name": "GitHub",
-            "username": "web-flow",
-            "email": "noreply@github.com"
+            "name": "Christopher Plieger",
+            "username": "cplieger",
+            "email": "917744+cplieger@users.noreply.github.com"
           },
-          "id": "22ecb93b0586a9d799b745b0b5f7c2a5da2fe072",
-          "message": "chore(deps): update cplieger/ci digest to f04eff4 (#512)",
-          "timestamp": "2026-08-25T08:02:03Z",
-          "url": "https://github.com/cplieger/ci/commit/22ecb93b0586a9d799b745b0b5f7c2a5da2fe072"
+          "id": "7070902ea9e83aa864442f770053ed7a3932c873",
+          "message": "fix(ui): let password managers fill and save the first-run admin account\n\nOn the first-launch wizard the admin-profile card offered no password-manager integration on its username field, while the password field beside it worked. Three causes, none of them in the field itself: its markup already matches the browsers' documented sign-up form.\n\nlogin.html carries four page-states in one document, and only the sign-in one shipped visible. The page was therefore classified while the SIGN-IN form was the visible, focused credential form and the admin card was still display:none. Every state now starts hidden and showPage reveals the one that applies.\n\nBoth username fields also carried autofocus. Only the first one in a document takes effect, and that one sat inside the page about to be hidden, so the admin username field was never focused at all. showPage now focuses the revealed page first field, skipping any field inside a hidden subtree.\n\nThe admin form submits over fetch and hands off through replaceState, so no navigation follows the password just chosen and nothing asked the browser to save it. It is now offered explicitly through the Credential Management API, un-awaited and never fatal.\n\nAlso fixes the single-sign-on link form, which hid the username input but left its label captioning the gap: those labels are siblings of their inputs, so the closest(\"label\") lookup never matched one.",
+          "timestamp": "2026-08-25T16:15:57Z",
+          "url": "https://github.com/cplieger/subflux/commit/7070902ea9e83aa864442f770053ed7a3932c873"
         },
         "date": 1787700632509,
         "tool": "customSmallerIsBetter",
