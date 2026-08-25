@@ -195,12 +195,13 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// it reveals filesystem structure and belongs to the config-editing
 	// role that consumes it.
 	admin.Add("POST /api/config/validate-path", confighandlers.HandleValidatePath)
-	// Config-time arr reachability probe: the same ping a save runs, on its
-	// own, so the settings UI and the setup wizard can answer "is this URL
-	// and key right" at the field. Admin for the same reason as the rest of
-	// the config surface, and unconfigured-tolerant because the wizard is
-	// exactly where it is most useful.
-	admin.Add("POST /api/config/test-arr", s.configH.HandleTestArr)
+	// Config-time connection probe: the same ping a save runs, on its own, so
+	// the settings UI and the setup wizard can answer "is this URL and key
+	// right" at the field. `kind` is the config section, so the surface
+	// generalizes by growing an arm rather than an endpoint. Admin for the same
+	// reason as the rest of the config surface, and unconfigured-tolerant
+	// because the wizard is exactly where it is most useful.
+	admin.Add("POST /api/config/test-connection", s.configH.HandleTestConnection)
 
 	// --- userConfigured: requires session + valid config ---
 

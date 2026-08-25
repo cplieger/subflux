@@ -1,4 +1,9 @@
-// Connection test control for a Sonarr/Radarr config section.
+// Connection test control for a config section that reaches a remote service.
+//
+// The control is generic; the SECTIONS that carry it are schema-declared
+// (SchemaSection.ConnTest), and today that is Sonarr and Radarr. `kind` is the
+// section key, which is also what the endpoint dispatches on, so a second kind
+// is a schema flag and a server arm rather than a second control.
 //
 // Shared by both bundles on purpose: the settings dialog (app.js) and the setup
 // wizard (login.js) ask the same question about the same two fields, and the
@@ -7,20 +12,29 @@
 // this in the chunk both entries already share, so the second host costs
 // nothing.
 //
+// The probe runs SERVER-side, and that is the point rather than a convenience:
+// the question is whether SUBFLUX can reach the service, which is the process
+// that will use it. The browser cannot answer that one — a section's `url` is
+// documented as the server's own address (the default is a Docker service name)
+// and carries a separate `public_url` for browser links precisely because the
+// two differ; an HTTPS page cannot fetch an http:// service at all; and a saved
+// key never reaches the browser. A browser-side green while the server cannot
+// connect would be worse than no test.
+//
 // It reports INLINE rather than through a toast or a page banner. The wizard has
-// no toaster at all, and in the settings dialog the arr sections sit inside a
+// no toaster at all, and in the settings dialog these sections sit inside a
 // scrolling dialog where a banner pinned to the top would be off-screen from the
 // button that produced it. Local feedback is the only shape that reads the same
 // in both places — and it keeps this module out of notify.ts's dependency cone,
 // which would otherwise drag the toast primitive into the login bundle.
 
 import { el } from "./dom.js";
-import { testArrConnectionRaw } from "./wire/client.gen.js";
+import { testConnectionRaw } from "./wire/client.gen.js";
 
 /** Fields the test reads. Elements rather than ids: both hosts build the
  *  control while their section is still a detached subtree, where
  *  getElementById cannot reach but a scoped querySelector can. */
-export interface ArrTestFields {
+export interface ConnTestFields {
   url: HTMLInputElement | null;
   apiKey: HTMLInputElement | null;
 }
@@ -28,11 +42,11 @@ export interface ArrTestFields {
 const LABEL_IDLE = "Test connection";
 const LABEL_BUSY = "Testing\u2026";
 
-/** Build the test-connection control for one arr section. `kind` is the config
- *  section key ("sonarr" / "radarr"), which is also what the endpoint takes. */
-export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement {
+/** Build the test-connection control for one section. `kind` is the config
+ *  section key, which is also what the endpoint takes. */
+export function connTestControl(kind: string, fields: ConnTestFields): HTMLElement {
   const status = el("span", {
-    className: "arr-test-status",
+    className: "conn-test-status",
     // Polite, not assertive: the operator asked for this result and is looking
     // at the button, so it needs announcing without interrupting. The wizard's
     // shared #wizardError slot is role="alert" precisely because nobody asked
@@ -42,7 +56,7 @@ export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement
 
   const btn = el(
     "button",
-    { type: "button", className: "arr-test-btn" },
+    { type: "button", className: "conn-test-btn" },
     LABEL_IDLE,
   ) as HTMLButtonElement;
 
@@ -100,7 +114,7 @@ export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement
 
     void (async (): Promise<void> => {
       try {
-        const res = await testArrConnectionRaw(body, { signal: ctl.signal });
+        const res = await testConnectionRaw(body, { signal: ctl.signal });
         if (ctl.signal.aborted) {
           return;
         }
@@ -108,7 +122,7 @@ export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement
         btn.removeAttribute("aria-busy");
         btn.textContent = LABEL_IDLE;
         if (!res.ok || !res.data) {
-          // Transport or envelope failure, not a verdict about the arr: an
+          // Transport or envelope failure, not a verdict about the service: an
           // expired session or a 500 lands here and must not read as
           // "your URL is wrong".
           settle("err", res.error ?? "Test request failed");
@@ -127,5 +141,5 @@ export function arrTestControl(kind: string, fields: ArrTestFields): HTMLElement
     })();
   });
 
-  return el("div", { className: "arr-test" }, btn, status);
+  return el("div", { className: "conn-test" }, btn, status);
 }

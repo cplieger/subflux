@@ -6,7 +6,7 @@
 import { validateConfigPath } from "./wire/client.gen.js";
 import { $ } from "./dom-core.js";
 import { el } from "./dom.js";
-import { arrTestControl } from "./arr-test.js";
+import { connTestControl } from "./conn-test.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import {
@@ -106,7 +106,7 @@ function renderArrGroup(
   if (section.conn_test) {
     const find = (fieldKey: string): HTMLInputElement | null =>
       group.querySelector<HTMLInputElement>(`#${CSS.escape("wiz-" + key + "-" + fieldKey)}`);
-    group.appendChild(arrTestControl(key, { url: find("url"), apiKey: find("api_key") }));
+    group.appendChild(connTestControl(key, { url: find("url"), apiKey: find("api_key") }));
   }
   container.appendChild(group);
 }

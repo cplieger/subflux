@@ -2,17 +2,17 @@
  *
  * "Did the thing I just clicked work?" is asked identically on both pages, so
  * the vocabulary for answering it lives here rather than in the app-only
- * layers. The button-state rules moved out of 02-base.css when the arr
- * connection test gave the login bundle its first inline async action — their
- * comment already claimed "consistent everywhere" and this is what makes that
- * true. Depends only on _shared-tokens.css, which both manifests include
+ * layers. The button-state rules moved out of 02-base.css when the connection
+ * test gave the login bundle its first inline async action — their comment
+ * already claimed "consistent everywhere" and this is what makes that true.
+ * Depends only on _shared-tokens.css, which both manifests include
  * immediately above.
  *
- * The .arr-test rules are deliberately self-contained rather than composing an
+ * The .conn-test rules are deliberately self-contained rather than composing an
  * existing button class: .ghost exists in 02-base.css but the login bundle only
  * ever declares it scoped to one wizard screen, so a shared control that leaned
  * on it would render unstyled on the page that needs it most. Two-class
- * selectors (.arr-test .arr-test-btn) keep the rules order-independent — this
+ * selectors (.conn-test .conn-test-btn) keep the rules order-independent — this
  * file loads before both .auth-card :where(button) and 02-base.css's bare
  * button, and a single class would only tie with the former.
  */
@@ -28,9 +28,10 @@ button[data-status="err"] {
   color: var(--err);
 }
 
-/* --- Connection test control (arr sections: settings dialog + wizard) --- */
+/* --- Connection test control (settings dialog + wizard; the sections that
+   carry it declare it via SchemaSection.ConnTest) --- */
 
-.arr-test {
+.conn-test {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-3);
@@ -40,7 +41,7 @@ button[data-status="err"] {
 
 /* A secondary action beside its fields, not a submit: both hosts stretch a bare
  * button to the form width, so width and flex are pinned here. */
-.arr-test .arr-test-btn {
+.conn-test .conn-test-btn {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
@@ -58,22 +59,22 @@ button[data-status="err"] {
  * had just asked for. Excluding [data-status] states that as a rule rather than
  * fixing it with a specificity race. Any edit in either field clears the
  * verdict, which restores the hover response along with it. */
-.arr-test .arr-test-btn:hover:not(:disabled, [data-status]) {
+.conn-test .conn-test-btn:hover:not(:disabled, [data-status]) {
   background: var(--ghost-hover);
   color: var(--text);
 }
 
-.arr-test .arr-test-btn[data-status="ok"] {
+.conn-test .conn-test-btn[data-status="ok"] {
   background: var(--ok-dim);
   color: var(--ok);
 }
 
-.arr-test .arr-test-btn[data-status="err"] {
+.conn-test .conn-test-btn[data-status="err"] {
   background: var(--err-dim);
   color: var(--err);
 }
 
-.arr-test-status {
+.conn-test-status {
   flex: 1 1 12rem;
   min-width: 0;
   font-size: var(--text-sm);
@@ -81,10 +82,10 @@ button[data-status="err"] {
   overflow-wrap: anywhere;
 }
 
-.arr-test-status[data-status="ok"] {
+.conn-test-status[data-status="ok"] {
   color: var(--ok);
 }
 
-.arr-test-status[data-status="err"] {
+.conn-test-status[data-status="err"] {
   color: var(--err);
 }

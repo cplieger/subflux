@@ -15,29 +15,42 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-// maxArrTestBodySize bounds the test request: a kind, a URL and a key.
-const maxArrTestBodySize = 4096
+// maxConnTestBodySize bounds the test request: a kind, a URL and a key.
+const maxConnTestBodySize = 4096
 
-// ArrTestResponse is the JSON response for an arr connection test. It is shaped
-// like PathValidationResponse, and for the same reason: a failed test is the
-// normal answer to the question being asked, not an HTTP error, so the status
-// stays 200 and Valid carries the verdict.
-type ArrTestResponse struct {
-	// Error is the failure, sanitized and capped for display. It is the arr
-	// client's own text (an HTTP status, a dial failure) rather than a
-	// classified message, because an operator needs to tell "HTTP 401" from
-	// "connection refused" and a vocabulary in front of those two would hide
-	// the distinction that makes the test useful.
+// ConnTestResponse is the JSON response for a connection test. It is shaped like
+// PathValidationResponse, and for the same reason: a failed test is the normal
+// answer to the question being asked, not an HTTP error, so the status stays 200
+// and Valid carries the verdict.
+type ConnTestResponse struct {
+	// Error is the failure, sanitized and capped for display. Where it is not
+	// one of the named HTTP answers (describeArrFailure) it is the client's own
+	// text, because an operator needs to tell "HTTP 401" from "connection
+	// refused" and a vocabulary in front of those two would hide the
+	// distinction that makes the test useful.
 	Error string `json:"error,omitempty"`
 	Valid bool   `json:"valid"`
 }
 
-// HandleTestArr reports whether a Sonarr or Radarr instance answers at a URL and
-// accepts an API key. It is the same check a config save runs before activating a
-// changed endpoint (pingArrIfChanged), reachable on its own so the settings UI and
-// the setup wizard can answer "is this right" at the field instead of at the save.
+// HandleTestConnection reports whether the remote service a config section points
+// at answers at its URL and accepts its API key. It is the same check a config
+// save runs before activating a changed endpoint (pingArrIfChanged), reachable on
+// its own so the settings UI and the setup wizard can answer "is this right" at
+// the field instead of at the save.
 //
-// POST /api/config/test-arr  body: {"kind":"sonarr","url":"http://sonarr:8989","api_key":"..."}
+// POST /api/config/test-connection  body: {"kind":"sonarr","url":"http://sonarr:8989","api_key":"..."}
+//
+// `kind` is the config section key and the dispatch point, so the surface
+// generalizes by growing an arm rather than by growing an endpoint. Today the
+// only kinds are the two arrs; the sections that offer a test declare it
+// themselves (subflux.SchemaSection.ConnTest), so the client never carries a list.
+//
+// It deliberately takes NO probe description from the caller — no path, no header
+// name, no success rule. That keeps the capability bounded to what a save already
+// performs: a GET of one known path on a validated host with one known header. A
+// caller-supplied descriptor would turn this into a general-purpose authenticated
+// prober, and a caller-supplied "just connect" check would answer green for a
+// wrong API key, which is the mistake the test mostly exists to catch.
 //
 // Deliberately NOT under saveMu: it reads the config file and touches no live
 // state, so serializing it behind a save would buy nothing and could block the
@@ -51,7 +64,14 @@ type ArrTestResponse struct {
 // addresses (10.x, sonarr:8989) are the normal case. arrapi's own constructor
 // validation still applies (absolute http(s) URL, host, no query or fragment), as
 // does its same-host redirect policy, so the API key cannot be forwarded off-origin.
-func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
+//
+// The probe runs here rather than in the browser because the question is whether
+// SUBFLUX can reach the service. A section's url is the SERVER's address for it —
+// the shipped default is a Docker service name, and public_url exists separately
+// for browser links precisely because the two differ — so a browser-side test
+// would answer a different question, and could not answer it at all over HTTPS or
+// for a key the redacting GET never shipped.
+func (h *Handler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
@@ -62,13 +82,15 @@ func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
 		URL    string `json:"url"`
 		APIKey string `json:"api_key"`
 	}
-	if !httpapi.DecodeJSONBody(w, r, &req, maxArrTestBodySize) {
+	if !httpapi.DecodeJSONBody(w, r, &req, maxConnTestBodySize) {
 		return
 	}
 
-	// An unknown kind is a client bug, not an operator mistake: the two
-	// sections are the only testable ones and both callers name them from the
-	// schema. That makes it the one failure here that is a 400.
+	// An unknown kind is a client bug, not an operator mistake: only sections
+	// declaring ConnTest offer a test, and both callers name them from the
+	// schema. That makes it the one failure here that is a 400. The set is
+	// closed HERE rather than derived from the schema, because a kind is only
+	// testable once this handler knows how to probe it.
 	kind := strings.TrimSpace(req.Kind)
 	if kind != "sonarr" && kind != "radarr" {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, `kind must be "sonarr" or "radarr"`)
@@ -77,7 +99,7 @@ func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
 
 	url := strings.TrimSpace(req.URL)
 	if url == "" {
-		httpapi.WriteJSON(w, ArrTestResponse{Error: "URL is required"})
+		httpapi.WriteJSON(w, ConnTestResponse{Error: "URL is required"})
 		return
 	}
 
@@ -86,7 +108,7 @@ func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
 		apiKey = h.storedArrAPIKey(r.Context(), kind)
 	}
 	if apiKey == "" {
-		httpapi.WriteJSON(w, ArrTestResponse{Error: "API key is required"})
+		httpapi.WriteJSON(w, ConnTestResponse{Error: "API key is required"})
 		return
 	}
 
@@ -96,15 +118,15 @@ func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
 		// absolute, no host, carries a query). That is an answer about the
 		// value the operator typed, so it rides the same 200 as a dial
 		// failure rather than becoming a 400.
-		httpapi.WriteJSON(w, ArrTestResponse{Error: logsafe.Field(err.Error())})
+		httpapi.WriteJSON(w, ConnTestResponse{Error: logsafe.Field(err.Error())})
 		return
 	}
 	if err := pinger.Ping(r.Context()); err != nil {
-		httpapi.WriteJSON(w, ArrTestResponse{Error: describeArrFailure(err)})
+		httpapi.WriteJSON(w, ConnTestResponse{Error: describeArrFailure(err)})
 		return
 	}
 
-	httpapi.WriteJSON(w, ArrTestResponse{Valid: true})
+	httpapi.WriteJSON(w, ConnTestResponse{Valid: true})
 }
 
 // describeArrFailure renders a failed ping as one line an operator can act on.
@@ -136,7 +158,9 @@ func describeArrFailure(err error) string {
 }
 
 // storedArrAPIKey reads an arr's API key out of the config file on disk, or ""
-// when there is none to read.
+// when there is none to read. Arr-specific by its path (<kind>.api_key), like
+// describeArrFailure: the ENDPOINT generalizes over kinds, the probe for each
+// kind does not.
 //
 // An empty api_key in the request means "test with the key you already have".
 // Both callers need it: a saved secret is rendered as an empty field with a

@@ -16,7 +16,7 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// testArrSchema is the minimum HandleTestArr needs: both arr sections with a
+// testArrSchema is the minimum HandleTestConnection needs: both arr sections with a
 // secret api_key, so secretPaths can address the stored key on disk.
 func testArrSchema() []subflux.SchemaSection {
 	arr := func(key string) subflux.SchemaSection {
@@ -29,7 +29,7 @@ func testArrSchema() []subflux.SchemaSection {
 	return []subflux.SchemaSection{arr("sonarr"), arr("radarr")}
 }
 
-// TestHandleTestArr pins the whole probe: which instance is built and with
+// TestHandleTestConnection pins the whole probe: which instance is built and with
 // which credentials, that a failed test is a 200 verdict rather than an HTTP
 // error, that an omitted key falls back to the one on disk, and that the ping
 // is unconditional where the save path's is not.
@@ -38,7 +38,7 @@ func testArrSchema() []subflux.SchemaSection {
 // reason the save-path gate asserts them: a probe that built the radarr client
 // for a sonarr request would validate the operator's new sonarr credentials
 // against the wrong instance and report a confident green.
-func TestHandleTestArr(t *testing.T) {
+func TestHandleTestConnection(t *testing.T) {
 	t.Parallel()
 	// A stored radarr key the request can omit, and a live config identical to
 	// what one case submits (the save path would skip that ping).
@@ -163,56 +163,56 @@ func TestHandleTestArr(t *testing.T) {
 			rec := doArrTest(t, h, tt.body)
 
 			if rec.Code != tt.wantStatus {
-				t.Errorf("HandleTestArr(%s) status = %d, want %d; body %s",
+				t.Errorf("HandleTestConnection(%s) status = %d, want %d; body %s",
 					tt.body, rec.Code, tt.wantStatus, rec.Body.String())
 			}
 			if !slices.Equal(gotSonarr, tt.wantSonarr) {
-				t.Errorf("HandleTestArr(%s) built sonarr client with %v, want %v",
+				t.Errorf("HandleTestConnection(%s) built sonarr client with %v, want %v",
 					tt.body, gotSonarr, tt.wantSonarr)
 			}
 			if !slices.Equal(gotRadarr, tt.wantRadarr) {
-				t.Errorf("HandleTestArr(%s) built radarr client with %v, want %v",
+				t.Errorf("HandleTestConnection(%s) built radarr client with %v, want %v",
 					tt.body, gotRadarr, tt.wantRadarr)
 			}
 			if pings != tt.wantPings {
-				t.Errorf("HandleTestArr(%s) pinged %d times, want %d", tt.body, pings, tt.wantPings)
+				t.Errorf("HandleTestConnection(%s) pinged %d times, want %d", tt.body, pings, tt.wantPings)
 			}
 			if tt.wantStatus != http.StatusOK {
 				return
 			}
 
-			var got ArrTestResponse
+			var got ConnTestResponse
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				// Establishes the value every check below reads.
-				t.Fatalf("HandleTestArr(%s) response %s: %v", tt.body, rec.Body.String(), err)
+				t.Fatalf("HandleTestConnection(%s) response %s: %v", tt.body, rec.Body.String(), err)
 			}
 			if got.Valid != tt.wantValid {
-				t.Errorf("HandleTestArr(%s) valid = %t, want %t (error %q)",
+				t.Errorf("HandleTestConnection(%s) valid = %t, want %t (error %q)",
 					tt.body, got.Valid, tt.wantValid, got.Error)
 			}
 			if tt.wantErrIs == "" {
 				if got.Error != "" {
-					t.Errorf("HandleTestArr(%s) error = %q, want empty", tt.body, got.Error)
+					t.Errorf("HandleTestConnection(%s) error = %q, want empty", tt.body, got.Error)
 				}
 			} else if !strings.Contains(got.Error, tt.wantErrIs) {
-				t.Errorf("HandleTestArr(%s) error = %q, want it to contain %q",
+				t.Errorf("HandleTestConnection(%s) error = %q, want it to contain %q",
 					tt.body, got.Error, tt.wantErrIs)
 			}
 		})
 	}
 }
 
-// TestHandleTestArr_rejects_non_post pins the method gate: the probe reads the
+// TestHandleTestConnection_rejects_non_post pins the method gate: the probe reads the
 // config file and dials an operator-supplied host, so it must not be reachable
 // by a GET a browser or crawler could trigger from a URL alone.
-func TestHandleTestArr_rejects_non_post(t *testing.T) {
+func TestHandleTestConnection_rejects_non_post(t *testing.T) {
 	t.Parallel()
 	h := New(&Deps{ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") }})
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/config/test-arr", http.NoBody)
 	rec := httptest.NewRecorder()
-	h.HandleTestArr(rec, req)
+	h.HandleTestConnection(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Errorf("HandleTestArr(GET) status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		t.Errorf("HandleTestConnection(GET) status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -310,12 +310,12 @@ func TestDescribeArrFailure(t *testing.T) {
 	}
 }
 
-// TestHandleTestArr_sanitizes_the_upstream_error pins the display bound on the
+// TestHandleTestConnection_sanitizes_the_upstream_error pins the display bound on the
 // one field that carries text subflux did not write. A body arrapi captured is
 // bounded at 64 KiB and reaches this endpoint through the unnamed arm of
 // describeArrFailure, so an arr answering with a newline-bearing wall of text
 // would otherwise put it verbatim into a JSON field the browser renders.
-func TestHandleTestArr_sanitizes_the_upstream_error(t *testing.T) {
+func TestHandleTestConnection_sanitizes_the_upstream_error(t *testing.T) {
 	t.Parallel()
 	hostile := "HTTP 500: " + strings.Repeat("a", 4096) + "\nSecond-Line: injected"
 	h := New(&Deps{
@@ -326,15 +326,15 @@ func TestHandleTestArr_sanitizes_the_upstream_error(t *testing.T) {
 	})
 
 	rec := doArrTest(t, h, `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`)
-	var got ArrTestResponse
+	var got ConnTestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		t.Fatalf("HandleTestArr() response %s: %v", rec.Body.String(), err)
+		t.Fatalf("HandleTestConnection() response %s: %v", rec.Body.String(), err)
 	}
 	if strings.ContainsAny(got.Error, "\n\r") {
-		t.Errorf("HandleTestArr() error = %q, want no line breaks", got.Error)
+		t.Errorf("HandleTestConnection() error = %q, want no line breaks", got.Error)
 	}
 	if len(got.Error) > 512 {
-		t.Errorf("HandleTestArr() error is %d bytes, want it capped near 256", len(got.Error))
+		t.Errorf("HandleTestConnection() error is %d bytes, want it capped near 256", len(got.Error))
 	}
 }
 
@@ -343,6 +343,6 @@ func doArrTest(t *testing.T, h *Handler, payload string) *httptest.ResponseRecor
 	req := httptest.NewRequestWithContext(t.Context(),
 		http.MethodPost, "/api/config/test-arr", strings.NewReader(payload))
 	rec := httptest.NewRecorder()
-	h.HandleTestArr(rec, req)
+	h.HandleTestConnection(rec, req)
 	return rec
 }

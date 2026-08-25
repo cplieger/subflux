@@ -1,30 +1,31 @@
-// arr-test.test.ts — the shared arr connection-test control.
+// conn-test.test.ts — the shared connection-test control.
 //
 // The control is the same object in the settings dialog and the setup wizard, so
 // its risks are behavioral rather than per-host: a verdict that outlives the
 // values it was about (a green "Connected" beside a URL edited since), a
-// transport failure rendered as a verdict about the arr, and a stale answer from
-// an abandoned click painting over a newer one. Those three are what these tests
-// aim at; where the control is APPENDED is covered by the two hosts' own suites.
+// transport failure rendered as a verdict about the service, and a stale answer
+// from an abandoned click painting over a newer one. Those three are what these
+// tests aim at; where the control is APPENDED is covered by the two hosts' own
+// suites.
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { arrTestControl } from "./arr-test.js";
+import { connTestControl } from "./conn-test.js";
 import type { ApiResult } from "./api-client.js";
-import type { ArrTestResponse } from "./wire/types.gen.js";
+import type { ConnTestResponse } from "./wire/types.gen.js";
 
 const wire = vi.hoisted(() => ({
   calls: [] as unknown[],
-  answers: [] as ApiResult<ArrTestResponse>[],
+  answers: [] as ApiResult<ConnTestResponse>[],
   defer: false,
   releases: [] as (() => void)[],
 }));
 
 vi.mock("./wire/client.gen.js", () => ({
-  testArrConnectionRaw: (body: unknown): Promise<ApiResult<ArrTestResponse>> => {
+  testConnectionRaw: (body: unknown): Promise<ApiResult<ConnTestResponse>> => {
     wire.calls.push(body);
-    const next = (): ApiResult<ArrTestResponse> =>
+    const next = (): ApiResult<ConnTestResponse> =>
       wire.answers.shift() ?? { ok: true, status: 200, data: { valid: true } };
     if (wire.defer) {
-      return new Promise<ApiResult<ArrTestResponse>>((resolve) => {
+      return new Promise<ApiResult<ConnTestResponse>>((resolve) => {
         wire.releases.push(() => {
           resolve(next());
         });
@@ -45,12 +46,12 @@ interface Mounted {
 function mount(kind = "sonarr"): Mounted {
   const url = document.createElement("input");
   const apiKey = document.createElement("input");
-  const root = arrTestControl(kind, { url, apiKey });
+  const root = connTestControl(kind, { url, apiKey });
   document.body.replaceChildren(url, apiKey, root);
   return {
     root,
     btn: root.querySelector("button") as HTMLButtonElement,
-    status: root.querySelector(".arr-test-status") as HTMLElement,
+    status: root.querySelector(".conn-test-status") as HTMLElement,
     url,
     apiKey,
   };
@@ -96,7 +97,7 @@ describe("arr-test: what it sends", () => {
 });
 
 describe("arr-test: what it reports", () => {
-  it("reports a reachable arr on both the button and the status line", async () => {
+  it("reports a reachable service on both the button and the status line", async () => {
     const m = mount();
     m.btn.click();
     await settle();
@@ -108,7 +109,7 @@ describe("arr-test: what it reports", () => {
     expect(m.btn.hasAttribute("aria-busy")).toBe(false);
   });
 
-  it("carries the server's reason for an unreachable arr", async () => {
+  it("carries the server's reason for an unreachable service", async () => {
     wire.answers = [{ ok: true, status: 200, data: { valid: false, error: "HTTP 401" } }];
     const m = mount();
     m.btn.click();
@@ -118,7 +119,7 @@ describe("arr-test: what it reports", () => {
     expect(m.status.textContent).toBe("HTTP 401");
   });
 
-  it("distinguishes a transport failure from a verdict about the arr", async () => {
+  it("distinguishes a transport failure from a verdict about the service", async () => {
     // An expired session or a 500 must not read as "your URL is wrong".
     wire.answers = [{ ok: false, status: 401, error: "unauthorized" }];
     const m = mount();
@@ -245,12 +246,12 @@ describe("arr-test: missing fields", () => {
     // must not throw, and the server owns the "URL is required" wording so the
     // two hosts cannot disagree about it.
     wire.answers = [{ ok: true, status: 200, data: { valid: false, error: "URL is required" } }];
-    const root = arrTestControl("sonarr", { url: null, apiKey: null });
+    const root = connTestControl("sonarr", { url: null, apiKey: null });
     document.body.replaceChildren(root);
     (root.querySelector("button") as HTMLButtonElement).click();
     await settle();
 
     expect(wire.calls).toEqual([{ kind: "sonarr", url: "", api_key: "" }]);
-    expect(root.querySelector(".arr-test-status")?.textContent).toBe("URL is required");
+    expect(root.querySelector(".conn-test-status")?.textContent).toBe("URL is required");
   });
 });

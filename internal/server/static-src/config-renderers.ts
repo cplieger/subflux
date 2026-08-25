@@ -1,6 +1,6 @@
 import { el, option, icon } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
-import { arrTestControl } from "./arr-test.js";
+import { connTestControl } from "./conn-test.js";
 import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
 import { prettyLabel } from "./utils.js";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -146,7 +146,7 @@ function appendConnTest(container: HTMLElement, schema: SchemaSection): void {
   }
   const find = (key: string): HTMLInputElement | null =>
     container.querySelector<HTMLInputElement>(`#${CSS.escape(fieldId(schema.key, key))}`);
-  container.appendChild(arrTestControl(schema.key, { url: find("url"), apiKey: find("api_key") }));
+  container.appendChild(connTestControl(schema.key, { url: find("url"), apiKey: find("api_key") }));
 }
 
 // wireShowWhen sets up show_when visibility toggling for fields.

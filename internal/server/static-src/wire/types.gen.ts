@@ -95,24 +95,6 @@ export interface Alert {
   dismissed: boolean;
 }
 
-/**
- * ArrTestResponse is the JSON response for an arr connection test. It is shaped
- * like PathValidationResponse, and for the same reason: a failed test is the
- * normal answer to the question being asked, not an HTTP error, so the status
- * stays 200 and Valid carries the verdict.
- */
-export interface ArrTestResponse {
-  /**
- * Error is the failure, sanitized and capped for display. It is the arr
- * client's own text (an HTTP status, a dial failure) rather than a
- * classified message, because an operator needs to tell "HTTP 401" from
- * "connection refused" and a vocabulary in front of those two would hide
- * the distinction that makes the test useful.
- */
-  error?: string;
-  valid: boolean;
-}
-
 /** AudioRuleJSON is a JSON-friendly audio rule. */
 export interface AudioRule {
   audio: string;
@@ -139,6 +121,24 @@ export interface BackoffEntry {
 export interface BulkDeleteRequest {
   media_type: MediaType;
   media_id: string;
+}
+
+/**
+ * ConnTestResponse is the JSON response for a connection test. It is shaped like
+ * PathValidationResponse, and for the same reason: a failed test is the normal
+ * answer to the question being asked, not an HTTP error, so the status stays 200
+ * and Valid carries the verdict.
+ */
+export interface ConnTestResponse {
+  /**
+ * Error is the failure, sanitized and capped for display. Where it is not
+ * one of the named HTTP answers (describeArrFailure) it is the client's own
+ * text, because an operator needs to tell "HTTP 401" from "connection
+ * refused" and a vocabulary in front of those two would hide the
+ * distinction that makes the test useful.
+ */
+  error?: string;
+  valid: boolean;
 }
 
 /**
