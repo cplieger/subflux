@@ -17,7 +17,14 @@
 <body>
 
 <!-- Login form -->
-<main id="loginPage" class="auth-page" aria-label="Sign in">
+<!-- Every .auth-page starts hidden: this one document holds four page-states,
+     two of them credential forms, and only JS knows which one applies. A
+     visible sign-in form at parse time is a second candidate credential form
+     for the browser and for every password manager, and the one they see
+     first — which is why the setup card's username field, revealed later, got
+     no fill affordance while its password field did. showPage() reveals the
+     right page and focuses its first field. -->
+<main id="loginPage" class="auth-page" hidden aria-label="Sign in">
   <div class="auth-card">
     <h1>Subflux</h1>
 
@@ -27,7 +34,7 @@
     <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on">
       <label for="username">Username</label>
       <input type="text" id="username" name="username"
-        autocomplete="username webauthn" required autofocus
+        autocomplete="username webauthn" required
         placeholder="Username">
 
       <label for="password">Password</label>
@@ -64,7 +71,7 @@
     <form id="setupForm" method="post" action="/api/auth/setup" autocomplete="on">
       <label for="setupUsername">Username</label>
       <input type="text" id="setupUsername" name="username"
-        autocomplete="username" required autofocus
+        autocomplete="username" required
         placeholder="admin">
 
       <label for="setupPassword">Password</label>
