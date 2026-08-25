@@ -95,6 +95,24 @@ export interface Alert {
   dismissed: boolean;
 }
 
+/**
+ * ArrTestResponse is the JSON response for an arr connection test. It is shaped
+ * like PathValidationResponse, and for the same reason: a failed test is the
+ * normal answer to the question being asked, not an HTTP error, so the status
+ * stays 200 and Valid carries the verdict.
+ */
+export interface ArrTestResponse {
+  /**
+ * Error is the failure, sanitized and capped for display. It is the arr
+ * client's own text (an HTTP status, a dial failure) rather than a
+ * classified message, because an operator needs to tell "HTTP 401" from
+ * "connection refused" and a vocabulary in front of those two would hide
+ * the distinction that makes the test useful.
+ */
+  error?: string;
+  valid: boolean;
+}
+
 /** AudioRuleJSON is a JSON-friendly audio rule. */
 export interface AudioRule {
   audio: string;
@@ -520,6 +538,14 @@ export interface SchemaSection {
   fields?: SchemaField[];
   provider_template?: SchemaField[];
   providers?: ProviderSchema[];
+  /**
+ * ConnTest marks a section that reaches a remote service and can be
+ * tested before saving: the settings dialog and the setup wizard render a
+ * "Test connection" control for it, keyed by the section's own Key. It is
+ * schema data for the same reason EnableKey is — which sections get which
+ * controls is the schema's job, not a key comparison inside a renderer.
+ */
+  conn_test?: boolean;
 }
 
 /** ScorePreview is the JSON response for POST /api/score/preview. */

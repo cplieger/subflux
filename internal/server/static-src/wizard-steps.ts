@@ -6,6 +6,7 @@
 import { validateConfigPath } from "./wire/client.gen.js";
 import { $ } from "./dom-core.js";
 import { el } from "./dom.js";
+import { arrTestControl } from "./arr-test.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
 import {
@@ -97,6 +98,15 @@ function renderArrGroup(
         field.help,
       ),
     );
+  }
+  // The test is OPTIONAL: Next validates presence only and does not wait on the
+  // network, so an operator who knows the values are right walks straight
+  // through. It exists because the alternative to using it is discovering a bad
+  // URL at the Finish save, six steps later.
+  if (section.conn_test) {
+    const find = (fieldKey: string): HTMLInputElement | null =>
+      group.querySelector<HTMLInputElement>(`#${CSS.escape("wiz-" + key + "-" + fieldKey)}`);
+    group.appendChild(arrTestControl(key, { url: find("url"), apiKey: find("api_key") }));
   }
   container.appendChild(group);
 }

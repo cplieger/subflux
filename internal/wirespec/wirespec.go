@@ -113,6 +113,7 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[authhandlers.WebAuthnLoginBeginResponse](),
 		wiregen.TypeRef[authhandlers.WebAuthnRegisterBeginResponse](),
 		wiregen.TypeRef[confighandlers.PathValidationResponse](),
+		wiregen.TypeRef[confighandlers.ArrTestResponse](),
 		wiregen.TypeRef[confighandlers.StructuredConfig](),
 		wiregen.TypeRef[mediahandlers.SeasonGroup](),
 		wiregen.TypeRef[mediahandlers.EpisodeItem](),
@@ -301,6 +302,12 @@ func Endpoints() []wiregen.Endpoint {
 			AuthGroup: GroupAdmin, HasBody: true,
 			Doc:      "Config-time directory probe; the one deliberate path-accepting endpoint.",
 			Response: wiregen.TypeRef[confighandlers.PathValidationResponse](),
+		},
+		{
+			Name: "testArrConnection", Method: http.MethodPost, Path: "/api/config/test-arr",
+			AuthGroup: GroupAdmin, HasBody: true,
+			Doc:      "Live Sonarr/Radarr reachability + API-key check; a failed test is 200 with valid=false.",
+			Response: wiregen.TypeRef[confighandlers.ArrTestResponse](),
 		},
 		{
 			Name: "listAlerts", Method: http.MethodGet, Path: "/api/alerts", AuthGroup: GroupUser,

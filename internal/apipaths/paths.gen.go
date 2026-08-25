@@ -26,6 +26,7 @@ const (
 	PathRenamePasskey          = "/api/auth/passkeys/{id}"
 	PathConfigSchema           = "/api/config/schema"
 	PathValidateConfigPath     = "/api/config/validate-path"
+	PathTestArrConnection      = "/api/config/test-arr"
 	PathListAlerts             = "/api/alerts"
 	PathDismissAlert           = "/api/alerts"
 	PathListActivity           = "/api/activity"

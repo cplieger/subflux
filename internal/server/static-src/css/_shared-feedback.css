@@ -1,0 +1,85 @@
+/* Inline action feedback, shared by style.css and login.css.
+ *
+ * "Did the thing I just clicked work?" is asked identically on both pages, so
+ * the vocabulary for answering it lives here rather than in the app-only
+ * layers. The button-state rules moved out of 02-base.css when the arr
+ * connection test gave the login bundle its first inline async action — their
+ * comment already claimed "consistent everywhere" and this is what makes that
+ * true. Depends only on _shared-tokens.css, which both manifests include
+ * immediately above.
+ *
+ * The .arr-test rules are deliberately self-contained rather than composing an
+ * existing button class: .ghost exists in 02-base.css but the login bundle only
+ * ever declares it scoped to one wizard screen, so a shared control that leaned
+ * on it would render unstyled on the page that needs it most. Two-class
+ * selectors (.arr-test .arr-test-btn) keep the rules order-independent — this
+ * file loads before both .auth-card :where(button) and 02-base.css's bare
+ * button, and a single class would only tie with the former.
+ */
+
+/* Button feedback states (data-status driven, consistent everywhere) */
+button[data-status="ok"] {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+button[data-status="err"] {
+  background: var(--err-dim);
+  color: var(--err);
+}
+
+/* --- Connection test control (arr sections: settings dialog + wizard) --- */
+
+.arr-test {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
+  margin-block-start: var(--sp-3);
+}
+
+/* A secondary action beside its fields, not a submit: both hosts stretch a bare
+ * button to the form width, so width and flex are pinned here. */
+.arr-test .arr-test-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  height: 1.75rem;
+  padding: 0 var(--sp-5);
+  background: var(--ghost);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.arr-test .arr-test-btn:hover:not(:disabled) {
+  background: var(--ghost-hover);
+  color: var(--text);
+}
+
+/* Beats the two rules above on order (same specificity) so a settled verdict
+ * keeps its colour. */
+.arr-test .arr-test-btn[data-status="ok"] {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+.arr-test .arr-test-btn[data-status="err"] {
+  background: var(--err-dim);
+  color: var(--err);
+}
+
+.arr-test-status {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.arr-test-status[data-status="ok"] {
+  color: var(--ok);
+}
+
+.arr-test-status[data-status="err"] {
+  color: var(--err);
+}

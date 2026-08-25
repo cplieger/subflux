@@ -1,0 +1,144 @@
+package confighandlers
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"github.com/cplieger/atomicfile/v3"
+	"github.com/cplieger/subflux/internal/httpapi"
+	"github.com/cplieger/subflux/internal/logsafe"
+	"github.com/cplieger/subflux/internal/subflux"
+	yaml "go.yaml.in/yaml/v3"
+)
+
+// maxArrTestBodySize bounds the test request: a kind, a URL and a key.
+const maxArrTestBodySize = 4096
+
+// ArrTestResponse is the JSON response for an arr connection test. It is shaped
+// like PathValidationResponse, and for the same reason: a failed test is the
+// normal answer to the question being asked, not an HTTP error, so the status
+// stays 200 and Valid carries the verdict.
+type ArrTestResponse struct {
+	// Error is the failure, sanitized and capped for display. It is the arr
+	// client's own text (an HTTP status, a dial failure) rather than a
+	// classified message, because an operator needs to tell "HTTP 401" from
+	// "connection refused" and a vocabulary in front of those two would hide
+	// the distinction that makes the test useful.
+	Error string `json:"error,omitempty"`
+	Valid bool   `json:"valid"`
+}
+
+// HandleTestArr reports whether a Sonarr or Radarr instance answers at a URL and
+// accepts an API key. It is the same check a config save runs before activating a
+// changed endpoint (pingArrIfChanged), reachable on its own so the settings UI and
+// the setup wizard can answer "is this right" at the field instead of at the save.
+//
+// POST /api/config/test-arr  body: {"kind":"sonarr","url":"http://sonarr:8989","api_key":"..."}
+//
+// Deliberately NOT under saveMu: it reads the config file and touches no live
+// state, so serializing it behind a save would buy nothing and could block the
+// button behind an unrelated write. It also pings UNCONDITIONALLY, where the save
+// path skips an unchanged endpoint — an explicit test whose answer depended on
+// whether the value had changed would be answering a different question.
+//
+// Admin-gated by its route group. It adds no capability: an admin can already make
+// the server dial an arbitrary host by saving it as an arr URL, and the arr leg is
+// deliberately outside the SSRF allowlist because operator-configured private
+// addresses (10.x, sonarr:8989) are the normal case. arrapi's own constructor
+// validation still applies (absolute http(s) URL, host, no query or fragment), as
+// does its same-host redirect policy, so the API key cannot be forwarded off-origin.
+func (h *Handler) HandleTestArr(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Kind   string `json:"kind"`
+		URL    string `json:"url"`
+		APIKey string `json:"api_key"`
+	}
+	if !httpapi.DecodeJSONBody(w, r, &req, maxArrTestBodySize) {
+		return
+	}
+
+	// An unknown kind is a client bug, not an operator mistake: the two
+	// sections are the only testable ones and both callers name them from the
+	// schema. That makes it the one failure here that is a 400.
+	kind := strings.TrimSpace(req.Kind)
+	if kind != "sonarr" && kind != "radarr" {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, `kind must be "sonarr" or "radarr"`)
+		return
+	}
+
+	url := strings.TrimSpace(req.URL)
+	if url == "" {
+		httpapi.WriteJSON(w, ArrTestResponse{Error: "URL is required"})
+		return
+	}
+
+	apiKey := strings.TrimSpace(req.APIKey)
+	if apiKey == "" {
+		apiKey = h.storedArrAPIKey(r.Context(), kind)
+	}
+	if apiKey == "" {
+		httpapi.WriteJSON(w, ArrTestResponse{Error: "API key is required"})
+		return
+	}
+
+	pinger, err := h.newArrPinger(kind, url, apiKey)
+	if err != nil {
+		// Construction failure is the URL contract being broken (not
+		// absolute, no host, carries a query). That is an answer about the
+		// value the operator typed, so it rides the same 200 as a dial
+		// failure rather than becoming a 400.
+		httpapi.WriteJSON(w, ArrTestResponse{Error: logsafe.Field(err.Error())})
+		return
+	}
+	if err := pinger.Ping(r.Context()); err != nil {
+		httpapi.WriteJSON(w, ArrTestResponse{Error: logsafe.Field(err.Error())})
+		return
+	}
+
+	httpapi.WriteJSON(w, ArrTestResponse{Valid: true})
+}
+
+// storedArrAPIKey reads an arr's API key out of the config file on disk, or ""
+// when there is none to read.
+//
+// An empty api_key in the request means "test with the key you already have".
+// Both callers need it: a saved secret is rendered as an empty field with a
+// "saved" placeholder (the redacting GET never ships the value), so the browser
+// genuinely cannot send a key the operator has not just retyped, and a test that
+// demanded one would fail on precisely the configs that work.
+//
+// The FILE is the source rather than the live config because the file is what a
+// save merges from (mergeExistingSecrets), so the test answers the question the
+// operator is actually asking: would saving this work. It also means the wizard
+// gets the right answer in unconfigured mode, where there is no live arr config
+// to read.
+//
+// Every read failure yields "" rather than an error: the caller then reports the
+// missing key as the user-facing answer it is. Nothing here can distinguish an
+// absent file from an unreadable one in a way an operator could act on
+// differently, and the save path already fails closed on an unreadable baseline.
+func (h *Handler) storedArrAPIKey(ctx context.Context, kind string) string {
+	data, err := atomicfile.ReadBounded(ctx, h.configPath(), maxBodySize)
+	if err != nil {
+		return ""
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return ""
+	}
+	doc := documentMapping(&root)
+	if doc == nil {
+		return ""
+	}
+	node := resolvePath(doc, secretPath{kind, "api_key"})
+	if node == nil || node.Kind != yaml.ScalarNode {
+		return ""
+	}
+	return strings.TrimSpace(node.Value)
+}
