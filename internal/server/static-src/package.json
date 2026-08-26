@@ -23,7 +23,7 @@
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.9.0",
     "fast-check": "4.9.0",
-    "html-validate": "11.9.0",
+    "html-validate": "11.10.0",
     "knip": "6.32.2",
     "playwright": "1.62.1",
     "prettier": "3.9.6",
