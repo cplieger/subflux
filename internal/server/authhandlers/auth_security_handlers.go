@@ -4,10 +4,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cplieger/auth/v4"
 	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 )
@@ -90,4 +92,58 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	httpapi.Ok(w)
 	Audit(r, slog.LevelInfo, AuditPasswordChange, true, user.Username)
+}
+
+// --- PUT /api/auth/profile ---
+
+// HandleUpdateProfile handles PUT /api/auth/profile — sets the current user's
+// display name.
+//
+// An empty value clears it, which makes the username the label again. The
+// username itself is deliberately not editable here: it is the login
+// identifier, and every session, passkey and API key is keyed to the account
+// rather than to the name.
+//
+// The client sends the WebAuthn current-user-details signal after a successful
+// save, so a stored passkey's label follows the account instead of keeping the
+// name it was registered under.
+func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	user := UserFromContext(r.Context())
+
+	req, ok := decodeAuthBody[struct {
+		DisplayName string `json:"display_name"`
+	}](w, r)
+	if !ok {
+		return
+	}
+
+	displayName := strings.TrimSpace(req.DisplayName)
+	if len([]rune(displayName)) > maxDisplayNameLen {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "display name too long")
+		return
+	}
+	// Refuse rather than sanitize. This value reaches every surface that lists
+	// the account and the user's own password manager, where a bidi control
+	// reorders what a human reads, and silently rewriting what someone typed
+	// hides the refusal from them.
+	if strings.ContainsFunc(displayName, runesafe.IsUnsafeSingleLine) {
+		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "display name contains a disallowed character")
+		return
+	}
+
+	if displayName == user.DisplayName {
+		httpapi.Ok(w)
+		return
+	}
+
+	user.DisplayName = displayName
+	user.UpdatedAt = time.Now()
+	if err := h.SecDB.UpdateUser(r.Context(), user); err != nil {
+		slog.Error("profile update: update user", "error", err)
+		httpapi.InternalErrorC(w, r, nil, subflux.CodeInternalError)
+		return
+	}
+
+	httpapi.Ok(w)
+	Audit(r, slog.LevelInfo, AuditProfileUpdate, true, user.Username)
 }

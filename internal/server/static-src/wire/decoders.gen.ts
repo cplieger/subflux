@@ -309,6 +309,7 @@ export const decodeMeResponse: Decoder<MeResponse> = (v) => {
   const o = asObject(v, "$.me_response");
   const out: MeResponse = {
     username: reqStr(o, "username", "$.me_response"),
+    display_name: reqStr(o, "display_name", "$.me_response"),
     role: reqOneOf(o, "role", ROLES, "$.me_response"),
     id: reqNum(o, "id", "$.me_response"),
     has_passkeys: reqBool(o, "has_passkeys", "$.me_response"),

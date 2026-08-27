@@ -45,6 +45,7 @@ export const PATH_WEBAUTHN_LOGIN_FINISH = "/api/auth/webauthn/login/finish";
 export const PATH_EVENTS = "/api/events";
 export const PATH_ME = "/api/auth/me";
 export const PATH_CHANGE_PASSWORD = "/api/auth/password";
+export const PATH_UPDATE_PROFILE = "/api/auth/profile";
 export const PATH_LIST_PASSKEYS = "/api/auth/passkeys";
 export const PATH_WEBAUTHN_SIGNAL_DATA = "/api/auth/webauthn/signal-data";
 export const PATH_WEBAUTHN_REGISTER_BEGIN = "/api/auth/webauthn/register/begin";
@@ -182,6 +183,14 @@ export function changePassword(body: unknown, opts?: ClientOpts): Promise<boolea
 
 export function changePasswordRaw(body: unknown, opts?: ClientOpts): Promise<ApiResult<unknown>> {
   return clientRequestRaw("PUT", "/api/auth/password", body, undefined, opts?.signal);
+}
+
+export function updateProfile(body: unknown, opts?: ClientOpts): Promise<boolean> {
+  return clientRequestOK("PUT", "/api/auth/profile", body, opts?.signal);
+}
+
+export function updateProfileRaw(body: unknown, opts?: ClientOpts): Promise<ApiResult<unknown>> {
+  return clientRequestRaw("PUT", "/api/auth/profile", body, undefined, opts?.signal);
 }
 
 export function listPasskeys(opts?: ClientOpts): Promise<PasskeyInfo[] | null> {

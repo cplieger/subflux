@@ -288,7 +288,9 @@ async function finishWebAuthnLogin(
     return;
   }
   const data = (await res.json()) as LoginRedirect;
-  void sendWebAuthnSignals();
+  // Awaited, not fired-and-forgotten: the signal needs a live page, and the
+  // navigation below tears one down.
+  await sendWebAuthnSignals();
   window.location.href = data.redirect ?? "/";
 }
 
@@ -370,6 +372,9 @@ function wireLoginForm(resumeSetup: boolean): void {
         }
         return;
       }
+      // A password sign-in repairs any drift too: the display name may have
+      // changed on another device since this passkey was registered.
+      await sendWebAuthnSignals();
       window.location.href = res.data?.redirect ?? "/";
     } finally {
       if (btn) {

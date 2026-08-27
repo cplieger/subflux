@@ -47,6 +47,7 @@ const (
 	AuditLoginRateLimited AuditEvent = "login.rate_limited"
 	AuditLogout           AuditEvent = "logout"
 	AuditPasswordChange   AuditEvent = "password.change"
+	AuditProfileUpdate    AuditEvent = "profile.update"
 	AuditPasskeyAdd       AuditEvent = "passkey.add"
 	AuditPasskeyDelete    AuditEvent = "passkey.delete"
 	AuditPasskeyRename    AuditEvent = "passkey.rename"

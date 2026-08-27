@@ -294,6 +294,7 @@ export interface ManualSearchResponse {
 /** MeResponse is the JSON response for GET /api/auth/me. */
 export interface MeResponse {
   username: string;
+  display_name: string;
   role: Role;
   id: number;
   has_passkeys: boolean;

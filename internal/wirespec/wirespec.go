@@ -272,6 +272,10 @@ func Endpoints() []wiregen.Endpoint {
 			HasBody: true,
 		},
 		{
+			Name: "updateProfile", Method: http.MethodPut, Path: "/api/auth/profile", AuthGroup: GroupUser,
+			HasBody: true,
+		},
+		{
 			Name: "listPasskeys", Method: http.MethodGet, Path: "/api/auth/passkeys", AuthGroup: GroupUser,
 			Response: wiregen.TypeRef[authhandlers.PasskeyInfo](), RespShape: wiregen.RespArray,
 		},

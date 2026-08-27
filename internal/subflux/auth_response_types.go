@@ -15,6 +15,7 @@ type SetupStatus struct {
 // MeResponse is the JSON response for GET /api/auth/me.
 type MeResponse struct {
 	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
 	Role        auth.Role `json:"role"`
 	ID          int64     `json:"id"`
 	HasPasskeys bool      `json:"has_passkeys"`

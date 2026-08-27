@@ -73,6 +73,11 @@ const (
 	// maxPasskeyNameLen is the maximum length for passkey names.
 	maxPasskeyNameLen = 128
 
+	// maxDisplayNameLen is the maximum length for a user's display name. It
+	// reaches the user's password manager as the passkey entry's label, so it
+	// is bounded like every other name a user chooses.
+	maxDisplayNameLen = 128
+
 	// maxAPIKeyLabelLen is the maximum length for API key labels.
 	maxAPIKeyLabelLen = 128
 )

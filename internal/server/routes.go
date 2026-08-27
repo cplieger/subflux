@@ -142,6 +142,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// carry their own in-band proof and also live here.
 	user.Add("GET /api/auth/me", s.authH.HandleAuthMe)
 	user.Add("PUT /api/auth/password", s.authH.HandleChangePassword)
+	user.Add("PUT /api/auth/profile", s.authH.HandleUpdateProfile)
 	user.Add("GET /api/auth/passkeys", s.authH.HandleListPasskeys)
 	user.Add("GET /api/auth/webauthn/signal-data", s.authH.HandleWebAuthnSignalData)
 	user.Add("POST /api/auth/webauthn/register/begin", s.authH.HandleWebAuthnRegisterBegin)
