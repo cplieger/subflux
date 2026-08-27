@@ -3,7 +3,7 @@ package authhandlers
 import (
 	"context"
 
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 )
 
 // AccountStore is the narrow interface consumed by the account handlers on

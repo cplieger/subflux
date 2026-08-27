@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/cplieger/atomicfile/v3"
-	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v5/ratelimit"
 	"github.com/cplieger/health"
 	"github.com/cplieger/slogx"
 	"github.com/cplieger/subflux/internal/arrsvc"

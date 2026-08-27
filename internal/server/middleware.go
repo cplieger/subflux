@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/subflux"

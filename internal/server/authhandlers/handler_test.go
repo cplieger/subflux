@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 )
 
 func TestExtractPathSegment(t *testing.T) {

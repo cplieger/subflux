@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/embedded"
 	"github.com/cplieger/subflux/internal/obs"
