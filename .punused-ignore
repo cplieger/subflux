@@ -358,3 +358,19 @@ constant ModeQuality
 constant ModeLowBitrate
 constant ModeAggressive
 constant TransformNone
+
+
+# --- Store methods a cross-module interface owns the only production call ----
+#   UserByWebAuthnHandle (authstore.Store, and the AccountStore declaration it
+#     satisfies) — reachable in production ONLY through auth/v5/webauthn.Store,
+#     which the library calls inside webauthn.CompleteLogin to resolve the
+#     asserting account from the assertion's user handle. punused drives gopls
+#     over this module, so the sole in-module references are the interface
+#     declaration and the tests, and the verdict is "used in test only" for a
+#     method every discoverable passkey login depends on. Deleting it would fail
+#     the AccountStore -> webauthn.Store satisfaction at the CompleteLogin call
+#     site in auth_webauthn_handlers.go, so the compiler holds the real
+#     guarantee here; adjudicated rather than wired, because a local caller
+#     would be a fake one.
+method (*Store).UserByWebAuthnHandle is used in test only
+method UserByWebAuthnHandle is used in test only
