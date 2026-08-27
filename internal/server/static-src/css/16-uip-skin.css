@@ -89,6 +89,15 @@
 }
 
 /* --- Tooltip (was .tooltip in 03-components) --- */
+
+/* The trigger's own affordance. It lives here, beside the skin, because both
+ * bundles load this split and both pages carry data-tip triggers (the app's
+ * settings labels, the wizard's field labels); a button or link already reads
+ * as interactive, so only the plain elements get the help cursor. */
+:where(:not(button, a))[data-tip] {
+  cursor: help;
+}
+
 .uip-tooltip {
   background: var(--surface);
   color: var(--text);

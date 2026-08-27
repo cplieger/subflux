@@ -392,11 +392,7 @@ td[data-col="actions"] button {
 }
 
 /* --- Tooltip trigger cursor --- */
-/* The tooltip itself (behaviour + DOM + the .uip-tooltip skin) is now the
+/* The tooltip itself (behaviour + DOM + the .uip-tooltip skin) is the
    @cplieger/ui-primitives tooltip primitive — base motion in
-   /ui-primitives.css, skin in 16-uip-skin.css. Only the help cursor on
-   non-button/link triggers stays here, still keyed off the existing data-tip
-   attributes the primitive reads. */
-:where(:not(button, a))[data-tip] {
-  cursor: help;
-}
+   /ui-primitives.css, skin in 16-uip-skin.css, which is also where the
+   trigger's help cursor now lives so the login bundle gets it too. */

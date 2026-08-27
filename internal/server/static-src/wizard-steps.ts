@@ -15,7 +15,6 @@ import {
   secretSaved,
   wizardValues,
   mediaRoots,
-  infoIcon,
   wizField,
   wizToggle,
 } from "./wizard.js";
@@ -326,9 +325,12 @@ export function buildSearchStep(): WizardStep {
       }
 
       if (adaptive?.fields) {
-        const titleSpan = el("span", null, "Adaptive Backoff");
-        titleSpan.appendChild(
-          infoIcon("Gradually increases delay between retries when no subtitles are found"),
+        const titleSpan = el(
+          "span",
+          {
+            "data-tip": "Gradually increases delay between retries when no subtitles are found",
+          },
+          "Adaptive Backoff",
         );
 
         const enabledVal = savedAdaptive["enabled"];

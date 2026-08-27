@@ -43,6 +43,15 @@
 .wizard-section {
   flex: 1;
   transition: opacity var(--dur-exit) var(--ease-exit);
+
+  /* The step body owns the gap above the nav's divider, matching the
+   * var(--sp-5) the nav already puts below it. Without it, any step tall
+   * enough to fill the card renders its last element flush against that
+   * line — measured at 0px under the Radarr connection test and under the
+   * review screen's last row, against 12px for every earlier sibling. The
+   * gap belongs here rather than on each step's own last child, which is a
+   * different element per step (an arr group, a review list, a field). */
+  padding-block-end: var(--sp-5);
 }
 
 .wizard-section.fade-out {
@@ -133,8 +142,13 @@
   margin-block-end: var(--sp-4);
 }
 
+/* min-width matches .cfg-field's floor in 10-config.css so both surfaces align
+ * their inputs at the same column. It has to clear the longest label the schema
+ * ships ("Streaming Service", 108px in the sidecar's face and 118px in DejaVu
+ * Sans at this size) — a label wider than the floor grows and takes its own
+ * input with it, which is what pushed the scoring step's box out of line. */
 .wiz-field label:not(.wiz-toggle) {
-  min-width: 7rem;
+  min-width: 7.5rem;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-2);
@@ -178,29 +192,13 @@
    10. Info tooltip
    ================================================================ */
 
-.wiz-info {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.6rem;
-  font-weight: 700;
-  cursor: help;
-  flex-shrink: 0;
-  position: relative;
-  line-height: 1;
-}
-
-/* The info tooltip itself is the delegated @cplieger/ui-primitives tooltip
- * (initTooltips in login.ts, reading the same data-tip attribute as the app
- * page) — the old CSS-only ::before tooltip had no viewport clamping, no
- * aria-describedby wiring, and no shared delay behavior. Skin comes from
- * 16-uip-skin.css, bundled into login.css via the MANIFEST. */
+/* A field's help text is a data-tip on its own label, read by the delegated
+ * @cplieger/ui-primitives tooltip (initTooltips in login.ts) exactly as the
+ * settings dialog does it; the help cursor that marks the trigger lives with
+ * the tooltip skin in 16-uip-skin.css, which both bundles load. The `.wiz-info`
+ * circle that used to carry it is gone: el() writes an unknown string prop as
+ * an attribute, so its `textContent: "i"` became textcontent="i" and the circle
+ * painted empty. */
 
 /* ================================================================
    11. Arr subsection

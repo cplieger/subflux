@@ -3,14 +3,7 @@
 import { $ } from "./dom-core.js";
 import { el } from "./dom.js";
 import { DEFAULT_VARIANT } from "./constants.js";
-import {
-  type WizardStep,
-  langRules,
-  langDefault,
-  infoIcon,
-  langSelect,
-  variantSelect,
-} from "./wizard.js";
+import { type WizardStep, langRules, langDefault, langSelect, variantSelect } from "./wizard.js";
 
 export function buildLanguagesStep(): WizardStep {
   return {
@@ -53,10 +46,10 @@ export function buildLanguagesStep(): WizardStep {
         {
           className: "wiz-lang-section-title",
           style: "margin-block-start:var(--sp-5)",
+          "data-tip": "Override defaults for specific audio languages",
         },
         "Audio-specific rules (optional)",
       );
-      ruleTitle.appendChild(infoIcon("Override defaults for specific audio languages"));
       container.appendChild(ruleTitle);
 
       const ruleContainer = el("div", { id: "wiz-lang-rules" });
