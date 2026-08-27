@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
@@ -109,7 +110,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	}
 
 	// Extract from archive.
-	result, err := provider.ExtractAndValidate(data, 0, 0)
+	result, err := provider.ExtractAndValidate(data, epmarker.Any())
 	if err != nil {
 		return nil, fmt.Errorf("yifysubtitles: %w", err)
 	}

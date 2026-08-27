@@ -377,6 +377,23 @@ func TestValidate(t *testing.T) {
 		{nil, "two bytes partial bzip2 magic passes", []byte("Bz")},
 		{errBinary, "zip magic detected", append([]byte("PK\x03\x04"), make([]byte, 100)...)},
 		{errBinary, "zip empty archive magic detected", append([]byte("PK\x05\x06"), make([]byte, 100)...)},
+		// A UTF-16 subtitle is about half NUL bytes, so a byte-level text test
+		// calls it binary. Four of the eight members of a real SubSource pack
+		// were refused for being exactly this, so these two cases are the
+		// reported defect stated as a contract.
+		{nil, "UTF-16LE SRT with BOM accepted", utf16LE(sampleSRT)},
+		{nil, "UTF-16BE SRT with BOM accepted", utf16BE(sampleSRT)},
+		{nil, "UTF-16LE SRT without BOM accepted", utf16LE(sampleSRT)[2:]},
+		{nil, "UTF-16BE SRT without BOM accepted", utf16BE(sampleSRT)[2:]},
+		// The acceptance must NOT extend past encodings detection can name. The
+		// Windows-1252 fallback maps every byte to a rune and NUL stripping
+		// removes any number of NULs, so leaning on either would let arbitrary
+		// binary talk its way through this gate.
+		{
+			errBinary, "NUL padding before a signature stays refused",
+			append(make([]byte, 600), []byte(" --> ")...),
+		},
+		{errBinary, "control-byte binary stays refused", bytes.Repeat([]byte{0x07}, 600)},
 	}
 
 	for _, tt := range tests {
@@ -573,6 +590,57 @@ func TestVariantFromFlags(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("VariantFromFlags(Tags{HearingImpaired: %v, Forced: %v}) = %q, want %q",
 					tt.hi, tt.forced, got, tt.want)
+			}
+		})
+	}
+}
+
+// sampleSRT is one well-formed cue, the smallest payload that carries an SRT
+// timing signature.
+const sampleSRT = "1\r\n00:00:01,000 --> 00:00:02,000\r\nHello\r\n\r\n"
+
+// utf16LE and utf16BE encode ASCII-only text as UTF-16 with a BOM, the shape
+// SubSource packs actually ship.
+func utf16LE(s string) []byte {
+	out := []byte{0xFF, 0xFE}
+	for _, r := range s {
+		out = append(out, byte(r), 0)
+	}
+	return out
+}
+
+func utf16BE(s string) []byte {
+	out := []byte{0xFE, 0xFF}
+	for _, r := range s {
+		out = append(out, 0, byte(r))
+	}
+	return out
+}
+
+// TestValidate_never_modifies_its_input is the counterweight to accepting
+// UTF-16: the gate had to learn about encodings to judge those bytes, and the
+// one thing it must not learn is converting them. subflux persists a converted
+// subtitle only when post_processing.normalize_utf8 is on, so a gate that
+// normalized in passing would silently override that setting for every download.
+func TestValidate_never_modifies_its_input(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		data []byte
+	}{
+		{"UTF-16LE", utf16LE(sampleSRT)},
+		{"UTF-16BE", utf16BE(sampleSRT)},
+		{"Windows-1252", []byte("1\r\n00:00:01,000 --> 00:00:02,000\r\ncaf\xe9\r\n\r\n")},
+		{"UTF-8 with BOM", append([]byte{0xEF, 0xBB, 0xBF}, sampleSRT...)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			want := bytes.Clone(tt.data)
+			if err := Validate(tt.data); err != nil {
+				t.Fatalf("Validate(%s) = %v, want nil", tt.name, err)
+			}
+			if !bytes.Equal(tt.data, want) {
+				t.Errorf("Validate(%s) modified its input: got %x, want %x", tt.name, tt.data, want)
 			}
 		})
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/runesafe/v2"
 	"github.com/cplieger/ssrf/v4"
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/httpwire"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/provider/classify"
@@ -248,7 +249,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	}
 	defer resp.Body.Close()
 
-	data, err := handleDownloadResponse(resp, sub.Season, sub.Episode)
+	data, err := handleDownloadResponse(resp, provider.TargetOf(sub))
 	if err != nil {
 		if _, ok := errors.AsType[*subflux.RateLimitError](err); ok {
 			slog.Warn("subdl: download rate limited", "url", fullURL)
@@ -291,7 +292,7 @@ func (p *Provider) doAPIRequest(ctx context.Context, params url.Values) (*apiRes
 // handleDownloadResponse processes the HTTP response from a subtitle download.
 // Detects rate limiting (429, 500 with small body) and extracts subtitles
 // from archive responses. Testable without HTTP infrastructure.
-func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, error) {
+func handleDownloadResponse(resp *http.Response, want epmarker.Target) ([]byte, error) {
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, &subflux.RateLimitError{
 			Msg:        "download rate limited (429)",
@@ -315,7 +316,7 @@ func handleDownloadResponse(resp *http.Response, season, episode int) ([]byte, e
 		return nil, err
 	}
 
-	result, err := provider.ExtractAndValidate(data, season, episode)
+	result, err := provider.ExtractAndValidate(data, want)
 	if err != nil {
 		return nil, fmt.Errorf("subdl: %w", err)
 	}

@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/epmarker"
 )
 
 func FuzzExtract(f *testing.F) {
@@ -27,14 +29,23 @@ func FuzzExtract(f *testing.F) {
 	f.Add(makeMinimalZipSRT(), 1, 5)
 
 	f.Fuzz(func(t *testing.T, data []byte, season, episode int) {
-		result := Extract(data, season, episode)
-		if result != nil {
-			if !LooksLikeSubtitle(result) {
-				t.Errorf("Extract returned non-subtitle content")
+		result, err := Extract(data, epmarker.For(epmarker.Marker{Season: season, Episode: episode}))
+		if err != nil {
+			if result != nil {
+				t.Errorf("Extract returned %d bytes alongside error %v, want nil content",
+					len(result), err)
 			}
-			if len(result) > MaxExtractSize {
-				t.Errorf("Extract returned %d bytes, exceeds MaxExtractSize", len(result))
-			}
+			return
+		}
+		if result == nil {
+			t.Error("Extract returned nil content with a nil error")
+			return
+		}
+		if !looksLikeSubtitle(result) {
+			t.Errorf("Extract returned non-subtitle content")
+		}
+		if len(result) > maxExtractSize {
+			t.Errorf("Extract returned %d bytes, exceeds maxExtractSize", len(result))
 		}
 	})
 }
@@ -61,7 +72,7 @@ func FuzzHasSignature(f *testing.F) {
 	f.Add([]byte{0x1f, 0x8b}) // gzip magic — not an archive
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		result := HasSignature(data)
+		result := hasSignature(data)
 
 		isZIP := len(data) >= 4 &&
 			data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4
@@ -94,11 +105,11 @@ func FuzzLooksLikeSubtitle(f *testing.F) {
 
 	bom := []byte{0xEF, 0xBB, 0xBF}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		got := LooksLikeSubtitle(data)
+		got := looksLikeSubtitle(data)
 
 		if !bytes.HasPrefix(data, bom) {
 			withBOM := append(append([]byte{}, bom...), data...)
-			if LooksLikeSubtitle(withBOM) != got {
+			if looksLikeSubtitle(withBOM) != got {
 				t.Errorf("LooksLikeSubtitle BOM-insensitivity violated for %q", data)
 			}
 		}

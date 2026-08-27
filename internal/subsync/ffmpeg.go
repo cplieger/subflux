@@ -10,6 +10,7 @@ import (
 	"log/slog"
 
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // LangMapper is a type alias for ffmpeg.LangMapper, preserving backward
@@ -70,7 +71,7 @@ func extractEmbeddedSRT(ctx context.Context, videoPath string, streamIndex int) 
 		return nil, nil
 	}
 
-	data := NormalizeEncoding(raw)
+	data := subtitleenc.Normalize(raw)
 	cues, err := ParseSRT(bytes.NewReader(data))
 	if err != nil {
 		return nil, err

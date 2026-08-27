@@ -139,7 +139,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	}
 
 	// Check if it's an archive and extract subtitle.
-	result, err := provider.ExtractAndValidate(data, sub.Season, sub.Episode)
+	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
 	if err != nil {
 		return nil, fmt.Errorf("betaseries: %w", err)
 	}

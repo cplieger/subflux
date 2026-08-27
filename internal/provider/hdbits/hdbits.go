@@ -189,7 +189,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 
 	// Normalize: extract the target episode from a season pack archive
 	// when applicable, then validate once.
-	result, err := provider.ExtractAndValidate(data, sub.Season, sub.Episode)
+	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
 	if err != nil {
 		return nil, fmt.Errorf("hdbits: %w", err)
 	}

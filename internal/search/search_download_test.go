@@ -688,9 +688,11 @@ func TestSearchTargets_successful_save_logs_no_failures(t *testing.T) {
 	}
 }
 
-// The attempt counter and the remaining count are how an operator reads a
-// retry sequence, so they are pinned per record: 1 of 2 with one left, then
-// 2 of 2 with none.
+// The attempt counter, the remaining count and the release name are how an
+// operator reads a retry sequence, so all three are pinned per record: 1 of 2
+// with one left, then 2 of 2 with none, each naming the release it tried.
+// Without the release name the log says a download failed and never says which
+// one, so diagnosing a bad archive means guessing which candidate produced it.
 //
 // capture.Default swaps the process-global logger: no t.Parallel.
 func TestDownloadBestCandidate_numbers_each_failed_attempt(t *testing.T) {
@@ -726,6 +728,11 @@ func TestDownloadBestCandidate_numbers_each_failed_attempt(t *testing.T) {
 	if got, want := recs.AttrValuesExact("download attempt failed, trying next", "remaining"),
 		[]string{"1", "0"}; !slices.Equal(got, want) {
 		t.Errorf(`SearchTargets(2 failing candidates) logged msg="download attempt failed, trying next" remaining=%v, want %v`,
+			got, want)
+	}
+	if got, want := recs.AttrValuesExact("download attempt failed, trying next", "release"),
+		[]string{"Movie-GRP", "Movie-OTHER"}; !slices.Equal(got, want) {
+		t.Errorf(`SearchTargets(2 failing candidates) logged msg="download attempt failed, trying next" release=%v, want %v`,
 			got, want)
 	}
 	if got, ok := recs.AttrValueExact("all download attempts failed", "attempted"); !ok || got != "2" {

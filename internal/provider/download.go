@@ -1,22 +1,54 @@
 package provider
 
 import (
+	"errors"
+
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/provider/archive"
+	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
-// ExtractAndValidate attempts to extract a subtitle from an archive (zip/rar),
-// falling back to the raw data if extraction yields nothing. The result is
-// validated for binary content. Returns the usable subtitle bytes or an error.
-func ExtractAndValidate(data []byte, season, episode int) ([]byte, error) {
-	if extracted := archive.Extract(data, season, episode); extracted != nil {
-		if err := subtitlefile.Validate(extracted); err != nil {
-			return nil, err
+// TargetOf returns the episode a subtitle download is looking for: the episode
+// the subtitle names, or epmarker.Any when it names none, which is what a movie
+// and a provider that reports no numbering both arrive with.
+//
+// It exists so the wire-to-target conversion happens once. Season and Episode are
+// adjacent ints of the same type, so a transposed conversion would compile and
+// then quietly extract the wrong episode; here it is written once and tested.
+func TargetOf(sub *subflux.Subtitle) epmarker.Target {
+	return epmarker.For(epmarker.Marker{Season: sub.Season, Episode: sub.Episode})
+}
+
+// ExtractAndValidate turns a provider's download body into usable subtitle
+// bytes: extract from an archive when there is one, fall back to the raw body
+// when nothing here could read it, and validate the result as subtitle content.
+//
+// The two failure paths report different things on purpose. When the archive
+// opened and had no subtitle for this target, its own refusal is returned,
+// because subtitlefile.Validate can only say "detected zip archive" — which reads
+// as "archives are unsupported" for a payload this code unpacked and inspected
+// member by member. Validate is the answer only when nothing opened the data,
+// where the raw bytes really are the whole story.
+//
+// Nothing here converts encodings. Validate judges a decoded VIEW so a UTF-16
+// subtitle is recognised as text, and the bytes returned are the bytes that
+// arrived, because whether a conversion is PERSISTED belongs to
+// post_processing.normalize_utf8 alone.
+func ExtractAndValidate(data []byte, want epmarker.Target) ([]byte, error) {
+	extracted, err := archive.Extract(data, want)
+	switch {
+	case err == nil:
+		if verr := subtitlefile.Validate(extracted); verr != nil {
+			return nil, verr
 		}
 		return extracted, nil
-	}
-	if err := subtitlefile.Validate(data); err != nil {
+	case errors.Is(err, archive.ErrNotArchive):
+		if verr := subtitlefile.Validate(data); verr != nil {
+			return nil, verr
+		}
+		return data, nil
+	default:
 		return nil, err
 	}
-	return data, nil
 }

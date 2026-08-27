@@ -10,6 +10,7 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
 	"github.com/cplieger/subflux/internal/subsync/ffmpeg"
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // SyncAgainstReference aligns subtitle timing against an embedded reference
@@ -90,7 +91,7 @@ func SyncFromAudio(ctx context.Context, data []byte, videoPath, subtitlePath str
 		}
 	}
 	if !isASS {
-		data = subsync.NormalizeEncoding(data)
+		data = subtitleenc.Normalize(data)
 		parsed, err := subsync.ParseSRT(bytes.NewReader(data))
 		if err != nil {
 			slog.Debug("sync: cannot parse incoming SRT for audio sync", "error", err)
@@ -144,7 +145,15 @@ func ExtractEmbeddedReference(ctx context.Context, videoPath, excludeLang string
 func SyncFromCues(ctx context.Context, data []byte, refCues []subsync.Cue, videoPath string) subsync.SyncResult {
 	noChange := subsync.SyncResult{Method: subsync.MethodNone}
 
-	incCues, err := subsync.ParseSRT(bytes.NewReader(data))
+	// Parse a decoded VIEW. A UTF-16 subtitle carries its own structure encoded
+	// too — the digits, the "-->" and the line breaks are all NUL-interleaved —
+	// so ParseSRT finds no cues in the raw bytes and this returns MethodNone,
+	// which reads as "nothing to correct" rather than "I could not read it".
+	// Nothing here persists the decode: the caller keeps the original bytes
+	// unless alignment actually produced a change, and whether a CONVERSION is
+	// written is post_processing.normalize_utf8's decision alone. The audio path
+	// above decodes for the same reason.
+	incCues, err := subsync.ParseSRT(bytes.NewReader(subtitleenc.Normalize(data)))
 	if err != nil {
 		slog.Debug("sync: cannot parse incoming SRT", "error", err)
 		return noChange

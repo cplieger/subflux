@@ -122,71 +122,86 @@ func TestIntegration_PostProcess_Whitespace(t *testing.T) {
 
 // --- Post-processing: encoding normalization ---
 
-func TestIntegration_PostProcess_UTF16LE(t *testing.T) {
-	t.Parallel()
-	// Build a UTF-16 LE encoded SRT with BOM.
-	original := "1\n00:00:01,000 --> 00:00:04,000\nHello world\n\n"
-	var utf16le []byte
-	utf16le = append(utf16le, 0xFF, 0xFE) // BOM
-	for _, r := range original {
-		utf16le = append(utf16le, byte(r), 0)
-	}
+// The decoder itself is exercised in internal/subtitleenc, which owns it. What
+// these two tests own is the WIRING: that the NormalizeEncoding option actually
+// reaches the decoder, and that turning it off leaves the bytes alone.
 
-	result := NormalizeEncoding(utf16le)
-	if !utf8.Valid(result) {
-		t.Error("result is not valid UTF-8")
+func TestIntegration_PostProcessBytes_normalizes_when_enabled(t *testing.T) {
+	t.Parallel()
+	srt := "1\n00:00:01,000 --> 00:00:04,000\nHello world\n\n"
+	tests := []struct {
+		name  string
+		input []byte
+		want  string
+	}{
+		{"UTF-16LE with BOM", utf16LE(srt), "Hello world"},
+		{"UTF-16BE with BOM", utf16BE(srt), "Hello world"},
+		{"Windows-1252", []byte("1\n00:00:01,000 --> 00:00:04,000\ncaf\xe9\n\n"), "café"},
+		{"UTF-8 with BOM", append([]byte{0xEF, 0xBB, 0xBF}, srt...), "Hello world"},
 	}
-	if bytes.Contains(result, []byte{0xFF, 0xFE}) {
-		t.Error("BOM not stripped")
-	}
-	if !strings.Contains(string(result), "Hello world") {
-		t.Errorf("content lost after normalization: %q", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := PostProcessBytes(tt.input, PostProcessOptions{NormalizeEncoding: true})
+			if !utf8.Valid(got) {
+				t.Errorf("PostProcessBytes(%s) = %x, want valid UTF-8", tt.name, got)
+			}
+			if bytes.HasPrefix(got, []byte{0xEF, 0xBB, 0xBF}) {
+				t.Errorf("PostProcessBytes(%s) kept a UTF-8 BOM", tt.name)
+			}
+			if !strings.Contains(string(got), tt.want) {
+				t.Errorf("PostProcessBytes(%s) = %q, want it to contain %q", tt.name, got, tt.want)
+			}
+		})
 	}
 }
 
-func TestIntegration_PostProcess_UTF16BE(t *testing.T) {
+// TestIntegration_PostProcessBytes_passes_through_when_disabled pins the
+// contract that makes normalize_utf8 a real setting rather than a description of
+// what happens anyway: with it off, a subtitle reaches disk byte-for-byte as the
+// provider sent it, whatever encoding that is. Every other layer may decode a
+// throwaway view to judge or parse the bytes; this is the one place that decides
+// what gets written, so this is where the guarantee has to hold.
+func TestIntegration_PostProcessBytes_passes_through_when_disabled(t *testing.T) {
 	t.Parallel()
-	original := "1\n00:00:01,000 --> 00:00:04,000\nBonjour\n\n"
-	var utf16be []byte
-	utf16be = append(utf16be, 0xFE, 0xFF) // BOM
-	for _, r := range original {
-		utf16be = append(utf16be, 0, byte(r))
-	}
-
-	result := NormalizeEncoding(utf16be)
-	if !utf8.Valid(result) {
-		t.Error("result is not valid UTF-8")
-	}
-	if !strings.Contains(string(result), "Bonjour") {
-		t.Errorf("content lost: %q", result)
+	srt := "1\n00:00:01,000 --> 00:00:04,000\nHello world\n\n"
+	for _, tt := range []struct {
+		name  string
+		input []byte
+	}{
+		{"UTF-16LE with BOM", utf16LE(srt)},
+		{"UTF-16BE with BOM", utf16BE(srt)},
+		{"Windows-1252", []byte("1\n00:00:01,000 --> 00:00:04,000\ncaf\xe9\n\n")},
+		{"UTF-8 with BOM", append([]byte{0xEF, 0xBB, 0xBF}, srt...)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			want := bytes.Clone(tt.input)
+			got := PostProcessBytes(tt.input, PostProcessOptions{})
+			if !bytes.Equal(got, want) {
+				t.Errorf("PostProcessBytes(%s, normalize off) = %x, want the input unchanged %x",
+					tt.name, got, want)
+			}
+		})
 	}
 }
 
-func TestIntegration_PostProcess_Windows1252(t *testing.T) {
-	t.Parallel()
-	// Windows-1252 bytes: "caf\xe9" = "café"
-	input := []byte("1\n00:00:01,000 --> 00:00:04,000\ncaf\xe9\n\n")
-
-	result := NormalizeEncoding(input)
-	if !utf8.Valid(result) {
-		t.Error("result is not valid UTF-8")
+// utf16LE and utf16BE encode ASCII-only text as UTF-16 with a BOM, which is the
+// shape SubSource packs actually ship (measured: 4 of 8 members in one pack).
+func utf16LE(s string) []byte {
+	out := []byte{0xFF, 0xFE}
+	for _, r := range s {
+		out = append(out, byte(r), 0)
 	}
-	if !strings.Contains(string(result), "café") {
-		t.Errorf("Windows-1252 not converted: %q", result)
-	}
+	return out
 }
 
-func TestIntegration_PostProcess_UTF8BOM(t *testing.T) {
-	t.Parallel()
-	input := append([]byte{0xEF, 0xBB, 0xBF}, []byte("1\n00:00:01,000 --> 00:00:04,000\nTest\n\n")...)
-
-	result := NormalizeEncoding(input)
-	if bytes.HasPrefix(result, []byte{0xEF, 0xBB, 0xBF}) {
-		t.Error("UTF-8 BOM not stripped")
+func utf16BE(s string) []byte {
+	out := []byte{0xFE, 0xFF}
+	for _, r := range s {
+		out = append(out, 0, byte(r))
 	}
-	if !strings.Contains(string(result), "Test") {
-		t.Errorf("content lost: %q", result)
-	}
+	return out
 }
 
 // --- Post-processing: line ending normalization ---

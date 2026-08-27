@@ -201,7 +201,7 @@ func (p *Provider) Download(ctx context.Context, sub *subflux.Subtitle) ([]byte,
 	}
 
 	// SubSource returns archives; extract the subtitle file.
-	result, err := provider.ExtractAndValidate(data, sub.Season, sub.Episode)
+	result, err := provider.ExtractAndValidate(data, provider.TargetOf(sub))
 	if err != nil {
 		return nil, fmt.Errorf("subsource: %w", err)
 	}
