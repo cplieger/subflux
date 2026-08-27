@@ -2,6 +2,7 @@ package authhandlers
 
 import (
 	"encoding/base64"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -213,6 +214,14 @@ func (h *Handler) HandleWebAuthnRegisterFinish(w http.ResponseWriter, r *http.Re
 	credential, err := authwebauthn.FinishRegistration(wa, webauthnUser, sessData, r)
 	if err != nil {
 		slog.Warn("webauthn register finish: failed", "error", err)
+		// A non-discoverable credential cannot complete the discoverable login
+		// ceremony subflux uses, so the user must register a different
+		// authenticator rather than retry with this one.
+		if errors.Is(err, authwebauthn.ErrNotDiscoverable) {
+			httpapi.BadRequestC(w, r, subflux.CodeWebAuthnNotDiscoverable,
+				"this authenticator cannot store a passkey; try a different device or a password manager")
+			return
+		}
 		httpapi.BadRequestC(w, r, subflux.CodeWebAuthnRegisterFailed, "registration failed")
 		return
 	}
