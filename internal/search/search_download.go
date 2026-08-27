@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/cplieger/subflux/internal/logsafe"
 	"github.com/cplieger/subflux/internal/search/syncing"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subtitlefile"
@@ -89,7 +90,7 @@ func (e *Engine) downloadAndSave(ctx context.Context, req *subflux.SearchRequest
 	slog.Debug("downloading subtitle",
 		"media", req.MediaLabel(), "lang", lang,
 		"provider", best.sub.Provider, "score", best.score,
-		"release", best.sub.ReleaseName,
+		"release", logsafe.Field(best.sub.ReleaseName),
 		"matched_by", best.sub.MatchedBy,
 		"hi", best.sub.HearingImp)
 
@@ -232,6 +233,7 @@ func (e *Engine) downloadBestCandidate(ctx context.Context, req *subflux.SearchR
 				"media", label, "lang", lang,
 				"variant", variant,
 				"provider", candidates[i].sub.Provider,
+				"release", logsafe.Field(candidates[i].sub.ReleaseName),
 				"score", candidates[i].score,
 				"attempt", i+1, "remaining", limit-i-1,
 				"error", err)

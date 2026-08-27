@@ -1,4 +1,4 @@
-package subsync
+package subtitleenc
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 // an arm holding a single assertion keeps t.Fatalf — there is no sibling on
 // that path for an abort to hide.
 
-func TestNormalizeEncoding(t *testing.T) {
+func TestNormalize(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string
@@ -78,7 +78,7 @@ func TestNormalizeEncoding(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := NormalizeEncoding(tt.input)
+			got := Normalize(tt.input)
 			switch {
 			case tt.wantEmpty:
 				if len(got) != 0 {
@@ -101,11 +101,11 @@ func TestNormalizeEncoding(t *testing.T) {
 }
 
 // PBT: output is always valid UTF-8.
-func TestNormalizeEncoding_always_valid_UTF8(t *testing.T) {
+func TestNormalize_always_valid_UTF8(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
 		data := rapid.SliceOf(rapid.Byte()).Draw(t, "data")
-		got := NormalizeEncoding(data)
+		got := Normalize(data)
 		if !utf8.Valid(got) {
 			t.Fatalf("output is not valid UTF-8 for input %x", data)
 		}
@@ -113,14 +113,98 @@ func TestNormalizeEncoding_always_valid_UTF8(t *testing.T) {
 }
 
 // PBT: output never contains a UTF-8 BOM.
-func TestNormalizeEncoding_never_contains_BOM(t *testing.T) {
+func TestNormalize_never_contains_BOM(t *testing.T) {
 	t.Parallel()
 	bom := []byte{0xEF, 0xBB, 0xBF}
 	rapid.Check(t, func(t *rapid.T) {
 		data := rapid.SliceOf(rapid.Byte()).Draw(t, "data")
-		got := NormalizeEncoding(data)
+		got := Normalize(data)
 		if len(got) >= 3 && got[0] == bom[0] && got[1] == bom[1] && got[2] == bom[2] {
 			t.Fatalf("output contains BOM for input %x", data)
 		}
 	})
+}
+
+// --- Detect ---
+
+func TestDetect(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input []byte
+		want  Encoding
+	}{
+		{"UTF-16LE BOM", []byte{0xFF, 0xFE, 'H', 0x00}, UTF16LE},
+		{"UTF-16BE BOM", []byte{0xFE, 0xFF, 0x00, 'H'}, UTF16BE},
+		{"UTF-16LE no BOM", []byte{'H', 0x00, 'i', 0x00}, UTF16LE},
+		{"UTF-16BE no BOM", []byte{0x00, 'H', 0x00, 'i'}, UTF16BE},
+		{"plain ASCII", []byte("1\n00:00:01,000 --> 00:00:02,000\n"), UTF8},
+		{"UTF-8 BOM", append([]byte{0xEF, 0xBB, 0xBF}, "Hello"...), UTF8},
+		{"UTF-8 multibyte", []byte("caf\u00e9 \u4e16\u754c"), UTF8},
+		// A lone 0xE9 is Windows-1252 'é' and not valid UTF-8, so nothing names
+		// it: only the fallback would read it, which is the case Detect withholds.
+		{"invalid UTF-8", []byte("caf\xe9"), Unknown},
+		{"too short for the NUL pattern", []byte{'H', 0x00}, UTF8},
+		{"empty", nil, UTF8},
+		// NUL padding is valid UTF-8 and does NOT match the alternating pattern,
+		// so it is named UTF8 and probed raw rather than NUL-stripped into text.
+		{"NUL run", append(make([]byte, 8), " --> "...), UTF8},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Detect(tt.input); got != tt.want {
+				t.Errorf("Detect(%x) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// --- TextView ---
+
+// TestTextView_decodes_only_what_detection_named is the soundness property that
+// keeps the content gate honest. Normalize must always produce something, so it
+// ends at Windows-1252 (which maps every byte to a rune) and at NUL stripping
+// (which removes any number of them). Either would let a caller judging "is this
+// text?" be talked into yes by arbitrary binary, so TextView withholds both and
+// hands back the raw bytes for anything detection could not name.
+func TestTextView_decodes_only_what_detection_named(t *testing.T) {
+	t.Parallel()
+
+	t.Run("decodes UTF-16", func(t *testing.T) {
+		t.Parallel()
+		in := []byte{0xFF, 0xFE, 'H', 0x00, 'i', 0x00}
+		if got := TextView(in); string(got) != "Hi" {
+			t.Errorf("TextView(UTF-16LE) = %q, want %q", got, "Hi")
+		}
+	})
+
+	t.Run("hands back unidentified bytes raw", func(t *testing.T) {
+		t.Parallel()
+		// Windows-1252 territory: Normalize would turn this into text.
+		in := []byte("caf\xe9")
+		if got := TextView(in); !bytes.Equal(got, in) {
+			t.Errorf("TextView(unidentified) = %x, want the input unchanged %x", got, in)
+		}
+	})
+
+	t.Run("does not strip a NUL run into a signature", func(t *testing.T) {
+		t.Parallel()
+		in := append(make([]byte, 600), " --> "...)
+		got := TextView(in)
+		if !bytes.Equal(got, in) {
+			t.Errorf("TextView(NUL padding) returned %d bytes, want the input unchanged (%d)",
+				len(got), len(in))
+		}
+	})
+
+	t.Run("property: an unnamed encoding is never decoded", rapid.MakeCheck(func(t *rapid.T) {
+		data := rapid.SliceOfN(rapid.Byte(), 0, 512).Draw(t, "data")
+		if Detect(data) != Unknown {
+			return
+		}
+		if got := TextView(data); !bytes.Equal(got, data) {
+			t.Fatalf("TextView(%x) = %x, want the input unchanged for an unnamed encoding", data, got)
+		}
+	}))
 }

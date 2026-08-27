@@ -3,6 +3,7 @@ package provider
 import (
 	"testing"
 
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/subtitlefile"
 )
 
@@ -20,7 +21,11 @@ func FuzzExtractAndValidate(f *testing.F) {
 	f.Add(make([]byte, 128), 1, 1)                            // all zeros
 
 	f.Fuzz(func(t *testing.T, data []byte, season, episode int) {
-		result, err := ExtractAndValidate(data, season, episode)
+		// The season/episode pair is fuzzed as two ints because that is what a
+		// provider reads off the wire; epmarker.For is what turns it into a
+		// target, collapsing an absent half to "any episode".
+		result, err := ExtractAndValidate(data,
+			epmarker.For(epmarker.Marker{Season: season, Episode: episode}))
 
 		// Invariant 1: never panics (implicit).
 

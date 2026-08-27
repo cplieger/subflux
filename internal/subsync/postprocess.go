@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"regexp"
 	"strings"
+
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // PostProcessOptions configures subtitle post-processing.
@@ -104,7 +106,7 @@ func cleanCueText(text string, opts PostProcessOptions) string {
 // to raw subtitle bytes. Call this before parsing, or on the final output.
 func PostProcessBytes(data []byte, opts PostProcessOptions) []byte {
 	if opts.NormalizeEncoding {
-		data = NormalizeEncoding(data)
+		data = subtitleenc.Normalize(data)
 	}
 	if opts.NormalizeLineEndings {
 		data = normalizeLineEndings(data)

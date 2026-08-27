@@ -1,4 +1,4 @@
-package subsync
+package subtitleenc
 
 import (
 	"bytes"
@@ -24,9 +24,9 @@ func FuzzNormalizeEncoding(f *testing.F) {
 		// The function's job is to produce UTF-8, so that is what is asserted:
 		// every path either passes through bytes utf8.Valid accepted or builds
 		// its output rune by rune. It must also not panic on arbitrary input.
-		result := NormalizeEncoding(data)
+		result := Normalize(data)
 		if !utf8.Valid(result) {
-			t.Errorf("NormalizeEncoding(%q) = %q, which is not valid UTF-8", data, result)
+			t.Errorf("Normalize(%q) = %q, which is not valid UTF-8", data, result)
 		}
 	})
 }
@@ -42,10 +42,10 @@ func FuzzNormalizeEncodingIdempotent(f *testing.F) {
 	f.Add([]byte{})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		once := NormalizeEncoding(data)
-		twice := NormalizeEncoding(once)
+		once := Normalize(data)
+		twice := Normalize(once)
 		if !bytes.Equal(once, twice) {
-			t.Errorf("NormalizeEncoding not idempotent: once=%q twice=%q", once, twice)
+			t.Errorf("Normalize not idempotent: once=%q twice=%q", once, twice)
 		}
 	})
 }

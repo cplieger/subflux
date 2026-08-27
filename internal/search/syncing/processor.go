@@ -7,6 +7,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/subsync"
+	"github.com/cplieger/subflux/internal/subtitleenc"
 )
 
 // SubtitleProcessor implements the SRT surface synchandlers declares, using subsync,
@@ -62,7 +63,7 @@ func subsyncCuesFromAPI(cues []subflux.SubtitleCue) []subsync.Cue {
 
 // NormalizeEncoding converts subtitle data to UTF-8.
 func (SubtitleProcessor) NormalizeEncoding(data []byte) []byte {
-	return subsync.NormalizeEncoding(data)
+	return subtitleenc.Normalize(data)
 }
 
 // ParseSRT parses SRT subtitle data into cues.

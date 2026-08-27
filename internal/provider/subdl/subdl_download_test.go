@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -49,7 +50,7 @@ func TestHandleDownloadResponse_success(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
-	got, err := handleDownloadResponse(resp, 0, 0)
+	got, err := handleDownloadResponse(resp, epmarker.Any())
 	if err != nil {
 		t.Fatalf("handleDownloadResponse() error: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestHandleDownloadResponse_429_rate_limit(t *testing.T) {
 		StatusCode: http.StatusTooManyRequests,
 		Body:       io.NopCloser(strings.NewReader("")),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(429) expected error")
 	}
@@ -80,7 +81,7 @@ func TestHandleDownloadResponse_500_small_body_rate_limit(t *testing.T) {
 		ContentLength: 10,
 		Body:          io.NopCloser(strings.NewReader("limit")),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(500, small) expected error")
 	}
@@ -96,7 +97,7 @@ func TestHandleDownloadResponse_500_large_body_generic(t *testing.T) {
 		ContentLength: 500,
 		Body:          io.NopCloser(strings.NewReader("")),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(500, large) expected error")
 	}
@@ -112,7 +113,7 @@ func TestHandleDownloadResponse_500_unknown_length_generic(t *testing.T) {
 		ContentLength: -1,
 		Body:          io.NopCloser(strings.NewReader("")),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(500, unknown) expected error")
 	}
@@ -127,7 +128,7 @@ func TestHandleDownloadResponse_other_error(t *testing.T) {
 		StatusCode: http.StatusForbidden,
 		Body:       io.NopCloser(strings.NewReader("")),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(403) expected error")
 	}
@@ -158,7 +159,7 @@ func TestHandleDownloadResponse_extracts_from_zip(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewReader(buf.Bytes())),
 	}
-	got, err := handleDownloadResponse(resp, 0, 0)
+	got, err := handleDownloadResponse(resp, epmarker.Any())
 	if err != nil {
 		t.Fatalf("handleDownloadResponse(zip) error: %v", err)
 	}
@@ -188,7 +189,7 @@ func TestHandleDownloadResponse_500_boundary_content_length(t *testing.T) {
 				ContentLength: tt.contentLength,
 				Body:          io.NopCloser(strings.NewReader("")),
 			}
-			_, err := handleDownloadResponse(resp, 0, 0)
+			_, err := handleDownloadResponse(resp, epmarker.Any())
 			if err == nil {
 				t.Fatal("handleDownloadResponse(500) expected error")
 			}
@@ -213,7 +214,7 @@ func TestHandleDownloadResponse_rejects_binary_raw_data(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewReader(binaryData)),
 	}
-	_, err := handleDownloadResponse(resp, 0, 0)
+	_, err := handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(binary raw) expected error")
 	}
@@ -246,7 +247,7 @@ func TestHandleDownloadResponse_rejects_binary_in_archive(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewReader(buf.Bytes())),
 	}
-	_, err = handleDownloadResponse(resp, 0, 0)
+	_, err = handleDownloadResponse(resp, epmarker.Any())
 	if err == nil {
 		t.Fatal("handleDownloadResponse(binary in zip) expected error")
 	}

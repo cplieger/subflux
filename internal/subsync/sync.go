@@ -9,7 +9,8 @@
 //
 // The entry point is SyncWithOptions, which takes already-parsed cues and
 // returns the winning SyncResult. Callers own file I/O: read the subtitle,
-// NormalizeEncoding it, ParseSRT it, sync, then WriteSRT the corrected cues.
+// decode it with subtitleenc.Normalize, ParseSRT it, sync, then WriteSRT the
+// corrected cues.
 // internal/search/syncing is the in-repo consumer and shows the full shape
 // (parse -> SyncWithOptions -> WriteSRT -> PostProcess).
 //

@@ -4,9 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/epmarker"
 	"pgregory.net/rapid"
 )
 
@@ -36,7 +40,7 @@ func makeZip(t *testing.T, files ...zipEntry) []byte {
 	return buf.Bytes()
 }
 
-func TestExtractFromZip(t *testing.T) {
+func TestZipExtract(t *testing.T) {
 	t.Parallel()
 
 	srt := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n")
@@ -97,9 +101,9 @@ func TestExtractFromZip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ExtractFromZip(tt.data, 0, 0)
+			got, _ := zipExtract(tt.data, epmarker.Any())
 			if !bytes.Equal(got, tt.want) {
-				t.Errorf("ExtractFromZip(%d bytes) = %q, want %q",
+				t.Errorf("zipExtract(%d bytes) = %q, want %q",
 					len(tt.data), got, tt.want)
 			}
 		})
@@ -127,9 +131,9 @@ func TestExtractFromZip_rejects_zip_bomb(t *testing.T) {
 	}
 	binary.LittleEndian.PutUint32(data[centralIdx+24:centralIdx+28], fakeUncompressed)
 
-	got := ExtractFromZip(data, 0, 0)
+	got, _ := zipExtract(data, epmarker.Any())
 	if got != nil {
-		t.Errorf("ExtractFromZip() = %q, want nil (zip bomb rejected)", got)
+		t.Errorf("zipExtract() = %q, want nil (zip bomb rejected)", got)
 	}
 }
 
@@ -148,46 +152,46 @@ func TestExtractFromZip_rejects_zero_compressed(t *testing.T) {
 	// Set compressed size to 0 (offset 20) while keeping uncompressed > 0.
 	binary.LittleEndian.PutUint32(data[centralIdx+20:centralIdx+24], 0)
 
-	got := ExtractFromZip(data, 0, 0)
+	got, _ := zipExtract(data, epmarker.Any())
 	if got != nil {
-		t.Errorf("ExtractFromZip() = %q, want nil (zero compressed rejected)", got)
+		t.Errorf("zipExtract() = %q, want nil (zero compressed rejected)", got)
 	}
 }
 
 // TestExtractFromZip_rejects_oversized verifies that subtitle content
-// exceeding MaxExtractSize is rejected rather than silently truncated.
+// exceeding maxExtractSize is rejected rather than silently truncated.
 func TestExtractFromZip_rejects_oversized(t *testing.T) {
 	t.Parallel()
 
 	// Create content one byte over the 5 MB limit.
 	// Use Store method (no compression) to avoid triggering the zip bomb
 	// ratio guard, which rejects high compression ratios.
-	content := make([]byte, MaxExtractSize+1)
+	content := make([]byte, maxExtractSize+1)
 	for i := range content {
 		content[i] = byte(i)
 	}
 	data := makeZipStored(t, zipEntry{"subtitle.srt", content})
 
-	got := ExtractFromZip(data, 0, 0)
+	got, _ := zipExtract(data, epmarker.Any())
 	if got != nil {
-		t.Errorf("ExtractFromZip() returned %d bytes, want nil (oversized rejected)", len(got))
+		t.Errorf("zipExtract() returned %d bytes, want nil (oversized rejected)", len(got))
 	}
 }
 
 // TestExtractFromZip_accepts_at_limit verifies that subtitle content
-// exactly at MaxExtractSize is accepted.
+// exactly at maxExtractSize is accepted.
 func TestExtractFromZip_accepts_at_limit(t *testing.T) {
 	t.Parallel()
 
-	content := make([]byte, MaxExtractSize)
+	content := make([]byte, maxExtractSize)
 	for i := range content {
 		content[i] = byte(i)
 	}
 	data := makeZipStored(t, zipEntry{"subtitle.srt", content})
 
-	got := ExtractFromZip(data, 0, 0)
+	got, _ := zipExtract(data, epmarker.Any())
 	if !bytes.Equal(got, content) {
-		t.Errorf("ExtractFromZip() returned %d bytes, want %d (at-limit accepted)",
+		t.Errorf("zipExtract() returned %d bytes, want %d (at-limit accepted)",
 			len(got), len(content))
 	}
 }
@@ -202,7 +206,7 @@ func TestExtractFromZip_roundtrip(t *testing.T) {
 
 		data := makeZipForPBT(t, zipEntry{"subtitle.srt", content})
 
-		got := ExtractFromZip(data, 0, 0)
+		got, _ := zipExtract(data, epmarker.Any())
 
 		if !bytes.Equal(got, content) {
 			t.Errorf("extractFromZip round-trip failed: got %d bytes, want %d bytes",
@@ -271,128 +275,67 @@ func TestExtractFromZip_episode_matching(t *testing.T) {
 
 	t.Run("extracts matching episode", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 1, 2)
+		got, _ := zipExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 2}))
 		if !bytes.Equal(got, e02) {
-			t.Errorf("ExtractFromZip(S01E02) = %q, want %q", got, e02)
+			t.Errorf("zipExtract(S01E02) = %q, want %q", got, e02)
 		}
 	})
 
 	t.Run("extracts first episode", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 1, 1)
+		got, _ := zipExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 1}))
 		if !bytes.Equal(got, e01) {
-			t.Errorf("ExtractFromZip(S01E01) = %q, want %q", got, e01)
+			t.Errorf("zipExtract(S01E01) = %q, want %q", got, e01)
 		}
 	})
 
 	t.Run("extracts last episode", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 1, 3)
+		got, _ := zipExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 3}))
 		if !bytes.Equal(got, e03) {
-			t.Errorf("ExtractFromZip(S01E03) = %q, want %q", got, e03)
+			t.Errorf("zipExtract(S01E03) = %q, want %q", got, e03)
 		}
 	})
 
 	t.Run("no match returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 1, 99)
+		got, _ := zipExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 99}))
 		if got != nil {
-			t.Errorf("ExtractFromZip(S01E99) = %q, want nil (no fallback)", got)
+			t.Errorf("zipExtract(S01E99) = %q, want nil (no fallback)", got)
 		}
 	})
 
 	t.Run("zero episode returns first", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 0, 0)
+		got, _ := zipExtract(data, epmarker.Any())
 		if !bytes.Equal(got, e01) {
-			t.Errorf("ExtractFromZip(0,0) = %q, want %q", got, e01)
+			t.Errorf("zipExtract(0,0) = %q, want %q", got, e01)
 		}
 	})
 
 	t.Run("wrong season returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 2, 1)
+		got, _ := zipExtract(data, epmarker.For(epmarker.Marker{Season: 2, Episode: 1}))
 		if got != nil {
-			t.Errorf("ExtractFromZip(S02E01) = %q, want nil (no fallback)", got)
+			t.Errorf("zipExtract(S02E01) = %q, want nil (no fallback)", got)
 		}
 	})
 
 	t.Run("season only falls back to first", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 1, 0)
+		got, _ := zipExtract(data, epmarker.Any())
 		if !bytes.Equal(got, e01) {
-			t.Errorf("ExtractFromZip(1,0) = %q, want %q (fallback to first)", got, e01)
+			t.Errorf("zipExtract(1,0) = %q, want %q (fallback to first)", got, e01)
 		}
 	})
 
 	t.Run("episode only falls back to first", func(t *testing.T) {
 		t.Parallel()
-		got := ExtractFromZip(data, 0, 1)
+		got, _ := zipExtract(data, epmarker.Any())
 		if !bytes.Equal(got, e01) {
-			t.Errorf("ExtractFromZip(0,1) = %q, want %q (fallback to first)", got, e01)
+			t.Errorf("zipExtract(0,1) = %q, want %q (fallback to first)", got, e01)
 		}
 	})
-}
-
-func TestMatchesEpisode(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		path    string
-		season  int
-		episode int
-		want    bool
-	}{
-		{"standard match", "Show S01E05.srt", 1, 5, true},
-		{"case insensitive", "show s02e10.srt", 2, 10, true},
-		{"nested path", "subs/Show S01E03.srt", 1, 3, true},
-		{"wrong episode", "Show S01E05.srt", 1, 6, false},
-		{"wrong season", "Show S02E05.srt", 1, 5, false},
-		{"no pattern", "subtitle.srt", 1, 1, false},
-		{"multi-ep E01E02 match first", "Show S01E01E02.srt", 1, 1, true},
-		{"multi-ep E01E02 match second", "Show S01E01E02.srt", 1, 2, true},
-		{"multi-ep E01E02 no match", "Show S01E01E02.srt", 1, 3, false},
-		{"multi-ep E01-E02 match", "Show S01E01-E02.srt", 1, 2, true},
-		{"multi-ep E03-E04 match", "Show S01E03-E04.srt", 1, 3, true},
-		{"multi-ep E01-02 match", "Show S01E01-02.srt", 1, 2, true},
-		{"single ep not false multi-ep", "Show S01E05.srt", 1, 3, false},
-
-		// Dot separator in multi-episode ranges.
-		{"multi-ep E01.E02 dot separator", "Show S01E01.E02.srt", 1, 2, true},
-		{"multi-ep E01.02 dot no E prefix", "Show S01E01.02.srt", 1, 2, true},
-
-		// Triple-episode: multiEpRe only matches first pair.
-		{"triple-ep first", "Show S01E01E02E03.srt", 1, 1, true},
-		{"triple-ep second", "Show S01E01E02E03.srt", 1, 2, true},
-		{"triple-ep third not matched", "Show S01E01E02E03.srt", 1, 3, false},
-
-		// False positive guards (ep2 > 999, span > 50).
-		{"year in title not false positive", "Show.1923.S01E01.1923.REPACK.srt", 1, 1923, false},
-		{"resolution not false positive", "Show.S01E05.720p.srt", 1, 720, false},
-		{"rejects ep2 over 999", "Show.S01E01.E1000.srt", 1, 500, false},
-		{"rejects span over 50", "Show.S01E01-E99.srt", 1, 50, false},
-		{"accepts span exactly 50", "Show.S01E01-E51.srt", 1, 25, true},
-
-		// Multi-digit seasons and high episode numbers.
-		{"multi-digit season", "Show S10E05.srt", 10, 5, true},
-		{"high episode number", "Show S01E100.srt", 1, 100, true},
-		{"three-digit season and episode", "Show S100E200.srt", 100, 200, true},
-
-		// Multiple S##E## patterns in one filename.
-		{"multiple SxxExx matches second", "Show S01E01 - S01E02.srt", 1, 2, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := MatchesEpisode(tt.path, tt.season, tt.episode)
-			if got != tt.want {
-				t.Errorf("MatchesEpisode(%q, %d, %d) = %v, want %v",
-					tt.path, tt.season, tt.episode, got, tt.want)
-			}
-		})
-	}
 }
 
 // TestExtractFromZip_accepts_exactly_max_entries verifies the inclusive
@@ -408,9 +351,9 @@ func TestExtractFromZip_accepts_exactly_max_entries(t *testing.T) {
 	}
 	data := makeZip(t, entries...)
 
-	got := ExtractFromZip(data, 0, 0)
+	got, _ := zipExtract(data, epmarker.Any())
 	if !bytes.Equal(got, first) {
-		t.Fatalf("ExtractFromZip(%d-entry zip) = %q, want %q "+
+		t.Fatalf("zipExtract(%d-entry zip) = %q, want %q "+
 			"(exactly maxZipEntries entries must be accepted)", maxZipEntries, got, first)
 	}
 }
@@ -441,45 +384,338 @@ func TestIsValidSubtitleEntry_size_guards(t *testing.T) {
 				CompressedSize64:   tc.comp,
 				UncompressedSize64: tc.uncomp,
 			}
-			if got := IsValidSubtitleEntry(f); got != tc.want {
-				t.Errorf("IsValidSubtitleEntry(comp=%d, uncomp=%d) = %v, want %v",
+			if got := gateZipEntry(f); got != tc.want {
+				t.Errorf("gateZipEntry(comp=%d, uncomp=%d) = %v, want %v",
 					tc.comp, tc.uncomp, got, tc.want)
 			}
 		})
 	}
 }
 
-func TestMatchesMultiEpisodeRange(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		file    string
-		episode int
-		want    bool
-	}{
-		{"in range", "Show.S01E01-E05.srt", 3, true},
-		{"out of range", "Show.S01E01-E05.srt", 6, false},
-		{"start of range", "Show.S01E01-E05.srt", 1, true},
-		{"end of range", "Show.S01E01-E05.srt", 5, true},
-		{"not a range", "Show.S01E05.srt", 5, false},
-
-		// Every range in the name is scanned, not just the first: episode 6
-		// lies only in the second range [5,8].
-		{"episode in second of two ranges", "Show.E01E02.and.E05E08.srt", 6, true},
-		{"episode in first of two ranges", "Show.E01E02.and.E05E08.srt", 1, true},
-
-		// ep2 == 999 is the inclusive top of the accepted range (the year/range
-		// guard rejects only ep2 > 999); ep2 == 1000 exceeds the cap.
-		{"ep2 exactly 999 accepted", "E950E999", 975, true},
-		{"ep2 1000 exceeds cap rejected", "E950E1000", 975, false},
+// makeZipUnreadableMethod builds a zip whose members are stored under a
+// compression method the READER has no decompressor for. That is not a
+// contrived shape: Go's archive/zip implements Store and Deflate only, so any
+// pack an uploader compressed with LZMA (method 14) or PPMd reads its central
+// directory perfectly and then fails at Open.
+func makeZipUnreadableMethod(t *testing.T, names ...string) []byte {
+	t.Helper()
+	const lzma = 14
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	// The bytes are written through verbatim; only the recorded method matters,
+	// because the reader rejects the entry before it decompresses anything.
+	w.RegisterCompressor(lzma, func(out io.Writer) (io.WriteCloser, error) {
+		return nopWriteCloser{out}, nil
+	})
+	for _, name := range names {
+		fw, err := w.CreateHeader(&zip.FileHeader{Name: name, Method: lzma})
+		if err != nil {
+			t.Fatalf("zip.CreateHeader(%q): %v", name, err)
+		}
+		if _, err := fw.Write([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n")); err != nil {
+			t.Fatalf("zip.Write(%q): %v", name, err)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := MatchesMultiEpisodeRange(tt.file, tt.episode); got != tt.want {
-				t.Errorf("MatchesMultiEpisodeRange(%q, %d) = %v, want %v",
-					tt.file, tt.episode, got, tt.want)
-			}
-		})
+	if err := w.Close(); err != nil {
+		t.Fatalf("zip.Close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }
+
+// TestExtractFromZip_matched_member_that_cannot_be_read_says_so pins the
+// distinction the old nil return could not express: the pack IS the right one
+// and its episode IS present, so reporting "no member for S01E08" would send
+// the reader looking for a numbering problem that does not exist.
+func TestExtractFromZip_matched_member_that_cannot_be_read_says_so(t *testing.T) {
+	t.Parallel()
+	data := makeZipUnreadableMethod(t, "Black.Sails.S01E08.BDRip.x264-DEMAND.srt")
+
+	got, err := zipExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 8}))
+	if got != nil {
+		t.Errorf("zipExtract(unreadable member) = %q, want nil", got)
+	}
+	if err == nil {
+		t.Fatal("zipExtract(unreadable member) err = nil, want a read failure")
+	}
+	if !strings.Contains(err.Error(), "failed to read") {
+		t.Errorf("zipExtract(unreadable member) err = %q, want it to report a read failure", err)
+	}
+	if !errors.Is(err, zip.ErrAlgorithm) {
+		t.Errorf("zipExtract(unreadable member) err = %v, want it to wrap zip.ErrAlgorithm", err)
+	}
+	if errors.Is(err, ErrNotArchive) {
+		t.Errorf("zipExtract(unreadable member) err = %v, want NOT ErrNotArchive: "+
+			"the zip opened, so the caller must not fall back to describing the raw bytes", err)
+	}
+}
+
+// TestExtractFromZip_reads_the_cross_notation_pack is the whole point of teaching
+// epmarker the ##x## form, stated at the level a user feels it. This is a real
+// SubSource pack's naming: ten members, every one of them numbered this way, and
+// before the notation was read the pack was unusable for every episode it held.
+func TestExtractFromZip_reads_the_cross_notation_pack(t *testing.T) {
+	t.Parallel()
+	data := makeZip(t,
+		zipEntry{"Black Sails - 01x08 - VIII..720p 2HD.English.srt", []byte("ep 8")},
+		zipEntry{"Black Sails - 01x09 - IX..720p 2HD.English.srt", []byte("ep 9")},
+	)
+
+	got, err := zipExtract(data, episode(1, 8))
+	if err != nil {
+		t.Fatalf("zipExtract(1x08-named pack, S01E08) error = %v, want the S01E08 member", err)
+	}
+	if string(got) != "ep 8" {
+		t.Errorf("zipExtract(1x08-named pack, S01E08) = %q, want %q", got, "ep 8")
+	}
+
+	// The other episode in the same pack, so the reader is selecting rather than
+	// taking the first member and getting lucky.
+	got, err = zipExtract(data, episode(1, 9))
+	if err != nil {
+		t.Fatalf("zipExtract(1x08-named pack, S01E09) error = %v, want the S01E09 member", err)
+	}
+	if string(got) != "ep 9" {
+		t.Errorf("zipExtract(1x08-named pack, S01E09) = %q, want %q", got, "ep 9")
+	}
+}
+
+// TestExtractFromZip_no_episode_match_names_the_members pins the member list in
+// the refusal. Without it an unsupported numbering scheme and a wrong-season
+// pack produce the same log line, which is what forced fetching the archive by
+// hand to tell them apart.
+func TestExtractFromZip_no_episode_match_names_the_members(t *testing.T) {
+	t.Parallel()
+	// A wrong-season pack: the members are perfectly readable and numbered in a
+	// notation this code understands, and none of them is the episode asked for.
+	data := makeZip(t,
+		zipEntry{"Black Sails - 03x01 - I..720p.English.srt", []byte("s3 ep 1")},
+		zipEntry{"Black Sails - 03x02 - II..720p.English.srt", []byte("s3 ep 2")},
+	)
+
+	got, err := zipExtract(data, episode(1, 8))
+	if got != nil {
+		t.Errorf("zipExtract(season-3 pack, S01E08) = %q, want nil (no fallback)", got)
+	}
+	if err == nil {
+		t.Fatal("zipExtract(season-3 pack, S01E08) err = nil, want a no-match refusal")
+	}
+	if !strings.Contains(err.Error(), "S01E08") {
+		t.Errorf("err = %q, want the target episode named", err)
+	}
+	if !strings.Contains(err.Error(), "03x01") {
+		t.Errorf("err = %q, want the member names listed", err)
+	}
+}
+
+// TestExtractFromZip_a_directory_name_does_not_decide_the_episode pins the one
+// piece of episode policy this package keeps for itself. epmarker reads a whole
+// name, so a member sitting under a directory named for another episode claims
+// both; narrowing to the last path element is what stops the directory answering
+// for the file, and getting it wrong writes one episode's subtitle under another
+// episode's name.
+func TestExtractFromZip_a_directory_name_does_not_decide_the_episode(t *testing.T) {
+	t.Parallel()
+	data := makeZip(t, zipEntry{"Show.S02E09.PACK/Show.S01E03.srt", []byte("s1 ep 3")})
+
+	got, err := zipExtract(data, episode(1, 3))
+	if err != nil {
+		t.Fatalf("zipExtract(member under a differently-numbered directory, S01E03) "+
+			"error = %v, want the member", err)
+	}
+	if string(got) != "s1 ep 3" {
+		t.Errorf("zipExtract(..., S01E03) = %q, want %q", got, "s1 ep 3")
+	}
+
+	if _, err := zipExtract(data, episode(2, 9)); err == nil {
+		t.Error("zipExtract(..., S02E09) succeeded, want a refusal: S02E09 names the " +
+			"DIRECTORY, and the only member in it is S01E03")
+	}
+}
+
+// TestSummarizeNames_truncates_and_sanitizes covers the two hostile properties
+// of a member list that reaches a log attribute: upstream names the members, and
+// a crafted archive may declare thousands of them.
+func TestSummarizeNames_truncates_and_sanitizes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("truncates past the cap", func(t *testing.T) {
+		t.Parallel()
+		names := make([]string, maxNamesInError+3)
+		for i := range names {
+			names[i] = fmt.Sprintf("member%02d.srt", i)
+		}
+		got := summarizeNames(names)
+		if !strings.Contains(got, "(+3 more)") {
+			t.Errorf("summarizeNames(%d names) = %q, want a (+3 more) marker", len(names), got)
+		}
+		if strings.Contains(got, fmt.Sprintf("member%02d.srt", maxNamesInError)) {
+			t.Errorf("summarizeNames(%d names) = %q, want no name past the cap", len(names), got)
+		}
+	})
+
+	t.Run("strips a record-forging newline", func(t *testing.T) {
+		t.Parallel()
+		got := summarizeNames([]string{"ok.srt\nlevel=ERROR msg=\"forged\""})
+		if strings.Contains(got, "\n") {
+			t.Errorf("summarizeNames(newline) = %q, want no raw newline", got)
+		}
+	})
+}
+
+// TestExtractFromZip_refusal_distinguishes_unreadable_naming pins the difference
+// between the two ways a pack can fail to answer, because they call for opposite
+// responses and used to produce the same sentence.
+//
+// A wrong-season pack is a release problem: something else should be downloaded.
+// A pack whose members carry no readable episode marker is a subflux problem: the
+// notation needs teaching. Both rendered as "no member for S01E08" until the
+// refusal started saying which it was, and the operator's only way to tell them
+// apart was to read the filenames out of the log and judge for themselves.
+func TestExtractFromZip_refusal_distinguishes_unreadable_naming(t *testing.T) {
+	t.Parallel()
+
+	t.Run("members claim other episodes", func(t *testing.T) {
+		t.Parallel()
+		data := makeZip(t,
+			zipEntry{"Show.S03E01.srt", []byte("s3 ep 1")},
+			zipEntry{"Show.S03E02.srt", []byte("s3 ep 2")},
+		)
+		_, err := zipExtract(data, episode(1, 8))
+		if err == nil {
+			t.Fatal("zipExtract(season-3 pack, S01E08) = nil error, want a refusal")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "claim S03E01, S03E02") {
+			t.Errorf("err = %q, want it to say what the members DO claim", msg)
+		}
+		if strings.Contains(msg, "no episode this scanner can read") {
+			t.Errorf("err = %q, want the wrong-season wording, not the unreadable-naming one", msg)
+		}
+	})
+
+	// Real member naming, measured on a SubSource Game of Thrones pack: a bare
+	// episode number and a title, with no season anywhere in the name. The
+	// numbers ARE read now, so the refusal has to say the episode is absent
+	// rather than that the naming is unreadable.
+	t.Run("members state bare numbers that do not include the target", func(t *testing.T) {
+		t.Parallel()
+		data := makeZip(t,
+			zipEntry{"1 - Winter Is Coming..srt", []byte("ep 1")},
+			zipEntry{"2 - The Kingsroad..srt", []byte("ep 2")},
+		)
+		_, err := zipExtract(data, episode(1, 8))
+		if err == nil {
+			t.Fatal("zipExtract(bare-numbered pack, S01E08) = nil error, want a refusal")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "bare episode numbers 1, 2") {
+			t.Errorf("err = %q, want it to report the bare numbers it did read", msg)
+		}
+		if !strings.Contains(msg, "S01E08") {
+			t.Errorf("err = %q, want the episode that could not be matched named", msg)
+		}
+	})
+
+	// Nothing states an episode in ANY form, so this is the arm that says the
+	// notation needs teaching.
+	t.Run("members name no episode in any form", func(t *testing.T) {
+		t.Parallel()
+		data := makeZip(t,
+			zipEntry{"Winter Is Coming.srt", []byte("ep 1")},
+			zipEntry{"The Kingsroad.srt", []byte("ep 2")},
+		)
+		_, err := zipExtract(data, episode(1, 8))
+		if err == nil {
+			t.Fatal("zipExtract(title-only pack, S01E08) = nil error, want a refusal")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "names no episode this scanner can read") {
+			t.Errorf("err = %q, want it to state that the naming is unreadable", msg)
+		}
+		if !strings.Contains(msg, "Winter Is Coming") {
+			t.Errorf("err = %q, want the member names listed so the notation is visible", msg)
+		}
+	})
+}
+
+// TestExtractFromZip_reads_a_bare_numbered_pack is the other half of the same
+// change: a pack whose members state an episode number and no season.
+//
+// The season is not being inferred. The provider search sends seasonNumber to the
+// API and stamps the result's season from that same request, so the target's
+// season came from Sonarr; the only thing missing from the member name is the
+// episode, which the leading number states outright.
+func TestExtractFromZip_reads_a_bare_numbered_pack(t *testing.T) {
+	t.Parallel()
+	data := makeZip(t,
+		zipEntry{"1 - Winter Is Coming..srt", []byte("ep 1")},
+		zipEntry{"2 - The Kingsroad..srt", []byte("ep 2")},
+		zipEntry{"10 - Fire And Blood..srt", []byte("ep 10")},
+	)
+
+	for _, tc := range []struct {
+		ep   int
+		want string
+	}{{1, "ep 1"}, {2, "ep 2"}, {10, "ep 10"}} {
+		got, err := zipExtract(data, episode(1, tc.ep))
+		if err != nil {
+			t.Errorf("zipExtract(bare-numbered pack, S01E%02d) error = %v, want %q",
+				tc.ep, err, tc.want)
+			continue
+		}
+		if string(got) != tc.want {
+			t.Errorf("zipExtract(bare-numbered pack, S01E%02d) = %q, want %q", tc.ep, got, tc.want)
+		}
+	}
+}
+
+// TestExtractFromZip_a_readable_notation_outvotes_a_bare_number pins the other
+// half of the bare-number contract. The reading is only sound where the archive
+// states no season anywhere, so a single member carrying a real marker has to
+// disqualify it for the whole archive — otherwise a pack that parses could be
+// answered by a number that happens to match.
+func TestExtractFromZip_a_readable_notation_outvotes_a_bare_number(t *testing.T) {
+	t.Parallel()
+	// "8 - …" would match S01E08 as a bare number, but a sibling member claims
+	// S03E01, so this archive names a season and the bare reading is off.
+	data := makeZip(t,
+		zipEntry{"8 - Some Title..srt", []byte("bare 8")},
+		zipEntry{"Show.S03E01.srt", []byte("s3 ep 1")},
+	)
+
+	got, err := zipExtract(data, episode(1, 8))
+	if err == nil {
+		t.Fatalf("zipExtract(mixed pack, S01E08) = %q, want a refusal: the archive claims "+
+			"S03E01, so it names a season and the bare reading must not apply", got)
+	}
+	if !strings.Contains(err.Error(), "claim S03E01") {
+		t.Errorf("err = %q, want the wrong-season wording", err)
+	}
+}
+
+// TestExtractFromZip_read_failure_renders_on_one_line pins the log-shape half of
+// the same concern. This text becomes a slog attribute, and errors.Join renders
+// its members newline-separated, which splits one record across several lines in
+// the operator's log. The chain still has to reach the cause.
+func TestExtractFromZip_read_failure_renders_on_one_line(t *testing.T) {
+	t.Parallel()
+	// Two members both claiming the episode, so a joined rendering would put a
+	// newline between their two failures. With one member there is nothing to
+	// join and the test could not tell the two renderings apart.
+	data := makeZipUnreadableMethod(t, "Show.S01E08.PROPER.srt", "Show.S01E08.REPACK.srt")
+
+	_, err := zipExtract(data, episode(1, 8))
+	if err == nil {
+		t.Fatal("zipExtract(unreadable member) = nil error, want a read failure")
+	}
+	if strings.ContainsAny(err.Error(), "\n\r") {
+		t.Errorf("err = %q, want no line break: this lands in a slog attribute", err)
+	}
+	if !errors.Is(err, zip.ErrAlgorithm) {
+		t.Errorf("err = %v, want the chain to still reach zip.ErrAlgorithm", err)
 	}
 }

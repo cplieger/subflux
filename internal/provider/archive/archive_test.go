@@ -3,6 +3,8 @@ package archive
 import (
 	"bytes"
 	"testing"
+
+	"github.com/cplieger/subflux/internal/epmarker"
 )
 
 func TestLooksLikeSubtitle(t *testing.T) {
@@ -26,8 +28,8 @@ func TestLooksLikeSubtitle(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := LooksLikeSubtitle(tt.data); got != tt.want {
-				t.Errorf("LooksLikeSubtitle() = %v, want %v", got, tt.want)
+			if got := looksLikeSubtitle(tt.data); got != tt.want {
+				t.Errorf("looksLikeSubtitle() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -43,8 +45,8 @@ func TestLooksLikeSubtitle_signature_within_4kb_of_large_input(t *testing.T) {
 	}
 	copy(data[100:], []byte(" --> "))
 
-	if !LooksLikeSubtitle(data) {
-		t.Error("LooksLikeSubtitle(large input, signature within 4KB) = false, want true")
+	if !looksLikeSubtitle(data) {
+		t.Error("looksLikeSubtitle(large input, signature within 4KB) = false, want true")
 	}
 }
 
@@ -57,8 +59,8 @@ func TestLooksLikeSubtitle_signature_beyond_4kb_returns_false(t *testing.T) {
 	}
 	copy(data[4500:], []byte(" --> "))
 
-	if LooksLikeSubtitle(data) {
-		t.Error("LooksLikeSubtitle(signature beyond 4KB) = true, want false")
+	if looksLikeSubtitle(data) {
+		t.Error("looksLikeSubtitle(signature beyond 4KB) = true, want false")
 	}
 }
 
@@ -70,8 +72,8 @@ func TestLooksLikeSubtitle_high_non_text_ratio_returns_false(t *testing.T) {
 	data = append(data, []byte(" --> ")...)
 	data = append(data, bytes.Repeat([]byte{0x01}, 50)...)
 
-	if LooksLikeSubtitle(data) {
-		t.Error("LooksLikeSubtitle(high non-text ratio with signature) = true, want false")
+	if looksLikeSubtitle(data) {
+		t.Error("looksLikeSubtitle(high non-text ratio with signature) = true, want false")
 	}
 }
 
@@ -94,8 +96,8 @@ func TestHasSignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := HasSignature(tt.data); got != tt.want {
-				t.Errorf("HasSignature() = %v, want %v", got, tt.want)
+			if got := hasSignature(tt.data); got != tt.want {
+				t.Errorf("hasSignature() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -113,7 +115,10 @@ func TestExtract(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Extract(tt.data, 1, 1)
+			got, err := Extract(tt.data, epmarker.For(epmarker.Marker{Season: 1, Episode: 1}))
+			if (err == nil) != tt.want {
+				t.Errorf("Extract() err=%v, want err==nil to be %v", err, tt.want)
+			}
 			if (got != nil) != tt.want {
 				t.Errorf("Extract() nil=%v, want nil=%v", got == nil, !tt.want)
 			}
@@ -131,10 +136,13 @@ func TestExtract_default_branch_zip(t *testing.T) {
 	z := makeZip(t, zipEntry{name: "sub.srt", content: content})
 	prefixed := append([]byte{'X'}, z...)
 
-	if HasSignature(prefixed) {
+	if hasSignature(prefixed) {
 		t.Fatalf("prefixed zip unexpectedly has an archive signature (test setup)")
 	}
-	got := Extract(prefixed, 0, 0)
+	got, err := Extract(prefixed, epmarker.Any())
+	if err != nil {
+		t.Fatalf("Extract(prefixed zip) unexpected error: %v", err)
+	}
 	if !bytes.Equal(got, content) {
 		t.Fatalf("Extract(prefixed zip) = %q, want %q", got, content)
 	}
@@ -148,10 +156,13 @@ func TestExtract_default_branch_rar(t *testing.T) {
 	rar := loadRARFixture(t)
 	prefixed := append([]byte("ZZZZ"), rar...)
 
-	if HasSignature(prefixed) {
+	if hasSignature(prefixed) {
 		t.Fatalf("prefixed rar unexpectedly has an archive signature (test setup)")
 	}
-	got := Extract(prefixed, 0, 0)
+	got, err := Extract(prefixed, epmarker.Any())
+	if err != nil {
+		t.Fatalf("Extract(prefixed rar) unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatalf("Extract(prefixed rar) = nil, want extracted subtitle")
 	}

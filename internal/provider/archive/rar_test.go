@@ -6,12 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/nwaples/rardecode/v2"
 )
 
 func TestExtractFromRAR_invalid_data(t *testing.T) {
 	t.Parallel()
-	got := ExtractFromRAR([]byte("not a rar"), 0, 0)
+	got, _ := rarExtract([]byte("not a rar"), epmarker.Any())
 	if got != nil {
 		t.Errorf("extractFromRAR(invalid) = %d bytes, want nil", len(got))
 	}
@@ -19,7 +20,7 @@ func TestExtractFromRAR_invalid_data(t *testing.T) {
 
 func TestExtractFromRAR_nil_data(t *testing.T) {
 	t.Parallel()
-	got := ExtractFromRAR(nil, 0, 0)
+	got, _ := rarExtract(nil, epmarker.Any())
 	if got != nil {
 		t.Errorf("extractFromRAR(nil) = %d bytes, want nil", len(got))
 	}
@@ -27,7 +28,7 @@ func TestExtractFromRAR_nil_data(t *testing.T) {
 
 func TestExtractFromRAR_empty_data(t *testing.T) {
 	t.Parallel()
-	got := ExtractFromRAR([]byte{}, 0, 0)
+	got, _ := rarExtract([]byte{}, epmarker.Any())
 	if got != nil {
 		t.Errorf("extractFromRAR(empty) = %d bytes, want nil", len(got))
 	}
@@ -38,7 +39,7 @@ func TestExtractFromArchive_prefers_zip(t *testing.T) {
 	content := []byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n")
 	data := makeZip(t, zipEntry{"sub.srt", content})
 
-	got := Extract(data, 0, 0)
+	got, _ := Extract(data, epmarker.Any())
 	if !bytes.Equal(got, content) {
 		t.Errorf("ExtractFromArchive(zip) = %q, want %q", got, content)
 	}
@@ -66,7 +67,7 @@ func TestExtractFromArchive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := Extract(tt.data, 0, 0)
+			got, _ := Extract(tt.data, epmarker.Any())
 			if tt.wantNil {
 				if got != nil {
 					t.Fatalf("Extract() = %d bytes, want nil", len(got))
@@ -99,7 +100,7 @@ func loadRARFixtureFile(t *testing.T, name string) []byte {
 func TestExtractFromRAR_returns_first_subtitle_without_episode_context(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 0, 0)
+	got, _ := rarExtract(data, epmarker.Any())
 	if got == nil {
 		t.Fatal("extractFromRAR(valid, 0, 0) = nil, want content")
 	}
@@ -111,7 +112,7 @@ func TestExtractFromRAR_returns_first_subtitle_without_episode_context(t *testin
 func TestExtractFromRAR_matches_episode_in_season_pack(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 1, 1)
+	got, _ := rarExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 1}))
 	if got == nil {
 		t.Fatal("extractFromRAR(valid, 1, 1) = nil, want matching content")
 	}
@@ -123,7 +124,7 @@ func TestExtractFromRAR_matches_episode_in_season_pack(t *testing.T) {
 func TestExtractFromRAR_matches_episode_2(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 1, 2)
+	got, _ := rarExtract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 2}))
 	if got == nil {
 		t.Fatal("extractFromRAR(valid, 1, 2) = nil, want matching content")
 	}
@@ -135,7 +136,7 @@ func TestExtractFromRAR_matches_episode_2(t *testing.T) {
 func TestExtractFromRAR_no_episode_match_returns_nil(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 99, 99)
+	got, _ := rarExtract(data, epmarker.For(epmarker.Marker{Season: 99, Episode: 99}))
 	if got != nil {
 		t.Errorf("extractFromRAR(valid, 99, 99) = %d bytes, want nil", len(got))
 	}
@@ -147,9 +148,9 @@ func TestExtractFromRAR_no_episode_match_returns_nil(t *testing.T) {
 func TestExtractFromRAR_season_zero_disables_episode_filter(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 0, 5)
+	got, _ := rarExtract(data, epmarker.Any())
 	if got == nil {
-		t.Fatal("ExtractFromRAR(fixture, 0, 5) = nil, want first subtitle " +
+		t.Fatal("rarExtract(fixture, epmarker.Any()) = nil, want first subtitle " +
 			"(season 0 must disable episode filtering)")
 	}
 }
@@ -160,9 +161,9 @@ func TestExtractFromRAR_season_zero_disables_episode_filter(t *testing.T) {
 func TestExtractFromRAR_episode_zero_disables_episode_filter(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := ExtractFromRAR(data, 1, 0)
+	got, _ := rarExtract(data, epmarker.Any())
 	if got == nil {
-		t.Fatal("ExtractFromRAR(fixture, 1, 0) = nil, want first subtitle " +
+		t.Fatal("rarExtract(fixture, epmarker.Any()) = nil, want first subtitle " +
 			"(episode 0 must disable episode filtering)")
 	}
 }
@@ -173,7 +174,7 @@ func TestExtractFromRAR_episode_zero_disables_episode_filter(t *testing.T) {
 func TestExtractFromRAR_skips_directory_entries(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixtureFile(t, "test_with_dir.rar")
-	got := ExtractFromRAR(data, 0, 0)
+	got, _ := rarExtract(data, epmarker.Any())
 	if got == nil {
 		t.Fatal("extractFromRAR(dir fixture, 0, 0) = nil, want subtitle content")
 	}
@@ -188,7 +189,7 @@ func TestExtractFromRAR_skips_directory_entries(t *testing.T) {
 func TestExtractFromRAR_skips_hidden_files(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixtureFile(t, "test_hidden.rar")
-	got := ExtractFromRAR(data, 0, 0)
+	got, _ := rarExtract(data, epmarker.Any())
 	if got == nil {
 		t.Fatal("extractFromRAR(hidden fixture, 0, 0) = nil, want visible subtitle")
 	}
@@ -204,7 +205,7 @@ func TestExtractFromRAR_skips_hidden_files(t *testing.T) {
 func TestExtractFromArchive_extracts_from_rar(t *testing.T) {
 	t.Parallel()
 	data := loadRARFixture(t)
-	got := Extract(data, 0, 0)
+	got, _ := Extract(data, epmarker.Any())
 	if got == nil {
 		t.Fatal("ExtractFromArchive(rar) = nil, want subtitle content")
 	}
@@ -219,7 +220,7 @@ func TestExtractFromArchive_rar_with_episode_context(t *testing.T) {
 
 	t.Run("matches episode 1", func(t *testing.T) {
 		t.Parallel()
-		got := Extract(data, 1, 1)
+		got, _ := Extract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 1}))
 		if got == nil {
 			t.Fatal("ExtractFromArchive(rar, 1, 1) = nil, want content")
 		}
@@ -230,7 +231,7 @@ func TestExtractFromArchive_rar_with_episode_context(t *testing.T) {
 
 	t.Run("no match returns nil", func(t *testing.T) {
 		t.Parallel()
-		got := Extract(data, 99, 99)
+		got, _ := Extract(data, epmarker.For(epmarker.Marker{Season: 99, Episode: 99}))
 		if got != nil {
 			t.Errorf("ExtractFromArchive(rar, 99, 99) = %d bytes, want nil", len(got))
 		}
@@ -256,7 +257,7 @@ func TestExtractFromArchive_rejects_zip_bomb_via_public_api(t *testing.T) {
 	fakeUncompressed := uint32(len(content)) * 100
 	binary.LittleEndian.PutUint32(data[centralIdx+24:centralIdx+28], fakeUncompressed)
 
-	got := Extract(data, 0, 0)
+	got, _ := Extract(data, epmarker.Any())
 	if got != nil {
 		t.Errorf("ExtractFromArchive(zip-bomb) = %d bytes, want nil "+
 			"(bomb must not fall through to looksLikeSubtitle)", len(got))
@@ -269,13 +270,13 @@ func TestExtractFromArchive_rejects_zip_bomb_via_public_api(t *testing.T) {
 func TestExtractFromArchive_rejects_oversized_zip_via_public_api(t *testing.T) {
 	t.Parallel()
 
-	content := make([]byte, MaxExtractSize+1)
+	content := make([]byte, maxExtractSize+1)
 	for i := range content {
 		content[i] = byte(i)
 	}
 	data := makeZipStored(t, zipEntry{"subtitle.srt", content})
 
-	got := Extract(data, 0, 0)
+	got, _ := Extract(data, epmarker.Any())
 	if got != nil {
 		t.Errorf("ExtractFromArchive(oversized) = %d bytes, want nil", len(got))
 	}
@@ -302,7 +303,7 @@ func TestExtractFromArchive_zip_with_episode_context(t *testing.T) {
 
 	t.Run("matches target episode", func(t *testing.T) {
 		t.Parallel()
-		got := Extract(data, 1, 2)
+		got, _ := Extract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 2}))
 		if !bytes.Equal(got, e02) {
 			t.Errorf("ExtractFromArchive(zip pack, 1, 2) = %q, want %q", got, e02)
 		}
@@ -310,7 +311,7 @@ func TestExtractFromArchive_zip_with_episode_context(t *testing.T) {
 
 	t.Run("no episode match returns nil not first", func(t *testing.T) {
 		t.Parallel()
-		got := Extract(data, 1, 99)
+		got, _ := Extract(data, epmarker.For(epmarker.Marker{Season: 1, Episode: 99}))
 		if got != nil {
 			t.Errorf("ExtractFromArchive(zip pack, 1, 99) = %q, "+
 				"want nil (no fallback to first)", got)
@@ -319,7 +320,7 @@ func TestExtractFromArchive_zip_with_episode_context(t *testing.T) {
 
 	t.Run("zero episode context falls back to first", func(t *testing.T) {
 		t.Parallel()
-		got := Extract(data, 0, 0)
+		got, _ := Extract(data, epmarker.Any())
 		if !bytes.Equal(got, e01) {
 			t.Errorf("ExtractFromArchive(zip pack, 0, 0) = %q, "+
 				"want %q (first)", got, e01)
@@ -329,7 +330,7 @@ func TestExtractFromArchive_zip_with_episode_context(t *testing.T) {
 
 // --- isValidRAREntry table ---
 
-func TestIsValidRAREntry(t *testing.T) {
+func TestGateRAREntry(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		hdr  *rardecode.FileHeader
@@ -410,7 +411,7 @@ func TestIsValidRAREntry(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := IsValidRAREntry(tc.hdr)
+			got := gateRAREntry(tc.hdr)
 			if got != tc.want {
 				t.Errorf("isValidRAREntry(%+v) = %v, want %v", tc.hdr, got, tc.want)
 			}
