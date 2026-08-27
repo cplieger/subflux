@@ -119,6 +119,7 @@ const (
 	bucketAuthAPIKeys  = buckets.AuthAPIKeys
 
 	bucketIxUserName    = buckets.IxUserName
+	bucketIxUserHandle  = buckets.IxUserHandle
 	bucketIxUserOIDC    = buckets.IxUserOIDC
 	bucketIxPasskeyUser = buckets.IxPasskeyUser
 	bucketIxAPIKeyUser  = buckets.IxAPIKeyUser

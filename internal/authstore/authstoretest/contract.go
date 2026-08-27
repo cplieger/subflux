@@ -24,6 +24,9 @@
 //   - session expiry: CleanupExpiredSessions evicts idle-expired and
 //     absolute-expired sessions, keeps live ones, with an exact count and an
 //     exclusive boundary (Requirement 10.3);
+//   - the WebAuthn user handle: create mints a non-empty one, it resolves its
+//     owner and nobody else, a duplicate is rejected, and an unknown or empty
+//     handle reports plain absence (the discoverable-login lookup);
 //   - sign_count durability across a simulated restart: a raised sign_count
 //     survives a Reopen, and so do the durable user/passkey records
 //     (Requirement 9.5, the durable-and-monotonic half every engine owes).
@@ -47,6 +50,7 @@
 package authstoretest
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -106,6 +110,86 @@ func Suite(t *testing.T, newHarness func(t *testing.T) Harness) {
 	t.Run("SignCount_durable_across_reopen", func(t *testing.T) {
 		testSignCountDurableAcrossReopen(t, newHarness(t))
 	})
+	t.Run("WebAuthnHandle_minted_unique_and_resolves", func(t *testing.T) {
+		testWebAuthnHandle(t, newHarness(t))
+	})
+}
+
+// testWebAuthnHandle asserts the WebAuthn user handle every engine owes: create
+// mints a non-empty one, it resolves its owner and nobody else, a duplicate is
+// rejected, and an unknown or empty handle reports plain absence.
+//
+// A discoverable passkey login arrives carrying only the handle, so this lookup
+// is the whole of how it finds the account — and a break surfaces as an ordinary
+// failed sign-in rather than an error, which is why it is pinned at the seam.
+func testWebAuthnHandle(t *testing.T, h Harness) {
+	t.Helper()
+	s := h.Store()
+	owner := assertHandleMintedAndResolves(t, s)
+	assertHandleUniqueness(t, s, owner)
+	assertUnknownHandleIsAbsence(t, s)
+}
+
+// assertHandleMintedAndResolves asserts create mints a non-empty handle per
+// account, the handles differ, and each resolves its own owner. Returns the
+// first account so the collision case has a handle already in use.
+func assertHandleMintedAndResolves(t *testing.T, s SPI) *auth.User {
+	t.Helper()
+	ctx := context.Background()
+	alice, bob := mkUser("handle-alice"), mkUser("handle-bob")
+	for _, u := range []*auth.User{alice, bob} {
+		if err := s.CreateUser(ctx, u); err != nil {
+			t.Fatalf("CreateUser(%q): %v", u.Username, err)
+		}
+		if len(u.WebAuthnHandle) == 0 {
+			t.Fatalf("CreateUser(%q) left WebAuthnHandle empty; a discoverable login has nothing to assert against", u.Username)
+		}
+	}
+	if bytes.Equal(alice.WebAuthnHandle, bob.WebAuthnHandle) {
+		t.Fatalf("two accounts share a handle (%x); one passkey would resolve either account", alice.WebAuthnHandle)
+	}
+	got, found, err := s.UserByWebAuthnHandle(ctx, alice.WebAuthnHandle)
+	if err != nil || !found || got == nil || got.ID != alice.ID {
+		t.Errorf("UserByWebAuthnHandle(alice) = (%+v, %t, %v), want Alice (id %d), true, nil", got, found, err, alice.ID)
+	}
+	return alice
+}
+
+// assertHandleUniqueness asserts a handle collision is refused. Without it the
+// colliding account silently becomes reachable by the other's passkey.
+func assertHandleUniqueness(t *testing.T, s SPI, taken *auth.User) {
+	t.Helper()
+	dup := mkUser("handle-dup")
+	dup.WebAuthnHandle = taken.WebAuthnHandle
+	if err := s.CreateUser(context.Background(), dup); err == nil {
+		t.Errorf("CreateUser duplicate WebAuthn handle: err = nil, want non-nil")
+	}
+}
+
+// assertUnknownHandleIsAbsence asserts a handle no account holds reports plain
+// absence rather than an error. Distinguishing an unknown handle from a
+// malformed one would let an unauthenticated caller probe which handles exist.
+func assertUnknownHandleIsAbsence(t *testing.T, s SPI) {
+	t.Helper()
+	ctx := context.Background()
+	for _, tt := range []struct {
+		name   string
+		handle []byte
+	}{
+		{name: "unknown", handle: []byte("no-account-holds-this-handle")},
+		{name: "empty", handle: []byte{}},
+		{name: "nil", handle: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			u, found, err := s.UserByWebAuthnHandle(ctx, tt.handle)
+			if err != nil {
+				t.Fatalf("UserByWebAuthnHandle(%x): %v", tt.handle, err)
+			}
+			if u != nil || found {
+				t.Errorf("UserByWebAuthnHandle(%x) = (%+v, %t), want (nil, false)", tt.handle, u, found)
+			}
+		})
+	}
 }
 
 // --- builders ---

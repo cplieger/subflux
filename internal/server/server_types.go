@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -30,7 +31,6 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/subflux/internal/wiring"
 	"github.com/cplieger/webhttp/v2"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -126,7 +126,7 @@ type liveState struct {
 	scorer    *scorer.Engine
 	sonarr    SonarrClient
 	radarr    RadarrClient
-	webauthn  *webauthn.WebAuthn
+	webauthn  *authwebauthn.RelyingParty
 	oidc      *oidcSlot
 	providers []provider.Provider
 }

@@ -9,8 +9,29 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v5"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 )
+
+// liveCeremony returns a real in-flight WebAuthn ceremony. Only the library can
+// mint one (Ceremony's state is unexported), and its own deadline is what the
+// ceremony store evicts on.
+func liveCeremony(t *testing.T) authwebauthn.Ceremony {
+	t.Helper()
+	rp, err := authwebauthn.New(authwebauthn.RPConfig{
+		ID:          "example.com",
+		DisplayName: "Test RP",
+		Origins:     []string{"https://example.com"},
+	})
+	if err != nil {
+		t.Fatalf("webauthn.New: %v", err)
+	}
+	_, ceremony, err := authwebauthn.BeginLogin(rp)
+	if err != nil {
+		t.Fatalf("BeginLogin: %v", err)
+	}
+	return ceremony
+}
 
 func TestListPasskeys_Empty(t *testing.T) {
 	t.Parallel()
@@ -327,12 +348,9 @@ func TestCleanupCeremonies_removes_expired(t *testing.T) {
 	expiredWAToken := "expired-wa-cleanup"
 	freshWAToken := "fresh-wa-cleanup"
 
-	cs.WebAuthn.Store(expiredWAToken, &authhandlers.WebAuthnSession{
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-	})
-	cs.WebAuthn.Store(freshWAToken, &authhandlers.WebAuthnSession{
-		CreatedAt: time.Now(),
-	})
+	// The zero Ceremony reports a zero deadline, so it is always past it.
+	cs.WebAuthn.Store(expiredWAToken, authwebauthn.Ceremony{})
+	cs.WebAuthn.Store(freshWAToken, liveCeremony(t))
 
 	cs.Cleanup()
 
@@ -352,26 +370,22 @@ func TestConsumeWebAuthnSession_expired(t *testing.T) {
 
 	cs := authhandlers.NewCeremonyStore()
 	token := "consume-expired-test"
-	cs.WebAuthn.Store(token, &authhandlers.WebAuthnSession{
-		CreatedAt: time.Now().Add(-10 * time.Minute),
-	})
+	cs.WebAuthn.Store(token, authwebauthn.Ceremony{})
 
-	result := cs.ConsumeWebAuthnSession(token)
-	if result != nil {
-		t.Error("consumeWebAuthnSession(expired) should return nil")
+	if _, found := cs.ConsumeWebAuthnSession(token); found {
+		t.Error("ConsumeWebAuthnSession(past deadline) found = true, want false")
 	}
 
-	_, exists := cs.WebAuthn.LoadAndDelete(token)
-	if exists {
-		t.Error("expired session not removed from map")
+	// Consuming it must also evict it, expired or not.
+	if _, exists := cs.WebAuthn.LoadAndDelete(token); exists {
+		t.Error("an expired ceremony was left in the map after being consumed")
 	}
 }
 
 func TestConsumeWebAuthnSession_missing(t *testing.T) {
 	t.Parallel()
 	cs := authhandlers.NewCeremonyStore()
-	result := cs.ConsumeWebAuthnSession("nonexistent-token")
-	if result != nil {
-		t.Error("consumeWebAuthnSession(missing) should return nil")
+	if _, found := cs.ConsumeWebAuthnSession("nonexistent-token"); found {
+		t.Error("ConsumeWebAuthnSession(unknown token) found = true, want false")
 	}
 }

@@ -193,8 +193,22 @@ func restoreOneUser(tx *bbolt.Tx, ub *bbolt.Bucket, u *auth.User) error {
 	if ub.Get(key) != nil {
 		return fmt.Errorf("authstore: restore user %q: duplicate surrogate id %d: %w", u.Username, u.ID, errConflict)
 	}
-	if err := uniqueCheck(tx, bucketIxUserName, userNameIndexKey(u.Username)); err != nil {
-		return fmt.Errorf("authstore: restore user %q: duplicate username: %w", u.Username, err)
+	nameKey, err := userNameIndexKey(u.Username)
+	if err != nil {
+		return fmt.Errorf("authstore: restore user %q: %w", u.Username, err)
+	}
+	if dupErr := uniqueCheck(tx, bucketIxUserName, nameKey); dupErr != nil {
+		return fmt.Errorf("authstore: restore user %q: duplicate username: %w", u.Username, dupErr)
+	}
+	// A handle is minted at create time and is what a discoverable login
+	// resolves, so a backup that carries none describes an account nobody can
+	// sign into with a passkey.
+	if len(u.WebAuthnHandle) == 0 {
+		return fmt.Errorf("authstore: restore user %q: no WebAuthn handle", u.Username)
+	}
+	handleKey := userHandleIndexKey(u.WebAuthnHandle)
+	if dupErr := uniqueCheck(tx, bucketIxUserHandle, handleKey); dupErr != nil {
+		return fmt.Errorf("authstore: restore user %q: duplicate WebAuthn handle: %w", u.Username, dupErr)
 	}
 	rec := toUserRec(u)
 	enc, err := kv.Encode(&rec)
@@ -204,7 +218,10 @@ func restoreOneUser(tx *bbolt.Tx, ub *bbolt.Bucket, u *auth.User) error {
 	if err := ub.Put(key, enc); err != nil {
 		return fmt.Errorf("authstore: restore user: %w", err)
 	}
-	if err := idxPut(tx, bucketIxUserName, userNameIndexKey(u.Username), key); err != nil {
+	if err := idxPut(tx, bucketIxUserName, nameKey, key); err != nil {
+		return err
+	}
+	if err := idxPut(tx, bucketIxUserHandle, handleKey, key); err != nil {
 		return err
 	}
 	if u.OIDCSub == "" {

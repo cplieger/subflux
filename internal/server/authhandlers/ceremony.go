@@ -12,11 +12,12 @@ import (
 	"time"
 
 	authwebauthn "github.com/cplieger/auth/v5/webauthn"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 const (
-	// CeremonyTTL is the maximum age for pending WebAuthn sessions.
+	// CeremonyTTL is the maximum age for a pending OIDC link ceremony. A
+	// WebAuthn ceremony is not bounded by it: it carries the deadline its own
+	// authenticator was given (authwebauthn.Ceremony.Expires).
 	CeremonyTTL = authwebauthn.CeremonyTimeout
 
 	// MaxCeremonySessions caps the in-memory ceremony maps to prevent OOM
@@ -29,12 +30,6 @@ const (
 	// HeaderWebAuthnSession is the HTTP header carrying the WebAuthn session token.
 	HeaderWebAuthnSession = "X-WebAuthn-Session"
 )
-
-// WebAuthnSession holds ephemeral WebAuthn ceremony data.
-type WebAuthnSession struct {
-	Data      *webauthn.SessionData
-	CreatedAt time.Time
-}
 
 // PendingLink holds state for an OIDC login that matched an existing local
 // account by username but not by (issuer, sub). The user must prove ownership
@@ -121,26 +116,27 @@ func (sm *ShardedCeremonyMap[V]) Cleanup(isExpired func(V) bool) {
 // CeremonyStore holds ephemeral ceremony state for auth flows.
 // Owned by the Server struct to enable per-instance isolation in tests.
 type CeremonyStore struct {
-	WebAuthn *ShardedCeremonyMap[*WebAuthnSession]
+	WebAuthn *ShardedCeremonyMap[authwebauthn.Ceremony]
 	Link     *ShardedCeremonyMap[*PendingLink]
 }
 
 // NewCeremonyStore creates a new ceremony store.
 func NewCeremonyStore() *CeremonyStore {
 	return &CeremonyStore{
-		WebAuthn: NewShardedCeremonyMap[*WebAuthnSession](),
+		WebAuthn: NewShardedCeremonyMap[authwebauthn.Ceremony](),
 		Link:     NewShardedCeremonyMap[*PendingLink](),
 	}
 }
 
-// ConsumeWebAuthnSession atomically retrieves and removes a WebAuthn session.
-// Returns nil if the session is missing or expired.
-func (cs *CeremonyStore) ConsumeWebAuthnSession(token string) *webauthn.SessionData {
-	ws, ok := cs.WebAuthn.LoadAndDelete(token)
-	if !ok || time.Since(ws.CreatedAt) > CeremonyTTL {
-		return nil
+// ConsumeWebAuthnSession atomically retrieves and removes a WebAuthn ceremony.
+// found is false when the token is unknown, already spent, or the ceremony's
+// own deadline has passed.
+func (cs *CeremonyStore) ConsumeWebAuthnSession(token string) (ceremony authwebauthn.Ceremony, found bool) {
+	c, ok := cs.WebAuthn.LoadAndDelete(token)
+	if !ok || time.Now().After(c.Expires()) {
+		return authwebauthn.Ceremony{}, false
 	}
-	return ws.Data
+	return c, true
 }
 
 // GenerateCeremonyToken generates a random hex token for ephemeral ceremony state.
@@ -154,12 +150,12 @@ func GenerateCeremonyToken() (string, error) {
 	return string(dst[:]), nil
 }
 
-// Cleanup removes expired pending WebAuthn sessions.
+// Cleanup removes expired pending WebAuthn ceremonies and OIDC links.
 // Called periodically by the server.
 func (cs *CeremonyStore) Cleanup() {
 	now := time.Now()
-	cs.WebAuthn.Cleanup(func(v *WebAuthnSession) bool {
-		return now.Sub(v.CreatedAt) > CeremonyTTL
+	cs.WebAuthn.Cleanup(func(v authwebauthn.Ceremony) bool {
+		return now.After(v.Expires())
 	})
 	cs.Link.Cleanup(func(v *PendingLink) bool {
 		return now.Sub(v.CreatedAt) > CeremonyTTL

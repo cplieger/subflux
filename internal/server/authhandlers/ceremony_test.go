@@ -9,8 +9,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-webauthn/webauthn/webauthn"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 )
+
+// liveCeremony returns a real in-flight WebAuthn ceremony. Only the library can
+// mint one (Ceremony's state is unexported), and its own deadline is what the
+// store evicts on.
+func liveCeremony(t *testing.T) authwebauthn.Ceremony {
+	t.Helper()
+	rp, err := authwebauthn.New(authwebauthn.RPConfig{
+		ID:          "example.com",
+		DisplayName: "Test RP",
+		Origins:     []string{"https://example.com"},
+	})
+	if err != nil {
+		t.Fatalf("webauthn.New: %v", err)
+	}
+	_, ceremony, err := authwebauthn.BeginLogin(rp)
+	if err != nil {
+		t.Fatalf("BeginLogin: %v", err)
+	}
+	return ceremony
+}
 
 type testCeremonyVal struct {
 	CreatedAt time.Time
@@ -101,11 +121,11 @@ func TestShardedCeremonyMap_LoadAndDelete_frees_capacity(t *testing.T) {
 
 func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[*WebAuthnSession]()
-	sm.Store("fresh", &WebAuthnSession{CreatedAt: time.Now()})
-	sm.Store("stale", &WebAuthnSession{CreatedAt: time.Now().Add(-time.Hour)})
+	sm := NewShardedCeremonyMap[*PendingLink]()
+	sm.Store("fresh", &PendingLink{CreatedAt: time.Now()})
+	sm.Store("stale", &PendingLink{CreatedAt: time.Now().Add(-time.Hour)})
 
-	sm.Cleanup(func(v *WebAuthnSession) bool {
+	sm.Cleanup(func(v *PendingLink) bool {
 		return time.Since(v.CreatedAt) > time.Minute
 	})
 
@@ -123,22 +143,22 @@ func TestShardedCeremonyMap_Cleanup_removes_expired_only(t *testing.T) {
 // while the map itself sat empty, locking users out of the login flow.
 func TestShardedCeremonyMap_Cleanup_frees_capacity(t *testing.T) {
 	t.Parallel()
-	sm := NewShardedCeremonyMap[*WebAuthnSession]()
+	sm := NewShardedCeremonyMap[*PendingLink]()
 	expired := time.Now().Add(-time.Hour)
 	for i := range MaxCeremonySessions {
-		if !sm.Store(fmt.Sprintf("k%d", i), &WebAuthnSession{CreatedAt: expired}) {
+		if !sm.Store(fmt.Sprintf("k%d", i), &PendingLink{CreatedAt: expired}) {
 			t.Fatalf("Store failed at %d, want success up to capacity %d", i, MaxCeremonySessions)
 		}
 	}
-	if sm.Store("overflow", &WebAuthnSession{CreatedAt: time.Now()}) {
+	if sm.Store("overflow", &PendingLink{CreatedAt: time.Now()}) {
 		t.Fatal("Store at capacity should fail")
 	}
 
-	sm.Cleanup(func(v *WebAuthnSession) bool {
+	sm.Cleanup(func(v *PendingLink) bool {
 		return time.Since(v.CreatedAt) > time.Minute
 	})
 
-	if !sm.Store("after-cleanup", &WebAuthnSession{CreatedAt: time.Now()}) {
+	if !sm.Store("after-cleanup", &PendingLink{CreatedAt: time.Now()}) {
 		t.Error("Store after Cleanup should succeed: the swept slots were not reclaimed")
 	}
 }
@@ -194,33 +214,36 @@ func TestGenerateCeremonyToken_format_and_uniqueness(t *testing.T) {
 func TestConsumeWebAuthnSession_fresh_expired_and_single_use(t *testing.T) {
 	t.Parallel()
 	cs := NewCeremonyStore()
-	data := &webauthn.SessionData{}
+	ceremony := liveCeremony(t)
 
-	// Fresh session returns the stored data.
-	cs.WebAuthn.Store("fresh", &WebAuthnSession{Data: data, CreatedAt: time.Now()})
-	if got := cs.ConsumeWebAuthnSession("fresh"); got != data {
-		t.Errorf("fresh session: got %v, want the stored SessionData", got)
+	// A live ceremony comes back intact.
+	cs.WebAuthn.Store("fresh", ceremony)
+	got, found := cs.ConsumeWebAuthnSession("fresh")
+	if !found || got != ceremony {
+		t.Errorf("ConsumeWebAuthnSession(fresh) = (%v, %t), want the stored ceremony and true", got, found)
 	}
-	// Single-use: a second consume of the same token returns nil.
-	if got := cs.ConsumeWebAuthnSession("fresh"); got != nil {
-		t.Error("a consumed session must be single-use (second consume must return nil)")
+	// Single-use: a second consume of the same token finds nothing.
+	if _, found := cs.ConsumeWebAuthnSession("fresh"); found {
+		t.Error("ConsumeWebAuthnSession(spent) found = true, want false: a ceremony is single-use")
 	}
-	// Missing token returns nil.
-	if got := cs.ConsumeWebAuthnSession("never-stored"); got != nil {
-		t.Error("missing session token must return nil")
+	// An unknown token finds nothing.
+	if _, found := cs.ConsumeWebAuthnSession("never-stored"); found {
+		t.Error("ConsumeWebAuthnSession(unknown) found = true, want false")
 	}
-	// Expired session returns nil even though it was present.
-	cs.WebAuthn.Store("stale", &WebAuthnSession{Data: data, CreatedAt: time.Now().Add(-2 * CeremonyTTL)})
-	if got := cs.ConsumeWebAuthnSession("stale"); got != nil {
-		t.Error("an expired session must return nil (TTL enforcement)")
+	// A ceremony past its deadline is refused even though it was present. The
+	// zero Ceremony reports a zero deadline, and it is the only past-deadline
+	// value a consumer can construct.
+	cs.WebAuthn.Store("stale", authwebauthn.Ceremony{})
+	if _, found := cs.ConsumeWebAuthnSession("stale"); found {
+		t.Error("ConsumeWebAuthnSession(past deadline) found = true, want false")
 	}
 }
 
 func TestCeremonyStore_Cleanup_expires_both_maps(t *testing.T) {
 	t.Parallel()
 	cs := NewCeremonyStore()
-	cs.WebAuthn.Store("wa-fresh", &WebAuthnSession{CreatedAt: time.Now()})
-	cs.WebAuthn.Store("wa-stale", &WebAuthnSession{CreatedAt: time.Now().Add(-2 * CeremonyTTL)})
+	cs.WebAuthn.Store("wa-fresh", liveCeremony(t))
+	cs.WebAuthn.Store("wa-stale", authwebauthn.Ceremony{})
 	cs.Link.Store("ln-fresh", &PendingLink{CreatedAt: time.Now()})
 	cs.Link.Store("ln-stale", &PendingLink{CreatedAt: time.Now().Add(-2 * CeremonyTTL)})
 
@@ -230,7 +253,7 @@ func TestCeremonyStore_Cleanup_expires_both_maps(t *testing.T) {
 		t.Error("Cleanup expired a fresh WebAuthn session it should have kept")
 	}
 	if _, ok := cs.WebAuthn.LoadAndDelete("wa-stale"); ok {
-		t.Error("Cleanup kept a stale WebAuthn session past the TTL")
+		t.Error("Cleanup kept a WebAuthn ceremony past its deadline")
 	}
 	if _, ok := cs.Link.LoadAndDelete("ln-fresh"); !ok {
 		t.Error("Cleanup expired a fresh pending link it should have kept")

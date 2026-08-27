@@ -44,6 +44,7 @@ const (
 	// Auth-domain indexes (builders in internal/authstore; names owned by
 	// the shared internal/store/buckets package).
 	bucketIxUserName    = buckets.IxUserName
+	bucketIxUserHandle  = buckets.IxUserHandle
 	bucketIxUserOIDC    = buckets.IxUserOIDC
 	bucketIxPasskeyUser = buckets.IxPasskeyUser
 	bucketIxAPIKeyUser  = buckets.IxAPIKeyUser
@@ -63,7 +64,7 @@ var (
 	}
 	authBuckets = [][]byte{
 		[]byte(bucketAuthUsers), []byte(bucketAuthPasskeys), []byte(bucketAuthAPIKeys),
-		[]byte(bucketIxUserName), []byte(bucketIxUserOIDC),
+		[]byte(bucketIxUserName), []byte(bucketIxUserHandle), []byte(bucketIxUserOIDC),
 		[]byte(bucketIxPasskeyUser), []byte(bucketIxAPIKeyUser),
 	}
 )

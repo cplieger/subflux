@@ -4,14 +4,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/cplieger/auth/v5"
 	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // --- POST /api/auth/webauthn/login/begin ---
@@ -20,20 +17,20 @@ import (
 // issues a WebAuthn assertion challenge. Supports both standard and
 // conditional (passkey autofill) mediation modes.
 func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Request) {
-	wa, ok := h.requireWebAuthn(w)
+	rp, ok := h.requireWebAuthn(w)
 	if !ok {
 		return
 	}
 
 	var (
-		assertion   *protocol.CredentialAssertion
-		sessionData *webauthn.SessionData
-		err         error
+		assertion *authwebauthn.CredentialAssertion
+		ceremony  authwebauthn.Ceremony
+		err       error
 	)
 	if r.URL.Query().Get("mediation") == "conditional" {
-		assertion, sessionData, err = authwebauthn.BeginConditionalLogin(wa)
+		assertion, ceremony, err = authwebauthn.BeginConditionalLogin(rp)
 	} else {
-		assertion, sessionData, err = authwebauthn.BeginLogin(wa)
+		assertion, ceremony, err = authwebauthn.BeginLogin(rp)
 	}
 	if err != nil {
 		slog.Error("webauthn: begin login", "error", err)
@@ -48,10 +45,7 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if !h.Ceremonies.WebAuthn.Store(token, &WebAuthnSession{
-		Data:      sessionData,
-		CreatedAt: time.Now(),
-	}) {
+	if !h.Ceremonies.WebAuthn.Store(token, ceremony) {
 		slog.Warn("webauthn: ceremony session limit reached")
 		httpapi.ServiceUnavailableC(w, r, subflux.CodeServiceUnavailable, "too many pending sessions")
 		return
@@ -69,13 +63,13 @@ func (h *Handler) HandleWebAuthnLoginBegin(w http.ResponseWriter, r *http.Reques
 // verifies the assertion response, updates the credential sign count, and
 // creates a session for the authenticated user.
 func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
-	wa, ok := h.requireWebAuthn(w)
+	rp, ok := h.requireWebAuthn(w)
 	if !ok {
 		return
 	}
 
-	sessData := h.consumeWebAuthnSession(w, r)
-	if sessData == nil {
+	ceremony, ok := h.consumeWebAuthnSession(w, r)
+	if !ok {
 		return
 	}
 
@@ -83,11 +77,11 @@ func (h *Handler) HandleWebAuthnLoginFinish(w http.ResponseWriter, r *http.Reque
 	// resolution from the user handle, assertion verification, and the
 	// post-login custody write (sign count + flags, including CloneWarning).
 	// Account-status policy stays here.
-	user, _, err := authwebauthn.CompleteLogin(r.Context(), wa, h.Store, sessData, r)
+	user, err := authwebauthn.CompleteLogin(r.Context(), rp, h.Store, ceremony, r)
 	if err != nil {
 		slog.Warn("webauthn: finish login failed", "error", err)
 
-		if _, unknownCred := errors.AsType[*protocol.ErrorUnknownCredential](err); unknownCred {
+		if errors.Is(err, authwebauthn.ErrUnknownCredential) {
 			httpapi.WriteJSONStatus(w, http.StatusUnauthorized, subflux.WebAuthnUnknownCredentialResponse{
 				Error:  "unknown credential",
 				Signal: "unknown_credential",

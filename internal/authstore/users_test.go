@@ -1,6 +1,7 @@
 package authstore
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -511,8 +512,12 @@ func TestUserByIndex_danglingEntryIsAnIntegrityFault(t *testing.T) {
 	ctx := t.Context()
 
 	// A name index entry pointing at user id 42, which no auth_users row holds.
+	nameKey, keyErr := userNameIndexKey("ghost")
+	if keyErr != nil {
+		t.Fatalf("userNameIndexKey(%q): %v", "ghost", keyErr)
+	}
 	if err := s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket([]byte(bucketIxUserName)).Put(userNameIndexKey("ghost"), kv.Be64(42))
+		return tx.Bucket([]byte(bucketIxUserName)).Put(nameKey, kv.Be64(42))
 	}); err != nil {
 		t.Fatalf("seed dangling name index entry: %v", err)
 	}
@@ -540,5 +545,160 @@ func TestUserByIndex_danglingEntryIsAnIntegrityFault(t *testing.T) {
 	// A genuinely absent user is still plain absence, not the integrity fault.
 	if _, found, err := s.UserByUsername(ctx, "nobody"); err != nil || found {
 		t.Errorf("UserByUsername(absent) = (found %t, err %v), want (false, nil)", found, err)
+	}
+}
+
+// A discoverable passkey login arrives carrying only the WebAuthn user handle,
+// so the handle minted at create time and its index are what resolve the
+// account. Nothing else reads them, and a miss surfaces as an ordinary failed
+// login, so a break here is silent.
+
+func TestCreateUser_mintsAHandleThatResolvesTheUser(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+
+	u := &auth.User{Username: "Alice", Role: auth.RoleAdmin, Enabled: true}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if len(u.WebAuthnHandle) == 0 {
+		t.Fatal("CreateUser left WebAuthnHandle empty; a discoverable login has nothing to assert against")
+	}
+
+	got, found, err := s.UserByWebAuthnHandle(ctx, u.WebAuthnHandle)
+	if err != nil {
+		t.Fatalf("UserByWebAuthnHandle: %v", err)
+	}
+	if !found || got == nil {
+		t.Fatalf("UserByWebAuthnHandle(minted handle) = (%+v, %t), want the created user and true", got, found)
+	}
+	if got.ID != u.ID || got.Username != u.Username {
+		t.Errorf("UserByWebAuthnHandle(minted handle) = id %d %q, want id %d %q",
+			got.ID, got.Username, u.ID, u.Username)
+	}
+	// The handle must survive the record round-trip, or the next login's index
+	// lookup and the credential's stored handle disagree.
+	if !bytes.Equal(got.WebAuthnHandle, u.WebAuthnHandle) {
+		t.Errorf("round-trip lost the handle: got %x, want %x", got.WebAuthnHandle, u.WebAuthnHandle)
+	}
+}
+
+func TestCreateUser_mintsADistinctHandlePerUser(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+
+	alice := &auth.User{Username: "Alice", Role: auth.RoleUser}
+	bob := &auth.User{Username: "Bob", Role: auth.RoleUser}
+	for _, u := range []*auth.User{alice, bob} {
+		if err := s.CreateUser(ctx, u); err != nil {
+			t.Fatalf("CreateUser(%q): %v", u.Username, err)
+		}
+	}
+
+	if bytes.Equal(alice.WebAuthnHandle, bob.WebAuthnHandle) {
+		t.Fatalf("two accounts share a handle (%x); each passkey would resolve either account", alice.WebAuthnHandle)
+	}
+	got, found, err := s.UserByWebAuthnHandle(ctx, bob.WebAuthnHandle)
+	if err != nil {
+		t.Fatalf("UserByWebAuthnHandle: %v", err)
+	}
+	if !found || got == nil || got.ID != bob.ID {
+		t.Errorf("UserByWebAuthnHandle(bob) = (%+v, %t), want Bob (id %d) and true", got, found, bob.ID)
+	}
+}
+
+func TestUserByWebAuthnHandle_unknownAndEmptyReportAbsence(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+	if err := s.CreateUser(ctx, &auth.User{Username: "Alice", Role: auth.RoleUser}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		handle []byte
+	}{
+		{name: "unknown handle", handle: []byte("no-account-holds-this-handle")},
+		{name: "empty handle", handle: []byte{}},
+		{name: "nil handle", handle: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, found, err := s.UserByWebAuthnHandle(ctx, tt.handle)
+			if err != nil {
+				t.Fatalf("UserByWebAuthnHandle(%x): %v", tt.handle, err)
+			}
+			if got != nil || found {
+				t.Errorf("UserByWebAuthnHandle(%x) = (%+v, %t), want (nil, false)", tt.handle, got, found)
+			}
+		})
+	}
+}
+
+func TestDeleteUser_dropsTheHandleIndexEntry(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+
+	u := &auth.User{Username: "Alice", Role: auth.RoleUser}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	handle := u.WebAuthnHandle
+	if err := s.DeleteUser(ctx, u.ID); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+
+	// A surviving entry points at a deleted row, which userByIndex reports as an
+	// integrity fault rather than absence — so a later login errors instead of
+	// failing cleanly.
+	got, found, err := s.UserByWebAuthnHandle(ctx, handle)
+	if err != nil {
+		t.Fatalf("UserByWebAuthnHandle after delete: %v", err)
+	}
+	if got != nil || found {
+		t.Errorf("UserByWebAuthnHandle(deleted user's handle) = (%+v, %t), want (nil, false)", got, found)
+	}
+}
+
+// The handle is store-owned, so an update that does not carry it must not blank
+// it. A wipe leaves the ix_user_handle entry pointing at a row that no longer
+// claims the handle: the lookup still resolves, so login appears to work, while
+// every value derived from the stored handle (the signal payloads, the handle a
+// new registration binds to) is wrong.
+func TestUpdateUser_preservesTheHandleACallerDidNotCarry(t *testing.T) {
+	s := newUserStore(t)
+	ctx := t.Context()
+
+	u := &auth.User{Username: "Alice", Role: auth.RoleUser, Enabled: true}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	minted := bytes.Clone(u.WebAuthnHandle)
+
+	// A caller that rebuilt the user from a partial view: no handle in hand.
+	update := &auth.User{ID: u.ID, Username: "Alice", Role: auth.RoleUser, Enabled: true, DisplayName: "Ada"}
+	if err := s.UpdateUser(ctx, update); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+	if !bytes.Equal(update.WebAuthnHandle, minted) {
+		t.Errorf("UpdateUser left the caller's handle = %x, want the stored %x", update.WebAuthnHandle, minted)
+	}
+
+	got, found, err := s.UserByID(ctx, u.ID)
+	if err != nil || !found || got == nil {
+		t.Fatalf("UserByID = (%+v, %t, %v), want the user, true, nil", got, found, err)
+	}
+	if !bytes.Equal(got.WebAuthnHandle, minted) {
+		t.Errorf("stored handle after UpdateUser = %x, want %x", got.WebAuthnHandle, minted)
+	}
+	if got.DisplayName != "Ada" {
+		t.Errorf("UpdateUser did not apply the display name: got %q, want %q", got.DisplayName, "Ada")
+	}
+
+	// The index and the row must still agree, which is what a discoverable
+	// login depends on.
+	byHandle, found, err := s.UserByWebAuthnHandle(ctx, minted)
+	if err != nil || !found || byHandle == nil || byHandle.ID != u.ID {
+		t.Errorf("UserByWebAuthnHandle after update = (%+v, %t, %v), want id %d, true, nil", byHandle, found, err, u.ID)
 	}
 }

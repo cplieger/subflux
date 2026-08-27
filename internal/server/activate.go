@@ -16,7 +16,6 @@ import (
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/subflux"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // This file owns the SINGLE activation path: activate() is the one operation
@@ -59,7 +58,7 @@ type activationCandidate struct {
 	scorer    *scorer.Engine
 	sonarr    SonarrClient
 	radarr    RadarrClient
-	webauthn  *webauthn.WebAuthn
+	webauthn  *authwebauthn.RelyingParty
 	oidc      *oidcSlot
 	providers []provider.Provider
 	drift     subflux.ConfigDrift
@@ -162,22 +161,22 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mod
 	return cand, nil
 }
 
-// buildWebAuthn constructs the WebAuthn instance for the candidate config.
+// buildWebAuthn constructs the relying party for the candidate config.
 // An empty RP ID means WebAuthn is not configured (nil, no error, no alert).
 // Construction failure is FATAL on a hot save and DEGRADED (warn + nil +
 // persistent alert) on cold boot.
-func (s *Server) buildWebAuthn(cfg *config.Config, mode activationMode) (wa *webauthn.WebAuthn, degraded bool, err error) {
+func (s *Server) buildWebAuthn(cfg *config.Config, mode activationMode) (rp *authwebauthn.RelyingParty, degraded bool, err error) {
 	rpID := cfg.WebAuthnRPID()
 	if rpID == "" {
 		return nil, false, nil
 	}
-	wa, err = authwebauthn.New(authwebauthn.RPConfig{
+	rp, err = authwebauthn.New(authwebauthn.RPConfig{
 		ID:          rpID,
 		DisplayName: "Subflux",
 		Origins:     []string{"https://" + rpID},
 	})
 	if err == nil {
-		return wa, false, nil
+		return rp, false, nil
 	}
 	if mode == activateHot {
 		return nil, false, fmt.Errorf("webauthn: invalid RP ID %q: %w", rpID, err)

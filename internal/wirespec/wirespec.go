@@ -21,6 +21,7 @@ package wirespec
 import (
 	"net/http"
 
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/confighandlers"
@@ -84,7 +85,11 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[subflux.SearchTargets](),
 		wiregen.TypeRef[subflux.SetupStatus](),
 		wiregen.TypeRef[subflux.LoginSuccess](),
-		wiregen.TypeRef[subflux.SignalData](),
+		// The WebAuthn Signal API payloads, derived by auth/v5/webauthn and
+		// passed straight to the browser's signal* calls by the client.
+		wiregen.TypeRef[authwebauthn.Signals](),
+		wiregen.TypeRef[authwebauthn.SignalCurrentUserDetails](),
+		wiregen.TypeRef[authwebauthn.SignalAllAcceptedCredentials](),
 		wiregen.TypeRef[subflux.PasskeyRegistered](),
 		wiregen.TypeRef[subflux.KeyGenerated](),
 		wiregen.TypeRef[subflux.BackoffEntry](),
@@ -138,7 +143,7 @@ func Registry() *wiregen.Registry {
 	// Enum values are auto-discovered from each type's const block in source.
 	// Two need explicit values because they aren't discoverable that way:
 	// MediaType ("series" is valid but has no const), and Role (its
-	// "admin"/"user" constants live in the external github.com/cplieger/auth/v4
+	// "admin"/"user" constants live in the external github.com/cplieger/auth/v5
 	// package, which wiregen does not scan for enum members).
 	r.Enums = map[string]wiregen.EnumDef{
 		"MediaType": {Values: []string{"movie", "episode", "series"}},
@@ -167,23 +172,30 @@ func Registry() *wiregen.Registry {
 		"SubtitleTargJSON":  "SubtitleTarget",
 	}
 
-	// go-webauthn's begin-response envelopes marshal their options under a
-	// NESTED "publicKey" key (protocol.CredentialAssertion{Response ... `json:"publicKey"`}
+	// The begin-response envelopes marshal their options under a NESTED
+	// "publicKey" key (webauthn.CredentialAssertion{Response ... `json:"publicKey"`}
 	// wrapped again by our WebAuthn*BeginResponse.PublicKey `json:"publicKey"`),
 	// so the wire shape is publicKey.publicKey.{challenge,...}. Mapping the
-	// protocol types to the DOM's WebAuthn Level 3 JSON option types makes
-	// that nesting compile-time-visible in the client (it was previously
-	// `unknown` + casts one level short — a masked login/registration break).
+	// option types to the DOM's WebAuthn Level 3 JSON option types makes that
+	// nesting compile-time-visible in the client (it was previously `unknown`
+	// + casts one level short — a masked login/registration break), and the DOM
+	// types are what the client hands straight to navigator.credentials.
+	//
+	// Base64URL is a []byte with base64url-string JSON, so without a mapping it
+	// would emit number[].
 	r.TypeMappings = map[string]string{ //nolint:gosec // G101: WebAuthn protocol TYPE names mapped to TS types; no credential material
-		"github.com/go-webauthn/webauthn/protocol.CredentialAssertion": "{ publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }",
-		"github.com/go-webauthn/webauthn/protocol.CredentialCreation":  "{ publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }",
+		"github.com/cplieger/auth/v5/webauthn.CredentialAssertion": "{ publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }",
+		"github.com/cplieger/auth/v5/webauthn.CredentialCreation":  "{ publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }",
+		"github.com/cplieger/auth/v5/webauthn.Base64URL":           "string",
 	}
-	// Paired decode-time hardening: assert the nested envelope shape (object
-	// with a string challenge) so future go-webauthn wire drift fails loudly
-	// at decode with a JSON path instead of silently breaking the ceremony.
+	// Paired decode-time hardening: a TypeMappings entry without one emits an
+	// unchecked `as` cast. Assert the nested envelope shape (object with a
+	// string challenge) so future wire drift fails loudly at decode with a JSON
+	// path instead of silently breaking the ceremony.
 	r.DecoderMappings = map[string]string{ //nolint:gosec // G101: decoder snippets keyed by WebAuthn TYPE names; no credential material
-		"github.com/go-webauthn/webauthn/protocol.CredentialAssertion": `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }; })`,
-		"github.com/go-webauthn/webauthn/protocol.CredentialCreation":  `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }; })`,
+		"github.com/cplieger/auth/v5/webauthn.CredentialAssertion": `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialRequestOptionsJSON; mediation?: string }; })`,
+		"github.com/cplieger/auth/v5/webauthn.CredentialCreation":  `((obj: Record<string, unknown>, key: string, path: string) => { const w = asObject(obj[key], path + "." + key); reqStr(asObject(w["publicKey"], path + "." + key + ".publicKey"), "challenge", path + "." + key + ".publicKey"); return w as unknown as { publicKey: PublicKeyCredentialCreationOptionsJSON; mediation?: string }; })`,
+		"github.com/cplieger/auth/v5/webauthn.Base64URL":           `reqStr`,
 	}
 
 	// EventData's runtime decoders: the discriminator values are the SSE
@@ -281,7 +293,7 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "webauthnSignalData", Method: http.MethodGet, Path: "/api/auth/webauthn/signal-data",
-			AuthGroup: GroupUser, Response: wiregen.TypeRef[subflux.SignalData](),
+			AuthGroup: GroupUser, Response: wiregen.TypeRef[authwebauthn.Signals](),
 		},
 		{
 			Name: "webauthnRegisterBegin", Method: http.MethodPost, Path: "/api/auth/webauthn/register/begin",

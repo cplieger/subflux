@@ -22,7 +22,6 @@ require (
 	github.com/cplieger/wiregen/v3 v3.0.0
 	github.com/cplieger/xmlx v1.0.3
 	github.com/evanw/esbuild v0.28.2
-	github.com/go-webauthn/webauthn v0.18.0
 	github.com/nwaples/rardecode/v2 v2.4.1
 	github.com/ulikunitz/xz v0.5.16
 	go.etcd.io/bbolt v1.5.0
@@ -37,6 +36,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
+	github.com/go-webauthn/webauthn v0.18.0 // indirect
 	github.com/go-webauthn/x v0.3.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect

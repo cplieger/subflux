@@ -19,7 +19,8 @@ const (
 
 // Auth secondary (index) buckets.
 const (
-	IxUserName    = "ix_user_name"    // lower(username) -> be64(user_id)
+	IxUserName    = "ix_user_name"    // NormalizeUsername(username) -> be64(user_id)
+	IxUserHandle  = "ix_user_handle"  // WebAuthn user handle -> be64(user_id)
 	IxUserOIDC    = "ix_user_oidc"    // issuer 0x00 sub -> be64(user_id)
 	IxPasskeyUser = "ix_passkey_user" // be64(user_id) 0x00 credential_id -> (empty)
 	IxAPIKeyUser  = "ix_apikey_user"  //nolint:gosec // G101: bbolt bucket name, not a credential
@@ -30,6 +31,6 @@ const (
 func Auth() []string {
 	return []string{
 		AuthUsers, AuthPasskeys, AuthAPIKeys,
-		IxUserName, IxUserOIDC, IxPasskeyUser, IxAPIKeyUser,
+		IxUserName, IxUserHandle, IxUserOIDC, IxPasskeyUser, IxAPIKeyUser,
 	}
 }

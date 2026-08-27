@@ -27,7 +27,6 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/authhandlers"
 	"github.com/cplieger/subflux/internal/server/events"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // --- Fixtures ---
@@ -394,8 +393,8 @@ func TestWorkerLatch_repeated_identical_put_launches_once(t *testing.T) {
 
 // --- WebAuthn failure policy: hot save FATAL, cold boot DEGRADED (R1.7) ---
 
-// badRPID fails go-webauthn's config validation (a URL pasted where a bare
-// domain belongs — the realistic user mistake).
+// badRPID fails relying-party validation (a URL pasted where a bare domain
+// belongs — the realistic user mistake).
 const badRPID = "http://subflux.example.com"
 
 func TestActivate_webauthn_failure_is_fatal_on_hot_save(t *testing.T) {
@@ -569,7 +568,7 @@ func TestActivate_rpid_change_locks_out_old_credential_predictably(t *testing.T)
 	s.newRadarr = func(_, _ string) (RadarrClient, error) { return dummyArrClient{}, nil }
 	s.launchWorkers = func() {}
 	s.lifetime = t.Context()
-	s.authH.WebAuthnResolver = func() *webauthn.WebAuthn { return s.state().webauthn }
+	s.authH.WebAuthnResolver = func() *authwebauthn.RelyingParty { return s.state().webauthn }
 
 	user := createTestUser(t, authDB, "alice", "correct horse battery staple")
 

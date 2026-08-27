@@ -4,14 +4,14 @@ import (
 	"time"
 
 	"github.com/cplieger/auth/v5"
-	"github.com/go-webauthn/webauthn/protocol"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 )
 
 // WebAuthnLoginBeginResponse wraps WebAuthn assertion options with a session token.
 // Used for login ceremonies.
 type WebAuthnLoginBeginResponse struct {
-	PublicKey    *protocol.CredentialAssertion `json:"publicKey"`
-	SessionToken string                        `json:"session_token"`
+	PublicKey    *authwebauthn.CredentialAssertion `json:"publicKey"`
+	SessionToken string                            `json:"session_token"`
 }
 
 // UserInfo is one entry of the GET /api/auth/users response.
@@ -45,6 +45,6 @@ type PasskeyInfo struct {
 // WebAuthnRegisterBeginResponse wraps WebAuthn creation options with a session token.
 // Used for passkey registration ceremonies.
 type WebAuthnRegisterBeginResponse struct {
-	PublicKey    *protocol.CredentialCreation `json:"publicKey"`
-	SessionToken string                       `json:"session_token"`
+	PublicKey    *authwebauthn.CredentialCreation `json:"publicKey"`
+	SessionToken string                           `json:"session_token"`
 }

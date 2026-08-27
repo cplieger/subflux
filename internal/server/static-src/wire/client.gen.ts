@@ -3,8 +3,8 @@
 import { clientRequest, clientRequestOK, clientRequestRaw } from "../api-client.js";
 import type { ApiResult } from "../api-client.js";
 import { decodeArray } from "../validators.js";
-import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignalData, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAudioResponse, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
-import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, SignalData, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
+import { decodeAPIKeyInfo, decodeActivityEntry, decodeAdminUserCreatedResponse, decodeAlert, decodeBackoffEntry, decodeConnTestResponse, decodeDownloadAccepted, decodeFileEntry, decodeKeyGenerated, decodeLoginSuccess, decodeManualLockEntry, decodeManualSearchResponse, decodeMeResponse, decodeMovieItem, decodeParsedConfig, decodePasskeyInfo, decodePathValidationResponse, decodePreviewStartResponse, decodeProviderInfo, decodeProvidersResponse, decodeResolveResponse, decodeScanAccepted, decodeSchemaSection, decodeScorePreview, decodeSearchTargets, decodeSeasonGroup, decodeSeriesItem, decodeSetupStatus, decodeSignals, decodeStateEntry, decodeStats, decodeStatusResponse, decodeStructuredConfig, decodeSubtitleEntry, decodeSyncAudioResponse, decodeUserInfo, decodeWebAuthnLoginBeginResponse, decodeWebAuthnRegisterBeginResponse } from "./decoders.gen.js";
+import type { APIKeyInfo, ActivityEntry, AdminUserCreatedResponse, Alert, BackoffEntry, BulkDeleteRequest, ConnTestResponse, DeleteFileRequest, DownloadAccepted, DownloadRequest, FileEntry, KeyGenerated, LoginSuccess, ManualLockEntry, ManualSearchResponse, MeResponse, MovieItem, ParsedConfig, PasskeyInfo, PathValidationResponse, PreviewStartResponse, ProviderInfo, ProvidersResponse, ResolveResponse, ScanAccepted, SchemaSection, ScorePreview, SearchTargets, SeasonGroup, SeriesItem, SetupStatus, Signals, StateEntry, Stats, StatusResponse, StructuredConfig, SubtitleEntry, SyncAudioRequest, SyncAudioResponse, SyncOffsetRequest, UserInfo, WebAuthnLoginBeginResponse, WebAuthnRegisterBeginResponse } from "./types.gen.js";
 
 /** Options accepted by every generated client function. */
 export interface ClientOpts {
@@ -201,12 +201,12 @@ export function listPasskeysRaw(opts?: ClientOpts): Promise<ApiResult<PasskeyInf
   return clientRequestRaw("GET", "/api/auth/passkeys", undefined, (v) => decodeArray(v, decodePasskeyInfo, "$"), opts?.signal);
 }
 
-export function webauthnSignalData(opts?: ClientOpts): Promise<SignalData | null> {
-  return clientRequest("GET", "/api/auth/webauthn/signal-data", undefined, decodeSignalData, opts?.signal);
+export function webauthnSignalData(opts?: ClientOpts): Promise<Signals | null> {
+  return clientRequest("GET", "/api/auth/webauthn/signal-data", undefined, decodeSignals, opts?.signal);
 }
 
-export function webauthnSignalDataRaw(opts?: ClientOpts): Promise<ApiResult<SignalData>> {
-  return clientRequestRaw("GET", "/api/auth/webauthn/signal-data", undefined, decodeSignalData, opts?.signal);
+export function webauthnSignalDataRaw(opts?: ClientOpts): Promise<ApiResult<Signals>> {
+  return clientRequestRaw("GET", "/api/auth/webauthn/signal-data", undefined, decodeSignals, opts?.signal);
 }
 
 export function webauthnRegisterBegin(body: unknown, opts?: ClientOpts): Promise<WebAuthnRegisterBeginResponse | null> {

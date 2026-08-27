@@ -147,29 +147,6 @@ func TestClientIP_table(t *testing.T) {
 	}
 }
 
-func TestBase64URLEncode(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		want  string
-		input []byte
-	}{
-		{name: "empty", input: []byte{}, want: ""},
-		{name: "nil", input: nil, want: ""},
-		{name: "hello", input: []byte("hello"), want: "aGVsbG8"},
-		{name: "binary", input: []byte{0xff, 0xfe, 0xfd}, want: "__79"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := authhandlers.Base64URLEncode(tt.input)
-			if got != tt.want {
-				t.Errorf("Base64URLEncode(%v) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestUpdateProfile_DisplayName covers what the handler accepts as a display
 // name and what it refuses. The refusals are the load-bearing half: this value
 // is rendered by every surface that lists the account and is handed to the
