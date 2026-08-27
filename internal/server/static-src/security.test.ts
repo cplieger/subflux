@@ -35,6 +35,8 @@ const client = vi.hoisted(() => ({
   beginBodies: [] as unknown[],
   deletedIds: [] as unknown[],
   revokedIds: [] as unknown[],
+  profileResult: { ok: true } as { ok: boolean; error?: string },
+  profileBodies: [] as unknown[],
 }));
 vi.mock("./wire/client.gen.js", () => ({
   me: () => {
@@ -83,6 +85,11 @@ vi.mock("./wire/client.gen.js", () => ({
     client.calls.push("oidcUnlinkRaw");
     return Promise.resolve(client.unlinkResult);
   },
+  updateProfileRaw: (body: unknown) => {
+    client.calls.push("updateProfileRaw");
+    client.profileBodies.push(body);
+    return Promise.resolve(client.profileResult);
+  },
   webauthnRegisterBegin: (body: unknown) => {
     client.calls.push("webauthnRegisterBegin");
     client.beginBodies.push(body);
@@ -94,7 +101,10 @@ vi.mock("./wire/client.gen.js", () => ({
   // check and calls this; answering null takes its "nothing to signal" return
   // before any PublicKeyCredential.signal* call, and keeps the stub off the
   // network.
-  webauthnSignalData: () => Promise.resolve(null),
+  webauthnSignalData: () => {
+    client.calls.push("webauthnSignalData");
+    return Promise.resolve(null);
+  },
   PATH_OIDC_REDIRECT: "/api/auth/oidc",
   PATH_WEBAUTHN_REGISTER_FINISH: "/api/auth/webauthn/register/finish",
 }));
@@ -143,6 +153,7 @@ import { initSecurity } from "./security.js";
 
 interface Me {
   username: string;
+  display_name: string;
   role: string;
   id: number;
   has_passkeys: boolean;
@@ -154,6 +165,7 @@ interface Me {
 function user(over: Partial<Me> = {}): Me {
   return {
     username: "root",
+    display_name: "",
     role: "user",
     id: 1,
     has_passkeys: false,
@@ -329,6 +341,19 @@ function sectionTitles(): string[] {
   return [...document.querySelectorAll("#securityDialog h3")].map((h) => h.textContent ?? "");
 }
 
+/** The `.sec-section` block whose heading is `title`. Every section renders a
+ *  `.sec-feedback` and most a `.sec-fields`, so a first-match query would
+ *  silently resolve to whichever section happens to come first. */
+function section(title: string): HTMLElement {
+  const found = [...document.querySelectorAll<HTMLElement>("#securityDialog .sec-section")].find(
+    (s) => s.querySelector("h3")?.textContent === title,
+  );
+  if (found === undefined) {
+    throw new Error(`missing section: ${title}; have: ${sectionTitles().join(" | ")}`);
+  }
+  return found;
+}
+
 /** Open the Security dialog the way the app does and return its body. */
 async function openSecurity(): Promise<HTMLElement> {
   initSecurity();
@@ -352,7 +377,7 @@ async function changePassword(current: string, next: string): Promise<HTMLButton
 }
 
 function feedback(): HTMLElement {
-  return req<HTMLElement>(".sec-feedback");
+  return req<HTMLElement>(".sec-feedback", section("Change Password"));
 }
 
 function releaseChange(result: { ok: boolean; error?: string }): void {
@@ -447,7 +472,7 @@ describe("security dialog: which sections an account gets", () => {
 
     await openSecurity();
 
-    expect(sectionTitles()).toEqual(["Change Password", "Passkeys", "API Keys"]);
+    expect(sectionTitles()).toEqual(["Display Name", "Change Password", "Passkeys", "API Keys"]);
   });
 
   it("withholds the API-key section from a non-admin", async () => {
@@ -455,7 +480,7 @@ describe("security dialog: which sections an account gets", () => {
 
     await openSecurity();
 
-    expect(sectionTitles()).toEqual(["Change Password", "Passkeys"]);
+    expect(sectionTitles()).toEqual(["Display Name", "Change Password", "Passkeys"]);
   });
 
   it("never asks the server for API keys as a non-admin", async () => {
@@ -471,7 +496,7 @@ describe("security dialog: which sections an account gets", () => {
 
     await openSecurity();
 
-    expect(sectionTitles()).toEqual(["API Keys"]);
+    expect(sectionTitles()).toEqual(["Display Name", "API Keys"]);
   });
 
   it("shows the loading placeholder until the sections arrive", async () => {
@@ -500,6 +525,109 @@ describe("security dialog: which sections an account gets", () => {
     await openSecurity();
 
     expect(sectionTitles()).toEqual([]);
+  });
+});
+
+describe("security dialog: display name", () => {
+  /** Fill the display-name field and click Save. */
+  async function saveDisplayName(value: string): Promise<void> {
+    req<HTMLInputElement>("#sec-display-name").value = value;
+    button("Save").click();
+    await settle();
+  }
+
+  function nameFeedback(): HTMLElement {
+    return req<HTMLElement>(".sec-feedback", section("Display Name"));
+  }
+
+  it("prefills the field with the stored display name", async () => {
+    client.me = user({ display_name: "Ada Lovelace" });
+
+    await openSecurity();
+
+    expect(req<HTMLInputElement>("#sec-display-name").value).toBe("Ada Lovelace");
+  });
+
+  it("offers the username as the placeholder when no display name is set", async () => {
+    client.me = user({ username: "ada", display_name: "" });
+
+    await openSecurity();
+
+    const input = req<HTMLInputElement>("#sec-display-name");
+    expect([input.value, input.placeholder]).toEqual(["", "ada"]);
+  });
+
+  it("sends the typed value under its wire name", async () => {
+    await openSecurity();
+
+    await saveDisplayName("Ada Lovelace");
+
+    expect(client.profileBodies).toEqual([{ display_name: "Ada Lovelace" }]);
+  });
+
+  it("signals the new account label to the credential manager after a save", async () => {
+    await openSecurity();
+    client.calls = [];
+
+    await saveDisplayName("Ada Lovelace");
+
+    // Without this the stored passkey keeps offering the name it was
+    // registered under, which is the whole reason the section exists.
+    expect(client.calls).toContain("webauthnSignalData");
+  });
+
+  it("confirms a successful save", async () => {
+    await openSecurity();
+
+    await saveDisplayName("Ada Lovelace");
+
+    expect(nameFeedback().textContent).toBe("Display name saved");
+  });
+
+  it("says the name was cleared when the field is emptied", async () => {
+    client.me = user({ display_name: "Ada Lovelace" });
+    await openSecurity();
+
+    await saveDisplayName("");
+
+    expect(nameFeedback().textContent).toBe("Display name cleared");
+  });
+
+  it("shows the server's rejection message", async () => {
+    client.profileResult = { ok: false, error: "display name contains a disallowed character" };
+    await openSecurity();
+
+    await saveDisplayName("Ada\u202eevoL");
+
+    expect(nameFeedback().textContent).toBe("display name contains a disallowed character");
+  });
+
+  it("sends no signal when the save is rejected", async () => {
+    client.profileResult = { ok: false, error: "display name too long" };
+    await openSecurity();
+    client.calls = [];
+
+    await saveDisplayName("a".repeat(200));
+
+    expect(client.calls).not.toContain("webauthnSignalData");
+  });
+
+  it("falls back to a generic message when the rejection carries no text", async () => {
+    client.profileResult = { ok: false };
+    await openSecurity();
+
+    await saveDisplayName("Ada Lovelace");
+
+    expect(nameFeedback().textContent).toBe("Failed to save display name");
+  });
+
+  it("offers the section to a password-less SSO account too", async () => {
+    client.me = user({ role: "user", has_password: false });
+
+    await openSecurity();
+
+    // A display name is not a credential, so it is not managed at the IdP.
+    expect(sectionTitles()).toContain("Display Name");
   });
 });
 
@@ -1641,7 +1769,7 @@ describe("security dialog: the chrome the stylesheet styles", () => {
       [...document.querySelectorAll("#securityDialog .sec-section")].map(
         (s) => s.querySelector("h3")?.textContent,
       ),
-    ).toEqual(["Change Password", "Passkeys", "API Keys", "Single Sign-On"]);
+    ).toEqual(["Display Name", "Change Password", "Passkeys", "API Keys", "Single Sign-On"]);
   });
 
   it("announces the loading placeholder as secondary text", async () => {
@@ -1659,10 +1787,11 @@ describe("security dialog: the chrome the stylesheet styles", () => {
   it("lays the password inputs out in a fields grid", async () => {
     await openSecurity();
 
-    expect([...req(".sec-fields").querySelectorAll("input")].map((i) => i.id)).toEqual([
-      "sec-current-pw",
-      "sec-new-pw",
-    ]);
+    expect(
+      [...req(".sec-fields", section("Change Password")).querySelectorAll("input")].map(
+        (i) => i.id,
+      ),
+    ).toEqual(["sec-current-pw", "sec-new-pw"]);
   });
 
   it("puts each section's controls in a trailing actions row", async () => {
@@ -1674,7 +1803,7 @@ describe("security dialog: the chrome the stylesheet styles", () => {
       [...document.querySelectorAll("#securityDialog .sec-actions button")].map((b) =>
         b.textContent?.trim(),
       ),
-    ).toEqual(["Change Password", "Add passkey", "Generate API key", "Disconnect"]);
+    ).toEqual(["Save", "Change Password", "Add passkey", "Generate API key", "Disconnect"]);
   });
 
   it("puts the connect control in an actions row too", async () => {
@@ -1687,7 +1816,7 @@ describe("security dialog: the chrome the stylesheet styles", () => {
       [...document.querySelectorAll("#securityDialog .sec-actions button")].map((b) =>
         b.textContent?.trim(),
       ),
-    ).toEqual(["Change Password", "Add passkey", "Generate API key", "Connect"]);
+    ).toEqual(["Save", "Change Password", "Add passkey", "Generate API key", "Connect"]);
   });
 
   it("renders the passkeys as a list of rows", async () => {

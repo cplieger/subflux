@@ -16,6 +16,7 @@ import {
   oidcUnlinkRaw,
   renamePasskey as renamePasskeyRequest,
   revokeAPIKey,
+  updateProfileRaw,
   webauthnRegisterBegin,
   PATH_OIDC_REDIRECT,
   PATH_WEBAUTHN_REGISTER_FINISH,
@@ -96,6 +97,11 @@ async function renderSections(body: HTMLElement): Promise<void> {
 
   const frag = document.createDocumentFragment();
 
+  // Identity first: the display name is not a credential, so an SSO-governed
+  // account gets it too.
+  if (user) {
+    frag.appendChild(buildProfileSection(user));
+  }
   // Local-credential management is only for accounts that have a password.
   // SSO-governed (password-less) accounts are managed at the identity provider.
   if (user?.has_password) {
@@ -113,6 +119,60 @@ async function renderSections(body: HTMLElement): Promise<void> {
   }
 
   patch(body, frag);
+}
+
+// --- Display name ---
+
+function buildProfileSection(user: MeResponse): HTMLElement {
+  const sec = el("div", { className: "sec-section" });
+  sec.appendChild(el("h3", null, "Display Name"));
+
+  const nameInput = el("input", {
+    type: "text",
+    id: "sec-display-name",
+    autocomplete: "nickname",
+    maxlength: "128",
+    placeholder: user.username,
+    value: user.display_name,
+  }) as HTMLInputElement;
+
+  const feedback = el("div", { className: "sec-feedback", hidden: true });
+
+  const submitBtn = el(
+    "button",
+    {
+      type: "button",
+      onclick: busyClick(async () => {
+        const r = await updateProfileRaw({ display_name: nameInput.value });
+        if (!r.ok) {
+          showFeedback(feedback, r.error ?? "Failed to save display name", true);
+          return;
+        }
+        showFeedback(
+          feedback,
+          nameInput.value.trim() ? "Display name saved" : "Display name cleared",
+          false,
+        );
+        // Tell the credential manager the account label changed, so a stored
+        // passkey stops offering the name it was registered under. Awaited:
+        // the signal needs the page alive to reach the provider.
+        await sendWebAuthnSignals();
+      }),
+    },
+    "Save",
+  );
+
+  sec.appendChild(
+    el(
+      "div",
+      { className: "sec-fields" },
+      el("label", { htmlFor: "sec-display-name" }, "Shown instead of your username"),
+      nameInput,
+    ),
+  );
+  sec.appendChild(feedback);
+  sec.appendChild(el("div", { className: "sec-actions" }, submitBtn));
+  return sec;
 }
 
 // --- Change Password ---

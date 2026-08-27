@@ -241,6 +241,7 @@ func (h *Handler) HandleAuthMe(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, subflux.MeResponse{
 		ID:          user.ID,
 		Username:    user.Username,
+		DisplayName: user.DisplayName,
 		Role:        user.Role,
 		HasPasskeys: passkeyCount > 0,
 		OIDCLinked:  user.OIDCSub != "",

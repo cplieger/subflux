@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -164,6 +165,106 @@ func TestBase64URLEncode(t *testing.T) {
 			got := authhandlers.Base64URLEncode(tt.input)
 			if got != tt.want {
 				t.Errorf("Base64URLEncode(%v) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestUpdateProfile_DisplayName covers what the handler accepts as a display
+// name and what it refuses. The refusals are the load-bearing half: this value
+// is rendered by every surface that lists the account and is handed to the
+// user's password manager as the passkey label, so a bidi control here
+// reorders what a human reads. A silently-sanitized value would be worse than
+// a refusal, and neither failure shows up at runtime.
+func TestUpdateProfile_DisplayName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStored string
+		wantStatus int
+	}{
+		{
+			name:       "plain name is stored",
+			body:       `{"display_name":"Ada Lovelace"}`,
+			wantStatus: http.StatusOK,
+			wantStored: "Ada Lovelace",
+		},
+		{
+			name:       "surrounding whitespace is trimmed",
+			body:       `{"display_name":"  Ada Lovelace  "}`,
+			wantStatus: http.StatusOK,
+			wantStored: "Ada Lovelace",
+		},
+		{
+			name:       "non-ASCII name is kept intact",
+			body:       `{"display_name":"Ada Löwe 好"}`,
+			wantStatus: http.StatusOK,
+			wantStored: "Ada Löwe 好",
+		},
+		{
+			name:       "empty value clears the display name",
+			body:       `{"display_name":""}`,
+			wantStatus: http.StatusOK,
+			wantStored: "",
+		},
+		{
+			name:       "bidi override is refused",
+			body:       `{"display_name":"Ada\u202eevoL"}`,
+			wantStatus: http.StatusBadRequest,
+			wantStored: "",
+		},
+		{
+			name:       "newline is refused",
+			body:       `{"display_name":"Ada\nLovelace"}`,
+			wantStatus: http.StatusBadRequest,
+			wantStored: "",
+		},
+		{
+			name:       "NUL is refused",
+			body:       `{"display_name":"Ada\u0000"}`,
+			wantStatus: http.StatusBadRequest,
+			wantStored: "",
+		},
+		{
+			name:       "over the length cap is refused",
+			body:       `{"display_name":"` + strings.Repeat("a", 129) + `"}`,
+			wantStatus: http.StatusBadRequest,
+			wantStored: "",
+		},
+		{
+			name:       "at the length cap is stored",
+			body:       `{"display_name":"` + strings.Repeat("a", 128) + `"}`,
+			wantStatus: http.StatusOK,
+			wantStored: strings.Repeat("a", 128),
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			s, db := testAuthServer(t)
+			username := "profile" + strconv.Itoa(i)
+			user := createTestUser(t, db, username, "correct-horse-battery-staple")
+
+			req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", strings.NewReader(test.body))
+			req = req.WithContext(authhandlers.NewUserContext(req.Context(), user))
+			rec := httptest.NewRecorder()
+			s.authH.HandleUpdateProfile(rec, req)
+
+			if rec.Code != test.wantStatus {
+				t.Fatalf("HandleUpdateProfile(%s) status = %d, want %d; body: %s",
+					test.body, rec.Code, test.wantStatus, rec.Body.String())
+			}
+
+			stored, found, err := db.UserByUsername(t.Context(), username)
+			if err != nil || !found {
+				t.Fatalf("UserByUsername(%q) = found %v, err %v", username, found, err)
+			}
+			if stored.DisplayName != test.wantStored {
+				t.Errorf("HandleUpdateProfile(%s) stored DisplayName = %q, want %q",
+					test.body, stored.DisplayName, test.wantStored)
 			}
 		})
 	}
