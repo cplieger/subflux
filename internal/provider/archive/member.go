@@ -194,15 +194,15 @@ func (s *selection) result() ([]byte, error) {
 func noMatchRefusal(want epmarker.Target, names []string, bareSeen []int) error {
 	if claimed := claimSummary(names); claimed != "" {
 		return fmt.Errorf("archive holds no member for %s; its %d member(s) claim %s: %s",
-			want, len(names), claimed, summarizeNames(names))
+			want.String(), len(names), claimed, summarizeNames(names))
 	}
 	if len(bareSeen) > 0 {
 		return fmt.Errorf("archive holds no member for %s; its %d member(s) state bare episode "+
 			"numbers %s with no season: %s",
-			want, len(names), summarizeInts(bareSeen), summarizeNames(names))
+			want.String(), len(names), summarizeInts(bareSeen), summarizeNames(names))
 	}
 	return fmt.Errorf("archive names no episode this scanner can read, so %s cannot be "+
-		"matched from it; its %d member(s): %s", want, len(names), summarizeNames(names))
+		"matched from it; its %d member(s): %s", want.String(), len(names), summarizeNames(names))
 }
 
 // summarizeInts renders episode numbers for a refusal, bounded the same way the
@@ -257,8 +257,16 @@ func claimSummary(names []string) string {
 //
 // It renders on ONE line rather than using errors.Join, because this text lands
 // in a slog attribute and Join's newlines would split one log record into
-// several. Unwrap keeps the chain intact so a caller can still reach a cause such
-// as zip.ErrAlgorithm with errors.Is.
+// several.
+//
+// It deliberately does NOT implement Unwrap, which is a translation at a
+// boundary rather than an oversight. The retry wrapper classifies a download
+// error with httpwire.IsTransient, and that walks the chain: an unwrappable
+// cause such as a truncated read could then be read as transient and the whole
+// download retried. An unreadable member is a property of the ARCHIVE, so every
+// retry fails identically, wastes a provider request and delays falling through
+// to the next candidate, which is the recovery that actually works. The causes
+// stay in the message, where the operator reads them.
 type memberReadError struct {
 	errs []error
 	want epmarker.Target
@@ -270,7 +278,5 @@ func (e *memberReadError) Error() string {
 		parts = append(parts, err.Error())
 	}
 	return fmt.Sprintf("every member matching %s failed to read: %s",
-		e.want, strings.Join(parts, "; "))
+		e.want.String(), strings.Join(parts, "; "))
 }
-
-func (e *memberReadError) Unwrap() []error { return e.errs }

@@ -160,11 +160,6 @@ func For(m Marker) Target {
 	return Target{want: m, fixed: true}
 }
 
-// Fixed reports whether t names one specific episode. A caller refusing to fall
-// back to an unmatched candidate needs this to know whether a miss is even
-// possible.
-func (t Target) Fixed() bool { return t.fixed }
-
 // Matches reports whether name claims the episode t is looking for. An Any
 // target matches every name.
 func (t Target) Matches(name string) bool {

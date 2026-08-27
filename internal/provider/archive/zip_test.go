@@ -444,8 +444,8 @@ func TestExtractFromZip_matched_member_that_cannot_be_read_says_so(t *testing.T)
 	if !strings.Contains(err.Error(), "failed to read") {
 		t.Errorf("zipExtract(unreadable member) err = %q, want it to report a read failure", err)
 	}
-	if !errors.Is(err, zip.ErrAlgorithm) {
-		t.Errorf("zipExtract(unreadable member) err = %v, want it to wrap zip.ErrAlgorithm", err)
+	if !strings.Contains(err.Error(), "unsupported compression algorithm") {
+		t.Errorf("zipExtract(unreadable member) err = %q, want the cause named in the message", err)
 	}
 	if errors.Is(err, ErrNotArchive) {
 		t.Errorf("zipExtract(unreadable member) err = %v, want NOT ErrNotArchive: "+
@@ -700,7 +700,12 @@ func TestExtractFromZip_a_readable_notation_outvotes_a_bare_number(t *testing.T)
 // TestExtractFromZip_read_failure_renders_on_one_line pins the log-shape half of
 // the same concern. This text becomes a slog attribute, and errors.Join renders
 // its members newline-separated, which splits one record across several lines in
-// the operator's log. The chain still has to reach the cause.
+// the operator's log.
+//
+// The causes stay in the message rather than in an unwrappable chain, and that is
+// deliberate: the retry wrapper classifies a download error by walking the chain,
+// and an unreadable member is a property of the archive, so every retry would
+// fail identically instead of falling through to the next candidate.
 func TestExtractFromZip_read_failure_renders_on_one_line(t *testing.T) {
 	t.Parallel()
 	// Two members both claiming the episode, so a joined rendering would put a
@@ -715,7 +720,11 @@ func TestExtractFromZip_read_failure_renders_on_one_line(t *testing.T) {
 	if strings.ContainsAny(err.Error(), "\n\r") {
 		t.Errorf("err = %q, want no line break: this lands in a slog attribute", err)
 	}
-	if !errors.Is(err, zip.ErrAlgorithm) {
-		t.Errorf("err = %v, want the chain to still reach zip.ErrAlgorithm", err)
+	if !strings.Contains(err.Error(), "unsupported compression algorithm") {
+		t.Errorf("err = %q, want the cause named in the message", err)
+	}
+	if !strings.Contains(err.Error(), "Show.S01E08.PROPER.srt") ||
+		!strings.Contains(err.Error(), "Show.S01E08.REPACK.srt") {
+		t.Errorf("err = %q, want both failing members named", err)
 	}
 }

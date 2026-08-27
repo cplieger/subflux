@@ -389,9 +389,6 @@ func TestTarget(t *testing.T) {
 				t.Errorf("Any().Matches(%q) = false, want true", name)
 			}
 		}
-		if epmarker.Any().Fixed() {
-			t.Error("Any().Fixed() = true, want false")
-		}
 	})
 
 	// A zero on either half is how the wire says "no episode to disambiguate",
@@ -405,9 +402,6 @@ func TestTarget(t *testing.T) {
 			{Season: -1, Episode: 5},
 		} {
 			got := epmarker.For(m)
-			if got.Fixed() {
-				t.Errorf("For(%+v).Fixed() = true, want false", m)
-			}
 			if !got.Matches("anything.srt") {
 				t.Errorf("For(%+v) should match any name", m)
 			}
@@ -417,9 +411,6 @@ func TestTarget(t *testing.T) {
 	t.Run("a fixed target matches only its own episode", func(t *testing.T) {
 		t.Parallel()
 		target := epmarker.For(epmarker.Marker{Season: 1, Episode: 8})
-		if !target.Fixed() {
-			t.Fatal("For(S01E08).Fixed() = false, want true")
-		}
 		for _, name := range []string{
 			"Black.Sails.S01E08.BDRip.srt",
 			"Black Sails - 01x08 - VIII..srt",
