@@ -19,6 +19,7 @@ import { reloadHistory } from "./history.js";
 import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js";
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
+import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
 import { configParsed, coverageMovies, coverageSeriesDetail, stateIDs } from "./wire/client.gen.js";
@@ -107,6 +108,11 @@ void initLanguages();
 initUserMenu();
 initStatusPopover();
 initSecurity();
+// Reconcile the user's passkey provider with what this server holds, once per
+// authenticated boot. Deliberately here and not on the login page: every login
+// path lands here, so no sign-in mechanism can be forgotten, and the login page
+// navigates immediately, which would abandon the signal it just sent.
+void sendWebAuthnSignals();
 // Scan buttons key off the shared runningScansByScope store: install the
 // effect that repaints every annotated button when the map changes.
 initScanButtons();

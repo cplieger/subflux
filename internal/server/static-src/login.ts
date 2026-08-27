@@ -19,11 +19,7 @@ import { storePasswordCredential } from "./password-credential.js";
 import { startConfigWizard } from "./wizard.js";
 import { postLoginDestination } from "./wizard-state.js";
 import { SETUP_PATH } from "./constants.js";
-import {
-  bufferToBase64url,
-  requestOptionsFromJSON,
-  sendWebAuthnSignals,
-} from "./webauthn-utils.js";
+import { bufferToBase64url, requestOptionsFromJSON } from "./webauthn-utils.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
 
 // --- Inline interfaces for API response shapes ---
@@ -288,9 +284,6 @@ async function finishWebAuthnLogin(
     return;
   }
   const data = (await res.json()) as LoginRedirect;
-  // Awaited, not fired-and-forgotten: the signal needs a live page, and the
-  // navigation below tears one down.
-  await sendWebAuthnSignals();
   window.location.href = data.redirect ?? "/";
 }
 
@@ -372,9 +365,6 @@ function wireLoginForm(resumeSetup: boolean): void {
         }
         return;
       }
-      // A password sign-in repairs any drift too: the display name may have
-      // changed on another device since this passkey was registered.
-      await sendWebAuthnSignals();
       window.location.href = res.data?.redirect ?? "/";
     } finally {
       if (btn) {

@@ -2,6 +2,7 @@
 // Single source of truth; imported by login.ts and security.ts.
 
 import { webauthnSignalData } from "./wire/client.gen.js";
+import type { SignalData } from "./wire/types.gen.js";
 
 function base64urlToBuffer(b64: string): ArrayBuffer {
   const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
@@ -55,32 +56,85 @@ export function creationOptionsFromJSON(
   return pk;
 }
 
-export async function sendWebAuthnSignals(): Promise<void> {
+/** How long to wait for one Signal API call before abandoning it.
+ *
+ *  Safari 26 can leave a Signal API promise pending forever
+ *  (https://bugs.webkit.org/show_bug.cgi?id=278339). A signal is a
+ *  best-effort hint: losing one costs a stale passkey label until the next
+ *  reconciliation, while waiting on one blocks whatever the caller does next. */
+const SIGNAL_DEADLINE_MS = 2000;
+
+/** Run one Signal API call, bounded and never throwing. A synchronous throw, a
+ *  rejection, and a promise that never settles all resolve here. */
+async function sendOne(send: () => Promise<unknown>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
-    if (!window.PublicKeyCredential) {
-      return;
-    }
-    const data = await webauthnSignalData();
-    if (!data) {
-      return;
-    }
-    if (typeof PublicKeyCredential.signalAllAcceptedCredentials === "function") {
-      await PublicKeyCredential.signalAllAcceptedCredentials({
-        rpId: data.rp_id,
-        userId: data.user_id,
-        allAcceptedCredentialIds: [...data.credential_ids],
-      });
-    }
-    if (typeof PublicKeyCredential.signalCurrentUserDetails === "function") {
-      await PublicKeyCredential.signalCurrentUserDetails({
-        rpId: data.rp_id,
-        userId: data.user_id,
-        name: data.name,
-        displayName: data.display_name,
-      });
-    }
-  } catch {
-    /* non-critical */
+    const quiet = Promise.resolve()
+      .then(send)
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+    const deadline = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, SIGNAL_DEADLINE_MS);
+    });
+    await Promise.race([quiet, deadline]);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** Fetch the reconciliation payload, or null when there is nothing to signal. */
+async function signalData(): Promise<SignalData | null> {
+  try {
+    return await webauthnSignalData();
+  } catch {
+    return null;
+  }
+}
+
+/** Tell the user's passkey provider what this server currently holds for the
+ *  account: which credentials it still accepts, and the account's current
+ *  label. Both are best-effort hints and neither is observable, so this never
+ *  throws and never blocks for longer than SIGNAL_DEADLINE_MS per call.
+ *
+ *  Call it from an authenticated page, not from a page about to navigate. */
+export async function sendWebAuthnSignals(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime feature detection
+  if (!window.PublicKeyCredential) {
+    return;
+  }
+  const data = await signalData();
+  if (!data) {
+    return;
+  }
+
+  // Independent rather than sequential. Each call carries a different fact,
+  // and Safari can hang or reject one of them; awaiting them in series let
+  // either outcome suppress the signal behind it.
+  const sent: Promise<void>[] = [];
+  if (typeof PublicKeyCredential.signalAllAcceptedCredentials === "function") {
+    sent.push(
+      sendOne(() =>
+        PublicKeyCredential.signalAllAcceptedCredentials({
+          rpId: data.rp_id,
+          userId: data.user_id,
+          allAcceptedCredentialIds: [...data.credential_ids],
+        }),
+      ),
+    );
+  }
+  if (typeof PublicKeyCredential.signalCurrentUserDetails === "function") {
+    sent.push(
+      sendOne(() =>
+        PublicKeyCredential.signalCurrentUserDetails({
+          rpId: data.rp_id,
+          userId: data.user_id,
+          name: data.name,
+          displayName: data.display_name,
+        }),
+      ),
+    );
+  }
+  await Promise.all(sent);
 }

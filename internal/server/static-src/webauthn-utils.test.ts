@@ -14,7 +14,7 @@
 // happens to ship: the signal methods arrived in Chromium 132 and the
 // production code feature-detects them precisely because that varies.
 // `unstubGlobals` in vitest.config undoes each stub after the test.
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, onTestFinished } from "vitest";
 import type { SignalData } from "./wire/types.gen.js";
 import {
   bufferToBase64url,
@@ -219,9 +219,51 @@ describe("sendWebAuthnSignals", () => {
     stubCredential({ signalAllAcceptedCredentials: all, signalCurrentUserDetails: current });
     wire.data = signalData();
 
-    // The caller is a login/registration path: a refused signal is
-    // non-critical and must not surface as a failed sign-in.
+    // A refused signal is non-critical and must never surface to the caller.
     await expect(sendWebAuthnSignals()).resolves.toBeUndefined();
-    expect(current).not.toHaveBeenCalled();
+  });
+
+  it("still signals the current user when the accepted-credentials call rejects", async () => {
+    const all = vi.fn(() => Promise.reject(new Error("signal refused")));
+    const current = vi.fn(() => Promise.resolve());
+    stubCredential({ signalAllAcceptedCredentials: all, signalCurrentUserDetails: current });
+    wire.data = signalData();
+
+    await sendWebAuthnSignals();
+
+    // The two calls carry different facts, so one failing must not suppress
+    // the other. Awaiting them in series used to skip this one.
+    expect(current).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves rather than throwing when a signal call throws synchronously", async () => {
+    const all = vi.fn(() => {
+      throw new TypeError("bad argument");
+    }) as unknown as ReturnType<typeof vi.fn>;
+    const current = vi.fn(() => Promise.resolve());
+    stubCredential({ signalAllAcceptedCredentials: all, signalCurrentUserDetails: current });
+    wire.data = signalData();
+
+    await expect(sendWebAuthnSignals()).resolves.toBeUndefined();
+    expect(current).toHaveBeenCalledTimes(1);
+  });
+
+  it("abandons a signal that never settles instead of hanging the caller", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    // Safari 26 can leave this promise pending forever:
+    // https://bugs.webkit.org/show_bug.cgi?id=278339
+    const all = vi.fn(() => new Promise<void>(() => undefined));
+    const current = vi.fn(() => Promise.resolve());
+    stubCredential({ signalAllAcceptedCredentials: all, signalCurrentUserDetails: current });
+    wire.data = signalData();
+
+    const pending = sendWebAuthnSignals();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(current).toHaveBeenCalledTimes(1);
   });
 });
