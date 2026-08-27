@@ -3,6 +3,9 @@ package authstore
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,22 +30,56 @@ func newPasskeyStore(t *testing.T) *Store {
 // sampleCred builds a fully-populated credential so round-trip assertions cover
 // every persisted field, including the binary credential material and flags
 // that auth.PasskeyCredential marks json:"-".
+// flagAttestedCredentialData is the AT bit (bit 6), set by every registration
+// that carries attested credential data. It is declared here rather than beside
+// the production flag constants because only a test needs it, and it is what
+// makes a DROPPED write observable: effectiveRawFlags can rebuild UP, UV, BE and
+// BS from the booleans, so a fixture whose octet holds only those four bits
+// round-trips identically whether the octet was persisted or reconstructed. AT
+// cannot be rebuilt, so an octet carrying it fails the moment the write drops.
+const flagAttestedCredentialData uint8 = 1 << 6
+
+// sampleCred sets EVERY field of auth.PasskeyCredential to a distinguishable
+// non-zero value, so the round-trip test below compares whole structs and a
+// field the store forgets to persist cannot pass. RawFlags is the case that
+// motivated it: it is the only flag input the library reads, and dropping it
+// fails every synced-passkey login while the four booleans still round-trip.
 func sampleCred(userID int64, credID []byte, name string) *auth.PasskeyCredential {
+	discoverable := true
 	return &auth.PasskeyCredential{
-		UserID:          userID,
-		CredentialID:    credID,
-		PublicKey:       []byte("pub-" + name),
-		AAGUID:          bytes.Repeat([]byte{0xAB}, 16),
-		RawAttestation:  []byte("raw-attestation-" + name),
-		AttestationType: "none",
-		Transport:       "usb",
-		Name:            name,
-		SignCount:       5,
-		BackupEligible:  true,
-		BackupState:     true,
-		UserPresent:     true,
-		UserVerified:    true,
+		UserID:            userID,
+		CredentialID:      credID,
+		PublicKey:         []byte("pub-" + name),
+		AAGUID:            bytes.Repeat([]byte{0xAB}, 16),
+		RawAttestation:    []byte("raw-attestation-" + name),
+		AttestationType:   "none",
+		AttestationFormat: "packed",
+		Transport:         "usb",
+		Name:              name,
+		RPID:              "subflux.example.com",
+		Attachment:        "cross-platform",
+		Discoverable:      &discoverable,
+		SignCount:         5,
+		RawFlags:          flagAttestedCredentialData | flagUserPresent | flagUserVerified | flagBackupEligible | flagBackupState,
+		BackupEligible:    true,
+		BackupState:       true,
+		UserPresent:       true,
+		UserVerified:      true,
 	}
+}
+
+// credDiff names the fields two credentials disagree on, so a whole-struct
+// comparison still fails with a specific cause rather than two %+v dumps.
+func credDiff(got, want *auth.PasskeyCredential) string {
+	gv, wv := reflect.ValueOf(*got), reflect.ValueOf(*want)
+	var b strings.Builder
+	for i := range gv.NumField() {
+		g, w := gv.Field(i).Interface(), wv.Field(i).Interface()
+		if !reflect.DeepEqual(g, w) {
+			fmt.Fprintf(&b, "\n  %s: got %+v, want %+v", gv.Type().Field(i).Name, g, w)
+		}
+	}
+	return b.String()
 }
 
 func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
@@ -72,18 +109,11 @@ func TestCreatePasskey_setsIDAndRoundTripsAllFields(t *testing.T) {
 	if got == nil {
 		t.Fatal("PasskeyByCredentialID returned nil for an existing credential")
 	}
-	if got.ID != cred.ID || got.UserID != 7 {
-		t.Errorf("id/user mismatch: got id=%d user=%d", got.ID, got.UserID)
-	}
-	if !bytes.Equal(got.CredentialID, credID) || !bytes.Equal(got.PublicKey, cred.PublicKey) ||
-		!bytes.Equal(got.AAGUID, cred.AAGUID) || !bytes.Equal(got.RawAttestation, cred.RawAttestation) {
-		t.Errorf("binary fields lost on round-trip: %+v", got)
-	}
-	if got.AttestationType != "none" || got.Transport != "usb" || got.Name != "yubikey" || got.SignCount != 5 {
-		t.Errorf("scalar fields lost on round-trip: %+v", got)
-	}
-	if !got.BackupEligible || !got.BackupState || !got.UserPresent || !got.UserVerified || !got.CloneWarning {
-		t.Errorf("flags lost on round-trip: %+v", got)
+	// Whole-struct, so a field the store stops persisting fails here rather
+	// than slipping past a hand-picked list. cred carries the store-assigned ID
+	// and CreatedAt by now, so the two are directly comparable.
+	if !reflect.DeepEqual(got, cred) {
+		t.Errorf("PasskeyByCredentialID round-trip lost fields:%s", credDiff(got, cred))
 	}
 }
 
@@ -438,5 +468,79 @@ func TestDeletePasskey_propagatesUpdateError(t *testing.T) {
 	seedCorruptPasskey(t, s, 1, []byte("corrupt-cred"))
 	if err := s.DeletePasskey(t.Context(), auth.PasskeyRef{ID: 999, UserID: 1}); err == nil {
 		t.Fatal("DeletePasskey over a corrupt record = nil, want a non-nil decode error")
+	}
+}
+
+// A row written before pkRec carried the flags octet decodes with RawFlags == 0.
+// The library reads ONLY that octet, so restoring it as zero hands go-webauthn a
+// credential with all-false flags, and it refuses any assertion whose
+// backup-eligible flag disagrees — which every synced passkey (iCloud Keychain,
+// Google Password Manager, 1Password, Bitwarden) asserts. The failure does not
+// name its cause: it reads as an authenticator inconsistency.
+func TestPkRec_preFieldRowRebuildsTheFlagsOctet(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		rec  pkRec
+		want uint8
+	}{
+		{
+			name: "synced passkey: UP+UV+BE+BS",
+			rec:  pkRec{UserPresent: true, UserVerified: true, BackupEligible: true, BackupState: true},
+			want: flagUserPresent | flagUserVerified | flagBackupEligible | flagBackupState,
+		},
+		{
+			name: "security key: UP+UV only, not backup eligible",
+			rec:  pkRec{UserPresent: true, UserVerified: true},
+			want: flagUserPresent | flagUserVerified,
+		},
+		{
+			name: "eligible but not currently backed up",
+			rec:  pkRec{UserPresent: true, BackupEligible: true},
+			want: flagUserPresent | flagBackupEligible,
+		},
+		{
+			name: "a stored octet is authoritative and is not rebuilt",
+			rec:  pkRec{RawFlags: flagUserPresent, BackupEligible: true, BackupState: true},
+			want: flagUserPresent,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.rec.effectiveRawFlags(); got != tt.want {
+				t.Errorf("effectiveRawFlags() = %#08b, want %#08b", got, tt.want)
+			}
+			// BackupEligible is the bit go-webauthn refuses on, so assert it
+			// reaches the reconstructed credential specifically.
+			if got := tt.rec.toPasskey(); got.RawFlags&flagBackupEligible != tt.want&flagBackupEligible {
+				t.Errorf("toPasskey().RawFlags backup-eligible bit = %t, want %t",
+					got.RawFlags&flagBackupEligible != 0, tt.want&flagBackupEligible != 0)
+			}
+		})
+	}
+}
+
+// The reconstruction has to survive a real decode, not just a struct literal:
+// the octet is absent from the stored JSON of a pre-field row, so this pins the
+// path an existing database actually takes.
+func TestPasskey_storedRowWithoutTheOctetReadsBackBackupEligible(t *testing.T) {
+	s := newPasskeyStore(t)
+	ctx := t.Context()
+
+	credID := []byte("pre-field-cred")
+	cred := sampleCred(9, credID, "synced")
+	cred.RawFlags = 0 // as a row written before pkRec carried the field
+	if err := s.CreatePasskey(ctx, cred); err != nil {
+		t.Fatalf("CreatePasskey: %v", err)
+	}
+
+	got, found, err := s.PasskeyByCredentialID(ctx, credID)
+	if err != nil || !found || got == nil {
+		t.Fatalf("PasskeyByCredentialID = (%+v, %t, %v), want the credential, true, nil", got, found, err)
+	}
+	want := flagUserPresent | flagUserVerified | flagBackupEligible | flagBackupState
+	if got.RawFlags != want {
+		t.Errorf("RawFlags after decoding a row with no octet = %#08b, want %#08b (rebuilt from the booleans)", got.RawFlags, want)
 	}
 }

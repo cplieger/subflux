@@ -52,65 +52,145 @@ import (
 // the clone-warning flag — so the credential round-trips through the bbolt
 // codec without loss (Requirement 9.5). The []byte fields marshal as base64.
 type pkRec struct {
-	CreatedAt       time.Time `json:"created_at"`
-	AttestationType string    `json:"attestation_type,omitempty"`
-	Transport       string    `json:"transport,omitempty"`
-	Name            string    `json:"name"`
-	CredentialID    []byte    `json:"credential_id"`
-	PublicKey       []byte    `json:"public_key"`
-	AAGUID          []byte    `json:"aaguid,omitempty"`
-	RawAttestation  []byte    `json:"raw_attestation,omitempty"`
-	ID              int64     `json:"id"`
-	UserID          int64     `json:"user_id"`
-	SignCount       uint32    `json:"sign_count"`
-	BackupEligible  bool      `json:"backup_eligible"`
-	BackupState     bool      `json:"backup_state"`
-	UserPresent     bool      `json:"user_present"`
-	UserVerified    bool      `json:"user_verified"`
-	CloneWarning    bool      `json:"clone_warning"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Discoverable is the credProps.rk output. A nil pointer means the client
+	// reported nothing, which the library treats as distinct from a reported
+	// false, so the pointer is persisted rather than flattened to a bool.
+	Discoverable *bool `json:"discoverable,omitempty"`
+
+	AttestationType string `json:"attestation_type,omitempty"`
+
+	// AttestationFormat is the attestation statement format identifier. Read by
+	// the library's metadata validation and by the FIDO AppID extension; both
+	// paths gate out early when unset, so a dropped value is latent rather than
+	// breaking, but it is still the authenticator's own report.
+	AttestationFormat string `json:"attestation_format,omitempty"`
+
+	Transport string `json:"transport,omitempty"`
+	Name      string `json:"name"`
+
+	// RPID is the relying party the credential was registered against. Stored so
+	// an RP-ID change can be audited against the credentials it orphans instead
+	// of silently invalidating them.
+	RPID string `json:"rp_id,omitempty"`
+
+	// Attachment is how the authenticator was attached at registration.
+	Attachment string `json:"attachment,omitempty"`
+
+	CredentialID   []byte `json:"credential_id"`
+	PublicKey      []byte `json:"public_key"`
+	AAGUID         []byte `json:"aaguid,omitempty"`
+	RawAttestation []byte `json:"raw_attestation,omitempty"`
+
+	ID        int64  `json:"id"`
+	UserID    int64  `json:"user_id"`
+	SignCount uint32 `json:"sign_count"`
+
+	// RawFlags is the authenticator-data flags octet and is the ONLY flag input
+	// the library reads. The four booleans below are the decoded view a consumer
+	// displays and filters on; dropping the octet restores every credential with
+	// all-false flags, and go-webauthn then refuses any assertion whose
+	// backup-eligible flag disagrees — which every synced passkey asserts.
+	RawFlags uint8 `json:"raw_flags,omitempty"`
+
+	BackupEligible bool `json:"backup_eligible"`
+	BackupState    bool `json:"backup_state"`
+	UserPresent    bool `json:"user_present"`
+	UserVerified   bool `json:"user_verified"`
+	CloneWarning   bool `json:"clone_warning"`
+}
+
+// Authenticator-data flag bit positions (WebAuthn §6.1, "Authenticator Data").
+// Declared locally rather than imported from go-webauthn: the auth v5 boundary
+// keeps that module out of this repo's own imports, and only these four bits are
+// ever reconstructed.
+const (
+	flagUserPresent    uint8 = 1 << 0
+	flagUserVerified   uint8 = 1 << 2
+	flagBackupEligible uint8 = 1 << 3
+	flagBackupState    uint8 = 1 << 4
+)
+
+// effectiveRawFlags returns the stored flags octet, rebuilt from the decoded
+// booleans when the row predates the field. A real registration always sets user
+// presence, so a zero octet means the row was written before the octet was
+// persisted, never that the authenticator reported no flags.
+//
+// Only the AT and ED bits are unrecoverable, and no decision reads them. The
+// branch is self-limiting: a row rewritten after this lands carries the octet,
+// so it can go once no pre-field rows remain.
+func (r *pkRec) effectiveRawFlags() uint8 {
+	if r.RawFlags != 0 {
+		return r.RawFlags
+	}
+	var f uint8
+	if r.UserPresent {
+		f |= flagUserPresent
+	}
+	if r.UserVerified {
+		f |= flagUserVerified
+	}
+	if r.BackupEligible {
+		f |= flagBackupEligible
+	}
+	if r.BackupState {
+		f |= flagBackupState
+	}
+	return f
 }
 
 // toPasskeyRec projects an auth.PasskeyCredential into its persisted form.
 func toPasskeyRec(c *auth.PasskeyCredential) pkRec {
 	return pkRec{
-		CreatedAt:       c.CreatedAt,
-		AttestationType: c.AttestationType,
-		Transport:       c.Transport,
-		Name:            c.Name,
-		CredentialID:    c.CredentialID,
-		PublicKey:       c.PublicKey,
-		AAGUID:          c.AAGUID,
-		RawAttestation:  c.RawAttestation,
-		ID:              c.ID,
-		UserID:          c.UserID,
-		SignCount:       c.SignCount,
-		BackupEligible:  c.BackupEligible,
-		BackupState:     c.BackupState,
-		UserPresent:     c.UserPresent,
-		UserVerified:    c.UserVerified,
-		CloneWarning:    c.CloneWarning,
+		CreatedAt:         c.CreatedAt,
+		AttestationType:   c.AttestationType,
+		AttestationFormat: c.AttestationFormat,
+		Transport:         c.Transport,
+		Name:              c.Name,
+		RPID:              c.RPID,
+		Attachment:        string(c.Attachment),
+		CredentialID:      c.CredentialID,
+		PublicKey:         c.PublicKey,
+		AAGUID:            c.AAGUID,
+		RawAttestation:    c.RawAttestation,
+		Discoverable:      c.Discoverable,
+		ID:                c.ID,
+		UserID:            c.UserID,
+		SignCount:         c.SignCount,
+		RawFlags:          c.RawFlags,
+		BackupEligible:    c.BackupEligible,
+		BackupState:       c.BackupState,
+		UserPresent:       c.UserPresent,
+		UserVerified:      c.UserVerified,
+		CloneWarning:      c.CloneWarning,
 	}
 }
 
 // toPasskey reconstructs the auth.PasskeyCredential from its persisted form.
 func (r *pkRec) toPasskey() *auth.PasskeyCredential {
 	return &auth.PasskeyCredential{
-		CreatedAt:       r.CreatedAt,
-		AttestationType: r.AttestationType,
-		Transport:       r.Transport,
-		Name:            r.Name,
-		CredentialID:    r.CredentialID,
-		PublicKey:       r.PublicKey,
-		AAGUID:          r.AAGUID,
-		RawAttestation:  r.RawAttestation,
-		ID:              r.ID,
-		UserID:          r.UserID,
-		SignCount:       r.SignCount,
-		BackupEligible:  r.BackupEligible,
-		BackupState:     r.BackupState,
-		UserPresent:     r.UserPresent,
-		UserVerified:    r.UserVerified,
-		CloneWarning:    r.CloneWarning,
+		CreatedAt:         r.CreatedAt,
+		AttestationType:   r.AttestationType,
+		AttestationFormat: r.AttestationFormat,
+		Transport:         r.Transport,
+		Name:              r.Name,
+		RPID:              r.RPID,
+		Attachment:        auth.AuthenticatorAttachment(r.Attachment),
+		CredentialID:      r.CredentialID,
+		PublicKey:         r.PublicKey,
+		AAGUID:            r.AAGUID,
+		RawAttestation:    r.RawAttestation,
+		Discoverable:      r.Discoverable,
+		ID:                r.ID,
+		UserID:            r.UserID,
+		SignCount:         r.SignCount,
+		RawFlags:          r.effectiveRawFlags(),
+		BackupEligible:    r.BackupEligible,
+		BackupState:       r.BackupState,
+		UserPresent:       r.UserPresent,
+		UserVerified:      r.UserVerified,
+		CloneWarning:      r.CloneWarning,
 	}
 }
 
