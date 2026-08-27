@@ -202,6 +202,12 @@ func mkUser(name string) *auth.User {
 // key, and a 16-byte AAGUID. A real passkey always carries these fields, so
 // always setting them keeps the suite engine-agnostic — an engine with NOT NULL
 // columns must never be the reason a case fails.
+//
+// RawFlags is set because it is the only flag input the library reads: an engine
+// that persists the four booleans and drops the octet restores every credential
+// with all-false flags, and go-webauthn then refuses any assertion whose
+// backup-eligible flag disagrees. The value is the synced-passkey shape
+// (UP|UV|BE|BS = bits 0, 2, 3, 4).
 func mkPasskey(userID int64, credID []byte, name string) *auth.PasskeyCredential {
 	return &auth.PasskeyCredential{
 		UserID:       userID,
@@ -209,6 +215,7 @@ func mkPasskey(userID int64, credID []byte, name string) *auth.PasskeyCredential
 		PublicKey:    []byte("pub-" + name),
 		AAGUID:       make([]byte, 16),
 		Name:         name,
+		RawFlags:     0b0001_1101,
 		SignCount:    0,
 	}
 }
