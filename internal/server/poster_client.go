@@ -58,7 +58,7 @@ func newPosterClient() *posterClient {
 func (c *posterClient) Do(req *http.Request) (*http.Response, error) {
 	state := &posterRedirectState{}
 	ctx := context.WithValue(req.Context(), posterRedirectStateKey{}, state)
-	resp, err := c.arr.Do(req.Clone(ctx))
+	resp, err := c.arr.Do(req.Clone(ctx)) // #nosec G704 -- arr origin is operator config; posterArrRedirectPolicy stops before any cross-origin send
 	if err != nil {
 		return nil, err
 	}
@@ -76,13 +76,13 @@ func (c *posterClient) Do(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("poster proxy: unsafe public redirect: %w", validateErr)
 	}
 
-	publicReq, err := http.NewRequestWithContext(ctx, http.MethodGet, nextURL.String(), http.NoBody)
+	publicReq, err := http.NewRequestWithContext(ctx, http.MethodGet, nextURL.String(), http.NoBody) // #nosec G704 -- nextURL passed ssrf.ValidateURL immediately above
 	if err != nil {
 		closePosterRedirect(resp.Body)
 		return nil, fmt.Errorf("poster proxy: build public request: %w", err)
 	}
 	closePosterRedirect(resp.Body)
-	return c.public.Do(publicReq)
+	return c.public.Do(publicReq) // #nosec G704 -- public client runs on ssrf.SafeTransport, which re-validates the resolved IP at dial
 }
 
 // posterArrRedirectPolicy keeps authenticated requests on the exact configured
