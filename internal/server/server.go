@@ -23,6 +23,7 @@ import (
 	"github.com/cplieger/auth/v5"
 	authoidc "github.com/cplieger/auth/v5/oidc"
 	"github.com/cplieger/auth/v5/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -42,7 +43,6 @@ import (
 	"github.com/cplieger/subflux/internal/server/synchandlers"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -300,7 +300,7 @@ func (s *Server) SetAuth(store AuthStore, rl ratelimit.Checker) error {
 		// Snapshot resolution: WebAuthn and OIDC ride the live state, so a
 		// hot config edit swaps what these return without re-wiring the
 		// handler (a direct field would stay stale forever).
-		WebAuthnResolver: func() *webauthn.WebAuthn { return s.state().webauthn },
+		WebAuthnResolver: func() *authwebauthn.RelyingParty { return s.state().webauthn },
 		OIDCResolver:     s.oidcProvider,
 		Ceremonies:       s.ceremonies,
 		Config: func() authhandlers.AuthConfig {

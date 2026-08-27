@@ -643,13 +643,41 @@ export interface SetupStatus {
   config_valid: boolean;
 }
 
-/** SignalData is the JSON response for GET /api/auth/webauthn/signal-data. */
-export interface SignalData {
-  rp_id: string;
-  user_id: string;
+/**
+ * SignalAllAcceptedCredentials is the payload for the client's
+ * signalAllAcceptedCredentials call: every credential this relying party still
+ * accepts for the user.
+ * //
+ * An EMPTY list is meaningful and is not the same as sending nothing — it tells
+ * the credential manager to remove every passkey it holds for this account,
+ * which is the correct signal after the last one is deleted server-side. It
+ * therefore always serializes as a JSON array, never as null.
+ */
+export interface SignalAllAcceptedCredentials {
+  rpId: string;
+  userId: string;
+  allAcceptedCredentialIds: string[];
+}
+
+/**
+ * SignalCurrentUserDetails is the payload for the client's
+ * signalCurrentUserDetails call: what the account is called now.
+ */
+export interface SignalCurrentUserDetails {
+  rpId: string;
   name: string;
-  display_name: string;
-  credential_ids: string[];
+  displayName: string;
+  userId: string;
+}
+
+/**
+ * Signals carries both reconciliation payloads for one user, derived together
+ * because both are read from the same account state and a client that sends one
+ * wants the other.
+ */
+export interface Signals {
+  currentUserDetails: SignalCurrentUserDetails;
+  allAcceptedCredentials: SignalAllAcceptedCredentials;
 }
 
 /** StateEntry represents a subtitle state record for API responses. */

@@ -30,9 +30,16 @@ import (
 // be64(id) as their value so a lookup is a single index walk plus one
 // dereference (no full-bucket scan):
 //
-//   - ix_user_name: asciiFold(username) -> be64(user_id). Case-insensitive
-//     username lookup AND the username uniqueness constraint. asciiFold matches
-//     SQLite's COLLATE NOCASE (ASCII A-Z only).
+//   - ix_user_name: auth.NormalizeUsername(username) -> be64(user_id). The
+//     case-insensitive username lookup AND the username uniqueness constraint.
+//     The auth library owns that rule (RFC 8265's PRECIS UsernameCaseMapped
+//     profile), and both the index write and the login lookup go through it, so
+//     the comparison happens on canonical forms at both ends. It folds case
+//     across the whole of Unicode, unlike the ASCII fold it replaced, and it
+//     refuses a username containing a space.
+//   - ix_user_handle: WebAuthn user handle -> be64(user_id). A discoverable
+//     passkey login arrives carrying only the handle, so this is the lookup that
+//     resolves it. Written for every account, minted at create time.
 //   - ix_user_oidc: issuer 0x00 sub -> be64(user_id), present only when
 //     oidc_sub != "" (mirrors the SQLite partial unique index
 //     `WHERE oidc_sub != ''`). The (issuer, sub) lookup and uniqueness.
@@ -60,8 +67,15 @@ type userRec struct {
 	Role         string    `json:"role"`
 	OIDCSub      string    `json:"oidc_sub,omitempty"`
 	OIDCIssuer   string    `json:"oidc_issuer,omitempty"`
-	ID           int64     `json:"id"`
-	Enabled      bool      `json:"enabled"`
+
+	// WebAuthnHandle is the account's WebAuthn user handle, the value a
+	// discoverable login arrives carrying. Persisted rather than derived because
+	// every passkey already registered is bound to the value in force at its
+	// registration; see the auth library's contract.
+	WebAuthnHandle []byte `json:"webauthn_handle,omitempty"`
+
+	ID      int64 `json:"id"`
+	Enabled bool  `json:"enabled"`
 }
 
 // toUserRec projects an auth.User into its persisted form.
@@ -76,8 +90,11 @@ func toUserRec(u *auth.User) userRec {
 		Role:         string(u.Role),
 		OIDCSub:      u.OIDCSub,
 		OIDCIssuer:   u.OIDCIssuer,
-		ID:           u.ID,
-		Enabled:      u.Enabled,
+
+		WebAuthnHandle: u.WebAuthnHandle,
+
+		ID:      u.ID,
+		Enabled: u.Enabled,
 	}
 }
 
@@ -93,8 +110,11 @@ func (r *userRec) toUser() *auth.User {
 		Role:         auth.Role(r.Role),
 		OIDCSub:      r.OIDCSub,
 		OIDCIssuer:   r.OIDCIssuer,
-		ID:           r.ID,
-		Enabled:      r.Enabled,
+
+		WebAuthnHandle: r.WebAuthnHandle,
+
+		ID:      r.ID,
+		Enabled: r.Enabled,
 	}
 }
 
@@ -107,11 +127,27 @@ func userKey(id int64) []byte {
 	return kv.Be64(uint64(id)) //nolint:gosec // G115: positive surrogate id from a monotonic sequence
 }
 
-// userNameIndexKey builds the ix_user_name key: asciiFold(username). The fold
-// gives the case-insensitive username lookup and uniqueness, matching SQLite's
-// COLLATE NOCASE.
-func userNameIndexKey(username string) []byte {
-	return []byte(asciiFold(username))
+// userNameIndexKey builds the ix_user_name key: auth.NormalizeUsername applied
+// to the username. That function decides whether two logins are the same
+// account, so the index key and the login lookup must both go through it — see
+// the auth library's store contract.
+//
+// It returns an error for a username the rule refuses (one containing a space is
+// the common case). A write must propagate that; a LOOKUP treats it as absence,
+// because a username the rule refuses cannot be in the index and answering
+// "not found" keeps a failed login indistinguishable from an unknown account.
+func userNameIndexKey(username string) ([]byte, error) {
+	normalized, err := auth.NormalizeUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(normalized), nil
+}
+
+// userHandleIndexKey builds the ix_user_handle key. The handle is already an
+// opaque byte string, so it is its own key.
+func userHandleIndexKey(handle []byte) []byte {
+	return handle
 }
 
 // userOIDCIndexKey builds the ix_user_oidc key: issuer 0x00 sub. Only written
@@ -201,8 +237,17 @@ func (s *Store) CreateUser(_ context.Context, user *auth.User) error {
 // index buckets before any write, yielding errConflict on a duplicate
 // (Requirement 9.3).
 func checkCreateUserUniqueness(tx *bbolt.Tx, user *auth.User) error {
-	if err := uniqueCheck(tx, bucketIxUserName, userNameIndexKey(user.Username)); err != nil {
+	nameKey, err := userNameIndexKey(user.Username)
+	if err != nil {
+		return fmt.Errorf("authstore: CreateUser: %w", err)
+	}
+	if err := uniqueCheck(tx, bucketIxUserName, nameKey); err != nil {
 		return err
+	}
+	if len(user.WebAuthnHandle) > 0 {
+		if err := uniqueCheck(tx, bucketIxUserHandle, userHandleIndexKey(user.WebAuthnHandle)); err != nil {
+			return err
+		}
 	}
 	if user.OIDCSub != "" {
 		if err := uniqueCheck(tx, bucketIxUserOIDC, userOIDCIndexKey(user.OIDCIssuer, user.OIDCSub)); err != nil {
@@ -229,7 +274,19 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 	}
 	user.UpdatedAt = user.CreatedAt
 	user.ID = id
+	// Every account needs a handle: a discoverable login arrives carrying only
+	// this value, and the specification forbids an empty one. Minted here rather
+	// than at each call site so no creation path can forget it.
+	if len(user.WebAuthnHandle) == 0 {
+		user.WebAuthnHandle = auth.GenerateWebAuthnHandle()
+	}
 
+	// Derived before the first write so a username the identity rule refuses
+	// fails before anything is put.
+	nameKey, err := userNameIndexKey(user.Username)
+	if err != nil {
+		return fmt.Errorf("authstore: CreateUser: %w", err)
+	}
 	rec := toUserRec(user)
 	enc, err := kv.Encode(&rec)
 	if err != nil {
@@ -239,7 +296,10 @@ func insertUser(tx *bbolt.Tx, ub *bbolt.Bucket, user *auth.User) error {
 	if err := ub.Put(key, enc); err != nil {
 		return fmt.Errorf("authstore: put user: %w", err)
 	}
-	if err := idxPut(tx, bucketIxUserName, userNameIndexKey(user.Username), key); err != nil {
+	if err := idxPut(tx, bucketIxUserName, nameKey, key); err != nil {
+		return err
+	}
+	if err := idxPut(tx, bucketIxUserHandle, userHandleIndexKey(user.WebAuthnHandle), key); err != nil {
 		return err
 	}
 	if user.OIDCSub != "" {
@@ -275,7 +335,28 @@ func (s *Store) UserByID(_ context.Context, id int64) (*auth.User, bool, error) 
 // UserByUsername looks up a user case-insensitively by username via
 // ix_user_name, reporting absence through found (Requirement 16.1).
 func (s *Store) UserByUsername(_ context.Context, username string) (*auth.User, bool, error) {
-	return s.userByIndex(bucketIxUserName, userNameIndexKey(username))
+	key, err := userNameIndexKey(username)
+	if err != nil {
+		// A username the identity rule refuses cannot be in the index, so this is
+		// absence rather than a failure — and answering it the same way as an
+		// unknown account keeps a failed login from revealing which it was.
+		return nil, false, nil
+	}
+	return s.userByIndex(bucketIxUserName, key)
+}
+
+// UserByWebAuthnHandle looks up a user by their WebAuthn user handle via
+// ix_user_handle, reporting absence through found. A discoverable passkey login
+// arrives carrying only the handle, so this is the lookup that resolves it.
+//
+// An unrecognized handle and a malformed one answer identically: the handle is an
+// opaque byte string with no shape to validate, and distinguishing the two would
+// let an unauthenticated caller probe which handles exist.
+func (s *Store) UserByWebAuthnHandle(_ context.Context, handle []byte) (*auth.User, bool, error) {
+	if len(handle) == 0 {
+		return nil, false, nil
+	}
+	return s.userByIndex(bucketIxUserHandle, userHandleIndexKey(handle))
 }
 
 // UserByEmail looks up a user case-insensitively by email, reporting absence
@@ -426,6 +507,12 @@ func (s *Store) UpdateUser(_ context.Context, user *auth.User) error {
 
 		user.CreatedAt = oldRec.CreatedAt
 		user.UpdatedAt = time.Now().UTC()
+		// The handle is store-owned: minted once at insert, indexed, and never
+		// caller-supplied. Restoring it from the stored record means a caller
+		// that passes a partially-populated user cannot blank it, which would
+		// strand the account's passkeys behind an index entry pointing at a row
+		// that no longer claims the handle.
+		user.WebAuthnHandle = oldRec.WebAuthnHandle
 		rec := toUserRec(user)
 		enc, err := kv.Encode(&rec)
 		if err != nil {
@@ -460,10 +547,15 @@ type userIndexUpdate struct {
 // against its index and yields errConflict on a collision (Requirement 9.3). An
 // unchanged username/identity is not re-checked, so a user keeps its own keys.
 func checkUpdateUserUniqueness(tx *bbolt.Tx, user *auth.User, oldRec *userRec) (userIndexUpdate, error) {
-	idx := userIndexUpdate{
-		newNameKey: userNameIndexKey(user.Username),
-		oldNameKey: userNameIndexKey(oldRec.Username),
+	newNameKey, err := userNameIndexKey(user.Username)
+	if err != nil {
+		return userIndexUpdate{}, fmt.Errorf("authstore: UpdateUser: %w", err)
 	}
+	oldNameKey, err := userNameIndexKey(oldRec.Username)
+	if err != nil {
+		return userIndexUpdate{}, fmt.Errorf("authstore: UpdateUser: stored username %q: %w", oldRec.Username, err)
+	}
+	idx := userIndexUpdate{newNameKey: newNameKey, oldNameKey: oldNameKey}
 	idx.nameChanged = !bytes.Equal(idx.newNameKey, idx.oldNameKey)
 	if idx.nameChanged {
 		if err := uniqueCheck(tx, bucketIxUserName, idx.newNameKey); err != nil {
@@ -563,8 +655,17 @@ func deleteUserAndIndexes(tx *bbolt.Tx, ub *bbolt.Bucket, key []byte, rec *userR
 	if err := ub.Delete(key); err != nil {
 		return fmt.Errorf("authstore: delete user: %w", err)
 	}
-	if err := idxDelete(tx, bucketIxUserName, userNameIndexKey(rec.Username)); err != nil {
+	nameKey, err := userNameIndexKey(rec.Username)
+	if err != nil {
+		return fmt.Errorf("authstore: DeleteUser: stored username %q: %w", rec.Username, err)
+	}
+	if err := idxDelete(tx, bucketIxUserName, nameKey); err != nil {
 		return err
+	}
+	if len(rec.WebAuthnHandle) > 0 {
+		if err := idxDelete(tx, bucketIxUserHandle, userHandleIndexKey(rec.WebAuthnHandle)); err != nil {
+			return err
+		}
 	}
 	if rec.OIDCSub != "" {
 		return idxDelete(tx, bucketIxUserOIDC, userOIDCIndexKey(rec.OIDCIssuer, rec.OIDCSub))

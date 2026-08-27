@@ -19,6 +19,9 @@ type AccountStore interface {
 	CreateUser(ctx context.Context, user *auth.User) error
 	UserByID(ctx context.Context, id int64) (user *auth.User, found bool, err error)
 	UserByUsername(ctx context.Context, username string) (user *auth.User, found bool, err error)
+	// UserByWebAuthnHandle resolves the asserting account during a
+	// discoverable login: the assertion carries a user handle, not a username.
+	UserByWebAuthnHandle(ctx context.Context, handle []byte) (user *auth.User, found bool, err error)
 	UpdateUser(ctx context.Context, user *auth.User) error
 	ListUsers(ctx context.Context) ([]auth.User, error)
 	UserCount(ctx context.Context) (int, error)

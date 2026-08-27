@@ -13,10 +13,10 @@ import (
 	"github.com/cplieger/auth/v5"
 	authoidc "github.com/cplieger/auth/v5/oidc"
 	"github.com/cplieger/auth/v5/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/cplieger/webhttp/v2"
-	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 // AuthConfig is the authentication half of the configuration, and the only
@@ -41,12 +41,12 @@ type Handler struct {
 	SecDB       SecurityStore
 	OidcDB      OIDCStore
 	RateLimiter ratelimit.Checker
-	// WebAuthnResolver resolves the current WebAuthn instance from the live
+	// WebAuthnResolver resolves the current relying party from the live
 	// snapshot per request (may resolve nil: RP ID unset or construction
 	// degraded). A direct field would freeze the boot-time instance across
 	// hot config edits; the resolver is the same seam OIDCResolver and
 	// Config already use.
-	WebAuthnResolver func() *webauthn.WebAuthn
+	WebAuthnResolver func() *authwebauthn.RelyingParty
 	OIDCResolver     func() *authoidc.Provider
 	Ceremonies       *CeremonyStore
 	Config           func() AuthConfig // returns current config (hot-reloadable)
@@ -217,35 +217,36 @@ func ValidateAndHashPassword(ctx context.Context, check PasswordCheck, client *h
 	return PasswordHash(auth.HashPassword(check.Password)), "", nil
 }
 
-// requireWebAuthn resolves the current WebAuthn instance from the live
-// snapshot, writing a 400 error and returning ok=false when WebAuthn is not
-// configured (no RP ID, cold-boot degrade, or no resolver wired in tests).
-func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*webauthn.WebAuthn, bool) {
-	var wa *webauthn.WebAuthn
+// requireWebAuthn resolves the current relying party from the live snapshot,
+// writing a 400 error and returning ok=false when WebAuthn is not configured
+// (no RP ID, cold-boot degrade, or no resolver wired in tests).
+func (h *Handler) requireWebAuthn(w http.ResponseWriter) (*authwebauthn.RelyingParty, bool) {
+	var rp *authwebauthn.RelyingParty
 	if h.WebAuthnResolver != nil {
-		wa = h.WebAuthnResolver()
+		rp = h.WebAuthnResolver()
 	}
-	if wa == nil {
+	if rp == nil {
 		httpapi.BadRequestC(w, nil, subflux.CodeBadRequest, "WebAuthn not configured")
 		return nil, false
 	}
-	return wa, true
+	return rp, true
 }
 
 // consumeWebAuthnSession reads the session token from the request header,
-// consumes it from the ceremony store, and writes an error response on failure.
-func (h *Handler) consumeWebAuthnSession(w http.ResponseWriter, r *http.Request) *webauthn.SessionData {
+// consumes the ceremony it names from the ceremony store, and writes an error
+// response on failure.
+func (h *Handler) consumeWebAuthnSession(w http.ResponseWriter, r *http.Request) (authwebauthn.Ceremony, bool) {
 	sessionToken := r.Header.Get(HeaderWebAuthnSession)
 	if sessionToken == "" {
 		httpapi.BadRequestC(w, r, subflux.CodeBadRequest, "missing session token")
-		return nil
+		return authwebauthn.Ceremony{}, false
 	}
-	sessData := h.Ceremonies.ConsumeWebAuthnSession(sessionToken)
-	if sessData == nil {
+	ceremony, found := h.Ceremonies.ConsumeWebAuthnSession(sessionToken)
+	if !found {
 		httpapi.UnauthorizedC(w, r, subflux.CodeWebAuthnSessionInvalid, "invalid or expired session")
-		return nil
+		return authwebauthn.Ceremony{}, false
 	}
-	return sessData
+	return ceremony, true
 }
 
 // extractPathSegment extracts a path segment between prefix and suffix.

@@ -15,7 +15,7 @@
 // production code feature-detects them precisely because that varies.
 // `unstubGlobals` in vitest.config undoes each stub after the test.
 import { describe, it, expect, vi, onTestFinished } from "vitest";
-import type { SignalData } from "./wire/types.gen.js";
+import type { Signals } from "./wire/types.gen.js";
 import {
   bufferToBase64url,
   requestOptionsFromJSON,
@@ -27,7 +27,7 @@ import {
 // is a plain function over a hoisted record (the pattern security.test.ts
 // uses for the same module).
 const wire = vi.hoisted(() => ({
-  data: null as SignalData | null,
+  data: null as Signals | null,
   reads: 0,
 }));
 vi.mock("./wire/client.gen.js", () => ({
@@ -46,14 +46,21 @@ function bytesOf(buf: ArrayBuffer | BufferSource): number[] {
 const ALPHABET_BYTES = [0xfb, 0xff];
 const ALPHABET_B64URL = "-_8";
 
-function signalData(over: Partial<SignalData> = {}): SignalData {
+/** The server derives these payloads in the browser API's own shape, so the
+ *  fixture is what the wire actually carries. */
+function signalData(): Signals {
   return {
-    rp_id: "subflux.example.com",
-    user_id: "dXNlci0x",
-    name: "admin",
-    display_name: "Administrator",
-    credential_ids: ["Y3JlZC1h", "Y3JlZC1i"],
-    ...over,
+    allAcceptedCredentials: {
+      rpId: "subflux.example.com",
+      userId: "dXNlci0x",
+      allAcceptedCredentialIds: ["Y3JlZC1h", "Y3JlZC1i"],
+    },
+    currentUserDetails: {
+      rpId: "subflux.example.com",
+      userId: "dXNlci0x",
+      name: "admin",
+      displayName: "Administrator",
+    },
   };
 }
 
@@ -172,7 +179,7 @@ describe("sendWebAuthnSignals", () => {
     expect(current).not.toHaveBeenCalled();
   });
 
-  it("maps the wire fields onto both signal calls", async () => {
+  it("hands each payload to its own signal call, not the other's", async () => {
     const all = vi.fn(() => Promise.resolve());
     const current = vi.fn(() => Promise.resolve());
     stubCredential({ signalAllAcceptedCredentials: all, signalCurrentUserDetails: current });

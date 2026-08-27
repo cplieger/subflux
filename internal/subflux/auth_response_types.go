@@ -36,15 +36,6 @@ type WebAuthnUnknownCredentialResponse struct {
 	Signal string `json:"signal"`
 }
 
-// SignalData is the JSON response for GET /api/auth/webauthn/signal-data.
-type SignalData struct {
-	RPID          string   `json:"rp_id"`
-	UserID        string   `json:"user_id"`
-	Name          string   `json:"name"`
-	DisplayName   string   `json:"display_name"`
-	CredentialIDs []string `json:"credential_ids"`
-}
-
 // PasskeyRegistered is the JSON response after successful passkey registration.
 type PasskeyRegistered struct {
 	CreatedAt time.Time `json:"created_at"`

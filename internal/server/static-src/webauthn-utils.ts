@@ -2,7 +2,7 @@
 // Single source of truth; imported by login.ts and security.ts.
 
 import { webauthnSignalData } from "./wire/client.gen.js";
-import type { SignalData } from "./wire/types.gen.js";
+import type { Signals } from "./wire/types.gen.js";
 
 function base64urlToBuffer(b64: string): ArrayBuffer {
   const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
@@ -84,8 +84,8 @@ async function sendOne(send: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** Fetch the reconciliation payload, or null when there is nothing to signal. */
-async function signalData(): Promise<SignalData | null> {
+/** Fetch the reconciliation payloads, or null when there is nothing to signal. */
+async function signalData(): Promise<Signals | null> {
   try {
     return await webauthnSignalData();
   } catch {
@@ -112,29 +112,17 @@ export async function sendWebAuthnSignals(): Promise<void> {
   // Independent rather than sequential. Each call carries a different fact,
   // and Safari can hang or reject one of them; awaiting them in series let
   // either outcome suppress the signal behind it.
+  //
+  // The server derives these payloads in the browser API's own shape, so they
+  // pass straight through — no field remapping to drift out of step with it.
   const sent: Promise<void>[] = [];
   if (typeof PublicKeyCredential.signalAllAcceptedCredentials === "function") {
     sent.push(
-      sendOne(() =>
-        PublicKeyCredential.signalAllAcceptedCredentials({
-          rpId: data.rp_id,
-          userId: data.user_id,
-          allAcceptedCredentialIds: [...data.credential_ids],
-        }),
-      ),
+      sendOne(() => PublicKeyCredential.signalAllAcceptedCredentials(data.allAcceptedCredentials)),
     );
   }
   if (typeof PublicKeyCredential.signalCurrentUserDetails === "function") {
-    sent.push(
-      sendOne(() =>
-        PublicKeyCredential.signalCurrentUserDetails({
-          rpId: data.rp_id,
-          userId: data.user_id,
-          name: data.name,
-          displayName: data.display_name,
-        }),
-      ),
-    );
+    sent.push(sendOne(() => PublicKeyCredential.signalCurrentUserDetails(data.currentUserDetails)));
   }
   await Promise.all(sent);
 }
