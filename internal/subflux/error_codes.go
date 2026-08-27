@@ -59,6 +59,7 @@ const (
 const (
 	CodeWebAuthnSessionInvalid    ErrorCode = "webauthn_session_invalid"
 	CodeWebAuthnRegisterFailed    ErrorCode = "webauthn_register_failed"
+	CodeWebAuthnNotDiscoverable   ErrorCode = "webauthn_not_discoverable"
 	CodeWebAuthnAssertionFailed   ErrorCode = "webauthn_assertion_failed"
 	CodeWebAuthnUnsupportedOrigin ErrorCode = "webauthn_unsupported_origin"
 )
