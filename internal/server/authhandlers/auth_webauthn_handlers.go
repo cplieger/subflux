@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v4"
-	authwebauthn "github.com/cplieger/auth/v4/webauthn"
+	"github.com/cplieger/auth/v5"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 	"github.com/go-webauthn/webauthn/protocol"

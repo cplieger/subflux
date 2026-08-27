@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cplieger/auth/v4"
-	authoidc "github.com/cplieger/auth/v4/oidc"
-	authwebauthn "github.com/cplieger/auth/v4/webauthn"
+	"github.com/cplieger/auth/v5"
+	authoidc "github.com/cplieger/auth/v5/oidc"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"

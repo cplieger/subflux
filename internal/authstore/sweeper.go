@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 )
 
 // This file holds the background sweeper that evicts expired sessions and OIDC

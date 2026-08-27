@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cplieger/auth/v4"
-	authoidc "github.com/cplieger/auth/v4/oidc"
-	"github.com/cplieger/auth/v4/ratelimit"
+	"github.com/cplieger/auth/v5"
+	authoidc "github.com/cplieger/auth/v5/oidc"
+	"github.com/cplieger/auth/v5/ratelimit"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"

@@ -51,7 +51,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cplieger/auth/v4"
+	"github.com/cplieger/auth/v5"
 )
 
 // SPI is the full auth persistence surface this contract suite exercises: the

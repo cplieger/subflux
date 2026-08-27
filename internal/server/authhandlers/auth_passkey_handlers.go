@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cplieger/auth/v4"
-	"github.com/cplieger/auth/v4/ratelimit"
-	authwebauthn "github.com/cplieger/auth/v4/webauthn"
+	"github.com/cplieger/auth/v5"
+	"github.com/cplieger/auth/v5/ratelimit"
+	authwebauthn "github.com/cplieger/auth/v5/webauthn"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 )
