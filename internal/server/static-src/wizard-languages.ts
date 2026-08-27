@@ -1,7 +1,7 @@
 // wizard-languages.ts — Extracted wizard languages step.
 
 import { $ } from "./dom-core.js";
-import { el } from "./dom.js";
+import { el, withHelp } from "./dom.js";
 import { DEFAULT_VARIANT } from "./constants.js";
 import { type WizardStep, langRules, langDefault, langSelect, variantSelect } from "./wizard.js";
 
@@ -41,14 +41,16 @@ export function buildLanguagesStep(): WizardStep {
         ),
       );
 
-      const ruleTitle = el(
-        "div",
-        {
-          className: "wiz-lang-section-title",
-          style: "margin-block-start:var(--sp-5)",
-          "data-tip": "Override defaults for specific audio languages",
-        },
-        "Audio-specific rules (optional)",
+      const ruleTitle = withHelp(
+        el(
+          "div",
+          {
+            className: "wiz-lang-section-title",
+            style: "margin-block-start:var(--sp-5)",
+          },
+          "Audio-specific rules (optional)",
+        ),
+        "Override defaults for specific audio languages",
       );
       container.appendChild(ruleTitle);
 

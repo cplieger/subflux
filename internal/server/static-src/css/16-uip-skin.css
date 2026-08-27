@@ -98,6 +98,30 @@
   cursor: help;
 }
 
+/* The marker for a help tooltip: a superscript "?" after a form label's text,
+ * built by dom.ts's withHelp. One affordance for the settings dialog and the
+ * setup wizard, which render the same schema `help` field.
+ *
+ * It must stay INLINE content, which is why the labels that host it are not
+ * flex containers: a flex item ignores vertical-align, so the glyph would sit
+ * on the baseline. */
+.help-mark {
+  /* Raise by PAINTING, not by layout: `vertical-align: super` (the UA default
+   * for <sup>) lifts the inline box itself, and the line box then grows to
+   * contain it — a marked label measured 22.5px against a bare one's 19.2px,
+   * which shows as a 2.5px row-height difference on the toggle rows, whose
+   * 20px slider is otherwise the tallest thing in the row. Baseline alignment
+   * plus a relative offset keeps the glyph where a superscript belongs and out
+   * of the line-box calculation. `font-size: smaller` stays inherited. */
+  vertical-align: baseline;
+  position: relative;
+  inset-block-start: -0.4em;
+  margin-inline-start: 0.0625rem;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 0;
+}
+
 .uip-tooltip {
   background: var(--surface);
   color: var(--text);

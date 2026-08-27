@@ -200,16 +200,31 @@ describe("arr step", () => {
     expect(input("wiz-radarr-url").value).toBe("");
   });
 
-  it("hangs a field's help text on the label, with nothing else to hover", async () => {
+  it("marks a field's help with a decorative superscript on the label", async () => {
     const host = await boot({ sections: { sonarr: { url: "http://sonarr:8989" } } });
 
     buildArrStep().render(host);
 
     const label = host.querySelector<HTMLLabelElement>('label[for="wiz-sonarr-url"]');
     expect(label?.getAttribute("data-tip")).toBe("Internal hostname or IP:port");
-    expect(label?.textContent).toBe("URL");
-    expect(host.querySelectorAll("[data-tip] *").length).toBe(0);
+    const mark = label?.querySelector("sup.help-mark");
+    expect(mark?.textContent).toBe("?");
+    // Decorative, so the label's accessible name stays the field's own.
+    expect(mark?.getAttribute("aria-hidden")).toBe("true");
+    // One tooltip per field: the marker is not a second anchor, and the input
+    // is not one either.
+    expect(mark?.hasAttribute("data-tip")).toBe(false);
     expect(input("wiz-sonarr-url").hasAttribute("data-tip")).toBe(false);
+  });
+
+  it("leaves a field with no help text unmarked", async () => {
+    const host = await boot({ sections: { sonarr: { url: "http://sonarr:8989" } } });
+
+    buildArrStep().render(host);
+
+    const label = host.querySelector<HTMLLabelElement>('label[for="wiz-sonarr-api_key"]');
+    expect(label?.hasAttribute("data-tip")).toBe(false);
+    expect(label?.querySelector("sup")).toBeNull();
   });
 
   it("renders a stored secret as a keep-placeholder, never as a value", async () => {
@@ -457,11 +472,22 @@ describe("search step", () => {
     expect(row?.hidden).toBe(false);
   });
 
+  it("names a boolean row's checkbox with its visible label", async () => {
+    const host = await boot();
+
+    buildSearchStep().render(host);
+
+    // The .wiz-toggle wrapper is text-free, so without `for` the checkbox has
+    // no accessible name at all.
+    expect(
+      [...(input("wiz-search-upgrade_enabled").labels ?? [])].map((l) => l.textContent),
+    ).toContain("Upgrade");
+  });
+
   it("shows the upgrade window immediately when the config enables upgrades", async () => {
     const host = await boot({ sections: { search: { upgrade_enabled: true } } });
 
     buildSearchStep().render(host);
-
     expect(document.getElementById("wiz-search-upgrade-window-row")?.hidden).toBe(false);
   });
 

@@ -59,6 +59,23 @@ beforeEach(() => {
 });
 
 describe("language builder round trip", () => {
+  it("names every language and variant select, so none is announced bare", () => {
+    const host = mount({
+      rules: [{ audio: "ja", subtitles: [{ code: "en", variant: "forced" }] }],
+      default: [{ code: "en" }],
+    });
+
+    // These rows caption their selects with a layout element, not a <label>,
+    // so the name has to be an aria-label (axe `select-name`, critical).
+    const unnamed = [...host.querySelectorAll("select")].filter(
+      (s) => !s.getAttribute("aria-label") && (s.labels?.length ?? 0) === 0,
+    );
+    expect(unnamed).toStrictEqual([]);
+    expect(
+      host.querySelector(".lang-rule .lang-row .lang-select")?.getAttribute("aria-label"),
+    ).toBe("Audio language");
+  });
+
   it("serialises a rendered rules + defaults config back to the same value", () => {
     const lr: LanguageRules = {
       rules: [

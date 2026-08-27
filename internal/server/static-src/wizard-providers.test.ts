@@ -133,6 +133,16 @@ describe("providers step: rendering", () => {
     ]);
   });
 
+  it("names each enable checkbox with its provider, so it is not announced bare", async () => {
+    await boot({});
+
+    // The .wiz-toggle wrapper holds only the slider span, so the visible
+    // provider name is the checkbox's only possible accessible name.
+    expect([...(checkbox("wiz-prov-subdl").labels ?? [])].map((l) => l.textContent)).toContain(
+      "SubDL",
+    );
+  });
+
   it("comes up unchecked and collapsed for a provider the config does not mention", async () => {
     const host = await boot({});
 

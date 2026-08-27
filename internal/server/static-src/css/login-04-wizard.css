@@ -30,13 +30,12 @@
   margin-block: var(--sp-5) var(--sp-4);
 }
 
-.wiz-adaptive-header > span {
+/* The title is a <label for> so the row's checkbox has an accessible name, so
+ * exclude the .wiz-toggle wrapper label from the title rule. */
+.wiz-adaptive-header > label:not(.wiz-toggle) {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   flex: 1;
 }
 
@@ -146,15 +145,14 @@
  * their inputs at the same column. It has to clear the longest label the schema
  * ships ("Streaming Service", 108px in the sidecar's face and 118px in DejaVu
  * Sans at this size) — a label wider than the floor grows and takes its own
- * input with it, which is what pushed the scoring step's box out of line. */
+ * input with it, which is what pushed the scoring step's box out of line.
+ * NOT a flex container: the help marker is a <sup>, and a flex item ignores
+ * vertical-align (16-uip-skin.css, .help-mark). */
 .wiz-field label:not(.wiz-toggle) {
   min-width: 7.5rem;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-2);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
 }
 
 .wiz-field:has(> .wiz-toggle) label:not(.wiz-toggle) {
@@ -192,13 +190,14 @@
    10. Info tooltip
    ================================================================ */
 
-/* A field's help text is a data-tip on its own label, read by the delegated
- * @cplieger/ui-primitives tooltip (initTooltips in login.ts) exactly as the
- * settings dialog does it; the help cursor that marks the trigger lives with
- * the tooltip skin in 16-uip-skin.css, which both bundles load. The `.wiz-info`
+/* A field's help text is a data-tip on its own label plus a superscript "?"
+ * marker, both applied by dom.ts's withHelp and shared with the settings
+ * dialog. The marker's styling and the trigger's help cursor live with the
+ * tooltip skin in 16-uip-skin.css, which both bundles load; 03-components.css
+ * is app-only, so a rule left there reaches no wizard label. The `.wiz-info`
  * circle that used to carry it is gone: el() writes an unknown string prop as
- * an attribute, so its `textContent: "i"` became textcontent="i" and the circle
- * painted empty. */
+ * an attribute, so its `textContent: "i"` became textcontent="i" and the
+ * circle painted empty. */
 
 /* ================================================================
    11. Arr subsection
@@ -276,9 +275,6 @@
   font-weight: 600;
   color: var(--text);
   margin-block-end: var(--sp-3);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
 }
 
 .wiz-lang-row {

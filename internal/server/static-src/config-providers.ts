@@ -45,8 +45,12 @@ export function renderProvidersSection(schema: SchemaSection): HTMLElement {
     // block is disabled (same as the old per-provider text blocks).
     const isEnabled = block !== undefined && block.enabled !== false;
 
-    const headerItems: HTMLElement[] = [el("span", null, prov.label)];
-    headerItems.push(cfgToggle(`cfg-prov-${prov.name}-enabled`, isEnabled));
+    // A <label for> rather than a span: the .toggle wrapper holds only the
+    // slider, so the provider name is the enable checkbox's only possible
+    // accessible name (axe `label`, critical, one node per provider).
+    const toggleId = `cfg-prov-${prov.name}-enabled`;
+    const headerItems: HTMLElement[] = [el("label", { for: toggleId }, prov.label)];
+    headerItems.push(cfgToggle(toggleId, isEnabled));
     card.appendChild(el("div", { className: "provider-head" }, ...headerItems));
 
     // Region-only disclosure (the header checkbox is the visible control):

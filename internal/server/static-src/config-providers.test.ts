@@ -6,8 +6,9 @@
 // set. A regression here is silent: the dialog renders the wrong state and the
 // next save writes it back as a deliberate choice.
 import { describe, it, expect } from "vitest";
-import { providerFieldValue } from "./config-providers.js";
-import type { SchemaField } from "./api-types.js";
+import { providerFieldValue, renderProvidersSection } from "./config-providers.js";
+import { setCfgSections } from "./config-values.js";
+import type { SchemaField, SchemaSection } from "./api-types.js";
 
 const boolDefaultTrue: SchemaField = {
   key: "use_hash",
@@ -98,4 +99,24 @@ describe("providerFieldValue", () => {
       expect(providerFieldValue(tc.field, tc.settings)).toBe(tc.want);
     });
   }
+});
+
+describe("renderProvidersSection", () => {
+  it("names each provider's enable toggle with the provider", () => {
+    setCfgSections({});
+    const schema: SchemaSection = {
+      key: "providers",
+      title: "Providers",
+      type: "providers",
+      providers: [{ name: "subdl", label: "SubDL" }],
+    };
+
+    const host = renderProvidersSection(schema);
+    document.body.replaceChildren(host);
+
+    // The .toggle wrapper holds only the slider, so the card's visible name is
+    // this checkbox's only possible accessible name.
+    const cb = host.querySelector<HTMLInputElement>("#cfg-prov-subdl-enabled");
+    expect([...(cb?.labels ?? [])].map((l) => l.textContent)).toContain("SubDL");
+  });
 });

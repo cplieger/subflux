@@ -99,6 +99,14 @@ describe("cfgField", () => {
     expect(inputOf(host).hasAttribute("data-tip")).toBe(false);
   });
 
+  it("marks the label with the same decorative superscript the wizard uses", () => {
+    const host = mount(cfgField("cfg-x-y", "URL", "text", "", "", "what this does"));
+
+    const mark = host.querySelector("label sup.help-mark");
+    expect(mark?.textContent).toBe("?");
+    expect(mark?.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("opts the input out of password-manager autofill", () => {
     // These attributes are why the drawer's secrets are type=text with CSS
     // masking; losing them lets a manager overwrite a stored credential.
@@ -156,6 +164,26 @@ describe("renderField dispatch", () => {
     const sel = host.querySelector("select");
     expect([...(sel?.options ?? [])].map((o) => o.value)).toStrictEqual(["info", "debug"]);
     expect(sel?.value).toBe("debug");
+  });
+
+  it("points a select's label at the select, so it is not announced bare", () => {
+    const host = mount(
+      renderField(
+        "cfg-s-level",
+        field({
+          key: "level",
+          label: "Level",
+          type: "select",
+          options: [{ value: "info", label: "Info" }],
+        }),
+        "info",
+      ),
+    );
+
+    // The row builder is handed a ready-made control, so the association has
+    // to be read off the element rather than passed in.
+    const sel = host.querySelector<HTMLSelectElement>("select");
+    expect([...(sel?.labels ?? [])].map((l) => l.textContent)).toContain("Level");
   });
 
   it("falls back to the schema default when a select has no current value", () => {
@@ -304,6 +332,40 @@ describe("renderFieldsSection", () => {
     expect(host.querySelectorAll("#cfg-adaptive-enabled")).toHaveLength(1);
     expect(host.querySelector(".cfg-title #cfg-adaptive-enabled")).not.toBeNull();
     expect(host.querySelector<HTMLInputElement>("#cfg-adaptive-enabled")?.checked).toBe(false);
+  });
+
+  it("names the header toggle with the section title", () => {
+    const schema: SchemaSection = {
+      key: "adaptive",
+      title: "Adaptive",
+      type: "fields",
+      enable_key: "enabled",
+      fields: [field({ key: "enabled", type: "bool" })],
+    };
+
+    const host = mount(renderFieldsSection(schema, null));
+
+    // The .toggle wrapper holds only the slider, so the title is this
+    // checkbox's only possible accessible name.
+    const cb = host.querySelector<HTMLInputElement>("#cfg-adaptive-enabled");
+    expect([...(cb?.labels ?? [])].map((l) => l.textContent)).toContain("Adaptive");
+  });
+
+  it("names a group header toggle with the field's label", () => {
+    const schema: SchemaSection = {
+      key: "search",
+      title: "Search",
+      type: "fields",
+      fields: [
+        field({ key: "upgrade_enabled", label: "Upgrades", type: "bool", group: "upgrades" }),
+        field({ key: "upgrade_window_days", type: "number", group: "upgrades" }),
+      ],
+    };
+
+    const host = mount(renderFieldsSection(schema, null));
+
+    const cb = host.querySelector<HTMLInputElement>("#cfg-search-upgrade_enabled");
+    expect([...(cb?.labels ?? [])].map((l) => l.textContent)).toContain("Upgrades");
   });
 
   it("treats an omitted enable_key value as enabled", () => {

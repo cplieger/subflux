@@ -25,6 +25,26 @@ export function icon(name: string): HTMLElement {
   return el("span", { className: `icon icon-${name}` });
 }
 
+/** withHelp marks a form label as carrying help text and returns it. The
+ *  tooltip anchors on the whole label; a superscript "?" tells the reader
+ *  there is one, since a hover-only affordance nothing marks is a hover
+ *  nobody tries. The settings dialog and the setup wizard render the same
+ *  schema `help` field, so both go through here rather than each inventing a
+ *  marker — the wizard's own was a bordered circle that shipped empty.
+ *
+ *  The glyph is aria-hidden because it names nothing: the label keeps its
+ *  accessible name, and the tooltip primitive announces the text through the
+ *  anchor's aria-describedby. An absent tip is a no-op, so a call site stays
+ *  one line. Styling (and the trigger's help cursor) is in 16-uip-skin.css,
+ *  the one CSS split both bundles load. */
+export function withHelp<T extends HTMLElement>(label: T, tip: string | undefined): T {
+  if (tip) {
+    label.setAttribute("data-tip", tip);
+    label.appendChild(el("sup", { className: "help-mark", "aria-hidden": "true" }, "?"));
+  }
+  return label;
+}
+
 export function emptyDiv(msg: string): HTMLElement {
   return el("div", { className: "empty" }, msg);
 }
