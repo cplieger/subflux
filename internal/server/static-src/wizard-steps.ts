@@ -5,7 +5,7 @@
 
 import { validateConfigPath } from "./wire/client.gen.js";
 import { $ } from "./dom-core.js";
-import { el } from "./dom.js";
+import { el, withHelp } from "./dom.js";
 import { connTestControl } from "./conn-test.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import type { SchemaField, SchemaSection } from "./api-types.js";
@@ -325,12 +325,12 @@ export function buildSearchStep(): WizardStep {
       }
 
       if (adaptive?.fields) {
-        const titleSpan = el(
-          "span",
-          {
-            "data-tip": "Gradually increases delay between retries when no subtitles are found",
-          },
-          "Adaptive Backoff",
+        // A <label for> rather than a span, for the same reason the provider
+        // cards use one: the .wiz-toggle wrapper is text-free, so the section
+        // title is this checkbox's only possible accessible name.
+        const titleSpan = withHelp(
+          el("label", { for: "wiz-adaptive-enabled" }, "Adaptive Backoff"),
+          "Gradually increases delay between retries when no subtitles are found",
         );
 
         const enabledVal = savedAdaptive["enabled"];

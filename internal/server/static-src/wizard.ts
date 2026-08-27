@@ -20,7 +20,7 @@ import {
 import { apiAction, retryNetwork, RETRY_STANDARD, registerCleanup } from "@cplieger/actions";
 import { LANGUAGES } from "./languages.js";
 import { $, showPage, showError, hideError } from "./dom-core.js";
-import { el, option } from "./dom.js";
+import { el, option, withHelp } from "./dom.js";
 import { SUBTITLE_VARIANTS, YAML_TIMEOUT_MS, DEFAULT_VARIANT, SETUP_PATH } from "./constants.js";
 import type { SchemaSection } from "./api-types.js";
 import type { StructuredConfig } from "./wire/types.gen.js";
@@ -193,14 +193,13 @@ function clearDraft(): void {
 
 // --- Shared field builders (consumed by the step modules) ---
 //
-// A field's schema `help` text rides on the LABEL as data-tip, the same
-// carrier the settings dialog uses (config-renderers.ts, pinned by
-// config-renderers.test.ts). The wizard used to append a bordered "i" circle
-// per field instead; it rendered EMPTY, because el() writes an unknown string
-// prop as an attribute, so `textContent: "i"` became textcontent="i" and the
-// glyph never existed. Two patterns for one concern, and the broken one also
-// added 20px to every label, which pushed the input out of line on any label
-// wider than the min-width floor.
+// A field's schema `help` text goes through dom.ts's withHelp, the one carrier
+// for both this wizard and the settings dialog. The wizard used to append its
+// own bordered "i" circle per field; it rendered EMPTY, because el() writes an
+// unknown string prop as an attribute, so `textContent: "i"` became
+// textcontent="i" and the glyph never existed. Two patterns for one concern,
+// and the broken one also added 20px to every label, which pushed the input
+// out of line on any label wider than the min-width floor.
 
 export function wizField(
   id: string,
@@ -210,10 +209,7 @@ export function wizField(
   placeholder: string,
   tip: string | undefined,
 ): HTMLElement {
-  const lbl = el("label", { for: id }, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
+  const lbl = withHelp(el("label", { for: id }, label), tip);
   const inp = el("input", {
     type: type === "number" ? "number" : "text",
     id,
@@ -235,10 +231,11 @@ export function wizToggle(
   checked: boolean,
   tip: string | undefined,
 ): HTMLElement {
-  const lbl = el("label", null, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
+  // `for` is what gives the checkbox its accessible name: the .wiz-toggle
+  // wrapper holds only the slider span, so without it the control announces
+  // as unlabelled (axe `label`, critical). It also makes the text a hit
+  // target, matching cfgCheckbox in the settings dialog.
+  const lbl = withHelp(el("label", { for: id }, label), tip);
   const cb = el("input", { type: "checkbox", id }) as HTMLInputElement;
   cb.checked = checked;
   const toggle = el("label", { className: "wiz-toggle" }, cb, el("span"));
@@ -246,7 +243,13 @@ export function wizToggle(
 }
 
 export function langSelect(id: string, value: string, placeholder: string): HTMLElement {
-  const sel = el("select", { id, className: "wiz-lang-select" }) as HTMLSelectElement;
+  // The placeholder doubles as the accessible name: these rows caption their
+  // selects with a layout element, not a <label>.
+  const sel = el("select", {
+    id,
+    className: "wiz-lang-select",
+    "aria-label": placeholder,
+  }) as HTMLSelectElement;
   sel.appendChild(option("", placeholder));
   for (const [code, name] of LANGUAGES) {
     sel.appendChild(option(code, name + " (" + code + ")"));
@@ -256,7 +259,11 @@ export function langSelect(id: string, value: string, placeholder: string): HTML
 }
 
 export function variantSelect(id: string, value: string): HTMLElement {
-  const sel = el("select", { id, className: "wiz-lang-variant" }) as HTMLSelectElement;
+  const sel = el("select", {
+    id,
+    className: "wiz-lang-variant",
+    "aria-label": "Subtitle variant",
+  }) as HTMLSelectElement;
   for (const v of SUBTITLE_VARIANTS) {
     sel.appendChild(option(v.value, v.label));
   }
@@ -454,6 +461,12 @@ function renderWizardProgress(): void {
     return;
   }
   const step = activeSteps[wizardIndex];
+  // The dots need a role for the label to count: aria-label on a role-less div
+  // is prohibited, so it was announcing nothing (axe `aria-prohibited-attr`,
+  // serious). role="img" over role="progressbar" because html-validate's
+  // prefer-native-element rule reads the latter as a <progress> that should
+  // have been written natively, and a native <progress> cannot be this dot
+  // strip. img also makes the dots presentational, which they are.
   container.setAttribute(
     "aria-label",
     `Step ${String(wizardIndex + 1)} of ${String(activeSteps.length)}: ${step?.title ?? ""}`,

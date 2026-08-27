@@ -150,8 +150,15 @@ export function langName(code: string): string {
 }
 
 // Build a <select> dropdown populated with all supported language codes.
-export function langSelect(id: string | null, value?: string): HTMLSelectElement {
-  const sel = el("select", { id, className: "lang-select" }) as HTMLSelectElement;
+// `label` is the accessible name: these live in rule rows whose caption is a
+// layout element, not a <label>, so without it the control is announced bare
+// (axe `select-name`, critical).
+export function langSelect(id: string | null, value?: string, label?: string): HTMLSelectElement {
+  const sel = el("select", {
+    id,
+    className: "lang-select",
+    "aria-label": label ?? null,
+  }) as HTMLSelectElement;
   for (const [code, name] of LANGUAGES) {
     sel.appendChild(option(code, `${code} \u2014 ${name}`));
   }

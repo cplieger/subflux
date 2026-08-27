@@ -1,4 +1,4 @@
-import { el, option, icon } from "./dom.js";
+import { el, option, icon, withHelp } from "./dom.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
 import { connTestControl } from "./conn-test.js";
 import { cfgValue, cfgSubValue, cfgBool, cfgScalar, cfgList } from "./config-values.js";
@@ -98,12 +98,15 @@ export function renderFieldsSection(schema: SchemaSection, pc: ParsedConfig | nu
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by hasEnableKey
     const toggleId = fieldId(schema.key, schema.enable_key!);
     const toggle = cfgToggle(toggleId, isEnabled);
+    // The title is a <label for> so the header toggle has an accessible name:
+    // the .toggle wrapper holds only the slider, so without it every section's
+    // enable checkbox is announced bare (axe `label`, critical).
     const header = el(
       "div",
       {
         className: "cfg-title",
       },
-      schema.title,
+      el("label", { for: toggleId }, schema.title),
       toggle,
     );
     sec.appendChild(header);
@@ -246,12 +249,14 @@ function renderFieldsInto(
         const value = resolveFieldValue(schema.key, field, pc);
         const isOn = value === "true";
         const toggle = cfgToggle(groupId, isOn);
+        // A <label for> for the same reason as the section header above: the
+        // .toggle wrapper is text-free, so this is the checkbox's only name.
         const groupHeader = el(
           "div",
           {
             className: "cfg-title",
           },
-          field.label,
+          el("label", { for: groupId }, field.label),
           toggle,
         );
         container.appendChild(groupHeader);
@@ -411,14 +416,10 @@ export function cfgField(
   placeholder: string,
   tip: string | undefined,
 ): HTMLElement {
-  const lbl = el("label", { for: id }, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
   return el(
     "div",
     { className: "cfg-field" },
-    lbl,
+    withHelp(el("label", { for: id }, label), tip),
     el("input", {
       id,
       type,
@@ -432,11 +433,17 @@ export function cfgField(
 }
 
 function cfgFieldEl(label: string, element: HTMLElement, tip: string | undefined): HTMLElement {
-  const lbl = el("label", null, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
-  return el("div", { className: "cfg-field" }, lbl, element);
+  // Associate the label with whatever control was handed in: a select rendered
+  // this way has an id but nothing pointing at it, so it is announced bare
+  // (axe `select-name`, critical). `id` is "" rather than null when unset, so
+  // the empty case has to be tested rather than coalesced.
+  const target = element.id || (element.querySelector("input, select, textarea")?.id ?? null);
+  return el(
+    "div",
+    { className: "cfg-field" },
+    withHelp(el("label", { for: target }, label), tip),
+    element,
+  );
 }
 
 function cfgSecretField(id: string, label: string, value: string): HTMLElement {
@@ -480,11 +487,12 @@ function cfgCheckbox(
   tip: string | undefined,
 ): HTMLElement {
   const toggle = cfgToggle(id, checked);
-  const lbl = el("label", { for: id }, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
-  return el("div", { className: "cfg-field" }, lbl, toggle);
+  return el(
+    "div",
+    { className: "cfg-field" },
+    withHelp(el("label", { for: id }, label), tip),
+    toggle,
+  );
 }
 
 export function cfgToggle(id: string, checked: boolean): HTMLElement {

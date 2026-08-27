@@ -90,7 +90,13 @@ function renderProviderCard(container: HTMLElement, prov: ProviderSchema): void 
   const card = el("div", { className: "wiz-prov-card" + (enabled ? " open" : "") });
 
   const header = el("div", { className: "wiz-prov-header" });
-  header.appendChild(el("span", { className: "wiz-prov-name" }, prov.label));
+  // A <label for> rather than a span: the .wiz-toggle wrapper holds only the
+  // slider, so the provider name is the checkbox's only possible accessible
+  // name (axe `label`, critical, one node per provider). It makes the name a
+  // hit target too, which is what a reader expects of it.
+  header.appendChild(
+    el("label", { className: "wiz-prov-name", for: "wiz-prov-" + prov.name }, prov.label),
+  );
 
   // Settings-body collapse controller — region-only disclosure (trigger:
   // null): the header checkbox is the visible control, the primitive drives

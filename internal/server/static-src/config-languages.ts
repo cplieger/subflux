@@ -1,7 +1,7 @@
 // config-languages.ts — Language builder section extracted from config.ts.
 
 import * as store from "./store.js";
-import { el, option, icon } from "./dom.js";
+import { el, option, icon, withHelp } from "./dom.js";
 import { langSelect } from "./utils.js";
 import { SUBTITLE_VARIANTS, DEFAULT_VARIANT } from "./constants.js";
 import { createDisclosure } from "@cplieger/ui-primitives/disclosure";
@@ -12,17 +12,25 @@ import type { AudioRule, LanguageRules, SubtitleTarget } from "./wire/types.gen.
 // --- Shared helper (duplicated from config.ts to avoid circular import) ---
 
 function cfgFieldEl(label: string, element: HTMLElement, tip: string | undefined): HTMLElement {
-  const lbl = el("label", null, label);
-  if (tip) {
-    lbl.setAttribute("data-tip", tip);
-  }
-  return el("div", { className: "cfg-field" }, lbl, element);
+  // Associate the label with whatever control was handed in; see the twin in
+  // config-renderers.ts.
+  const target = element.id || (element.querySelector("input, select, textarea")?.id ?? null);
+  return el(
+    "div",
+    { className: "cfg-field" },
+    withHelp(el("label", { for: target }, label), tip),
+    element,
+  );
 }
 
 // --- Exported functions ---
 
 function variantSelect(id: string | null, value: string | undefined): HTMLSelectElement {
-  const sel = el("select", { id, className: "variant-select" }) as HTMLSelectElement;
+  const sel = el("select", {
+    id,
+    className: "variant-select",
+    "aria-label": "Subtitle variant",
+  }) as HTMLSelectElement;
   for (const v of SUBTITLE_VARIANTS) {
     sel.appendChild(option(v.value, v.label));
   }
@@ -107,7 +115,7 @@ function buildSubTarget(sub: SubtitleTarget, isDefault: boolean): HTMLElement {
   const wrapper = el("div", { className: "lang-sub" });
 
   const row = el("div", { className: "lang-row" });
-  row.appendChild(langSelect(null, sub.code));
+  row.appendChild(langSelect(null, sub.code, "Subtitle language"));
   if (!isDefault) {
     row.appendChild(variantSelect(null, sub.variant ?? DEFAULT_VARIANT));
   }
@@ -199,7 +207,7 @@ function buildRuleBlock(rule: AudioRule): HTMLElement {
 
   block.appendChild(el("span", { className: "lang-label" }, "Audio:"));
   const header = el("div", { className: "lang-row" });
-  header.appendChild(langSelect(null, rule.audio));
+  header.appendChild(langSelect(null, rule.audio, "Audio language"));
   header.appendChild(
     el(
       "button",
