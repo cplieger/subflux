@@ -66,7 +66,7 @@ function schemaFixture(): SchemaSection[] {
       title: "Sonarr",
       type: "object",
       fields: [
-        { key: "url", label: "URL", type: "text" },
+        { key: "url", label: "URL", type: "text", help: "Internal hostname or IP:port" },
         { key: "api_key", label: "API Key", type: "secret" },
       ],
     },
@@ -198,6 +198,18 @@ describe("arr step", () => {
     expect(input("wiz-sonarr-url").value).toBe("http://sonarr:8989");
     expect(input("wiz-sonarr-api_key").value).toBe("k");
     expect(input("wiz-radarr-url").value).toBe("");
+  });
+
+  it("hangs a field's help text on the label, with nothing else to hover", async () => {
+    const host = await boot({ sections: { sonarr: { url: "http://sonarr:8989" } } });
+
+    buildArrStep().render(host);
+
+    const label = host.querySelector<HTMLLabelElement>('label[for="wiz-sonarr-url"]');
+    expect(label?.getAttribute("data-tip")).toBe("Internal hostname or IP:port");
+    expect(label?.textContent).toBe("URL");
+    expect(host.querySelectorAll("[data-tip] *").length).toBe(0);
+    expect(input("wiz-sonarr-url").hasAttribute("data-tip")).toBe(false);
   });
 
   it("renders a stored secret as a keep-placeholder, never as a value", async () => {

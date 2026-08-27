@@ -192,16 +192,15 @@ function clearDraft(): void {
 }
 
 // --- Shared field builders (consumed by the step modules) ---
-
-export function infoIcon(tip: string): HTMLElement {
-  return el("span", {
-    className: "wiz-info",
-    textContent: "i",
-    "data-tip": tip,
-    tabindex: "0",
-    role: "note",
-  });
-}
+//
+// A field's schema `help` text rides on the LABEL as data-tip, the same
+// carrier the settings dialog uses (config-renderers.ts, pinned by
+// config-renderers.test.ts). The wizard used to append a bordered "i" circle
+// per field instead; it rendered EMPTY, because el() writes an unknown string
+// prop as an attribute, so `textContent: "i"` became textcontent="i" and the
+// glyph never existed. Two patterns for one concern, and the broken one also
+// added 20px to every label, which pushed the input out of line on any label
+// wider than the min-width floor.
 
 export function wizField(
   id: string,
@@ -213,7 +212,7 @@ export function wizField(
 ): HTMLElement {
   const lbl = el("label", { for: id }, label);
   if (tip) {
-    lbl.appendChild(infoIcon(tip));
+    lbl.setAttribute("data-tip", tip);
   }
   const inp = el("input", {
     type: type === "number" ? "number" : "text",
@@ -238,7 +237,7 @@ export function wizToggle(
 ): HTMLElement {
   const lbl = el("label", null, label);
   if (tip) {
-    lbl.appendChild(infoIcon(tip));
+    lbl.setAttribute("data-tip", tip);
   }
   const cb = el("input", { type: "checkbox", id }) as HTMLInputElement;
   cb.checked = checked;
