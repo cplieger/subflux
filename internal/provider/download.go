@@ -3,6 +3,7 @@ package provider
 import (
 	"errors"
 
+	"github.com/cplieger/httpx/v5"
 	"github.com/cplieger/subflux/internal/epmarker"
 	"github.com/cplieger/subflux/internal/provider/archive"
 	"github.com/cplieger/subflux/internal/subflux"
@@ -35,6 +36,16 @@ func TargetOf(sub *subflux.Subtitle) epmarker.Target {
 // subtitle is recognised as text, and the bytes returned are the bytes that
 // arrived, because whether a conversion is PERSISTED belongs to
 // post_processing.normalize_utf8 alone.
+//
+// Every refusal from an archive that DID open is marked permanent on the way
+// out. Those errors wrap a cause so a caller can reach it with errors.Is, and
+// one of the causes a truncated member produces is io.ErrUnexpectedEOF, which
+// httpx.IsTransient reads as a reason to re-download. An unreadable or
+// wrong-episode archive is a property of the bytes, so a retry fetches the same
+// bytes and fails identically while delaying the fall-through to the next
+// candidate. IsPermanent is consulted before every transient test, and
+// httpx.Permanent adds no text and keeps the chain, so neither the operator's
+// log line nor errors.Is changes.
 func ExtractAndValidate(data []byte, want epmarker.Target) ([]byte, error) {
 	extracted, err := archive.Extract(data, want)
 	switch {
@@ -49,6 +60,6 @@ func ExtractAndValidate(data []byte, want epmarker.Target) ([]byte, error) {
 		}
 		return data, nil
 	default:
-		return nil, err
+		return nil, httpx.Permanent(err)
 	}
 }
