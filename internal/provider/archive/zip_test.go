@@ -447,6 +447,9 @@ func TestExtractFromZip_matched_member_that_cannot_be_read_says_so(t *testing.T)
 	if !strings.Contains(err.Error(), "unsupported compression algorithm") {
 		t.Errorf("zipExtract(unreadable member) err = %q, want the cause named in the message", err)
 	}
+	if !errors.Is(err, zip.ErrAlgorithm) {
+		t.Errorf("zipExtract(unreadable member) err = %v, want the chain to reach zip.ErrAlgorithm", err)
+	}
 	if errors.Is(err, ErrNotArchive) {
 		t.Errorf("zipExtract(unreadable member) err = %v, want NOT ErrNotArchive: "+
 			"the zip opened, so the caller must not fall back to describing the raw bytes", err)
@@ -702,10 +705,11 @@ func TestExtractFromZip_a_readable_notation_outvotes_a_bare_number(t *testing.T)
 // its members newline-separated, which splits one record across several lines in
 // the operator's log.
 //
-// The causes stay in the message rather than in an unwrappable chain, and that is
-// deliberate: the retry wrapper classifies a download error by walking the chain,
-// and an unreadable member is a property of the archive, so every retry would
-// fail identically instead of falling through to the next candidate.
+// Both halves are asserted here, because they trade against each other: the
+// message has to name every failing member for the operator, AND the chain has
+// to reach the cause for errors.Is. The retry hazard that used to argue against
+// the chain is answered at the boundary instead, by provider.ExtractAndValidate
+// marking these permanent.
 func TestExtractFromZip_read_failure_renders_on_one_line(t *testing.T) {
 	t.Parallel()
 	// Two members both claiming the episode, so a joined rendering would put a
@@ -726,5 +730,8 @@ func TestExtractFromZip_read_failure_renders_on_one_line(t *testing.T) {
 	if !strings.Contains(err.Error(), "Show.S01E08.PROPER.srt") ||
 		!strings.Contains(err.Error(), "Show.S01E08.REPACK.srt") {
 		t.Errorf("err = %q, want both failing members named", err)
+	}
+	if !errors.Is(err, zip.ErrAlgorithm) {
+		t.Errorf("err = %v, want the chain to reach zip.ErrAlgorithm", err)
 	}
 }

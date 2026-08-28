@@ -259,14 +259,16 @@ func claimSummary(names []string) string {
 // in a slog attribute and Join's newlines would split one log record into
 // several.
 //
-// It deliberately does NOT implement Unwrap, which is a translation at a
-// boundary rather than an oversight. The retry wrapper classifies a download
-// error with httpwire.IsTransient, and that walks the chain: an unwrappable
-// cause such as a truncated read could then be read as transient and the whole
-// download retried. An unreadable member is a property of the ARCHIVE, so every
-// retry fails identically, wastes a provider request and delays falling through
-// to the next candidate, which is the recovery that actually works. The causes
-// stay in the message, where the operator reads them.
+// Unwrap keeps the chain intact so a caller can reach a cause such as
+// zip.ErrAlgorithm with errors.Is. That is safe only because the retry verdict
+// is decided at the boundary instead of by the absence of this method:
+// provider.ExtractAndValidate marks every refusal from this package permanent,
+// so httpx.IsTransient stops before it can read a truncated member's
+// io.ErrUnexpectedEOF as a reason to re-download. An unreadable member is a
+// property of the ARCHIVE, so every retry would fail identically, waste a
+// provider request and delay falling through to the next candidate, which is
+// the recovery that works. Removing that mark reopens the bug, and
+// TestExtractAndValidate_a_member_read_failure_is_not_transient pins it.
 type memberReadError struct {
 	errs []error
 	want epmarker.Target
@@ -280,3 +282,7 @@ func (e *memberReadError) Error() string {
 	return fmt.Sprintf("every member matching %s failed to read: %s",
 		e.want.String(), strings.Join(parts, "; "))
 }
+
+// Unwrap exposes the per-member causes so errors.Is reaches a sentinel such as
+// zip.ErrAlgorithm. See the type comment for why that is safe.
+func (e *memberReadError) Unwrap() []error { return e.errs }
