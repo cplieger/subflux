@@ -47,6 +47,18 @@ func (s *Server) newResolver() *resolve.Resolver {
 	}
 }
 
+// configStateView projects the live arr endpoints for the config handlers.
+// cfg stays nil until the first activation, and that is the state a first boot
+// saves from, so the nil branch is the whole job: a zero view means "no live
+// endpoint", which the connectivity gate reads as a change and pings.
+func (s *Server) configStateView() confighandlers.StateView {
+	cfg := s.state().cfg
+	if cfg == nil {
+		return confighandlers.StateView{}
+	}
+	return confighandlers.StateView{Sonarr: cfg.Sonarr(), Radarr: cfg.Radarr()}
+}
+
 // initHandlers constructs all handler families on the server.
 // Called from New() after options are applied and live state is initialized.
 func (s *Server) initHandlers() {
@@ -97,11 +109,8 @@ func (s *Server) initHandlers() {
 		NewRadarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
 			return s.newRadarr(baseURL, apiKey)
 		},
-		HotReload: s.hotReload,
-		State: func() confighandlers.StateView {
-			ls := s.state()
-			return confighandlers.StateView{Cfg: ls.cfg}
-		},
+		HotReload:  s.hotReload,
+		State:      s.configStateView,
 		Configured: func() bool { return s.configured.Load() },
 		ConfigPath: configFilePath,
 	})

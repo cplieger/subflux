@@ -396,12 +396,6 @@ func (p recordingPinger) Ping(context.Context) error {
 	return p.err
 }
 
-// arrPair is the live-config view the connectivity check compares against.
-type arrPair struct{ sonarr, radarr subflux.ArrConfig }
-
-func (a arrPair) Sonarr() subflux.ArrConfig { return a.sonarr }
-func (a arrPair) Radarr() subflux.ArrConfig { return a.radarr }
-
 // TestHandleSaveConfig_arr_connectivity_gate pins the whole connectivity
 // gate: which instance is pinged, with which credentials, whether the save
 // survives the answer, and the cases that must not ping at all (an arr with
@@ -409,13 +403,16 @@ func (a arrPair) Radarr() subflux.ArrConfig { return a.radarr }
 // save that pings the wrong instance would validate the operator's new
 // sonarr credentials against radarr, so the recorded constructor arguments
 // are asserted per role, not just counted.
+//
+// The live view is the production StateView, not a fake standing in for it:
+// a fake implementing an interface cannot reproduce an unconfigured server.
 func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 	t.Parallel()
 	const validTail = "languages:\n  default:\n    - code: en\n"
 	tests := []struct {
 		name       string
 		body       string
-		live       arrPair
+		live       StateView
 		pingErr    error
 		newErr     error
 		wantStatus int
@@ -426,7 +423,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "changed_sonarr_is_pinged_with_the_new_credentials",
 			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
-			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			live:       StateView{Sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
 			wantStatus: http.StatusOK,
 			wantSonarr: []string{"http://new:8989|k-new"},
 			wantPings:  1,
@@ -434,7 +431,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "changed_radarr_is_pinged_with_the_new_credentials",
 			body:       "radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" + validTail,
-			live:       arrPair{radarr: subflux.ArrConfig{URL: "http://old:7878", APIKey: "r-old"}},
+			live:       StateView{Radarr: subflux.ArrConfig{URL: "http://old:7878", APIKey: "r-old"}},
 			wantStatus: http.StatusOK,
 			wantRadarr: []string{"http://new:7878|r-new"},
 			wantPings:  1,
@@ -442,7 +439,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "unreachable_arr_rejects_the_save",
 			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
-			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			live:       StateView{Sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
 			pingErr:    errors.New("connection refused"),
 			wantStatus: http.StatusBadRequest,
 			wantSonarr: []string{"http://new:8989|k-new"},
@@ -451,7 +448,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "unbuildable_arr_client_rejects_the_save",
 			body:       "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" + validTail,
-			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
+			live:       StateView{Sonarr: subflux.ArrConfig{URL: "http://old:8989", APIKey: "k-old"}},
 			newErr:     errors.New("bad base url"),
 			wantStatus: http.StatusBadRequest,
 			wantSonarr: []string{"http://new:8989|k-new"},
@@ -460,7 +457,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "arr_without_a_url_is_not_pinged",
 			body:       "radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" + validTail,
-			live:       arrPair{},
+			live:       StateView{},
 			pingErr:    errors.New("must not be reached"),
 			wantStatus: http.StatusBadRequest, // the radarr ping fails; sonarr was skipped
 			wantRadarr: []string{"http://new:7878|r-new"},
@@ -469,10 +466,22 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 		{
 			name:       "unchanged_arr_is_not_pinged",
 			body:       "sonarr:\n  url: \"http://same:8989\"\n  api_key: \"k-same\"\n" + validTail,
-			live:       arrPair{sonarr: subflux.ArrConfig{URL: "http://same:8989", APIKey: "k-same"}},
+			live:       StateView{Sonarr: subflux.ArrConfig{URL: "http://same:8989", APIKey: "k-same"}},
 			pingErr:    errors.New("must not be reached"),
 			wantStatus: http.StatusOK,
 			wantPings:  0,
+		},
+		{
+			// A first boot has no live config to compare against, so both
+			// arrs are pinged.
+			name: "unconfigured_server_pings_both_arrs",
+			body: "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" +
+				"radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" + validTail,
+			live:       StateView{},
+			wantStatus: http.StatusOK,
+			wantSonarr: []string{"http://new:8989|k-new"},
+			wantRadarr: []string{"http://new:7878|r-new"},
+			wantPings:  2,
 		},
 	}
 	for _, tt := range tests {
@@ -497,7 +506,7 @@ func TestHandleSaveConfig_arr_connectivity_gate(t *testing.T) {
 				NewSonarr:  record(&gotSonarr),
 				NewRadarr:  record(&gotRadarr),
 				HotReload:  func(context.Context, *config.Config) error { return nil },
-				State:      func() StateView { return StateView{Cfg: tt.live} },
+				State:      func() StateView { return tt.live },
 				ConfigPath: func() string { return configPath },
 			})
 
