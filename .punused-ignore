@@ -202,9 +202,16 @@ method (*Pattern).String
 # *FieldDependencyError to ve.Add and to fmt.Errorf's %w, so the message is
 # rendered through the error interface on the startup log and the config
 # response body. Deleting either Error breaks the build at those returns.
+# memberReadError.Unwrap is the multi-error form of the same protocol: it returns
+# []error, which errors.Is walks since Go 1.20, and that is the whole point of it
+# existing — provider/download_test.go's errors.Is(err, zip.ErrAlgorithm) and
+# archive/zip_test.go's two chain assertions are what it serves. Its counterpart
+# guard is NOT here but in the code: ExtractAndValidate marks these permanent, or
+# the reachable chain would make a corrupt archive look retryable.
 method (*RateLimitError).Error
 method (*RegistryError).Error
 method (*RegistryError).Unwrap
+method (*memberReadError).Unwrap
 method (*ValidationError).Error
 method (*FieldDependencyError).Error
 
