@@ -11,7 +11,9 @@
 
 A fast, small subtitle search, download, and sync engine for Sonarr and Radarr. A Go-based Bazarr alternative that ships as a ~14 MB container.
 
-> **Alpha.** Subflux is pre-1.0 and moving fast. It is functional and runs a 52k-episode production library today, but the UI, config format, and API can still change between releases, and rough edges remain. See [ROADMAP.md](ROADMAP.md) for the path to 1.0.
+## ⚠️ Alpha software
+
+Subflux is pre-1.0 and under active development. It is functional and runs a 52,000-episode library in production today, but rough edges remain. **Any update can introduce a breaking change.** The config format, the on-disk state, the API, and behavior can all change between releases. Pin a specific image tag instead of `latest`, and check the release notes before upgrading. See [ROADMAP.md](ROADMAP.md) for the path to 1.0.
 
 ## What it does
 
