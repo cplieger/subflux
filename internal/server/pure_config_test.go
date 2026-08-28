@@ -8,6 +8,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/server/activity"
+	"github.com/cplieger/subflux/internal/server/confighandlers"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -113,6 +114,45 @@ func TestRequireConfigured_passes_when_configured(t *testing.T) {
 // internal/server/confighandlers/provider_schema_test.go with the function
 // itself, which left internal/subflux because that package implements no registry
 // and consumes no schema.
+
+// --- configStateView ---
+
+// TestConfigStateView pins the unconfigured branch: the config handlers' live
+// view must survive a nil cfg, which is what every new install saves from.
+func TestConfigStateView(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unconfigured yields a zero view", func(t *testing.T) {
+		t.Parallel()
+		s := &Server{}
+		s.live.Store(&liveState{}) // cfg nil: no activation yet
+
+		got := s.configStateView()
+
+		if want := (confighandlers.StateView{}); got != want {
+			t.Errorf("configStateView(unconfigured) = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("configured projects both arr endpoints", func(t *testing.T) {
+		t.Parallel()
+		// The base fixture declares sonarr; radarr is this test's addition,
+		// so a projection that read one block twice would show up here.
+		s := &Server{}
+		s.live.Store(&liveState{cfg: testConfig(t,
+			"radarr:\n  url: \"http://radarr:7878\"\n  api_key: \"k-rad\"\n",
+		)})
+
+		got := s.configStateView()
+
+		if got.Sonarr.URL != "http://sonarr:8989" || got.Sonarr.APIKey != "test" {
+			t.Errorf("configStateView().Sonarr = %+v, want url http://sonarr:8989 key test", got.Sonarr)
+		}
+		if got.Radarr.URL != "http://radarr:7878" || got.Radarr.APIKey != "k-rad" {
+			t.Errorf("configStateView().Radarr = %+v, want url http://radarr:7878 key k-rad", got.Radarr)
+		}
+	})
+}
 
 // --- provider.ClearCaches ---
 

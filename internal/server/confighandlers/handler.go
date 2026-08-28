@@ -80,23 +80,17 @@ type Deps struct {
 	DefaultConfig []byte
 }
 
-// arrEndpoints is what the config handlers read out of the LIVE configuration:
-// the two arr connection blocks, compared against the incoming ones so an
-// unchanged arr is never pinged. 2 of the 37 values a *config.Config offers.
+// StateView is the LIVE arr configuration the config handlers compare an
+// incoming save against, so an unchanged arr is never pinged. 2 of the 37
+// values a *config.Config offers.
 //
-// The candidate config these handlers load and activate is NOT this type: it
-// arrives from LoadConfig and leaves through HotReload whole and concrete,
-// because the composition root is what consumes it. Reading two values out of a
-// config and carrying a config are different jobs, and only the first one
-// belongs here.
-type arrEndpoints interface {
-	Sonarr() subflux.ArrConfig
-	Radarr() subflux.ArrConfig
-}
-
-// StateView provides the live state needed by config handlers.
+// VALUES, never an interface: the only source is a *config.Config that stays
+// nil until activation, and boxing that nil defeats the consumer's nil test.
+// The zero view is unconfigured mode, and a zero URL never equals an incoming
+// one, so a first-boot save pings instead of comparing.
 type StateView struct {
-	Cfg arrEndpoints
+	Sonarr subflux.ArrConfig
+	Radarr subflux.ArrConfig
 }
 
 // Handler holds all dependencies for the config handler family.
@@ -300,23 +294,16 @@ func (h *Handler) HandleConfigSchema(w http.ResponseWriter, r *http.Request) {
 // --- Internal helpers ---
 
 // pingArrIfChanged pings an arr instance only when its URL or API key
-// differs from the current live config.
+// differs from the current live config. An unconfigured server has no live
+// endpoint, so oldArr is zero and every incoming URL counts as a change.
 func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
-	newArr subflux.ArrConfig, oldCfg arrEndpoints,
+	newArr, oldArr subflux.ArrConfig,
 ) error {
 	if newArr.URL == "" {
 		return nil
 	}
-	if oldCfg != nil {
-		var old subflux.ArrConfig
-		if name == arrSonarr {
-			old = oldCfg.Sonarr()
-		} else {
-			old = oldCfg.Radarr()
-		}
-		if newArr.URL == old.URL && newArr.APIKey == old.APIKey {
-			return nil
-		}
+	if newArr.URL == oldArr.URL && newArr.APIKey == oldArr.APIKey {
+		return nil
 	}
 	pinger, err := h.newArrPinger(name, newArr.URL, newArr.APIKey)
 	if err != nil {
