@@ -200,6 +200,24 @@ func (c *CachedSonarr) Series(ctx context.Context) ([]arrapi.Series, error) {
 	return payloadAs[seriesSnapshot](v).rows, nil
 }
 
+// SeriesByTvdbID returns the cached series row for one TVDB id, resolved
+// through the tvdb→row index carried inside the entry value. Absence is a
+// normal answer: an id the list does not hold (only positive ids are ever
+// indexed) reports found == false with a nil error. The returned row shares
+// cache state: read-only.
+func (c *CachedSonarr) SeriesByTvdbID(ctx context.Context, tvdbID int) (arrapi.Series, bool, error) {
+	v, err := c.table.read(ctx, keySeriesList, fetchSeries(c.shipped), fetchSeries(c.wave))
+	if err != nil {
+		return arrapi.Series{}, false, err
+	}
+	snap := payloadAs[seriesSnapshot](v)
+	i, ok := snap.byTvdb[tvdbID]
+	if !ok {
+		return arrapi.Series{}, false, nil
+	}
+	return snap.rows[i], true, nil
+}
+
 func fetchSeries(src sonarrReads) fetchFn {
 	return func(ctx context.Context) (any, error) {
 		rows, err := src.Series(ctx)
@@ -356,6 +374,21 @@ func (c *CachedRadarr) Movies(ctx context.Context) ([]arrapi.Movie, error) {
 		return nil, err
 	}
 	return payloadAs[movieSnapshot](v).rows, nil
+}
+
+// MovieByTmdbID returns the cached movie row for one TMDB id; see
+// SeriesByTvdbID.
+func (c *CachedRadarr) MovieByTmdbID(ctx context.Context, tmdbID int) (arrapi.Movie, bool, error) {
+	v, err := c.table.read(ctx, keyMovieList, fetchMovies(c.shipped), fetchMovies(c.wave))
+	if err != nil {
+		return arrapi.Movie{}, false, err
+	}
+	snap := payloadAs[movieSnapshot](v)
+	i, ok := snap.byTmdb[tmdbID]
+	if !ok {
+		return arrapi.Movie{}, false, nil
+	}
+	return snap.rows[i], true, nil
 }
 
 func fetchMovies(src radarrReads) fetchFn {

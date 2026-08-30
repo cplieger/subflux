@@ -224,11 +224,17 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	userConfigured.Add("GET /api/media/movies", s.mediaH.HandleMediaMovies)
 	userConfigured.Add("GET /api/media/series/", s.mediaH.HandleMediaEpisodes)
 
-	// Coverage.
+	// Coverage. The per-item summary routes coexist with the legacy
+	// trailing-slash detail prefix under ServeMux specificity: {tvdbId}/summary
+	// is the more specific pattern, everything else under the prefix still
+	// reaches the detail handler.
 	userConfigured.Add("GET /api/coverage/series", s.coverageH.HandleCoverageSeries)
 	userConfigured.Add("GET /api/coverage/movies", s.coverageH.HandleCoverageMovies)
 	userConfigured.Add("GET /api/coverage/series/", s.coverageH.HandleCoverageDetail)
 	userConfigured.Add("GET /api/coverage/scan-state", s.coverageH.HandleScanStates)
+	userConfigured.Add("GET /api/coverage/series/{tvdbId}/summary", s.coverageH.HandleCoverageSeriesSummary)
+	userConfigured.Add("GET /api/coverage/movies/{tmdbId}/summary", s.coverageH.HandleCoverageMovieSummary)
+	userConfigured.Add("GET /api/coverage/movies/{tmdbId}/subs", s.coverageH.HandleCoverageMovieSubs)
 
 	// Write endpoints.
 	userConfigured.Add("POST /api/search/download", s.manualH.HandleManualDownload)

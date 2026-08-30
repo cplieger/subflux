@@ -184,6 +184,14 @@ func (dummyArrClient) ResolveExcludeTagIDs(context.Context, []string, bool) map[
 func (dummyArrClient) ResolveExcludeTagIDsErr(context.Context, []string, bool) (map[int]struct{}, error) {
 	return nil, nil
 }
+
+func (dummyArrClient) SeriesByTvdbID(context.Context, int) (arrapi.Series, bool, error) {
+	return arrapi.Series{}, false, nil
+}
+
+func (dummyArrClient) MovieByTmdbID(context.Context, int) (arrapi.Movie, bool, error) {
+	return arrapi.Movie{}, false, nil
+}
 func (dummyArrClient) RescanSeries(context.Context, int) error { return nil }
 func (dummyArrClient) RescanMovie(context.Context, int) error  { return nil }
 func (dummyArrClient) SeriesByID(context.Context, int) (arrapi.Series, error) {

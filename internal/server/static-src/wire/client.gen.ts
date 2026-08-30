@@ -92,6 +92,9 @@ export const PATH_COVERAGE_SERIES = "/api/coverage/series";
 export const PATH_COVERAGE_MOVIES = "/api/coverage/movies";
 export const PATH_COVERAGE_SERIES_DETAIL = "/api/coverage/series/{tvdbId}";
 export const PATH_COVERAGE_SCAN_STATE = "/api/coverage/scan-state";
+export const PATH_COVERAGE_SERIES_SUMMARY = "/api/coverage/series/{tvdbId}/summary";
+export const PATH_COVERAGE_MOVIE_SUMMARY = "/api/coverage/movies/{tmdbId}/summary";
+export const PATH_COVERAGE_MOVIE_SUBS = "/api/coverage/movies/{tmdbId}/subs";
 export const PATH_DOWNLOAD_SUBTITLE = "/api/search/download";
 export const PATH_CLEAR_LOCK = "/api/search/clear-lock";
 export const PATH_SCORE_RELEASE = "/api/score";
@@ -533,6 +536,33 @@ export function coverageScanState(opts?: ClientOpts): Promise<boolean> {
 
 export function coverageScanStateRaw(opts?: ClientOpts): Promise<ApiResult<unknown>> {
   return clientRequestRaw("GET", "/api/coverage/scan-state", undefined, undefined, opts?.signal);
+}
+
+/** Per-item series coverage summary keyed by TVDB id; honors ?recovery=1. 404 exactly where the collection omits. */
+export function coverageSeriesSummary(tvdbId: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<SeriesItem | null> {
+  return clientRequest("GET", `/api/coverage/series/${encodeURIComponent(String(tvdbId))}/summary` + qs(query), undefined, decodeSeriesItem, opts?.signal);
+}
+
+export function coverageSeriesSummaryRaw(tvdbId: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<SeriesItem>> {
+  return clientRequestRaw("GET", `/api/coverage/series/${encodeURIComponent(String(tvdbId))}/summary` + qs(query), undefined, decodeSeriesItem, opts?.signal);
+}
+
+/** Per-item movie coverage summary keyed by TMDB id, no subtitle rows; honors ?recovery=1. 404 exactly where the collection omits. */
+export function coverageMovieSummary(tmdbId: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<MovieItem | null> {
+  return clientRequest("GET", `/api/coverage/movies/${encodeURIComponent(String(tmdbId))}/summary` + qs(query), undefined, decodeMovieItem, opts?.signal);
+}
+
+export function coverageMovieSummaryRaw(tmdbId: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<MovieItem>> {
+  return clientRequestRaw("GET", `/api/coverage/movies/${encodeURIComponent(String(tmdbId))}/summary` + qs(query), undefined, decodeMovieItem, opts?.signal);
+}
+
+/** One movie's subtitle rows. Store-only: rows or an empty list, no arr read, so it does not honor ?recovery=1. */
+export function coverageMovieSubs(tmdbId: string | number, opts?: ClientOpts): Promise<SubtitleEntry[] | null> {
+  return clientRequest("GET", `/api/coverage/movies/${encodeURIComponent(String(tmdbId))}/subs`, undefined, (v) => decodeArray(v, decodeSubtitleEntry, "$"), opts?.signal);
+}
+
+export function coverageMovieSubsRaw(tmdbId: string | number, opts?: ClientOpts): Promise<ApiResult<SubtitleEntry[]>> {
+  return clientRequestRaw("GET", `/api/coverage/movies/${encodeURIComponent(String(tmdbId))}/subs`, undefined, (v) => decodeArray(v, decodeSubtitleEntry, "$"), opts?.signal);
 }
 
 /** Video addressed by MediaRef (media_id = arr ID + season/episode); no file path on the wire. */

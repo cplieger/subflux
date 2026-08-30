@@ -49,13 +49,15 @@ import (
 // narrows it. The declaration these replace was a hand-written nine-method list
 // in internal/subflux, and the ten embedded surfaces below then summed to exactly
 // those nine — the list happened to be right, and nothing in the code would have
-// noticed if it had stopped being. (The sum is ten today: the coverage surface
-// grew the error-returning exclude-tag form.)
+// noticed if it had stopped being. (The sum is eleven today: the coverage
+// surface grew the error-returning exclude-tag form and the per-item
+// tvdb→row index lookup the series summary answers from.)
 //
-// The width, measured: 10 of *arrsvc.Sonarr's 20 exported methods and 8 of
-// *arrsvc.Radarr's 17, so unlike liveState.cfg below these ARE narrowing. No
-// single consumer reads more than 5 of the 10 or 4 of the 8 — the poller, which
-// is the only one that both polls history and looks items up by ID.
+// The width, measured: 11 of *arrsvc.CachedSonarr's 21 exported methods and 9
+// of *arrsvc.CachedRadarr's 18, so unlike liveState.cfg below these ARE
+// narrowing. No single consumer reads more than 5 of the 11 or 4 of the 9 —
+// the poller, which is the only one that both polls history and looks items
+// up by ID.
 //
 // An interface rather than the concrete *arrsvc.Sonarr, which is the opposite
 // call from cfg, and the difference is what the type is: the arr client is this
@@ -87,7 +89,7 @@ type SonarrClient interface {
 }
 
 // RadarrClient is SonarrClient's movie-side twin; see that doc for the width
-// and the placement. Eight methods, from the same ten consumers plus the ping.
+// and the placement. Nine methods, from the same ten consumers plus the ping.
 type RadarrClient interface {
 	coveragehandlers.CoverageRadarrClient
 	filehandlers.FileRadarrClient

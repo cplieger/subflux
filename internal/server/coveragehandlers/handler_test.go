@@ -125,6 +125,18 @@ func (f *covSonarrFake) Series(_ context.Context) ([]arrapi.Series, error) {
 	return f.series, f.err
 }
 
+func (f *covSonarrFake) SeriesByTvdbID(_ context.Context, tvdbID int) (arrapi.Series, bool, error) {
+	if f.err != nil {
+		return arrapi.Series{}, false, f.err
+	}
+	for i := range f.series {
+		if f.series[i].TvdbID == tvdbID {
+			return f.series[i], true, nil
+		}
+	}
+	return arrapi.Series{}, false, nil
+}
+
 func (f *covSonarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return nil
 }
@@ -141,6 +153,18 @@ type covRadarrFake struct {
 
 func (f *covRadarrFake) Movies(_ context.Context) ([]arrapi.Movie, error) {
 	return f.movies, f.err
+}
+
+func (f *covRadarrFake) MovieByTmdbID(_ context.Context, tmdbID int) (arrapi.Movie, bool, error) {
+	if f.err != nil {
+		return arrapi.Movie{}, false, f.err
+	}
+	for i := range f.movies {
+		if f.movies[i].TmdbID == tmdbID {
+			return f.movies[i], true, nil
+		}
+	}
+	return arrapi.Movie{}, false, nil
 }
 
 func (f *covRadarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
