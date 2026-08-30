@@ -104,10 +104,10 @@ func (s *Server) initHandlers() {
 		// asked for is a wrap, done here because adapting is what a composition
 		// root is for.
 		NewSonarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
-			return s.newSonarr(baseURL, apiKey)
+			return s.newSonarr(baseURL, apiKey, s.arrReads)
 		},
 		NewRadarr: func(baseURL, apiKey string) (confighandlers.ArrPinger, error) {
-			return s.newRadarr(baseURL, apiKey)
+			return s.newRadarr(baseURL, apiKey, s.arrReads)
 		},
 		HotReload:  s.hotReload,
 		State:      s.configStateView,

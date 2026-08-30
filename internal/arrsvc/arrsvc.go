@@ -5,11 +5,15 @@
 // history polling, and connectivity ping are promoted from the embedded arrapi
 // client unchanged, so this package adds only the app-level behavior arrapi
 // deliberately does not provide.
+//
+// It also holds the ONE arr-read wrapper (CachedSonarr/CachedRadarr over a
+// shared ReadGate): the four read families — series list, movie list,
+// episodes-by-series, exclude-tag resolution — route through its cache,
+// plain-read coalescing, and ?recovery=1 waves.
 package arrsvc
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
@@ -92,31 +96,46 @@ func (s *Sonarr) ResolveExcludeTagIDs(ctx context.Context, names []string, logMi
 	return resolveExcludeTagIDs(ctx, s.ResolveTagIDs, names, logMissing)
 }
 
+// ResolveExcludeTagIDsErr is the error-returning form: a tag-fetch error
+// PROPAGATES instead of failing open, so a recovery read can surface it as a
+// typed leg failure.
+func (s *Sonarr) ResolveExcludeTagIDsErr(ctx context.Context, names []string, logMissing bool) (map[int]struct{}, error) {
+	return resolveExcludeTagIDsErr(ctx, s.ResolveTagIDs, names, logMissing)
+}
+
 // ResolveExcludeTagIDs is the Radarr-side counterpart.
 func (r *Radarr) ResolveExcludeTagIDs(ctx context.Context, names []string, logMissing bool) map[int]struct{} {
 	return resolveExcludeTagIDs(ctx, r.ResolveTagIDs, names, logMissing)
 }
 
-// resolveExcludeTagIDs delegates the fetch-and-match to arrapi.ResolveTagIDs and
-// adds subflux's app-side behavior: fail open (log + nil) on a tag-fetch error,
-// and, when logMissing is set, an INFO hint for each configured tag name that
-// matched no arr tag.
-func resolveExcludeTagIDs(ctx context.Context,
-	resolve func(context.Context, ...string) (map[int]struct{}, []string, error),
+// ResolveExcludeTagIDsErr is the Radarr-side error-returning form.
+func (r *Radarr) ResolveExcludeTagIDsErr(ctx context.Context, names []string, logMissing bool) (map[int]struct{}, error) {
+	return resolveExcludeTagIDsErr(ctx, r.ResolveTagIDs, names, logMissing)
+}
+
+// resolveExcludeTagIDs is the fail-open projection of resolveExcludeTagIDsErr
+// (log + nil on a tag-fetch error), kept by plain reads and the scan path.
+func resolveExcludeTagIDs(ctx context.Context, resolve tagResolveFn,
 	names []string, logMissing bool,
 ) map[int]struct{} {
+	return failOpenTagIDs(resolveExcludeTagIDsErr(ctx, resolve, names, logMissing))
+}
+
+// resolveExcludeTagIDsErr delegates the fetch-and-match to
+// arrapi.ResolveTagIDs, returning the error, and, when logMissing is set,
+// logs an INFO hint for each configured tag name that matched no arr tag.
+func resolveExcludeTagIDsErr(ctx context.Context, resolve tagResolveFn,
+	names []string, logMissing bool,
+) (map[int]struct{}, error) {
 	if len(names) == 0 {
-		return nil
+		return nil, nil
 	}
 	ids, unmatched, err := resolve(ctx, names...)
 	if err != nil {
-		slog.Warn("failed to fetch tags, exclude_arr_tags will not work", "error", err)
-		return nil
+		return nil, err
 	}
 	if logMissing {
-		for _, name := range unmatched {
-			slog.Info("exclude_tag not found in arr, create it in Settings > Tags", "tag", name)
-		}
+		logUnmatchedTags(unmatched)
 	}
-	return ids
+	return ids, nil
 }

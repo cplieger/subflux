@@ -129,6 +129,10 @@ func (f *covSonarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bo
 	return nil
 }
 
+func (f *covSonarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
+	return nil, nil
+}
+
 // covRadarrFake implements CoverageRadarrClient with canned movies.
 type covRadarrFake struct {
 	err    error
@@ -141,6 +145,10 @@ func (f *covRadarrFake) Movies(_ context.Context) ([]arrapi.Movie, error) {
 
 func (f *covRadarrFake) ResolveExcludeTagIDs(_ context.Context, _ []string, _ bool) map[int]struct{} {
 	return nil
+}
+
+func (f *covRadarrFake) ResolveExcludeTagIDsErr(_ context.Context, _ []string, _ bool) (map[int]struct{}, error) {
+	return nil, nil
 }
 
 // newCoverageHandler builds a Handler around the given store, config, and

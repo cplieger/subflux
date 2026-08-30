@@ -24,6 +24,7 @@ import (
 	authoidc "github.com/cplieger/auth/v5/oidc"
 	"github.com/cplieger/auth/v5/ratelimit"
 	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/search"
 	"github.com/cplieger/subflux/internal/server/activity"
@@ -204,6 +205,10 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
 	}
+	// The arr-read wrapper's shared half: built here (not per activation) so
+	// the wave-admission ceiling spans reloads and both arr sides. Waves run
+	// under the server lifetime context and register with bgWg.
+	s.arrReads = arrsvc.NewReadGate(func() context.Context { return s.lifetime }, &s.bgWg)
 	// Metrics is REQUIRED, and it is checked here rather than at Start because
 	// initHandlers below binds it into four child Deps by value. Expressed as an
 	// Option it read as voluntary, and it never was: twenty-two sites dereference
