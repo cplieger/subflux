@@ -13,6 +13,7 @@
   "mutate": [
     "api-client.ts",
     "config.ts",
+    "coverage-heal.ts",
     "coverage.ts",
     "detail.ts",
     "dom.ts",

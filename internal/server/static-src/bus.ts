@@ -32,6 +32,11 @@ interface EventMap {
   // Request a refresh of the current view (replaces the old needsRefresh
   // store pulse — this is an event, not state).
   "data:invalidate": undefined;
+  // A full coverage pair snapshot is about to overwrite the collection's rows
+  // (the library route loader / a refresh). The heal coalescer runs A6's reset
+  // rule on it; bus-routed because coverage.ts and coverage-heal.ts would
+  // otherwise import each other.
+  "coverage:overwrite": undefined;
 }
 
 // Event name constants — use these instead of string literals.
@@ -46,6 +51,7 @@ export const BusEvent = {
   ScanMovie: "scan:movie",
   OpenSecurity: "open:security",
   DataInvalidate: "data:invalidate",
+  CoverageOverwrite: "coverage:overwrite",
 } as const;
 
 const bus = createBus<EventMap>();

@@ -68,6 +68,7 @@ vi.mock("@cplieger/actions", () => ({
   defineAction: (def: { name: string }) => actions.register(def),
   retryNetwork: (fn: unknown) => fn,
   RETRY_STANDARD: {},
+  registerCleanup: () => undefined,
 }));
 
 // The popover primitive, with the options object status.ts hands it kept so a

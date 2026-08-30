@@ -1,10 +1,9 @@
 // Server-Sent Events connection. Receives real-time updates from the
 // server and dispatches them to the store and notification system.
 
-import * as store from "./store.js";
 import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
-import { fetchAndMergeCoverage } from "./coverage.js";
+import { healFromCoverageEvent } from "./coverage-heal.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { registerCleanup } from "@cplieger/actions";
 import { SSE_RECONNECT_MS, SSE_MAX_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
@@ -70,17 +69,13 @@ export function connect(): void {
 
   eventSource.addEventListener("coverage", (e: MessageEvent) => {
     const payload = decodeSSE(e, decodeCoverageEvent);
-    const mediaId = payload?.media_id ?? "";
-
-    if (mediaId && store.get("currentPage") === "library" && !store.get("detailCtx")) {
-      // Refetch + setAll updates the affected row's signal reactively (bindList
-      // repaints just that row); no manual per-badge DOM patching.
-      void fetchAndMergeCoverage().catch(() => {
-        emit(BusEvent.DataInvalidate);
-      });
+    if (!payload) {
       return;
     }
-    emit(BusEvent.DataInvalidate);
+    // Identity-only event → per-root heal through the A6 coalescer (parse,
+    // gate, coalesce, summary GET). Task 12's history trigger observes
+    // coverage events OUTSIDE that gate and hooks in here, beside this call.
+    healFromCoverageEvent(payload);
   });
 
   eventSource.addEventListener("notify", (e: MessageEvent) => {

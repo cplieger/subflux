@@ -8,12 +8,8 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import type * as BusModule from "./bus.js";
 
-vi.mock("./store.js", () => ({ get: vi.fn(), set: vi.fn() }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
-vi.mock("./coverage.js", () => ({
-  patchCoverageBadge: vi.fn(),
-  fetchAndMergeCoverage: vi.fn(),
-}));
+vi.mock("./coverage-heal.js", () => ({ healFromCoverageEvent: vi.fn() }));
 vi.mock("./status.js", () => ({ pollStatus: vi.fn(), abortPoll: vi.fn() }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 vi.mock("./bus.js", async (importOriginal) => ({

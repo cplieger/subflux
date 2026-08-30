@@ -3,15 +3,8 @@ import { SSE_RECONNECT_MS, VISIBILITY_DEBOUNCE_MS } from "./constants.js";
 // Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
 import type * as BusModule from "./bus.js";
 
-vi.mock("./store.js", () => ({
-  get: vi.fn(),
-  set: vi.fn(),
-}));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
-vi.mock("./coverage.js", () => ({
-  patchCoverageBadge: vi.fn(),
-  fetchAndMergeCoverage: vi.fn().mockResolvedValue([]),
-}));
+vi.mock("./coverage-heal.js", () => ({ healFromCoverageEvent: vi.fn() }));
 vi.mock("./status.js", () => ({ pollStatus: vi.fn(), abortPoll: vi.fn() }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 vi.mock("./bus.js", async (importOriginal) => ({
@@ -19,9 +12,8 @@ vi.mock("./bus.js", async (importOriginal) => ({
   emit: vi.fn(),
 }));
 
-import * as store from "./store.js";
 import * as notify from "./notify.js";
-import { fetchAndMergeCoverage } from "./coverage.js";
+import { healFromCoverageEvent } from "./coverage-heal.js";
 import { pollStatus, abortPoll } from "./status.js";
 import { registerCleanup } from "@cplieger/actions";
 import { emit, BusEvent } from "./bus.js";
@@ -123,8 +115,6 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", FakeEventSource);
   vi.useFakeTimers();
   vi.spyOn(Math, "random").mockReturnValue(0); // deterministic backoff jitter
-  // mockReset (vitest.config) wipes the module-scope resolved value.
-  vi.mocked(fetchAndMergeCoverage).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -307,46 +297,31 @@ describe("events: SSE connection", () => {
 });
 
 describe("events: SSE handlers", () => {
-  it("coverage event triggers fetchAndMergeCoverage when on library page", () => {
-    vi.mocked(store.get).mockImplementation((key: string) =>
-      key === "currentPage" ? "library" : undefined,
-    );
+  it("coverage event dispatches its decoded payload to the heal coalescer", () => {
     events.connect();
 
-    lastES().frame("coverage", {
+    const payload = {
       media_type: "episode",
       media_id: "tvdb-81189-s01e01",
       language: "en",
       variant: "standard",
       source: "opensubtitles",
-    });
+    };
+    lastES().frame("coverage", payload);
 
-    expect(fetchAndMergeCoverage).toHaveBeenCalled();
+    // The coalescer owns parse/gate/coalesce; the handler owns only decode +
+    // dispatch, and no longer touches the full-collection refresh path.
+    expect(healFromCoverageEvent).toHaveBeenCalledExactlyOnceWith(payload);
     expect(emit).not.toHaveBeenCalledWith(BusEvent.DataInvalidate);
   });
 
-  it("coverage event invalidates data when on detail page", () => {
-    vi.mocked(store.get).mockImplementation((key: string) => {
-      if (key === "currentPage") {
-        return "library";
-      }
-      if (key === "detailCtx") {
-        return { tvdbId: 81189 }; // a detail view is open
-      }
-      return undefined;
-    });
+  it("an undecodable coverage frame is dropped without a heal dispatch", () => {
     events.connect();
 
-    lastES().frame("coverage", {
-      media_type: "episode",
-      media_id: "tvdb-81189-s01e01",
-      language: "en",
-      variant: "standard",
-      source: "opensubtitles",
-    });
+    lastES().frame("coverage", { media_type: 42 });
 
-    expect(fetchAndMergeCoverage).not.toHaveBeenCalled();
-    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+    expect(healFromCoverageEvent).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalledWith(BusEvent.DataInvalidate);
   });
 
   it("notify event calls notify.error for error level", () => {
@@ -373,63 +348,6 @@ describe("events: SSE handlers", () => {
     lastES().frame("scan:start", { action: "scan", detail: "Breaking Bad", source: "scheduled" });
 
     expect(notify.info).toHaveBeenCalledWith("Scan started: Breaking Bad");
-  });
-
-  it("coverage event off the library page invalidates instead of refetching", () => {
-    // The row-level refetch only pays off where the rows are; any other page
-    // reloads through DataInvalidate.
-    vi.mocked(store.get).mockImplementation((key: string) =>
-      key === "currentPage" ? "files" : undefined,
-    );
-    events.connect();
-
-    lastES().frame("coverage", {
-      media_type: "episode",
-      media_id: "tvdb-81189-s01e01",
-      language: "en",
-      variant: "standard",
-      source: "opensubtitles",
-    });
-
-    expect(fetchAndMergeCoverage).not.toHaveBeenCalled();
-    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
-  });
-
-  it("coverage event without a media id invalidates instead of refetching", () => {
-    vi.mocked(store.get).mockImplementation((key: string) =>
-      key === "currentPage" ? "library" : undefined,
-    );
-    events.connect();
-
-    lastES().frame("coverage", {
-      media_type: "episode",
-      media_id: "",
-      language: "en",
-      variant: "standard",
-      source: "opensubtitles",
-    });
-
-    expect(fetchAndMergeCoverage).not.toHaveBeenCalled();
-    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
-  });
-
-  it("coverage refetch failure falls back to invalidating the page", async () => {
-    vi.mocked(store.get).mockImplementation((key: string) =>
-      key === "currentPage" ? "library" : undefined,
-    );
-    vi.mocked(fetchAndMergeCoverage).mockRejectedValue(new Error("network down"));
-    events.connect();
-
-    lastES().frame("coverage", {
-      media_type: "episode",
-      media_id: "tvdb-81189-s01e01",
-      language: "en",
-      variant: "standard",
-      source: "opensubtitles",
-    });
-    await vi.waitFor(() => {
-      expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
-    });
   });
 
   it("notify event calls notify.success for success level", () => {

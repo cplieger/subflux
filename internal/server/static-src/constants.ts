@@ -1,6 +1,13 @@
 // Named constants for timeout and interval values used across the UI.
 
 export const STATUS_POLL_MS = 5_000;
+export const STATUS_RECONCILE_MS = 60_000;
+// Per-root coverage-heal window: events arriving inside one window share one
+// trailing flush (one summary GET per root).
+export const SUMMARY_COALESCE_MS = 300;
+// Best-effort belt for twice-failed heal roots; dropped roots converge via the
+// next event, replay, or transaction.
+export const DIRTY_ROOT_CAP = 64;
 export const SEARCH_TIMEOUT_MS = 30_000;
 export const DOWNLOAD_POLL_MS = 2_000;
 export const DOWNLOAD_DEADLINE_MS = 5 * 60_000;

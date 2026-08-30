@@ -48,6 +48,7 @@ vi.mock("@cplieger/actions", () => ({
   defineAction: (cfg: { name: string }) => registerAction(cfg),
   retryNetwork: (fn: unknown) => fn,
   RETRY_STANDARD: {},
+  registerCleanup: () => undefined,
 }));
 vi.mock("./notify.js", () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }));
 vi.mock("./wire/decoders.gen.js", () => ({
@@ -78,6 +79,7 @@ vi.mock("./popover-menu.js", () => ({
 
 import * as store from "./store.js";
 import { buildActivityItem, updateLiveTimers } from "./status.js";
+import { STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
 import type * as BusModule from "./bus.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
@@ -1266,5 +1268,61 @@ describe("status: poll action contract", () => {
     // Background polling must neither pile up requests nor toast blips.
     expect(actionConfigs.get("status.poll")?.["dedupe"]).toBe(true);
     expect(actionConfigs.get("status.poll")?.["error"]).toBe(false);
+  });
+});
+
+describe("status: reconcile tick", () => {
+  // Fresh status instance per test: the tick's interval + registration flag
+  // are module state, and the interval must be created under THIS test's fake
+  // clock (a stale handle from a sibling test would tick nothing).
+  let h: PollHarness;
+
+  function setDocumentHidden(hidden: boolean): void {
+    Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    h = await freshPollHarness();
+  });
+
+  afterEach(() => {
+    setDocumentHidden(false);
+    vi.useRealTimers();
+  });
+
+  it("runs registered tasks at each reconcile interval", () => {
+    const task = vi.fn();
+    h.status.registerReconcileTask(task);
+
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS - 1);
+    expect(task).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(task).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS);
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
+  it("pauses while the tab is hidden and resumes when visible", () => {
+    const task = vi.fn();
+    h.status.registerReconcileTask(task);
+
+    setDocumentHidden(true);
+    vi.advanceTimersByTime(5 * STATUS_RECONCILE_MS);
+    expect(task).not.toHaveBeenCalled();
+
+    // No catch-up burst on return: the next scheduled tick runs, once.
+    setDocumentHidden(false);
+    vi.advanceTimersByTime(STATUS_RECONCILE_MS);
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
+  it("an unregistered task no longer runs", () => {
+    const task = vi.fn();
+    const off = h.status.registerReconcileTask(task);
+    off();
+
+    vi.advanceTimersByTime(3 * STATUS_RECONCILE_MS);
+    expect(task).not.toHaveBeenCalled();
   });
 });

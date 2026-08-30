@@ -14,13 +14,20 @@ import {
   PATH_DISMISS_ACTIVITY,
   PATH_DISMISS_ALERT,
 } from "./wire/client.gen.js";
-import { apiAction, defineAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
+import {
+  apiAction,
+  defineAction,
+  registerCleanup,
+  retryNetwork,
+  RETRY_STANDARD,
+} from "@cplieger/actions";
 import type {
   Alert,
   Stats as StatsType,
   ProvidersResponse as ProvidersResponseType,
 } from "./wire/types.gen.js";
 import { fmtTime } from "./utils.js";
+import { STATUS_RECONCILE_MS } from "./constants.js";
 import type { ActivityEntry } from "./api-types.js";
 import { runningScans } from "./scan-scope.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
@@ -347,6 +354,42 @@ export function abortPoll(): void {
  *  pollStatusAction's dedupe coalesces with any in-flight poll. */
 export async function pollStatus(): Promise<void> {
   await pollStatusAction.dispatch(undefined);
+}
+
+// --- Reconcile tick ---
+//
+// The 60s drift belt (E2). Task 6's dirty-set retry rides it today; task 11
+// folds the status poll onto the same cadence. Started lazily on the first
+// registration, and it PAUSES WHEN HIDDEN: a hidden tab converges on return
+// via replay or transaction instead.
+
+const reconcileTasks = new Set<() => void>();
+let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Run `fn` at each reconcile tick (skipped while the tab is hidden).
+ *  Returns an unregister function. */
+export function registerReconcileTask(fn: () => void): () => void {
+  reconcileTasks.add(fn);
+  if (reconcileTimer === null) {
+    reconcileTimer = setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+      for (const task of reconcileTasks) {
+        task();
+      }
+    }, STATUS_RECONCILE_MS);
+    registerCleanup(() => {
+      if (reconcileTimer !== null) {
+        clearInterval(reconcileTimer);
+        reconcileTimer = null;
+      }
+      reconcileTasks.clear();
+    });
+  }
+  return (): void => {
+    reconcileTasks.delete(fn);
+  };
 }
 
 // buildActivityItem constructs a single activity row for the status popup.
