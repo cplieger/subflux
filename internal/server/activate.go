@@ -130,16 +130,20 @@ func (s *Server) prepare(ctx context.Context, newCfg, oldCfg *config.Config, mod
 
 	// Arr clients are constructed HERE in both modes: activation owns their
 	// lifecycle (main.go builds none), so a failed construction rejects the
-	// candidate without side effects.
+	// candidate without side effects. The factories receive the shared read
+	// gate: the arr-read wrapper's own wave clients are built in prepare
+	// beside the shipped clients and published/closed atomically with them,
+	// and each activation's wrapper starts with a fresh cache, which is what
+	// revokes the outgoing instance's in-flight wave writes on a reload.
 	if sonarrCfg := newCfg.Sonarr(); sonarrCfg.URL != "" {
-		c, sonarrErr := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey)
+		c, sonarrErr := s.newSonarr(sonarrCfg.URL, sonarrCfg.APIKey, s.arrReads)
 		if sonarrErr != nil {
 			return nil, fmt.Errorf("invalid sonarr config: %w", sonarrErr)
 		}
 		cand.sonarr = c
 	}
 	if radarrCfg := newCfg.Radarr(); radarrCfg.URL != "" {
-		c, radarrErr := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey)
+		c, radarrErr := s.newRadarr(radarrCfg.URL, radarrCfg.APIKey, s.arrReads)
 		if radarrErr != nil {
 			return nil, fmt.Errorf("invalid radarr config: %w", radarrErr)
 		}

@@ -108,8 +108,9 @@ func (s *Server) hotReload(ctx context.Context, newCfg *config.Config) error {
 // it, and that is derived rather than chosen: both are the union of what their
 // consumers ask for, and no handler, scan or poll path shuts an arr client down
 // — activation does, which is here. Close is one of the ten exported methods
-// *arrsvc.Sonarr has beyond the nine in the union. A nil interface value is a
-// no-op, so an unconfigured arr and a test double both fall through.
+// *arrsvc.Sonarr has beyond the ten in the union. A nil interface value is a
+// no-op, so an unconfigured arr and a test double both fall through. The
+// wrapped client's Close releases the shipped and wave transports together.
 func closeArrClient(c any) {
 	if closer, ok := c.(interface{ Close() }); ok {
 		closer.Close()

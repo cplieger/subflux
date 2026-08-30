@@ -33,16 +33,22 @@ type CoverageStore interface {
 	ScanStates(ctx context.Context, mediaType subflux.MediaType, mediaIDPrefix string) ([]subflux.ScanStateRow, error)
 }
 
-// CoverageSonarrClient is the Sonarr surface coverage handlers use.
+// CoverageSonarrClient is the Sonarr surface coverage handlers use: the
+// series list, the shipped fail-open exclude-tag resolution (plain reads),
+// and the error-returning form a ?recovery=1 read needs — its wave failure or
+// refusal must reach the wire typed, never as a silent empty-exclusion 200.
 type CoverageSonarrClient interface {
 	Series(ctx context.Context) ([]arrapi.Series, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
+	ResolveExcludeTagIDsErr(ctx context.Context, tags []string, logMissing bool) (map[int]struct{}, error)
 }
 
-// CoverageRadarrClient is the Radarr surface coverage handlers use.
+// CoverageRadarrClient is the Radarr surface coverage handlers use; the three
+// methods mirror CoverageSonarrClient's.
 type CoverageRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
+	ResolveExcludeTagIDsErr(ctx context.Context, tags []string, logMissing bool) (map[int]struct{}, error)
 }
 
 // tagResolver is the minimal surface fetchCoverageData needs; both role clients

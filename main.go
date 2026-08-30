@@ -508,10 +508,13 @@ func serverOptions(reg *provider.Registry, syncExec syncing.SyncExec) []server.O
 }
 
 // newSonarrFactory returns a function that creates Sonarr API clients, used by
-// the server for hot reload and config-save connectivity checks.
-func newSonarrFactory() func(baseURL, apiKey string) (server.SonarrClient, error) {
-	return func(baseURL, apiKey string) (server.SonarrClient, error) {
-		c, err := arrsvc.NewSonarr(baseURL, arrsvc.APIKey(apiKey))
+// the server for hot reload and config-save connectivity checks. The client is
+// the arr-read wrapper (arrsvc.CachedSonarr): the series-list, episodes and
+// exclude-tag families route through its cache and recovery waves; everything
+// else passes through to the shipped client.
+func newSonarrFactory() func(baseURL, apiKey string, reads *arrsvc.ReadGate) (server.SonarrClient, error) {
+	return func(baseURL, apiKey string, reads *arrsvc.ReadGate) (server.SonarrClient, error) {
+		c, err := arrsvc.NewCachedSonarr(baseURL, arrsvc.APIKey(apiKey), reads)
 		if err != nil {
 			return nil, err
 		}
@@ -519,10 +522,11 @@ func newSonarrFactory() func(baseURL, apiKey string) (server.SonarrClient, error
 	}
 }
 
-// newRadarrFactory returns a function that creates Radarr API clients.
-func newRadarrFactory() func(baseURL, apiKey string) (server.RadarrClient, error) {
-	return func(baseURL, apiKey string) (server.RadarrClient, error) {
-		c, err := arrsvc.NewRadarr(baseURL, arrsvc.APIKey(apiKey))
+// newRadarrFactory returns a function that creates Radarr API clients, wrapped
+// like newSonarrFactory's.
+func newRadarrFactory() func(baseURL, apiKey string, reads *arrsvc.ReadGate) (server.RadarrClient, error) {
+	return func(baseURL, apiKey string, reads *arrsvc.ReadGate) (server.RadarrClient, error) {
+		c, err := arrsvc.NewCachedRadarr(baseURL, arrsvc.APIKey(apiKey), reads)
 		if err != nil {
 			return nil, err
 		}

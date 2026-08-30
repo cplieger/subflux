@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	authwebauthn "github.com/cplieger/auth/v5/webauthn"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/config"
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
@@ -46,13 +47,14 @@ import (
 // Composed by EMBEDDING, never by re-listing, so the width is derived: adding a
 // method to polling.PollSonarrClient widens this automatically and removing one
 // narrows it. The declaration these replace was a hand-written nine-method list
-// in internal/subflux, and the ten embedded surfaces below already summed to exactly
+// in internal/subflux, and the ten embedded surfaces below then summed to exactly
 // those nine — the list happened to be right, and nothing in the code would have
-// noticed if it had stopped being.
+// noticed if it had stopped being. (The sum is ten today: the coverage surface
+// grew the error-returning exclude-tag form.)
 //
-// The width, measured: 9 of *arrsvc.Sonarr's 19 exported methods and 7 of
-// *arrsvc.Radarr's 16, so unlike liveState.cfg below these ARE narrowing. No
-// single consumer reads more than 5 of the 9 or 4 of the 7 — the poller, which
+// The width, measured: 10 of *arrsvc.Sonarr's 20 exported methods and 8 of
+// *arrsvc.Radarr's 17, so unlike liveState.cfg below these ARE narrowing. No
+// single consumer reads more than 5 of the 10 or 4 of the 8 — the poller, which
 // is the only one that both polls history and looks items up by ID.
 //
 // An interface rather than the concrete *arrsvc.Sonarr, which is the opposite
@@ -80,12 +82,12 @@ type SonarrClient interface {
 	// The connectivity check a config save runs before activating a changed
 	// arr. confighandlers declares it as its own one-method surface, which is
 	// why it is embedded here rather than listed: Ping is the only method of
-	// these nine that no scan, poll or handler path calls.
+	// these ten that no scan, poll or handler path calls.
 	confighandlers.ArrPinger
 }
 
 // RadarrClient is SonarrClient's movie-side twin; see that doc for the width
-// and the placement. Seven methods, from the same ten consumers plus the ping.
+// and the placement. Eight methods, from the same ten consumers plus the ping.
 type RadarrClient interface {
 	coveragehandlers.CoverageRadarrClient
 	filehandlers.FileRadarrClient
@@ -197,22 +199,27 @@ type Server struct {
 	manualH      *manualops.Handler
 	previewH     *previewhandlers.Handler
 	loadConfig   confighandlers.ConfigLoader
-	newSonarr    func(baseURL, apiKey string) (SonarrClient, error)
-	newRadarr    func(baseURL, apiKey string) (RadarrClient, error)
-	wire         wiring.Func
-	activity     *activity.Log
-	live         atomic.Pointer[liveState]
-	queryH       *queryhandlers.Handler
-	schemaFunc   subflux.SchemaFunc
-	configH      *confighandlers.Handler
-	alerts       *activity.AlertLog
-	events       *events.EventBus
-	coverageH    *coveragehandlers.Handler
-	activityH    *activityhandlers.Handler
-	storeOps     *storeops.Runner
-	syncH        *synchandlers.Handler
-	fileH        *filehandlers.Handler
-	mediaH       *mediahandlers.Handler
+	newSonarr    func(baseURL, apiKey string, reads *arrsvc.ReadGate) (SonarrClient, error)
+	newRadarr    func(baseURL, apiKey string, reads *arrsvc.ReadGate) (RadarrClient, error)
+	// arrReads is the shared half of the arr-read wrapper (A4): the global
+	// wave-admission FIFO both arr sides share, so the recovery concurrency
+	// ceiling is aggregate. One per server, surviving reloads; activation
+	// hands it to the factories beside each activation's fresh client pair.
+	arrReads   *arrsvc.ReadGate
+	wire       wiring.Func
+	activity   *activity.Log
+	live       atomic.Pointer[liveState]
+	queryH     *queryhandlers.Handler
+	schemaFunc subflux.SchemaFunc
+	configH    *confighandlers.Handler
+	alerts     *activity.AlertLog
+	events     *events.EventBus
+	coverageH  *coveragehandlers.Handler
+	activityH  *activityhandlers.Handler
+	storeOps   *storeops.Runner
+	syncH      *synchandlers.Handler
+	fileH      *filehandlers.Handler
+	mediaH     *mediahandlers.Handler
 	scanSubsystem
 	authDeps
 	// logSetup re-runs the process-global logging setup on a logging-section
@@ -304,10 +311,12 @@ func WithMetrics(m Metrics) Option { return func(s *Server) { s.metrics = m } }
 func WithPort(port int) Option { return func(s *Server) { s.serverPort = port } }
 
 // WithArrClientFactories sets the factories for creating Sonarr and Radarr API
-// clients, used by hot reload and config-save connectivity checks.
+// clients, used by hot reload and config-save connectivity checks. The reads
+// gate is the server's shared arr-read wrapper half; main.go's factories build
+// the wrapped clients (arrsvc.CachedSonarr/CachedRadarr) around it.
 func WithArrClientFactories(
-	newSonarr func(baseURL, apiKey string) (SonarrClient, error),
-	newRadarr func(baseURL, apiKey string) (RadarrClient, error),
+	newSonarr func(baseURL, apiKey string, reads *arrsvc.ReadGate) (SonarrClient, error),
+	newRadarr func(baseURL, apiKey string, reads *arrsvc.ReadGate) (RadarrClient, error),
 ) Option {
 	return func(s *Server) {
 		s.newSonarr = newSonarr

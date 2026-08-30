@@ -180,6 +180,10 @@ func (dummyArrClient) WantedMovies(context.Context, map[int]struct{}, func(arrap
 func (dummyArrClient) ResolveExcludeTagIDs(context.Context, []string, bool) map[int]struct{} {
 	return nil
 }
+
+func (dummyArrClient) ResolveExcludeTagIDsErr(context.Context, []string, bool) (map[int]struct{}, error) {
+	return nil, nil
+}
 func (dummyArrClient) RescanSeries(context.Context, int) error { return nil }
 func (dummyArrClient) RescanMovie(context.Context, int) error  { return nil }
 func (dummyArrClient) SeriesByID(context.Context, int) (arrapi.Series, error) {
