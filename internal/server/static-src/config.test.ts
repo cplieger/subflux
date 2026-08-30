@@ -27,6 +27,7 @@ vi.mock("@cplieger/actions", () => ({
   bindLoadingState: () => undefined,
   retryNetwork: (fn: unknown) => fn,
   RETRY_STANDARD: {},
+  registerCleanup: () => undefined,
 }));
 
 import { markRequiredFields, buildSectionsFromForm } from "./config.js";

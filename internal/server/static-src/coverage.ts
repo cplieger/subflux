@@ -64,6 +64,57 @@ export function coverageLoaded(): boolean {
   return coverage.size > 0;
 }
 
+// --- A6 pair-landing state: the heal gate + task 9's collection-leg seam ---
+
+// True once a full series+movies pair has LANDED this tab. Distinct from
+// coverageLoaded(): row-level upserts (a heal into an incomplete collection)
+// never set it, so an incomplete collection cannot open the heal gate.
+let pairLanded = false;
+// Collections a landed pair registered for later transaction collection legs
+// (task 9 reads registeredCollections ∪ the current route's needs). Tab
+// state — survives SSE boot_id changes.
+const registeredCollectionNames = new Set<string>();
+
+/** A6's heal gate: true once the full library pair has landed this tab. */
+export function libraryLoaded(): boolean {
+  return pairLanded;
+}
+
+/** Collections registered by landed pair loads (task 9's collection leg). */
+export function registeredCollections(): ReadonlySet<string> {
+  return registeredCollectionNames;
+}
+
+/** A6 heal write: identity-preserving single-row upsert. A row whose
+ *  signature is unchanged keeps its CURRENT object (its signal never fires,
+ *  nothing repaints); a changed row lands whole and repaints through the
+ *  data-sig-gated full-row updater; a new root is appended (display order is
+ *  the filtered view's sort, not collection order). */
+export function applyHealedRow(item: CoverageItem): void {
+  const cur = coverage.get(coverageMediaId(item));
+  if (cur !== undefined && coverageItemSignature(cur) === coverageItemSignature(item)) {
+    return;
+  }
+  coverage.upsert(item);
+}
+
+/** A6 heal delete: a summary 404 means the collection omits this row now. */
+export function removeCoverageRow(rootKey: string): void {
+  coverage.remove(rootKey);
+}
+
+/** Untracked read of one row by collection key (`tvdb-{n}` / `tmdb-{n}`). */
+export function coverageRow(rootKey: string): CoverageItem | undefined {
+  return coverage.get(rootKey);
+}
+
+/** Test-only: drop all rows, close the heal gate, forget registrations. */
+export function _resetCoverageForTest(): void {
+  coverage.clear();
+  pairLanded = false;
+  registeredCollectionNames.clear();
+}
+
 /** Snapshot of the current coverage rows (for non-reactive lookups). */
 export function coverageItems(): CoverageItem[] {
   return coverage.items();
@@ -131,7 +182,18 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
       ? cur
       : item;
   });
+  // A6 RESET RULE: every row is about to be overwritten, so the heal
+  // coalescer aborts its in-flight per-root GETs and drops its pending window
+  // before the snapshot lands.
+  emit(BusEvent.CoverageOverwrite);
   coverage.setAll(merged);
+  if (series !== null && movies !== null) {
+    // The pair LANDED: open A6's heal gate and register the pair for task 9's
+    // transaction collection legs. A null leg is a failed read (the generated
+    // client null-collapses), and a failed pair load must open nothing.
+    pairLanded = true;
+    registeredCollectionNames.add("series").add("movies");
+  }
   return merged;
 }
 

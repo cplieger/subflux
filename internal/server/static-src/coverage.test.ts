@@ -65,6 +65,7 @@ vi.mock("./bus.js", () => ({
     OpenMovie: "open:movie",
     ScanSeries: "scan:series",
     ScanMovie: "scan:movie",
+    CoverageOverwrite: "coverage:overwrite",
   },
 }));
 // Mocked whole: the real module registers apiActions at import time and pulls
@@ -93,12 +94,18 @@ vi.mock("./store.js", () => ({
 }));
 
 import {
+  _resetCoverageForTest,
+  applyHealedRow,
   configurePanel,
   coverageItems,
   coverageLoaded,
+  coverageRow,
   fetchAndMergeCoverage,
   filterCoverage,
+  libraryLoaded,
   loadCoverage,
+  registeredCollections,
+  removeCoverageRow,
   renderCoverage,
 } from "./coverage.js";
 import type { CoverageItem, CoverageTarget } from "./api-types.js";
@@ -188,6 +195,7 @@ beforeEach(async () => {
   clientState.defer = false;
   clientState.pending = [];
   await fetchAndMergeCoverage();
+  _resetCoverageForTest(); // gate + registrations back to a fresh tab
   clientState.signals = [];
   document.body.innerHTML = FIXTURE;
   bus.emitted = [];
@@ -246,7 +254,9 @@ function cellsOf(i: number): Element[] {
   return Array.from(reqRow(i).children);
 }
 
-/** Render the given wire rows through the real load path. */
+/** Render the given wire rows through the real load path. Drops the load's
+ *  own `coverage:overwrite` emission (pinned by its own suite below) so
+ *  interaction tests assert only what the interaction emitted. */
 async function load(
   seriesRows: Record<string, unknown>[],
   movieRows: Record<string, unknown>[] = [],
@@ -254,6 +264,7 @@ async function load(
   clientState.series = seriesRows;
   clientState.movies = movieRows;
   await loadCoverage();
+  bus.emitted = bus.emitted.filter((e) => e.event !== "coverage:overwrite");
 }
 
 describe("coverage: fetchAndMergeCoverage", () => {
@@ -656,7 +667,8 @@ describe("coverage: identity-preserving merge", () => {
     // The row click hands the CURRENT entity to the detail view — a closure
     // over the mount-time object would deliver the stale count.
     reqRow(0).click();
-    expect(bus.emitted[0]?.payload).toEqual({
+    expect(bus.emitted.at(-1)?.event).toBe("open:series");
+    expect(bus.emitted.at(-1)?.payload).toEqual({
       item: expect.objectContaining({ title: "One", episodes: 4 }),
     });
   });
@@ -1341,5 +1353,73 @@ describe("coverage: renderCoverage", () => {
     renderCoverage();
 
     expect(rowTitles()).toEqual(["Show"]);
+  });
+});
+
+describe("coverage: A6 pair landing (heal gate + task 9 seam)", () => {
+  it("a landed pair opens the gate and registers both collections", async () => {
+    expect(libraryLoaded()).toBe(false);
+    expect(registeredCollections().size).toBe(0);
+
+    await load([series(1, "Show")], [movie(2, "Film")]);
+
+    expect(libraryLoaded()).toBe(true);
+    expect([...registeredCollections()].sort()).toEqual(["movies", "series"]);
+  });
+
+  it("a failed leg (null read) lands nothing: gate closed, nothing registered", async () => {
+    clientState.series = null; // the generated client null-collapses failures
+    clientState.movies = [movie(2, "Film")];
+
+    await fetchAndMergeCoverage();
+
+    expect(libraryLoaded()).toBe(false);
+    expect(registeredCollections().size).toBe(0);
+  });
+
+  it("emits coverage:overwrite before every pair snapshot (the reset-rule trigger)", async () => {
+    clientState.series = [series(1, "Show")];
+    clientState.movies = [];
+
+    await fetchAndMergeCoverage();
+
+    expect(bus.emitted.map((e) => e.event)).toContain("coverage:overwrite");
+  });
+
+  it("applyHealedRow upserts a changed row and keeps an unchanged row's object", async () => {
+    await load([series(1, "Show")]);
+    const cur = coverageRow("tvdb-1");
+
+    // Fresh object, equal signature: the CURRENT object must survive.
+    applyHealedRow({ ...series(1, "Show"), _type: "series" } as CoverageItem);
+    expect(coverageRow("tvdb-1")).toBe(cur);
+
+    // A real change lands whole and repaints the row.
+    applyHealedRow({
+      ...series(1, "Show", { targets: [target("en", 3, 3)] }),
+      _type: "series",
+    } as CoverageItem);
+    expect(coverageRow("tvdb-1")).not.toBe(cur);
+    expect(badges(0)).toEqual(["ok|en3/3"]);
+  });
+
+  it("applyHealedRow inserts a new root without opening the gate", async () => {
+    await fetchAndMergeCoverage(); // empty pair: gate opens, rows stay empty
+    _resetCoverageForTest(); // ...so close it again: an incomplete tab
+
+    applyHealedRow({ ...series(7, "New Show"), _type: "series" } as CoverageItem);
+
+    expect(coverageRow("tvdb-7")?.title).toBe("New Show");
+    expect(coverageLoaded()).toBe(true); // rows exist...
+    expect(libraryLoaded()).toBe(false); // ...but the pair never landed
+  });
+
+  it("removeCoverageRow drops the row from the collection and the DOM", async () => {
+    await load([series(1, "One"), series(2, "Two")]);
+
+    removeCoverageRow("tvdb-1");
+
+    expect(coverageRow("tvdb-1")).toBeUndefined();
+    expect(rowTitles()).toEqual(["Two"]);
   });
 });
