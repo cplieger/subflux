@@ -348,12 +348,14 @@ func TestHandleScan_non_post_returns_405(t *testing.T) {
 }
 
 // TestBuildHandler_preserves_streaming_writer smoke-tests that the global
-// middleware chain (webhttp.Logging skip + Recoverer's StatusRecorder +
-// SecurityHeaders + Cache-Control) still hands a streaming handler a writer that
+// middleware chain (webhttp.Logging skip + Recoverer's StatusRecorder + the
+// gzip delayed-commit writer + SecurityHeaders + Cache-Control) still hands a
+// streaming handler a writer that
 // implements http.Flusher and whose http.ResponseController can clear the
 // per-connection write deadline (reaching the real writer via
-// StatusRecorder.Unwrap). This guards the SSE (/api/events, skipped by Logging)
-// and preview-video (/api/preview/video, logged) routes against the webhttp swap.
+// StatusRecorder.Unwrap). This guards the SSE (/api/events, skipped by Logging
+// and exempt from gzip) and preview-video (/api/preview/video, logged) routes
+// against the webhttp swap.
 func TestBuildHandler_preserves_streaming_writer(t *testing.T) {
 	t.Parallel()
 

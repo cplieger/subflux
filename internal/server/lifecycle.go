@@ -115,7 +115,12 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 // the StatusRecorder whose Unwrap keeps http.ResponseController (per-connection
 // write-deadline clearing) reaching the real writer. Recoverer sits INSIDE the
 // access logger so a recovered panic logs as its 500 (not the recorder's
-// default 200) and increments the panic metric. SecurityHeaders and the
+// default 200) and increments the panic metric. The delayed-commit gzip
+// writer (gzip.go) sits INSIDE Recoverer so a handler panic unwinds through
+// it before the 500 decision — an uncommitted buffer is discarded and the
+// 500 goes out clean; a committed compressed stream is sealed and the 500 is
+// skipped — and it short-circuits /api/events before wrapping (the SSE hub
+// needs the raw writer). SecurityHeaders and the
 // app-owned Cache-Control: no-store setter run innermost, so every response —
 // including 4xx/5xx envelopes — carries them.
 func (s *Server) buildHandler(mux http.Handler) http.Handler {
@@ -169,6 +174,7 @@ func (s *Server) buildHandler(mux http.Handler) http.Handler {
 			webhttp.WithRecoverLogger(slog.Default()),
 			webhttp.WithPanicHook(func(_ any, _ []byte) { s.metrics.RecordPanic() }),
 		),
+		gzipMW(),
 		securityHeadersMW(),
 		cacheControlMW,
 	)
