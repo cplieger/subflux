@@ -4,37 +4,46 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
 )
 
 var errMock = errors.New("mock error")
 
-// fakeSonarr implements MediaSonarrClient with canned data.
+// fakeSonarr implements MediaSonarrClient with canned data and records
+// whether each read's ctx carried the recovery marker.
 type fakeSonarr struct {
-	err      error
-	series   []arrapi.Series
-	episodes []arrapi.Episode
+	err            error
+	series         []arrapi.Series
+	episodes       []arrapi.Episode
+	seriesMarked   bool
+	episodesMarked bool
 }
 
-func (f *fakeSonarr) Series(_ context.Context) ([]arrapi.Series, error) {
+func (f *fakeSonarr) Series(ctx context.Context) ([]arrapi.Series, error) {
+	f.seriesMarked = arrsvc.RecoveryMarked(ctx)
 	return f.series, f.err
 }
 
-func (f *fakeSonarr) Episodes(_ context.Context, _ int) ([]arrapi.Episode, error) {
+func (f *fakeSonarr) Episodes(ctx context.Context, _ int) ([]arrapi.Episode, error) {
+	f.episodesMarked = arrsvc.RecoveryMarked(ctx)
 	return f.episodes, f.err
 }
 
 // fakeRadarr implements MediaRadarrClient with canned data.
 type fakeRadarr struct {
-	err    error
-	movies []arrapi.Movie
+	err          error
+	movies       []arrapi.Movie
+	moviesMarked bool
 }
 
-func (f *fakeRadarr) Movies(_ context.Context) ([]arrapi.Movie, error) {
+func (f *fakeRadarr) Movies(ctx context.Context) ([]arrapi.Movie, error) {
+	f.moviesMarked = arrsvc.RecoveryMarked(ctx)
 	return f.movies, f.err
 }
 
@@ -373,6 +382,113 @@ func TestHandleMediaEpisodes_invalid_series_id_returns_400(t *testing.T) {
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("HandleMediaEpisodes(%s) status = %d, want %d",
 					tt.name, rec.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
+// --- ?recovery=1 honoring (A3): episodes-by-series is the one honoring
+// endpoint of this family; the series and movie lists ignore the parameter ---
+
+func TestHandleMediaEpisodes_recovery_honoring(t *testing.T) {
+	t.Parallel()
+
+	t.Run("interprets_recovery_1", func(t *testing.T) {
+		t.Parallel()
+		sonarr := &fakeSonarr{episodes: []arrapi.Episode{{ID: 101, SeasonNumber: 1, EpisodeNumber: 1}}}
+		h := newMediaHandler(sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleMediaEpisodes(rec,
+			httptest.NewRequest(http.MethodGet, "/api/media/series/1/episodes?recovery=1", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if !sonarr.episodesMarked {
+			t.Error("marked request: Episodes ctx carried no recovery marker")
+		}
+	})
+
+	t.Run("plain_read_stays_unmarked", func(t *testing.T) {
+		t.Parallel()
+		sonarr := &fakeSonarr{episodes: []arrapi.Episode{{ID: 101, SeasonNumber: 1, EpisodeNumber: 1}}}
+		h := newMediaHandler(sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleMediaEpisodes(rec,
+			httptest.NewRequest(http.MethodGet, "/api/media/series/1/episodes", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if sonarr.episodesMarked {
+			t.Error("plain request: Episodes ctx carried a recovery marker")
+		}
+	})
+
+	t.Run("only_the_literal_1_marks", func(t *testing.T) {
+		t.Parallel()
+		sonarr := &fakeSonarr{episodes: []arrapi.Episode{{ID: 101, SeasonNumber: 1, EpisodeNumber: 1}}}
+		h := newMediaHandler(sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleMediaEpisodes(rec,
+			httptest.NewRequest(http.MethodGet, "/api/media/series/1/episodes?recovery=0", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if sonarr.episodesMarked {
+			t.Error("recovery=0 marked the read; only recovery=1 may")
+		}
+	})
+
+	t.Run("series_list_ignores_recovery_1", func(t *testing.T) {
+		t.Parallel()
+		sonarr := &fakeSonarr{series: []arrapi.Series{{ID: 1, Title: "Show", TvdbID: 81189}}}
+		h := newMediaHandler(sonarr, nil)
+		rec := httptest.NewRecorder()
+		h.HandleMediaSeries(rec,
+			httptest.NewRequest(http.MethodGet, "/api/media/series?recovery=1", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if sonarr.seriesMarked {
+			t.Error("media series list interpreted ?recovery=1; only the five honoring endpoints may")
+		}
+	})
+
+	t.Run("movie_list_ignores_recovery_1", func(t *testing.T) {
+		t.Parallel()
+		radarr := &fakeRadarr{movies: []arrapi.Movie{{ID: 1, Title: "Film", TmdbID: 12345}}}
+		h := newMediaHandler(nil, radarr)
+		rec := httptest.NewRecorder()
+		h.HandleMediaMovies(rec,
+			httptest.NewRequest(http.MethodGet, "/api/media/movies?recovery=1", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if radarr.moviesMarked {
+			t.Error("media movie list interpreted ?recovery=1; only the five honoring endpoints may")
+		}
+	})
+}
+
+func TestHandleMediaEpisodes_sentinel_mapping(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		err  error
+		name string
+		want int
+	}{
+		{name: "refused_maps_to_429", err: fmt.Errorf("%w: budget", arrsvc.ErrRecoveryRefused), want: http.StatusTooManyRequests},
+		{name: "unknown_series_maps_to_404", err: fmt.Errorf("%w: series 1", arrsvc.ErrUnknownSeries), want: http.StatusNotFound},
+		{name: "failed_maps_to_502", err: fmt.Errorf("%w: upstream", arrsvc.ErrRecoveryFailed), want: http.StatusBadGateway},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := newMediaHandler(&fakeSonarr{err: tc.err}, nil)
+			rec := httptest.NewRecorder()
+			h.HandleMediaEpisodes(rec,
+				httptest.NewRequest(http.MethodGet, "/api/media/series/1/episodes?recovery=1", nil))
+			if rec.Code != tc.want {
+				t.Errorf("episodes status = %d, want %d (err %v)", rec.Code, tc.want, tc.err)
 			}
 		})
 	}

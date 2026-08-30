@@ -1,11 +1,15 @@
 package coveragehandlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/cplieger/arrapi/v2"
@@ -691,5 +695,208 @@ func TestHandleCoverageMovies_nil_movie_file_omits_path(t *testing.T) {
 	}
 	if result[0].SceneName != "" {
 		t.Errorf("scene_name = %q, want empty (nil MovieFile)", result[0].SceneName)
+	}
+}
+
+// --- The movies wire cut (A3): no inlined rows, positive canonical ids ---
+
+func TestHandleCoverageMovies_serializes_no_subs_key(t *testing.T) {
+	t.Parallel()
+	// The store HOLDS rows for the movie; the collection must still serialize
+	// none of them — a decode-level pin, so a re-added field under any name
+	// tag ("subs") fails here whatever the Go struct looks like.
+	store := &mockCoverageStore{subtitleFiles: []subflux.SubtitleEntry{
+		{MediaID: "tmdb-12345", Language: "fr", Variant: "standard", Source: "external", Codec: "srt"},
+	}}
+	cfg := &fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}}
+	h := newCoverageHandler(store, cfg, nil, &covRadarrFake{movies: coverageMoviesFixture()})
+
+	rec := httptest.NewRecorder()
+	h.HandleCoverageMovies(rec, httptest.NewRequest(http.MethodGet, "/api/coverage/movies", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(raw) == 0 {
+		t.Fatal("collection serialized no rows; the no-subs assertion would be vacuous")
+	}
+	for i, row := range raw {
+		if _, ok := row["subs"]; ok {
+			t.Errorf("row %d carries a subs key; A3 removed inlined subtitle rows from the collection wire", i)
+		}
+	}
+}
+
+func TestHandleCoverageSeries_drops_rows_without_positive_canonical_id(t *testing.T) {
+	t.Parallel()
+	series := []arrapi.Series{
+		{ID: 1, Title: "Keyed", TvdbID: 81189, Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 3}},
+		// No TVDB id: the client keys rows "tvdb-{id}", so every such row
+		// would collide onto "tvdb-0" (the key-collision class A3 closes) —
+		// the imdb id does not rescue it.
+		{ID: 2, Title: "Zero Id", TvdbID: 0, ImdbID: "tt0000001", Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5}},
+	}
+	h := newCoverageHandler(&mockCoverageStore{},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
+		&covSonarrFake{series: series}, nil)
+
+	rec := httptest.NewRecorder()
+	h.HandleCoverageSeries(rec, httptest.NewRequest(http.MethodGet, "/api/coverage/series", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var result []SeriesItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result) != 1 || result[0].TvdbID != 81189 {
+		t.Errorf("collection = %+v, want only the tvdb-81189 row (zero-id rows dropped)", result)
+	}
+}
+
+func TestHandleCoverageMovies_drops_rows_without_positive_canonical_id(t *testing.T) {
+	t.Parallel()
+	movies := []arrapi.Movie{
+		{ID: 1, Title: "Keyed", TmdbID: 12345, HasFile: true},
+		// No TMDB id: even with the imdb fallback available the row has no
+		// positive canonical id — the client would key it "tmdb-0" and the
+		// summary route could never address it.
+		{ID: 2, Title: "Imdb Only", TmdbID: 0, ImdbID: "tt0000002", HasFile: true},
+	}
+	h := newCoverageHandler(&mockCoverageStore{},
+		&fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "fr"}}},
+		nil, &covRadarrFake{movies: movies})
+
+	rec := httptest.NewRecorder()
+	h.HandleCoverageMovies(rec, httptest.NewRequest(http.MethodGet, "/api/coverage/movies", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var result []MovieItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result) != 1 || result[0].TmdbID != 12345 {
+		t.Errorf("collection = %+v, want only the tmdb-12345 row (zero-id rows dropped)", result)
+	}
+}
+
+// TestHandleCoverageMovies_payload_size_evidence records the collection
+// payload sizes at a realistic library scale, against a reconstruction of the
+// pre-A3 wire (the same rows with their subtitle entries inlined, the shape
+// HandleCoverageMovies serialized before the cut). EVIDENCE for the ≥60%
+// size-reduction hypothesis, not a gate: the numbers land in the test log;
+// the only assertion is that the cut payload stayed smaller.
+func TestHandleCoverageMovies_payload_size_evidence(t *testing.T) {
+	t.Parallel()
+	const movieCount = 1000
+
+	movies := make([]arrapi.Movie, 0, movieCount)
+	var files []subflux.SubtitleEntry
+	for i := range movieCount {
+		tmdb := 10000 + i
+		movies = append(movies, arrapi.Movie{
+			ID:               i + 1,
+			Title:            fmt.Sprintf("Deterministic Movie %04d: The Reckoning", i),
+			Year:             1970 + i%55,
+			TmdbID:           tmdb,
+			ImdbID:           fmt.Sprintf("tt%07d", 1000000+i),
+			InCinemas:        "2024-06-01",
+			DigitalRelease:   "2024-09-01",
+			HasFile:          true,
+			OriginalLanguage: &arrapi.Language{Name: "English"},
+			MovieFile: &arrapi.MovieFile{
+				Path:      fmt.Sprintf("/movies/Deterministic Movie %04d (2024)/movie.mkv", i),
+				SceneName: fmt.Sprintf("Deterministic.Movie.%04d.2024.1080p.BluRay.x264-GROUP", i),
+			},
+			Tags: []int{1, 3},
+		})
+		// Subtitle rows per movie, deterministic by index: one external per
+		// covered target (en always, fr for every other movie) plus 0-7
+		// embedded tracks — coverage indexes EVERY embedded subtitle track
+		// (text and bitmap alike), and multi-language embeds dominate real
+		// libraries. Average ≈ 5 rows per movie.
+		mediaID := "tmdb-" + strconv.Itoa(tmdb)
+		files = append(files, subflux.SubtitleEntry{
+			MediaID: mediaID, Language: "en", Variant: "standard",
+			Source: "opensubtitles", Codec: "srt", Score: 80 + i%20, OffsetMs: int64(i % 500),
+		})
+		if i%2 == 0 {
+			files = append(files, subflux.SubtitleEntry{
+				MediaID: mediaID, Language: "fr", Variant: "standard",
+				Source: "subdl", Codec: "srt", Score: 60 + i%30, Ordinal: 1,
+			})
+		}
+		embLangs := [...]string{"en", "fr", "de", "es", "ja", "pt", "it"}
+		embCodecs := [...]string{"pgs", "ass", "srt"}
+		for e := range i % 8 {
+			files = append(files, subflux.SubtitleEntry{
+				MediaID: mediaID, Language: embLangs[e%len(embLangs)], Variant: "standard",
+				Source: "embedded", Codec: embCodecs[e%len(embCodecs)],
+			})
+		}
+	}
+
+	store := &mockCoverageStore{subtitleFiles: files}
+	cfg := &fakeCoverageCfg{targets: []subflux.SubtitleTarget{{Code: "en"}, {Code: "fr"}}}
+	h := newCoverageHandler(store, cfg, nil, &covRadarrFake{movies: movies})
+
+	rec := httptest.NewRecorder()
+	h.HandleCoverageMovies(rec, httptest.NewRequest(http.MethodGet, "/api/coverage/movies", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	after := rec.Body.Bytes()
+
+	// The pre-cut wire: each row plus its deduplicated inlined entries, the
+	// exact attach the collection performed before A3.
+	var items []MovieItem
+	if err := json.Unmarshal(after, &items); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	byMedia := make(map[string][]subflux.SubtitleEntry)
+	for i := range files {
+		byMedia[files[i].MediaID] = append(byMedia[files[i].MediaID], files[i])
+	}
+	type preCutMovieItem struct {
+		MovieItem
+		Subs []subflux.SubtitleEntry `json:"subs"`
+	}
+	preCut := make([]preCutMovieItem, 0, len(items))
+	for _, item := range items {
+		preCut = append(preCut, preCutMovieItem{
+			MovieItem: item,
+			Subs:      coverage.DeduplicateFileRows(byMedia["tmdb-"+strconv.Itoa(item.TmdbID)]),
+		})
+	}
+	before, err := json.Marshal(preCut)
+	if err != nil {
+		t.Fatalf("marshal pre-cut payload: %v", err)
+	}
+
+	gzipSize := func(b []byte) int {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		if _, werr := zw.Write(b); werr != nil {
+			t.Fatalf("gzip write: %v", werr)
+		}
+		if cerr := zw.Close(); cerr != nil {
+			t.Fatalf("gzip close: %v", cerr)
+		}
+		return buf.Len()
+	}
+	beforeGz, afterGz := gzipSize(before), gzipSize(after)
+	pct := func(b, a int) float64 { return 100 * (1 - float64(a)/float64(b)) }
+	t.Logf("movies collection payload at %d movies (%d subtitle rows):", movieCount, len(files))
+	t.Logf("  raw:  %d -> %d bytes (-%.1f%%)", len(before), len(after), pct(len(before), len(after)))
+	t.Logf("  gzip: %d -> %d bytes (-%.1f%%)", beforeGz, afterGz, pct(beforeGz, afterGz))
+
+	if len(after) >= len(before) {
+		t.Errorf("cut payload (%d bytes) is not smaller than the pre-cut payload (%d bytes)",
+			len(after), len(before))
 	}
 }

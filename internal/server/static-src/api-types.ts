@@ -18,7 +18,7 @@ export type {
   SyncAudioResponse,
 } from "./wire/types.gen.js";
 
-import type { MovieItem, CoverageTarget, SubtitleEntry } from "./wire/types.gen.js";
+import type { MovieItem, CoverageTarget } from "./wire/types.gen.js";
 
 // --- Client-only types ---
 
@@ -43,7 +43,6 @@ export interface CoverageItem {
   scene_name?: string;
   in_cinemas?: string;
   digital_release?: string;
-  subs?: SubtitleEntry[];
   // Shared optional
   imdb_id?: string;
   tags?: number[];

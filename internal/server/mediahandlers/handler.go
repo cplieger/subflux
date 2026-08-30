@@ -4,6 +4,7 @@ package mediahandlers
 import (
 	"cmp"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cplieger/arrapi/v2"
+	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
 	"golang.org/x/sync/singleflight"
@@ -185,6 +187,7 @@ type SeasonGroup struct {
 }
 
 // HandleMediaEpisodes returns episodes for a series, grouped by season.
+// Honors ?recovery=1 by marking the request context for the arr-read wrapper.
 // GET /api/media/series/{id}/episodes
 func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 	ls := h.deps.StateFunc()
@@ -204,11 +207,9 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	episodes, err := ls.Sonarr.Episodes(r.Context(), seriesID)
+	episodes, err := ls.Sonarr.Episodes(markRecovery(r), seriesID)
 	if err != nil {
-		slog.Error("media browser: failed to fetch episodes",
-			"series_id", seriesID, "error", err)
-		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch episodes")
+		writeEpisodesReadError(w, r, err, seriesID)
 		return
 	}
 
@@ -230,6 +231,36 @@ func (h *Handler) HandleMediaEpisodes(w http.ResponseWriter, r *http.Request) {
 		out = append(out, item)
 	}
 	httpapi.WriteJSON(w, groupEpisodesBySeason(out))
+}
+
+// markRecovery returns the request context, marked for wave admission when
+// the request carries ?recovery=1 (the coveragehandlers helper, mirrored).
+// Episodes-by-series is this family's one honoring endpoint; the series and
+// movie lists never call it.
+func markRecovery(r *http.Request) context.Context {
+	if r.URL.Query().Get("recovery") == "1" {
+		return arrsvc.WithRecovery(r.Context())
+	}
+	return r.Context()
+}
+
+// writeEpisodesReadError maps an episodes-read failure onto the wire: the
+// wrapper's refusal sentinel answers 429 (a refusal to keep waiting, never a
+// 500; deliberately no Retry-After — the client's latch ladder is the retry
+// policy), the ordered gate's post-wave miss answers 404 with no upstream
+// call made, and everything else — wave execution failures included — keeps
+// the family's upstream-failure 502.
+func writeEpisodesReadError(w http.ResponseWriter, r *http.Request, err error, seriesID int) {
+	switch {
+	case errors.Is(err, arrsvc.ErrRecoveryRefused):
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "arr read refused, retry later")
+	case errors.Is(err, arrsvc.ErrUnknownSeries):
+		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "unknown series")
+	default:
+		slog.Error("media browser: failed to fetch episodes",
+			"series_id", seriesID, "error", err)
+		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch episodes")
+	}
 }
 
 // groupEpisodesBySeason groups episodes by season number, sorted ascending.

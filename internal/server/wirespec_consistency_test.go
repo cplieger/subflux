@@ -81,6 +81,53 @@ func TestWirespec_matches_registerRoutes(t *testing.T) {
 	}
 }
 
+// TestWirespec_query_flags pins each endpoint's Query flag against a full
+// snapshot, split by why it is set: the FIVE ?recovery=1-honoring endpoints
+// (the two coverage collections, episodes-by-series, and the two per-item
+// summaries — A3's transport precondition) and the eleven shipped endpoints
+// that carry it for unrelated query strings. Every other endpoint is
+// flag-free — a new Query: true is a deliberate wire-contract change that
+// updates this snapshot. The HONORING pin itself is handler-level (the
+// coveragehandlers and mediahandlers recovery tests); this is the transport
+// half of the split.
+func TestWirespec_query_flags(t *testing.T) {
+	t.Parallel()
+	honoring := map[string]bool{
+		"coverageSeries":        true,
+		"coverageMovies":        true,
+		"mediaEpisodes":         true,
+		"coverageSeriesSummary": true,
+		"coverageMovieSummary":  true,
+	}
+	unrelatedQuery := map[string]bool{
+		"webauthnLoginBegin": true,
+		"dismissAlert":       true,
+		"dismissActivity":    true,
+		"manualSearch":       true,
+		"searchResolve":      true,
+		"searchTargets":      true,
+		"listState":          true,
+		"stateIDs":           true,
+		"backoffPrefix":      true,
+		"listFiles":          true,
+		"previewStart":       true,
+	}
+	seen := 0
+	for _, e := range wirespec.Endpoints() {
+		want := honoring[e.Name] || unrelatedQuery[e.Name]
+		if e.Query != want {
+			t.Errorf("endpoint %s: Query = %v, want %v", e.Name, e.Query, want)
+		}
+		if want {
+			seen++
+		}
+	}
+	if want := len(honoring) + len(unrelatedQuery); seen != want {
+		t.Errorf("snapshot names %d Query endpoints, table matched %d — a renamed or removed entry must update this snapshot",
+			want, seen)
+	}
+}
+
 // TestWirespec_routePatterns_are_prefix_consistent pins the override map's
 // shape: every override must either be method-less (the deliberately
 // any-method routes) or a "METHOD /prefix/" trailing-slash pattern whose

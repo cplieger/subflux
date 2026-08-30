@@ -306,7 +306,7 @@ export interface MeResponse {
 /**
  * MovieItem is the coverage summary for one movie. It carries no file path
  * (S7): clients address the video by MediaRef (id = arr ID) and the server
- * resolves paths.
+ * resolves paths. Subtitle rows travel on /subs (A2/A3), never inline.
  */
 export interface MovieItem {
   title: string;
@@ -317,7 +317,6 @@ export interface MovieItem {
   audio_lang: string;
   rule: string;
   targets: CoverageTarget[];
-  subs: SubtitleEntry[];
   tags?: number[];
   tmdb_id: number;
   id: number;
