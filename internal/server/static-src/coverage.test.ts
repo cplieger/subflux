@@ -101,7 +101,7 @@ import {
   loadCoverage,
   renderCoverage,
 } from "./coverage.js";
-import type { CoverageItem, CoverageTarget } from "./api-types.js";
+import type { CoverageItem, CoverageTarget, SubtitleEntry } from "./api-types.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -149,6 +149,20 @@ function movie(
     has_file: true,
     targets: [target("en", 0, 1)],
     ...extra,
+  };
+}
+
+/** Movie subtitle entry with the given score (the movie-detail badge input). */
+function sub(score: number): SubtitleEntry {
+  return {
+    media_id: "tmdb-1",
+    language: "en",
+    variant: "standard",
+    source: "opensubtitles",
+    codec: "srt",
+    score,
+    ordinal: 1,
+    offset_ms: 0,
   };
 }
 
@@ -229,6 +243,21 @@ function badges(i: number): string[] {
   return Array.from(reqRow(i).querySelectorAll(".badge")).map(
     (b) => `${b.getAttribute("data-status") ?? ""}|${b.textContent ?? ""}`,
   );
+}
+
+/** The row's content signature, read off the DOM the way update() compares it. */
+function rowSig(i: number): string {
+  const sig = reqRow(i).dataset["sig"];
+  if (sig === undefined) {
+    throw new Error("row carries no data-sig");
+  }
+  return sig;
+}
+
+/** One row's cell elements by identity — a repaint replaces them, a skipped
+ *  repaint keeps every reference. */
+function cellsOf(i: number): Element[] {
+  return Array.from(reqRow(i).children);
 }
 
 /** Render the given wire rows through the real load path. */
@@ -564,19 +593,226 @@ describe("coverage: row interaction", () => {
   });
 });
 
-describe("coverage: per-row repaint", () => {
-  it("repaints only the changed row's badge cell", async () => {
-    await load([series(1, "One"), series(2, "Two")]);
-    const firstRow = reqRow(0);
+describe("coverage: identity-preserving merge", () => {
+  /** applyFilters reads #cov-filter exactly once per run, so counting that
+   *  lookup counts recomputes of the filtered+sorted view (sort included). */
+  function countRecomputes(): () => number {
+    const byId = vi.spyOn(document, "getElementById");
+    return () => byId.mock.calls.filter(([id]) => id === "cov-filter").length;
+  }
 
-    // Same ids in the same order: the structure tier must not reconcile, so the
-    // row node survives and only its badge cell is rewritten.
+  it("a no-op refresh repaints zero rows and recomputes nothing", async () => {
+    await load([series(1, "One"), series(2, "Two")], [movie(3, "Film")]);
+    const beforeCells = [...cellsOf(0), ...cellsOf(1), ...cellsOf(2)];
+    const sigs = [rowSig(0), rowSig(1), rowSig(2)];
+    const recomputes = countRecomputes();
+
+    // Same wire payload again: every merged object is fresh, every signature
+    // is equal, so the merge must keep the CURRENT objects and no per-row
+    // signal may fire.
+    await loadCoverage(true);
+
+    const afterCells = [...cellsOf(0), ...cellsOf(1), ...cellsOf(2)];
+    expect(afterCells.length).toBe(beforeCells.length);
+    for (const [k, cell] of afterCells.entries()) {
+      expect(cell).toBe(beforeCells[k]);
+    }
+    expect([rowSig(0), rowSig(1), rowSig(2)]).toEqual(sigs);
+    // The filtered view never recomputed, so the sort never ran either.
+    expect(recomputes()).toBe(0);
+  });
+
+  it("a one-row change repaints exactly that row and recomputes once", async () => {
+    await load([series(1, "One"), series(2, "Two")]);
+    const changed = reqRow(0);
+    const untouched = cellsOf(1);
+    const recomputes = countRecomputes();
+
     clientState.series = [series(1, "One", { targets: [target("en", 3, 3)] }), series(2, "Two")];
     await loadCoverage(true);
 
-    expect(reqRow(0)).toBe(firstRow);
+    // The changed row keeps its node (structure tier untouched) but every
+    // cell is rebuilt from the fresh item; the sibling keeps every cell.
+    expect(reqRow(0)).toBe(changed);
     expect(badges(0)).toEqual(["ok|en3/3"]);
     expect(badges(1)).toEqual(["partial|en1/3"]);
+    for (const [j, cell] of untouched.entries()) {
+      expect(cellsOf(1)[j]).toBe(cell);
+    }
+    expect(recomputes()).toBe(1);
+  });
+
+  it("a title-only change repaints the title cell in place", async () => {
+    // The full-row updater's reason to exist: the shipped one repainted only
+    // the badge cell, so a renamed title kept its old cell forever.
+    await load([series(1, "One"), series(2, "Two")]);
+    const row = reqRow(0);
+
+    clientState.series = [series(1, "Onf"), series(2, "Two")];
+    await loadCoverage(true);
+
+    expect(reqRow(0)).toBe(row);
+    expect(rowTitles()).toEqual(["Onf", "Two"]);
+  });
+
+  it("an episode-count change repaints its row and refreshes the click payload", async () => {
+    await load([series(1, "One", { episodes: 3 }), series(2, "Two")]);
+    const before = cellsOf(0);
+    const untouched = cellsOf(1);
+
+    clientState.series = [series(1, "One", { episodes: 4 }), series(2, "Two")];
+    await loadCoverage(true);
+
+    expect(cellsOf(0).some((cell, j) => cell !== before[j])).toBe(true);
+    for (const [j, cell] of untouched.entries()) {
+      expect(cellsOf(1)[j]).toBe(cell);
+    }
+    // The row click hands the CURRENT entity to the detail view — a closure
+    // over the mount-time object would deliver the stale count.
+    reqRow(0).click();
+    expect(bus.emitted[0]?.payload).toEqual({
+      item: expect.objectContaining({ title: "One", episodes: 4 }),
+    });
+  });
+
+  it("keeps focus on the focused row through a heal and a no-op refresh", async () => {
+    await load([series(1, "One"), series(2, "Two")]);
+    const row = reqRow(0);
+    row.focus();
+    expect(document.activeElement).toBe(row);
+
+    // A heal that repaints the focused row must not re-seat or blur it.
+    clientState.series = [series(1, "One", { targets: [target("en", 3, 3)] }), series(2, "Two")];
+    await loadCoverage(true);
+    expect(badges(0)).toEqual(["ok|en3/3"]);
+    expect(document.activeElement).toBe(row);
+
+    // A no-op refresh touches nothing at all.
+    await loadCoverage(true);
+    expect(document.activeElement).toBe(row);
+  });
+});
+
+describe("coverage: signature field audit", () => {
+  // The coverageItemSignature audit: every wire field of SeriesItem/MovieItem
+  // must flip the signature, because each one is rendered, keyed, filtered,
+  // sorted, or handed onward through a row action —
+  //   id                 scan scope keys, detail file/sync actions
+  //   tvdb_id/tmdb_id    collection key, detail routes
+  //   imdb_id            search popup identity query
+  //   title              cell, filter, sort
+  //   year               cell, sort tiebreak
+  //   first_aired / in_cinemas / digital_release   date sort
+  //   rule               Audio cell
+  //   audio_lang         detail header info
+  //   tags               exclusion inputs riding the item
+  //   excluded           action cell (badge vs Search)
+  //   has_file           movie detail sync gating
+  //   scene_name         search popup release matching
+  //   episodes           series detail header ("N ep")
+  //   targets            coverage badges (every field, own table below)
+  //   subs               movie detail badges/actions (leaves with the movies
+  //                      wire cut: A3 removes MovieItem.Subs, and this entry
+  //                      plus the signature component go with it)
+  // The mapped type is the enforcement: a field added to or removed from
+  // CoverageItem fails compilation here, forcing the audit to re-run. `_type`
+  // is the client merge's own discriminant (never on the wire), pinned by the
+  // dedicated series/movie pair test below.
+  const sigCases: {
+    [K in keyof Required<Omit<CoverageItem, "_type">>]: {
+      kind: "series" | "movie";
+      change: Pick<Required<CoverageItem>, K>;
+    };
+  } = {
+    id: { kind: "series", change: { id: 99 } },
+    tvdb_id: { kind: "series", change: { tvdb_id: 99 } },
+    tmdb_id: { kind: "movie", change: { tmdb_id: 99 } },
+    imdb_id: { kind: "series", change: { imdb_id: "tt0903747" } },
+    title: { kind: "series", change: { title: "Other" } },
+    year: { kind: "series", change: { year: 1999 } },
+    first_aired: { kind: "series", change: { first_aired: "2021-06-01" } },
+    in_cinemas: { kind: "movie", change: { in_cinemas: "2021-06-01" } },
+    digital_release: { kind: "movie", change: { digital_release: "2021-06-01" } },
+    rule: { kind: "series", change: { rule: "fr" } },
+    audio_lang: { kind: "series", change: { audio_lang: "fr" } },
+    tags: { kind: "series", change: { tags: [5] } },
+    excluded: { kind: "series", change: { excluded: true } },
+    has_file: { kind: "movie", change: { has_file: false } },
+    scene_name: { kind: "movie", change: { scene_name: "Film.2021.1080p" } },
+    episodes: { kind: "series", change: { episodes: 4 } },
+    targets: { kind: "series", change: { targets: [target("en", 1, 3), target("fr", 0, 3)] } },
+    subs: { kind: "movie", change: { subs: [sub(50)] } },
+  };
+
+  /** Load a base row of the given kind, then reload it with one field
+   *  changed; the two signatures the DOM carried are the audit's verdict. */
+  async function sigAfterMutation(
+    kind: "series" | "movie",
+    change: Partial<CoverageItem>,
+    baseExtra: Partial<CoverageItem> = {},
+  ): Promise<{ before: string; after: string }> {
+    const mk = (extra: Partial<CoverageItem>): Record<string, unknown> =>
+      kind === "series" ? series(1, "Show", extra) : movie(1, "Show", extra);
+    await load(kind === "series" ? [mk(baseExtra)] : [], kind === "movie" ? [mk(baseExtra)] : []);
+    const before = rowSig(0);
+    clientState.series = kind === "series" ? [mk({ ...baseExtra, ...change })] : [];
+    clientState.movies = kind === "movie" ? [mk({ ...baseExtra, ...change })] : [];
+    await loadCoverage(true);
+    return { before, after: rowSig(0) };
+  }
+
+  for (const [field, c] of Object.entries(sigCases)) {
+    it(`the signature covers ${field}`, async () => {
+      const { before, after } = await sigAfterMutation(c.kind, c.change);
+      expect(after).not.toBe(before);
+    });
+  }
+
+  // Each case differs from the base fixture's target("en", 1, 3) in exactly
+  // the named field; the mapped type forces a case per CoverageTarget field.
+  const targetCases: { [K in keyof Required<CoverageTarget>]: CoverageTarget } = {
+    language: target("fr", 1, 3),
+    variant: target("en", 1, 3, 0, "forced"),
+    have: target("en", 2, 3),
+    have_ignored: target("en", 1, 3, 1),
+    total: target("en", 1, 4),
+  };
+
+  for (const [field, mutated] of Object.entries(targetCases)) {
+    it(`the signature covers targets[].${field}`, async () => {
+      const { before, after } = await sigAfterMutation("series", { targets: [mutated] });
+      expect(after).not.toBe(before);
+    });
+  }
+
+  it("the signature covers the targets vector length", async () => {
+    const { before, after } = await sigAfterMutation("series", { targets: [] });
+    expect(after).not.toBe(before);
+  });
+
+  it("the signature covers a subs entry's content", async () => {
+    const { before, after } = await sigAfterMutation(
+      "movie",
+      { subs: [sub(99)] },
+      { subs: [sub(50)] },
+    );
+    expect(after).not.toBe(before);
+  });
+
+  it("a series row and a movie row never share a signature", async () => {
+    // Same title, year, rule and targets; the discriminant (with its id
+    // fields) keeps the signatures apart.
+    await load(
+      [series(1, "Show")],
+      [movie(1, "Show", { year: 2020, targets: [target("en", 1, 3)] })],
+    );
+
+    expect(rowSig(0)).not.toBe(rowSig(1));
+  });
+
+  it("an identical reload leaves the signature unchanged", async () => {
+    const { before, after } = await sigAfterMutation("series", {});
+    expect(after).toBe(before);
   });
 });
 
@@ -605,19 +841,6 @@ describe("coverage: empty states", () => {
     const empties = Array.from(document.querySelectorAll<HTMLElement>(".cov-list .empty"));
     expect(empties.map((e) => e.hidden)).toEqual([true, true]);
     expect(reqEl<HTMLElement>("table.library").hidden).toBe(false);
-  });
-
-  it("sizes the title column from the average title length", async () => {
-    // ceil(((4 + 8) / 2) * 2) = 12ch.
-    await load([series(1, "Four"), series(2, "EightAAA")]);
-
-    expect(reqEl<HTMLElement>("table.library").style.getPropertyValue("--title-w")).toBe("12ch");
-  });
-
-  it("sizes nothing while the table is empty", async () => {
-    await load([]);
-
-    expect(reqEl<HTMLElement>("table.library").style.getPropertyValue("--title-w")).toBe("");
   });
 });
 

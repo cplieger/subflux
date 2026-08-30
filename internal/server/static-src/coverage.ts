@@ -3,9 +3,11 @@
 // Two-tier reactive model: coverage rows live in a `createCollection` keyed by
 // media id (per-row signals); the table is rendered once via `bindList` over a
 // computed `visibleIds` view (filter + sort + pagination as a sliced id list).
-// A per-row SSE update repaints just that row; a filter/sort/page change
-// recomputes the view and reconciles structure. No paged-list, no manual
-// per-badge DOM patching.
+// A refresh merges identity-preservingly: a row whose content signature is
+// unchanged keeps its CURRENT object, so its signal never fires and nothing
+// repaints; a changed row repaints whole, gated by `data-sig`. A filter/sort/
+// page change recomputes the view and reconciles structure. No paged-list, no
+// manual per-badge DOM patching.
 
 import * as store from "./store.js";
 import { $, el, text, icon, errDiv, input, select, insertNavButton } from "./dom.js";
@@ -19,6 +21,7 @@ import { applyScanButtonState } from "./detail-scan.js";
 import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
 import { signal, computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
+import { join } from "@cplieger/keyenc";
 
 // --- Coverage view ---
 
@@ -66,8 +69,62 @@ export function coverageItems(): CoverageItem[] {
   return coverage.items();
 }
 
+/** Canonical content signature over EVERY field the library view renders,
+ *  keys, filters, sorts, or hands onward through a row action (row click →
+ *  detail, Search → scan): the full SeriesItem/MovieItem wire structs plus
+ *  the client `_type`. Audited by coverage.test.ts's per-field mutation
+ *  tables, typed over `keyof Required<CoverageItem>` and CoverageTarget so a
+ *  wire field change fails compilation there and re-runs the audit. Nested
+ *  keyenc `join`s (detail.ts's epSig discipline): a separator-carrying value
+ *  cannot alias field boundaries; a collision only skips a repaint, never
+ *  misidentifies a row. */
+function coverageItemSignature(item: CoverageItem): string {
+  return join(
+    item._type,
+    String(item.id),
+    String(item.tvdb_id ?? ""),
+    String(item.tmdb_id ?? ""),
+    item.imdb_id ?? "",
+    item.title,
+    String(item.year),
+    item.first_aired ?? "",
+    item.in_cinemas ?? "",
+    item.digital_release ?? "",
+    item.rule,
+    item.audio_lang,
+    join(...(item.tags ?? []).map(String)),
+    item.excluded ? "1" : "0",
+    String(item.has_file ?? ""),
+    item.scene_name ?? "",
+    String(item.episodes ?? ""),
+    join(
+      ...item.targets.map((t) =>
+        join(t.language, t.variant, String(t.have), String(t.have_ignored), String(t.total)),
+      ),
+    ),
+    join(
+      ...(item.subs ?? []).map((s) =>
+        join(
+          s.media_id,
+          s.language,
+          s.variant,
+          s.source,
+          s.codec ?? "",
+          String(s.score ?? ""),
+          String(s.ordinal ?? ""),
+          String(s.offset_ms ?? ""),
+        ),
+      ),
+    ),
+  );
+}
+
 /** Fetch series and movies coverage, merge with _type discriminant, and load
- *  the collection. Aborts any prior in-flight fetch — only the latest wins. */
+ *  the collection identity-preservingly: a row whose signature is unchanged
+ *  keeps its CURRENT object, so its per-row signal never fires (signals skip
+ *  Object.is-equal writes) and unchanged rows never repaint — the filtered/
+ *  sorted views recompute only when something real changed. Aborts any prior
+ *  in-flight fetch — only the latest wins. */
 export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   coverageAbort?.abort();
   coverageAbort = new AbortController();
@@ -82,7 +139,12 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   const merged: CoverageItem[] = [
     ...(series ?? []).map((s) => ({ ...s, _type: "series" as const })),
     ...(movies ?? []).map((m) => ({ ...m, _type: "movie" as const })),
-  ];
+  ].map((item) => {
+    const cur = coverage.get(coverageMediaId(item));
+    return cur !== undefined && coverageItemSignature(cur) === coverageItemSignature(item)
+      ? cur
+      : item;
+  });
   coverage.setAll(merged);
   return merged;
 }
@@ -293,10 +355,12 @@ function buildBadges(targets: CoverageTarget[]): DocumentFragment {
   return frag;
 }
 
-function buildCoverageRow(item: CoverageItem): HTMLElement {
+/** The five cells of a coverage row, all derived from the item. Shared by
+ *  mount and the full-row updater so the two can never drift; the button
+ *  closures capture the item they were painted from, which the `data-sig`
+ *  gate keeps current up to signature equality. */
+function coverageRowCells(item: CoverageItem): HTMLElement[] {
   const isSeries = item._type === "series";
-  const targets = item.targets;
-  const covFrag = buildBadges(targets);
   const covId = coverageMediaId(item);
 
   const arrType = isSeries ? "Sonarr" : "Radarr";
@@ -333,30 +397,46 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
     actionBtn = scanBtn;
   }
 
-  const openDetail = isSeries
-    ? () => {
-        emit(BusEvent.OpenSeries, { item });
-      }
-    : () => {
-        emit(BusEvent.OpenMovie, { item });
-      };
-
-  return clickableRow(
-    openDetail,
+  return [
     el("td", { "data-col": "title" }, item.title),
     el("td", { "data-col": "meta" }, String(item.year || "")),
     el("td", { "data-col": "meta" }, langName(item.rule || "default")),
-    el("td", { "data-col": "badges", "data-cov-id": covId }, covFrag),
+    el("td", { "data-col": "badges", "data-cov-id": covId }, buildBadges(item.targets)),
     el("td", { "data-col": "actions" }, actionBtn),
-  );
+  ];
 }
 
-function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
+function buildCoverageRow(item: CoverageItem): HTMLElement {
   const covId = coverageMediaId(item);
-  const cell = row.querySelector(`[data-cov-id="${CSS.escape(covId)}"]`);
-  if (cell) {
-    cell.replaceChildren(buildBadges(item.targets));
+  const row = clickableRow(
+    () => {
+      // Late-bound: the collection is the source of truth, so a click always
+      // hands the CURRENT entity to the detail view — a closure over the
+      // mount-time item would go stale the first time this row is updated.
+      const cur = coverage.get(covId);
+      if (!cur) {
+        return;
+      }
+      emit(cur._type === "series" ? BusEvent.OpenSeries : BusEvent.OpenMovie, { item: cur });
+    },
+    ...coverageRowCells(item),
+  );
+  row.dataset["sig"] = coverageItemSignature(item);
+  return row;
+}
+
+/** Full-row in-place updater, gated by `data-sig` (the detail.ts discipline):
+ *  a signature-equal update is a no-op, and a real change rebuilds every cell
+ *  from the fresh item — title, year, audio, badges, action — so no cell can
+ *  serve stale content. The row element itself is kept (focus and structure
+ *  tier untouched). */
+function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
+  const sig = coverageItemSignature(item);
+  if (row.dataset["sig"] === sig) {
+    return;
   }
+  row.replaceChildren(...coverageRowCells(item));
+  row.dataset["sig"] = sig;
 }
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
@@ -423,7 +503,7 @@ function ensureMounted(): void {
     ),
   );
 
-  // Empty-state / show-more / title-width, all derived from the collection +
+  // Empty-state / show-more visibility, derived from the collection +
   // filtered view.
   bindings.push(
     effect(() => {
@@ -435,12 +515,6 @@ function ensureMounted(): void {
       const tableEmpty = !hasData || filtered.length === 0;
       tbl.hidden = tableEmpty;
       showMore.hidden = tableEmpty || visibleCount >= filtered.length;
-      if (!tableEmpty) {
-        const avgLen = Math.ceil(
-          (filtered.reduce((sum, i) => sum + i.title.length, 0) / (filtered.length || 1)) * 2,
-        );
-        tbl.style.setProperty("--title-w", `${avgLen}ch`);
-      }
     }),
   );
 }

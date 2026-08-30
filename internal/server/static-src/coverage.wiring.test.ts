@@ -340,23 +340,35 @@ describe("coverage: nav button labels", () => {
 });
 
 describe("coverage: render disposal", () => {
+  /** Row titles of one specific table element (the global rowTitles() only
+   *  sees the table attached to the document). */
+  function titlesOf(tbl: HTMLElement): string[] {
+    return Array.from(tbl.querySelectorAll('[data-col="title"]')).map((td) => td.textContent ?? "");
+  }
+
   it("a re-mounted table leaves its predecessor's bindings disposed", async () => {
     await load([series(1, "AA"), series(2, "BB")]);
     const discarded = reqEl<HTMLElement>("table.library");
-    expect(discarded.style.getPropertyValue("--title-w")).toBe("4ch");
+    expect(titlesOf(discarded)).toEqual(["AA", "BB"]);
 
     // Detail navigation replaces #coverageContent, so the next load re-mounts.
     reqEl("#coverageContent").replaceChildren();
-    await load([series(3, "CCCCC")]);
+    await load([series(3, "CC")]);
     const live = reqEl<HTMLElement>("table.library");
     expect(live).not.toBe(discarded);
+    // The re-mounting load writes the collection BEFORE ensureMounted
+    // disposes the old bindings, so the discarded table tracked that one
+    // last write...
+    expect(titlesOf(discarded)).toEqual(["CC"]);
 
-    await load([series(4, "DDDDDDDD")]);
+    await load([series(4, "DD")]);
 
-    // Only the live render tracks the collection now; the discarded table is
-    // frozen at the width and visibility it had when it was dropped.
-    expect(live.style.getPropertyValue("--title-w")).toBe("16ch");
-    expect(discarded.style.getPropertyValue("--title-w")).toBe("10ch");
+    // ...and is frozen from the re-mount on: only the live render tracks the
+    // collection, while the discarded table's rows and visibility stay
+    // exactly as dropped — an undisposed structural binding would have
+    // reconciled its tbody to "DD" too.
+    expect(titlesOf(live)).toEqual(["DD"]);
+    expect(titlesOf(discarded)).toEqual(["CC"]);
 
     await load([]);
 
