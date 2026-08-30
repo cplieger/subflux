@@ -114,7 +114,7 @@ type SeriesItem struct {
 
 // MovieItem is the coverage summary for one movie. It carries no file path
 // (S7): clients address the video by MediaRef (id = arr ID) and the server
-// resolves paths.
+// resolves paths. Subtitle rows travel on /subs (A2/A3), never inline.
 type MovieItem struct {
 	Title          string                    `json:"title"`
 	ImdbID         string                    `json:"imdb_id,omitempty"`
@@ -124,7 +124,6 @@ type MovieItem struct {
 	AudioLang      string                    `json:"audio_lang"`
 	Rule           string                    `json:"rule"`
 	Targets        []coverage.TargetCoverage `json:"targets"`
-	Subs           []subflux.SubtitleEntry   `json:"subs"`
 	Tags           []int                     `json:"tags,omitempty"`
 	TmdbID         int                       `json:"tmdb_id"`
 	ID             int                       `json:"id"`
@@ -134,13 +133,14 @@ type MovieItem struct {
 }
 
 // HandleCoverageSeries returns subtitle coverage for all TV series.
+// Honors ?recovery=1 by marking the request context for the arr-read wrapper.
 // GET /api/coverage/series
 func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	if r.Method != http.MethodGet {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
+	ctx := markRecovery(r)
 	ls := h.deps.StateFunc()
 	if ls.Sonarr == nil {
 		httpapi.WriteJSON(w, []SeriesItem{})
@@ -149,12 +149,7 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 
 	allSeries, excludeIDs, allFiles, err := h.fetchCoverageSeriesData(ctx, ls)
 	if err != nil {
-		if errors.Is(err, errFetchSeries) {
-			slog.Error("coverage: failed to fetch series", "error", err)
-			httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch series")
-		} else {
-			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage series files")
-		}
+		writeCollectionFetchError(w, r, err, errFetchSeries, "series")
 		return
 	}
 
@@ -185,8 +180,12 @@ func seriesEpisodeCount(ser *arrapi.Series) int {
 
 // seriesIncluded is the series half of the exclusion-parity predicate shared
 // by the collection and the per-item summary (A2): the summary 404s exactly
-// where the collection omits — today a series with zero episode files.
-func seriesIncluded(ser *arrapi.Series) bool { return seriesEpisodeCount(ser) > 0 }
+// where the collection omits — a series with zero episode files, or without a
+// positive TVDB id, the canonical id the client keys rows by (every zero-id
+// row would collide onto one "tvdb-0" key).
+func seriesIncluded(ser *arrapi.Series) bool {
+	return ser.TvdbID > 0 && seriesEpisodeCount(ser) > 0
+}
 
 // buildSeriesItem assembles one SeriesItem — the one construction site the
 // collection and the per-item summary share, so the summary stays deep-equal
@@ -233,13 +232,14 @@ func groupEpisodeSubsBySeries(allSeries []arrapi.Series, episodeSubs map[string]
 }
 
 // HandleCoverageMovies returns subtitle coverage for all movies.
+// Honors ?recovery=1 by marking the request context for the arr-read wrapper.
 // GET /api/coverage/movies
 func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	if r.Method != http.MethodGet {
 		httpapi.MethodNotAllowedC(w, r, subflux.CodeMethodNotAllowed)
 		return
 	}
+	ctx := markRecovery(r)
 	ls := h.deps.StateFunc()
 	if ls.Radarr == nil {
 		httpapi.WriteJSON(w, []MovieItem{})
@@ -248,21 +248,12 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 
 	allMovies, excludeIDs, allFiles, err := h.fetchCoverageMoviesData(ctx, ls)
 	if err != nil {
-		if errors.Is(err, errFetchMovies) {
-			slog.Error("coverage: failed to fetch movies", "error", err)
-			httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch movies")
-		} else {
-			httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage movies files")
-		}
+		writeCollectionFetchError(w, r, err, errFetchMovies, "movies")
 		return
 	}
 
 	ignoredCodecs := search.IgnoredCodecsFromConfig(ls.Cfg)
 	movieSubs := coverage.IndexSubStatus(allFiles, ignoredCodecs)
-	movieFiles := make(map[string][]subflux.SubtitleEntry)
-	for i := range allFiles {
-		movieFiles[allFiles[i].MediaID] = append(movieFiles[allFiles[i].MediaID], allFiles[i])
-	}
 
 	out := make([]MovieItem, 0, len(allMovies))
 	for i := range allMovies {
@@ -271,9 +262,7 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
-		item := buildMovieItem(ls.Cfg, m, movieSubs[mediaID], excludeIDs)
-		item.Subs = coverage.DeduplicateFileRows(movieFiles[mediaID])
-		out = append(out, item)
+		out = append(out, buildMovieItem(ls.Cfg, m, movieSubs[mediaID], excludeIDs))
 	}
 	slog.Debug("coverage: movies computed", "count", len(out), "movie_total", len(allMovies), "movie_files", len(allFiles))
 	httpapi.WriteJSON(w, out)
@@ -281,14 +270,16 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 
 // movieIncluded is the movie half of the exclusion-parity predicate shared by
 // the collection and the per-item summary (A2): the collection omits
-// file-less movies and rows with no canonical id.
+// file-less movies and rows without a positive TMDB id — the canonical id the
+// client keys rows by and the summary routes on, so an imdb-only row is
+// unaddressable and a zero id would collide onto "tmdb-0".
 func movieIncluded(m *arrapi.Movie) bool {
-	return m.HasFile && mediaid.Movie(m.TmdbID, m.ImdbID) != ""
+	return m.HasFile && m.TmdbID > 0
 }
 
-// buildMovieItem assembles one MovieItem minus Subs — the one construction
-// site the collection and the per-item summary share. The summary serializes
-// no rows (/subs owns them); the collection attaches its own.
+// buildMovieItem assembles one MovieItem — the one construction site the
+// collection and the per-item summary share, so the summary stays deep-equal
+// to the collection's row. Subtitle rows are never inlined; /subs owns them.
 func buildMovieItem(cfg coverageCfg, m *arrapi.Movie, subs map[coverage.Key]*coverage.Status, excludeIDs map[int]struct{}) MovieItem {
 	audioLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
 	targets := cfg.ResolveTargetsWithFallback(audioLang, nil)
@@ -411,8 +402,9 @@ func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, med
 		return fetchMedia(gctx)
 	})
 	g.Go(func() error {
-		excludeIDs = client.ResolveExcludeTagIDs(gctx, excludeTags, false)
-		return nil
+		var terr error
+		excludeIDs, terr = resolveExcludeTags(gctx, client, excludeTags)
+		return terr
 	})
 	g.Go(func() error {
 		var err error
@@ -423,6 +415,35 @@ func (h *Handler) fetchCoverageData(ctx context.Context, client tagResolver, med
 		return nil, nil, err
 	}
 	return excludeIDs, allFiles, nil
+}
+
+// resolveExcludeTags resolves the exclude-tag set for one coverage read: a
+// marked read propagates the wrapper's typed failure (a refusal or wave
+// failure must never become a silent empty-exclusion 200), a plain read keeps
+// the fail-open projection.
+func resolveExcludeTags(ctx context.Context, client tagResolver, tags []string) (map[int]struct{}, error) {
+	if arrsvc.RecoveryMarked(ctx) {
+		return client.ResolveExcludeTagIDsErr(ctx, tags, false)
+	}
+	return client.ResolveExcludeTagIDs(ctx, tags, false), nil
+}
+
+// writeCollectionFetchError maps a collection fetch failure onto the wire the
+// way the summaries do (A3): the wrapper's refusal sentinel answers 429 (a
+// refusal to keep waiting, never a 500; deliberately no Retry-After — the
+// client's latch ladder is the retry policy), an arr read failure — a marked
+// exclude-tag leg's wave failure included — answers the family's
+// upstream-failure 502, and a store failure keeps the generic 500 arm.
+func writeCollectionFetchError(w http.ResponseWriter, r *http.Request, err error, fetchErr error, what string) {
+	switch {
+	case errors.Is(err, arrsvc.ErrRecoveryRefused):
+		httpapi.TooManyRequestsC(w, r, subflux.CodeRateLimited, "arr read refused, retry later")
+	case errors.Is(err, fetchErr), errors.Is(err, arrsvc.ErrRecoveryFailed):
+		slog.Error("coverage: failed to fetch "+what, "error", err)
+		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch "+what)
+	default:
+		httpapi.InternalErrorC(w, r, err, subflux.CodeInternalError, "query", "coverage "+what+" files")
+	}
 }
 
 // extractPathSegment extracts the segment between prefix and suffix in a URL path.

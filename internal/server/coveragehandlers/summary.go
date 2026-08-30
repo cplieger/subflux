@@ -46,7 +46,7 @@ func (h *Handler) HandleCoverageSeriesSummary(w http.ResponseWriter, r *http.Req
 		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "unknown tvdb id")
 		return
 	}
-	excludeIDs, err := summaryExcludeTags(ctx, ls.Cfg, ls.Sonarr)
+	excludeIDs, err := resolveExcludeTags(ctx, ls.Sonarr, ls.Cfg.Search().ExcludeArrTags)
 	if err != nil {
 		writeArrReadError(w, r, err, "series")
 		return
@@ -89,7 +89,7 @@ func (h *Handler) HandleCoverageMovieSummary(w http.ResponseWriter, r *http.Requ
 		httpapi.NotFoundC(w, r, subflux.CodeMediaNotFound, "unknown tmdb id")
 		return
 	}
-	excludeIDs, err := summaryExcludeTags(ctx, ls.Cfg, ls.Radarr)
+	excludeIDs, err := resolveExcludeTags(ctx, ls.Radarr, ls.Cfg.Search().ExcludeArrTags)
 	if err != nil {
 		writeArrReadError(w, r, err, "movie")
 		return
@@ -140,25 +140,13 @@ func positivePathID(w http.ResponseWriter, r *http.Request, name, label string) 
 }
 
 // markRecovery returns the request context, marked for wave admission when
-// the request carries ?recovery=1. The two summaries are this family's
-// honoring endpoints; /subs never calls it.
+// the request carries ?recovery=1. The two collections and the two summaries
+// are this family's honoring endpoints; /subs never calls it.
 func markRecovery(r *http.Request) context.Context {
 	if r.URL.Query().Get("recovery") == "1" {
 		return arrsvc.WithRecovery(r.Context())
 	}
 	return r.Context()
-}
-
-// summaryExcludeTags resolves the exclude-tag set for one summary read: a
-// marked read propagates the wrapper's typed failure (a refusal or wave
-// failure must never become a silent empty-exclusion 200), a plain read
-// keeps the fail-open projection the collections use.
-func summaryExcludeTags(ctx context.Context, cfg coverageCfg, client tagResolver) (map[int]struct{}, error) {
-	tags := cfg.Search().ExcludeArrTags
-	if arrsvc.RecoveryMarked(ctx) {
-		return client.ResolveExcludeTagIDsErr(ctx, tags, false)
-	}
-	return client.ResolveExcludeTagIDs(ctx, tags, false), nil
 }
 
 // seriesEpisodeSubs indexes a prefix-bounded scan's rows into the

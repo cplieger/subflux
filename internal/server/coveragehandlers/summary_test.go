@@ -15,23 +15,31 @@ import (
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
-// summarySonarrFake is the sonarr double for the summary tests: canned rows
-// answered through the same by-id semantics as the cached wrapper, canned
-// exclude-tag ids on both resolution forms, and a record of whether each
-// read's ctx carried the recovery marker.
+// summarySonarrFake is the sonarr double for the summary and collection
+// tests: canned rows answered through the same by-id semantics as the cached
+// wrapper, canned exclude-tag ids on both resolution forms, and a record of
+// whether each read's ctx carried the recovery marker.
 type summarySonarrFake struct {
+	listErr      error
 	byIDErr      error
 	tagsErr      error
 	tagIDs       map[int]struct{}
 	series       []arrapi.Series
+	listCalls    int
 	byIDCalls    int
 	tagsCalls    int // fail-open form
 	tagsErrCalls int // error-returning form
+	listMarked   bool
 	byIDMarked   bool
 	tagsMarked   bool
 }
 
-func (f *summarySonarrFake) Series(_ context.Context) ([]arrapi.Series, error) {
+func (f *summarySonarrFake) Series(ctx context.Context) ([]arrapi.Series, error) {
+	f.listCalls++
+	f.listMarked = arrsvc.RecoveryMarked(ctx)
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
 	return f.series, nil
 }
 
@@ -65,18 +73,26 @@ func (f *summarySonarrFake) ResolveExcludeTagIDsErr(ctx context.Context, _ []str
 
 // summaryRadarrFake mirrors summarySonarrFake for the radarr side.
 type summaryRadarrFake struct {
+	listErr      error
 	byIDErr      error
 	tagsErr      error
 	tagIDs       map[int]struct{}
 	movies       []arrapi.Movie
+	listCalls    int
 	byIDCalls    int
 	tagsCalls    int
 	tagsErrCalls int
+	listMarked   bool
 	byIDMarked   bool
 	tagsMarked   bool
 }
 
-func (f *summaryRadarrFake) Movies(_ context.Context) ([]arrapi.Movie, error) {
+func (f *summaryRadarrFake) Movies(ctx context.Context) ([]arrapi.Movie, error) {
+	f.listCalls++
+	f.listMarked = arrsvc.RecoveryMarked(ctx)
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
 	return f.movies, nil
 }
 
@@ -110,12 +126,13 @@ func (f *summaryRadarrFake) ResolveExcludeTagIDsErr(ctx context.Context, _ []str
 
 // prefixStore serves canned subtitle rows honoring the mediaIDPrefix bound —
 // the production store is a prefix scan — and records each call's prefix and
-// recovery marker.
+// recovery marker (scan-state reads record theirs into scanMarked).
 type prefixStore struct {
-	err      error
-	rows     []subflux.SubtitleEntry
-	prefixes []string
-	marked   []bool
+	err        error
+	rows       []subflux.SubtitleEntry
+	prefixes   []string
+	marked     []bool
+	scanMarked []bool
 }
 
 func (m *prefixStore) SubtitleFiles(ctx context.Context, _ subflux.MediaType, prefix string) ([]subflux.SubtitleEntry, error) {
@@ -133,7 +150,8 @@ func (m *prefixStore) SubtitleFiles(ctx context.Context, _ subflux.MediaType, pr
 	return out, nil
 }
 
-func (m *prefixStore) ScanStates(_ context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
+func (m *prefixStore) ScanStates(ctx context.Context, _ subflux.MediaType, _ string) ([]subflux.ScanStateRow, error) {
+	m.scanMarked = append(m.scanMarked, arrsvc.RecoveryMarked(ctx))
 	return nil, nil
 }
 
@@ -245,7 +263,7 @@ func TestHandleCoverageSeriesSummary_deep_equals_collection_item(t *testing.T) {
 	}
 }
 
-func TestHandleCoverageMovieSummary_equals_collection_item_modulo_subs(t *testing.T) {
+func TestHandleCoverageMovieSummary_deep_equals_collection_item(t *testing.T) {
 	t.Parallel()
 	cfg := summarySeriesCfg()
 	radarr := &summaryRadarrFake{movies: summaryMoviesFixture(), tagIDs: map[int]struct{}{2: {}}}
@@ -274,7 +292,7 @@ func TestHandleCoverageMovieSummary_equals_collection_item_modulo_subs(t *testin
 		t.Fatal("collection does not serialize movie 12345")
 	}
 	if want.Title != "Test Movie" || want.Rule != "en" || !want.Excluded ||
-		len(want.Subs) != 1 || len(want.Targets) != 1 || want.Targets[0].Have != 1 {
+		len(want.Targets) != 1 || want.Targets[0].Have != 1 {
 		t.Fatalf("seed item lost its meaningful fields: %+v", want)
 	}
 
@@ -291,14 +309,10 @@ func TestHandleCoverageMovieSummary_equals_collection_item_modulo_subs(t *testin
 		t.Fatalf("decode summary: %v", err)
 	}
 
-	// Equal modulo Subs: the summary serializes NO rows (task 4 upgrades this
-	// to full equality when MovieItem.Subs is removed).
-	if got.Subs != nil {
-		t.Errorf("summary subs = %+v, want none (A2: /subs owns the rows)", got.Subs)
-	}
-	want.Subs = nil
+	// FULL equality (R7.1): with MovieItem.Subs gone, the summary is the
+	// collection's row, byte for byte.
 	if !reflect.DeepEqual(got, *want) {
-		t.Errorf("summary item = %+v, want the collection's row modulo Subs %+v", got, *want)
+		t.Errorf("summary item = %+v, want the collection's row %+v", got, *want)
 	}
 	if len(store.prefixes) != 1 || store.prefixes[0] != "tmdb-12345" {
 		t.Errorf("summary store prefixes = %q, want one bounded scan [\"tmdb-12345\"]", store.prefixes)
@@ -378,6 +392,43 @@ func TestHandleCoverageMovieSummary_exclusion_boundary_404(t *testing.T) {
 				t.Errorf("movie summary (%s) status = %d, want %d", tc.name, rec.Code, http.StatusNotFound)
 			}
 		})
+	}
+}
+
+func TestCoverageSummaries_zero_canonical_id_rows_unreachable(t *testing.T) {
+	t.Parallel()
+	// The A2 exclusion parity for the rows the collections stopped
+	// serializing (A3): a fixture holding ONLY rows without a positive
+	// canonical id answers 404 for every positive-id request — no id can
+	// reach such a row — and the zero id itself is malformed (400).
+	sonarr := &summarySonarrFake{series: []arrapi.Series{{
+		ID: 1, Title: "Zero Id", TvdbID: 0, ImdbID: "tt0000001",
+		Statistics: &arrapi.SeriesStatistics{EpisodeFileCount: 5},
+	}}}
+	radarr := &summaryRadarrFake{movies: []arrapi.Movie{{
+		ID: 1, Title: "Imdb Only", TmdbID: 0, ImdbID: "tt0000002", HasFile: true,
+	}}}
+	h := newCoverageHandler(&prefixStore{}, summarySeriesCfg(), sonarr, radarr)
+
+	rec := httptest.NewRecorder()
+	h.HandleCoverageSeriesSummary(rec,
+		summaryRequest("/api/coverage/series/81189/summary", "tvdbId", "81189"))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("series summary status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	rec = httptest.NewRecorder()
+	h.HandleCoverageMovieSummary(rec,
+		summaryRequest("/api/coverage/movies/12345/summary", "tmdbId", "12345"))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("movie summary status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	rec = httptest.NewRecorder()
+	h.HandleCoverageSeriesSummary(rec,
+		summaryRequest("/api/coverage/series/0/summary", "tvdbId", "0"))
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("series summary (id 0) status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
 

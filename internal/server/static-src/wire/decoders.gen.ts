@@ -327,7 +327,6 @@ export const decodeMovieItem: Decoder<MovieItem> = (v) => {
     audio_lang: reqStr(o, "audio_lang", "$.movie_item"),
     rule: reqStr(o, "rule", "$.movie_item"),
     targets: o["targets"] === null ? [] : decodeArray(o["targets"], decodeCoverageTarget, "$.movie_item.targets"),
-    subs: o["subs"] === null ? [] : decodeArray(o["subs"], decodeSubtitleEntry, "$.movie_item.subs"),
     tmdb_id: reqNum(o, "tmdb_id", "$.movie_item"),
     id: reqNum(o, "id", "$.movie_item"),
     year: reqNum(o, "year", "$.movie_item"),

@@ -3,7 +3,12 @@
 import * as store from "./store.js";
 import { $, el, icon, errDiv, pad, insertNavButton } from "./dom.js";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
-import { coverageSeriesDetail, mediaEpisodes, stateIDs } from "./wire/client.gen.js";
+import {
+  coverageSeriesDetail,
+  coverageMovieSubs,
+  mediaEpisodes,
+  stateIDs,
+} from "./wire/client.gen.js";
 import { registerCleanup } from "@cplieger/actions";
 import {
   fmtEpisode,
@@ -259,7 +264,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
   );
 
   Promise.all([
-    mediaEpisodes(s.id, { signal }),
+    mediaEpisodes(s.id, undefined, { signal }),
     coverageSeriesDetail(s.tvdb_id, { signal }),
     stateIDs({ type: "episode", prefix: `tvdb-${s.tvdb_id}-` }, { signal }),
   ])
@@ -993,8 +998,9 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   const info = `${m.year} \u00B7 audio: ${langName(
     m.rule,
   )}${subsInfo ? ` \u00B7 subs: ${subsInfo}` : ""}`;
-  const subs = m.subs;
-  const hasExtSubs = subs.some((s) => s.source !== EMBEDDED_PROVIDER);
+  // The header renders from the cached row alone; the buttons that depend on
+  // the subtitle rows (sync, Files) are added by renderMovieDetail once the
+  // on-demand /subs read lands, the way the series path adds its Files button.
   emit(BusEvent.PanelConfigure, {
     visible: false,
     detail: {
@@ -1003,11 +1009,6 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
       backPath: "/",
       arrLink: buildRadarrLink(m),
       arrName: "Radarr",
-      filesAction: hasExtSubs
-        ? () => {
-            openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
-          }
-        : null,
     },
   });
 
@@ -1044,27 +1045,98 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
   store.set("detailCtx", { movie: true, tmdbId: m.tmdb_id });
   const out = $.coverageContent;
 
+  // Anti-flicker loading skeleton for the on-demand /subs read (the series
+  // path's constants: 150ms show-delay + 300ms min-visible, abort-aware).
+  // The commit does NOT force-detach: renderMovieDetail's reuse check
+  // decides — a fast load leaves the bound <tbody> live, so a same-movie
+  // refresh repaints in place; a painted skeleton has already detached it,
+  // so the render rebuilds.
+  const timing = skeletonTiming(
+    () => {
+      const skel = document.createDocumentFragment();
+      for (let i = 0; i < 3; i++) {
+        skel.appendChild(
+          el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
+        );
+      }
+      patch(out, skel);
+    },
+    { minVisibleMs: 300, signal },
+  );
+
+  coverageMovieSubs(m.tmdb_id, { signal })
+    .then((subs) => {
+      if (signal.aborted) {
+        timing.cancel();
+        return;
+      }
+      timing.commit(() => {
+        renderMovieDetail(m, subs ?? []);
+      });
+    })
+    .catch((e: unknown) => {
+      if (signal.aborted) {
+        timing.cancel();
+        return;
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      timing.commit(() => {
+        patch(out, errDiv(msg));
+      });
+    });
+}
+
+/** Render the movie detail body from the cached row plus its fetched
+ *  subtitle rows, and add the header buttons those rows decide (sync for
+ *  external subs, Files for an admin). Split from openMovieDetail so the
+ *  skeleton controller owns WHEN this runs. */
+function renderMovieDetail(m: MovieDetail, subs: SubtitleEntry[]): void {
+  const targets = m.targets;
+  const out = $.coverageContent;
+
   // Collect all external subtitles for the sync button.
   const extSubs = subs.filter((s) => s.source !== EMBEDDED_PROVIDER);
-
-  // Add sync button to header if external subs exist.
-  const firstExtSub = extSubs[0];
-  if (extSubs.length > 0 && firstExtSub) {
-    const syncBtn = el(
-      "button",
-      {
-        type: "button",
-        className: "ghost",
-        "data-nav": "sync",
-        "data-tip": "Adjust subtitle timing",
-        onclick: () => {
-          openSyncDialog(extSubs, "movie", m.id, m.title);
+  const headerEl = document.querySelector("#coveragePanel .card-head");
+  if (headerEl) {
+    // Replace, not append: a same-movie refresh re-runs this with fresh rows.
+    headerEl.querySelector('[data-nav="sync"]')?.remove();
+    const firstExtSub = extSubs[0];
+    if (extSubs.length > 0 && firstExtSub) {
+      const syncBtn = el(
+        "button",
+        {
+          type: "button",
+          className: "ghost",
+          "data-nav": "sync",
+          "data-tip": "Adjust subtitle timing",
+          onclick: () => {
+            openSyncDialog(extSubs, "movie", m.id, m.title);
+          },
         },
-      },
-      icon("sync"),
-      el("span", { className: "btn-text" }, " Sync"),
-    );
-    insertNavButton(syncBtn);
+        icon("sync"),
+        el("span", { className: "btn-text" }, " Sync"),
+      );
+      insertNavButton(syncBtn);
+    }
+
+    headerEl.querySelector('[data-nav="files"]')?.remove();
+    if (extSubs.length > 0 && store.get("isAdmin")) {
+      const filesBtn = el(
+        "button",
+        {
+          type: "button",
+          className: "ghost",
+          "data-nav": "files",
+          "data-tip": "Manage subtitle files",
+          onclick: () => {
+            openFileManager("movie", `tmdb-${m.tmdb_id}`, m.title, `/movie/${m.tmdb_id}`, m.id);
+          },
+        },
+        icon("file"),
+        el("span", { className: "btn-text" }, " Files"),
+      );
+      insertNavButton(filesBtn);
+    }
   }
 
   if (targets.length === 0) {

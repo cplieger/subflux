@@ -498,28 +498,31 @@ export function mediaMoviesRaw(opts?: ClientOpts): Promise<ApiResult<unknown>> {
   return clientRequestRaw("GET", "/api/media/movies", undefined, undefined, opts?.signal);
 }
 
-export function mediaEpisodes(id: string | number, opts?: ClientOpts): Promise<SeasonGroup[] | null> {
-  return clientRequest("GET", `/api/media/series/${encodeURIComponent(String(id))}/episodes`, undefined, (v) => decodeArray(v, decodeSeasonGroup, "$"), opts?.signal);
+/** Episodes grouped by season; honors ?recovery=1. */
+export function mediaEpisodes(id: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<SeasonGroup[] | null> {
+  return clientRequest("GET", `/api/media/series/${encodeURIComponent(String(id))}/episodes` + qs(query), undefined, (v) => decodeArray(v, decodeSeasonGroup, "$"), opts?.signal);
 }
 
-export function mediaEpisodesRaw(id: string | number, opts?: ClientOpts): Promise<ApiResult<SeasonGroup[]>> {
-  return clientRequestRaw("GET", `/api/media/series/${encodeURIComponent(String(id))}/episodes`, undefined, (v) => decodeArray(v, decodeSeasonGroup, "$"), opts?.signal);
+export function mediaEpisodesRaw(id: string | number, query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<SeasonGroup[]>> {
+  return clientRequestRaw("GET", `/api/media/series/${encodeURIComponent(String(id))}/episodes` + qs(query), undefined, (v) => decodeArray(v, decodeSeasonGroup, "$"), opts?.signal);
 }
 
-export function coverageSeries(opts?: ClientOpts): Promise<SeriesItem[] | null> {
-  return clientRequest("GET", "/api/coverage/series", undefined, (v) => decodeArray(v, decodeSeriesItem, "$"), opts?.signal);
+/** Whole-collection series coverage; honors ?recovery=1. */
+export function coverageSeries(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<SeriesItem[] | null> {
+  return clientRequest("GET", "/api/coverage/series" + qs(query), undefined, (v) => decodeArray(v, decodeSeriesItem, "$"), opts?.signal);
 }
 
-export function coverageSeriesRaw(opts?: ClientOpts): Promise<ApiResult<SeriesItem[]>> {
-  return clientRequestRaw("GET", "/api/coverage/series", undefined, (v) => decodeArray(v, decodeSeriesItem, "$"), opts?.signal);
+export function coverageSeriesRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<SeriesItem[]>> {
+  return clientRequestRaw("GET", "/api/coverage/series" + qs(query), undefined, (v) => decodeArray(v, decodeSeriesItem, "$"), opts?.signal);
 }
 
-export function coverageMovies(opts?: ClientOpts): Promise<MovieItem[] | null> {
-  return clientRequest("GET", "/api/coverage/movies", undefined, (v) => decodeArray(v, decodeMovieItem, "$"), opts?.signal);
+/** Whole-collection movie coverage, no inlined subtitle rows (/subs owns them); honors ?recovery=1. */
+export function coverageMovies(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<MovieItem[] | null> {
+  return clientRequest("GET", "/api/coverage/movies" + qs(query), undefined, (v) => decodeArray(v, decodeMovieItem, "$"), opts?.signal);
 }
 
-export function coverageMoviesRaw(opts?: ClientOpts): Promise<ApiResult<MovieItem[]>> {
-  return clientRequestRaw("GET", "/api/coverage/movies", undefined, (v) => decodeArray(v, decodeMovieItem, "$"), opts?.signal);
+export function coverageMoviesRaw(query?: Record<string, QueryValue>, opts?: ClientOpts): Promise<ApiResult<MovieItem[]>> {
+  return clientRequestRaw("GET", "/api/coverage/movies" + qs(query), undefined, (v) => decodeArray(v, decodeMovieItem, "$"), opts?.signal);
 }
 
 export function coverageSeriesDetail(tvdbId: string | number, opts?: ClientOpts): Promise<SubtitleEntry[] | null> {

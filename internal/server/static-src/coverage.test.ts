@@ -18,7 +18,7 @@ const clientState = vi.hoisted(() => ({
   pending: [] as ((v: unknown) => void)[],
 }));
 vi.mock("./wire/client.gen.js", () => ({
-  coverageSeries: (opts?: { signal?: AbortSignal }) => {
+  coverageSeries: (_query?: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
     clientState.signals.push(opts?.signal);
     if (clientState.defer) {
       return new Promise((resolve) => {
@@ -29,7 +29,7 @@ vi.mock("./wire/client.gen.js", () => ({
       ? Promise.reject(clientState.seriesError)
       : Promise.resolve(clientState.series);
   },
-  coverageMovies: (opts?: { signal?: AbortSignal }) => {
+  coverageMovies: (_query?: Record<string, unknown>, opts?: { signal?: AbortSignal }) => {
     clientState.signals.push(opts?.signal);
     return Promise.resolve(clientState.movies);
   },
@@ -101,7 +101,7 @@ import {
   loadCoverage,
   renderCoverage,
 } from "./coverage.js";
-import type { CoverageItem, CoverageTarget, SubtitleEntry } from "./api-types.js";
+import type { CoverageItem, CoverageTarget } from "./api-types.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -149,20 +149,6 @@ function movie(
     has_file: true,
     targets: [target("en", 0, 1)],
     ...extra,
-  };
-}
-
-/** Movie subtitle entry with the given score (the movie-detail badge input). */
-function sub(score: number): SubtitleEntry {
-  return {
-    media_id: "tmdb-1",
-    language: "en",
-    variant: "standard",
-    source: "opensubtitles",
-    codec: "srt",
-    score,
-    ordinal: 1,
-    offset_ms: 0,
   };
 }
 
@@ -711,9 +697,6 @@ describe("coverage: signature field audit", () => {
   //   scene_name         search popup release matching
   //   episodes           series detail header ("N ep")
   //   targets            coverage badges (every field, own table below)
-  //   subs               movie detail badges/actions (leaves with the movies
-  //                      wire cut: A3 removes MovieItem.Subs, and this entry
-  //                      plus the signature component go with it)
   // The mapped type is the enforcement: a field added to or removed from
   // CoverageItem fails compilation here, forcing the audit to re-run. `_type`
   // is the client merge's own discriminant (never on the wire), pinned by the
@@ -741,7 +724,6 @@ describe("coverage: signature field audit", () => {
     scene_name: { kind: "movie", change: { scene_name: "Film.2021.1080p" } },
     episodes: { kind: "series", change: { episodes: 4 } },
     targets: { kind: "series", change: { targets: [target("en", 1, 3), target("fr", 0, 3)] } },
-    subs: { kind: "movie", change: { subs: [sub(50)] } },
   };
 
   /** Load a base row of the given kind, then reload it with one field
@@ -749,14 +731,13 @@ describe("coverage: signature field audit", () => {
   async function sigAfterMutation(
     kind: "series" | "movie",
     change: Partial<CoverageItem>,
-    baseExtra: Partial<CoverageItem> = {},
   ): Promise<{ before: string; after: string }> {
     const mk = (extra: Partial<CoverageItem>): Record<string, unknown> =>
       kind === "series" ? series(1, "Show", extra) : movie(1, "Show", extra);
-    await load(kind === "series" ? [mk(baseExtra)] : [], kind === "movie" ? [mk(baseExtra)] : []);
+    await load(kind === "series" ? [mk({})] : [], kind === "movie" ? [mk({})] : []);
     const before = rowSig(0);
-    clientState.series = kind === "series" ? [mk({ ...baseExtra, ...change })] : [];
-    clientState.movies = kind === "movie" ? [mk({ ...baseExtra, ...change })] : [];
+    clientState.series = kind === "series" ? [mk(change)] : [];
+    clientState.movies = kind === "movie" ? [mk(change)] : [];
     await loadCoverage(true);
     return { before, after: rowSig(0) };
   }
@@ -787,15 +768,6 @@ describe("coverage: signature field audit", () => {
 
   it("the signature covers the targets vector length", async () => {
     const { before, after } = await sigAfterMutation("series", { targets: [] });
-    expect(after).not.toBe(before);
-  });
-
-  it("the signature covers a subs entry's content", async () => {
-    const { before, after } = await sigAfterMutation(
-      "movie",
-      { subs: [sub(99)] },
-      { subs: [sub(50)] },
-    );
     expect(after).not.toBe(before);
   });
 

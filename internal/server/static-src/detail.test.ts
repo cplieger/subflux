@@ -11,10 +11,17 @@ const clientState = vi.hoisted(() => ({
   stateIDs: null as string[] | null,
   seasons: null as unknown,
   seasonsError: null as Error | null,
+  // Movie /subs rows (A5: openMovieDetail reads them on demand) + a call
+  // counter for the one-bounded-fetch pin.
+  movieSubs: [] as unknown[] | null,
+  movieSubsCalls: 0,
   // When set, mediaEpisodes hands back a promise the test resolves by hand, so
   // two navigations can be interleaved in a chosen order.
   defer: false,
   pending: [] as ((v: unknown) => void)[],
+  // The movie /subs mirror of defer/pending.
+  subsDefer: false,
+  subsPending: [] as ((v: unknown) => void)[],
 }));
 vi.mock("./wire/client.gen.js", () => ({
   mediaEpisodes: () => {
@@ -28,6 +35,15 @@ vi.mock("./wire/client.gen.js", () => ({
       : Promise.resolve(clientState.seasons);
   },
   coverageSeriesDetail: () => Promise.resolve([]),
+  coverageMovieSubs: () => {
+    clientState.movieSubsCalls += 1;
+    if (clientState.subsDefer) {
+      return new Promise((resolve) => {
+        clientState.subsPending.push(resolve as (v: unknown) => void);
+      });
+    }
+    return Promise.resolve(clientState.movieSubs);
+  },
   stateIDs: () => Promise.resolve(clientState.stateIDs),
 }));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: () => undefined }));
@@ -145,7 +161,7 @@ function epSub(mediaId: string, score: number, ordinal = 0): SubtitleEntry {
   };
 }
 
-function makeMovie(tmdbId: number, subs: SubtitleEntry[]): MovieDetail {
+function makeMovie(tmdbId: number): MovieDetail {
   return {
     title: `Movie ${tmdbId}`,
     audio_lang: "en",
@@ -154,12 +170,20 @@ function makeMovie(tmdbId: number, subs: SubtitleEntry[]): MovieDetail {
       { language: "en", variant: "standard", have: 0, total: 1, have_ignored: 0 },
       { language: "fr", variant: "standard", have: 0, total: 1, have_ignored: 0 },
     ],
-    subs,
     tmdb_id: tmdbId,
     id: tmdbId,
     year: 2021,
     has_file: true,
   };
+}
+
+/** Open a movie detail and let its on-demand /subs read land: the mocked
+ *  fetch resolves inside the skeleton's 150ms show-delay, so the commit
+ *  renders on the microtask queue — two ticks drain the then/commit chain. */
+async function openMovieSettled(m: MovieDetail, skipPush?: boolean): Promise<void> {
+  openMovieDetail(m, skipPush);
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 function movieSub(language: string, score: number, ordinal = 0): SubtitleEntry {
@@ -905,10 +929,10 @@ describe("detail: renderSeriesDetail", () => {
     }
 
     (scanSeries as (p: { item: SeriesItem }) => void)({ item: series });
-    (scanMovie as (p: { item: MovieDetail }) => void)({ item: makeMovie(328, []) });
+    (scanMovie as (p: { item: MovieDetail }) => void)({ item: makeMovie(328) });
 
     expect(triggerSeriesScan).toHaveBeenCalledWith(series);
-    expect(triggerMovieScan).toHaveBeenCalledWith(makeMovie(328, []));
+    expect(triggerMovieScan).toHaveBeenCalledWith(makeMovie(328));
   });
 
   it("leaves an unchanged row's badge nodes in place across a refresh", () => {
@@ -1062,15 +1086,20 @@ describe("detail: openMovieDetail", () => {
     storeState.config = null;
     storeState.sets = [];
     clientState.stateIDs = null;
+    clientState.movieSubs = [];
+    clientState.movieSubsCalls = 0;
+    clientState.subsDefer = false;
+    clientState.subsPending = [];
     history.replaceState(null, "", "/");
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
   });
 
-  it("coverage refresh repaints only the changed language row and keeps row identity", () => {
+  it("coverage refresh repaints only the changed language row and keeps row identity", async () => {
     // Initial: en covered, fr uncovered.
-    openMovieDetail(makeMovie(50, [movieSub("en", 90)]));
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(50));
 
     const tbody = movieTbody();
     expect(tbody.children.length).toBe(2); // en, fr (target order)
@@ -1088,8 +1117,9 @@ describe("detail: openMovieDetail", () => {
     expect(frBefore.querySelector("span.badge")?.getAttribute("data-status")).toBe("err");
     expect(enBefore.querySelector("span.badge")?.className).toBe("badge");
 
-    // Refresh (new movie object, same tmdb_id): fr now covered, en unchanged.
-    openMovieDetail(makeMovie(50, [movieSub("en", 90), movieSub("fr", 85)]), true);
+    // Refresh (same tmdb_id, fresh /subs rows): fr now covered, en unchanged.
+    clientState.movieSubs = [movieSub("en", 90), movieSub("fr", 85)];
+    await openMovieSettled(makeMovie(50), true);
 
     // REUSE: same <tbody> node.
     expect(movieTbody()).toBe(tbody);
@@ -1102,8 +1132,9 @@ describe("detail: openMovieDetail", () => {
     expect(covText(enBefore)).toBe(enCovBefore);
   });
 
-  it("switching to a different movie rebuilds the table", () => {
-    openMovieDetail(makeMovie(60, [movieSub("en", 90)]));
+  it("switching to a different movie rebuilds the table", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(60));
     const tbodyA = movieTbody();
     const aRow = tbodyA.children.item(0); // en row of movie A
     expect(aRow instanceof HTMLElement).toBe(true);
@@ -1111,7 +1142,8 @@ describe("detail: openMovieDetail", () => {
     // Different movie id -> REBUILD: keyed <table> forces patch to replace the
     // table (and its freshly-bound <tbody>), so A's rows are gone and the live
     // binding is attached to the in-DOM node rather than a detached one.
-    openMovieDetail(makeMovie(61, [movieSub("en", 80)]));
+    clientState.movieSubs = [movieSub("en", 80)];
+    await openMovieSettled(makeMovie(61));
     const tbodyB = movieTbody();
 
     expect(tbodyB).not.toBe(tbodyA);
@@ -1119,8 +1151,86 @@ describe("detail: openMovieDetail", () => {
     expect(covText(tbodyB.children.item(0))).toBe(`srt: ext ${STAR}80`);
   });
 
-  it("assembles the language-row signature as nested joins that split back", () => {
-    openMovieDetail(makeMovie(70, [movieSub("en", 90)]));
+  it("fetches the movie's rows on demand: one bounded /subs read per open", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(65));
+
+    expect(clientState.movieSubsCalls).toBe(1);
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}90`);
+
+    // A refresh of the same movie is one more bounded read, never a
+    // collection fetch (detail.ts does not even import the collection
+    // functions; this pins the count stays 1:1 with opens).
+    await openMovieSettled(makeMovie(65), true);
+    expect(clientState.movieSubsCalls).toBe(2);
+  });
+
+  it("paints the loading skeleton at 150ms and holds it 300ms once shown", async () => {
+    vi.useFakeTimers();
+    try {
+      clientState.subsDefer = true;
+      openMovieDetail(makeMovie(66));
+
+      // Inside the show-delay window nothing paints.
+      await vi.advanceTimersByTimeAsync(149);
+      expect(document.querySelector("#coverageContent .skeleton")).toBeNull();
+      // 150ms: the skeleton is up.
+      await vi.advanceTimersByTimeAsync(1);
+      expect(document.querySelector("#coverageContent .skeleton")).not.toBeNull();
+
+      // The fetch resolves while the skeleton is fresh: the commit defers
+      // until the 300ms min-visible elapses, then the table replaces it.
+      clientState.subsPending[0]?.([movieSub("en", 90)]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(document.querySelector("table.movie-detail")).toBeNull();
+      expect(document.querySelector("#coverageContent .skeleton")).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(document.querySelector("table.movie-detail")).not.toBeNull();
+      expect(document.querySelector("#coverageContent .skeleton")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never paints the skeleton for a fast /subs read", async () => {
+    vi.useFakeTimers();
+    try {
+      clientState.movieSubs = [movieSub("en", 90)];
+      openMovieDetail(makeMovie(67));
+      // The mocked fetch settles on the microtask queue, inside the 150ms
+      // show-delay; advancing past it must find the table, never a skeleton.
+      await vi.advanceTimersByTimeAsync(500);
+      expect(document.querySelector("#coverageContent .skeleton")).toBeNull();
+      expect(document.querySelector("table.movie-detail")).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drops a superseded /subs response instead of painting it", async () => {
+    // The stale fetch resolves LAST, so only the abort check keeps it from
+    // painting over the view the user actually navigated to.
+    clientState.subsDefer = true;
+    openMovieDetail(makeMovie(68));
+    openMovieDetail(makeMovie(69));
+    expect(clientState.subsPending).toHaveLength(2);
+
+    clientState.subsPending[1]?.([movieSub("en", 80)]);
+    await vi.waitFor(() => {
+      expect(document.querySelector("table.movie-detail")).not.toBeNull();
+    });
+    clientState.subsPending[0]?.([movieSub("en", 90)]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.querySelector('table.movie-detail[data-movie-id="69"]')).not.toBeNull();
+    expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}80`);
+  });
+
+  it("assembles the language-row signature as nested joins that split back", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(70));
 
     const [entriesBlock, ignoredCodecs] = split(reqSig(movieTbody().children.item(0)));
     expect(ignoredCodecs).toBe("");
@@ -1129,7 +1239,7 @@ describe("detail: openMovieDetail", () => {
     expect(split(entry ?? "")).toEqual(["external", "srt", "90"]);
   });
 
-  it("repaints a language row where the old signature collapsed two coverage states", () => {
+  it("repaints a language row where the old signature collapsed two coverage states", async () => {
     const entry = (source: string, codec: string): SubtitleEntry => ({
       media_id: "tmdb-71",
       language: "en",
@@ -1148,48 +1258,53 @@ describe("detail: openMovieDetail", () => {
       entries.map((e) => `${e.source}:${e.codec ?? ""}:${e.score ?? 0}`).join(",");
     expect(pipeJoinedMovieBlock(twoEntries)).toBe(pipeJoinedMovieBlock(oneEntry)); // the defect
 
-    openMovieDetail(makeMovie(71, twoEntries));
+    clientState.movieSubs = twoEntries;
+    await openMovieSettled(makeMovie(71));
     const row = reqRow(movieTbody().children.item(0));
     const sigBefore = reqSig(row);
     const covBefore = covText(row);
 
-    openMovieDetail(makeMovie(71, oneEntry), true); // REUSE path
+    clientState.movieSubs = oneEntry;
+    await openMovieSettled(makeMovie(71), true); // REUSE path
 
     expect(reqRow(movieTbody().children.item(0))).toBe(row); // same node, repainted
     expect(reqSig(row)).not.toBe(sigBefore);
     expect(covText(row)).not.toBe(covBefore);
   });
 
-  it("sorts the ignored-codec set into the language-row signature", () => {
+  it("sorts the ignored-codec set into the language-row signature", async () => {
     storeState.ignoredCodecs = new Set(["pgs", "ass"]);
 
-    openMovieDetail(makeMovie(72, [movieSub("en", 90)]));
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(72));
 
     const [, ignoredCodecs] = split(reqSig(movieTbody().children.item(0)));
     expect(ignoredCodecs).toBe("ass:pgs");
   });
 
-  it("leaves an unchanged language row's badge node in place across a refresh", () => {
-    openMovieDetail(makeMovie(73, [movieSub("en", 90)]));
+  it("leaves an unchanged language row's badge node in place across a refresh", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(73));
     const enRow = reqRow(movieTbody().children.item(0));
     const badgeBefore = enRow.querySelector("span.badge");
 
-    openMovieDetail(makeMovie(73, [movieSub("en", 90), movieSub("fr", 85)]), true);
+    clientState.movieSubs = [movieSub("en", 90), movieSub("fr", 85)];
+    await openMovieSettled(makeMovie(73), true);
 
     expect(badgeBefore).not.toBeNull();
     expect(enRow.querySelector("span.badge")).toBe(badgeBefore);
   });
 
-  it("labels a non-standard variant and offers a per-language search button", () => {
+  it("labels a non-standard variant and offers a per-language search button", async () => {
     const movie: MovieDetail = {
-      ...makeMovie(74, []),
+      ...makeMovie(74),
       targets: [
         { language: "fr", variant: "forced", have: 0, total: 1, have_ignored: 0 },
         { language: "en", variant: "standard", have: 0, total: 1, have_ignored: 0 },
       ],
     };
 
-    openMovieDetail(movie);
+    await openMovieSettled(movie);
 
     const rows = movieTbody().children;
     expect(rows.item(0)?.children.item(0)?.textContent).toBe("French (forced)");
@@ -1199,20 +1314,21 @@ describe("detail: openMovieDetail", () => {
     expect(searchBtn?.querySelector(".btn-text")?.textContent).toBe(" Search");
   });
 
-  it("pushes the movie URL unless the caller already owns the history entry", () => {
-    openMovieDetail(makeMovie(75, []));
+  it("pushes the movie URL unless the caller already owns the history entry", async () => {
+    await openMovieSettled(makeMovie(75));
     expect(location.pathname).toBe("/movie/75");
     expect(document.title).toBe("Subflux \u00B7 Movie 75");
 
     history.replaceState(null, "", "/library");
-    openMovieDetail(makeMovie(76, []), true);
+    await openMovieSettled(makeMovie(76), true);
     expect(location.pathname).toBe("/library");
   });
 
-  it("configures the panel with the target list, the Radarr link and a files action", () => {
+  it("configures the panel from the cached row alone: no files action rides the bus", async () => {
     storeState.config = { radarr_url: "http://radarr:7878//" };
 
-    openMovieDetail(makeMovie(77, [movieSub("en", 90)]));
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(77));
 
     expect(emit).toHaveBeenCalledWith(BusEvent.PanelConfigure, {
       visible: false,
@@ -1223,13 +1339,13 @@ describe("detail: openMovieDetail", () => {
         // Trailing slashes stripped, so the path is appended exactly once.
         arrLink: "http://radarr:7878/movie/77",
         arrName: "Radarr",
-        filesAction: expect.any(Function) as unknown as () => void,
       },
     });
     expect(storeState.sets).toContainEqual(["detailCtx", { movie: true, tmdbId: 77 }]);
   });
 
-  it("offers no files action when every subtitle is an embedded track", () => {
+  it("offers no Files or sync button when every subtitle is an embedded track", async () => {
+    storeState.isAdmin = true; // absence must come from the rows, not the role
     const embedded: SubtitleEntry = {
       media_id: "tmdb-78",
       language: "en",
@@ -1240,33 +1356,39 @@ describe("detail: openMovieDetail", () => {
       ordinal: 0,
     };
 
-    openMovieDetail(makeMovie(78, [embedded]));
+    clientState.movieSubs = [embedded];
+    await openMovieSettled(makeMovie(78));
 
-    const call = vi
-      .mocked(emit)
-      .mock.calls.find(([event]) => event === BusEvent.PanelConfigure)?.[1] as {
-      detail: { filesAction: unknown; arrLink: unknown };
-    };
-    expect(call.detail.filesAction).toBeNull();
-    // No config in the store, so no Radarr deep link either.
-    expect(call.detail.arrLink).toBeNull();
+    expect(document.querySelector('[data-nav="files"]')).toBeNull();
     expect(document.querySelector('[data-nav="sync"]')).toBeNull();
+    // No config in the store, so no Radarr deep link either.
+    expect(panelDetail()["arrLink"]).toBeNull();
   });
 
-  it("the files action opens the file manager for the movie", () => {
-    openMovieDetail(makeMovie(79, [movieSub("en", 90)]));
+  it("adds the Files button for an admin once the rows arrive, wired to the file manager", async () => {
+    storeState.isAdmin = true;
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(79));
 
-    const detail = vi
-      .mocked(emit)
-      .mock.calls.find(([event]) => event === BusEvent.PanelConfigure)?.[1] as {
-      detail: { filesAction: () => void };
-    };
-    detail.detail.filesAction();
+    const filesBtn = document.querySelector<HTMLButtonElement>('[data-nav="files"]');
+    if (!filesBtn) {
+      throw new Error("files button missing");
+    }
+    expect(filesBtn.querySelector(".btn-text")?.textContent).toBe(" Files");
+    filesBtn.click();
 
     expect(openFileManager).toHaveBeenCalledWith("movie", "tmdb-79", "Movie 79", "/movie/79", 79);
   });
 
-  it("offers a header sync button for the external subtitles only", () => {
+  it("withholds the Files button from a non-admin", async () => {
+    storeState.isAdmin = false;
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(86));
+
+    expect(document.querySelector('[data-nav="files"]')).toBeNull();
+  });
+
+  it("offers a header sync button for the external subtitles only", async () => {
     const external = movieSub("en", 90);
     const embedded: SubtitleEntry = {
       media_id: "tmdb-80",
@@ -1278,7 +1400,8 @@ describe("detail: openMovieDetail", () => {
       ordinal: 0,
     };
 
-    openMovieDetail(makeMovie(80, [embedded, external]));
+    clientState.movieSubs = [embedded, external];
+    await openMovieSettled(makeMovie(80));
 
     const syncBtn = document.querySelector<HTMLButtonElement>('[data-nav="sync"]');
     if (!syncBtn) {
@@ -1290,11 +1413,20 @@ describe("detail: openMovieDetail", () => {
     expect(openSyncDialog).toHaveBeenCalledWith([external], "movie", 80, "Movie 80");
   });
 
+  it("replaces the sync button on a same-movie refresh instead of adding a second one", async () => {
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(87));
+    expect(document.querySelectorAll('[data-nav="sync"]').length).toBe(1);
+
+    await openMovieSettled(makeMovie(87), true);
+
+    expect(document.querySelectorAll('[data-nav="sync"]').length).toBe(1);
+  });
+
   it("adds a history button when the movie has downloads, and wires it to the log", async () => {
     clientState.stateIDs = ["tmdb-81"];
 
-    openMovieDetail(makeMovie(81, []));
-    await Promise.resolve();
+    await openMovieSettled(makeMovie(81));
 
     const histBtn = document.querySelector<HTMLButtonElement>('[data-nav="hist"]');
     if (!histBtn) {
@@ -1309,8 +1441,7 @@ describe("detail: openMovieDetail", () => {
   it("adds no history button when the movie has no downloads", async () => {
     clientState.stateIDs = [];
 
-    openMovieDetail(makeMovie(82, []));
-    await Promise.resolve();
+    await openMovieSettled(makeMovie(82));
 
     expect(document.querySelector('[data-nav="hist"]')).toBeNull();
   });
@@ -1319,9 +1450,9 @@ describe("detail: openMovieDetail", () => {
     // Opening a second movie aborts the first fetch; its late resolution must
     // not add a button describing the movie the user left.
     clientState.stateIDs = ["tmdb-83"];
-    openMovieDetail(makeMovie(83, []));
+    openMovieDetail(makeMovie(83));
     clientState.stateIDs = [];
-    openMovieDetail(makeMovie(84, []));
+    openMovieDetail(makeMovie(84));
 
     await Promise.resolve();
     await Promise.resolve();
@@ -1329,10 +1460,10 @@ describe("detail: openMovieDetail", () => {
     expect(document.querySelector('[data-nav="hist"]')).toBeNull();
   });
 
-  it("explains a movie with no language rule and offers a way to fix it", () => {
-    const movie: MovieDetail = { ...makeMovie(85, []), targets: [] };
+  it("explains a movie with no language rule and offers a way to fix it", async () => {
+    const movie: MovieDetail = { ...makeMovie(85), targets: [] };
 
-    openMovieDetail(movie);
+    await openMovieSettled(movie);
 
     expect(document.querySelector("table.movie-detail")).toBeNull();
     const out = document.querySelector("#coverageContent");
@@ -1662,15 +1793,20 @@ describe("detail: openMovieDetail chrome", () => {
     storeState.config = null;
     storeState.sets = [];
     clientState.stateIDs = null;
+    clientState.movieSubs = [];
+    clientState.movieSubsCalls = 0;
+    clientState.subsDefer = false;
+    clientState.subsPending = [];
     history.replaceState(null, "", "/");
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"><h2 id="lib-heading"></h2></div>' +
       '<div id="coverageContent"></div></div>';
   });
 
-  it("offers the files action when only SOME subtitles are embedded tracks", () => {
+  it("offers the Files button when only SOME subtitles are embedded tracks", async () => {
     // The file manager lists sidecar files; one downloaded subtitle among
     // embedded tracks is enough for there to be something to manage.
+    storeState.isAdmin = true;
     const embedded: SubtitleEntry = {
       media_id: "tmdb-95",
       language: "en",
@@ -1681,31 +1817,37 @@ describe("detail: openMovieDetail chrome", () => {
       ordinal: 0,
     };
 
-    openMovieDetail(makeMovie(95, [embedded, movieSub("fr", 70)]));
+    clientState.movieSubs = [embedded, movieSub("fr", 70)];
+    await openMovieSettled(makeMovie(95));
 
-    expect(typeof panelDetail()["filesAction"]).toBe("function");
+    expect(document.querySelector('[data-nav="files"]')).not.toBeNull();
   });
 
-  it("renders the movie table for the bus event coverage.ts publishes", () => {
+  it("renders the movie table for the bus event coverage.ts publishes", async () => {
     const handler = busHandlers.map.get("open:movie");
     if (!handler) {
       throw new Error("open:movie handler not registered");
     }
 
-    (handler as (p: { item: MovieDetail }) => void)({ item: makeMovie(96, [movieSub("en", 90)]) });
+    clientState.movieSubs = [movieSub("en", 90)];
+    (handler as (p: { item: MovieDetail }) => void)({ item: makeMovie(96) });
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(movieTbody().children.length).toBe(2); // en, fr (target order)
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}90`);
   });
 
-  it("leaves an unchanged language row's own element untouched across a refresh", () => {
+  it("leaves an unchanged language row's own element untouched across a refresh", async () => {
     // Same probe as the series table: a marker attribute survives an in-place
     // row update and is equalised away by a table re-render.
-    openMovieDetail(makeMovie(97, [movieSub("en", 90)]));
+    clientState.movieSubs = [movieSub("en", 90)];
+    await openMovieSettled(makeMovie(97));
 
     reqRow(movieTbody().children.item(0)).setAttribute("data-probe", "kept");
 
-    openMovieDetail(makeMovie(97, [movieSub("en", 90), movieSub("fr", 85)]), true);
+    clientState.movieSubs = [movieSub("en", 90), movieSub("fr", 85)];
+    await openMovieSettled(makeMovie(97), true);
 
     expect(covText(movieTbody().children.item(1))).toBe(`srt: ext ${STAR}85`);
     expect(reqRow(movieTbody().children.item(0)).getAttribute("data-probe")).toBe("kept");

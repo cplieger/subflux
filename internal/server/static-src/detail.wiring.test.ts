@@ -34,6 +34,10 @@ vi.mock("./wire/client.gen.js", () => ({
     clientState.calls.push({ name: "coverageSeriesDetail", args });
     return Promise.resolve([]);
   },
+  coverageMovieSubs: (...args: unknown[]) => {
+    clientState.calls.push({ name: "coverageMovieSubs", args });
+    return Promise.resolve([]);
+  },
   stateIDs: (...args: unknown[]) => {
     clientState.calls.push({ name: "stateIDs", args });
     if (clientState.deferStateIDs) {
@@ -153,13 +157,12 @@ function epSub(mediaId: string, score: number): SubtitleEntry {
   };
 }
 
-function makeMovie(tmdbId: number, subs: SubtitleEntry[]): MovieDetail {
+function makeMovie(tmdbId: number): MovieDetail {
   return {
     title: `Movie ${tmdbId}`,
     audio_lang: "en",
     rule: "en",
     targets: [{ language: "en", variant: "standard", have: 0, total: 1, have_ignored: 0 }],
-    subs,
     tmdb_id: tmdbId,
     id: tmdbId,
     year: 2021,
@@ -312,10 +315,11 @@ describe("detail: episode and season action buttons", () => {
     ]);
   });
 
-  it("wires a movie language row's Search button and keeps the click off the row", () => {
-    const movie = makeMovie(98, []);
+  it("wires a movie language row's Search button and keeps the click off the row", async () => {
+    const movie = makeMovie(98);
 
     openMovieDetail(movie);
+    await flush();
 
     const row = reqRow(movieTbody().children.item(0));
     const btn = row.querySelector<HTMLButtonElement>('[data-col="actions"] button');
@@ -472,15 +476,19 @@ describe("detail: navigation and cancellation", () => {
     // History is scoped to THIS series' episodes: an unscoped query would put
     // History buttons on rows whose downloads belong to another show.
     expect(ids?.args[0]).toEqual({ type: "episode", prefix: "tvdb-367-" });
+    // A steady-state navigation is a PLAIN read: no ?recovery=1 query rides
+    // the episodes request (task 1's recovery legs set it themselves).
+    expect(eps?.args[1]).toBeUndefined();
     // Every request carries the navigation's signal, so the next navigation
     // CANCELS the transfer rather than only discarding its result.
-    expect(eps?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
+    expect(eps?.args[2]).toEqual({ signal: expect.any(AbortSignal) });
     expect(cov?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
     expect(ids?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
 
-    const signals = [eps, cov, ids].map(
-      (c) => (c?.args[1] as { signal: AbortSignal } | undefined)?.signal,
-    );
+    const epsSignal = (eps?.args[2] as { signal: AbortSignal } | undefined)?.signal;
+    const covSignal = (cov?.args[1] as { signal: AbortSignal } | undefined)?.signal;
+    const idsSignal = (ids?.args[1] as { signal: AbortSignal } | undefined)?.signal;
+    const signals = [epsSignal, covSignal, idsSignal];
     expect(signals.map((s) => s?.aborted)).toEqual([false, false, false]);
 
     openSeriesViaBus(makeSeries(368, "Other"));
@@ -489,28 +497,34 @@ describe("detail: navigation and cancellation", () => {
     expect(signals.map((s) => s?.aborted)).toEqual([true, true, true]);
   });
 
-  it("requests the movie's download history under its own id prefix, cancellably", async () => {
+  it("requests the movie's rows and download history under its own id, cancellably", async () => {
     clientState.stateIDs = [];
 
-    openMovieDetail(makeMovie(99, []));
+    openMovieDetail(makeMovie(99));
     await flush();
 
+    const subs = clientState.calls.find((c) => c.name === "coverageMovieSubs");
+    expect(subs?.args[0]).toBe(99);
+    expect(subs?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
     const ids = clientState.calls.find((c) => c.name === "stateIDs");
     expect(ids?.args[0]).toEqual({ type: "movie", prefix: "tmdb-99" });
     expect(ids?.args[1]).toEqual({ signal: expect.any(AbortSignal) });
 
     const signal = (ids?.args[1] as { signal: AbortSignal } | undefined)?.signal;
+    const subsSignal = (subs?.args[1] as { signal: AbortSignal } | undefined)?.signal;
     expect(signal?.aborted).toBe(false);
+    expect(subsSignal?.aborted).toBe(false);
 
-    openMovieDetail(makeMovie(100, []));
+    openMovieDetail(makeMovie(100));
     await flush();
 
     expect(signal?.aborted).toBe(true);
+    expect(subsSignal?.aborted).toBe(true);
   });
 
   it("adds no second History button when the header already has one", async () => {
     clientState.stateIDs = ["tmdb-101"];
-    const movie = makeMovie(101, []);
+    const movie = makeMovie(101);
 
     openMovieDetail(movie);
     await flush();
@@ -527,7 +541,7 @@ describe("detail: navigation and cancellation", () => {
   it("aborts an in-flight detail fetch when the page tears down", async () => {
     expect(cleanupState.fns).toHaveLength(1);
     clientState.deferStateIDs = true;
-    openMovieDetail(makeMovie(102, []));
+    openMovieDetail(makeMovie(102));
 
     // Page unload: the module's cleanup hook aborts whatever is in flight, so
     // a late response cannot touch a document that is going away.

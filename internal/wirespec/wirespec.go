@@ -458,16 +458,19 @@ func Endpoints() []wiregen.Endpoint {
 		},
 		{
 			Name: "mediaEpisodes", Method: http.MethodGet, Path: "/api/media/series/{id}/episodes",
-			AuthGroup: GroupUserConfigured,
-			Response:  wiregen.TypeRef[mediahandlers.SeasonGroup](), RespShape: wiregen.RespArray,
+			AuthGroup: GroupUserConfigured, Query: true,
+			Response: wiregen.TypeRef[mediahandlers.SeasonGroup](), RespShape: wiregen.RespArray,
+			Doc: "Episodes grouped by season; honors ?recovery=1.",
 		},
 		{
 			Name: "coverageSeries", Method: http.MethodGet, Path: "/api/coverage/series",
-			AuthGroup: GroupUserConfigured, Response: seriesItem, RespShape: wiregen.RespArray,
+			AuthGroup: GroupUserConfigured, Query: true, Response: seriesItem, RespShape: wiregen.RespArray,
+			Doc: "Whole-collection series coverage; honors ?recovery=1.",
 		},
 		{
 			Name: "coverageMovies", Method: http.MethodGet, Path: "/api/coverage/movies",
-			AuthGroup: GroupUserConfigured, Response: movieItem, RespShape: wiregen.RespArray,
+			AuthGroup: GroupUserConfigured, Query: true, Response: movieItem, RespShape: wiregen.RespArray,
+			Doc: "Whole-collection movie coverage, no inlined subtitle rows (/subs owns them); honors ?recovery=1.",
 		},
 		{
 			Name: "coverageSeriesDetail", Method: http.MethodGet, Path: "/api/coverage/series/{tvdbId}",

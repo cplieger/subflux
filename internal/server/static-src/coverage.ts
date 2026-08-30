@@ -102,20 +102,6 @@ function coverageItemSignature(item: CoverageItem): string {
         join(t.language, t.variant, String(t.have), String(t.have_ignored), String(t.total)),
       ),
     ),
-    join(
-      ...(item.subs ?? []).map((s) =>
-        join(
-          s.media_id,
-          s.language,
-          s.variant,
-          s.source,
-          s.codec ?? "",
-          String(s.score ?? ""),
-          String(s.ordinal ?? ""),
-          String(s.offset_ms ?? ""),
-        ),
-      ),
-    ),
   );
 }
 
@@ -130,8 +116,8 @@ export async function fetchAndMergeCoverage(): Promise<CoverageItem[]> {
   coverageAbort = new AbortController();
   const { signal: sig } = coverageAbort;
   const [series, movies] = await Promise.all([
-    coverageSeries({ signal: sig }),
-    coverageMovies({ signal: sig }),
+    coverageSeries(undefined, { signal: sig }),
+    coverageMovies(undefined, { signal: sig }),
   ]);
   if (sig.aborted) {
     return coverage.items();
