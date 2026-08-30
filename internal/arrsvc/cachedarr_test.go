@@ -554,3 +554,64 @@ func TestCachedSonarr_reloadPublishesFreshInstance(t *testing.T) {
 		}
 	})
 }
+
+func TestCachedSonarr_SeriesByTvdbID(t *testing.T) {
+	shipped := &fakeSonarr{series: []arrapi.Series{
+		{ID: 1, TvdbID: 11},
+		{ID: 2, TvdbID: 22, Title: "Two"},
+	}}
+	c := testCachedSonarr(shipped, &fakeSonarr{}, testGate(t.Context()))
+
+	ser, found, err := c.SeriesByTvdbID(t.Context(), 22)
+	if err != nil || !found {
+		t.Fatalf("SeriesByTvdbID(22) = found %v, err %v; want the indexed row", found, err)
+	}
+	if ser.ID != 2 || ser.Title != "Two" {
+		t.Errorf("SeriesByTvdbID(22) = %+v, want ID 2 / Title \"Two\"", ser)
+	}
+
+	// Absence is a normal answer: found false, nil error — and lookups share
+	// the ONE cached list entry, so no extra upstream call is made.
+	_, found, err = c.SeriesByTvdbID(t.Context(), 404404)
+	if err != nil || found {
+		t.Errorf("SeriesByTvdbID(unknown) = found %v, err %v; want false, nil", found, err)
+	}
+	if s, _ := shipped.counts(); s != 1 {
+		t.Errorf("shipped series calls = %d, want 1 (index lookups share the list entry)", s)
+	}
+}
+
+func TestCachedSonarr_SeriesByTvdbID_propagates_fetch_error(t *testing.T) {
+	errUpstream := errors.New("upstream down")
+	shipped := &fakeSonarr{err: errUpstream}
+	c := testCachedSonarr(shipped, &fakeSonarr{}, testGate(t.Context()))
+
+	_, found, err := c.SeriesByTvdbID(t.Context(), 11)
+	if !errors.Is(err, errUpstream) || found {
+		t.Errorf("SeriesByTvdbID(fetch error) = found %v, err %v; want false, errUpstream", found, err)
+	}
+}
+
+func TestCachedRadarr_MovieByTmdbID(t *testing.T) {
+	shipped := &fakeRadarr{movies: []arrapi.Movie{
+		{ID: 5, TmdbID: 55},
+		{ID: 6, TmdbID: 66, Title: "Six"},
+	}}
+	c := testCachedRadarr(shipped, &fakeRadarr{}, testGate(t.Context()))
+
+	m, found, err := c.MovieByTmdbID(t.Context(), 66)
+	if err != nil || !found {
+		t.Fatalf("MovieByTmdbID(66) = found %v, err %v; want the indexed row", found, err)
+	}
+	if m.ID != 6 || m.Title != "Six" {
+		t.Errorf("MovieByTmdbID(66) = %+v, want ID 6 / Title \"Six\"", m)
+	}
+
+	_, found, err = c.MovieByTmdbID(t.Context(), 404404)
+	if err != nil || found {
+		t.Errorf("MovieByTmdbID(unknown) = found %v, err %v; want false, nil", found, err)
+	}
+	if mv, _ := shipped.counts(); mv != 1 {
+		t.Errorf("shipped movie calls = %d, want 1 (index lookups share the list entry)", mv)
+	}
+}

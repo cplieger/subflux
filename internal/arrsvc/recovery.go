@@ -74,3 +74,12 @@ func recoveryFrom(ctx context.Context) (recoveryState, bool) {
 	rec, ok := ctx.Value(recoveryKey{}).(recoveryState)
 	return rec, ok
 }
+
+// RecoveryMarked reports whether ctx carries the ?recovery=1 marker set by
+// WithRecovery. The handler-level honoring pin reads it through fake clients:
+// exactly the honoring endpoints interpret the query parameter, and this is
+// what lets a test observe that from outside the package.
+func RecoveryMarked(ctx context.Context) bool {
+	_, ok := recoveryFrom(ctx)
+	return ok
+}

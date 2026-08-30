@@ -478,6 +478,24 @@ func Endpoints() []wiregen.Endpoint {
 			AuthGroup: GroupUserConfigured,
 		},
 		{
+			Name: "coverageSeriesSummary", Method: http.MethodGet,
+			Path: "/api/coverage/series/{tvdbId}/summary", AuthGroup: GroupUserConfigured,
+			Query: true, Response: seriesItem,
+			Doc: "Per-item series coverage summary keyed by TVDB id; honors ?recovery=1. 404 exactly where the collection omits.",
+		},
+		{
+			Name: "coverageMovieSummary", Method: http.MethodGet,
+			Path: "/api/coverage/movies/{tmdbId}/summary", AuthGroup: GroupUserConfigured,
+			Query: true, Response: movieItem,
+			Doc: "Per-item movie coverage summary keyed by TMDB id, no subtitle rows; honors ?recovery=1. 404 exactly where the collection omits.",
+		},
+		{
+			Name: "coverageMovieSubs", Method: http.MethodGet,
+			Path: "/api/coverage/movies/{tmdbId}/subs", AuthGroup: GroupUserConfigured,
+			Response: subtitleEntry, RespShape: wiregen.RespArray,
+			Doc: "One movie's subtitle rows. Store-only: rows or an empty list, no arr read, so it does not honor ?recovery=1.",
+		},
+		{
 			Name: "downloadSubtitle", Method: http.MethodPost, Path: "/api/search/download",
 			AuthGroup: GroupUserConfigured,
 			Request:   wiregen.TypeRef[manualops.DownloadRequest](),

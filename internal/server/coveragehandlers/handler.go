@@ -34,27 +34,32 @@ type CoverageStore interface {
 }
 
 // CoverageSonarrClient is the Sonarr surface coverage handlers use: the
-// series list, the shipped fail-open exclude-tag resolution (plain reads),
-// and the error-returning form a ?recovery=1 read needs — its wave failure or
+// series list, the per-item tvdb→row index lookup the series summary answers
+// from, the shipped fail-open exclude-tag resolution (plain reads), and the
+// error-returning form a ?recovery=1 read needs — its wave failure or
 // refusal must reach the wire typed, never as a silent empty-exclusion 200.
 type CoverageSonarrClient interface {
 	Series(ctx context.Context) ([]arrapi.Series, error)
+	SeriesByTvdbID(ctx context.Context, tvdbID int) (arrapi.Series, bool, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 	ResolveExcludeTagIDsErr(ctx context.Context, tags []string, logMissing bool) (map[int]struct{}, error)
 }
 
-// CoverageRadarrClient is the Radarr surface coverage handlers use; the three
+// CoverageRadarrClient is the Radarr surface coverage handlers use; the four
 // methods mirror CoverageSonarrClient's.
 type CoverageRadarrClient interface {
 	Movies(ctx context.Context) ([]arrapi.Movie, error)
+	MovieByTmdbID(ctx context.Context, tmdbID int) (arrapi.Movie, bool, error)
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
 	ResolveExcludeTagIDsErr(ctx context.Context, tags []string, logMissing bool) (map[int]struct{}, error)
 }
 
-// tagResolver is the minimal surface fetchCoverageData needs; both role clients
-// satisfy it.
+// tagResolver is the exclude-tag surface the shared fetch paths need — the
+// fail-open projection for plain reads and the error-returning form for
+// marked ones; both role clients satisfy it.
 type tagResolver interface {
 	ResolveExcludeTagIDs(ctx context.Context, tags []string, logMissing bool) map[int]struct{}
+	ResolveExcludeTagIDsErr(ctx context.Context, tags []string, logMissing bool) (map[int]struct{}, error)
 }
 
 // Deps holds the dependencies for coverage handlers.
@@ -160,37 +165,50 @@ func (h *Handler) HandleCoverageSeries(w http.ResponseWriter, r *http.Request) {
 	out := make([]SeriesItem, 0, len(allSeries))
 	for i := range allSeries {
 		ser := &allSeries[i]
-		epCount := 0
-		if ser.Statistics != nil {
-			epCount = ser.Statistics.EpisodeFileCount
-		}
-		if epCount == 0 {
+		if !seriesIncluded(ser) {
 			continue
 		}
-
-		audioLang := arrsvc.OriginalLangCode(ser.OriginalLanguage)
-		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
-		ruleName := coverage.ResolveRuleName(audioLang, targets)
-
-		tCov := coverage.CountEpisodesGrouped(grouped[i], targets, epCount)
-
-		out = append(out, SeriesItem{
-			ID:         ser.ID,
-			Title:      ser.Title,
-			Year:       ser.Year,
-			TvdbID:     ser.TvdbID,
-			ImdbID:     ser.ImdbID,
-			FirstAired: ser.FirstAired,
-			Episodes:   epCount,
-			AudioLang:  audioLang,
-			Rule:       ruleName,
-			Targets:    tCov,
-			Tags:       ser.Tags,
-			Excluded:   arrsvc.HasExcludeTag(ser.Tags, excludeIDs),
-		})
+		out = append(out, buildSeriesItem(ls.Cfg, ser, grouped[i], excludeIDs))
 	}
 	slog.Debug("coverage: series computed", "count", len(out), "series_total", len(allSeries), "episode_files", len(allFiles))
 	httpapi.WriteJSON(w, out)
+}
+
+// seriesEpisodeCount returns the series' episode-file count (0 when arr sent
+// no statistics).
+func seriesEpisodeCount(ser *arrapi.Series) int {
+	if ser.Statistics == nil {
+		return 0
+	}
+	return ser.Statistics.EpisodeFileCount
+}
+
+// seriesIncluded is the series half of the exclusion-parity predicate shared
+// by the collection and the per-item summary (A2): the summary 404s exactly
+// where the collection omits — today a series with zero episode files.
+func seriesIncluded(ser *arrapi.Series) bool { return seriesEpisodeCount(ser) > 0 }
+
+// buildSeriesItem assembles one SeriesItem — the one construction site the
+// collection and the per-item summary share, so the summary stays deep-equal
+// to the collection's row.
+func buildSeriesItem(cfg coverageCfg, ser *arrapi.Series, epSubs []map[coverage.Key]*coverage.Status, excludeIDs map[int]struct{}) SeriesItem {
+	epCount := seriesEpisodeCount(ser)
+	audioLang := arrsvc.OriginalLangCode(ser.OriginalLanguage)
+	targets := cfg.ResolveTargetsWithFallback(audioLang, nil)
+	return SeriesItem{
+		ID:         ser.ID,
+		Title:      ser.Title,
+		Year:       ser.Year,
+		TvdbID:     ser.TvdbID,
+		ImdbID:     ser.ImdbID,
+		FirstAired: ser.FirstAired,
+		Episodes:   epCount,
+		AudioLang:  audioLang,
+		Rule:       coverage.ResolveRuleName(audioLang, targets),
+		Targets:    coverage.CountEpisodesGrouped(epSubs, targets, epCount),
+		Tags:       ser.Tags,
+		Excluded:   arrsvc.HasExcludeTag(ser.Tags, excludeIDs),
+	}
 }
 
 // groupEpisodeSubsBySeries buckets indexed episode subtitle maps by their
@@ -249,45 +267,51 @@ func (h *Handler) HandleCoverageMovies(w http.ResponseWriter, r *http.Request) {
 	out := make([]MovieItem, 0, len(allMovies))
 	for i := range allMovies {
 		m := &allMovies[i]
-		if !m.HasFile {
+		if !movieIncluded(m) {
 			continue
 		}
-
-		audioLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
-		targets := ls.Cfg.ResolveTargetsWithFallback(audioLang, nil)
-		ruleName := coverage.ResolveRuleName(audioLang, targets)
-
 		mediaID := mediaid.Movie(m.TmdbID, m.ImdbID)
-		if mediaID == "" {
-			continue
-		}
-		tCov := coverage.CountMovies(movieSubs[mediaID], targets)
-
-		var sceneName string
-		if m.MovieFile != nil {
-			sceneName = m.MovieFile.SceneName
-		}
-
-		out = append(out, MovieItem{
-			ID:             m.ID,
-			Title:          m.Title,
-			Year:           m.Year,
-			TmdbID:         m.TmdbID,
-			ImdbID:         m.ImdbID,
-			InCinemas:      m.InCinemas,
-			DigitalRelease: m.DigitalRelease,
-			HasFile:        m.HasFile,
-			SceneName:      sceneName,
-			AudioLang:      audioLang,
-			Rule:           ruleName,
-			Targets:        tCov,
-			Subs:           coverage.DeduplicateFileRows(movieFiles[mediaID]),
-			Tags:           m.Tags,
-			Excluded:       arrsvc.HasExcludeTag(m.Tags, excludeIDs),
-		})
+		item := buildMovieItem(ls.Cfg, m, movieSubs[mediaID], excludeIDs)
+		item.Subs = coverage.DeduplicateFileRows(movieFiles[mediaID])
+		out = append(out, item)
 	}
 	slog.Debug("coverage: movies computed", "count", len(out), "movie_total", len(allMovies), "movie_files", len(allFiles))
 	httpapi.WriteJSON(w, out)
+}
+
+// movieIncluded is the movie half of the exclusion-parity predicate shared by
+// the collection and the per-item summary (A2): the collection omits
+// file-less movies and rows with no canonical id.
+func movieIncluded(m *arrapi.Movie) bool {
+	return m.HasFile && mediaid.Movie(m.TmdbID, m.ImdbID) != ""
+}
+
+// buildMovieItem assembles one MovieItem minus Subs — the one construction
+// site the collection and the per-item summary share. The summary serializes
+// no rows (/subs owns them); the collection attaches its own.
+func buildMovieItem(cfg coverageCfg, m *arrapi.Movie, subs map[coverage.Key]*coverage.Status, excludeIDs map[int]struct{}) MovieItem {
+	audioLang := arrsvc.OriginalLangCode(m.OriginalLanguage)
+	targets := cfg.ResolveTargetsWithFallback(audioLang, nil)
+	var sceneName string
+	if m.MovieFile != nil {
+		sceneName = m.MovieFile.SceneName
+	}
+	return MovieItem{
+		ID:             m.ID,
+		Title:          m.Title,
+		Year:           m.Year,
+		TmdbID:         m.TmdbID,
+		ImdbID:         m.ImdbID,
+		InCinemas:      m.InCinemas,
+		DigitalRelease: m.DigitalRelease,
+		HasFile:        m.HasFile,
+		SceneName:      sceneName,
+		AudioLang:      audioLang,
+		Rule:           coverage.ResolveRuleName(audioLang, targets),
+		Targets:        coverage.CountMovies(subs, targets),
+		Tags:           m.Tags,
+		Excluded:       arrsvc.HasExcludeTag(m.Tags, excludeIDs),
+	}
 }
 
 // HandleCoverageDetail returns per-episode subtitle files for a series.
