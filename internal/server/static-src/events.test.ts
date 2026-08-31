@@ -40,13 +40,13 @@ vi.mock("./coverage.js", () => ({
   applyCoveragePair: vi.fn(),
   abortInFlightPairFetch: vi.fn(),
 }));
-// The transaction seams live on the row-store leaf.
+// The row-store's own transaction seams (the open-transaction flag itself is
+// transaction.ts's, a leaf this suite lets run for real).
 vi.mock("./coverage-store.js", () => ({
-  beginCoverageTransaction: vi.fn(),
   beginCoveredPairWrite: vi.fn(() => vi.fn()),
   registeredCollections: vi.fn(() => new Set<string>()),
   setCollectionLegJoin: vi.fn(),
-  settleCoverageTransaction: vi.fn(),
+  releaseCoverageTombstones: vi.fn(),
 }));
 vi.mock("./page-leg.js", () => ({
   currentRouteKey: vi.fn(() => "history"),

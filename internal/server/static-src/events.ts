@@ -33,12 +33,12 @@ import {
 } from "./status.js";
 import { applyCoveragePair, abortInFlightPairFetch } from "./coverage.js";
 import {
-  beginCoverageTransaction,
   beginCoveredPairWrite,
   registeredCollections,
+  releaseCoverageTombstones,
   setCollectionLegJoin,
-  settleCoverageTransaction,
 } from "./coverage-store.js";
+import { beginTransaction, settleTransaction } from "./transaction.js";
 import { currentRouteKey, dispatchTransactionPageLeg } from "./page-leg.js";
 import { clearSyncCorrelation, syncDoneFromEvent } from "./sync-jobs.js";
 import { armDownloadRestartSweep } from "./search.js";
@@ -651,12 +651,14 @@ async function handleEpoch(epoch: EpochEvent): Promise<void> {
   }
 
   // Create the transaction SYNCHRONOUSLY before resolving the boot gate, so
-  // the boot route loader finds the collection leg's join registered and
-  // joins it instead of double-fetching.
+  // the boot route loader finds the collection leg's join registered and joins
+  // it instead of double-fetching — and, for /history, so the page-0 reload
+  // that gate release dispatches is recorded as THIS transaction's, which is
+  // what lets the history leg join it instead of latching a second read.
   const t: Transaction = { head: epoch.head, revoked: false };
   txn = t;
   holdQueue.push(...defensiveHold);
-  beginCoverageTransaction();
+  beginTransaction();
   const join = createCollectionLegJoin();
   settleBootGate();
   // One microtask: the gate-released applyRoute sets its route state
@@ -705,7 +707,8 @@ async function handleEpoch(epoch: EpochEvent): Promise<void> {
     if (txn === t) {
       txn = null;
     }
-    settleCoverageTransaction();
+    settleTransaction();
+    releaseCoverageTombstones();
   }
 }
 
@@ -725,7 +728,8 @@ function abortTransaction(t: Transaction): void {
   forceLatch = true;
   teardownConnection();
   scheduleReconnect();
-  settleCoverageTransaction();
+  settleTransaction();
+  releaseCoverageTombstones();
 }
 
 // --- The collection leg ---
