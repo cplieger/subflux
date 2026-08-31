@@ -205,6 +205,16 @@ func New(db Store, reg confighandlers.SchemaRegistry, opts ...Option) *Server {
 	if s.live.Load() == nil {
 		s.live.Store(&liveState{})
 	}
+	// Status events (E1): the activity log and alert log publish deltas onto
+	// the SSE bus through hooks — set here, because neither registry can
+	// import the events bus. Activity upserts coalesce per entry through the
+	// publisher (terminal transitions immediate, with its flush barrier);
+	// alert raises/dismissals publish directly.
+	statusEvents := events.NewActivityPublisher(s.events.Publish)
+	s.activity.SetOnUpsert(func(e activity.Entry) { statusEvents.Upsert(&e) })
+	s.activity.SetOnRemove(func(e activity.Entry) { statusEvents.Remove(&e) })
+	s.alerts.SetOnRaise(func(a activity.Alert) { s.events.PublishAlert(events.AlertRaise, &a) })
+	s.alerts.SetOnDismiss(func(a activity.Alert) { s.events.PublishAlert(events.AlertDismiss, &a) })
 	// The arr-read wrapper's shared half: built here (not per activation) so
 	// the wave-admission ceiling spans reloads and both arr sides. Waves run
 	// under the server lifetime context and register with bgWg.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/scheduler"
 )
 
@@ -58,6 +59,26 @@ func (s *Server) runAuthCleanup(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			s.ceremonies.Cleanup()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// activityPruneInterval is how often the activity retention ticker runs; a
+// completed entry is removed within [PruneAge, PruneAge + this) of ending.
+const activityPruneInterval = 60 * time.Second
+
+// runActivityPrune drives activity retention on a ticker. The prune POLICY
+// (what leaves, and the remove events it fires) stays on Log.PruneCompleted;
+// this goroutine — the server's, on bgWg — is its one driver.
+func (s *Server) runActivityPrune(ctx context.Context) {
+	ticker := time.NewTicker(activityPruneInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.activity.PruneCompleted(activity.DefaultPruneAge)
 		case <-ctx.Done():
 			return
 		}

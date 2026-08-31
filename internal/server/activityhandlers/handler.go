@@ -90,10 +90,9 @@ func (h *Handler) HandleDismissAlert(w http.ResponseWriter, r *http.Request) {
 // survive the page cap unconditionally — a busy system must never hide a live
 // cancellable scan, because UI restoration depends on seeing it — and each
 // running entry carries the serialization-time cancellable flag merged from the
-// stop registry.
+// stop registry. Retention is NOT this handler's job: the server's prune
+// ticker is the one owner of PruneCompleted, so a read never mutates the log.
 func (h *Handler) HandleGetActivity(w http.ResponseWriter, _ *http.Request) {
-	h.deps.Activity.PruneCompleted(activity.DefaultPruneAge)
-
 	src := h.deps.Activity.Entries()
 	if len(src) == 0 {
 		httpapi.WriteJSON(w, []activity.Entry{})

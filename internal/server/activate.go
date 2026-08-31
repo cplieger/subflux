@@ -15,6 +15,7 @@ import (
 	"github.com/cplieger/subflux/internal/provider"
 	"github.com/cplieger/subflux/internal/scorer"
 	"github.com/cplieger/subflux/internal/search"
+	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/subflux"
 )
 
@@ -245,6 +246,20 @@ func (s *Server) finalize(ctx context.Context, oldState *liveState, newCfg *conf
 	// Re-apply the SSE client cap on the running hub (admission-time
 	// enforced; existing streams above a lowered cap drain naturally).
 	s.events.SetMaxClients(sseClientCap(newCfg))
+
+	// Provider status events (E1): install the SSE publisher on the fresh
+	// engine's health tracker. Per activation because the tracker is rebuilt
+	// with the engine; an outgoing engine's in-flight scan may still fire its
+	// old hook briefly, which publishes to the same bus and is harmless.
+	if cand.engine != nil {
+		cand.engine.SetProviderHealthHook(func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+			op := events.ProviderClear
+			if raised {
+				op = events.ProviderRaise
+			}
+			s.events.PublishProvider(op, &events.ProviderTimeoutEntry{Provider: id, Status: status})
+		})
+	}
 
 	// Configured-mode flip + gauge.
 	s.configured.Store(true)

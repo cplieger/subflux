@@ -564,3 +564,157 @@ func BenchmarkActivityLog_StartEnd(b *testing.B) {
 		log.End(id)
 	}
 }
+
+// ---- upsert / remove hooks (status events, E1) ----
+
+// The upsert hook observes every mutation with the post-mutation snapshot,
+// fired after the lock is released — proven by re-entering the log from
+// inside the hook, which would deadlock if it ran under the write lock.
+func TestActivityLog_onUpsert_fires_per_mutation_after_unlock(t *testing.T) {
+	a := New(10)
+	var got []Entry
+	a.SetOnUpsert(func(e Entry) {
+		if _, ok := a.Get(e.ID); !ok {
+			t.Errorf("hook re-entry: entry %q not readable from inside the hook", e.ID)
+		}
+		got = append(got, e)
+	})
+
+	id := a.Start("Scan", "d", SourceManual)
+	a.Progress(id, 3, 10, "working")
+	a.End(id)
+
+	if len(got) != 3 {
+		t.Fatalf("upsert hook fired %d times for start+progress+end, want 3", len(got))
+	}
+	if got[0].ID != id || got[0].Done {
+		t.Errorf("start snapshot = id %q done %v, want %q running", got[0].ID, got[0].Done, id)
+	}
+	if got[1].Current != 3 || got[1].Detail != "working" {
+		t.Errorf("progress snapshot = current %d detail %q, want 3 %q", got[1].Current, got[1].Detail, "working")
+	}
+	if !got[2].Done || got[2].EndedAt == nil {
+		t.Errorf("end snapshot = done %v endedAt %v, want terminal", got[2].Done, got[2].EndedAt)
+	}
+}
+
+// Fail and FinishCancelled snapshots carry their full terminal state (the
+// hook must fire after the whole mutation, not mid-way through finish).
+func TestActivityLog_onUpsert_terminal_snapshots_complete(t *testing.T) {
+	a := New(10)
+	var got []Entry
+	a.SetOnUpsert(func(e Entry) { got = append(got, e) })
+
+	a.Fail(a.Start("Scan", "d", SourceManual))
+	a.FinishCancelled(a.Start("Scan", "d", SourceManual))
+
+	if len(got) != 4 {
+		t.Fatalf("upsert hook fired %d times, want 4", len(got))
+	}
+	if !got[1].Done || !got[1].Failed {
+		t.Errorf("Fail snapshot = done %v failed %v, want both true", got[1].Done, got[1].Failed)
+	}
+	if !got[3].Done || !got[3].Cancelled {
+		t.Errorf("FinishCancelled snapshot = done %v cancelled %v, want both true", got[3].Done, got[3].Cancelled)
+	}
+}
+
+// A queued-cancel is an upsert (the entry stays in the log, flagged); a
+// StartScan hitting an existing scope mutates nothing and fires nothing.
+func TestActivityLog_onUpsert_cancel_and_idempotent_startScan(t *testing.T) {
+	a := New(10)
+	count := 0
+	a.SetOnUpsert(func(Entry) { count++ })
+
+	id, _ := a.StartScan("Scan", "d", SourceManual, ScanScope{Kind: ScanKindFull}, "admin")
+	a.SetQueued(id, true)
+	if !a.Cancel(id) {
+		t.Fatal("Cancel(queued) = false, want true")
+	}
+	if count != 3 {
+		t.Errorf("upsert hook fired %d times for start+queue+cancel, want 3", count)
+	}
+
+	if _, existing := a.StartScan("Scan", "d", SourceManual, ScanScope{Kind: ScanKindFull}, "admin"); existing {
+		t.Fatal("second StartScan existing = true; scope should be startable again (cancelled)")
+	}
+	before := count
+	a.Progress("no-such-id", 1, 2, "x")
+	if count != before {
+		t.Errorf("hook count after miss-Progress = %d, want %d (a no-op mutation fires nothing)", count, before)
+	}
+}
+
+// The remove hook fires on DISMISS with the under-lock snapshot, after
+// unlock (the hook re-enters the log).
+func TestActivityLog_onRemove_fires_on_dismiss_after_unlock(t *testing.T) {
+	a := New(10)
+	var removed []Entry
+	a.SetOnRemove(func(e Entry) {
+		_ = a.Entries() // re-entry: deadlocks if fired under the write lock
+		removed = append(removed, e)
+	})
+
+	id := a.Start("Scan", "d", SourceManual)
+	a.End(id)
+	a.Dismiss(id)
+
+	if len(removed) != 1 {
+		t.Fatalf("remove hook fired %d times on dismiss, want 1", len(removed))
+	}
+	if removed[0].ID != id || !removed[0].Done {
+		t.Errorf("dismiss snapshot = id %q done %v, want %q true", removed[0].ID, removed[0].Done, id)
+	}
+}
+
+// Dismissing a running entry removes nothing and fires nothing.
+func TestActivityLog_onRemove_not_fired_for_running_dismiss(t *testing.T) {
+	a := New(10)
+	fired := false
+	a.SetOnRemove(func(Entry) { fired = true })
+
+	a.Dismiss(a.Start("Scan", "d", SourceManual))
+
+	if fired {
+		t.Error("remove hook fired for a running entry's dismiss; dismiss only removes Done entries")
+	}
+}
+
+// The remove hook fires on PRUNE, once per pruned entry, with snapshots
+// collected under the lock.
+func TestActivityLog_onRemove_fires_on_prune(t *testing.T) {
+	a := New(10)
+	old := time.Now().Add(-20 * time.Minute)
+	appendEntry(a, doneEntry("old1", old))
+	appendEntry(a, doneEntry("old2", old))
+	appendEntry(a, Entry{ID: "live", Action: "scan"})
+	var removed []string
+	a.SetOnRemove(func(e Entry) { removed = append(removed, e.ID) })
+
+	a.PruneCompleted(10 * time.Minute)
+
+	if !slices.Equal(removed, []string{"old1", "old2"}) {
+		t.Errorf("prune removes = %v, want [old1 old2]", removed)
+	}
+}
+
+// The remove hook fires on CAP EVICTION, with the evicted entry's snapshot,
+// after unlock (the hook re-enters the log mid-Start).
+func TestActivityLog_onRemove_fires_on_cap_eviction(t *testing.T) {
+	a := New(1)
+	var removed []Entry
+	a.SetOnRemove(func(e Entry) {
+		_ = a.Entries() // re-entry: deadlocks if fired under the write lock
+		removed = append(removed, e)
+	})
+
+	a.End(a.Start("Scan", "first", SourceManual))
+	a.Start("Scan", "second", SourceManual)
+
+	if len(removed) != 1 {
+		t.Fatalf("remove hook fired %d times on cap eviction, want 1", len(removed))
+	}
+	if removed[0].ID != "1" || !removed[0].Done {
+		t.Errorf("evicted snapshot = id %q done %v, want id 1, done", removed[0].ID, removed[0].Done)
+	}
+}

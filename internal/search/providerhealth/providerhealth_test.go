@@ -2,9 +2,12 @@ package providerhealth
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 func clockAt(t time.Time) *func() time.Time {
@@ -312,5 +315,133 @@ func TestProviderTimeout_RecordFailure_keeps_capacity_when_live_count_equals_thr
 
 	if got := cap(tr.failures["pB"]); got != 16 {
 		t.Errorf("cap(failures[pB]) = %d, want 16 (no shrink at length boundary)", got)
+	}
+}
+
+// ---- OnChange transitions (provider status events, E1) ----
+
+type trackedChange struct {
+	status subflux.ProviderStatus
+	id     subflux.ProviderID
+	raised bool
+}
+
+// The trip transition raises exactly once — further failures while tripped
+// re-raise nothing — with the under-lock trip snapshot, fired after unlock
+// (the hook re-enters the tracker).
+func TestProviderTimeout_onChange_raises_once_on_trip(t *testing.T) {
+	t.Parallel()
+	clock := clockAt(time.Now())
+	it := newTestTracker(3, 10*time.Minute, time.Hour, clock)
+	var changes []trackedChange
+	it.SetOnChange(func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+		_ = it.Status() // re-entry: deadlocks if fired under the tracker's lock
+		changes = append(changes, trackedChange{id: id, status: status, raised: raised})
+	})
+
+	boom := errors.New("boom")
+	for range 5 {
+		it.RecordFailure("p", boom)
+	}
+
+	if len(changes) != 1 {
+		t.Fatalf("onChange fired %d times across 5 failures, want 1 (the trip)", len(changes))
+	}
+	c := changes[0]
+	if c.id != "p" || !c.raised {
+		t.Fatalf("trip change = id %q raised %v, want p raised", c.id, c.raised)
+	}
+	if !c.status.TimedOut || c.status.CooldownRemaining != time.Hour ||
+		c.status.RecentFailures != 3 || c.status.Threshold != 3 || c.status.LastError != "boom" {
+		t.Errorf("trip snapshot = %+v, want timed_out with full cooldown, 3/3 failures, last error", c.status)
+	}
+}
+
+// Observing cooldown expiry through IsTimedOut clears the timeout.
+func TestProviderTimeout_onChange_clears_on_expiry(t *testing.T) {
+	t.Parallel()
+	start := time.Now()
+	clock := clockAt(start)
+	it := newTestTracker(2, 10*time.Minute, time.Hour, clock)
+	var changes []trackedChange
+	it.SetOnChange(func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+		changes = append(changes, trackedChange{id: id, status: status, raised: raised})
+	})
+
+	it.RecordFailure("p", nil)
+	it.RecordFailure("p", nil)
+	*clock = func() time.Time { return start.Add(time.Hour + time.Second) }
+	if it.IsTimedOut("p") {
+		t.Fatal("IsTimedOut past the cooldown = true, want expired")
+	}
+
+	if len(changes) != 2 {
+		t.Fatalf("onChange fired %d times for trip+expiry, want 2", len(changes))
+	}
+	if changes[1].raised || changes[1].id != "p" {
+		t.Errorf("expiry change = id %q raised %v, want p cleared", changes[1].id, changes[1].raised)
+	}
+	if changes[1].status.TimedOut {
+		t.Errorf("expiry snapshot still timed out: %+v", changes[1].status)
+	}
+}
+
+// A success clears a TRIPPED provider (and only a tripped one: successes on
+// a healthy provider publish nothing).
+func TestProviderTimeout_onChange_clears_on_success_only_when_tripped(t *testing.T) {
+	t.Parallel()
+	clock := clockAt(time.Now())
+	it := newTestTracker(2, 10*time.Minute, time.Hour, clock)
+	var changes []trackedChange
+	it.SetOnChange(func(id subflux.ProviderID, status subflux.ProviderStatus, raised bool) {
+		changes = append(changes, trackedChange{id: id, status: status, raised: raised})
+	})
+
+	it.RecordSuccess("p") // healthy: no transition
+	it.RecordFailure("p", nil)
+	it.RecordSuccess("p") // failures but not tripped: no transition
+	if len(changes) != 0 {
+		t.Fatalf("onChange fired %d times without a trip, want 0", len(changes))
+	}
+
+	it.RecordFailure("p", nil)
+	it.RecordFailure("p", nil) // trips
+	it.RecordSuccess("p")      // clears
+
+	if len(changes) != 2 {
+		t.Fatalf("onChange fired %d times for trip+success-clear, want 2", len(changes))
+	}
+	if changes[1].raised {
+		t.Errorf("success change raised = true, want cleared")
+	}
+	if it.IsTimedOut("p") {
+		t.Error("provider still timed out after RecordSuccess")
+	}
+}
+
+// The operator reset clears every tripped provider, one transition each;
+// untripped providers with mere failure history publish nothing.
+func TestProviderTimeout_onChange_reset_clears_each_tripped(t *testing.T) {
+	t.Parallel()
+	clock := clockAt(time.Now())
+	it := newTestTracker(2, 10*time.Minute, time.Hour, clock)
+	var cleared []subflux.ProviderID
+	it.SetOnChange(func(id subflux.ProviderID, _ subflux.ProviderStatus, raised bool) {
+		if !raised {
+			cleared = append(cleared, id)
+		}
+	})
+
+	for _, p := range []subflux.ProviderID{"a", "b"} {
+		it.RecordFailure(p, nil)
+		it.RecordFailure(p, nil)
+	}
+	it.RecordFailure("healthy-ish", nil) // history, no trip
+
+	it.Reset()
+
+	slices.Sort(cleared)
+	if !slices.Equal(cleared, []subflux.ProviderID{"a", "b"}) {
+		t.Errorf("reset cleared %v, want [a b] (one clear per tripped provider, none for untripped)", cleared)
 	}
 }

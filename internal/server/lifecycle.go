@@ -45,6 +45,12 @@ func (s *Server) serveAndWait(ctx context.Context, addr string, mux *http.ServeM
 	// inside ceremonies.Cleanup(). It was the only one not registered.
 	s.bgWg.Go(func() { s.runAuthCleanup(ctx) })
 
+	// The ONE owner of activity retention (E1): the read path no longer
+	// prunes, so a completed entry leaves the log — and fires its remove
+	// event — within [PruneAge, PruneAge + activityPruneInterval) of ending,
+	// whether or not anyone polls.
+	s.bgWg.Go(func() { s.runActivityPrune(ctx) })
+
 	if onReady != nil {
 		s.ready.Set(true)
 		onReady()

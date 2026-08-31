@@ -134,6 +134,7 @@ type providerHealth interface {
 	RecordFailure(provider subflux.ProviderID, err error)
 	Status() map[subflux.ProviderID]subflux.ProviderStatus
 	Reset()
+	SetOnChange(fn providerhealth.OnChange)
 }
 
 // noopHealth is a no-op implementation used when timeouts are disabled.
@@ -144,6 +145,7 @@ func (noopHealth) RecordSuccess(subflux.ProviderID)                      {}
 func (noopHealth) RecordFailure(subflux.ProviderID, error)               {}
 func (noopHealth) Status() map[subflux.ProviderID]subflux.ProviderStatus { return nil }
 func (noopHealth) Reset()                                                {}
+func (noopHealth) SetOnChange(providerhealth.OnChange)                   {}
 
 // atomicWriter is the default FileWriter that delegates to atomicfile.WriteFile.
 // WithMaxBytes mirrors the read bound on the data it persists: downloaded
@@ -256,6 +258,14 @@ func (e *Engine) ProviderTimeouts() (map[subflux.ProviderID]subflux.ProviderStat
 // ResetTimeouts clears all provider timeout state and re-enables all providers.
 func (e *Engine) ResetTimeouts() {
 	e.timeout.Reset()
+}
+
+// SetProviderHealthHook installs the observer for provider timeout raise and
+// clear transitions (a no-op when timeouts are disabled). The server installs
+// the SSE publisher here after each activation — the tracker is rebuilt with
+// the engine on a config reload, so the hook is re-installed with it.
+func (e *Engine) SetProviderHealthHook(fn providerhealth.OnChange) {
+	e.timeout.SetOnChange(fn)
 }
 
 // SimulateScore simulates scoring a subtitle against a video using release names.
