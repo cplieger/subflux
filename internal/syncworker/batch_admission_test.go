@@ -127,9 +127,9 @@ func TestBatch_concurrency_exactly_one_and_automatic_interleaves(t *testing.T) {
 		exec := func(ctx context.Context, in *syncjobs.ExecInput, hook func() bool) syncjobs.ExecResult {
 			out := client.RunAudio(ctx, []byte(tinySRT), in.VideoPath, in.SubtitlePath, hook)
 			if out.Outcome != OutcomeResult {
-				return syncjobs.ExecResult{Outcome: syncjobs.OutcomeCancelled, Err: out.Err}
+				return syncjobs.ExecResult{Outcome: subflux.JobCancelled, Err: out.Err}
 			}
-			return syncjobs.ExecResult{Outcome: syncjobs.OutcomeResult, Applied: true, Confidence: 0.9}
+			return syncjobs.ExecResult{Outcome: subflux.JobResult, Applied: true, Confidence: 0.9}
 		}
 		ctx, cancel := context.WithCancel(t.Context())
 		d := syncjobs.New(syncjobs.Deps{
@@ -214,21 +214,21 @@ func TestBatch_wedged_item_consumes_its_ceiling_and_the_batch_proceeds(t *testin
 			})}, nil
 		})
 		log := activity.New(50)
-		var outcomes []syncjobs.JobOutcome
+		var outcomes []subflux.JobOutcome
 		var mu sync.Mutex
 		exec := func(ctx context.Context, in *syncjobs.ExecInput, hook func() bool) syncjobs.ExecResult {
 			out := client.RunAudio(ctx, []byte(tinySRT), in.VideoPath, in.SubtitlePath, hook)
 			res := syncjobs.ExecResult{Err: out.Err}
 			switch out.Outcome {
 			case OutcomeResult:
-				res.Outcome = syncjobs.OutcomeResult
+				res.Outcome = subflux.JobResult
 				res.Applied = true
 			case OutcomeTimeout:
-				res.Outcome = syncjobs.OutcomeTimeout
+				res.Outcome = subflux.JobTimeout
 			case OutcomeCancelled:
-				res.Outcome = syncjobs.OutcomeCancelled
+				res.Outcome = subflux.JobCancelled
 			default:
-				res.Outcome = syncjobs.OutcomeCrash
+				res.Outcome = subflux.JobCrash
 			}
 			mu.Lock()
 			outcomes = append(outcomes, res.Outcome)
@@ -284,10 +284,10 @@ func TestBatch_wedged_item_consumes_its_ceiling_and_the_batch_proceeds(t *testin
 		for _, j := range d.Jobs(acc.ActivityID) {
 			byOrdinal[j.Ordinal] = j
 		}
-		if byOrdinal[1].Outcome != syncjobs.OutcomeTimeout {
+		if byOrdinal[1].Outcome != subflux.JobTimeout {
 			t.Errorf("wedged item outcome = %q, want timeout from its own budget", byOrdinal[1].Outcome)
 		}
-		if byOrdinal[2].Outcome != syncjobs.OutcomeResult {
+		if byOrdinal[2].Outcome != subflux.JobResult {
 			t.Errorf("follow-up item outcome = %q, want the batch to proceed past the wedge", byOrdinal[2].Outcome)
 		}
 		mu.Lock()

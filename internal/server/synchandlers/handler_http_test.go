@@ -327,7 +327,7 @@ func TestHandleSyncAudio_dispatches_and_the_job_applies_the_result(t *testing.T)
 	}
 
 	job := awaitJob(t, hs.d, resp.JobID)
-	if job.Outcome != syncjobs.OutcomeResult || !job.Applied {
+	if job.Outcome != subflux.JobResult || !job.Applied {
 		t.Fatalf("job = %+v, want an applied result", job)
 	}
 	if job.OffsetMs != 100 {
@@ -465,7 +465,7 @@ func TestHandleSyncAudio_unreadable_file_is_a_failed_job(t *testing.T) {
 		t.Fatal(err)
 	}
 	job := awaitJob(t, hs.d, resp.JobID)
-	if job.Outcome != syncjobs.OutcomeCrash || job.Error == "" {
+	if job.Outcome != subflux.JobCrash || job.Error == "" {
 		t.Errorf("job = %+v, want done(crash) with the read error", job)
 	}
 	entry, ok := hs.log.Get(resp.ActivityID)

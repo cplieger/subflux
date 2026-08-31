@@ -20,6 +20,23 @@ const (
 	ScanBackedOff ScanOutcome = "backed_off"
 )
 
+// --- Sync job outcome ---
+
+// JobOutcome names how a done sync job ended, mirroring the typed core's
+// vocabulary. It lives here rather than beside the dispatcher because it
+// crosses a one-way seam: syncjobs.Job serves it on GET /api/sync/jobs and
+// events.SyncDoneEvent carries it on sync:done, and syncjobs imports events
+// (the publish seam), so neither of those two can own it.
+type JobOutcome string
+
+// Sync job outcomes (meaningful only in the done state).
+const (
+	JobResult    JobOutcome = "result"
+	JobTimeout   JobOutcome = "timeout"
+	JobCancelled JobOutcome = "cancelled"
+	JobCrash     JobOutcome = "crash"
+)
+
 // --- API response types ---
 
 // KeyStatus is the canonical JSON key for operation result status responses

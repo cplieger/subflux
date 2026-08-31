@@ -182,18 +182,21 @@ func (ProviderEvent) eventData() {}
 // terminal result, published when the job's worker ran (a queued
 // cancellation publishes nothing). JobID is the dialog's correlation key —
 // the 202 handed it over, and replay is idempotent per job_id. OffsetMs is
-// the CUMULATIVE offset (stored plus this run's correction); Error is set
-// for timeout/crash/cancelled outcomes.
+// the CUMULATIVE offset (stored plus this run's correction). Outcome is the
+// registry's own typed verdict, always set (the event exists only for a
+// settled job): it is what tells a stopped job from a crashed one, which
+// Error cannot — both carry one.
 type SyncDoneEvent struct {
-	BatchActivityID string          `json:"batch_activity_id,omitempty"`
-	Method          string          `json:"method,omitempty"`
-	Error           string          `json:"error,omitempty"`
-	FileRef         resolve.FileRef `json:"file_ref"`
-	JobID           int64           `json:"job_id"`
-	OffsetMs        int64           `json:"offset_ms"`
-	Confidence      float64         `json:"confidence"`
-	Applied         bool            `json:"applied"`
-	DryRun          bool            `json:"dry_run"`
+	BatchActivityID string             `json:"batch_activity_id,omitempty"`
+	Method          string             `json:"method,omitempty"`
+	Error           string             `json:"error,omitempty"`
+	Outcome         subflux.JobOutcome `json:"outcome"`
+	FileRef         resolve.FileRef    `json:"file_ref"`
+	JobID           int64              `json:"job_id"`
+	OffsetMs        int64              `json:"offset_ms"`
+	Confidence      float64            `json:"confidence"`
+	Applied         bool               `json:"applied"`
+	DryRun          bool               `json:"dry_run"`
 }
 
 func (SyncDoneEvent) eventData() {}

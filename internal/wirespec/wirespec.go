@@ -167,7 +167,8 @@ func Registry() *wiregen.Registry {
 		// both auto-discovered from the activity package's const blocks.
 		"ScanKind": {}, "Outcome": {},
 		// Sync job lifecycle + outcome (async sync D1), auto-discovered from
-		// the syncjobs package's const blocks.
+		// the const blocks in syncjobs (JobState) and internal/subflux
+		// (JobOutcome, shared by the registry read and the sync:done event).
 		"JobState": {}, "JobOutcome": {},
 		// SSE event names (events.EventType consts) and the error-code
 		// catalog (subflux.ErrorCode consts) — both auto-discovered, so a new

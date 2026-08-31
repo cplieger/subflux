@@ -980,6 +980,7 @@ export const decodeSyncAudioRequest: Decoder<SyncAudioRequest> = (v) => {
 export const decodeSyncDoneEvent: Decoder<SyncDoneEvent> = (v) => {
   const o = asObject(v, "$.sync_done_event");
   const out: SyncDoneEvent = {
+    outcome: reqOneOf(o, "outcome", JOB_OUTCOMES, "$.sync_done_event"),
     file_ref: decodeFileRef(o["file_ref"]),
     job_id: reqNum(o, "job_id", "$.sync_done_event"),
     offset_ms: reqNum(o, "offset_ms", "$.sync_done_event"),

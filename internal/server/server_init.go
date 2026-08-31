@@ -132,25 +132,9 @@ func (s *Server) initHandlers() {
 		FFmpegSem:    s.ffmpegSem,
 		PosterClient: s.posterClient,
 		Resolve:      resolver,
-		StateFunc: func() *previewhandlers.LiveState {
-			ls := s.state()
-			pls := &previewhandlers.LiveState{}
-			if ls.cfg != nil {
-				pls.HasSonarr = ls.sonarr != nil
-				pls.HasRadarr = ls.radarr != nil
-				if ls.sonarr != nil {
-					sc := ls.cfg.Sonarr()
-					pls.SonarrConfig = previewhandlers.ArrConfig{URL: sc.URL, APIKey: sc.APIKey}
-				}
-				if ls.radarr != nil {
-					rc := ls.cfg.Radarr()
-					pls.RadarrConfig = previewhandlers.ArrConfig{URL: rc.URL, APIKey: rc.APIKey}
-				}
-			}
-			return pls
-		},
-		ReadBounded: atomicfile.ReadBounded,
-		ServerCtx:   func() context.Context { return s.lifetime },
+		StateFunc:    s.previewLiveState,
+		ReadBounded:  atomicfile.ReadBounded,
+		ServerCtx:    func() context.Context { return s.lifetime },
 	})
 
 	s.storeOps = storeops.New(storeops.Deps{
@@ -191,20 +175,10 @@ func (s *Server) initHandlers() {
 		},
 	})
 	s.fileH = filehandlers.NewHandler(filehandlers.Deps{
-		Store:   s.db,
-		Resolve: resolver,
-		StateFunc: func() *filehandlers.LiveState {
-			ls := s.state()
-			fls := &filehandlers.LiveState{Cfg: ls.cfg}
-			if ls.sonarr != nil {
-				fls.Sonarr = ls.sonarr
-			}
-			if ls.radarr != nil {
-				fls.Radarr = ls.radarr
-			}
-			return fls
-		},
-		Events: s.events,
+		Store:     s.db,
+		Resolve:   resolver,
+		StateFunc: s.fileLiveState,
+		Events:    s.events,
 	})
 	s.mediaH = mediahandlers.NewHandler(mediahandlers.Deps{
 		StateFunc: func() *mediahandlers.LiveState {
@@ -223,20 +197,59 @@ func (s *Server) initHandlers() {
 		SubtitleProc: s.subtitleProc,
 		Jobs:         s.syncJobs,
 		Resolve:      resolver,
-		SeasonState: func() *synchandlers.SeasonState {
-			ls := s.state()
-			sst := &synchandlers.SeasonState{}
-			// Conditional assigns: a nil concrete pointer boxed into the
-			// interface field would defeat the handler's nil checks.
-			if ls.cfg != nil {
-				sst.Cfg = ls.cfg
-			}
-			if ls.sonarr != nil {
-				sst.Sonarr = ls.sonarr
-			}
-			return sst
-		},
+		SeasonState:  s.syncSeasonState,
 	})
+}
+
+// previewLiveState projects the live snapshot onto the preview handlers'
+// view: the arr credentials the poster proxy needs, present only when that
+// arr is wired.
+func (s *Server) previewLiveState() *previewhandlers.LiveState {
+	ls := s.state()
+	pls := &previewhandlers.LiveState{}
+	if ls.cfg == nil {
+		return pls
+	}
+	pls.HasSonarr = ls.sonarr != nil
+	pls.HasRadarr = ls.radarr != nil
+	if ls.sonarr != nil {
+		sc := ls.cfg.Sonarr()
+		pls.SonarrConfig = previewhandlers.ArrConfig{URL: sc.URL, APIKey: sc.APIKey}
+	}
+	if ls.radarr != nil {
+		rc := ls.cfg.Radarr()
+		pls.RadarrConfig = previewhandlers.ArrConfig{URL: rc.URL, APIKey: rc.APIKey}
+	}
+	return pls
+}
+
+// fileLiveState projects the live snapshot onto the file handlers' view.
+// Conditional assigns: a nil concrete pointer boxed into an interface field
+// would defeat the handler's nil checks.
+func (s *Server) fileLiveState() *filehandlers.LiveState {
+	ls := s.state()
+	fls := &filehandlers.LiveState{Cfg: ls.cfg}
+	if ls.sonarr != nil {
+		fls.Sonarr = ls.sonarr
+	}
+	if ls.radarr != nil {
+		fls.Radarr = ls.radarr
+	}
+	return fls
+}
+
+// syncSeasonState projects the live snapshot onto the season batch's
+// dependency view, with the same nil-boxing care as fileLiveState.
+func (s *Server) syncSeasonState() *synchandlers.SeasonState {
+	ls := s.state()
+	sst := &synchandlers.SeasonState{}
+	if ls.cfg != nil {
+		sst.Cfg = ls.cfg
+	}
+	if ls.sonarr != nil {
+		sst.Sonarr = ls.sonarr
+	}
+	return sst
 }
 
 // initManualHandler constructs the manualops.Handler with the server's dependencies.

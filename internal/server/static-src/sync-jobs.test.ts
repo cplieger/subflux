@@ -22,6 +22,7 @@ import type { Job, SyncDoneEvent } from "./wire/types.gen.js";
 function doneEvent(jobId: number, over: Partial<SyncDoneEvent> = {}): SyncDoneEvent {
   return {
     job_id: jobId,
+    outcome: "result",
     file_ref: {
       media_type: "movie",
       media_id: "tmdb-1",
@@ -90,12 +91,21 @@ describe("watchSyncJob + syncDoneFromEvent", () => {
     syncDoneFromEvent(doneEvent(7));
     watchSyncJob(8, (ev) => seenB.push(ev));
 
-    syncDoneFromEvent(doneEvent(7)); // the replay
+    // The replay carries a DIFFERENT verdict: settlement is idempotent per
+    // job_id, so the first delivery's outcome is the one the dialog keeps.
+    syncDoneFromEvent(doneEvent(7, { outcome: "cancelled", error: "context canceled" }));
 
     expect(seenA).toHaveLength(1); // idempotent per job_id: no second settle
+    expect(seenA[0]?.outcome).toBe("result");
+    // A late watcher of the settled job reads the FIRST verdict too, so a
+    // replay can never re-render a settled job as something else.
+    const lateA: (SyncDoneEvent | null)[] = [];
+    watchSyncJob(7, (ev) => lateA.push(ev));
+    expect(lateA[0]?.outcome).toBe("result");
     expect(seenB).toHaveLength(0); // B untouched by A's replay
-    syncDoneFromEvent(doneEvent(8));
+    syncDoneFromEvent(doneEvent(8, { outcome: "crash" }));
     expect(seenB).toHaveLength(1);
+    expect(seenB[0]?.outcome).toBe("crash");
   });
 
   it("unwatch stops the callback", () => {

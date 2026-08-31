@@ -17,7 +17,7 @@ import { signal, effect, patch } from "@cplieger/reactive";
 import { audioSyncAction, saveManualOffsetAction, seasonSyncAction } from "./sync-actions.js";
 import { attachSyncJob, watchSyncJob } from "./sync-jobs.js";
 import { refKey, subtitleRef, type FileRefArgs } from "./file-ref.js";
-import type { Job, SyncDoneEvent } from "./wire/types.gen.js";
+import type { Job, JobOutcome, SyncDoneEvent } from "./wire/types.gen.js";
 import {
   previewStart,
   syncJobs,
@@ -526,12 +526,28 @@ async function applyManualOffset(): Promise<void> {
 }
 
 // The fields the inline result panel renders, shared by the live sync:done
-// event and the reload path's job record.
+// event and the reload path's job record. Both carry the registry's typed
+// outcome; the event's is always set, a queued/running record's is not.
 interface SyncOutcomeView {
+  outcome?: JobOutcome;
   applied?: boolean;
   confidence?: number;
   offset_ms?: number;
   error?: string;
+}
+
+/** The line for a job that produced no offset. Read from the TYPED outcome:
+ *  a stopped job, a timed-out one and a crashed one all carry an error
+ *  string, so `error` alone cannot tell them apart. */
+function failedOutcomeText(outcome: Exclude<JobOutcome, "result">, error?: string): string {
+  switch (outcome) {
+    case "cancelled":
+      return "Audio sync was stopped.";
+    case "timeout":
+      return "Audio sync ran out of time before it finished.";
+    case "crash":
+      return `Audio sync failed: ${error ?? "unknown error"}`;
+  }
 }
 
 /** Render one job's terminal outcome into the inline result panel — the
@@ -539,7 +555,13 @@ interface SyncOutcomeView {
 function renderSyncOutcome(view: SyncOutcomeView, resultDiv: HTMLElement): void {
   resultDiv.hidden = false;
   resultDiv.className = "sync-audio-result";
+  if (view.outcome !== undefined && view.outcome !== "result") {
+    resultDiv.textContent = failedOutcomeText(view.outcome, view.error);
+    return;
+  }
   if (view.error) {
+    // A record with no outcome cannot arrive from this server; keep the
+    // generic line rather than claiming a verdict nothing supplied.
     resultDiv.textContent = `Audio sync did not complete: ${view.error}`;
     return;
   }
@@ -1296,21 +1318,20 @@ async function renderSeasonBatch(
         return;
       }
       j.state = "done";
-      j.outcome = ev.error ? "crash" : "result";
+      j.outcome = ev.outcome;
       j.applied = ev.applied;
       j.offset_ms = ev.offset_ms;
       j.confidence = ev.confidence;
       const rowEl = rows.get(ev.job_id);
       if (rowEl) {
-        rowEl.textContent = `${seasonItemLabel(j)} \u2014 ${
-          ev.error ? "failed" : seasonItemStatus(j)
-        }`;
+        rowEl.textContent = `${seasonItemLabel(j)} \u2014 ${seasonItemStatus(j)}`;
       }
       settle();
-      if (ev.error) {
-        // An errored item may mean the batch was stopped: siblings then
+      if (ev.outcome === "cancelled") {
+        // A stopped item means the batch was stopped: its siblings then
         // settle cancelled with no events of their own. One re-read
-        // reconciles whatever the registry now says.
+        // reconciles whatever the registry now says. A crash does NOT stop
+        // the batch, so it needs no re-read.
         refresh();
       }
     });

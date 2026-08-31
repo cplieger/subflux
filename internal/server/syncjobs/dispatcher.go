@@ -29,6 +29,7 @@ import (
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
 	"github.com/cplieger/subflux/internal/server/resolve"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // MaxJobs is the admission lease: at most this many accepted (queued or
@@ -41,8 +42,7 @@ const MaxJobs = 8
 const DefaultRegistryCap = 256
 
 // JobState is a job's lifecycle position. (Named for the flat TS wire
-// namespace, where a bare State or Outcome would collide with the activity
-// vocabulary.)
+// namespace, where a bare State would collide with the activity vocabulary.)
 type JobState string
 
 // Job states: queued → running (at the admission hook) → done.
@@ -52,42 +52,30 @@ const (
 	StateDone    JobState = "done"
 )
 
-// JobOutcome names how a done job ended, mirroring the typed core's
-// vocabulary.
-type JobOutcome string
-
-// Job outcomes (meaningful only in StateDone).
-const (
-	OutcomeResult    JobOutcome = "result"
-	OutcomeTimeout   JobOutcome = "timeout"
-	OutcomeCancelled JobOutcome = "cancelled"
-	OutcomeCrash     JobOutcome = "crash"
-)
-
 // Job is one sync job record: the wire shape GET /api/sync/jobs serves.
 // JobID is a NUMERIC process sequence — distinct from the activity log's
 // string ids, which the record carries beside it. The registry is truth
 // independent of the activity ring; a restart drops it (jobs are not
 // persisted — the client re-attaches via this read and finds nothing).
 type Job struct {
-	AcceptedAt      time.Time       `json:"accepted_at"`
-	StartedAt       *time.Time      `json:"started_at,omitempty"`
-	EndedAt         *time.Time      `json:"ended_at,omitempty"`
-	BatchActivityID string          `json:"batch_activity_id,omitempty"`
-	Method          string          `json:"method,omitempty"`
-	Error           string          `json:"error,omitempty"`
-	State           JobState        `json:"state"`
-	Outcome         JobOutcome      `json:"outcome,omitempty"`
-	ActivityID      string          `json:"activity_id"`
-	FileRef         resolve.FileRef `json:"file_ref"`
-	JobID           int64           `json:"job_id"`
-	OffsetMs        int64           `json:"offset_ms,omitempty"`
-	SeriesID        int             `json:"series_id,omitempty"`
-	Season          int             `json:"season,omitempty"`
-	Ordinal         int             `json:"ordinal,omitempty"`
-	Confidence      float64         `json:"confidence,omitempty"`
-	Applied         bool            `json:"applied,omitempty"`
-	DryRun          bool            `json:"dry_run,omitempty"`
+	AcceptedAt      time.Time          `json:"accepted_at"`
+	StartedAt       *time.Time         `json:"started_at,omitempty"`
+	EndedAt         *time.Time         `json:"ended_at,omitempty"`
+	BatchActivityID string             `json:"batch_activity_id,omitempty"`
+	Method          string             `json:"method,omitempty"`
+	Error           string             `json:"error,omitempty"`
+	State           JobState           `json:"state"`
+	Outcome         subflux.JobOutcome `json:"outcome,omitempty"`
+	ActivityID      string             `json:"activity_id"`
+	FileRef         resolve.FileRef    `json:"file_ref"`
+	JobID           int64              `json:"job_id"`
+	OffsetMs        int64              `json:"offset_ms,omitempty"`
+	SeriesID        int                `json:"series_id,omitempty"`
+	Season          int                `json:"season,omitempty"`
+	Ordinal         int                `json:"ordinal,omitempty"`
+	Confidence      float64            `json:"confidence,omitempty"`
+	Applied         bool               `json:"applied,omitempty"`
+	DryRun          bool               `json:"dry_run,omitempty"`
 }
 
 // ExecInput is one job's work order, resolved at accept time (the handler
@@ -105,7 +93,7 @@ type ExecInput struct {
 type ExecResult struct {
 	Err        error
 	Method     string
-	Outcome    JobOutcome
+	Outcome    subflux.JobOutcome
 	OffsetMs   int64
 	Confidence float64
 	Applied    bool
@@ -113,7 +101,7 @@ type ExecResult struct {
 
 // ExecFunc runs one job's analysis. The hook MUST be invoked exactly once at
 // execution-slot acquisition (the typed core does this); returning false
-// refuses the run and the executor reports OutcomeCancelled.
+// refuses the run and the executor reports subflux.JobCancelled.
 type ExecFunc func(ctx context.Context, in *ExecInput, hook func() bool) ExecResult
 
 // Accepted is a dispatch answer: the two ids the 202 hands the client, and
@@ -300,7 +288,7 @@ func (d *Dispatcher) Cancel(activityID string) CancelOutcome {
 		// Still in the queue: settle done(cancelled) here — retained,
 		// dedupe and capacity released immediately, no success event.
 		d.queue = slices.DeleteFunc(d.queue, func(e queueEntry) bool { return e.batch == nil && e.jobID == id })
-		d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: context.Canceled})
+		d.settleLocked(j, ExecResult{Outcome: subflux.JobCancelled, Err: context.Canceled})
 		d.mu.Unlock()
 		d.deps.Log.FinishCancelled(activityID)
 		return CancelledQueued
@@ -367,20 +355,29 @@ func (d *Dispatcher) Run(ctx context.Context) {
 			return
 		case <-d.wake:
 		}
-		for {
-			if ctx.Err() != nil {
-				d.drain()
-				return
-			}
-			j, b := d.pop()
-			if j == nil && b == nil {
-				break
-			}
-			if b != nil {
-				d.runBatch(ctx, b)
-			} else {
-				d.runJob(ctx, j)
-			}
+		if !d.runQueued(ctx) {
+			d.drain()
+			return
+		}
+	}
+}
+
+// runQueued executes every queued entry in FIFO order until the queue
+// empties, reporting whether it emptied: false means ctx died mid-drain and
+// the caller owns the drain.
+func (d *Dispatcher) runQueued(ctx context.Context) bool {
+	for {
+		if ctx.Err() != nil {
+			return false
+		}
+		j, b := d.pop()
+		switch {
+		case b != nil:
+			d.runBatch(ctx, b)
+		case j != nil:
+			d.runJob(ctx, j)
+		default:
+			return true
 		}
 	}
 }
@@ -413,7 +410,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 		// settled it).
 		settled := j.record.State == StateDone
 		if !settled {
-			d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: context.Canceled})
+			d.settleLocked(j, ExecResult{Outcome: subflux.JobCancelled, Err: context.Canceled})
 		}
 		actID := j.record.ActivityID
 		d.mu.Unlock()
@@ -461,14 +458,14 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 	d.mu.Unlock()
 
 	switch res.Outcome {
-	case OutcomeResult:
+	case subflux.JobResult:
 		d.deps.Log.End(rec.ActivityID)
-	case OutcomeCancelled:
+	case subflux.JobCancelled:
 		d.deps.Log.FinishCancelled(rec.ActivityID)
 	default:
 		d.deps.Log.Fail(rec.ActivityID)
 	}
-	if ran || res.Outcome != OutcomeCancelled {
+	if ran || res.Outcome != subflux.JobCancelled {
 		// sync:done settles the dialog for every job whose worker ran AND
 		// for a pre-admission failure (the client must not wait forever); a
 		// never-admitted CANCELLATION publishes no success event (the
@@ -477,6 +474,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 			JobID:           rec.JobID,
 			BatchActivityID: rec.BatchActivityID,
 			FileRef:         rec.FileRef,
+			Outcome:         rec.Outcome,
 			OffsetMs:        rec.OffsetMs,
 			Confidence:      rec.Confidence,
 			Method:          rec.Method,
@@ -485,7 +483,7 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 			Error:           rec.Error,
 		})
 	}
-	if res.Outcome != OutcomeResult && res.Outcome != OutcomeCancelled {
+	if res.Outcome != subflux.JobResult && res.Outcome != subflux.JobCancelled {
 		slog.Warn("sync job failed",
 			"job_id", rec.JobID, "activity_id", rec.ActivityID,
 			"outcome", string(res.Outcome), "error", rec.Error)
@@ -514,7 +512,7 @@ func (d *Dispatcher) drain() {
 		if j.record.State != StateQueued {
 			continue
 		}
-		d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: ErrShuttingDown})
+		d.settleLocked(j, ExecResult{Outcome: subflux.JobCancelled, Err: ErrShuttingDown})
 		acts = append(acts, j.record.ActivityID)
 	}
 	d.mu.Unlock()

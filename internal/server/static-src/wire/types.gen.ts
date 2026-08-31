@@ -922,13 +922,16 @@ export interface SyncAudioRequest {
  * terminal result, published when the job's worker ran (a queued
  * cancellation publishes nothing). JobID is the dialog's correlation key —
  * the 202 handed it over, and replay is idempotent per job_id. OffsetMs is
- * the CUMULATIVE offset (stored plus this run's correction); Error is set
- * for timeout/crash/cancelled outcomes.
+ * the CUMULATIVE offset (stored plus this run's correction). Outcome is the
+ * registry's own typed verdict, always set (the event exists only for a
+ * settled job): it is what tells a stopped job from a crashed one, which
+ * Error cannot — both carry one.
  */
 export interface SyncDoneEvent {
   batch_activity_id?: string;
   method?: string;
   error?: string;
+  outcome: JobOutcome;
   file_ref: FileRef;
   job_id: number;
   offset_ms: number;

@@ -16,6 +16,7 @@ import (
 
 	"github.com/cplieger/subflux/internal/server/activity"
 	"github.com/cplieger/subflux/internal/server/events"
+	"github.com/cplieger/subflux/internal/subflux"
 )
 
 // BatchInput is one season batch's work order: pre-resolved items in ordinal
@@ -25,12 +26,12 @@ import (
 type BatchInput struct {
 	// Detail is the batch activity entry's aggregate detail line.
 	Detail string
+	// Items in ordinal order; item i is ordinal i+1.
+	Items []ExecInput
 	// SeriesID and Season scope the batch: a dispatch for a scope that
 	// already has a live batch answers that batch's id (idempotent).
 	SeriesID int
 	Season   int
-	// Items in ordinal order; item i is ordinal i+1.
-	Items []ExecInput
 }
 
 // BatchAccepted is a season dispatch answer.
@@ -55,10 +56,10 @@ type batch struct {
 	endedAt       time.Time
 	activityID    string
 	detail        string
+	state         JobState
 	itemIDs       []int64
 	seriesID      int
 	season        int
-	state         JobState
 	cancelPending bool
 	popped        bool
 }
@@ -179,7 +180,7 @@ func (d *Dispatcher) settleBatchItemsLocked(b *batch, err error) {
 		if !ok || j.record.State == StateDone {
 			continue
 		}
-		d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: err})
+		d.settleLocked(j, ExecResult{Outcome: subflux.JobCancelled, Err: err})
 	}
 }
 
@@ -295,7 +296,7 @@ func (d *Dispatcher) runBatchItem(ctx context.Context, id int64) {
 	rec := j.record
 	d.mu.Unlock()
 
-	if ran || res.Outcome != OutcomeCancelled {
+	if ran || res.Outcome != subflux.JobCancelled {
 		// Each item publishes its OWN sync:done, batch_activity_id set —
 		// same rule as a single job (a never-admitted cancellation
 		// publishes nothing; the registry is its record).
@@ -303,6 +304,7 @@ func (d *Dispatcher) runBatchItem(ctx context.Context, id int64) {
 			JobID:           rec.JobID,
 			BatchActivityID: rec.BatchActivityID,
 			FileRef:         rec.FileRef,
+			Outcome:         rec.Outcome,
 			OffsetMs:        rec.OffsetMs,
 			Confidence:      rec.Confidence,
 			Method:          rec.Method,
@@ -325,9 +327,9 @@ func (d *Dispatcher) batchOutcomesLocked(itemIDs []int64) (applied, failed, low 
 		}
 		rec := &j.record
 		switch {
-		case rec.Outcome == OutcomeResult && rec.Applied:
+		case rec.Outcome == subflux.JobResult && rec.Applied:
 			applied++
-		case rec.Outcome == OutcomeResult:
+		case rec.Outcome == subflux.JobResult:
 			low++
 		default:
 			failed++
