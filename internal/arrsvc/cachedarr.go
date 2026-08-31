@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cplieger/arrapi/v2"
@@ -17,9 +18,16 @@ import (
 const (
 	keySeriesList = "series"
 	keyMovieList  = "movies"
+	// episodesPrefix namespaces the episodes-by-series family. It is the one
+	// family with an entry per series rather than per instance, so the table
+	// reads the prefix to route it to its bounded store.
+	episodesPrefix = "episodes/"
 )
 
-func episodesKey(seriesID int) string { return "episodes/" + strconv.Itoa(seriesID) }
+func episodesKey(seriesID int) string { return episodesPrefix + strconv.Itoa(seriesID) }
+
+// isEpisodesKey reports whether key belongs to the episodes family.
+func isEpisodesKey(key string) bool { return strings.HasPrefix(key, episodesPrefix) }
 
 // tagsKey keys exclude-tag resolution by the tag NAME SET (sorted, so order
 // is immaterial). logMissing stays out of the key: the hint is caller-side,
@@ -273,7 +281,7 @@ func fetchEpisodes(src sonarrReads, seriesID int) fetchFn {
 // cachedSeriesHas is the gate's fast-path check against the current cached
 // series list; a missing or expired entry reads as a miss.
 func (c *CachedSonarr) cachedSeriesHas(seriesID int) bool {
-	e, ok := c.table.cache.Get(keySeriesList)
+	e, ok := c.table.lookup(keySeriesList)
 	if !ok {
 		return false
 	}

@@ -3,6 +3,8 @@ package polling
 import (
 	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -123,11 +125,6 @@ func newTestPollCache() *PollCache {
 
 // --- poll-cycle test helpers ---
 
-// ttlProbeDelay is longer than the "short" tag-cache TTLs under test (2ms) and
-// far shorter than the "long" ones (>=4m), so an entry's presence after this
-// delay deterministically reflects the configured TTL.
-const ttlProbeDelay = 5 * time.Millisecond
-
 // noopStore is a stateless (race-free) PollerStore for the concurrent PollOnce
 // test where store side effects are not asserted.
 type noopStore struct{}
@@ -136,8 +133,9 @@ func (noopStore) DeleteStateByPaths(_ context.Context, paths []string) (subflux.
 	return subflux.CleanupResult{Paths: paths}, nil
 }
 
-// countingExcludeResolver embeds *mockHistoryPoller and counts ResolveExcludeTagIDs
-// calls, used to assert the poller's tag-cache TTL behaviour.
+// countingExcludeResolver embeds *mockHistoryPoller and counts
+// ResolveExcludeTagIDs calls, so a test can pin how often the poller asks its
+// arr client to resolve the exclude tags.
 type countingExcludeResolver struct {
 	*mockHistoryPoller
 	result map[int]struct{}
@@ -247,9 +245,6 @@ func TestPollOnce_returns_entry_count_on_activity(t *testing.T) {
 	}
 	cfg := &mockCfg{interval: time.Second, langs: []string{"en"}}
 	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
-	// Use NewPoller (rather than &Poller{...}) so the internal tagCache
-	// is initialized; the entries reach excludeTagIDs which dereferences
-	// tagCache.
 	p := NewPoller(deps, func() *LiveState { return ls })
 
 	// Both entries' paths are missing on disk and will skip out of
@@ -272,52 +267,6 @@ func TestBurstPollConstants_in_canonical_relationship(t *testing.T) {
 	}
 	if cycles := burstPollWindow / burstPollInterval; cycles < 4 {
 		t.Errorf("burst window should span >=4 burst cycles, got %d", cycles)
-	}
-}
-
-// --- NewPoller tag-cache TTL derivation ---
-
-// With a nil Cfg, NewPoller falls back to a default tag-cache TTL
-// (2*defaultPollInterval = 4m), so resolved exclude tags stay cached.
-func TestNewPoller_defaultTTL_caches_tags(t *testing.T) {
-	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
-	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{} })
-	ctx := t.Context()
-	p.excludeTagIDs(ctx, fake, "default", nil, 0)
-	time.Sleep(ttlProbeDelay)
-	p.excludeTagIDs(ctx, fake, "default", nil, 0)
-	if got := fake.calls.Load(); got != 1 {
-		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (default-branch ttl=4m must cache)", got)
-	}
-}
-
-// A configured short PollInterval yields a short tag-cache TTL (2*1ms) that
-// expires before the probe delay, forcing a re-fetch.
-func TestNewPoller_shortInterval_TTL_expires(t *testing.T) {
-	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
-	cfg := &mockCfg{interval: time.Millisecond}
-	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ctx := t.Context()
-	p.excludeTagIDs(ctx, fake, "short", nil, 0)
-	time.Sleep(ttlProbeDelay)
-	p.excludeTagIDs(ctx, fake, "short", nil, 0)
-	if got := fake.calls.Load(); got != 2 {
-		t.Errorf("ResolveExcludeTagIDs calls = %d, want 2 (ttl=2ms expires before %v)", got, ttlProbeDelay)
-	}
-}
-
-// A configured long PollInterval yields a long tag-cache TTL (2*1h) that keeps
-// resolved exclude tags cached across the probe delay.
-func TestNewPoller_longInterval_TTL_caches(t *testing.T) {
-	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{}}
-	cfg := &mockCfg{interval: time.Hour}
-	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ctx := t.Context()
-	p.excludeTagIDs(ctx, fake, "long", nil, 0)
-	time.Sleep(ttlProbeDelay)
-	p.excludeTagIDs(ctx, fake, "long", nil, 0)
-	if got := fake.calls.Load(); got != 1 {
-		t.Errorf("ResolveExcludeTagIDs calls = %d, want 1 (ttl=2h must cache)", got)
 	}
 }
 
@@ -370,19 +319,128 @@ func TestPollOnce_returns_sum_of_arr_counts(t *testing.T) {
 	}
 }
 
-// --- excludeTagIDs ---
+// --- exclude-tag resolution ---
 
-// excludeTagIDs returns the resolved IDs on a successful fetch.
-func TestGetExcludeTagIDs_returns_ids_on_success(t *testing.T) {
-	fake := &countingExcludeResolver{mockHistoryPoller: &mockHistoryPoller{}, result: map[int]struct{}{42: {}}}
-	cfg := &mockCfg{interval: time.Hour}
-	p := NewPoller(Deps{}, func() *LiveState { return &LiveState{Cfg: cfg} })
-	ids := p.excludeTagIDs(t.Context(), fake, "ok", nil, 0)
-	if ids == nil {
-		t.Fatalf("excludeTagIDs on success returned nil")
+// The poller's own tag cache is gone: the arr-read wrapper beneath owns the
+// coalescing and the TTL. What the poller still owns is asking ONCE per batch,
+// so a batch's entries never each pay a resolution.
+func TestExecuteBatch_resolvesExcludeTagsOncePerBatch(t *testing.T) {
+	sonarr := &countingExcludeResolver{
+		mockHistoryPoller: &mockHistoryPoller{history: []arrapi.HistoryRecord{
+			histEntry("/nonexistent/a.mkv"),
+			histEntry("/nonexistent/b.mkv"),
+			histEntry("/nonexistent/c.mkv"),
+		}},
+		result: map[int]struct{}{42: {}},
 	}
-	if _, ok := ids[42]; !ok || len(ids) != 1 {
-		t.Errorf("excludeTagIDs = %v, want map[42:{}]", ids)
+	cfg := &mockCfg{interval: time.Hour, langs: []string{"en"}}
+	ls := &LiveState{Cfg: cfg, Sonarr: sonarr}
+	p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
+
+	p.detectSonarr(t.Context(), ls)
+	drainOne(t, p)
+	if got := sonarr.calls.Load(); got != 1 {
+		t.Errorf("ResolveExcludeTagIDs calls for a 3-entry batch = %d, want 1", got)
+	}
+
+	// A second cycle is a second batch, so a second ask — the wrapper decides
+	// whether that ask reaches the arr, and this level must not second-guess it.
+	p.detectSonarr(t.Context(), ls)
+	drainOne(t, p)
+	if got := sonarr.calls.Load(); got != 2 {
+		t.Errorf("ResolveExcludeTagIDs calls after a second batch = %d, want 2", got)
+	}
+}
+
+// Each source resolves against ITS OWN arr, so a tag id that excludes on one
+// side must not exclude on the other.
+const (
+	sonarrExcludeTagID = 1
+	radarrExcludeTagID = 9
+)
+
+// importedVideo writes the file an import event points at, so the precheck
+// passes and the tag verdict is reached.
+func importedVideo(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "imported.mkv")
+	if err := os.WriteFile(path, []byte("video"), 0o600); err != nil {
+		t.Fatalf("write imported video: %v", err)
+	}
+	return path
+}
+
+func TestExecuteBatch_sonarrExcludeSetIgnoresRadarrTagIDs(t *testing.T) {
+	cases := []struct {
+		name         string
+		seriesTags   []int
+		wantSearched bool
+	}{
+		{name: "radarr_id_does_not_exclude", seriesTags: []int{radarrExcludeTagID}, wantSearched: true},
+		{name: "sonarr_id_excludes", seriesTags: []int{sonarrExcludeTagID}, wantSearched: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			imported := importedVideo(t)
+			sonarr := &countingExcludeResolver{
+				mockHistoryPoller: &mockHistoryPoller{
+					history: []arrapi.HistoryRecord{histEntry(imported)},
+					series:  map[int]arrapi.Series{0: {ID: 7, Title: "Show", Tags: tc.seriesTags}},
+				},
+				result: map[int]struct{}{sonarrExcludeTagID: {}},
+			}
+			engine := &mockEngine{}
+			ls := &LiveState{
+				Cfg:    &mockCfg{interval: time.Hour, langs: []string{"en"}},
+				Sonarr: sonarr,
+				Engine: engine,
+			}
+			p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
+
+			p.detectSonarr(t.Context(), ls)
+			drainOne(t, p)
+			if searched := engine.searches.Load() > 0; searched != tc.wantSearched {
+				t.Errorf("series tags %v against the sonarr exclude set {%d}: searched = %v, want %v",
+					tc.seriesTags, sonarrExcludeTagID, searched, tc.wantSearched)
+			}
+		})
+	}
+}
+
+func TestExecuteBatch_radarrExcludeSetIgnoresSonarrTagIDs(t *testing.T) {
+	cases := []struct {
+		name         string
+		movieTags    []int
+		wantSearched bool
+	}{
+		{name: "sonarr_id_does_not_exclude", movieTags: []int{sonarrExcludeTagID}, wantSearched: true},
+		{name: "radarr_id_excludes", movieTags: []int{radarrExcludeTagID}, wantSearched: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			imported := importedVideo(t)
+			radarr := &countingExcludeResolver{
+				mockHistoryPoller: &mockHistoryPoller{
+					history: []arrapi.HistoryRecord{histEntry(imported)},
+					movies:  map[int]arrapi.Movie{0: {ID: 3, Title: "Film", Tags: tc.movieTags}},
+				},
+				result: map[int]struct{}{radarrExcludeTagID: {}},
+			}
+			engine := &mockEngine{}
+			ls := &LiveState{
+				Cfg:    &mockCfg{interval: time.Hour, langs: []string{"en"}},
+				Radarr: radarr,
+				Engine: engine,
+			}
+			p := NewPoller(fullDeps(&mockStore{}), func() *LiveState { return ls })
+
+			p.detectRadarr(t.Context(), ls)
+			drainOne(t, p)
+			if searched := engine.searches.Load() > 0; searched != tc.wantSearched {
+				t.Errorf("movie tags %v against the radarr exclude set {%d}: searched = %v, want %v",
+					tc.movieTags, radarrExcludeTagID, searched, tc.wantSearched)
+			}
+		})
 	}
 }
 

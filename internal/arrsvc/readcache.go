@@ -60,24 +60,43 @@ type keyState struct {
 	mu            sync.Mutex
 }
 
-// readTable is the per-arr-instance half of the wrapper: the cache and the
-// per-key wave/flight coordination. A config reload publishes a fresh
+// readTable is the per-arr-instance half of the wrapper: the entry stores and
+// the per-key wave/flight coordination. A config reload publishes a fresh
 // instance, so an old instance's in-flight wave writes land in an orphaned
 // table — revoked — and post-reload reads start cold against the new arr
 // client.
 type readTable struct {
-	gate  *ReadGate
-	cache *cache.Cache[readEntry]
-	keys  map[string]*keyState
-	mu    sync.Mutex
+	gate     *ReadGate
+	cache    *cache.Cache[readEntry]
+	episodes *episodeStore
+	keys     map[string]*keyState
+	mu       sync.Mutex
 }
 
 func newReadTable(gate *ReadGate) *readTable {
 	return &readTable{
-		gate:  gate,
-		cache: cache.New[readEntry](arrCacheTTL),
-		keys:  make(map[string]*keyState),
+		gate:     gate,
+		cache:    cache.New[readEntry](arrCacheTTL),
+		episodes: newEpisodeStore(),
+		keys:     make(map[string]*keyState),
 	}
+}
+
+// lookup answers from the store the key's family lives in.
+func (t *readTable) lookup(key string) (readEntry, bool) {
+	if isEpisodesKey(key) {
+		return t.episodes.get(key)
+	}
+	return t.cache.Get(key)
+}
+
+// put stores an entry in the store the key's family lives in.
+func (t *readTable) put(key string, e readEntry) {
+	if isEpisodesKey(key) {
+		t.episodes.put(key, e)
+		return
+	}
+	t.cache.Set(key, e)
 }
 
 // key returns the coordination record for key, creating it on first use.
@@ -110,7 +129,7 @@ func (t *readTable) commitLocked(ks *keyState, key string, e readEntry) {
 		return
 	}
 	ks.lastCommit = e.readBegin
-	t.cache.Set(key, e)
+	t.put(key, e)
 }
 
 func (t *readTable) commit(key string, e readEntry) {
@@ -139,7 +158,7 @@ func (t *readTable) writeThrough(key string, e readEntry) {
 // robs a joiner; each waiter still honors its own context. A marked read
 // never joins a plain flight and a plain read never joins a wave.
 func (t *readTable) plainRead(ctx context.Context, key string, fetch fetchFn) (any, error) {
-	if e, ok := t.cache.Get(key); ok {
+	if e, ok := t.lookup(key); ok {
 		return e.payload, nil
 	}
 	ks := t.key(key)

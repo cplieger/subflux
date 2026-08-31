@@ -15,7 +15,6 @@ import (
 	"github.com/cplieger/subflux/internal/arrsvc"
 	"github.com/cplieger/subflux/internal/httpapi"
 	"github.com/cplieger/subflux/internal/subflux"
-	"golang.org/x/sync/singleflight"
 )
 
 // MediaSonarrClient is the Sonarr surface the media browser uses.
@@ -32,9 +31,11 @@ type MediaRadarrClient interface {
 // Deps holds the dependencies for media handlers.
 type Deps struct {
 	StateFunc func() *LiveState
-	// ServerCtx returns the server-level context (outlives individual requests).
-	// Used for singleflight closures so that a cancelled request doesn't
-	// abort a shared fetch that other callers are waiting on.
+	// ServerCtx returns the server-level context (outlives individual
+	// requests). The arr-read wrapper owns coalescing and caching for the list
+	// reads; this decides only which lifetime a cold read charges against, so a
+	// client that walks away mid-fetch does not turn one into a 502 nobody
+	// reads.
 	ServerCtx func() context.Context
 }
 
@@ -48,8 +49,7 @@ type LiveState struct {
 
 // Handler provides HTTP handlers for the /api/media/* endpoints.
 type Handler struct {
-	deps    Deps
-	mediaSF singleflight.Group
+	deps Deps
 }
 
 // NewHandler creates a media Handler with the given dependencies.
@@ -77,37 +77,31 @@ func (h *Handler) HandleMediaSeries(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, []SeriesItem{})
 		return
 	}
-	// Use server context for singleflight to avoid cancellation from a single
-	// request aborting a shared fetch that other callers are waiting on.
-	ctx := h.deps.ServerCtx()
-	v, err, _ := h.mediaSF.Do("series", func() (any, error) {
-		series, err := ls.Sonarr.Series(ctx)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]SeriesItem, 0, len(series))
-		for i := range series {
-			item := SeriesItem{
-				ID:     series[i].ID,
-				Title:  series[i].Title,
-				Year:   series[i].Year,
-				TvdbID: series[i].TvdbID,
-				ImdbID: series[i].ImdbID,
-			}
-			if series[i].Statistics != nil {
-				item.Episodes = series[i].Statistics.EpisodeFileCount
-				item.Seasons = series[i].Statistics.SeasonCount
-			}
-			out = append(out, item)
-		}
-		return out, nil
-	})
+	// The arr-read wrapper beneath coalesces concurrent readers of the series
+	// list into one upstream call and holds the result for its TTL, so this
+	// handler keeps no flight of its own.
+	series, err := ls.Sonarr.Series(h.deps.ServerCtx())
 	if err != nil {
 		slog.Error("media browser: failed to fetch series", "error", err)
 		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch series")
 		return
 	}
-	httpapi.WriteJSON(w, v)
+	out := make([]SeriesItem, 0, len(series))
+	for i := range series {
+		item := SeriesItem{
+			ID:     series[i].ID,
+			Title:  series[i].Title,
+			Year:   series[i].Year,
+			TvdbID: series[i].TvdbID,
+			ImdbID: series[i].ImdbID,
+		}
+		if series[i].Statistics != nil {
+			item.Episodes = series[i].Statistics.EpisodeFileCount
+			item.Seasons = series[i].Statistics.SeasonCount
+		}
+		out = append(out, item)
+	}
+	httpapi.WriteJSON(w, out)
 }
 
 // MovieItem is the JSON shape returned by GET /api/media/movies. It carries
@@ -132,37 +126,31 @@ func (h *Handler) HandleMediaMovies(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, []MovieItem{})
 		return
 	}
-	// Use server context for singleflight — same rationale as HandleMediaSeries.
-	ctx := h.deps.ServerCtx()
-	v, err, _ := h.mediaSF.Do("movies", func() (any, error) {
-		movies, err := ls.Radarr.Movies(ctx)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]MovieItem, 0, len(movies))
-		for i := range movies {
-			m := &movies[i]
-			item := MovieItem{
-				ID:      m.ID,
-				Title:   m.Title,
-				Year:    m.Year,
-				TmdbID:  m.TmdbID,
-				ImdbID:  m.ImdbID,
-				HasFile: m.HasFile,
-			}
-			if m.MovieFile != nil {
-				item.SceneName = m.MovieFile.SceneName
-			}
-			out = append(out, item)
-		}
-		return out, nil
-	})
+	// Same rationale as HandleMediaSeries: the wrapper owns the movie list's
+	// coalescing and TTL.
+	movies, err := ls.Radarr.Movies(h.deps.ServerCtx())
 	if err != nil {
 		slog.Error("media browser: failed to fetch movies", "error", err)
 		httpapi.BadGatewayC(w, r, subflux.CodeBadGateway, "failed to fetch movies")
 		return
 	}
-	httpapi.WriteJSON(w, v)
+	out := make([]MovieItem, 0, len(movies))
+	for i := range movies {
+		m := &movies[i]
+		item := MovieItem{
+			ID:      m.ID,
+			Title:   m.Title,
+			Year:    m.Year,
+			TmdbID:  m.TmdbID,
+			ImdbID:  m.ImdbID,
+			HasFile: m.HasFile,
+		}
+		if m.MovieFile != nil {
+			item.SceneName = m.MovieFile.SceneName
+		}
+		out = append(out, item)
+	}
+	httpapi.WriteJSON(w, out)
 }
 
 // EpisodeItem is the JSON shape for a single episode. It carries no file
