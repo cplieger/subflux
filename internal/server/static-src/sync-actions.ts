@@ -1,23 +1,26 @@
 // sync-actions.ts — shared action defs for the subtitle sync flows.
 //
-// Two callers:
-//   - sync.ts: single-subtitle sync dialog (audio sync + manual offset save)
-//   - detail-season-sync.ts: bulk season sync dialog (per-episode audio sync
-//     in a worker pool)
-//
-// Centralising the action defs here means both dispatch sites get identical
-// retry/dedupe/error semantics without duplicating the request shape.
+// One caller (sync.ts: the single-subtitle sync dialog and the season batch
+// dialog), one home: the defs stay here so every dispatch site gets
+// identical retry/dedupe/error semantics without duplicating request shapes.
 //
 // S7 addressing: the sync verbs carry a FileRef (media_type, media_id,
 // language, variant, source, ordinal) — never a filesystem path. The server
 // resolves the subtitle path from the store row and the video path from the
-// same media.
+// same media. The season verb carries only {series_id, season}: the server
+// enumerates the files itself (D2).
 
 import { apiAction, retryNetwork, RETRY_STANDARD } from "@cplieger/actions";
 import { join } from "@cplieger/keyenc";
-import { PATH_SYNC_AUDIO, PATH_SYNC_OFFSET } from "./wire/client.gen.js";
-import { decodeSyncAccepted } from "./wire/decoders.gen.js";
-import type { SyncAccepted, SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
+import { PATH_SYNC_AUDIO, PATH_SYNC_OFFSET, PATH_SYNC_SEASON } from "./wire/client.gen.js";
+import { decodeSeasonSyncAccepted, decodeSyncAccepted } from "./wire/decoders.gen.js";
+import type {
+  SeasonSyncAccepted,
+  SyncAccepted,
+  SyncAudioRequest,
+  SyncOffsetRequest,
+  SyncSeasonRequest,
+} from "./wire/types.gen.js";
 import { refKey } from "./file-ref.js";
 
 // Both dedupe keys nest `refKey(args)`, which is itself a keyenc value, so the
@@ -44,6 +47,20 @@ export const audioSyncAction = apiAction<SyncAudioRequest, SyncAccepted>({
   decode: (data) => decodeSyncAccepted(data),
   dedupe: (args) => join("sync.audio", refKey(args)),
   error: false, // callers handle inline result UI; toast would be redundant
+});
+
+/** Dispatch one server-owned season sync batch: an instant 202
+ *  {activity_id}; the server enumerates the season's files itself, so this
+ *  is the season UI's ONE request — no client fan-out. Carries NO retry for
+ *  the same reason as sync.audio (the 429 cap refusal renders inline and
+ *  must cost exactly one request); dedupe collapses a double-click, and the
+ *  server's same-scope idempotency answers the live batch's id anyway. */
+export const seasonSyncAction = apiAction<SyncSeasonRequest, SeasonSyncAccepted>({
+  name: "sync.season",
+  request: (args) => ({ method: "POST", path: PATH_SYNC_SEASON, body: args }),
+  decode: (data) => decodeSeasonSyncAccepted(data),
+  dedupe: (args) => join("sync.season", String(args.series_id), String(args.season)),
+  error: false, // the dialog renders refusals inline
 });
 
 /** Save a manually-entered offset. Idempotent server-side (overwrites any

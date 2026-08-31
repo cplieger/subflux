@@ -73,7 +73,7 @@ vi.mock("./bus.js", () => ({
   },
 }));
 vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
-vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn() }));
+vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn(), confirmSeasonSync: vi.fn() }));
 vi.mock("./files.js", () => ({ openFileManager: vi.fn() }));
 vi.mock("./config.js", () => ({ openConfig: vi.fn() }));
 vi.mock("./detail-scan.js", () => ({
@@ -82,7 +82,6 @@ vi.mock("./detail-scan.js", () => ({
   triggerMovieScan: vi.fn(),
   applyScanButtonState: vi.fn(),
 }));
-vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: vi.fn() }));
 const storeState = vi.hoisted(() => ({
   ignoredCodecs: new Set<string>(),
   isAdmin: false,
@@ -109,8 +108,8 @@ vi.mock("./store.js", () => ({
 
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import { openSearchPopup } from "./search.js";
+import { confirmSeasonSync } from "./sync.js";
 import { applyScanButtonState } from "./detail-scan.js";
-import { confirmSeasonSync } from "./detail-season-sync.js";
 import { seasonScopeKey } from "./scan-scope.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
 
@@ -298,21 +297,10 @@ describe("detail: episode and season action buttons", () => {
     }
     syncBtn.click();
 
-    // Season sync is destructive enough to route through a confirmation, and
-    // the confirmation needs the exact file refs it is about to retime.
-    expect(confirmSeasonSync).toHaveBeenCalledWith("Show AS", 1, [
-      {
-        ref: {
-          media_type: "episode",
-          media_id: "tvdb-352-s01e01",
-          language: "en",
-          variant: "standard",
-          source: "external",
-          ordinal: 0,
-        },
-        label: "S01E01",
-      },
-    ]);
+    // Season sync routes through a confirmation; the dialog needs only the
+    // batch scope (the server enumerates the files at acceptance) plus the
+    // client-side count hint the confirm text shows.
+    expect(confirmSeasonSync).toHaveBeenCalledWith("Show AS", 1, 352, 1);
   });
 
   it("wires a movie language row's Search button and keeps the click off the row", async () => {

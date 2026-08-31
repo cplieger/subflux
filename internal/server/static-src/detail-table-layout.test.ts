@@ -46,7 +46,10 @@ vi.mock("./bus.js", () => ({
   },
 }));
 vi.mock("./search.js", () => ({ openSearchPopup: () => undefined }));
-vi.mock("./sync.js", () => ({ openSyncDialog: () => undefined }));
+vi.mock("./sync.js", () => ({
+  openSyncDialog: () => undefined,
+  confirmSeasonSync: () => undefined,
+}));
 vi.mock("./files.js", () => ({ openFileManager: () => undefined }));
 vi.mock("./config.js", () => ({ openConfig: () => undefined }));
 vi.mock("./detail-scan.js", () => ({
@@ -55,7 +58,6 @@ vi.mock("./detail-scan.js", () => ({
   triggerMovieScan: () => undefined,
   applyScanButtonState: () => undefined,
 }));
-vi.mock("./detail-season-sync.js", () => ({ confirmSeasonSync: () => undefined }));
 vi.mock("./store.js", () => ({
   get: (k: string): unknown => (k === "ignoredCodecs" ? new Set<string>() : null),
   set: () => undefined,

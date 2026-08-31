@@ -144,6 +144,8 @@ func Registry() *wiregen.Registry {
 		wiregen.TypeRef[synchandlers.SyncAudioRequest](),
 		wiregen.TypeRef[synchandlers.SyncOffsetRequest](),
 		wiregen.TypeRef[synchandlers.SyncAccepted](),
+		wiregen.TypeRef[synchandlers.SyncSeasonRequest](),
+		wiregen.TypeRef[synchandlers.SeasonSyncAccepted](),
 		wiregen.TypeRef[syncjobs.Job](),
 		wiregen.TypeRef[resolve.FileRef](),
 		wiregen.TypeRef[previewhandlers.PreviewStartResponse](),
@@ -553,6 +555,12 @@ func Endpoints() []wiregen.Endpoint {
 			Request:  wiregen.TypeRef[synchandlers.SyncAudioRequest](),
 			Response: wiregen.TypeRef[synchandlers.SyncAccepted](),
 			Doc:      "Dispatch one async audio-sync job: 202 {activity_id, job_id} after validation; the terminal result rides the sync:done event (matched on job_id) and the jobs read. Same-file dispatch answers the existing job's ids; a full admission lease answers 429.",
+		},
+		{
+			Name: "syncSeason", Method: http.MethodPost, Path: "/api/sync/season", AuthGroup: GroupUserConfigured,
+			Request:  wiregen.TypeRef[synchandlers.SyncSeasonRequest](),
+			Response: wiregen.TypeRef[synchandlers.SeasonSyncAccepted](),
+			Doc:      "Dispatch one server-owned season sync batch: the season's subtitle files are enumerated server-side and answer 202 {activity_id}. Item job ids arrive via the jobs read filtered by batch_activity_id and the per-item sync:done events; a live batch for the same season answers its existing id; a full admission lease answers 429.",
 		},
 		{
 			Name: "syncOffset", Method: http.MethodPost, Path: "/api/sync/offset", AuthGroup: GroupUserConfigured,

@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { configureApi } from "@cplieger/actions";
 import { resetActionFramework } from "@cplieger/actions/testing";
-import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
+import { audioSyncAction, saveManualOffsetAction, seasonSyncAction } from "./sync-actions.js";
 import type { SyncAudioRequest, SyncOffsetRequest } from "./wire/types.gen.js";
 
 const AUDIO_ACCEPTED = { activity_id: "act-1", job_id: 7 };
@@ -155,5 +155,52 @@ describe("the audio dispatch's retry posture (D3)", () => {
     const outcome = await audioSyncAction.dispatch(audioArgs()).outcome;
     expect(requests.length).toBe(1);
     expect(outcome.status).toBe("error");
+  });
+});
+
+describe("the season dispatch's posture (D2/D3)", () => {
+  const SEASON_ACCEPTED = { activity_id: "act-9" };
+
+  beforeEach(() => {
+    resetActionFramework();
+    configureApi({ baseUrl: "http://localhost", fetchFn: recordingFetch });
+    requests = [];
+    respondWith = () =>
+      new Response(JSON.stringify(SEASON_ACCEPTED), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+  });
+
+  it("resolves the 202's batch activity id", async () => {
+    const outcome = await seasonSyncAction.dispatch({ series_id: 42, season: 1 }).outcome;
+    expect(outcome.status).toBe("success");
+    if (outcome.status === "success") {
+      expect(outcome.value).toEqual(SEASON_ACCEPTED);
+    }
+  });
+
+  it("collapses a double-click of the same scope onto one request", () => {
+    const first = seasonSyncAction.dispatch({ series_id: 42, season: 1 });
+    const second = seasonSyncAction.dispatch({ series_id: 42, season: 1 });
+    expect(requests.length).toBe(1);
+    // A DIFFERENT season is a different key: it dispatches.
+    const other = seasonSyncAction.dispatch({ series_id: 42, season: 2 });
+    expect(requests.length).toBe(2);
+    return Promise.all([first, second, other]);
+  });
+
+  it("the capacity 429 costs exactly ONE request — visible, never auto-retried", async () => {
+    respondWith = () =>
+      new Response(JSON.stringify({ error: "sync queue is full", code: "rate_limited" }), {
+        status: 429,
+        headers: { "content-type": "application/json" },
+      });
+    const outcome = await seasonSyncAction.dispatch({ series_id: 42, season: 1 }).outcome;
+    expect(requests.length).toBe(1);
+    expect(outcome.status).toBe("error");
+    if (outcome.status === "error") {
+      expect((outcome.error as { status?: number }).status).toBe(429);
+    }
   });
 });

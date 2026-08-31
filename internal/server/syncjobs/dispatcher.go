@@ -1,5 +1,5 @@
-// Package syncjobs owns the server-side async sync job machinery (D1): a
-// bounded FIFO dispatcher with an admission lease, the job record registry
+// Package syncjobs owns the server-side async sync job machinery (D1, D2):
+// a bounded FIFO dispatcher with an admission lease, the job record registry
 // GET /api/sync/jobs serves, and the sync:done publication seam.
 //
 // The dispatcher accepts at most MaxJobs top-level entries (queued plus
@@ -7,7 +7,8 @@
 // a same-file dispatch answers the EXISTING job's ids even at cap. Entries
 // run ONE at a time in FIFO order — a queued single behind a season batch
 // waits, visibly — while the syncworker semaphore stays the execution-slot
-// authority (the automatic sync path interleaves there between entries).
+// authority (the automatic sync path interleaves there between entries). A
+// season batch (batch.go) is ONE entry holding N item job records.
 //
 // Locking: mu > activity.Log's lock (Dispatch creates the activity entry
 // under mu so a same-file race cannot observe a half-registered job); the
@@ -167,14 +168,23 @@ type Deps struct {
 }
 
 // job is the dispatcher's internal record: the wire Job plus run state.
+// batch is non-nil for a season batch item, whose admission slot and stop
+// entry belong to the batch.
 type job struct {
 	cancel        context.CancelFunc
 	unregister    func()
+	batch         *batch
 	subtitlePath  string
 	videoPath     string
 	record        Job
 	cancelPending bool
 	popped        bool
+}
+
+// queueEntry is one FIFO slot: a single-file job or a season batch.
+type queueEntry struct {
+	batch *batch // non-nil for a season batch
+	jobID int64  // the single job's id when batch is nil
 }
 
 // Dispatcher owns the FIFO, the admission lease, the dedupe map, per-job
@@ -183,9 +193,10 @@ type Dispatcher struct {
 	deps       Deps
 	jobs       map[int64]*job
 	byActivity map[string]int64
+	batches    map[string]*batch
 	dedupe     map[string]int64
 	wake       chan struct{}
-	queue      []int64
+	queue      []queueEntry
 	cap        int
 	nextID     int64
 	accepted   int
@@ -203,6 +214,7 @@ func New(deps Deps) *Dispatcher {
 		deps:       deps,
 		jobs:       make(map[int64]*job),
 		byActivity: make(map[string]int64),
+		batches:    make(map[string]*batch),
 		dedupe:     make(map[string]int64),
 		wake:       make(chan struct{}, 1),
 		cap:        capacity,
@@ -251,7 +263,7 @@ func (d *Dispatcher) Dispatch(in *ExecInput) (Accepted, error) {
 	d.jobs[id] = j
 	d.byActivity[actID] = id
 	d.dedupe[in.SubtitlePath] = id
-	d.queue = append(d.queue, id)
+	d.queue = append(d.queue, queueEntry{jobID: id})
 	d.evictLocked()
 	d.poke() // non-blocking, safe under mu
 	return Accepted{JobID: id, ActivityID: actID}, nil
@@ -266,9 +278,14 @@ func (d *Dispatcher) poke() {
 }
 
 // Cancel routes an activity-id cancellation into the dispatcher. See the
-// CancelOutcome constants for the verdict semantics.
+// CancelOutcome constants for the verdict semantics. A batch activity id
+// addresses the WHOLE batch (the batch is the cancellation unit); its item
+// records are settled by the batch arms, never individually.
 func (d *Dispatcher) Cancel(activityID string) CancelOutcome {
 	d.mu.Lock()
+	if b, ok := d.batches[activityID]; ok {
+		return d.cancelBatchLocked(b) // unlocks
+	}
 	id, ok := d.byActivity[activityID]
 	if !ok {
 		d.mu.Unlock()
@@ -282,7 +299,7 @@ func (d *Dispatcher) Cancel(activityID string) CancelOutcome {
 	case j.record.State == StateQueued && !j.popped:
 		// Still in the queue: settle done(cancelled) here — retained,
 		// dedupe and capacity released immediately, no success event.
-		d.queue = slices.DeleteFunc(d.queue, func(qid int64) bool { return qid == id })
+		d.queue = slices.DeleteFunc(d.queue, func(e queueEntry) bool { return e.batch == nil && e.jobID == id })
 		d.settleLocked(j, ExecResult{Outcome: OutcomeCancelled, Err: context.Canceled})
 		d.mu.Unlock()
 		d.deps.Log.FinishCancelled(activityID)
@@ -308,9 +325,10 @@ func (d *Dispatcher) Cancel(activityID string) CancelOutcome {
 	}
 }
 
-// settleLocked moves j to done with res, releasing its dedupe entry and its
-// admission slot. Caller holds mu and owns the post-unlock activity
-// transition and any event publish.
+// settleLocked moves j to done with res, releasing its dedupe entry — and,
+// for a single-file job, its admission slot (a batch item's slot belongs to
+// the batch, released once by finishBatchLocked). Caller holds mu and owns
+// the post-unlock activity transition and any event publish.
 func (d *Dispatcher) settleLocked(j *job, res ExecResult) {
 	if j.record.State == StateDone {
 		return
@@ -332,7 +350,9 @@ func (d *Dispatcher) settleLocked(j *job, res ExecResult) {
 		j.record.Error = res.Err.Error()
 	}
 	delete(d.dedupe, j.subtitlePath)
-	d.accepted--
+	if j.batch == nil {
+		d.accepted--
+	}
 }
 
 // Run executes queued entries one at a time in FIFO order until ctx (the
@@ -352,29 +372,37 @@ func (d *Dispatcher) Run(ctx context.Context) {
 				d.drain()
 				return
 			}
-			j := d.pop()
-			if j == nil {
+			j, b := d.pop()
+			if j == nil && b == nil {
 				break
 			}
-			d.runJob(ctx, j)
+			if b != nil {
+				d.runBatch(ctx, b)
+			} else {
+				d.runJob(ctx, j)
+			}
 		}
 	}
 }
 
-// pop removes the FIFO head. The record stays queued until the admission
+// pop removes the FIFO head. A job record stays queued until the admission
 // hook flips it; popped marks the in-flight-toward-admission window for
-// Cancel's race arms.
-func (d *Dispatcher) pop() *job {
+// Cancel's race arms (batches mirror it between pop and batch start).
+func (d *Dispatcher) pop() (*job, *batch) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if len(d.queue) == 0 {
-		return nil
+		return nil, nil
 	}
-	id := d.queue[0]
+	e := d.queue[0]
 	d.queue = d.queue[1:]
-	j := d.jobs[id]
+	if e.batch != nil {
+		e.batch.popped = true
+		return nil, e.batch
+	}
+	j := d.jobs[e.jobID]
 	j.popped = true
-	return j
+	return j, nil
 }
 
 // runJob executes one entry through the injected executor and settles it.
@@ -465,15 +493,24 @@ func (d *Dispatcher) runJob(ctx context.Context, j *job) {
 }
 
 // drain settles every still-queued entry as done(cancelled) — settle, never
-// execute — and refuses further dispatches.
+// execute; whole batches included — and refuses further dispatches.
 func (d *Dispatcher) drain() {
 	d.mu.Lock()
 	d.closed = true
 	queued := d.queue
 	d.queue = nil
 	var acts []string
-	for _, id := range queued {
-		j := d.jobs[id]
+	for _, e := range queued {
+		if e.batch != nil {
+			if e.batch.state == StateDone {
+				continue
+			}
+			d.settleBatchItemsLocked(e.batch, ErrShuttingDown)
+			d.finishBatchLocked(e.batch)
+			acts = append(acts, e.batch.activityID)
+			continue
+		}
+		j := d.jobs[e.jobID]
 		if j.record.State != StateQueued {
 			continue
 		}
@@ -487,8 +524,9 @@ func (d *Dispatcher) drain() {
 }
 
 // Jobs snapshots the registry in the total order accepted_at DESC, job_id
-// DESC (numeric), optionally filtered by batch_activity_id. The field exists
-// now; the batch itself arrives with the season endpoint.
+// DESC (numeric), optionally filtered by batch_activity_id. Batch item
+// records live here like any job; the batch itself is not a record — its
+// aggregate is the activity entry.
 func (d *Dispatcher) Jobs(batchActivityID string) []Job {
 	d.mu.Lock()
 	out := make([]Job, 0, len(d.jobs))
@@ -510,7 +548,8 @@ func (d *Dispatcher) Jobs(batchActivityID string) []Job {
 
 // Prune removes done records older than maxAge (retention =
 // activity.DefaultPruneAge, one owner: the server's prune ticker drives
-// both). Queued and running records are never evicted.
+// both). Queued and running records are never evicted. Terminal batch
+// entries age out with their items.
 func (d *Dispatcher) Prune(maxAge time.Duration) {
 	cutoff := time.Now().Add(-maxAge)
 	d.mu.Lock()
@@ -519,6 +558,11 @@ func (d *Dispatcher) Prune(maxAge time.Duration) {
 		if j.record.State == StateDone && j.record.EndedAt != nil && j.record.EndedAt.Before(cutoff) {
 			delete(d.jobs, id)
 			delete(d.byActivity, j.record.ActivityID)
+		}
+	}
+	for id, b := range d.batches {
+		if b.state == StateDone && b.endedAt.Before(cutoff) {
+			delete(d.batches, id)
 		}
 	}
 }

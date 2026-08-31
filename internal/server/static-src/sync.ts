@@ -1,15 +1,27 @@
 // sync.ts — Subtitle sync dialog: audio sync, manual offset, video preview, timecode controls.
 
 import * as notify from "./notify.js";
-import { el, text, option, icon, dialog, closeDialog, onBackdropClose } from "./dom.js";
-import { openDialog } from "@cplieger/ui-primitives/dialog";
+import {
+  el,
+  text,
+  option,
+  icon,
+  dialog,
+  closeDialog,
+  onBackdropClose,
+  dialogHead,
+  pad,
+} from "./dom.js";
+import { openDialog, createDialog } from "@cplieger/ui-primitives/dialog";
 import { signal, effect, patch } from "@cplieger/reactive";
-import { audioSyncAction, saveManualOffsetAction } from "./sync-actions.js";
+import { audioSyncAction, saveManualOffsetAction, seasonSyncAction } from "./sync-actions.js";
 import { attachSyncJob, watchSyncJob } from "./sync-jobs.js";
 import { refKey, subtitleRef, type FileRefArgs } from "./file-ref.js";
-import type { SyncDoneEvent } from "./wire/types.gen.js";
+import type { Job, SyncDoneEvent } from "./wire/types.gen.js";
 import {
   previewStart,
+  syncJobs,
+  cancelActivity,
   PATH_PREVIEW_POSTER,
   PATH_PREVIEW_SUBTITLE,
   PATH_PREVIEW_VIDEO,
@@ -1075,4 +1087,342 @@ function previewPlayIcon(): SVGSVGElement {
   poly.setAttribute("fill", "white");
   svg.appendChild(poly);
   return svg;
+}
+
+// --- Season sync (D2/D3): ONE POST, a server-owned batch ---
+//
+// The dialog dispatches POST /api/sync/season and then only OBSERVES: the
+// server enumerates the season's files, runs them sequentially, and owns
+// every per-item fact in the job registry. The view drives from the batch
+// aggregate derived over the registry rows (filtered by batch_activity_id)
+// plus each item's own sync:done; closing the dialog or the tab abandons
+// nothing, and reopening re-attaches through the jobs read.
+
+// Disposers for the open batch view's per-item watches. Dropping a WATCH
+// never touches the job; the batch is the server's.
+let seasonUnwatchers: (() => void)[] = [];
+
+function stopSeasonWatches(): void {
+  for (const unwatch of seasonUnwatchers) {
+    unwatch();
+  }
+  seasonUnwatchers = [];
+}
+
+/** A live batch for (series, season) found in the registry, if any. */
+async function findLiveSeasonBatch(seriesId: number, seasonNum: number): Promise<string | null> {
+  const jobs = await syncJobs();
+  if (!jobs) {
+    return null;
+  }
+  for (const j of jobs) {
+    if (
+      j.series_id === seriesId &&
+      j.season === seasonNum &&
+      j.batch_activity_id !== undefined &&
+      (j.state === "queued" || j.state === "running")
+    ) {
+      return j.batch_activity_id;
+    }
+  }
+  return null;
+}
+
+/** One item row's label: episode marker, language, variant, manual ordinal. */
+function seasonItemLabel(job: Job): string {
+  const se = parseSeasonEpisode(job.file_ref.media_id);
+  let label = `S${pad(se.season)}E${pad(se.episode)} \u00B7 ${langName(job.file_ref.language)}`;
+  if (job.file_ref.variant !== "standard") {
+    label += ` (${job.file_ref.variant})`;
+  }
+  const ordinal = job.file_ref.ordinal ?? 0;
+  if (ordinal > 0) {
+    label += ` #${ordinal}`;
+  }
+  return label;
+}
+
+/** One item row's status text from its registry record. */
+function seasonItemStatus(job: Job): string {
+  switch (job.state) {
+    case "queued":
+      return "queued";
+    case "running":
+      return "analyzing\u2026";
+    default:
+      break;
+  }
+  if (job.outcome === "result") {
+    const confidence = ((job.confidence ?? 0) * 100).toFixed(0);
+    return job.applied
+      ? `${formatOffsetMs(job.offset_ms ?? 0)} (${confidence}%)`
+      : `low confidence (${confidence}%)`;
+  }
+  return job.outcome === "cancelled" ? "stopped" : "failed";
+}
+
+/** Fold the registry rows into the aggregate line the dialog shows. */
+function seasonAggregate(items: Job[]): string {
+  let done = 0;
+  let applied = 0;
+  let failed = 0;
+  let low = 0;
+  for (const j of items) {
+    if (j.state !== "done") {
+      continue;
+    }
+    done++;
+    if (j.outcome === "result") {
+      if (j.applied) {
+        applied++;
+      } else {
+        low++;
+      }
+    } else {
+      failed++;
+    }
+  }
+  if (done < items.length) {
+    return `Syncing ${done}/${items.length}\u2026`;
+  }
+  return `Done: ${applied} synced${failed > 0 ? `, ${failed} failed` : ""}${
+    low > 0 ? `, ${low} low confidence` : ""
+  }`;
+}
+
+/** Render (or re-render) the batch view from one registry read, then watch
+ *  each live item's own sync:done. */
+async function renderSeasonBatch(
+  dlg: HTMLDialogElement,
+  label: string,
+  batchId: string,
+  closeFn: () => void,
+): Promise<void> {
+  stopSeasonWatches();
+  const jobs = await syncJobs({ batch_activity_id: batchId });
+  if (!dlg.open) {
+    return;
+  }
+
+  const header = dialogHead(`Sync ${label}`, closeFn);
+  const body = el("div", { className: "dlg-body" });
+  const aggregate = el("div", { id: "season-sync-status" });
+  body.appendChild(aggregate);
+
+  const stopBtn = el(
+    "button",
+    {
+      type: "button",
+      className: "ghost",
+      onclick: () => {
+        (stopBtn as HTMLButtonElement).disabled = true;
+        // The batch is THE cancellation unit: one stop request; queued
+        // items settle cancelled server-side (no per-item events), so
+        // re-read the registry for the settled rows.
+        void cancelActivity(batchId).then(() => renderSeasonBatch(dlg, label, batchId, closeFn));
+      },
+    },
+    "Stop",
+  );
+  const closeBtn = el("button", { type: "button", className: "ghost", onclick: closeFn }, "Close");
+  const footer = el("div", { className: "dlg-foot" }, stopBtn, closeBtn);
+
+  if (!jobs || jobs.length === 0) {
+    // Nothing to attach to: the registry dropped the batch (server restart)
+    // or the read failed. Reported instead of a spinner that never settles.
+    aggregate.textContent =
+      jobs === null
+        ? "Could not load the batch state. Close and reopen to retry."
+        : "This batch is gone (a server restart drops it). Start a new sync.";
+    patch(dlg, header, body, el("div", { className: "dlg-foot" }, closeBtn));
+    return;
+  }
+
+  const items = [...jobs].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0));
+  const rows = new Map<number, HTMLElement>();
+  const list = el("div", { className: "season-sync-items" });
+  for (const j of items) {
+    const rowEl = el("div", null, `${seasonItemLabel(j)} \u2014 ${seasonItemStatus(j)}`);
+    rows.set(j.job_id, rowEl);
+    list.appendChild(rowEl);
+  }
+  body.appendChild(list);
+  aggregate.textContent = seasonAggregate(items);
+  patch(dlg, header, body, footer);
+
+  const allDone = (): boolean => items.every((j) => j.state === "done");
+  const settle = (): void => {
+    aggregate.textContent = seasonAggregate(items);
+    if (allDone()) {
+      stopSeasonWatches();
+      stopBtn.hidden = true;
+    }
+  };
+  settle();
+
+  let refreshQueued = false;
+  const refresh = (): void => {
+    // Coalesced re-read: covers rows that settle WITHOUT their own event
+    // (queued items cancelled by a stop settle server-side only).
+    if (refreshQueued) {
+      return;
+    }
+    refreshQueued = true;
+    void renderSeasonBatch(dlg, label, batchId, closeFn);
+  };
+
+  for (const j of items) {
+    if (j.state === "done") {
+      continue;
+    }
+    const unwatch = watchSyncJob(j.job_id, (ev: SyncDoneEvent | null) => {
+      if (!dlg.open) {
+        return;
+      }
+      if (ev === null) {
+        // Boot change: correlation lost; re-attach through the jobs read.
+        refresh();
+        return;
+      }
+      j.state = "done";
+      j.outcome = ev.error ? "crash" : "result";
+      j.applied = ev.applied;
+      j.offset_ms = ev.offset_ms;
+      j.confidence = ev.confidence;
+      const rowEl = rows.get(ev.job_id);
+      if (rowEl) {
+        rowEl.textContent = `${seasonItemLabel(j)} \u2014 ${
+          ev.error ? "failed" : seasonItemStatus(j)
+        }`;
+      }
+      settle();
+      if (ev.error) {
+        // An errored item may mean the batch was stopped: siblings then
+        // settle cancelled with no events of their own. One re-read
+        // reconciles whatever the registry now says.
+        refresh();
+      }
+    });
+    seasonUnwatchers.push(unwatch);
+  }
+}
+
+/**
+ * Season sync entry point: confirm, then ONE POST — the server owns the
+ * batch from acceptance. A live batch for this season (this tab or a
+ * reload ago) re-attaches instead of re-confirming.
+ */
+export function confirmSeasonSync(
+  seriesTitle: string,
+  seasonNum: number,
+  seriesId: number,
+  fileCount: number,
+): void {
+  const dlg = dialog("seasonSyncConfirm");
+  const label = `${seriesTitle} S${pad(seasonNum)}`;
+
+  const ctrl = createDialog(dlg, {});
+  dlg.addEventListener(
+    "close",
+    () => {
+      stopSeasonWatches();
+      ctrl.dispose();
+    },
+    { once: true },
+  );
+  const closeFn = (): void => {
+    ctrl.close();
+  };
+
+  const header = dialogHead(`Sync ${label}`, closeFn);
+  const body = el(
+    "div",
+    { className: "dlg-body" },
+    el(
+      "p",
+      null,
+      `This will run audio sync on ${fileCount} subtitle file${
+        fileCount === 1 ? "" : "s"
+      } in ${label}.`,
+    ),
+    el(
+      "p",
+      null,
+      "Audio sync analyzes the video audio track to align subtitle " +
+        "timing automatically. Results depend on audio quality and " +
+        "are not guaranteed to be accurate for every file.",
+    ),
+  );
+  const status = el("div", { id: "season-sync-status", hidden: true });
+  body.appendChild(status);
+
+  const startBtn = el(
+    "button",
+    {
+      type: "button",
+      id: "season-sync-start",
+      onclick: () => {
+        void startSeasonSync(
+          dlg,
+          label,
+          seriesId,
+          seasonNum,
+          startBtn as HTMLButtonElement,
+          status,
+          closeFn,
+        );
+      },
+    },
+    "Start Sync",
+  );
+  const footer = el(
+    "div",
+    { className: "dlg-foot" },
+    startBtn,
+    el("button", { type: "button", className: "ghost", onclick: closeFn }, "Cancel"),
+  );
+
+  patch(dlg, header, body, footer);
+  ctrl.open();
+
+  // RELOAD RE-ATTACH: a batch dispatched before a reload (or from a closed
+  // dialog) is still the server's; show ITS progress instead of offering a
+  // second start (which the server would answer with the same batch anyway).
+  void findLiveSeasonBatch(seriesId, seasonNum).then((batchId) => {
+    if (batchId !== null && dlg.open) {
+      void renderSeasonBatch(dlg, label, batchId, closeFn);
+    }
+  });
+}
+
+/** Dispatch the ONE season POST and hand the dialog to the batch view. */
+async function startSeasonSync(
+  dlg: HTMLDialogElement,
+  label: string,
+  seriesId: number,
+  seasonNum: number,
+  startBtn: HTMLButtonElement,
+  status: HTMLElement,
+  closeFn: () => void,
+): Promise<void> {
+  startBtn.disabled = true;
+  const outcome = await seasonSyncAction.dispatch({ series_id: seriesId, season: seasonNum })
+    .outcome;
+  if (!dlg.open || outcome.status === "cancelled") {
+    return;
+  }
+  if (outcome.status === "error") {
+    startBtn.disabled = false;
+    if (isCapacityRefusal(outcome.error)) {
+      // THE 429 ARM: the typed cap refusal renders inline — exactly ONE
+      // visible surface (error: false keeps the framework toast off).
+      status.hidden = false;
+      status.textContent =
+        "Sync queue is full \u2014 wait for a running sync to finish, then try again.";
+    } else {
+      notify.error("Season sync failed");
+    }
+    return;
+  }
+  void renderSeasonBatch(dlg, label, outcome.value.activity_id, closeFn);
 }
