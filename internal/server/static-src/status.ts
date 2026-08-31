@@ -3,7 +3,6 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
-import { emit, BusEvent } from "./bus.js";
 import { el, text, icon, $ } from "./dom.js";
 import { fillPath } from "./api-client.js";
 import {
@@ -233,18 +232,8 @@ function seedToastHistory(activities: readonly ActivityEntry[]): void {
   }
 }
 
-/** Process activity side effects: detect scan completion, show toasts. */
-function processActivitySideEffects(
-  btn: HTMLElement,
-  activities: readonly ActivityEntry[],
-  isActive: boolean,
-): void {
-  const wasActive = btn.dataset["wasActive"] === "true";
-  btn.dataset["wasActive"] = String(isActive);
-  if (wasActive && !isActive) {
-    emit(BusEvent.DataInvalidate);
-  }
-
+/** Process activity side effects: detect completions, show toasts. */
+function processActivitySideEffects(activities: readonly ActivityEntry[]): void {
   if (!activitiesInitialized) {
     // No baseline yet: an entry seen before the first poll seeds cannot be
     // told from history, so completion toasts wait for the seed.
@@ -423,9 +412,9 @@ export function applyProviderEvent(ev: ProviderEvent): void {
 
 /** Repaint every status surface from the store: the running-scans map the
  *  scan buttons key off, the stopping-overlay reconcile, the nav button +
- *  label, completion toasts, and the popup when it is open. Shared by event
- *  application and the poll, so buttons and chip stay event-fresh with the
- *  poll silent. */
+ *  label, completion toasts, the registered activity observers, and the
+ *  popup when it is open. Shared by event application and the poll, so
+ *  buttons and chip stay event-fresh with the poll silent. */
 function renderStatus(): void {
   const btn = $.statusBtn;
   const activities = [...knownActivities.values()];
@@ -436,12 +425,33 @@ function renderStatus(): void {
   reconcileStoppingOverlay(activities);
 
   const isActive = updateStatusButton(btn, knownProviders, alerts, activities, ongoing);
-  processActivitySideEffects(btn, activities, isActive);
+  processActivitySideEffects(activities);
+  for (const fn of activityObservers) {
+    fn(activities);
+  }
 
   if (!isPopupOpen()) {
     return;
   }
   renderPopup(knownStats, knownProviders, activities, alerts, ongoing, isActive);
+}
+
+// --- Activity observers (task 12) ---
+//
+// Modules tracking specific activity ids (search.ts's download buttons)
+// observe every status-store change — event-fed while SSE is up, poll-fed
+// while it is down (the degraded 5s poll and the reconcile tick land here
+// too) — through one registration, replacing per-consumer pollers.
+
+const activityObservers = new Set<(activities: readonly ActivityEntry[]) => void>();
+
+/** Run `fn` with the full activity snapshot after every status-store change.
+ *  Returns an unregister function. */
+export function observeActivities(fn: (activities: readonly ActivityEntry[]) => void): () => void {
+  activityObservers.add(fn);
+  return (): void => {
+    activityObservers.delete(fn);
+  };
 }
 
 /** Publish the running-scans-by-scope map derived from the structured scope

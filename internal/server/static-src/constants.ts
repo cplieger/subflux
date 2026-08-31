@@ -12,8 +12,6 @@ export const SUMMARY_COALESCE_MS = 300;
 // next event, replay, or transaction.
 export const DIRTY_ROOT_CAP = 64;
 export const SEARCH_TIMEOUT_MS = 30_000;
-export const DOWNLOAD_POLL_MS = 2_000;
-export const DOWNLOAD_DEADLINE_MS = 5 * 60_000;
 export const SSE_RECONNECT_MS = 5_000;
 export const SSE_MAX_RECONNECT_MS = 60_000;
 // The epoch deadline prices a SILENT open stream only (refusals fail fast);
@@ -28,6 +26,11 @@ export const REPLAY_BUDGET = 256;
 export const VERDICT_BUFFER_CAP = 2_048;
 export const YAML_TIMEOUT_MS = 15_000;
 export const ROUTE_TRANSITION_MS = 200;
+// History depth cap (E4): the server clamps ?limit at 10 000 SILENTLY, so a
+// depth-preserving reload past it could not detect the truncation — the
+// client never asks for more. "Show more" hides at the cap while hasMore
+// stays true internally.
+export const HISTORY_DEPTH_CAP = 10_000;
 
 // Default subtitle variant value — the sentinel used when no variant is specified.
 export const DEFAULT_VARIANT = "standard" as const;

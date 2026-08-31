@@ -1,10 +1,14 @@
 // history.ts — download history page (server-side paginated).
 //
 // The accumulated entries live in a createCollection keyed by the server's
-// unique row id; bindList renders them. "Reload" (filter change)
-// is setAll(page 0); "show more" fetches the next server page and upserts it
-// (appended). The collection IS the bindList ListSource — no per-row updates
-// (history is append-only display), so only the structure tier does work.
+// unique row id; bindList renders them. Navigation and filter changes are
+// page-0 reloads; "show more" fetches the next server page and upserts it
+// (appended). Coverage events and terminal activity events — observed via
+// events.ts OUTSIDE the A6 gate — reload the OPEN history page through one
+// serializer with FOREGROUND PRIORITY and depth-preserving newest-window
+// semantics (E4). The collection IS the bindList ListSource — no per-row
+// updates (history is append-only display), so only the structure tier does
+// work.
 
 import { el, input, select, option, errDiv } from "./dom.js";
 import { listStateRaw } from "./wire/client.gen.js";
@@ -14,6 +18,7 @@ import { on, emit, BusEvent } from "./bus.js";
 import { fmtDateTime, fmtEpisode, clickableRow, emptyState } from "./utils.js";
 import { signal, effect, createCollection, bindList, patch } from "@cplieger/reactive";
 import { skeletonTiming } from "@cplieger/ui-primitives/skeleton";
+import { HISTORY_DEPTH_CAP, SUMMARY_COALESCE_MS } from "./constants.js";
 import * as store from "./store.js";
 
 const PAGE_SIZE = 50;
@@ -25,23 +30,45 @@ const PAGE_SIZE = 50;
 const historyKey = (e: StateEntry): string => String(e.id);
 const history = createCollection<StateEntry>(historyKey);
 
-// Whether the server has more pages beyond what's loaded (drives "show more").
+// Whether the server has more pages beyond what's loaded (one of the two
+// facts behind "Show more"; the other is loaded < HISTORY_DEPTH_CAP).
 const hasMore = signal(false);
 // Render tick so the filter-aware empty-state effect re-runs after every load
 // even when the id list is unchanged (empty -> empty on a filter change, where
 // setAll's shallow-equal order signal doesn't fire).
 const renderTick = signal(0);
-// Monotonic token: the latest reload/loadMore wins. A stale in-flight fetch
-// (e.g. a filter-change reload superseding an in-flight show-more) is discarded
-// on return, so the two never interleave into the collection.
-let gen = 0;
 
-// --- THE SETTLEMENT MODEL (E3, task 9) ---
+// --- THE SERIALIZER (E4, task 12) ---
+//
+// One serializer owns every fetch into the collection: user gestures
+// (loadMore), event reloads, filter/navigation reloads, and the
+// transaction's history leg. FOREGROUND PRIORITY: a gesture is never
+// cancelled by an event reload — the event latches ONE pending reload that
+// dispatches at the NEW depth once the gesture's slot closes. A filter
+// change supersedes everything, gesture and latch alike. Every dispatch
+// captures {filters, depth} at dispatch time under one generation.
+
+// Generation id source, and the newest DISPATCHED run's generation. Landings
+// compare against liveGen — a QUEUED (latched) generation takes an id
+// without taking the slot, so it never discards the run it waits behind.
+let genCounter = 0;
+let liveGen = 0;
+
+// The in-flight run (at most one) and the ONE latched pending reload.
+// Invariant: pendingReload !== null implies a run is in flight (the latch
+// drains when the slot closes, and a route leave drops it).
+let running: { gen: number; kind: "reload" | "gesture" } | null = null;
+let pendingReload: number | null = null;
+// The trailing event-trigger window (the A6 window): notes arriving inside
+// one window share one reload.
+let triggerTimer: ReturnType<typeof setTimeout> | null = null;
+
+// --- THE SETTLEMENT MODEL (E3, task 9; internals replaced by task 12) ---
 //
 // Every created or queued generation settles exactly once as
 // applied | failed | superseded(next) | abandoned, published through this
 // module-owned gen → settlement handle. A superseder settles its priors at
-// START (g !== gen proves it started, not that it applied), so a waiter
+// START (g !== liveGen proves it started, not that it applied), so a waiter
 // resolves "superseded" only by chaining superseded(next) links to a
 // generation that settles applied; a chain ending failed or abandoned leaves
 // the transaction leg REJECTING. `next: null` marks the dispatcher's
@@ -49,7 +76,6 @@ let gen = 0;
 // route's page leg, owned by the dispatcher's re-dispatch, never a latch.
 // `abandoned` is a DEFENSIVE terminal with no shipped producer — any
 // settlement path not otherwise named rejects loudly rather than hanging.
-// Task 12 replaces the reload internals behind this same seam and contract.
 
 type HistorySettlement =
   | { kind: "applied" }
@@ -68,16 +94,12 @@ const settlements = new Map<number, SettlementRecord>();
 // evicted generation can no longer be awaited — chains are short-lived).
 const SETTLEMENT_CAP = 64;
 
-/** Create the next generation; every prior UNSETTLED generation settles
- *  superseded(next = the new one) — the superseder started. */
-function newGeneration(): number {
-  const g = gen + 1;
-  for (const [pg, rec] of settlements) {
-    if (rec.settled === null) {
-      settleGeneration(pg, { kind: "superseded", next: g });
-    }
-  }
-  gen = g;
+/** Allocate a generation with an open settlement record, evicting settled
+ *  records past the ledger cap. Supersedes nothing — a QUEUED (latched)
+ *  generation must not settle the run it waits behind. */
+function allocGeneration(): number {
+  genCounter += 1;
+  const g = genCounter;
   let resolve!: (s: HistorySettlement) => void;
   const promise = new Promise<HistorySettlement>((res) => {
     resolve = res;
@@ -92,6 +114,17 @@ function newGeneration(): number {
     }
   }
   return g;
+}
+
+/** Settle every prior UNSETTLED generation superseded(next) — the superseder
+ *  started. `except` shields the pending latch from a gesture's supersession:
+ *  the latched reload still runs, after the gesture. */
+function supersedePriors(next: number, except?: number | null): void {
+  for (const [pg, rec] of settlements) {
+    if (pg !== next && pg !== except && rec.settled === null) {
+      settleGeneration(pg, { kind: "superseded", next });
+    }
+  }
 }
 
 /** Publish a generation's settlement — exactly once; later calls no-op. */
@@ -134,6 +167,114 @@ async function chainSettlement(g: number): Promise<"applied" | "superseded" | "r
     }
   }
 }
+
+// --- Run lifecycle: the slot, the latch, the trigger ---
+
+function beginRun(g: number, kind: "reload" | "gesture"): void {
+  running = { gen: g, kind };
+  liveGen = g;
+}
+
+/** Close a run's slot. Only the slot's current owner clears it (a superseder
+ *  already took it over otherwise), then the pending latch drains. */
+function endRun(g: number): void {
+  if (running?.gen !== g) {
+    return;
+  }
+  running = null;
+  drainPending();
+}
+
+/** The depth an event/leg reload preserves: the loaded row count, floored at
+ *  one page (the initial load) and capped at HISTORY_DEPTH_CAP — the server
+ *  clamps a larger ?limit silently, so the client never asks past it. */
+function eventDepth(): number {
+  return Math.min(Math.max(history.size, PAGE_SIZE), HISTORY_DEPTH_CAP);
+}
+
+/** Latch the ONE pending reload (idempotent): it dispatches at the NEW depth
+ *  when the in-flight run's slot closes. */
+function ensurePendingLatch(): number {
+  pendingReload ??= allocGeneration();
+  return pendingReload;
+}
+
+/** Drop the pending latch and any armed trigger window on a route leave,
+ *  settling under task 9's re-route arm: the dispatcher's re-dispatch owns
+ *  the continuation, never a latch. */
+function dropPendingLatch(): void {
+  if (triggerTimer !== null) {
+    clearTimeout(triggerTimer);
+    triggerTimer = null;
+  }
+  if (pendingReload !== null) {
+    settleGeneration(pendingReload, { kind: "superseded", next: null });
+    pendingReload = null;
+  }
+}
+
+function drainPending(): void {
+  if (pendingReload === null) {
+    return;
+  }
+  if (store.get("currentPage") !== "history") {
+    dropPendingLatch();
+    return;
+  }
+  const g = allocGeneration();
+  supersedePriors(g); // the latch settles superseded(next: g) — its dispatch started
+  pendingReload = null;
+  beginRun(g, "reload");
+  void runReload(g, eventDepth());
+}
+
+/** E4's history trigger (the events.ts hook point, OUTSIDE task 6's gate):
+ *  while the history page is open, coverage events and terminal activity
+ *  events note a data mutation. Notes coalesce in one trailing window into a
+ *  single depth-preserving reload, latched behind any in-flight run. */
+export function noteHistoryMutation(): void {
+  if (store.get("currentPage") !== "history") {
+    return;
+  }
+  triggerTimer ??= setTimeout(() => {
+    triggerTimer = null;
+    requestEventReload();
+  }, SUMMARY_COALESCE_MS);
+}
+
+function requestEventReload(): void {
+  if (store.get("currentPage") !== "history") {
+    return; // left mid-window (belt: the leave also clears the timer)
+  }
+  if (running !== null) {
+    ensurePendingLatch();
+    return;
+  }
+  const g = allocGeneration();
+  supersedePriors(g);
+  beginRun(g, "reload");
+  void runReload(g, eventDepth());
+}
+
+/** Task 12's re-arm seam (app.ts wires it to coverage-heal's onHealReset):
+ *  a full-pair overwrite just aborted in-flight heals — churn an in-flight
+ *  history reload's server read may predate — so the trailing latch re-arms
+ *  behind that run rather than trusting its read. Idle or off-history,
+ *  nothing is in doubt and nothing re-arms. */
+export function reArmHistoryLatch(): void {
+  if (store.get("currentPage") !== "history" || running === null) {
+    return;
+  }
+  ensurePendingLatch();
+}
+
+// A route leave drops the pending latch (and the armed window): the
+// dispatcher's re-route arm owns the continuation.
+store.subscribe("currentPage", (page) => {
+  if (page !== "history") {
+    dropPendingLatch();
+  }
+});
 
 /** Query for a history page: limit always, offset only past page 0, and the
  *  filter params only when non-empty (undefined entries are skipped at
@@ -301,12 +442,16 @@ function ensureMounted(): void {
   bindings.push(
     effect(() => {
       void renderTick.value;
-      const empty = history.ids.value.length === 0;
+      const loaded = history.ids.value.length;
+      const empty = loaded === 0;
       const filtered = anyFilterActive();
       emptyNoData.hidden = !(empty && !filtered);
       emptyFiltered.hidden = !(empty && filtered);
       tbl.hidden = empty;
-      showMore.hidden = empty || !hasMore.value;
+      // "Show more" = hasMore && loaded < cap (two facts): the server has
+      // more AND the client may still ask — past the cap the server's silent
+      // LIMIT clamp would truncate a depth-preserving reload undetectably.
+      showMore.hidden = empty || !hasMore.value || loaded >= HISTORY_DEPTH_CAP;
     }),
   );
 }
@@ -319,13 +464,17 @@ function showError(e: unknown): void {
   }
 }
 
-// runReload is the reload internals behind both entry points: fetch page 0
-// through the RAW list read (a transaction leg must observe a non-2xx — the
-// null-collapsing read maps failure to an empty page and no wrapper can see
-// it), apply on landing, and publish this generation's settlement. An abort
-// by the dispatcher's re-route settles superseded(next: null); a genuine
-// failure settles failed with prior rows intact.
-async function runReload(g: number, signal?: AbortSignal): Promise<void> {
+// runReload is the reload internals behind every reload dispatch: ONE fetch
+// of the newest window (`limit` rows from offset 0) through the RAW list
+// read (a transaction leg must observe a non-2xx — the null-collapsing read
+// maps failure to an empty page and no wrapper can see it), applied as a
+// keyed setAll — COUNT preserved at the fetched depth, surviving rows keep
+// identity, displaced rows drop off the bottom — and the generation's
+// settlement published. An abort by the dispatcher's re-route settles
+// superseded(next: null); a genuine failure settles failed with prior rows
+// intact. Filters and depth are captured at dispatch: buildQuery reads the
+// controls synchronously, before the first await.
+async function runReload(g: number, limit: number, signal?: AbortSignal): Promise<void> {
   // Design-system skeleton (same anti-flicker timing as the library table)
   // for the first mount only: previously the panel stayed BLANK for the whole
   // fetch. Filter-change reloads keep the current rows until data lands
@@ -335,7 +484,7 @@ async function runReload(g: number, signal?: AbortSignal): Promise<void> {
   const timing = firstMount
     ? skeletonTiming(
         () => {
-          if (g !== gen) {
+          if (g !== liveGen) {
             return;
           }
           const skel = document.createDocumentFragment();
@@ -352,8 +501,8 @@ async function runReload(g: number, signal?: AbortSignal): Promise<void> {
       )
     : null;
   try {
-    const res = await listStateRaw(buildQuery(0, PAGE_SIZE), signal ? { signal } : undefined);
-    if (g !== gen) {
+    const res = await listStateRaw(buildQuery(0, limit), signal ? { signal } : undefined);
+    if (g !== liveGen) {
       timing?.cancel();
       return; // superseded — the superseder settled this generation at start
     }
@@ -373,10 +522,10 @@ async function runReload(g: number, signal?: AbortSignal): Promise<void> {
     }
     const items = res.data ?? [];
     history.setAll(items);
-    hasMore.value = items.length >= PAGE_SIZE;
+    hasMore.value = items.length >= limit;
     updateHistoryFilters(history.items());
     const mount = (): void => {
-      if (g !== gen) {
+      if (g !== liveGen) {
         return;
       }
       ensureMounted();
@@ -396,18 +545,28 @@ async function runReload(g: number, signal?: AbortSignal): Promise<void> {
       kind: "failed",
       error: e instanceof Error ? e : new Error(String(e)),
     });
+  } finally {
+    endRun(g);
   }
 }
 
 async function loadMore(): Promise<void> {
-  if (!hasMore.value) {
+  if (!hasMore.value || history.size >= HISTORY_DEPTH_CAP) {
     return;
   }
-  const g = newGeneration();
+  // FOREGROUND PRIORITY: the gesture takes the slot now. An in-flight
+  // event/leg reload's FETCH is superseded, but its obligation is not lost —
+  // it re-latches and runs at the new depth after the append commits.
+  if (running !== null && running.kind === "reload") {
+    ensurePendingLatch();
+  }
+  const g = allocGeneration();
+  supersedePriors(g, pendingReload);
+  beginRun(g, "gesture");
   const scrollPos = window.scrollY;
   try {
     const res = await listStateRaw(buildQuery(history.size, PAGE_SIZE));
-    if (g !== gen) {
+    if (g !== liveGen) {
       return; // superseded (e.g. a filter-change reload won)
     }
     if (!res.ok) {
@@ -436,33 +595,51 @@ async function loadMore(): Promise<void> {
       kind: "failed",
       error: e instanceof Error ? e : new Error(String(e)),
     });
-    if (g === gen) {
+    if (g === liveGen) {
       showError(e);
     }
+  } finally {
+    endRun(g);
   }
 }
 
-/** The UI adapter (routes navigating to /history, filter changes): kick a
- *  reload and route a chain-final rejection to the error panel. */
+/** The UI adapter (routes navigating to /history, filter changes): a page-0
+ *  reload that SUPERSEDES EVERYTHING — the in-flight gesture and the pending
+ *  latch alike (their chains resolve through this reload's landing) — and
+ *  routes a chain-final rejection to the error panel. */
 export function reloadHistory(): void {
-  const g = newGeneration();
-  void runReload(g);
+  if (triggerTimer !== null) {
+    clearTimeout(triggerTimer);
+    triggerTimer = null;
+  }
+  pendingReload = null; // its generation settles superseded(next: g) below
+  const g = allocGeneration();
+  supersedePriors(g);
+  beginRun(g, "reload");
+  void runReload(g, PAGE_SIZE);
   chainSettlement(g).catch((e: unknown) => {
     showError(e);
   });
 }
 
-/** Task 9's REQUIRED EXTRACTION: the transaction's history page leg. Backed
- *  by the raw list read; resolves once this run's settlement chain
- *  terminates — "applied" (this run landed), "superseded" (a superseder
- *  applied), "rerouted" (a route leave re-routed the leg; the dispatcher
- *  re-dispatches) — and REJECTS when the chain ends failed or abandoned
- *  (prior rows intact, watermark untouched; the transaction aborts). */
+/** Task 9's REQUIRED EXTRACTION: the transaction's history page leg. Latches
+ *  like any event reload — behind an in-flight gesture too, so COMMIT WAITS
+ *  for the depth-preserving reload that runs after the append commits —
+ *  and resolves once this generation's settlement chain terminates:
+ *  "applied" (this run landed), "superseded" (a superseder applied),
+ *  "rerouted" (a route leave re-routed the leg; the dispatcher
+ *  re-dispatches). REJECTS when the chain ends failed or abandoned (prior
+ *  rows intact, watermark untouched; the transaction aborts). */
 export function reloadHistoryForTransaction(
   signal?: AbortSignal,
 ): Promise<"applied" | "superseded" | "rerouted"> {
-  const g = newGeneration();
-  void runReload(g, signal);
+  if (running !== null || pendingReload !== null) {
+    return chainSettlement(ensurePendingLatch());
+  }
+  const g = allocGeneration();
+  supersedePriors(g);
+  beginRun(g, "reload");
+  void runReload(g, eventDepth(), signal);
   return chainSettlement(g);
 }
 
@@ -470,11 +647,19 @@ on(BusEvent.LoadHistory, () => {
   reloadHistory();
 });
 
-/** Test-only: clear the collection, the ledger, and the generation counter. */
+/** Test-only: clear the collection, the ledger, the serializer state, and
+ *  the generation counters. */
 export function _resetHistoryForTest(): void {
   history.clear();
   settlements.clear();
-  gen = 0;
+  genCounter = 0;
+  liveGen = 0;
+  running = null;
+  pendingReload = null;
+  if (triggerTimer !== null) {
+    clearTimeout(triggerTimer);
+    triggerTimer = null;
+  }
   hasMore.value = false;
   renderTick.value = 0;
   disposeBindings();

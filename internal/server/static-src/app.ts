@@ -13,7 +13,8 @@ import { filterCoverage } from "./coverage.js";
 import { closeSearchPopup } from "./search.js";
 import { consumeSyncClosing } from "./sync.js";
 import { navigate, navigateToHistory, applyRoute, updateLibraryFilters } from "./router.js";
-import { reloadHistory } from "./history.js";
+import { reloadHistory, reArmHistoryLatch } from "./history.js";
+import { onHealReset } from "./coverage-heal.js";
 import { openConfig, closeConfig, saveConfig, initLanguages } from "./config.js";
 import { initUserMenu } from "./user-menu.js";
 import { initSecurity } from "./security.js";
@@ -48,6 +49,11 @@ const configDlg = dialog("configDialog");
 
 // The page-leg dispatcher (page-leg.ts, loaded via router.ts) owns the
 // BusEvent.DataInvalidate handler and the per-route refresh enumeration.
+
+// E4: history's pending-reload latch re-arms when a full-pair overwrite
+// resets in-flight heals (composition-root wiring — history.ts must not pull
+// the coverage graph into its own imports).
+onHealReset(reArmHistoryLatch);
 
 events.connect();
 

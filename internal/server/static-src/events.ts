@@ -21,8 +21,8 @@
 // the boot transaction refetches everything.
 
 import * as notify from "./notify.js";
-import { emit, BusEvent } from "./bus.js";
 import { healFromCoverageEvent, resetCoverageHeal, subsumeDirtyRoots } from "./coverage-heal.js";
+import { noteHistoryMutation } from "./history.js";
 import {
   abortPoll,
   applyActivityEvent,
@@ -472,14 +472,16 @@ function showNotifyToast(payload: NotifyEvent): void {
 
 /** THE REPLAY TABLE, exhaustive over the union:
  *  - coverage re-applies through the A6 coalescer (idempotent — the heal
- *    fetches current truth);
+ *    fetches current truth) and notes E4's history trigger;
  *  - notify dedupes by (boot_id, frame_id);
  *  - scan:start re-applies; its toast half dedupes like notify's;
- *  - scan:done re-applies STATE (status poll + page refresh, both
- *    idempotent); its toast half lives in the status poll's transition
- *    detector, deduped there by activity id;
+ *  - scan:done re-applies as a no-op: state rides the terminal activity
+ *    upsert (status store + E4's history trigger) and the per-root coverage
+ *    events; its toast half lives in the status poll's transition detector,
+ *    deduped there by activity id;
  *  - activity / alert / provider re-apply through the status store's keyed
- *    idempotent appliers (a re-applied delta mutates nothing);
+ *    idempotent appliers (a re-applied delta mutates nothing); a TERMINAL
+ *    activity upsert notes E4's history trigger too;
  *  - sync:done re-applies, idempotent per job_id (the settlement registry
  *    keeps each job's terminal, so a replayed frame settles nothing twice);
  *  - epoch is never replayed (no id, handled before this table).
@@ -487,6 +489,10 @@ function showNotifyToast(payload: NotifyEvent): void {
 function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
   switch (f.type) {
     case "coverage":
+      // E4's history trigger observes here, OUTSIDE the A6 gate: a poller
+      // import on a fresh /history tab reloads history even though no
+      // collection is loaded and the heal enqueues nothing.
+      noteHistoryMutation();
       healFromCoverageEvent(f.payload as CoverageEvent);
       break;
     case "notify":
@@ -504,14 +510,19 @@ function applyFrame(f: BufferedFrame, advanceCounters: boolean): void {
       break;
     }
     case "scan:done":
-      // State half: immediate status refresh (buttons + popup) plus a page
-      // refresh so coverage counts reconcile after any terminal outcome.
-      void pollStatus();
-      emit(BusEvent.DataInvalidate);
+      // Nothing left to apply: the terminal activity upsert owns the status
+      // flip and E4's history trigger, per-root coverage events own the row
+      // heals, and the toast half lives in the status transition detector.
       break;
-    case "activity":
-      applyActivityEvent(f.payload as ActivityEvent);
+    case "activity": {
+      const p = f.payload as ActivityEvent;
+      applyActivityEvent(p);
+      if (p.op !== "remove" && p.entry?.done) {
+        // A terminal activity (download, scan) may have written history rows.
+        noteHistoryMutation();
+      }
       break;
+    }
     case "alert":
       applyAlertEvent(f.payload as AlertEvent);
       break;

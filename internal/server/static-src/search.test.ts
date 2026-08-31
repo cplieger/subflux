@@ -23,9 +23,6 @@ const wire = vi.hoisted(() => ({
   searchSignals: [] as (AbortSignal | undefined)[],
   searchDefer: false,
   searchRelease: [] as ((v: unknown) => void)[],
-  activity: [] as unknown[][],
-  activityCalls: 0,
-  activitySignals: [] as (AbortSignal | undefined)[],
 }));
 vi.mock("./wire/client.gen.js", () => ({
   manualSearchRaw: (query: unknown, opts?: { signal?: AbortSignal }) => {
@@ -38,20 +35,36 @@ vi.mock("./wire/client.gen.js", () => ({
     }
     return Promise.resolve(wire.searchResult);
   },
-  listActivity: (opts?: { signal?: AbortSignal }) => {
-    const next = wire.activity.length > 1 ? wire.activity.shift() : wire.activity[0];
-    wire.activityCalls += 1;
-    wire.activitySignals.push(opts?.signal);
-    return Promise.resolve(next ?? []);
-  },
   PATH_DOWNLOAD_SUBTITLE: "/api/search/download",
 }));
 
+// The activity-store seam (task 12): search.ts registers its download-button
+// reconciler through observeActivities; tests drive it with activity
+// snapshots exactly as status.ts does — from an SSE activity event or from
+// the degraded poll alike, the callback and payload are identical.
+const statusSeam = vi.hoisted(() => ({
+  observers: [] as ((activities: unknown[]) => void)[],
+}));
+vi.mock("./status.js", () => ({
+  observeActivities: (fn: (activities: unknown[]) => void) => {
+    statusSeam.observers.push(fn);
+    return () => undefined;
+  },
+}));
+
+/** Feed every registered observer one activity snapshot (what renderStatus
+ *  does after an event application or a poll). */
+function feedActivities(activities: unknown[]): void {
+  for (const fn of statusSeam.observers) {
+    fn(activities);
+  }
+}
+
 // apiAction is replaced so the download's dispatch is drivable and its
-// `retryable` predicate — module-private otherwise — is reachable. pollUntil,
-// registerCleanup and retryNetwork stay REAL: the poll loop under test is
-// search.ts's step + until callbacks, and faking the loop around them would
-// prove the fake instead.
+// `retryable` predicate — module-private otherwise — is reachable.
+// registerCleanup and retryNetwork stay REAL: the button reconciler under
+// test is search.ts's own observer callback, driven through the status seam
+// above.
 interface ActionDef {
   name?: string;
   retryable?: (err: { code?: string; status?: number }) => boolean;
@@ -59,7 +72,11 @@ interface ActionDef {
 const actions = vi.hoisted(() => ({
   defs: new Map<string, unknown>(),
   dispatched: [] as unknown[],
-  outcome: { status: "success", value: { activity_id: "act-1", status: "accepted" } } as unknown,
+  // Per-dispatch outcomes: shift while more than one remains, then repeat the
+  // last (mirrors a queue with a steady tail).
+  outcomes: [
+    { status: "success", value: { activity_id: "act-1", status: "accepted" } },
+  ] as unknown[],
 }));
 vi.mock("@cplieger/actions", async (importOriginal) => {
   const real = (await importOriginal()) as Record<string, unknown>;
@@ -72,7 +89,8 @@ vi.mock("@cplieger/actions", async (importOriginal) => {
       return {
         dispatch: (args: unknown) => {
           actions.dispatched.push(args);
-          return { outcome: Promise.resolve(actions.outcome) };
+          const next = actions.outcomes.length > 1 ? actions.outcomes.shift() : actions.outcomes[0];
+          return { outcome: Promise.resolve(next) };
         },
       };
     },
@@ -94,16 +112,7 @@ vi.mock("./notify.js", () => ({
   info: () => undefined,
 }));
 
-const busState = vi.hoisted(() => ({ emitted: [] as string[] }));
-vi.mock("./bus.js", () => ({
-  emit: (event: string) => {
-    busState.emitted.push(event);
-  },
-  on: () => () => undefined,
-  BusEvent: { DataInvalidate: "data:invalidate" },
-}));
-
-import { openSearchPopup, closeSearchPopup } from "./search.js";
+import { openSearchPopup, closeSearchPopup, _resetSearchForTest } from "./search.js";
 import type { SearchResult } from "./wire/types.gen.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
@@ -209,6 +218,7 @@ function downloadButton(): HTMLButtonElement {
 }
 
 beforeEach(() => {
+  _resetSearchForTest();
   req<HTMLDialogElement>("#searchResultPopup").replaceChildren();
   history.replaceState(null, "", "/");
   wire.searchResult = { ok: true, status: 200, data: { results: [] } };
@@ -216,14 +226,10 @@ beforeEach(() => {
   wire.searchSignals = [];
   wire.searchDefer = false;
   wire.searchRelease = [];
-  wire.activity = [[activityEntry()]];
-  wire.activityCalls = 0;
-  wire.activitySignals = [];
   actions.dispatched = [];
-  actions.outcome = { status: "success", value: { activity_id: "act-1", status: "accepted" } };
+  actions.outcomes = [{ status: "success", value: { activity_id: "act-1", status: "accepted" } }];
   storeState.config = { languages: ["en", "fr"] };
   toasts.errors = [];
-  busState.emitted = [];
 });
 
 afterEach(() => {
@@ -945,7 +951,6 @@ describe("downloadFromPopup", () => {
   });
 
   it("sends the subtitle, media and scoring details the server needs", async () => {
-    vi.useFakeTimers();
     await clickDownload();
 
     expect(actions.dispatched).toEqual([
@@ -967,7 +972,6 @@ describe("downloadFromPopup", () => {
   });
 
   it("marks a lower pick as a manual download", async () => {
-    vi.useFakeTimers();
     wire.searchResult = {
       ok: true,
       status: 200,
@@ -983,7 +987,6 @@ describe("downloadFromPopup", () => {
   });
 
   it("reports a movie download with no season or episode", async () => {
-    vi.useFakeTimers();
     wire.searchResult = { ok: true, status: 200, data: { results: [result()] } };
     await openMoviePopup();
 
@@ -994,31 +997,27 @@ describe("downloadFromPopup", () => {
   });
 
   it("disables the button while the download is running", async () => {
-    vi.useFakeTimers();
-
     const btn = await clickDownload();
 
     expect(btn.disabled).toBe(true);
   });
 
   it("shows the download as pending", async () => {
-    vi.useFakeTimers();
-
     const btn = await clickDownload();
 
     expect(btn.getAttribute("data-tip")).toBe("Downloading\u2026");
   });
 
-  it("shows a spinner while the activity is polled", async () => {
-    vi.useFakeTimers();
-
+  it("shows a spinner while the download runs in the background", async () => {
     const btn = await clickDownload();
 
     expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
   it("marks a rejected dispatch with a close icon", async () => {
-    actions.outcome = { status: "error", error: { code: "provider_error", message: "no route" } };
+    actions.outcomes = [
+      { status: "error", error: { code: "provider_error", message: "no route" } },
+    ];
 
     const btn = await clickDownload();
 
@@ -1026,7 +1025,9 @@ describe("downloadFromPopup", () => {
   });
 
   it("flags a rejected dispatch on the button", async () => {
-    actions.outcome = { status: "error", error: { code: "provider_error", message: "no route" } };
+    actions.outcomes = [
+      { status: "error", error: { code: "provider_error", message: "no route" } },
+    ];
 
     const btn = await clickDownload();
 
@@ -1034,7 +1035,9 @@ describe("downloadFromPopup", () => {
   });
 
   it("keeps a rejected dispatch disabled unless the download itself failed", async () => {
-    actions.outcome = { status: "error", error: { code: "provider_error", message: "no route" } };
+    actions.outcomes = [
+      { status: "error", error: { code: "provider_error", message: "no route" } },
+    ];
 
     const btn = await clickDownload();
 
@@ -1042,7 +1045,9 @@ describe("downloadFromPopup", () => {
   });
 
   it("re-enables the button after a failed download so the user can retry", async () => {
-    actions.outcome = { status: "error", error: { code: "download_failed", message: "timeout" } };
+    actions.outcomes = [
+      { status: "error", error: { code: "download_failed", message: "timeout" } },
+    ];
 
     const btn = await clickDownload();
 
@@ -1050,196 +1055,168 @@ describe("downloadFromPopup", () => {
   });
 
   it("falls back to a generic tip when a cancelled dispatch carries no error", async () => {
-    actions.outcome = { status: "cancelled" };
+    actions.outcomes = [{ status: "cancelled" }];
 
     const btn = await clickDownload();
 
     expect(btn.getAttribute("data-tip")).toBe("Download failed");
   });
 
-  it("marks the button done once the activity completes", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true })]];
+  it("carries the 202's activity id on the button for the observer to key on", async () => {
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect(btn.dataset["status"]).toBe("ok");
+    expect(btn.getAttribute("data-activity-id")).toBe("act-1");
   });
 
-  it("shows a check once the activity completes", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true })]];
+  it("download completion flips the button to done via the activity event", async () => {
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    feedActivities([activityEntry({ done: true })]);
 
+    expect(btn.dataset["status"]).toBe("ok");
     expect(btn.querySelector(".icon-check")).toBeTruthy();
   });
 
   it("ignores activity entries belonging to other work", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ id: "other-act", done: true })]];
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    feedActivities([activityEntry({ id: "other-act", done: true })]);
 
     expect(btn.dataset["status"]).toBeUndefined();
-  });
-
-  it("hands the poll an abort signal so a teardown cancels the fetch", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })]];
-    await clickDownload();
-    await vi.advanceTimersByTimeAsync(2000);
-
-    window.dispatchEvent(new Event("beforeunload"));
-
-    expect(wire.activitySignals.at(-1)?.aborted).toBe(true);
-  });
-
-  it("releases the poll's signal once the download completes", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true })]];
-    await clickDownload();
-
-    await vi.advanceTimersByTimeAsync(2000);
-
-    // That signal composes a five-minute download deadline. Leaving it live
-    // after the poll has finished keeps the deadline's timer armed for every
-    // download the session ever runs.
-    expect(wire.activitySignals.at(-1)?.aborted).toBe(true);
-  });
-
-  it("flags the button when the page unloads mid-download", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })]];
-    const btn = await clickDownload();
-    await vi.advanceTimersByTimeAsync(2000);
-
-    window.dispatchEvent(new Event("beforeunload"));
-    await settle();
-
-    expect(btn.getAttribute("data-tip")).toBe("Download timed out");
-  });
-
-  it("invalidates the cached data once the download lands", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true })]];
-    await clickDownload();
-
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect(busState.emitted).toEqual(["data:invalidate"]);
+    expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
   it("drops the pending tip once the download lands", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true })]];
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    feedActivities([activityEntry({ done: true })]);
 
     expect(btn.hasAttribute("data-tip")).toBe(false);
   });
 
   it("flags an activity that finished in failure", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true, failed: true })]];
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    feedActivities([activityEntry({ done: true, failed: true })]);
 
     expect(btn.dataset["status"]).toBe("err");
-  });
-
-  it("shows a close icon for an activity that finished in failure", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true, failed: true })]];
-    const btn = await clickDownload();
-
-    await vi.advanceTimersByTimeAsync(2000);
-
     expect(btn.querySelector(".icon-close")).toBeTruthy();
   });
 
-  it("invalidates nothing when the activity failed", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: true, failed: true })]];
-    await clickDownload();
-
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect(busState.emitted).toEqual([]);
-  });
-
-  it("keeps polling while the activity is still running", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })], [activityEntry({ done: true })]];
+  it("keeps the running state while the activity is still running", async () => {
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    feedActivities([activityEntry({ done: false })]);
 
     expect(btn.dataset["status"]).toBeUndefined();
+    expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
-  it("finishes once a running activity completes", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })], [activityEntry({ done: true })]];
+  it("finishes once a running activity completes on a later snapshot", async () => {
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(4000);
+    feedActivities([activityEntry({ done: false })]);
+    feedActivities([activityEntry({ done: true })]);
 
     expect(btn.dataset["status"]).toBe("ok");
   });
 
   it("treats an entry evicted after being seen as completion", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })], []];
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(4000);
+    feedActivities([activityEntry({ done: false })]);
+    feedActivities([]);
 
     expect(btn.dataset["status"]).toBe("ok");
   });
 
   it("keeps waiting for an entry that has not appeared yet", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[]];
     const btn = await clickDownload();
 
-    await vi.advanceTimersByTimeAsync(6000);
+    feedActivities([]);
+    feedActivities([]);
 
     expect(btn.dataset["status"]).toBeUndefined();
+    expect(btn.querySelector(".spinner")).toBeTruthy();
   });
 
-  it("flags the button when the poll is torn down", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })]];
-    const btn = await clickDownload();
+  it("TWO concurrent downloads resolve correctly, each from its own entry", async () => {
+    actions.outcomes = [
+      { status: "success", value: { activity_id: "act-1", status: "accepted" } },
+      { status: "success", value: { activity_id: "act-2", status: "accepted" } },
+    ];
+    wire.searchResult = {
+      ok: true,
+      status: 200,
+      data: { results: [result(), result({ subtitle_id: "sub-2" })] },
+    };
+    await openEpisodePopup();
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".result-dl button")];
+    buttons[0]?.click();
+    await settle();
+    buttons[1]?.click();
+    await settle();
 
-    closeSearchPopup();
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect([btn.dataset["status"], btn.getAttribute("data-tip")]).toEqual([
-      "err",
-      "Download timed out",
+    // One snapshot settles both, in opposite directions.
+    feedActivities([
+      activityEntry({ id: "act-1", done: true, failed: true }),
+      activityEntry({ id: "act-2", done: true }),
     ]);
+
+    expect(buttons[0]?.dataset["status"]).toBe("err");
+    expect(buttons[1]?.dataset["status"]).toBe("ok");
   });
 
-  it("shows a close icon on a torn-down download", async () => {
-    vi.useFakeTimers();
-    wire.activity = [[activityEntry({ done: false })]];
+  it("close-before-complete: a reopen re-derives the running state and still flips", async () => {
     const btn = await clickDownload();
+    expect(btn.querySelector(".spinner")).toBeTruthy();
 
     closeSearchPopup();
-    await vi.advanceTimersByTimeAsync(2000);
+    // Reopen re-runs the search; the rebuilt row re-derives the in-flight
+    // download from the tracking map (same subtitle identity).
+    await openEpisodePopup();
+    const reopened = downloadButton();
+    expect(reopened).not.toBe(btn);
+    expect(reopened.disabled).toBe(true);
+    expect(reopened.querySelector(".spinner")).toBeTruthy();
+    expect(reopened.getAttribute("data-activity-id")).toBe("act-1");
 
-    expect(btn.querySelector(".icon-close")).toBeTruthy();
+    feedActivities([activityEntry({ done: true })]);
+
+    expect(reopened.dataset["status"]).toBe("ok");
+    expect(reopened.querySelector(".icon-check")).toBeTruthy();
+  });
+
+  it("a download completed while the popup was closed reopens as a fresh button", async () => {
+    await clickDownload();
+    closeSearchPopup();
+
+    // Terminal observed with no button in the dialog: the tracking entry
+    // leaves; nothing is left to re-derive.
+    feedActivities([activityEntry({ done: true })]);
+    await openEpisodePopup();
+
+    const reopened = downloadButton();
+    expect(reopened.disabled).toBe(false);
+    expect(reopened.dataset["status"]).toBeUndefined();
+    expect(reopened.querySelector(".icon-download")).toBeTruthy();
+  });
+
+  it("SSE-down completion still observed: a poll-shaped full snapshot flips the button", async () => {
+    // While the stream is down the degraded 5s poll REPLACES the activity
+    // store and renderStatus feeds observers the same way — the reconciler
+    // cannot tell the sources apart, so a full snapshot is the SSE-down path.
+    const btn = await clickDownload();
+
+    feedActivities([
+      activityEntry({ id: "unrelated", done: false }),
+      activityEntry({ done: true }),
+    ]);
+
+    expect(btn.dataset["status"]).toBe("ok");
   });
 
   it("shows an hourglass the moment the download is dispatched", async () => {
-    vi.useFakeTimers();
     wire.searchResult = { ok: true, status: 200, data: { results: [result()] } };
     await openEpisodePopup();
     const btn = downloadButton();

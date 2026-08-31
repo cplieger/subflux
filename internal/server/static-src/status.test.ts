@@ -88,7 +88,6 @@ import * as store from "./store.js";
 import { buildActivityItem, updateLiveTimers } from "./status.js";
 import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type * as StatusModule from "./status.js";
-import type * as BusModule from "./bus.js";
 import type { ActivityEntry } from "./wire/types.gen.js";
 import type {
   Alert,
@@ -446,7 +445,6 @@ interface PollHarness {
   };
   status: typeof StatusModule;
   store: typeof store;
-  bus: typeof BusModule;
 }
 
 // Only the module under test carries the `?boot=` query, and it is what makes
@@ -465,7 +463,7 @@ interface PollHarness {
 // that does not exist and status.ts reports 0% coverage while this suite stays
 // green.
 //
-// ./store.js, ./notify.js and ./bus.js are imported plainly on purpose: a busted
+// ./store.js and ./notify.js are imported plainly on purpose: a busted
 // specifier mints a DUPLICATE instance, so busting those would hand this harness
 // different objects than the status instance reads, and both the seeded store
 // values and the notify spies would be invisible to it.
@@ -479,7 +477,6 @@ async function freshPollHarness(): Promise<PollHarness> {
   st.set("isUnconfigured", true);
   st.set("isAdmin", false);
   const notifyM = (await import("./notify.js")) as unknown as PollHarness["notifyM"];
-  const bus = await import("./bus.js");
   const status = (await import(
     /* @vite-ignore */ `./status.ts?boot=${++bootCount}`
   )) as typeof StatusModule;
@@ -497,7 +494,7 @@ async function freshPollHarness(): Promise<PollHarness> {
   const runPoll = async (activities: ActivityEntry[]): Promise<void> => {
     await runPollWith({ activities });
   };
-  return { runPoll, runPollWith, notifyM, status, store: st, bus };
+  return { runPoll, runPollWith, notifyM, status, store: st };
 }
 
 describe("status: toast seeding across polls", () => {
@@ -805,20 +802,41 @@ describe("status: poll side effects", () => {
     expect([...scans.values()]).toEqual([{ activityId: "sc1", cancellable: true }]);
   });
 
-  it("invalidates cached data only when the last running scan finishes", async () => {
-    const invalidated = vi.fn();
-    h.bus.on(h.bus.BusEvent.DataInvalidate, invalidated);
-
-    await h.runPollWith({ activities: [] });
-    expect(invalidated).not.toHaveBeenCalled();
-
-    await h.runPollWith({ activities: [entry({ id: "r1" })] });
-    expect(invalidated).not.toHaveBeenCalled();
+  it("feeds registered activity observers from every poll — the SSE-down path", async () => {
+    // The degraded 5s poll and the reconcile tick land here: a download
+    // completion is observed with zero SSE events seen.
+    const seen: string[][] = [];
+    h.status.observeActivities((a) => seen.push(a.map((e) => e.id)));
 
     await h.runPollWith({
-      activities: [entry({ id: "r1", done: true, ended_at: "2026-07-19T10:01:00Z" })],
+      activities: [entry({ id: "d1", done: true, ended_at: "2026-07-19T10:01:00Z" })],
     });
-    expect(invalidated).toHaveBeenCalledTimes(1);
+
+    expect(seen.at(-1)).toEqual(["d1"]);
+  });
+
+  it("feeds registered activity observers from an activity event delta", async () => {
+    const seen: string[][] = [];
+    h.status.observeActivities((a) => seen.push(a.map((e) => e.id)));
+
+    h.status.applyActivityEvent({
+      op: "upsert",
+      entry: entry({ id: "e9", done: true, ended_at: "2026-07-19T10:01:00Z" }),
+    });
+
+    expect(seen.at(-1)).toEqual(["e9"]);
+  });
+
+  it("an unregistered activity observer is not called again", async () => {
+    const seen: string[][] = [];
+    const off = h.status.observeActivities((a) => seen.push(a.map((e) => e.id)));
+    await h.runPollWith({ activities: [] });
+    const count = seen.length;
+
+    off();
+    await h.runPollWith({ activities: [entry({ id: "x1" })] });
+
+    expect(seen.length).toBe(count);
   });
 
   it("keeps the optimistic stopping overlay while the scan is still running", async () => {

@@ -115,6 +115,7 @@ vi.mock("./wire/client.gen.js", async (importOriginal) => ({
   coverageMovieSummaryRaw: (id: unknown, q?: unknown, opts?: { signal?: AbortSignal }) =>
     wireCall(wire.movieSummaryRaw, [id, q, opts?.signal]) as Promise<RawResult>,
 }));
+vi.mock("./history.js", () => ({ noteHistoryMutation: vi.fn() }));
 
 import type { SeriesItem } from "./wire/types.gen.js";
 import * as store from "./store.js";
@@ -127,6 +128,7 @@ import {
   _resetCoverageForTest,
 } from "./coverage.js";
 import { _resetHealForTest } from "./coverage-heal.js";
+import { noteHistoryMutation } from "./history.js";
 
 const events = await import("./events.js");
 
@@ -519,5 +521,39 @@ describe("the dirty set and the committing transaction", () => {
     }
     await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
     expect(wire.seriesSummaryRaw.calls).toHaveLength(healCallsBefore);
+  });
+});
+
+describe("E4's history trigger sits OUTSIDE the heal gate", () => {
+  it("a poller-import event on a fresh /history tab notes the reload with zero coverage fetches", async () => {
+    // A fresh tab straight to /history: no collection loaded, no library
+    // route — the boot transaction's collection leg is EMPTY.
+    store.set("currentPage", "history");
+    store.set("detailCtx", null);
+    events.connect();
+    lastFakeES().open();
+    lastFakeES().epoch("boot-a", false, 5);
+    await settle();
+    expect(libraryLoaded()).toBe(false);
+    expect(wire.seriesRaw.calls).toHaveLength(0);
+
+    // The server's poller imported a subtitle: a coverage event arrives.
+    lastFakeES().frame(
+      "coverage",
+      {
+        media_type: "episode",
+        media_id: "tvdb-42-s01e01",
+        language: "en",
+        variant: "standard",
+        source: "auto",
+      },
+      6,
+    );
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS + 50);
+
+    // The heal gate is CLOSED (nothing on screen renders the root): zero
+    // summary fetches — but the history trigger observed the event anyway.
+    expect(wire.seriesSummaryRaw.calls).toHaveLength(0);
+    expect(noteHistoryMutation).toHaveBeenCalledTimes(1);
   });
 });

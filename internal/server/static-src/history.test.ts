@@ -28,9 +28,25 @@ vi.mock("./bus.js", () => ({
   emit,
   BusEvent: { LoadHistory: "load:history", NavRoute: "nav:route" },
 }));
+// The real cap is 10 000; the suites below exercise the cap BEHAVIOR without
+// rendering ten thousand rows. Everything else keeps its real value (the
+// trigger window in particular).
+// Type-only: erased at runtime, so the hoisted vi.mock factory may reference it.
+import type * as ConstantsModule from "./constants.js";
+vi.mock("./constants.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof ConstantsModule>()),
+  HISTORY_DEPTH_CAP: 250,
+}));
 
 import * as store from "./store.js";
-import { reloadHistory, reloadHistoryForTransaction, _resetHistoryForTest } from "./history.js";
+import {
+  reloadHistory,
+  reloadHistoryForTransaction,
+  noteHistoryMutation,
+  reArmHistoryLatch,
+  _resetHistoryForTest,
+} from "./history.js";
+import { SUMMARY_COALESCE_MS } from "./constants.js";
 import type { ParsedConfig } from "./wire/types.gen.js";
 
 // Mirrors the wire StateEntry fields buildHistoryRow reads (only those matter
@@ -950,29 +966,31 @@ describe("history: the settlement model (task 9)", () => {
     expect(cellText()[1]).toBe("Title 9"); // S's row, not T's
   });
 
-  it("the SUPERSEDED-CHAIN: T lands, S starts and 502s — the leg REJECTS", async () => {
+  it("the LATCHED CHAIN: the leg latched behind a run whose follow-up 502s — the leg REJECTS", async () => {
+    store.set("currentPage", "history");
     dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
     await reloadHistoryForTransaction(); // prior rows
 
-    const releaseT = deferPage();
-    const t = reloadHistoryForTransaction();
-    // Attach the rejection expectation before S settles the chain, so the
+    // A reload is in flight; the second leg arrives and LATCHES.
+    const releaseFirst = deferPage();
+    const first = reloadHistoryForTransaction();
+    const second = reloadHistoryForTransaction();
+    // Attach the rejection expectation before the chain settles, so the
     // rejection never sits unhandled across a macrotask.
-    const tOutcome = expect(t).rejects.toThrow("history load failed");
+    const secondOutcome = expect(second).rejects.toThrow("history load failed");
     await Promise.resolve();
 
-    // S starts (bumps gen) and fails — a second transaction dispatch, so no
-    // adapter error panel competes with the prior-rows assertion.
+    // The first run applies; the drained latch execution answers 502.
     dispatch.mockResolvedValueOnce(null);
-    const sOutcome = expect(reloadHistoryForTransaction()).rejects.toThrow("history load failed");
+    releaseFirst([makeEntry(1), makeEntry(2)]);
     await tick();
 
-    releaseT([makeEntry(7)]); // T's landing: discarded (g !== gen)
-
-    await tOutcome;
-    await sOutcome;
-    // Prior rows unchanged: T never applied, S never applied.
+    expect(await first).toBe("applied");
+    await secondOutcome;
+    // Prior rows intact; the transaction owns recovery, so the leg painted
+    // no error panel over them.
     expect(reqTbody().children.length).toBe(2);
+    expect(document.querySelector('#historyContent [data-status="err"]')).toBeNull();
   });
 
   it("the dispatcher's RE-ROUTE (abort) settles 'rerouted' — no latch, no rejection", async () => {
@@ -996,5 +1014,363 @@ describe("history: the settlement model (task 9)", () => {
 
     const err = document.querySelector('#historyContent [data-status="err"]');
     expect(err?.textContent).toBe("history load failed");
+  });
+});
+
+// --- Task 12: the event trigger, foreground priority, and the depth cap ---
+//
+// E4: coverage events and terminal activity events (noted by events.ts via
+// noteHistoryMutation, OUTSIDE the A6 gate) reload the OPEN history page
+// through one serializer. A gesture is never cancelled by an event reload —
+// the event latches ONE pending reload that runs at the NEW depth after the
+// append commits; a filter change supersedes everything; a route leave drops
+// the latch. Reloads are depth-preserving newest-window fetches, capped at
+// HISTORY_DEPTH_CAP (mocked to 250 here so the cap is reachable without ten
+// thousand rows).
+
+function entries(startId: number, count: number): Entry[] {
+  return Array.from({ length: count }, (_, i) => makeEntry(startId + i));
+}
+
+/** Flush the microtask + due-timer queue under fake timers. */
+const flushFake = async (): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(0);
+};
+
+/** Queue one page that stays in flight until the returned release runs. */
+function deferOnePage(): (items: unknown) => void {
+  let release!: (v: unknown) => void;
+  dispatch.mockImplementationOnce(
+    () =>
+      new Promise((res) => {
+        release = res;
+      }),
+  );
+  return (items: unknown) => {
+    release(items);
+  };
+}
+
+/** Load exactly `n` rows (a page-0 reload plus Show-more appends of full
+ *  pages), asserting the depth landed. */
+async function loadDepth(n: number): Promise<void> {
+  dispatch.mockResolvedValueOnce(entries(1, PAGE));
+  reloadHistory();
+  await flushFake();
+  for (let start = PAGE + 1; start <= n; start += PAGE) {
+    dispatch.mockResolvedValueOnce(entries(start, PAGE));
+    clickShowMore();
+    await flushFake();
+  }
+  expect(reqTbody().children.length).toBe(n);
+}
+
+function showMoreBtn(): HTMLButtonElement {
+  const btn = document.querySelector<HTMLButtonElement>(".more-btn");
+  if (!btn) {
+    throw new Error("show-more button not mounted");
+  }
+  return btn;
+}
+
+describe("history: the event trigger (task 12)", () => {
+  beforeEach(() => {
+    _resetHistoryForTest();
+    mountShell();
+    store.set("config", null);
+    store.set("currentPage", "history");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    _resetHistoryForTest();
+    vi.useRealTimers();
+  });
+
+  it("a burst of notes with history OPEN reloads once per window", async () => {
+    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    reloadHistory();
+    await flushFake();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+
+    dispatch.mockResolvedValueOnce([makeEntry(1), makeEntry(2)]);
+    noteHistoryMutation();
+    noteHistoryMutation();
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+    await flushFake();
+
+    expect(dispatch).toHaveBeenCalledTimes(2); // ONE reload for the burst
+    expect(reqTbody().children.length).toBe(2);
+  });
+
+  it("notes with the history page closed reload nothing", async () => {
+    store.set("currentPage", "library");
+
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 2);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("an event reload on an EMPTY page asks for one full page", async () => {
+    // A fresh tab at /history with nothing loaded (the poller-import case):
+    // the trigger's reload uses the page floor, not a zero limit.
+    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+    await flushFake();
+
+    expect(lastQuery()).toMatchObject({ limit: 50 });
+    expect(reqTbody().children.length).toBe(1);
+  });
+
+  it("the event reload preserves the loaded depth in one fetch", async () => {
+    await loadDepth(150);
+
+    dispatch.mockResolvedValueOnce(entries(1, 150));
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+    await flushFake();
+
+    expect(lastQuery()).toMatchObject({ limit: 150, offset: undefined });
+    expect(reqTbody().children.length).toBe(150);
+  });
+
+  it("a note mid-flight of an event reload latches ONE trailing reload", async () => {
+    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    reloadHistory();
+    await flushFake();
+
+    const release = deferOnePage();
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // reload dispatched, in flight
+    noteHistoryMutation(); // a fresh event arrives mid-flight
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // its window fires → latch
+    const inFlightCount = dispatch.mock.calls.length;
+
+    dispatch.mockResolvedValueOnce([makeEntry(1)]);
+    release([makeEntry(1)]);
+    await flushFake();
+
+    expect(dispatch.mock.calls.length).toBe(inFlightCount + 1); // the trailing reload
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 3);
+    expect(dispatch.mock.calls.length).toBe(inFlightCount + 1); // and only one
+  });
+
+  it("a route leave clears an armed trigger window", async () => {
+    noteHistoryMutation();
+
+    store.set("currentPage", "library");
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 2);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("history: foreground priority (task 12)", () => {
+  beforeEach(() => {
+    _resetHistoryForTest();
+    mountShell();
+    store.set("config", null);
+    store.set("currentPage", "history");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    _resetHistoryForTest();
+    vi.useRealTimers();
+  });
+
+  it("THE STORM ORACLE: N events during an in-flight Show more latch ONE reload at the new depth", async () => {
+    await loadDepth(150);
+    const baseline = dispatch.mock.calls.length; // 3: the page-0 reload + two appends
+    const firstNode = reqTbody().children.item(0);
+
+    const releaseAppend = deferOnePage();
+    clickShowMore(); // the gesture: offset 150, in flight
+    await flushFake();
+
+    for (let i = 0; i < 5; i++) {
+      noteHistoryMutation();
+    }
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // window → latch (gesture running)
+    for (let i = 0; i < 5; i++) {
+      noteHistoryMutation();
+    }
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // second window → same latch
+    // The gesture was never cancelled and no reload was dispatched past it.
+    expect(dispatch.mock.calls.length).toBe(baseline + 1);
+
+    dispatch.mockResolvedValueOnce(entries(1, 200)); // the trailing reload's window
+    releaseAppend(entries(151, 50)); // the append commits: 150 → 200
+    await flushFake();
+
+    // Exactly ONE pending reload ran, at the NEW depth, all 200 rows keyed.
+    expect(dispatch.mock.calls.length).toBe(baseline + 2);
+    expect(lastQuery()).toMatchObject({ limit: 200, offset: undefined });
+    expect(reqTbody().children.length).toBe(200);
+    expect(reqTbody().children.item(0)).toBe(firstNode); // keyed setAll reused the node
+  });
+
+  it("the depth pin under a storm: count preserved, survivors keep identity, displaced drop", async () => {
+    await loadDepth(150);
+    const survivor = reqTbody().children.item(5); // entry id 6's node
+
+    // The newest 150 rows are now 6..155: five new rows arrived server-side,
+    // five oldest displaced off the bottom.
+    dispatch.mockResolvedValueOnce(entries(6, 150));
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+    await flushFake();
+
+    expect(lastQuery()).toMatchObject({ limit: 150 });
+    const rows = reqTbody().children;
+    expect(rows.length).toBe(150); // COUNT preserved
+    expect(rows.item(0)).toBe(survivor); // surviving row keeps its node
+    expect(rows.item(0)?.textContent).toContain("Title 6");
+    expect(rows.item(149)?.textContent).toContain("Title 155"); // newest tail
+  });
+
+  it("a filter change supersedes both the in-flight gesture and the pending latch", async () => {
+    await loadDepth(150);
+    const releaseAppend = deferOnePage();
+    clickShowMore();
+    await flushFake();
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // latch armed behind the gesture
+
+    dispatch.mockResolvedValueOnce([makeEntry(999)]);
+    reloadHistory(); // the filter change
+    await flushFake();
+    expect(lastQuery()).toMatchObject({ limit: 50, offset: undefined }); // page-0 semantics
+    expect(reqTbody().children.length).toBe(1);
+
+    const afterFilter = dispatch.mock.calls.length;
+    releaseAppend(entries(151, 50)); // the superseded gesture lands late
+    await flushFake();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 3);
+
+    expect(reqTbody().children.length).toBe(1); // discarded — the filter page stands
+    expect(reqTbody().children.item(0)?.textContent).toContain("Title 999");
+    expect(dispatch.mock.calls.length).toBe(afterFilter); // and no trailing reload either
+  });
+
+  it("the transaction leg latches behind an in-flight gesture: COMMIT WAITS for the trailing reload", async () => {
+    await loadDepth(50);
+    const releaseAppend = deferOnePage();
+    clickShowMore();
+    await flushFake();
+
+    const outcomes: string[] = [];
+    const leg = reloadHistoryForTransaction().then((r) => {
+      outcomes.push(r);
+      return r;
+    });
+    await flushFake();
+    expect(outcomes).toEqual([]); // the leg waits behind the gesture
+
+    dispatch.mockResolvedValueOnce(entries(1, 100)); // the trailing reload at the NEW depth
+    releaseAppend(entries(51, 50));
+    await flushFake();
+
+    expect(lastQuery()).toMatchObject({ limit: 100 });
+    expect(await leg).toBe("superseded"); // the latch's chain ended in the trailing apply
+    expect(reqTbody().children.length).toBe(100);
+  });
+
+  it("a route leave drops the pending latch: the leg resolves 'rerouted', the gesture still lands", async () => {
+    await loadDepth(50);
+    const releaseAppend = deferOnePage();
+    clickShowMore();
+    await flushFake();
+    const leg = reloadHistoryForTransaction(); // latches behind the gesture
+
+    store.set("currentPage", "library"); // the route leave drops the latch
+
+    releaseAppend(entries(51, 50));
+    await flushFake();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 3);
+
+    expect(await leg).toBe("rerouted");
+    expect(reqTbody().children.length).toBe(100); // foreground append landed
+    expect(dispatch.mock.calls.length).toBe(2); // page-0 + gesture; NO trailing reload
+  });
+
+  it("the re-arm seam latches one trailing reload behind an in-flight reload", async () => {
+    await loadDepth(50);
+    const release = deferOnePage();
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS); // event reload dispatched, in flight
+
+    reArmHistoryLatch(); // a full-pair overwrite reset heals mid-flight
+
+    dispatch.mockResolvedValueOnce(entries(1, 50));
+    release(entries(1, 50));
+    await flushFake();
+
+    expect(dispatch.mock.calls.length).toBe(3); // page-0 + event reload + re-armed trailing
+  });
+
+  it("the re-arm seam is a no-op when idle or off /history", async () => {
+    await loadDepth(50);
+
+    reArmHistoryLatch(); // idle: nothing in flight, nothing in doubt
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 3);
+    expect(dispatch.mock.calls.length).toBe(1);
+
+    store.set("currentPage", "library");
+    reArmHistoryLatch();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS * 3);
+    expect(dispatch.mock.calls.length).toBe(1);
+  });
+});
+
+describe("history: the depth cap (task 12)", () => {
+  beforeEach(() => {
+    _resetHistoryForTest();
+    mountShell();
+    store.set("config", null);
+    store.set("currentPage", "history");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    _resetHistoryForTest();
+    vi.useRealTimers();
+  });
+
+  it("the button hides at the cap while hasMore stays true internally", async () => {
+    await loadDepth(250); // the mocked cap; the last page was full, so hasMore is true
+
+    expect(showMoreBtn().hidden).toBe(true);
+
+    // hasMore is still TRUE internally: a full event reload at the cap depth
+    // keeps it true, and the button stays hidden rather than flickering back.
+    dispatch.mockResolvedValueOnce(entries(1, 250));
+    noteHistoryMutation();
+    await vi.advanceTimersByTimeAsync(SUMMARY_COALESCE_MS);
+    await flushFake();
+
+    expect(lastQuery()).toMatchObject({ limit: 250 }); // clamped to the cap
+    expect(reqTbody().children.length).toBe(250);
+    expect(showMoreBtn().hidden).toBe(true);
+  });
+
+  it("a gesture at the cap fetches nothing (belt behind the hidden button)", async () => {
+    await loadDepth(250);
+    const count = dispatch.mock.calls.length;
+
+    clickShowMore();
+    await flushFake();
+
+    expect(dispatch.mock.calls.length).toBe(count);
+  });
+
+  it("below the cap the full-page rule still shows the button", async () => {
+    await loadDepth(200);
+
+    expect(showMoreBtn().hidden).toBe(false);
   });
 });
