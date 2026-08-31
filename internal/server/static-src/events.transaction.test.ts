@@ -44,6 +44,7 @@ vi.mock("./coverage-heal.js", () => ({
   resetCoverageHeal: vi.fn(),
   subsumeDirtyRoots: vi.fn(),
 }));
+vi.mock("./history.js", () => ({ noteHistoryMutation: vi.fn() }));
 
 const status = vi.hoisted(() => ({ polls: 0 }));
 vi.mock("./status.js", () => ({
@@ -136,6 +137,8 @@ vi.mock("./wire/client.gen.js", () => ({
 
 import { emit, BusEvent } from "./bus.js";
 import { subsumeDirtyRoots } from "./coverage-heal.js";
+import { noteHistoryMutation } from "./history.js";
+import { applyActivityEvent } from "./status.js";
 
 const events = await import("./events.js");
 
@@ -690,14 +693,21 @@ describe("boot-change application", () => {
     expect(toasts.infos).toStrictEqual(["boot A payload", "boot B payload"]);
   });
 
-  it("a held old-boot scan:done is SKIPPED (state half) while a new-boot scan:start applies", async () => {
+  it("a held old-boot ACTIVITY delta is SKIPPED (state-bearing) while a new-boot scan:start applies", async () => {
     wire.defer = true;
     events.connect();
     lastFakeES().open();
     lastFakeES().epoch("boot-a", false, 5);
     await settle();
-    const pollsMidTransaction = status.polls;
-    lastFakeES().frame("scan:done", { action: "scan", detail: "", source: "scheduled" }, 9);
+    const doneEntry = {
+      started_at: "2026-08-30T10:00:00Z",
+      id: "a1",
+      action: "Manual Download",
+      detail: "d",
+      source: "manual",
+      done: true,
+    };
+    lastFakeES().frame("activity", { op: "upsert", entry: doneEntry }, 9);
     expect(events._stateForTest().holdQueueLength).toBe(1);
 
     lastFakeES().fail(); // restart mid-transaction
@@ -711,9 +721,11 @@ describe("boot-change application", () => {
     await settle();
     lastFakeES().frame("scan:start", { action: "scan", detail: "Fresh", source: "scheduled" }, 2);
 
-    // The old scan:done's state half never ran: the only pollStatus calls
-    // are the two transactions' own status legs.
-    expect(status.polls).toBe(pollsMidTransaction + 1);
+    // The old boot's status delta never applied (the new transaction's own
+    // status fetch is strictly newer authority), and a skipped TERMINAL
+    // delta notes no history trigger either.
+    expect(applyActivityEvent).not.toHaveBeenCalled();
+    expect(noteHistoryMutation).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalledWith(BusEvent.DataInvalidate);
     // The new boot's frames apply normally.
     expect(toasts.infos).toStrictEqual(["Scan started: Fresh"]);

@@ -19,6 +19,7 @@ vi.mock("./coverage-heal.js", () => ({
   resetCoverageHeal: vi.fn(),
   subsumeDirtyRoots: vi.fn(),
 }));
+vi.mock("./history.js", () => ({ noteHistoryMutation: vi.fn() }));
 vi.mock("./status.js", () => ({
   pollStatus: vi.fn(async () => undefined),
   abortPoll: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("./wire/client.gen.js", () => ({
 
 import * as notify from "./notify.js";
 import { healFromCoverageEvent } from "./coverage-heal.js";
+import { noteHistoryMutation } from "./history.js";
 import { syncDoneFromEvent } from "./sync-jobs.js";
 import {
   abortPoll,
@@ -368,7 +370,10 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
     expect(notify.info).toHaveBeenCalledExactlyOnceWith("Scan started: Breaking Bad");
   });
 
-  it("scan:done re-applies state: status poll + page refresh", async () => {
+  it("scan:done applies nothing: no status poll, no page refresh, zero coverage fetches", async () => {
+    // Task 12: the terminal activity upsert owns the status flip and the
+    // history trigger; per-root coverage events own the row heals. Scan
+    // completion must not trigger a blanket refresh or any coverage fetch.
     events.connect();
     await openWithEpoch();
     vi.mocked(pollStatus).mockClear();
@@ -376,8 +381,68 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
 
     lastFakeES().frame("scan:done", { action: "scan", detail: "", source: "scheduled" }, 5);
 
-    expect(pollStatus).toHaveBeenCalled();
-    expect(emit).toHaveBeenCalledWith(BusEvent.DataInvalidate);
+    expect(pollStatus).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+    expect(healFromCoverageEvent).not.toHaveBeenCalled();
+    expect(noteHistoryMutation).not.toHaveBeenCalled();
+  });
+
+  it("a coverage frame notes the history trigger OUTSIDE the heal gate", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    lastFakeES().frame(
+      "coverage",
+      {
+        media_type: "episode",
+        media_id: "tvdb-42-s01e01",
+        language: "en",
+        variant: "standard",
+        source: "opensubtitles",
+      },
+      5,
+    );
+
+    // Both observers run: the gated heal (its own gate lives inside the
+    // mocked module) and the history trigger beside it.
+    expect(noteHistoryMutation).toHaveBeenCalledTimes(1);
+    expect(healFromCoverageEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("a TERMINAL activity upsert notes the history trigger; a running one does not", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    const entry = {
+      started_at: "2026-08-30T10:00:00Z",
+      id: "a1",
+      action: "Manual Download",
+      detail: "d",
+      source: "manual",
+      done: false,
+    };
+    lastFakeES().frame("activity", { op: "upsert", entry }, 8);
+    expect(noteHistoryMutation).not.toHaveBeenCalled();
+
+    lastFakeES().frame("activity", { op: "upsert", entry: { ...entry, done: true } }, 9);
+    expect(noteHistoryMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it("an activity REMOVE never notes the history trigger, done or not", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    const entry = {
+      started_at: "2026-08-30T10:00:00Z",
+      id: "a1",
+      action: "Manual Download",
+      detail: "d",
+      source: "manual",
+      done: true,
+    };
+    lastFakeES().frame("activity", { op: "remove", entry }, 8);
+
+    expect(noteHistoryMutation).not.toHaveBeenCalled();
   });
 
   it("sync:done routes its decoded payload to the settlement registry", async () => {

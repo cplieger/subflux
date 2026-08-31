@@ -2,18 +2,19 @@
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
-import { emit, BusEvent } from "./bus.js";
 import { prettyLabel, fmtEpisode, langName } from "./utils.js";
 import { el, option, icon, dialog, closeDialog, emptyDiv, errDiv } from "./dom.js";
 import { openDialog } from "@cplieger/ui-primitives/dialog";
 import { patch } from "@cplieger/reactive";
-import { listActivity, manualSearchRaw, PATH_DOWNLOAD_SUBTITLE } from "./wire/client.gen.js";
+import { join } from "@cplieger/keyenc";
+import { manualSearchRaw, PATH_DOWNLOAD_SUBTITLE } from "./wire/client.gen.js";
 import type { QueryValue } from "./wire/client.gen.js";
 import { decodeDownloadAccepted } from "./wire/decoders.gen.js";
 import type { DownloadAccepted, SearchResult } from "./wire/types.gen.js";
-import { apiAction, retryNetwork, registerCleanup, pollUntil } from "@cplieger/actions";
+import { apiAction, retryNetwork, registerCleanup } from "@cplieger/actions";
+import { observeActivities } from "./status.js";
 import { hasCode, ErrorCode } from "./error_codes.js";
-import { SEARCH_TIMEOUT_MS, DOWNLOAD_POLL_MS, DOWNLOAD_DEADLINE_MS } from "./constants.js";
+import { SEARCH_TIMEOUT_MS } from "./constants.js";
 import type { ActivityEntry, MediaType } from "./api-types.js";
 
 /** Data-driven error-code-to-message mapping for search popup errors. */
@@ -77,17 +78,9 @@ interface DownloadArgs {
   forced: boolean;
 }
 
-/** Polled state for the post-download activity poll. `act` is the matching
- *  activity entry (undefined once it is evicted from the activity list);
- *  `seen` latches true once the entry has appeared, so an eviction after the
- *  entry was seen counts as completion (matches the old seenActivity flag). */
-interface DownloadPollState {
-  act: ActivityEntry | undefined;
-  seen: boolean;
-}
-
-/** Download a subtitle. Server returns 202 + activity_id; the caller
- *  polls /api/activity for completion. retryNetwork allows the framework
+/** Download a subtitle. Server returns 202 + activity_id; completion arrives
+ *  through the activity store (SSE activity events, or the degraded 5s poll
+ *  while the stream is down). retryNetwork allows the framework
  *  to recover from transient blips, but app-level "download_failed"
  *  errors (provider 4xx, IO errors) are NOT retried — the user re-clicks
  *  via the manually-re-enabled button. */
@@ -100,19 +93,94 @@ const downloadAction = apiAction<DownloadArgs, DownloadAccepted>({
 });
 
 let searchAbort: AbortController | null = null;
-const activePolls = new Set<AbortController>();
 
-// Drain in-flight search + download polls on page unload. Each poll's
-// AbortController is also removed from the Set when it terminates
-// naturally; this hook is a safety net for unload + tests.
-registerCleanup(() => {
+// --- Download tracking (task 12): the activity store flips the buttons ---
+
+/** A download in flight, keyed by its subtitle identity so a reopened popup
+ *  re-derives the button state (the dialog content is rebuilt per open).
+ *  `seen` latches once the activity entry has been observed; an entry that
+ *  later vanishes counts as completed — the server evicts only terminal
+ *  rows, so eviction after `seen` means the done frame was missed. */
+interface TrackedDownload {
+  activityId: string;
+  seen: boolean;
+}
+
+// Subtitle key → in-flight download. Entries leave on a terminal observation.
+const trackedDownloads = new Map<string, TrackedDownload>();
+
+function downloadKey(sub: SearchResult, lang: string): string {
+  return join("dl", sub.provider, sub.subtitle_id, lang);
+}
+
+/** The running-download render, shared by the fresh 202 and the reopen
+ *  re-derive: disabled, spinner, and the activity id the observer keys on. */
+function markDownloading(btn: HTMLButtonElement, activityId: string): void {
+  btn.disabled = true;
+  btn.dataset["activityId"] = activityId;
+  patch(btn, el("span", { className: "spinner" }));
+  btn.setAttribute("data-tip", "Downloading\u2026");
+}
+
+/** Terminal render for a download button; a no-op when the popup is closed
+ *  or re-rendered without the row — the tracking entry is already gone, so
+ *  a later reopen renders a fresh button. */
+function settleDownloadButton(activityId: string, failed: boolean): void {
+  const btn = searchDlg.querySelector<HTMLButtonElement>(
+    `button[data-activity-id="${CSS.escape(activityId)}"]`,
+  );
+  if (!btn) {
+    return;
+  }
+  if (failed) {
+    btn.dataset["status"] = "err";
+    patch(btn, icon("close"));
+  } else {
+    btn.dataset["status"] = "ok";
+    patch(btn, icon("check"));
+  }
+  btn.removeAttribute("data-tip");
+}
+
+/** Flip tracked download buttons from the activity store: an entry observed
+ *  done settles its button; an entry evicted after being seen counts as
+ *  completed; an entry not yet observed keeps waiting (the 202 precedes the
+ *  event by construction — the server starts the activity before answering). */
+function reconcileDownloadButtons(activities: readonly ActivityEntry[]): void {
+  if (trackedDownloads.size === 0) {
+    return;
+  }
+  const byId = new Map(activities.map((a) => [a.id, a]));
+  for (const [key, t] of trackedDownloads) {
+    const act = byId.get(t.activityId);
+    if (act && !act.done) {
+      t.seen = true;
+      continue;
+    }
+    if (!act && !t.seen) {
+      continue;
+    }
+    trackedDownloads.delete(key);
+    settleDownloadButton(t.activityId, act?.failed ?? false);
+  }
+}
+
+observeActivities(reconcileDownloadButtons);
+
+/** Drain the in-flight search and the download tracking. */
+function drainSearchState(): void {
   searchAbort?.abort();
   searchAbort = null;
-  for (const p of activePolls) {
-    p.abort();
-  }
-  activePolls.clear();
-});
+  trackedDownloads.clear();
+}
+
+/** Test-only. */
+export function _resetSearchForTest(): void {
+  drainSearchState();
+}
+
+// Page-unload safety net (also covers soft navigations in tests).
+registerCleanup(drainSearchState);
 
 const searchDlg: HTMLDialogElement = dialog("searchResultPopup");
 
@@ -204,10 +272,6 @@ export function openSearchPopup(
 }
 
 export function closeSearchPopup(): void {
-  for (const p of activePolls) {
-    p.abort();
-  }
-  activePolls.clear();
   closeDialog(searchDlg);
   if (searchPushedHistory && location.pathname.includes("/search/")) {
     searchPushedHistory = false;
@@ -388,6 +452,13 @@ function renderPopupResults(
       },
       icon("download"),
     ) as HTMLButtonElement;
+    // Reopen re-derive: a download dispatched from an earlier open of this
+    // popup is still in flight — render its running state; the observer
+    // flips it when the activity terminates.
+    const tracked = trackedDownloads.get(downloadKey(s, lang));
+    if (tracked) {
+      markDownloading(dlBtn, tracked.activityId);
+    }
 
     // Build score tooltip from match breakdown.
     const matches: Record<string, number> = s.matches ?? {};
@@ -470,62 +541,10 @@ async function downloadFromPopup(btn: HTMLElement, opts: DownloadOpts): Promise<
     return;
   }
   const data = o.value;
-  // 202 Accepted: download running in background.
-  const actID: string = data.activity_id;
-  patch(btn, el("span", { className: "spinner" }));
-  btn.setAttribute("data-tip", "Downloading\u2026");
-
-  // Poll activity until done, with AbortSignal timeout for clean cancellation.
-  const abort = new AbortController();
-  const timeout = AbortSignal.timeout(DOWNLOAD_DEADLINE_MS);
-  const signal = AbortSignal.any([abort.signal, timeout]);
-  let seen = false;
-  activePolls.add(abort);
-
-  // pollUntil drives the wait-then-poll loop. The step latches `seen` when the
-  // activity entry appears; `until` is terminal when the entry is done OR was
-  // seen and then evicted. timeoutMs mirrors the old AbortSignal.timeout
-  // deadline, and the combined abort+timeout signal still cancels the in-flight
-  // /api/activity fetch on deadline or teardown (cleanup aborts via activePolls).
-  const outcome = await pollUntil<DownloadPollState>(
-    async (sig: AbortSignal): Promise<DownloadPollState | null> => {
-      const acts = await listActivity({ signal: sig });
-      if (!acts) {
-        return null;
-      }
-      const act: ActivityEntry | undefined = acts.find((a: ActivityEntry) => a.id === actID);
-      if (act) {
-        seen = true;
-      }
-      return { act, seen };
-    },
-    {
-      intervalMs: DOWNLOAD_POLL_MS,
-      timeoutMs: DOWNLOAD_DEADLINE_MS,
-      until: (s) => (s.act?.done ?? false) || (s.act === undefined && s.seen),
-      signal,
-    },
-  );
-
-  if (outcome.status === "done") {
-    // Either act.done is true, or the entry was evicted after being seen.
-    activePolls.delete(abort);
-    abort.abort();
-    if (outcome.result.act?.failed) {
-      btn.dataset["status"] = "err";
-      patch(btn, icon("close"));
-    } else {
-      btn.dataset["status"] = "ok";
-      patch(btn, icon("check"));
-      emit(BusEvent.DataInvalidate);
-    }
-    btn.removeAttribute("data-tip");
-  } else {
-    // timeout (deadline reached) or aborted (cleanup / page unload): matches
-    // the old signal-aborted branch — flag the button and stop tracking.
-    activePolls.delete(abort);
-    btn.dataset["status"] = "err";
-    patch(btn, icon("close"));
-    btn.setAttribute("data-tip", "Download timed out");
-  }
+  // 202 Accepted: the download runs in a background goroutine. The button
+  // carries the activity id; the activity-store observer flips it on the
+  // terminal event (or the degraded poll while SSE is down). A close/reopen
+  // re-derives the running state from the tracking map.
+  trackedDownloads.set(downloadKey(sub, lang), { activityId: data.activity_id, seen: false });
+  markDownloading(btn as HTMLButtonElement, data.activity_id);
 }
