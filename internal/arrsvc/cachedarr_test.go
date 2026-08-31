@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -692,5 +694,55 @@ func TestCachedRadarr_MovieByTmdbID(t *testing.T) {
 	}
 	if mv, _ := shipped.counts(); mv != 1 {
 		t.Errorf("shipped movie calls = %d, want 1 (index lookups share the list entry)", mv)
+	}
+}
+
+// The wrapper builds TWO transports — the shipped 3-attempt client and its own
+// single-attempt wave client — so its Close has to release both. It OVERRIDES
+// the Close promoted from the embedded *Sonarr, and that is the whole hazard:
+// deleting the override leaves the promoted method, which still satisfies the
+// `interface{ Close() }` assertion activation reaches it through
+// (server/reload.go closeArrClient), so the wave transport would leak with no
+// compile error anywhere. Nothing else can catch that, which is why these two
+// tests exist.
+func TestNewCachedSonarr_Close_releases_the_wave_transport(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	c, err := NewCachedSonarr(srv.URL, APIKey("k"), testGate(t.Context()))
+	if err != nil {
+		t.Fatalf("NewCachedSonarr: %v", err)
+	}
+	if c.waveClose == nil {
+		t.Fatal("NewCachedSonarr left waveClose nil; the wave transport has no owner")
+	}
+	waveClosed := 0
+	c.waveClose = func() { waveClosed++ }
+
+	c.Close()
+
+	if waveClosed != 1 {
+		t.Errorf("wave closes after one Close() = %d, want 1", waveClosed)
+	}
+}
+
+func TestNewCachedRadarr_Close_releases_the_wave_transport(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	c, err := NewCachedRadarr(srv.URL, APIKey("k"), testGate(t.Context()))
+	if err != nil {
+		t.Fatalf("NewCachedRadarr: %v", err)
+	}
+	if c.waveClose == nil {
+		t.Fatal("NewCachedRadarr left waveClose nil; the wave transport has no owner")
+	}
+	waveClosed := 0
+	c.waveClose = func() { waveClosed++ }
+
+	c.Close()
+
+	if waveClosed != 1 {
+		t.Errorf("wave closes after one Close() = %d, want 1", waveClosed)
 	}
 }
