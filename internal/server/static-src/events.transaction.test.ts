@@ -70,7 +70,7 @@ vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 // the process that owned their activity ids, so a boot change has to tell it.
 const dl = vi.hoisted(() => ({ arms: 0 }));
 vi.mock("./search.js", () => ({
-  armDownloadRestartSweep: () => {
+  noteServerRestart: () => {
     dl.arms += 1;
     seq.log.push("armDownloadSweep");
   },
