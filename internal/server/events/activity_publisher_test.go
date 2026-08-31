@@ -1,6 +1,7 @@
 package events
 
 import (
+	"strconv"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -216,6 +217,100 @@ func TestActivityPublisher_remove_publishes_after_terminal_and_cancels_window(t 
 		if deltas[1].Entry.ID != "1" || deltas[2].Entry.ID != "2" {
 			t.Errorf("remove entries = %q, %q, want 1, 2 (removes carry the entry snapshot)",
 				deltas[1].Entry.ID, deltas[2].Entry.ID)
+		}
+	})
+}
+
+// retainedState reports how many activities the publisher still holds
+// coalescer state for, and whether id is one of them. Read under the
+// publisher's own mutex, so it is safe beside the window timers.
+func retainedState(p *ActivityPublisher, id string) (total int, held bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, held = p.pending[id]
+	return len(p.pending), held
+}
+
+// tombstoneCount is the size of the recently-removed id set, read under the
+// publisher's own mutex.
+func tombstoneCount(p *ActivityPublisher) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.removed)
+}
+
+// ops projects the recorded activity events onto their operations, which is
+// what the ordering assertions are about.
+func ops(t *testing.T, events []Event) []ActivityOp {
+	t.Helper()
+	deltas := activityDeltas(t, events)
+	out := make([]ActivityOp, 0, len(deltas))
+	for _, d := range deltas {
+		out = append(out, d.Op)
+	}
+	return out
+}
+
+// The two mutators of one entry interleave: the Log fires its hooks AFTER
+// releasing its own lock, so a Dismiss's remove and the entry's own terminal
+// transition can reach the publisher in either order. With the remove first,
+// the late terminal upsert must be dropped — publishing it resurrects the
+// dismissed row on every client — and the id must leave no coalescer state
+// behind, because no later hook for a removed id can ever clear it.
+func TestActivityPublisher_upsert_after_remove_is_dropped_and_leaves_no_state(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var rec recorder
+		p := NewActivityPublisher(rec.publish)
+
+		p.Upsert(&activity.Entry{ID: "1", Current: 4, Total: 10}) // window armed
+		p.Remove(&activity.Entry{ID: "1", Done: true})            // the dismiss won the race
+		p.Upsert(&activity.Entry{ID: "1", Done: true})            // End's terminal hook, late
+		p.Upsert(&activity.Entry{ID: "1", Current: 5, Total: 10}) // a progress straggler too
+
+		time.Sleep(2 * ActivityEventMinInterval) // past the armed window
+		synctest.Wait()
+
+		got := ops(t, rec.all())
+		if len(got) != 1 || got[0] != ActivityRemove {
+			// Establishes what the state assertions below are about.
+			t.Fatalf("ops = %v, want [%s] (nothing is published for an id after its remove)",
+				got, ActivityRemove)
+		}
+		total, held := retainedState(p, "1")
+		if held || total != 0 {
+			t.Errorf("after the remove, state held for id 1 = %v and %d activities retained, want false and 0",
+				held, total)
+		}
+	})
+}
+
+// The tombstone set that enforces remove-is-final is bounded: removes past
+// activityTombstones evict oldest-first instead of growing, and the recent
+// ids — the only ones an after-unlock straggler can still reference — stay
+// final.
+func TestActivityPublisher_tombstones_are_bounded(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var rec recorder
+		p := NewActivityPublisher(rec.publish)
+
+		const removes = 3 * activityTombstones
+		for i := 1; i <= removes; i++ {
+			p.Remove(&activity.Entry{ID: strconv.Itoa(i), Done: true})
+		}
+		if got := tombstoneCount(p); got != activityTombstones {
+			t.Errorf("tombstones after %d removes = %d, want %d (drop-oldest bound)",
+				removes, got, activityTombstones)
+		}
+
+		p.Upsert(&activity.Entry{ID: strconv.Itoa(removes), Done: true}) // straggler for the newest
+		time.Sleep(2 * ActivityEventMinInterval)
+		synctest.Wait()
+
+		if got := len(ops(t, rec.all())); got != removes {
+			t.Errorf("events = %d, want %d (the %d removes and nothing after the newest one)",
+				got, removes, removes)
 		}
 	})
 }
