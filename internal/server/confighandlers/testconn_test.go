@@ -358,3 +358,46 @@ func doArrTest(t *testing.T, h *Handler, payload string) *httptest.ResponseRecor
 	h.HandleTestConnection(rec, req)
 	return rec
 }
+
+// The on-demand probe builds a client per press of the Test button, so it must
+// close it whatever the ping answered. Left open, a settings dialog the
+// operator retries a few times strands one client's transports per press.
+func TestHandleTestConnection_closes_the_client_it_builds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		pingErr error
+	}{
+		{name: "reachable"},
+		{name: "unreachable", pingErr: errors.New("connection refused")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var built, pings, closes int
+			newPinger := func(string, string) (ArrPinger, error) {
+				built++
+				return closingPinger{pings: &pings, closes: &closes, err: tt.pingErr}, nil
+			}
+			h := New(&Deps{
+				SchemaFunc: func(_ []subflux.ProviderSchema) []subflux.SchemaSection {
+					return testArrSchema()
+				},
+				NewSonarr:  newPinger,
+				NewRadarr:  newPinger,
+				ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
+			})
+
+			doArrTest(t, h, `{"kind":"sonarr","url":"http://sonarr:8989","api_key":"k1"}`)
+
+			if built != 1 || pings != 1 {
+				// Establishes what the close count below is measured against.
+				t.Fatalf("HandleTestConnection() built %d clients and pinged %d times, want 1 of each",
+					built, pings)
+			}
+			if closes != 1 {
+				t.Errorf("HandleTestConnection() closed the client %d times, want 1", closes)
+			}
+		})
+	}
+}

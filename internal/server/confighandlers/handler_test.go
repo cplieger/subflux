@@ -385,7 +385,10 @@ func captureSlog(t *testing.T) *bytes.Buffer {
 
 // --- arr connectivity gate ---
 
-// recordingPinger records every Ping and answers with a fixed error.
+// recordingPinger records every Ping and answers with a fixed error. It
+// implements ArrPinger and nothing else, which is the shape the production
+// close path must tolerate: Close is a capability found by assertion, not a
+// method of the interface.
 type recordingPinger struct {
 	pings *int
 	err   error
@@ -394,6 +397,74 @@ type recordingPinger struct {
 func (p recordingPinger) Ping(context.Context) error {
 	*p.pings++
 	return p.err
+}
+
+// closingPinger is recordingPinger plus the Close capability the real arr
+// clients carry, counting both calls.
+type closingPinger struct {
+	pings  *int
+	closes *int
+	err    error
+}
+
+func (p closingPinger) Ping(context.Context) error {
+	*p.pings++
+	return p.err
+}
+
+func (p closingPinger) Close() { *p.closes++ }
+
+// Every arr client the save-time connectivity check builds is built for that
+// one ping and dropped, so the save must close it — on the ping-failure path
+// too. Left open, each save strands the client's idle connections, and the
+// arr-read wrapper holds two transports per client.
+func TestHandleSaveConfig_connectivity_check_closes_every_client_it_builds(t *testing.T) {
+	t.Parallel()
+	const body = "sonarr:\n  url: \"http://new:8989\"\n  api_key: \"k-new\"\n" +
+		"radarr:\n  url: \"http://new:7878\"\n  api_key: \"r-new\"\n" +
+		"languages:\n  default:\n    - code: en\n"
+	tests := []struct {
+		name      string
+		pingErr   error
+		wantBuilt int // radarr is never reached once sonarr's ping fails
+	}{
+		{name: "both_arrs_reachable", wantBuilt: 2},
+		{name: "first_arr_unreachable", pingErr: errors.New("connection refused"), wantBuilt: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var built, pings, closes int
+			newPinger := func(string, string) (ArrPinger, error) {
+				built++
+				return closingPinger{pings: &pings, closes: &closes, err: tt.pingErr}, nil
+			}
+			h := New(&Deps{
+				LoadConfig: func(data []byte) (*config.Config, error) {
+					return config.LoadFromBytes(t.Context(), data)
+				},
+				NewSonarr:  newPinger,
+				NewRadarr:  newPinger,
+				HotReload:  func(context.Context, *config.Config) error { return nil },
+				State:      func() StateView { return StateView{} }, // unconfigured: both arrs are a change
+				ConfigPath: func() string { return filepath.Join(t.TempDir(), "config.yaml") },
+			})
+
+			req := httptest.NewRequestWithContext(t.Context(),
+				http.MethodPut, "/api/config", strings.NewReader(body))
+			h.HandleSaveConfig(httptest.NewRecorder(), req)
+
+			if built != tt.wantBuilt || pings != tt.wantBuilt {
+				// Establishes what the close count below is measured against.
+				t.Fatalf("HandleSaveConfig() built %d clients and pinged %d times, want %d of each",
+					built, pings, tt.wantBuilt)
+			}
+			if closes != built {
+				t.Errorf("HandleSaveConfig() closed %d of the %d clients it built, want all of them",
+					closes, built)
+			}
+		})
+	}
 }
 
 // TestHandleSaveConfig_arr_connectivity_gate pins the whole connectivity

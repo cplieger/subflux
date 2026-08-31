@@ -121,6 +121,7 @@ func (h *Handler) HandleTestConnection(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, ConnTestResponse{Error: logsafe.Field(err.Error())})
 		return
 	}
+	defer closeArrPinger(pinger)
 	if err := pinger.Ping(r.Context()); err != nil {
 		httpapi.WriteJSON(w, ConnTestResponse{Error: describeArrFailure(err)})
 		return

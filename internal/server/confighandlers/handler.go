@@ -309,6 +309,7 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 	if err != nil {
 		return err
 	}
+	defer closeArrPinger(pinger)
 	if err := pinger.Ping(ctx); err != nil {
 		slog.Warn(name+" connectivity check failed", "error", err)
 		return err
@@ -317,12 +318,31 @@ func (h *Handler) pingArrIfChanged(ctx context.Context, name string,
 }
 
 // newArrPinger builds the arr client matching name ("sonarr"/"radarr") for a
-// connectivity check. Both role clients expose Ping.
+// connectivity check. Both role clients expose Ping. The client is built for
+// ONE ping and is the caller's to close (closeArrPinger).
 func (h *Handler) newArrPinger(name, baseURL, apiKey string) (ArrPinger, error) {
 	if name == arrSonarr {
 		return h.newSonarr(baseURL, apiKey)
 	}
 	return h.newRadarr(baseURL, apiKey)
+}
+
+// closeArrPinger releases the transports a per-ping arr client holds, when
+// the concrete type exposes Close. Every client this package builds is built
+// for one ping and dropped, so without this each save-time check and each
+// press of a Test button strands the client's idle connections — one per
+// transport the client keeps, which for the arr-read wrapper is both the
+// shipped and the wave transport.
+//
+// A capability assertion rather than a method on ArrPinger, matching how
+// activation closes a replaced live client (server.closeArrClient): ArrPinger
+// is embedded in the composition root's SonarrClient/RadarrClient unions,
+// where the LIVE client's shutdown belongs to activation and no test double
+// implements Close.
+func closeArrPinger(p ArrPinger) {
+	if closer, ok := p.(interface{ Close() }); ok {
+		closer.Close()
+	}
 }
 
 // atomicWriteConfig writes data to path atomically with 0o600 permissions.
