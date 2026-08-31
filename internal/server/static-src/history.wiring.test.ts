@@ -47,6 +47,7 @@ vi.mock("./bus.js", () => ({
 
 import * as store from "./store.js";
 import { reloadHistory } from "./history.js";
+import { historyView } from "./view-scope.js";
 
 // Mirrors the wire StateEntry fields buildHistoryRow reads.
 interface Entry {
@@ -131,6 +132,7 @@ function mountShell(): void {
     '<input id="h-filter" />' +
     '<div id="historyContent"></div>' +
     "</div>";
+  historyView.clear();
 }
 
 beforeEach(() => {
@@ -329,7 +331,10 @@ describe("history: render disposal", () => {
     const discarded = reqEl<HTMLElement>("table.history");
     expect(discarded.hidden).toBe(false);
 
-    // Navigating away replaces the render target, so the next reload re-mounts.
+    // An error paint releases the render target (the only thing that replaces
+    // the history pane), so the next reload re-mounts. Release is immediate,
+    // so the discarded table is frozen from here on.
+    historyView.clear();
     reqEl("#historyContent").replaceChildren();
     dispatch.mockResolvedValueOnce([makeEntry(1)]);
     reloadHistory();

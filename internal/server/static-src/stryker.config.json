@@ -32,7 +32,8 @@
     "sync-timecode.ts",
     "theme.ts",
     "utils.ts",
-    "validators.ts"
+    "validators.ts",
+    "view-scope.ts"
   ],
   "mutator": {
     "excludedMutations": ["StringLiteral"]

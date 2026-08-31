@@ -20,6 +20,13 @@ import {
   _scanButtonCountForTest,
 } from "./detail-scan.js";
 import { seriesScopeKey, seasonScopeKey, movieScopeKey } from "./scan-scope.js";
+import {
+  contentView,
+  ownedByRoute,
+  releaseRouteViews,
+  seriesViewId,
+  type Scope,
+} from "./view-scope.js";
 import type { RunningScan } from "./scan-scope.js";
 import type { ScanAccepted } from "./wire/types.gen.js";
 import type { SeriesItem, MovieDetail } from "./api-types.js";
@@ -83,17 +90,25 @@ function movie(id: number): MovieDetail {
   return { id, title: "Film" } as MovieDetail;
 }
 
+// One mounted view per test, re-mounted in beforeEach; buttons that do not
+// name a scope get a child of it, mirroring a render's per-row child scopes.
+let testView: Scope = contentView.mount("test");
+let rowSeq = 0;
+
 /** A scan button as the render paths build it: the scope key in the dataset,
- *  an icon slot for the spinner to replace, mounted and REGISTERED the way
- *  every render path registers its buttons at creation. */
-function scanButton(scopeKey: string): HTMLButtonElement {
+ *  an icon slot for the spinner to replace, mounted and REGISTERED into a
+ *  disposal scope the way every render path registers its buttons at creation. */
+function scanButton(
+  scopeKey: string,
+  scope: Scope = testView.child(`row-${String(++rowSeq)}`),
+): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.dataset["scanScope"] = scopeKey;
   const slot = document.createElement("span");
   slot.className = "icon icon-search";
   btn.appendChild(slot);
   document.body.appendChild(btn);
-  registerScanButton(btn);
+  registerScanButton(btn, scope);
   return btn;
 }
 
@@ -107,6 +122,10 @@ beforeEach(() => {
   polls.count = 0;
   running([]);
   document.body.replaceChildren();
+  // Mounting releases the previous test's view, so the registry starts empty.
+  releaseRouteViews();
+  testView = contentView.mount("test");
+  rowSeq = 0;
 });
 
 describe("scan start endpoints", () => {
@@ -291,9 +310,6 @@ describe("initScanButtons", () => {
 });
 
 describe("the mounted-button registry (R8.5)", () => {
-  /** Resolves after the registration burst's coalesced prune microtask. */
-  const microtask = (): Promise<void> => new Promise((r) => queueMicrotask(r));
-
   it("repaints registered buttons without a document-wide scan", () => {
     const btn = scanButton(seriesScopeKey(42));
     initScanButtons();
@@ -323,26 +339,84 @@ describe("the mounted-button registry (R8.5)", () => {
     expect(btn.querySelector(".spinner")).toBeNull();
   });
 
-  it("a publish drops unmounted buttons from the registry", async () => {
-    const a = scanButton(seriesScopeKey(1));
-    scanButton(movieScopeKey(2));
+  it("a disposed scope releases its buttons, so no publish can reach them", () => {
+    // The observable the registry exists for: a button whose subtree is gone
+    // must never be written to again. Whether it is still in the document is
+    // beside the point — the scope decides, not the DOM.
+    const goneRow = testView.child("row-gone");
+    const gone = scanButton(seriesScopeKey(1), goneRow);
+    const live = scanButton(seriesScopeKey(1), testView.child("row-live"));
     initScanButtons();
-    await microtask();
-    expect(_scanButtonCountForTest()).toBe(2);
 
-    a.remove();
-    running([]);
+    goneRow.dispose();
+    running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
 
+    expect(gone.disabled).toBe(false);
+    expect(gone.hasAttribute("aria-busy")).toBe(false);
+    expect(gone.querySelector(".spinner")).toBeNull();
+    // Same scope key, a scope still open: the registry did not lose it.
+    expect(live.disabled).toBe(true);
+  });
+
+  it("a row scope re-opened by a repaint releases the previous paint's button", () => {
+    // Every repaint of a row rebuilds its cells, so each paint registers a NEW
+    // button and abandons the last. Re-opening the row's scope is what keeps
+    // the registry from growing once per repaint forever.
+    scanButton(seriesScopeKey(1), testView.child("row-1"));
+    scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const last = scanButton(seriesScopeKey(1), testView.child("row-1"));
+
+    expect(_scanButtonCountForTest()).toBe(1);
+
+    initScanButtons();
+    running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
+    expect(last.disabled).toBe(true);
+  });
+
+  it("a released row scope drops that row's button and leaves its siblings", () => {
+    const removed = scanButton(seriesScopeKey(1), testView.child("row-1"));
+    const kept = scanButton(seriesScopeKey(2), testView.child("row-2"));
+    initScanButtons();
+
+    testView.release("row-1");
+    running([
+      [seriesScopeKey(1), { activityId: "a", cancellable: true }],
+      [seriesScopeKey(2), { activityId: "b", cancellable: true }],
+    ]);
+
+    expect(removed.disabled).toBe(false);
+    expect(kept.disabled).toBe(true);
     expect(_scanButtonCountForTest()).toBe(1);
   });
 
-  it("a registration burst prunes disconnected buttons without waiting for a publish", async () => {
-    const a = scanButton(seriesScopeKey(1));
-    a.remove();
-    scanButton(seriesScopeKey(3));
+  it("a route leave releases the buttons the departed view registered", () => {
+    // The router's leave path (page-leg's abortPageLeg) releases every view the
+    // route mounted, which unregisters their buttons: a detail view's Search
+    // buttons must not be repainted after the user has left it.
+    const view = contentView.mount(seriesViewId("1"));
+    ownedByRoute(view);
+    const departed = scanButton(seasonScopeKey(1, 1), view.child("head-1"));
+    initScanButtons();
 
-    await microtask();
+    releaseRouteViews();
+    running([[seasonScopeKey(1, 1), { activityId: "a", cancellable: true }]]);
 
-    expect(_scanButtonCountForTest()).toBe(1);
+    expect(departed.disabled).toBe(false);
+    expect(departed.querySelector(".spinner")).toBeNull();
+    expect(_scanButtonCountForTest()).toBe(0);
+  });
+
+  it("registers nothing when the scope is already disposed", () => {
+    // A late registration would be unreleasable: the subtree it belongs to is
+    // already gone, so the disposer runs immediately instead.
+    const row = testView.child("row-1");
+    row.dispose();
+
+    const btn = scanButton(seriesScopeKey(1), row);
+    initScanButtons();
+    running([[seriesScopeKey(1), { activityId: "a", cancellable: true }]]);
+
+    expect(btn.disabled).toBe(false);
+    expect(_scanButtonCountForTest()).toBe(0);
   });
 });

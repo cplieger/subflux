@@ -71,6 +71,7 @@ import * as notify from "./notify.js";
 import { emit, BusEvent } from "./bus.js";
 import { openSyncDialog } from "./sync.js";
 import * as store from "./store.js";
+import { contentView } from "./view-scope.js";
 
 // Mirrors the wire FileEntry fields files.ts consumes (only the fields the
 // row builder and the collection key read matter here). No paths on the
@@ -156,6 +157,7 @@ describe("files: renderFiles", () => {
     // appended to #coveragePanel .card-head, both of which must exist.
     document.body.innerHTML =
       '<div id="coveragePanel"><div class="card-head"></div><div id="coverageContent"></div></div>';
+    contentView.clear();
   });
 
   it("two external files for the same media_id+language render as two rows", async () => {

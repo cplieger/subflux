@@ -33,15 +33,11 @@ import type { QueryValue } from "./wire/client.gen.js";
 import type { ApiResult } from "./api-client.js";
 import type { MovieDetail } from "./api-types.js";
 import { loadCoverage } from "./coverage.js";
-import {
-  disposeDetailBindings,
-  openMovieDetail,
-  renderMovieDetailFromLeg,
-  renderSeriesDetail,
-} from "./detail.js";
+import { openMovieDetail, renderMovieDetailFromLeg, renderSeriesDetail } from "./detail.js";
 import { reloadHistory, reloadHistoryForTransaction } from "./history.js";
-import { setDetailRefresher } from "./coverage-heal.js";
+import { dropDetailScopedDirtyRoots, setDetailRefresher } from "./coverage-heal.js";
 import { coverageRow } from "./coverage-store.js";
+import { releaseRouteViews } from "./view-scope.js";
 
 /** How a page-leg run settled: it applied its results, or a newer dispatch /
  *  a route leave superseded it and the results were discarded. */
@@ -100,17 +96,24 @@ function isCurrent(key: string, gen: number, ctrl: AbortController): boolean {
   return !ctrl.signal.aborted && generations.get(key) === gen && currentRouteKey() === key;
 }
 
-/** The ROUTER's leave path: abort the departing route's in-flight page leg,
- *  so the detail refresh pair dies on leave, and release the detail bindings
- *  beside it (C2) — the departing view's row effects must not outlive the
- *  view. One owner: every route leave funnels through here. */
+/** THE ROUTER's leave path: abort the departing route's in-flight page leg,
+ *  so the detail refresh pair dies on leave, and release the views that route
+ *  mounted beside it (C2) — a departing view's bindings, row effects and
+ *  registry entries must not outlive it. One owner: every route leave funnels
+ *  through here. */
 export function abortPageLeg(): void {
   for (const [key, ctrl] of controllers) {
     generations.set(key, (generations.get(key) ?? 0) + 1);
     ctrl.abort();
   }
   controllers.clear();
-  disposeDetailBindings();
+  releaseRouteViews();
+  // A6: a heal entry whose only renderer was a detail view (the library never
+  // loaded, so nothing else renders the root) dies with the route. This is the
+  // only reachable transition for one: a detail-scoped entry requires an
+  // unloaded library, so no row click can exist to swap details without the
+  // router.
+  dropDetailScopedDirtyRoots();
 }
 
 /** THE page-leg dispatcher. Runs the current route's page leg under the

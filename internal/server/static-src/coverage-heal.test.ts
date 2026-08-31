@@ -81,6 +81,7 @@ import * as store from "./store.js";
 import { SUMMARY_COALESCE_MS, DIRTY_ROOT_CAP } from "./constants.js";
 import {
   _resetHealForTest,
+  dropDetailScopedDirtyRoots,
   healFromCoverageEvent,
   onHealReset,
   parseCoverageMediaId,
@@ -580,8 +581,10 @@ describe("coverage-heal: failure escalation", () => {
     expect(wire.summaryCalls).toHaveLength(2); // nothing left to retry
   });
 
-  it("detail-coupled dirty entries clear on route leave", async () => {
-    // Library never loaded: the movie's own open detail is what admits it.
+  it("detail-coupled dirty entries die with the detail view", async () => {
+    // Library never loaded: the movie's own open detail is what admits it, so
+    // once that view is released nothing renders the root and a retry could
+    // repaint nothing.
     store.set("detailCtx", { movie: true, tmdbId: 7 });
 
     healFromCoverageEvent(ev("tmdb-7", "movie"));
@@ -589,26 +592,47 @@ describe("coverage-heal: failure escalation", () => {
     await window_(); // twice failed → dirty, scoped to the detail
     expect(wire.summaryCalls).toHaveLength(2);
 
-    store.set("detailCtx", null); // route leave
+    dropDetailScopedDirtyRoots(); // the router's leave path (page-leg)
 
     fireReconcileTick();
     await window_();
     expect(wire.summaryCalls).toHaveLength(2); // nothing left to retry
   });
 
-  it("library-scoped dirty entries survive a route change", async () => {
+  it("library-scoped dirty entries survive the same release", async () => {
     await load([seriesWire(1)]);
     healFromCoverageEvent(ev("tvdb-1-s01e01"));
     await window_();
     await window_(); // dirty (500 default)
 
-    store.set("detailCtx", { movie: true, tmdbId: 3 });
-    store.set("detailCtx", null);
+    dropDetailScopedDirtyRoots();
 
     wire.summaries.set("series:1", okRes(seriesWire(1, { title: "Persisted" })));
     fireReconcileTick();
     await window_();
     expect(coverageRow("tvdb-1")?.title).toBe("Persisted");
+  });
+
+  it("a library-scoped re-add outlives a release the earlier detail entry armed", async () => {
+    // The same root can be marked dirty twice: first while only its detail
+    // rendered it, then again with the library loaded. The second lifetime is
+    // the one that counts — the release must not take the library entry.
+    store.set("detailCtx", { movie: true, tmdbId: 7 });
+    healFromCoverageEvent(ev("tmdb-7", "movie"));
+    await window_();
+    await window_(); // dirty, detail-scoped
+
+    await load([], [movieWire(7)]); // library lands: every root has a renderer now
+    healFromCoverageEvent(ev("tmdb-7", "movie"));
+    await window_();
+    await window_(); // dirty again, library-scoped
+    const before = wire.summaryCalls.length;
+
+    dropDetailScopedDirtyRoots();
+
+    fireReconcileTick();
+    await window_();
+    expect(wire.summaryCalls.length).toBe(before + 1);
   });
 });
 

@@ -26,6 +26,7 @@ import { openSyncDialog } from "./sync.js";
 import { subtitleRef } from "./file-ref.js";
 import type { MediaType } from "./api-types.js";
 import { computed, effect, createCollection, bindList, patch } from "@cplieger/reactive";
+import { contentView } from "./view-scope.js";
 import { join } from "@cplieger/keyenc";
 
 // --- API response shapes ---
@@ -151,6 +152,7 @@ async function loadFiles(): Promise<void> {
           el("div", { className: "skeleton-row" }, el("div", { className: "skeleton" })),
         );
       }
+      contentView.clear();
       patch(out, skel);
     },
     { minVisibleMs: 300 },
@@ -188,7 +190,7 @@ async function refreshFileData(): Promise<void> {
   const data = await listFiles(query);
   if (data === null) {
     settle(() => {
-      disposeBindings();
+      contentView.clear();
       patch(out, errDiv("Failed to load files"));
     });
     return;
@@ -289,23 +291,19 @@ function buildFileRow(f: FileEntry): HTMLElement {
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
 
-let bindings: (() => void)[] = [];
-
-function disposeBindings(): void {
-  for (const dispose of bindings) {
-    dispose();
-  }
-  bindings = [];
-}
+/** The file manager's view id in the shared content host. */
+const VIEW_FILES = "files";
 
 function ensureMounted(): void {
   const out = $.coverageContent;
-  // Already mounted and still in the DOM (navigation away replaces the
-  // container, so re-mount when the table is gone).
-  if (out.querySelector("table.files-table") !== null) {
+  // Already the host's occupant: the table this view bound is still the
+  // container's content, so the live binding renders it. Ownership answers
+  // this — a DOM probe cannot tell a live table from one another view has
+  // already patched over.
+  if (contentView.scopeFor(VIEW_FILES) !== null) {
     return;
   }
-  disposeBindings();
+  const scope = contentView.mount(VIEW_FILES);
 
   const isSeries = currentMediaType === "episode";
 
@@ -327,7 +325,7 @@ function ensureMounted(): void {
   patch(out, el("div", { className: "files-list" }, emptyEl, tbl));
 
   // Structure tier: reconcile rows keyed by path on add/remove/reorder.
-  bindings.push(
+  scope.add(
     bindList(
       tbody,
       { ids: sortedIds, signalFor: (id: string) => files.signalFor(id) },
@@ -360,7 +358,7 @@ function ensureMounted(): void {
 
   // Empty-state, table, and bulk-button visibility/count derived from the
   // collection's id list.
-  bindings.push(
+  scope.add(
     effect(() => {
       const n = files.ids.value.length;
       emptyEl.hidden = n > 0;

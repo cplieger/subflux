@@ -29,6 +29,7 @@ import {
 } from "./scan-scope.js";
 import type { ScanAccepted } from "./wire/types.gen.js";
 import type { SeriesItem, MovieDetail } from "./api-types.js";
+import type { Scope } from "./view-scope.js";
 
 interface ScanStartArgs {
   url: string;
@@ -108,39 +109,21 @@ function runningMap(): RunningScansByScope {
 }
 
 // The mounted-button registry (R8.5): render paths register each scan button
-// at creation, and the store effect repaints THESE — never a document-wide
-// query per publish. There is no unmount hook, so removal is a prune of
-// disconnected buttons: once per registration burst (a microtask after the
-// render pass, when the built tree is in the DOM and any discarded template
-// buttons are not), and again on every publish as the belt.
+// into the SCOPE of the subtree that built it, and the store effect repaints
+// THESE — never a document-wide query per publish. Membership is exact by
+// construction: the repaint or removal that discards a button disposes its
+// scope, which unregisters it (view-scope.ts). No detachment sampling.
 const scanButtons = new Set<HTMLButtonElement>();
-let prunePending = false;
 
-function pruneDisconnected(): void {
-  for (const btn of scanButtons) {
-    if (!btn.isConnected) {
-      scanButtons.delete(btn);
-    }
-  }
-}
-
-function schedulePrune(): void {
-  if (prunePending) {
-    return;
-  }
-  prunePending = true;
-  queueMicrotask(() => {
-    prunePending = false;
-    pruneDisconnected();
-  });
-}
-
-/** Register a freshly created scan button: it joins the store-driven registry
- *  and gets the current state painted, so rows painted mid-scan show the
- *  running state without waiting for the next store change. */
-export function registerScanButton(btn: HTMLButtonElement): void {
+/** Register a freshly created scan button into its subtree's scope: it joins
+ *  the store-driven registry until that scope is disposed, and gets the
+ *  current state painted, so rows painted mid-scan show the running state
+ *  without waiting for the next store change. */
+export function registerScanButton(btn: HTMLButtonElement, scope: Scope): void {
   scanButtons.add(btn);
-  schedulePrune();
+  scope.add(() => {
+    scanButtons.delete(btn);
+  });
   patchScanButton(btn, runningMap());
 }
 
@@ -151,7 +134,6 @@ export function _scanButtonCountForTest(): number {
 
 /** Sync every registered scan button with the shared store. */
 function syncScanButtons(): void {
-  pruneDisconnected();
   const running = runningMap();
   for (const btn of scanButtons) {
     patchScanButton(btn, running);

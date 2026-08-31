@@ -22,6 +22,7 @@ import type { DetailConfig } from "./bus.js";
 import type { CoverageTarget, CoverageItem } from "./api-types.js";
 import type { SeriesItem, MovieItem } from "./wire/types.gen.js";
 import { registerScanButton } from "./detail-scan.js";
+import { contentView, type Scope } from "./view-scope.js";
 import { seriesScopeKey, movieScopeKey } from "./scan-scope.js";
 import { resetCoverageHeal } from "./coverage-heal.js";
 import {
@@ -142,6 +143,9 @@ export function _resetCoverageForTest(): void {
   _resetCoverageStoreForTest();
   coverageAbort?.abort();
   coverageAbort = null;
+  // A fresh tab has no mounted view: release the library view so the next
+  // render mounts rather than reusing a departed document's binding.
+  contentView.clear();
 }
 
 /** Build the 8-row coverage-table loading skeleton fragment. */
@@ -177,6 +181,7 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
     showSkeleton && ctrl
       ? skeletonTiming(
           () => {
+            contentView.clear();
             patch(out, coverageSkeleton());
           },
           // The library default is min-visible 0; subflux keeps its 300ms
@@ -197,9 +202,11 @@ export async function loadCoverage(silent?: boolean): Promise<void> {
     const msg = e instanceof Error ? e.message : String(e);
     if (timing) {
       timing.commit(() => {
+        contentView.clear();
         patch(out, errDiv(msg));
       });
     } else if (!silent) {
+      contentView.clear();
       patch(out, errDiv(msg));
     }
   }
@@ -320,8 +327,10 @@ function buildBadges(targets: CoverageTarget[]): DocumentFragment {
 /** The five cells of a coverage row, all derived from the item. Shared by
  *  mount and the full-row updater so the two can never drift; the button
  *  closures capture the item they were painted from, which the `data-sig`
- *  gate keeps current up to signature equality. */
-function coverageRowCells(item: CoverageItem): HTMLElement[] {
+ *  gate keeps current up to signature equality. `scope` is the ROW's scope —
+ *  every paint gets a fresh one, so the scan button this paint builds is
+ *  released when the next paint discards it. */
+function coverageRowCells(item: CoverageItem, scope: Scope): HTMLElement[] {
   const isSeries = item._type === "series";
   const covId = coverageMediaId(item);
 
@@ -355,7 +364,7 @@ function coverageRowCells(item: CoverageItem): HTMLElement[] {
       el("span", { className: "btn-text" }, " Search"),
     ) as HTMLButtonElement;
     // Rows painted while a scan runs restore the disabled+spinner state.
-    registerScanButton(scanBtn);
+    registerScanButton(scanBtn, scope);
     actionBtn = scanBtn;
   }
 
@@ -368,7 +377,7 @@ function coverageRowCells(item: CoverageItem): HTMLElement[] {
   ];
 }
 
-function buildCoverageRow(item: CoverageItem): HTMLElement {
+function buildCoverageRow(item: CoverageItem, scope: Scope): HTMLElement {
   const covId = coverageMediaId(item);
   const row = clickableRow(
     () => {
@@ -381,7 +390,7 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
       }
       emit(cur._type === "series" ? BusEvent.OpenSeries : BusEvent.OpenMovie, { item: cur });
     },
-    ...coverageRowCells(item),
+    ...coverageRowCells(item, scope),
   );
   row.dataset["sig"] = coverageItemSignature(item);
   return row;
@@ -391,31 +400,33 @@ function buildCoverageRow(item: CoverageItem): HTMLElement {
  *  a signature-equal update is a no-op, and a real change rebuilds every cell
  *  from the fresh item — title, year, audio, badges, action — so no cell can
  *  serve stale content. The row element itself is kept (focus and structure
- *  tier untouched). */
-function updateCoverageRow(row: HTMLElement, item: CoverageItem): void {
+ *  tier untouched). The row's scope is re-opened only where the cells are
+ *  actually replaced, so a no-op update leaves the standing registrations —
+ *  including the mount's — in place. */
+function updateCoverageRow(row: HTMLElement, item: CoverageItem, view: Scope, id: string): void {
   const sig = coverageItemSignature(item);
   if (row.dataset["sig"] === sig) {
     return;
   }
-  row.replaceChildren(...coverageRowCells(item));
+  row.replaceChildren(...coverageRowCells(item, view.child(id)));
   row.dataset["sig"] = sig;
 }
 
 // --- Render: build the table shell once, bind the tbody, react for the rest ---
 
-let bindings: (() => void)[] = [];
+/** The library table's view id in the shared content host. */
+const VIEW_LIBRARY = "library";
 
 function ensureMounted(): void {
   const out = $.coverageContent;
-  // Already mounted and still in the DOM (detail navigation replaces the
-  // container, so re-mount when the table is gone).
-  if (out.querySelector("table.library") !== null) {
+  // Already the host's occupant: the table this view bound is still the
+  // container's content, so the live binding renders it. Ownership answers
+  // this — a DOM probe cannot tell a live table from one another view has
+  // already patched over.
+  if (contentView.scopeFor(VIEW_LIBRARY) !== null) {
     return;
   }
-  for (const dispose of bindings) {
-    dispose();
-  }
-  bindings = [];
+  const scope = contentView.mount(VIEW_LIBRARY);
 
   const tbody = el("tbody");
   const thead = el(
@@ -451,15 +462,21 @@ function ensureMounted(): void {
   patch(out, el("div", { className: "cov-list" }, emptyEl, noMatchEl, tbl, showMore));
 
   // Content + structure tiers: per-row repaint on entity change, structural
-  // reconcile on visibleIds change.
-  bindings.push(
+  // reconcile on visibleIds change. Each row builds in a CHILD scope of this
+  // view's, keyed by row id: the paint that discards its cells re-opens it
+  // (releasing what the last paint registered), a removal releases it, and a
+  // view swap releases every row with it.
+  scope.add(
     bindList(
       tbody,
       { ids: visibleIds, signalFor: coverageSignalFor },
       {
-        mount: (item) => buildCoverageRow(item),
-        update: (row, item) => {
-          updateCoverageRow(row, item);
+        mount: (item, id) => buildCoverageRow(item, scope.child(id)),
+        update: (row, item, id) => {
+          updateCoverageRow(row, item, scope, id);
+        },
+        onRemove: (_row, id) => {
+          scope.release(id);
         },
       },
     ),
@@ -467,7 +484,7 @@ function ensureMounted(): void {
 
   // Empty-state / show-more visibility, derived from the collection +
   // filtered view.
-  bindings.push(
+  scope.add(
     effect(() => {
       const hasData = coverageIds.value.length > 0;
       const filtered = filteredItems.value;

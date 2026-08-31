@@ -40,6 +40,7 @@ import type {
 } from "./api-types.js";
 import { patch, createCollection, bindList, type ListSpec } from "@cplieger/reactive";
 import { join } from "@cplieger/keyenc";
+import { contentView, movieViewId, ownedByRoute, seriesViewId, type Scope } from "./view-scope.js";
 
 // Module-level abort controller for detail navigation fetches. Self-cleans
 // on internal navigation (each new openSeriesDetail/openMovieDetail aborts
@@ -53,46 +54,30 @@ registerCleanup(() => {
 
 // --- Persistent two-tier render state (mirrors coverage.ts / files.ts) ---
 //
-// Each detail view owns a module-level `createCollection` + a `bindList`
-// binding so a coverage SSE refresh updates rows IN PLACE (stable DOM node
-// identity, buttons not re-created, only changed coverage cells repaint)
-// instead of rebuilding the whole <table>. A render REUSES the live binding
-// when it targets the same media id and the bound <tbody> is still in the DOM;
-// otherwise it REBUILDS (fresh collection + binding + table shell).
+// Each detail view mounts into the shared content host (view-scope.ts) and
+// registers its `bindList` binding in the scope it gets back, so a coverage SSE
+// refresh updates rows IN PLACE (stable DOM node identity, buttons not
+// re-created, only changed coverage cells repaint) instead of rebuilding the
+// whole <table>. A render REUSES the live binding while the host still holds
+// that exact view; otherwise it MOUNTS a fresh one, and mounting releases
+// everything the previous occupant registered — bindings, row effects and the
+// scan buttons its rows built.
+//
+// The collections are the only per-view state a REUSE needs to reach, and each
+// is nulled by its own view scope, so "the host holds this view" and "this
+// collection is live" are one fact.
 
 let seriesColl: ReturnType<typeof createCollection<DetailRow>> | null = null;
-let seriesTbody: HTMLElement | null = null;
-let seriesUnbind: (() => void) | null = null;
-let seriesKey = ""; // String(tvdb_id) of the currently-bound series
-
 let movieColl: ReturnType<typeof createCollection<MovieRow>> | null = null;
-let movieTbody: HTMLElement | null = null;
-let movieUnbind: (() => void) | null = null;
-let movieKey = ""; // String(tmdb_id) of the currently-bound movie
 
-function disposeSeriesBinding(): void {
-  seriesUnbind?.();
-  seriesUnbind = null;
-  seriesColl = null;
-  seriesTbody = null;
-  seriesKey = "";
-}
-
-function disposeMovieBinding(): void {
-  movieUnbind?.();
-  movieUnbind = null;
-  movieColl = null;
-  movieTbody = null;
-  movieKey = "";
-}
-
-/** C2 — release on leave: drop both detail bindings (collection
- *  subscriptions + row effects). The ROUTER's leave path owns the call, via
- *  page-leg's abortPageLeg; renders re-dispose on rebuild, so this is safely
- *  idempotent. */
-export function disposeDetailBindings(): void {
-  disposeSeriesBinding();
-  disposeMovieBinding();
+/** Mount a detail view: the content host releases the previous occupant, and
+ *  the ROUTER owns this one too (C2) — a detail view must not outlive the route
+ *  that mounted it, and a navigation to another page writes no container it
+ *  lives in. */
+function mountDetailView(viewId: string): Scope {
+  const scope = contentView.mount(viewId);
+  ownedByRoute(scope);
+  return scope;
 }
 
 /** Drop null entries so a children list can be spread into `replaceChildren`
@@ -251,13 +236,14 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
   const out = $.coverageContent;
   // Anti-flicker loading skeleton (150ms show-delay + 300ms min-visible,
   // abort-aware): a cached/fast load never paints it, a slow one keeps it up
-  // long enough not to blink. The commit ALWAYS detaches the current content
-  // (fresh-fragment patch) before rendering — preserving the always-REBUILD
-  // guarantee the old eager skeleton patch provided, so renderSeriesDetail
-  // never reuses a stale live-table binding from a previous detail view. (A
+  // long enough not to blink. The commit ALWAYS releases the pane and detaches
+  // the current content (fresh-fragment patch) before rendering — preserving
+  // the always-MOUNT guarantee the old eager skeleton patch provided, so
+  // renderSeriesDetail never reuses a previous detail view's binding. (A
   // coverage SSE refresh paints no skeleton, so it reuses — unchanged.)
   const timing = skeletonTiming(
     () => {
+      contentView.clear();
       const skel = document.createDocumentFragment();
       for (let i = 0; i < 6; i++) {
         skel.appendChild(
@@ -280,7 +266,8 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
         return;
       }
       timing.commit(() => {
-        patch(out, document.createDocumentFragment()); // detach: rebuild guarantee
+        contentView.clear();
+        patch(out, document.createDocumentFragment()); // detach: mount guarantee
         renderSeriesDetail(s, seasons ?? [], subFiles ?? [], new Set(historyIDs ?? []));
       });
     })
@@ -291,6 +278,7 @@ function openSeriesDetail(s: SeriesItem, skipPush?: boolean): void {
       }
       const msg = e instanceof Error ? e.message : String(e);
       timing.commit(() => {
+        contentView.clear();
         patch(out, errDiv(msg));
       });
     });
@@ -589,8 +577,10 @@ function paintEpisodeRow(node: HTMLElement, row: DetailEpRow): void {
   node.dataset["sig"] = row.sig;
 }
 
-/** Action-group children for a season-head row: [sync?, history?, search]. */
-function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
+/** Action-group children for a season-head row: [sync?, history?, search].
+ *  `scope` is the ROW's scope — a fresh one per paint, so the scan button this
+ *  paint builds is released when the next paint discards it. */
+function seasonHeadActionChildren(row: DetailHeadRow, scope: Scope): (HTMLElement | null)[] {
   const { series, season, syncFiles, hasHistory } = row;
 
   const searchBtn = el(
@@ -606,7 +596,7 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
     el("span", { className: "btn-text" }, " Search"),
   ) as HTMLButtonElement;
   // Rows painted while a scan runs restore the disabled+spinner state.
-  registerScanButton(searchBtn);
+  registerScanButton(searchBtn, scope);
   const histBtn = hasHistory
     ? el(
         "button",
@@ -645,7 +635,7 @@ function seasonHeadActionChildren(row: DetailHeadRow): (HTMLElement | null)[] {
  *  the data columns on desktop (grid placement in 06-table.css); the two
  *  empty cells only exist for the mobile branch's flex layout, which hides
  *  them, and stay hidden on desktop. */
-function buildSeasonHeadRow(row: DetailHeadRow): HTMLElement {
+function buildSeasonHeadRow(row: DetailHeadRow, scope: Scope): HTMLElement {
   const tr = el(
     "tr",
     { className: "season-head", role: "row" },
@@ -655,7 +645,7 @@ function buildSeasonHeadRow(row: DetailHeadRow): HTMLElement {
     el(
       "td",
       { role: "cell", "data-col": "actions" },
-      el("div", { className: "action-group" }, ...seasonHeadActionChildren(row)),
+      el("div", { className: "action-group" }, ...seasonHeadActionChildren(row, scope)),
     ),
   );
   tr.dataset["sig"] = row.sig;
@@ -664,52 +654,59 @@ function buildSeasonHeadRow(row: DetailHeadRow): HTMLElement {
 
 /** Repaint a season-head row's action buttons (sync/history visibility tracks
  *  syncEps + hasHistory). */
-function paintSeasonHead(node: HTMLElement, row: DetailHeadRow): void {
+function paintSeasonHead(node: HTMLElement, row: DetailHeadRow, scope: Scope): void {
   const actionGroup = node.querySelector('[data-col="actions"] .action-group');
   if (actionGroup) {
-    actionGroup.replaceChildren(...compact(seasonHeadActionChildren(row)));
+    actionGroup.replaceChildren(...compact(seasonHeadActionChildren(row, scope)));
   }
   node.dataset["sig"] = row.sig;
 }
 
-// bindList row lifecycle for the series table. Bound once per REBUILD; every
-// closure is data-driven (reads only the row argument) so a REUSE setAll feeds
-// fresh row objects without any stale render-scope capture.
-const seriesSpec: ListSpec<DetailRow> = {
-  mount: (r) => {
-    switch (r.kind) {
-      case "gap":
-        // Spans every column via grid-column: 1 / -1 (06-table.css); the
-        // colSpan escape hatch died with the table formatting context.
-        return el("tr", { className: "season-gap", role: "row" }, el("td", { role: "cell" }));
-      case "head":
-        return buildSeasonHeadRow(r);
-      case "cols":
-        return makeColHeaders();
-      case "ep":
-        return buildEpisodeRow(r);
-    }
-  },
-  update: (node, r) => {
-    switch (r.kind) {
-      case "gap":
-      case "cols":
-        return; // static rows — never repaint
-      case "head":
-        if (node.dataset["sig"] === r.sig) {
+// bindList row lifecycle for the series table. Built once per MOUNT, over that
+// view's scope: every closure is otherwise data-driven (reads only the row
+// argument) so a REUSE setAll feeds fresh row objects without any stale
+// render-scope capture, and capturing the scope is safe because the scope's
+// lifetime IS the binding's.
+function makeSeriesSpec(scope: Scope): ListSpec<DetailRow> {
+  return {
+    mount: (r, id) => {
+      switch (r.kind) {
+        case "gap":
+          // Spans every column via grid-column: 1 / -1 (06-table.css); the
+          // colSpan escape hatch died with the table formatting context.
+          return el("tr", { className: "season-gap", role: "row" }, el("td", { role: "cell" }));
+        case "head":
+          return buildSeasonHeadRow(r, scope.child(id));
+        case "cols":
+          return makeColHeaders();
+        case "ep":
+          return buildEpisodeRow(r);
+      }
+    },
+    update: (node, r, id) => {
+      switch (r.kind) {
+        case "gap":
+        case "cols":
+          return; // static rows — never repaint
+        case "head":
+          if (node.dataset["sig"] === r.sig) {
+            return;
+          }
+          paintSeasonHead(node, r, scope.child(id));
           return;
-        }
-        paintSeasonHead(node, r);
-        return;
-      case "ep":
-        if (node.dataset["sig"] === r.sig) {
+        case "ep":
+          if (node.dataset["sig"] === r.sig) {
+            return;
+          }
+          paintEpisodeRow(node, r);
           return;
-        }
-        paintEpisodeRow(node, r);
-        return;
-    }
-  },
-};
+      }
+    },
+    onRemove: (_node, id) => {
+      scope.release(id);
+    },
+  };
+}
 
 /** Seasons with download history, derived in ONE pass over the history set
  *  (C3): the per-season `[...historySet].some(startsWith)` scan was a full
@@ -850,8 +847,9 @@ export function renderSeriesDetail(
   }
 
   if (seasons.length === 0) {
-    // Tear down any live series binding so a later same-series render rebuilds.
-    disposeSeriesBinding();
+    // Nothing to bind: release the pane (the empty state owns no registrations)
+    // so a later same-series render mounts fresh.
+    contentView.clear();
     const frag = document.createDocumentFragment();
     frag.appendChild(
       emptyState(
@@ -898,32 +896,32 @@ export function renderSeriesDetail(
 
   const rows = buildSeriesRows(series, sortedSeasons, subIdx, targetLangs, hasAbsOrder, historySet);
 
-  // REUSE: same series and the bound <tbody> is still live in the DOM — just
-  // push the new rows; the per-row signals repaint only the changed rows.
+  // REUSE: this exact series view is still the content host's occupant, so its
+  // binding renders the table on screen — just push the new rows; the per-row
+  // signals repaint only the changed rows.
   const key = String(series.tvdb_id);
-  if (
-    seriesKey === key &&
-    seriesColl &&
-    seriesTbody &&
-    seriesTbody.isConnected &&
-    out.contains(seriesTbody)
-  ) {
+  const viewId = seriesViewId(key);
+  if (contentView.scopeFor(viewId) !== null && seriesColl) {
     seriesColl.setAll(rows);
     return;
   }
 
-  // REBUILD: fresh collection + binding + table shell.
-  disposeSeriesBinding();
+  // MOUNT: fresh scope (releasing the previous occupant), collection, binding
+  // and table shell.
+  const scope = mountDetailView(viewId);
   const coll = createCollection<DetailRow>(detailRowKey);
   const tbody = el("tbody", { role: "rowgroup" });
-  const unbind = bindList(tbody, coll, seriesSpec);
+  scope.add(bindList(tbody, coll, makeSeriesSpec(scope)));
   coll.setAll(rows);
+  seriesColl = coll;
+  scope.add(() => {
+    seriesColl = null;
+  });
 
   // Detach any previous content BEFORE patching the fresh shell in: patch
   // reuses position-matched elements, so patching the new table over a live
-  // old one keeps the OLD tbody on screen and strands this binding's tbody
-  // in the discarded copy (row updates would repaint a detached node). A
-  // rebuild is a replacement by definition.
+  // old one would keep the OLD tbody on screen and leave this binding's tbody
+  // off it. A mount is a replacement by definition.
   patch(out, document.createDocumentFragment());
 
   // The desktop tree leaves the table formatting context (C1), which strips
@@ -946,10 +944,6 @@ export function renderSeriesDetail(
     ),
   );
   patch(out, frag);
-  seriesColl = coll;
-  seriesTbody = tbody;
-  seriesUnbind = unbind;
-  seriesKey = key;
 }
 
 // --- Movie detail drilldown ---
@@ -1148,11 +1142,12 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
 
   // Anti-flicker loading skeleton for the on-demand read (the series path's
   // constants: 150ms show-delay + 300ms min-visible, abort-aware). The commit
-  // does NOT force-detach: renderMovieDetail's reuse check decides — a fast
-  // load leaves the bound <tbody> live, so a same-movie refresh repaints in
-  // place; a painted skeleton has already detached it, so the render rebuilds.
+  // does NOT release the pane: renderMovieDetail's reuse check decides — a fast
+  // load leaves the movie view mounted, so a same-movie refresh repaints in
+  // place; a painted skeleton has already released it, so the render mounts.
   const timing = skeletonTiming(
     () => {
+      contentView.clear();
       const skel = document.createDocumentFragment();
       for (let i = 0; i < 3; i++) {
         skel.appendChild(
@@ -1190,6 +1185,7 @@ export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: 
       }
       const msg = e instanceof Error ? e.message : String(e);
       timing.commit(() => {
+        contentView.clear();
         patch(out, errDiv(msg));
       });
     });
@@ -1256,10 +1252,10 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
   }
 
   if (targets.length === 0) {
-    // No language targets: nothing to bind. Drop any live movie binding and
-    // explain the state with a way out (a bare "not scanned" badge as the
-    // whole page body was a dead end).
-    disposeMovieBinding();
+    // No language targets: nothing to bind. Release the pane (the empty state
+    // owns no registrations) and explain the state with a way out (a bare
+    // "not scanned" badge as the whole page body was a dead end).
+    contentView.clear();
     patch(
       out,
       emptyState(
@@ -1281,32 +1277,31 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     return { key, label, entries, lang: t.language, movie: m, sig: movieSig(entries) };
   });
 
-  // REUSE: same movie and the bound <tbody> is still live — push fresh rows.
+  // REUSE: this exact movie view is still the content host's occupant — push
+  // fresh rows.
   const mKey = String(m.tmdb_id);
-  if (
-    movieKey === mKey &&
-    movieColl &&
-    movieTbody &&
-    movieTbody.isConnected &&
-    out.contains(movieTbody)
-  ) {
+  const viewId = movieViewId(mKey);
+  if (contentView.scopeFor(viewId) !== null && movieColl) {
     movieColl.setAll(rows);
     return;
   }
 
-  // REBUILD: fresh collection + binding + table shell.
-  disposeMovieBinding();
+  // MOUNT: fresh scope, collection, binding and table shell.
+  const scope = mountDetailView(viewId);
   const coll = createCollection<MovieRow>((r) => r.key);
   const tbody = el("tbody");
-  const unbind = bindList(tbody, coll, movieSpec);
+  scope.add(bindList(tbody, coll, movieSpec));
   coll.setAll(rows);
+  movieColl = coll;
+  scope.add(() => {
+    movieColl = null;
+  });
 
   // Detach any previous content BEFORE patching the fresh shell in: patch
-  // keys tables by data-movie-id, so a same-movie rebuild over a live table
-  // would keep the OLD tbody on screen and strand this binding's tbody in
-  // the discarded copy (C2's route-leave dispose makes that reachable: the
-  // reuse check above fails on a disposed binding while the table is still
-  // connected). A rebuild is a replacement by definition.
+  // keys tables by data-movie-id, so a same-movie mount over a live table
+  // would keep the OLD tbody on screen and leave this binding's tbody off it
+  // (reachable whenever the previous occupant was released while its table was
+  // still standing). A mount is a replacement by definition.
   patch(out, document.createDocumentFragment());
 
   const frag = document.createDocumentFragment();
@@ -1323,10 +1318,6 @@ function renderMovieDetail(m: MovieDetail, reads: MovieDetailReads): void {
     ),
   );
   patch(out, frag);
-  movieColl = coll;
-  movieTbody = tbody;
-  movieUnbind = unbind;
-  movieKey = mKey;
 }
 
 // --- Bus handlers: coverage.js emits these ---

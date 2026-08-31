@@ -65,6 +65,7 @@ vi.mock("./store.js", () => ({
 
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
+import { contentView } from "./view-scope.js";
 
 // The real stylesheets, once per file. Order matches the MANIFEST slice this
 // suite exercises (tokens -> base -> components -> card -> table).
@@ -150,6 +151,7 @@ function mountPanel(width?: string): HTMLElement {
     '<section class="card" id="coveragePanel">' +
     '<div class="card-head"><h2 id="lib-heading">Show 1</h2></div>' +
     '<div id="coverageContent"></div></section>';
+  contentView.clear();
   const panel = document.getElementById("coveragePanel");
   if (!panel) {
     throw new Error("panel missing");

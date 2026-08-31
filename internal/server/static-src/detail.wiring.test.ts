@@ -76,11 +76,21 @@ vi.mock("./search.js", () => ({ openSearchPopup: vi.fn() }));
 vi.mock("./sync.js", () => ({ openSyncDialog: vi.fn(), confirmSeasonSync: vi.fn() }));
 vi.mock("./files.js", () => ({ openFileManager: vi.fn() }));
 vi.mock("./config.js", () => ({ openConfig: vi.fn() }));
+// registerScanButton keeps the same membership rule as the real registry (a
+// button lives until its disposal scope closes), so a registration this render
+// drops or leaks is observable through `liveScanButtons`. A plain function, not
+// a vi.fn: mockReset would strip the body between tests.
+const scanReg = vi.hoisted(() => ({ live: [] as HTMLButtonElement[] }));
 vi.mock("./detail-scan.js", () => ({
   triggerSeriesScan: vi.fn(),
   triggerSeasonScan: vi.fn(),
   triggerMovieScan: vi.fn(),
-  registerScanButton: vi.fn(),
+  registerScanButton: (btn: HTMLButtonElement, scope: { add: (fn: () => void) => void }) => {
+    scanReg.live.push(btn);
+    scope.add(() => {
+      scanReg.live = scanReg.live.filter((b) => b !== btn);
+    });
+  },
 }));
 const storeState = vi.hoisted(() => ({
   ignoredCodecs: new Set<string>(),
@@ -109,9 +119,9 @@ vi.mock("./store.js", () => ({
 import { renderSeriesDetail, openMovieDetail } from "./detail.js";
 import { openSearchPopup } from "./search.js";
 import { confirmSeasonSync } from "./sync.js";
-import { registerScanButton } from "./detail-scan.js";
 import { seasonScopeKey } from "./scan-scope.js";
 import type { SeriesItem, SeasonGroup, SubtitleEntry, MovieDetail } from "./api-types.js";
+import { contentView } from "./view-scope.js";
 
 // --- Fixtures (hardcoded, DAMP) ---
 
@@ -227,6 +237,8 @@ function resetEnv(): void {
   clientState.pendingStateIDs = [];
   history.replaceState(null, "", "/");
   document.body.innerHTML = PANEL_HTML;
+  contentView.clear();
+  scanReg.live = [];
 }
 
 describe("detail: episode and season action buttons", () => {
@@ -262,6 +274,19 @@ describe("detail: episode and season action buttons", () => {
     expect(openSearchPopup).toHaveBeenCalledWith("episode", series, 1, seasons[0]?.episodes[0]);
   });
 
+  /** The season-head Search buttons on screen, in DOM order. The fixture has
+   *  two seasons, so a registry holding exactly these two is the invariant. */
+  function seasonSearchButtons(): [HTMLButtonElement, HTMLButtonElement] {
+    const btns = [
+      ...document.querySelectorAll<HTMLButtonElement>("tr.season-head button[data-scan-scope]"),
+    ];
+    const [first, second] = btns;
+    if (!first || !second || btns.length !== 2) {
+      throw new Error(`expected 2 season search buttons, found ${String(btns.length)}`);
+    }
+    return [first, second];
+  }
+
   it("hands the season Search button to the scan-state applier", () => {
     // A row painted while a scan is already running must come up disabled with
     // a spinner; the applier is what reads the shared running-scans map.
@@ -269,14 +294,54 @@ describe("detail: episode and season action buttons", () => {
 
     renderSeriesDetail(series, makeSeasons("Pilot", "Second", "Return"), [], new Set());
 
-    const seasonSearch = document.querySelector<HTMLButtonElement>(
-      "tr.season-head button[data-scan-scope]",
-    );
-    if (!seasonSearch) {
-      throw new Error("season search button missing");
-    }
-    expect(seasonSearch.getAttribute("data-scan-scope")).toBe(seasonScopeKey(351, 1));
-    expect(registerScanButton).toHaveBeenCalledWith(seasonSearch);
+    const [seasonOne, seasonTwo] = seasonSearchButtons();
+    expect(seasonOne.getAttribute("data-scan-scope")).toBe(seasonScopeKey(351, 1));
+    // Registered with the row's disposal scope, so the button is released when
+    // that row repaints or the view is swapped (view-scope.ts).
+    expect(scanReg.live).toHaveLength(2);
+    expect(scanReg.live).toContain(seasonOne);
+    expect(scanReg.live).toContain(seasonTwo);
+  });
+
+  it("keeps exactly the season Search button that is on screen registered", () => {
+    // A season-head repaint rebuilds its action group, so each paint registers
+    // a NEW button: the row's scope has to release the discarded one, and an
+    // update that repaints nothing must not release the standing one.
+    const series = makeSeries(353, "Show AT");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    renderSeriesDetail(series, seasons, [], new Set());
+    const [first] = seasonSearchButtons();
+
+    // Same rows: the update repaints nothing and the standing buttons survive.
+    renderSeriesDetail(series, seasons, [], new Set());
+    expect(seasonSearchButtons()[0]).toBe(first);
+    expect(scanReg.live).toHaveLength(2);
+    expect(scanReg.live).toContain(first);
+
+    // A season-head signature change (its Sync affordance appears) repaints it,
+    // which releases the button that paint discards.
+    renderSeriesDetail(series, seasons, [epSub("tvdb-353-s01e01", 80)], new Set());
+    const [repainted] = seasonSearchButtons();
+
+    expect(repainted).not.toBe(first);
+    expect(scanReg.live).toHaveLength(2);
+    expect(scanReg.live).toContain(repainted);
+    expect(scanReg.live).not.toContain(first);
+  });
+
+  it("drops the Search button of a season that leaves the table", () => {
+    const series = makeSeries(354, "Show AU");
+    const seasons = makeSeasons("Pilot", "Second", "Return");
+    renderSeriesDetail(series, seasons, [], new Set());
+    const departing = scanReg.live.find((b) => b.dataset["scanScope"] === seasonScopeKey(354, 2));
+
+    // Season 2 vanishes (Sonarr dropped it): the same view reuses its binding,
+    // so the row's own scope is what releases the button leaving with it.
+    renderSeriesDetail(series, seasons.slice(0, 1), [], new Set());
+
+    expect(departing).toBeDefined();
+    expect(scanReg.live).toHaveLength(1);
+    expect(scanReg.live).not.toContain(departing);
   });
 
   it("confirms a season audio sync with the season's external subtitles", () => {
