@@ -19,7 +19,14 @@ vi.mock("./coverage-heal.js", () => ({
   resetCoverageHeal: vi.fn(),
   subsumeDirtyRoots: vi.fn(),
 }));
-vi.mock("./status.js", () => ({ pollStatus: vi.fn(async () => undefined), abortPoll: vi.fn() }));
+vi.mock("./status.js", () => ({
+  pollStatus: vi.fn(async () => undefined),
+  abortPoll: vi.fn(),
+  setStatusDegraded: vi.fn(),
+  applyActivityEvent: vi.fn(),
+  applyAlertEvent: vi.fn(),
+  applyProviderEvent: vi.fn(),
+}));
 vi.mock("@cplieger/actions", () => ({ registerCleanup: vi.fn() }));
 vi.mock("./bus.js", async (importOriginal) => ({
   ...(await importOriginal<typeof BusModule>()),
@@ -49,7 +56,14 @@ vi.mock("./wire/client.gen.js", () => ({
 import * as notify from "./notify.js";
 import { healFromCoverageEvent } from "./coverage-heal.js";
 import { syncDoneFromEvent } from "./sync-jobs.js";
-import { pollStatus, abortPoll } from "./status.js";
+import {
+  abortPoll,
+  applyActivityEvent,
+  applyAlertEvent,
+  applyProviderEvent,
+  pollStatus,
+  setStatusDegraded,
+} from "./status.js";
 import { emit, BusEvent } from "./bus.js";
 
 const events = await import("./events.js");
@@ -386,6 +400,104 @@ describe("events: SSE handlers (post-epoch, the replay table)", () => {
     expect(syncDoneFromEvent).not.toHaveBeenCalled();
   });
 
+  it("activity deltas dispatch their decoded payload to the status store", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    const payload = {
+      op: "upsert",
+      entry: {
+        started_at: "2026-08-30T10:00:00Z",
+        id: "a1",
+        action: "Series Search",
+        detail: "d",
+        source: "manual",
+        done: false,
+      },
+    };
+    lastFakeES().frame("activity", payload, 8);
+
+    expect(applyActivityEvent).toHaveBeenCalledExactlyOnceWith(payload);
+  });
+
+  it("alert deltas dispatch their decoded payload to the status store", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    const payload = {
+      op: "raise",
+      alert: {
+        time: "2026-08-30T10:00:00Z",
+        level: "warn",
+        message: "m",
+        source: "scanner",
+        kind: "transient",
+        id: 3,
+        dismissed: false,
+      },
+    };
+    lastFakeES().frame("alert", payload, 9);
+
+    expect(applyAlertEvent).toHaveBeenCalledExactlyOnceWith(payload);
+  });
+
+  it("provider deltas dispatch their decoded payload to the status store", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    const payload = {
+      op: "raise",
+      entry: {
+        provider: "opensubtitles",
+        status: { recent_failures: 3, threshold: 5, timed_out: true },
+      },
+    };
+    lastFakeES().frame("provider", payload, 10);
+
+    expect(applyProviderEvent).toHaveBeenCalledExactlyOnceWith(payload);
+  });
+
+  it("undecodable status deltas are dropped without an application", async () => {
+    events.connect();
+    await openWithEpoch();
+
+    lastFakeES().frame("activity", { op: "explode" }, 8);
+    lastFakeES().frame("alert", { op: 42 }, 9);
+    lastFakeES().frame("provider", { entry: "nope" }, 10);
+
+    expect(applyActivityEvent).not.toHaveBeenCalled();
+    expect(applyAlertEvent).not.toHaveBeenCalled();
+    expect(applyProviderEvent).not.toHaveBeenCalled();
+  });
+
+  it("a REPLAYED activity delta re-applies — idempotence lives in the store, not here", async () => {
+    // Unlike notify, the status rows carry no toast dedupe: the replay table
+    // re-applies them and the store's keyed appliers make that a no-op.
+    events.connect();
+    await openWithEpoch();
+    const payload = {
+      op: "upsert",
+      entry: {
+        started_at: "2026-08-30T10:00:00Z",
+        id: "a1",
+        action: "Series Search",
+        detail: "d",
+        source: "manual",
+        done: true,
+      },
+    };
+    lastFakeES().frame("activity", payload, 11);
+    expect(applyActivityEvent).toHaveBeenCalledTimes(1);
+
+    // The connection drops; the native retry replays the same frame.
+    lastFakeES().errorWhileOpen();
+    lastFakeES().frame("activity", payload, 11);
+    lastFakeES().epoch("boot-a", false, 11);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(applyActivityEvent).toHaveBeenCalledTimes(2);
+  });
+
   it("malformed frames are dropped without side effects", async () => {
     events.connect();
     await openWithEpoch();
@@ -441,5 +553,45 @@ describe("events: the epoch gate on dispatch", () => {
     lastFakeES().fail();
     vi.advanceTimersByTime(SSE_RECONNECT_MS);
     expect(lastFakeES().url).toBe("/api/events");
+  });
+});
+
+describe("events: the status poll floor (E2)", () => {
+  it("a CLOSED connection enters degraded polling; the next open leaves it", () => {
+    events.connect();
+    expect(setStatusDegraded).not.toHaveBeenCalled();
+
+    // The browser gave up (refused connect / server gone): the reconnect
+    // ladder is a DOWN period, so status rides the 5s poll.
+    lastFakeES().fail();
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(true);
+
+    vi.advanceTimersByTime(SSE_RECONNECT_MS);
+    lastFakeES().open();
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(false);
+  });
+
+  it("a CONNECTING blip does not trigger degraded polling", async () => {
+    events.connect();
+    await openWithEpoch();
+    vi.mocked(setStatusDegraded).mockClear();
+
+    // readyState stays OPEN: the browser retries this one itself.
+    lastFakeES().errorWhileOpen();
+    vi.advanceTimersByTime(10 * SSE_RECONNECT_MS);
+
+    expect(setStatusDegraded).not.toHaveBeenCalledWith(true);
+  });
+
+  it("a deliberate hidden-tab disconnect is not a down period", () => {
+    events.connect();
+    lastFakeES().fail();
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(true);
+
+    // Hiding the tab cancels the ladder: no degraded poll may survive it (a
+    // hidden tab issues zero status polls).
+    setHidden(true);
+    expect(setStatusDegraded).toHaveBeenLastCalledWith(false);
+    setHidden(false);
   });
 });

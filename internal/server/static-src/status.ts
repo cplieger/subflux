@@ -1,4 +1,5 @@
-// status.ts — Status bar: activity/alerts polling, provider health.
+// status.ts — Status surfaces: the event-fed status store with its poll
+// floor (E2), buttons/chip, popup, provider health.
 
 import * as store from "./store.js";
 import * as notify from "./notify.js";
@@ -17,19 +18,23 @@ import {
 import {
   apiAction,
   defineAction,
+  pollAction,
   registerCleanup,
   retryNetwork,
   RETRY_STANDARD,
 } from "@cplieger/actions";
 import type {
+  ActivityEvent,
   Alert,
+  AlertEvent,
+  ProviderEvent,
   Stats as StatsType,
   ProvidersResponse as ProvidersResponseType,
 } from "./wire/types.gen.js";
 import { fmtTime } from "./utils.js";
-import { STATUS_RECONCILE_MS } from "./constants.js";
+import { SSE_DOWN_POLL_MS, STATUS_RECONCILE_MS } from "./constants.js";
 import type { ActivityEntry } from "./api-types.js";
-import { runningScans } from "./scan-scope.js";
+import { runningScans, type RunningScansByScope } from "./scan-scope.js";
 import { createMenuPopover, type MenuPopover } from "./popover-menu.js";
 import { skeletonTiming, type SkeletonTimingController } from "@cplieger/ui-primitives/skeleton";
 import { patch, reconcile } from "@cplieger/reactive";
@@ -212,48 +217,55 @@ function setOfflineStatus(btn: HTMLElement, popupVisible: boolean): void {
   }
 }
 
-/** Process activity side effects: seed toasted set, detect scan completion, show toasts. */
-function processActivitySideEffects(
-  btn: HTMLElement,
-  activities: ActivityEntry[],
-  isActive: boolean,
-): void {
-  if (!activitiesInitialized) {
-    // First successful poll: whatever is already done predates this page
-    // load — seed it as historical (even when the snapshot has no done
-    // entries at all) so only LATER completions toast.
-    activitiesInitialized = true;
-    for (const a of activities) {
-      if (a.done) {
-        toastedActivities.add(a.id);
-      }
+/** First successful poll: whatever is already done predates this page load —
+ *  seed it as historical (even when the snapshot has no done entries at all)
+ *  so only LATER completions toast. Poll-only, because a FULL snapshot is the
+ *  one honest baseline; event deltas never seed. */
+function seedToastHistory(activities: readonly ActivityEntry[]): void {
+  if (activitiesInitialized) {
+    return;
+  }
+  activitiesInitialized = true;
+  for (const a of activities) {
+    if (a.done) {
+      toastedActivities.add(a.id);
     }
   }
+}
 
+/** Process activity side effects: detect scan completion, show toasts. */
+function processActivitySideEffects(
+  btn: HTMLElement,
+  activities: readonly ActivityEntry[],
+  isActive: boolean,
+): void {
   const wasActive = btn.dataset["wasActive"] === "true";
   btn.dataset["wasActive"] = String(isActive);
   if (wasActive && !isActive) {
     emit(BusEvent.DataInvalidate);
   }
 
-  if (Array.isArray(activities)) {
-    for (const a of activities) {
-      if (a.done && !toastedActivities.has(a.id)) {
-        toastedActivities.add(a.id);
-        if (
-          a.action !== "Manual Search" &&
-          a.action !== "Manual Download" &&
-          a.action !== "Audio Sync"
-        ) {
-          // Distinct terminal signals: a cancelled or failed scan must not
-          // produce a success toast.
-          if (a.cancelled) {
-            notify.info(`Stopped: ${a.detail}`);
-          } else if (a.failed) {
-            notify.error(`Failed: ${a.detail}`);
-          } else {
-            notify.success(a.detail);
-          }
+  if (!activitiesInitialized) {
+    // No baseline yet: an entry seen before the first poll seeds cannot be
+    // told from history, so completion toasts wait for the seed.
+    return;
+  }
+  for (const a of activities) {
+    if (a.done && !toastedActivities.has(a.id)) {
+      toastedActivities.add(a.id);
+      if (
+        a.action !== "Manual Search" &&
+        a.action !== "Manual Download" &&
+        a.action !== "Audio Sync"
+      ) {
+        // Distinct terminal signals: a cancelled or failed scan must not
+        // produce a success toast.
+        if (a.cancelled) {
+          notify.info(`Stopped: ${a.detail}`);
+        } else if (a.failed) {
+          notify.error(`Failed: ${a.detail}`);
+        } else {
+          notify.success(a.detail);
         }
       }
     }
@@ -265,81 +277,47 @@ function processActivitySideEffects(
 // guard + `pollAbort` AbortController. abortPoll() calls .cancel() to
 // abort in-flight on disconnect / page unload. error: false because
 // transient failures during background polling shouldn't toast.
-//
-// Exported so app.ts can pass the action to pollAction() for the
-// periodic background poll.
-export const pollStatusAction = defineAction<undefined, undefined>({
+const pollStatusAction = defineAction<undefined, undefined>({
   name: "status.poll",
   dedupe: true,
   run: async (_args, signal) => {
     const unconfigured = store.get("isUnconfigured");
     const popupVisible = isPopupOpen();
 
-    // Always fetch alerts and activity. Alerts go through the RAW flavor so a
-    // network-level failure (status 0, not an abort) is distinguishable from
-    // "no alerts": an unreachable server must show the offline state, not
-    // coalesce to a green "Healthy" — the status button would otherwise be at
-    // its most reassuring exactly when the app is down.
-    const alertsRes = await listAlertsRaw({ signal });
+    // Every leg issues in ONE concurrent burst; offline detection gates what
+    // is done with the RESULTS below, never their issuance. Alerts go
+    // through the RAW flavor so a network-level failure (status 0, not an
+    // abort) is distinguishable from "no alerts": an unreachable server must
+    // show the offline state, not coalesce to a green "Healthy" — the status
+    // button would otherwise be at its most reassuring exactly when the app
+    // is down. stateStats stays popup-gated.
+    const [alertsRes, activitiesRes, providersRes, statsRes] = await Promise.all([
+      listAlertsRaw({ signal }),
+      listActivity({ signal }),
+      unconfigured ? null : providerTimeouts({ signal }),
+      unconfigured || !popupVisible ? null : stateStats({ signal }),
+    ]);
+
     if (!alertsRes.ok && alertsRes.status === 0) {
       if (!signal.aborted) {
         setOfflineStatus($.statusBtn, popupVisible);
       }
       return;
     }
-    const alerts = (alertsRes.ok ? alertsRes.data : null) ?? [];
-    const activities = (await listActivity({ signal })) ?? [];
 
-    // Publish the running-scans-by-scope map derived from the structured
-    // scope fields. This is the load-bearing restoration/catch-up path: a
-    // fresh poll rebuilds it with zero SSE events seen (reconnects create a
-    // fresh EventSource that sends no Last-Event-ID). Scan buttons subscribe
-    // via detail-scan.ts. Also reconcile the optimistic "stopping…" overlay:
-    // entries that reached a terminal state (or vanished) leave the set.
-    store.set("runningScansByScope", runningScans(activities));
-    if (stoppingActivities.size > 0) {
-      const live = new Set<string>();
-      for (const a of activities) {
-        if (!a.done) {
-          live.add(a.id);
-        }
-      }
-      for (const id of stoppingActivities) {
-        if (!live.has(id)) {
-          stoppingActivities.delete(id);
-        }
-      }
-    }
-
-    let providers: ProvidersResponse = { enabled: false, providers: {} };
-    let stats: Stats | null = null;
+    // The poll is the reconcile authority: it REPLACES the event-fed store
+    // wholesale, which is what converges the three event-less cases (alert
+    // TTL expiry, alert cap eviction, unqueried provider-cooldown expiry).
+    const activities = activitiesRes ?? [];
+    knownActivities = new Map(activities.map((a) => [a.id, a]));
+    knownAlerts = new Map(((alertsRes.ok ? alertsRes.data : null) ?? []).map((a) => [a.id, a]));
+    knownProviders = providersRes ?? { enabled: false, providers: {} };
     if (!unconfigured && popupVisible) {
-      const [providersRes, statsRes] = await Promise.all([
-        providerTimeouts({ signal }),
-        stateStats({ signal }),
-      ]);
-      if (providersRes) {
-        providers = providersRes;
-      }
-      if (statsRes) {
-        stats = statsRes;
-      }
-    } else if (!unconfigured) {
-      const providersRes = await providerTimeouts({ signal });
-      if (providersRes) {
-        providers = providersRes;
-      }
+      knownStats = statsRes;
     }
 
-    const btn = $.statusBtn;
-    const ongoing = timedOutProviders(providers);
-    const isActive = updateStatusButton(btn, providers, alerts, activities, ongoing);
-    processActivitySideEffects(btn, activities, isActive);
-
-    if (!popupVisible) {
-      return;
-    }
-    renderPopup(stats, providers, activities, alerts, ongoing, isActive);
+    seedToastHistory(activities);
+    renderStatus();
   },
   error: false,
 });
@@ -356,12 +334,212 @@ export async function pollStatus(): Promise<void> {
   await pollStatusAction.dispatch(undefined);
 }
 
+// --- The event-fed status store (E2) ---
+//
+// The server's status deltas (activity upsert/remove, alert raise/dismiss,
+// provider raise/clear) land here idempotently via events.ts; each full poll
+// REPLACES the snapshot wholesale. Maps preserve arrival order: the poll
+// writes the server's chronological list, an unseen event key appends, a
+// known key updates in place.
+
+let knownActivities = new Map<string, ActivityEntry>();
+let knownAlerts = new Map<number, Alert>();
+let knownProviders: ProvidersResponse = { enabled: false, providers: {} };
+let knownStats: Stats | null = null;
+
+/** Shallow equality over two decoder-shaped flat records (every compared
+ *  field is a primitive, and absent optionals are omitted rather than set to
+ *  undefined). What makes re-application a no-op. */
+function sameRecord<T extends object>(a: T, b: T): boolean {
+  const keys = Object.keys(a) as (keyof T)[];
+  if (keys.length !== Object.keys(b).length) {
+    return false;
+  }
+  return keys.every((k) => a[k] === b[k]);
+}
+
+/** Apply an activity delta (op upsert|remove, keyed entry.id). Re-applying a
+ *  frame the store already reflects mutates nothing and repaints nothing. */
+export function applyActivityEvent(ev: ActivityEvent): void {
+  const entry = ev.entry;
+  if (!entry) {
+    return;
+  }
+  if (ev.op === "remove") {
+    if (!knownActivities.delete(entry.id)) {
+      return;
+    }
+  } else {
+    const prev = knownActivities.get(entry.id);
+    if (prev && sameRecord(prev, entry)) {
+      return;
+    }
+    knownActivities.set(entry.id, entry);
+  }
+  renderStatus();
+}
+
+/** Apply an alert delta (op raise|dismiss, keyed alert.id), idempotently. */
+export function applyAlertEvent(ev: AlertEvent): void {
+  const alert = ev.alert;
+  if (!alert) {
+    return;
+  }
+  if (ev.op === "dismiss") {
+    if (!knownAlerts.delete(alert.id)) {
+      return;
+    }
+  } else {
+    const prev = knownAlerts.get(alert.id);
+    if (prev && sameRecord(prev, alert)) {
+      return;
+    }
+    knownAlerts.set(alert.id, alert);
+  }
+  renderStatus();
+}
+
+/** Apply a provider timeout delta (op raise|clear, keyed entry.provider),
+ *  idempotently. Both ops upsert the carried status snapshot — a clear is
+ *  the entry with timed_out false, the same per-provider shape the poll
+ *  serves — and any provider event proves the health tracker is live, so
+ *  `enabled` flips true. A cooldown expiring UNQUERIED emits no event; the
+ *  reconcile tick's full fetch owns that convergence. */
+export function applyProviderEvent(ev: ProviderEvent): void {
+  const entry = ev.entry;
+  if (!entry) {
+    return;
+  }
+  const prev = knownProviders.providers[entry.provider];
+  if (knownProviders.enabled && prev && sameRecord(prev, entry.status)) {
+    return;
+  }
+  knownProviders = {
+    enabled: true,
+    providers: { ...knownProviders.providers, [entry.provider]: entry.status },
+  };
+  renderStatus();
+}
+
+/** Repaint every status surface from the store: the running-scans map the
+ *  scan buttons key off, the stopping-overlay reconcile, the nav button +
+ *  label, completion toasts, and the popup when it is open. Shared by event
+ *  application and the poll, so buttons and chip stay event-fresh with the
+ *  poll silent. */
+function renderStatus(): void {
+  const btn = $.statusBtn;
+  const activities = [...knownActivities.values()];
+  const alerts = [...knownAlerts.values()];
+  const ongoing = timedOutProviders(knownProviders);
+
+  publishRunningScans(activities);
+  reconcileStoppingOverlay(activities);
+
+  const isActive = updateStatusButton(btn, knownProviders, alerts, activities, ongoing);
+  processActivitySideEffects(btn, activities, isActive);
+
+  if (!isPopupOpen()) {
+    return;
+  }
+  renderPopup(knownStats, knownProviders, activities, alerts, ongoing, isActive);
+}
+
+/** Publish the running-scans-by-scope map derived from the structured scope
+ *  fields. This is the load-bearing restoration/catch-up path: a fresh poll
+ *  rebuilds it with zero SSE events seen, and activity events keep it live
+ *  in between. Scan buttons subscribe via detail-scan.ts, so an unchanged
+ *  map is NOT re-published — a re-applied event writes no signal. */
+function publishRunningScans(activities: readonly ActivityEntry[]): void {
+  const next = runningScans(activities);
+  // Pre-boot reads (app.ts seeds the key before any poll or event) are
+  // undefined at runtime even though the store type says otherwise.
+  const prev = store.get("runningScansByScope") as RunningScansByScope | undefined;
+  if (prev !== undefined && sameScans(prev, next)) {
+    return;
+  }
+  store.set("runningScansByScope", next);
+}
+
+function sameScans(a: RunningScansByScope, b: RunningScansByScope): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const [key, scan] of b) {
+    const prev = a.get(key);
+    if (prev === undefined) {
+      return false;
+    }
+    if (
+      prev.activityId !== scan.activityId ||
+      prev.cancellable !== scan.cancellable ||
+      prev.requiredRole !== scan.requiredRole
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Reconcile the optimistic "stopping…" overlay: entries that reached a
+ *  terminal state (or vanished) leave the set. */
+function reconcileStoppingOverlay(activities: readonly ActivityEntry[]): void {
+  if (stoppingActivities.size === 0) {
+    return;
+  }
+  const live = new Set<string>();
+  for (const a of activities) {
+    if (!a.done) {
+      live.add(a.id);
+    }
+  }
+  for (const id of stoppingActivities) {
+    if (!live.has(id)) {
+      stoppingActivities.delete(id);
+    }
+  }
+}
+
+// --- The poll floor (E2) ---
+//
+// One fetch at connect/boot: the transaction's status leg (events.ts). While
+// CONNECTED, events feed the store and the 60s reconcile tick is the drift
+// belt. ONLY while the stream is DOWN does status ride the 5s poll.
+
+let stopDownPoll: (() => void) | null = null;
+
+/** SSE connection state, driven by events.ts. DOWN — a refused connect or
+ *  the post-CLOSED reconnect ladder — puts status on the 5s poll (pausing
+ *  while hidden; pollAction owns that); a live stream stops it. CONNECTING
+ *  blips never enter here: the browser's own retry is not a down period. */
+export function setStatusDegraded(down: boolean): void {
+  if (down === (stopDownPoll !== null)) {
+    return;
+  }
+  if (down) {
+    stopDownPoll = pollAction(pollStatusAction, undefined, { interval: SSE_DOWN_POLL_MS });
+  } else {
+    stopDownPoll?.();
+    stopDownPoll = null;
+  }
+}
+
+/** Put the status poll on the shared 60s reconcile cadence: the drift belt
+ *  while SSE is CONNECTED. Each tick's full fetch owns the three
+ *  reconcile-only convergence cases no event carries — alert TTL expiry,
+ *  alert cap eviction, and a provider cooldown expiring unqueried. The tick
+ *  skips while hidden: a hidden tab issues zero status polls. */
+export function initStatusReconcile(): void {
+  registerReconcileTask(() => {
+    void pollStatus();
+  });
+}
+
 // --- Reconcile tick ---
 //
-// The 60s drift belt (E2). Task 6's dirty-set retry rides it today; task 11
-// folds the status poll onto the same cadence. Started lazily on the first
-// registration, and it PAUSES WHEN HIDDEN: a hidden tab converges on return
-// via replay or transaction instead.
+// The 60s drift belt (E2), shared: the coverage dirty-set retry and the
+// status poll both ride it. Started lazily on the first registration, and it
+// PAUSES WHEN HIDDEN: a hidden tab converges on return via replay or
+// transaction instead.
 
 const reconcileTasks = new Set<() => void>();
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;

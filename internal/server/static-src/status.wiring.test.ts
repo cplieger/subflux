@@ -69,6 +69,8 @@ vi.mock("@cplieger/actions", () => ({
   retryNetwork: (fn: unknown) => fn,
   RETRY_STANDARD: {},
   registerCleanup: () => undefined,
+  // Inert: the degraded 5s floor's cadence is status.test.ts's subject.
+  pollAction: () => () => undefined,
 }));
 
 // The popover primitive, with the options object status.ts hands it kept so a
