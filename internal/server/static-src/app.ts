@@ -2,7 +2,6 @@
 
 import { initActions } from "./actions-boot.js";
 import * as store from "./store.js";
-import { on, BusEvent } from "./bus.js";
 
 // Wire @cplieger/actions notifier + API layer before any action is created.
 initActions();
@@ -10,8 +9,7 @@ import * as events from "./events.js";
 import * as theme from "./theme.js";
 import { initStatusPopover, pollStatusAction, updateLiveTimers } from "./status.js";
 import { initScanButtons } from "./detail-scan.js";
-import { loadCoverage, filterCoverage } from "./coverage.js";
-import { renderSeriesDetail, openMovieDetail } from "./detail.js";
+import { filterCoverage } from "./coverage.js";
 import { closeSearchPopup } from "./search.js";
 import { consumeSyncClosing } from "./sync.js";
 import { navigate, navigateToHistory, applyRoute, updateLibraryFilters } from "./router.js";
@@ -22,11 +20,10 @@ import { initSecurity } from "./security.js";
 import { sendWebAuthnSignals } from "./webauthn-utils.js";
 import { dialog, onBackdropClose, closeDialog, $ } from "./dom.js";
 import { initTooltips } from "@cplieger/ui-primitives/tooltip";
-import { configParsed, coverageMovies, coverageSeriesDetail, stateIDs } from "./wire/client.gen.js";
+import { configParsed } from "./wire/client.gen.js";
 import { subscribeToActions, registerCleanup, pollAction } from "@cplieger/actions";
 import { viewTransition, debounce } from "./utils.js";
 import { STATUS_POLL_MS } from "./constants.js";
-import type { MovieItem } from "./api-types.js";
 
 // Initialize store.
 store.batch(() => {
@@ -50,51 +47,8 @@ store.computed("isReady", () => store.get("configChecked") && !store.get("isUnco
 const searchDlg = dialog("searchResultPopup");
 const configDlg = dialog("configDialog");
 
-function refreshCurrentPage(): void {
-  // History is its own surface: a completed download invalidates it just like
-  // the library, but the coverage-centric branches below would never reload
-  // it, leaving /history stale until a filter change or navigation.
-  if (store.get("currentPage") === "history") {
-    reloadHistory();
-    return;
-  }
-  const ctx = store.get("detailCtx");
-  if (ctx && "files" in ctx && ctx.files) {
-    // Files page handles its own refresh after delete; skip SSE-triggered refreshes.
-    return;
-  }
-  // refreshCurrentPage re-fetches data and passes it to detail renderers.
-  if (ctx && "tvdbId" in ctx && ctx.tvdbId) {
-    void Promise.all([
-      coverageSeriesDetail(ctx.tvdbId),
-      stateIDs({ type: "episode", prefix: `tvdb-${ctx.tvdbId}-` }),
-    ]).then(([subFiles, historyIDs]) => {
-      renderSeriesDetail(ctx.series, ctx.seasons, subFiles ?? [], new Set(historyIDs ?? []));
-    });
-  } else if (ctx && "movie" in ctx && ctx.movie) {
-    // Movie detail: re-fetch coverage and re-render.
-    void coverageMovies().then((movies) => {
-      if (!movies) {
-        return;
-      }
-      const m = movies.find((x: MovieItem) => x.tmdb_id === ctx.tmdbId);
-      if (m?.id != null && m.title) {
-        openMovieDetail(m, true);
-      } else {
-        void loadCoverage(true);
-      }
-    });
-  } else {
-    void loadCoverage(true);
-  }
-}
-
-// Any module can trigger a refresh by emitting BusEvent.DataInvalidate.
-// Scan starts are instant 202s now, so there is no long-lived button
-// animation to protect; refreshes apply immediately.
-on(BusEvent.DataInvalidate, () => {
-  refreshCurrentPage();
-});
+// The page-leg dispatcher (page-leg.ts, loaded via router.ts) owns the
+// BusEvent.DataInvalidate handler and the per-route refresh enumeration.
 
 events.connect();
 

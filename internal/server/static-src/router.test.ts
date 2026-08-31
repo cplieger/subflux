@@ -69,6 +69,17 @@ vi.mock("./files.js", () => ({
   },
 }));
 
+// The page-leg dispatcher: the router owns its leave path (applyRoute aborts
+// the departing route's in-flight page leg). Mocked so the dispatcher's own
+// module graph (detail, coverage, history renderers) stays out of this suite.
+const pageLeg = vi.hoisted(() => ({ abortCalls: 0 }));
+vi.mock("./page-leg.js", () => ({
+  abortPageLeg: () => {
+    pageLeg.abortCalls++;
+  },
+  refreshCurrentPage: () => Promise.resolve("applied"),
+}));
+
 // The view transition is cosmetic and asynchronous; running the callback
 // straight through keeps the assertions about routing. Only the primitive is
 // replaced, so utils.ts (setDocTitle included) stays real.
@@ -175,6 +186,7 @@ beforeEach(() => {
   collaborators.configOpens.length = 0;
   collaborators.searchCalls.length = 0;
   collaborators.fileManagerCalls.length = 0;
+  pageLeg.abortCalls = 0;
   const f = filters();
   f.type.value = "all";
   f.q.value = "";
@@ -500,6 +512,28 @@ describe("page switching", () => {
     expect(el("lib-heading").textContent).toBe("");
     // skipRender: the detail route replaces the content itself.
     expect(coverage.renderCalls).toBe(0);
+  });
+});
+
+describe("route leave", () => {
+  it("aborts the in-flight page leg on every route application", async () => {
+    // The departing route's refresh work (the detail pair included) must die
+    // when the URL-driven navigation paths run: back/forward, navigate(), and
+    // the initial route apply all funnel through applyRoute.
+    at("/series/42");
+    await router.applyRoute();
+    expect(pageLeg.abortCalls).toBe(1);
+
+    at("/");
+    await router.applyRoute();
+    expect(pageLeg.abortCalls).toBe(2);
+  });
+
+  it("navigate() runs the leave path too", () => {
+    at("/history");
+    router.navigate("/history", true);
+
+    expect(pageLeg.abortCalls).toBe(1);
   });
 });
 

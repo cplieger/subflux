@@ -1228,6 +1228,22 @@ describe("detail: openMovieDetail", () => {
     expect(covText(movieTbody().children.item(0))).toBe(`srt: ext ${STAR}80`);
   });
 
+  it("aborts the on-demand reads when the page leg's route signal aborts", async () => {
+    // B2: the dispatcher's movie arm threads its route controller in, so a
+    // route leave kills the /subs read mid-flight instead of painting it.
+    clientState.subsDefer = true;
+    const leg = new AbortController();
+    openMovieDetail(makeMovie(72), true, leg.signal);
+    expect(clientState.subsPending).toHaveLength(1);
+
+    leg.abort(); // the router's leave path aborted the movie page leg
+    clientState.subsPending[0]?.([movieSub("en", 90)]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.querySelector("table.movie-detail")).toBeNull();
+  });
+
   it("assembles the language-row signature as nested joins that split back", async () => {
     clientState.movieSubs = [movieSub("en", 90)];
     await openMovieSettled(makeMovie(70));

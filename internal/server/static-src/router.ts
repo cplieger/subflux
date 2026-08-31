@@ -13,6 +13,7 @@ import {
 import { on, emit, BusEvent } from "./bus.js";
 import { openSearchPopup } from "./search.js";
 import { openFileManager } from "./files.js";
+import { abortPageLeg } from "./page-leg.js";
 import { viewTransition, setDocTitle } from "./utils.js";
 import { ROUTE_TRANSITION_MS } from "./constants.js";
 import type { CoverageItem } from "./api-types.js";
@@ -219,6 +220,11 @@ const routes: Route[] = [
 // Read location.pathname and render the matching view.
 // This is called on initial load, pushState navigation, and popstate.
 export async function applyRoute(): Promise<void> {
+  // THE LEAVE PATH (B2): the view on screen is being left or re-applied, so
+  // any in-flight page-leg work belongs to a departed view — abort its
+  // controller before the new route renders. (C2's detail dispose joins this
+  // path in a later task.)
+  abortPageLeg();
   const path = location.pathname;
 
   // Simple path matches (no regex needed).

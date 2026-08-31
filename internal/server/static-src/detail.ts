@@ -980,13 +980,15 @@ const movieSpec: ListSpec<MovieRow> = {
   },
 };
 
-export function openMovieDetail(m: MovieDetail, skipPush?: boolean): void {
+export function openMovieDetail(m: MovieDetail, skipPush?: boolean, legSignal?: AbortSignal): void {
   // Abort any prior in-flight detail fetch.
   if (detailAbort) {
     detailAbort.abort();
   }
   detailAbort = new AbortController();
-  const { signal } = detailAbort;
+  // The page-leg dispatcher's movie arm (B2) threads its route controller in,
+  // so a route leave aborts this open's /subs + stateIDs reads too.
+  const signal = legSignal ? AbortSignal.any([detailAbort.signal, legSignal]) : detailAbort.signal;
 
   if (!skipPush) {
     history.pushState(null, "", `/movie/${m.tmdb_id}`);
