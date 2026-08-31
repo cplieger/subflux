@@ -90,6 +90,7 @@ import {
 } from "./coverage-heal.js";
 import {
   _resetCoverageForTest,
+  applyHealedRow,
   coverageRow,
   fetchAndMergeCoverage,
   filterCoverage,
@@ -97,7 +98,7 @@ import {
   loadCoverage,
   registeredCollections,
 } from "./coverage.js";
-import type { CoverageEvent, CoverageTarget, MediaType } from "./wire/types.gen.js";
+import type { CoverageEvent, CoverageTarget, MediaType, SeriesItem } from "./wire/types.gen.js";
 import type { CoverageItem } from "./api-types.js";
 
 // --- Fixtures: full wire shapes (the real summary endpoint payloads) ---
@@ -346,6 +347,36 @@ describe("coverage-heal: gate", () => {
     ]);
     // Upsert-into-incomplete: the row lands, the gate stays closed.
     expect(coverageRow("tmdb-9")?.title).toBe("Film 9");
+    expect(libraryLoaded()).toBe(false);
+  });
+
+  it("a cold-cache deep link flips neither libraryLoaded nor the gate (task 8)", async () => {
+    // The router's deep-link resolution: the summary row lands through the
+    // identity-preserving upsert and the detail opens — the pair never lands.
+    const deepLinked = { ...seriesWire(4), _type: "series" } as unknown as CoverageItem;
+    applyHealedRow(deepLinked);
+    store.set("detailCtx", {
+      series: deepLinked as unknown as SeriesItem,
+      seasons: [],
+      tvdbId: 4,
+    });
+    expect(libraryLoaded()).toBe(false);
+
+    // An event for ANOTHER root makes NO request: the deep-link insert did
+    // not open the gate.
+    healFromCoverageEvent(ev("tvdb-8-s01e01"));
+    await window_();
+    expect(wire.summaryCalls).toHaveLength(0);
+
+    // An event for the OPEN root heals — the detail-open arm.
+    wire.summaries.set("series:4", okRes(seriesWire(4, { targets: [target("en", 3, 3)] })));
+    healFromCoverageEvent(ev("tvdb-4-s01e02"));
+    await window_();
+
+    expect(wire.summaryCalls).toEqual([
+      expect.objectContaining({ kind: "series", id: 4 }) as unknown,
+    ]);
+    expect(coverageRow("tvdb-4")?.targets).toEqual([target("en", 3, 3)]);
     expect(libraryLoaded()).toBe(false);
   });
 });

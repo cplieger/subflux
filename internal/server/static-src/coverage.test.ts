@@ -98,7 +98,6 @@ import {
   applyHealedRow,
   configurePanel,
   coverageItems,
-  coverageLoaded,
   coverageRow,
   fetchAndMergeCoverage,
   filterCoverage,
@@ -283,7 +282,6 @@ describe("coverage: fetchAndMergeCoverage", () => {
 
     await fetchAndMergeCoverage();
 
-    expect(coverageLoaded()).toBe(true);
     expect(coverageItems().map((i) => i.title)).toEqual(["Show", "Film"]);
   });
 
@@ -329,10 +327,9 @@ describe("coverage: fetchAndMergeCoverage", () => {
     expect(signals.map((s) => s?.aborted)).toEqual([true, true]);
   });
 
-  it("reports no coverage loaded for an empty library", async () => {
+  it("holds no rows for an empty library", async () => {
     await fetchAndMergeCoverage();
 
-    expect(coverageLoaded()).toBe(false);
     expect(coverageItems()).toEqual([]);
   });
 });
@@ -1410,7 +1407,7 @@ describe("coverage: A6 pair landing (heal gate + task 9 seam)", () => {
     applyHealedRow({ ...series(7, "New Show"), _type: "series" } as CoverageItem);
 
     expect(coverageRow("tvdb-7")?.title).toBe("New Show");
-    expect(coverageLoaded()).toBe(true); // rows exist...
+    expect(coverageItems()).toHaveLength(1); // the row exists...
     expect(libraryLoaded()).toBe(false); // ...but the pair never landed
   });
 

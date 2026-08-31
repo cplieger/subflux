@@ -59,16 +59,11 @@ registerCleanup(() => {
   coverageAbort = null;
 });
 
-/** Whether any coverage rows have been loaded. */
-export function coverageLoaded(): boolean {
-  return coverage.size > 0;
-}
-
 // --- A6 pair-landing state: the heal gate + task 9's collection-leg seam ---
 
-// True once a full series+movies pair has LANDED this tab. Distinct from
-// coverageLoaded(): row-level upserts (a heal into an incomplete collection)
-// never set it, so an incomplete collection cannot open the heal gate.
+// True once a full series+movies pair has LANDED this tab. Row-level upserts
+// (a heal or deep-link insert into an incomplete collection) never set it, so
+// an incomplete collection cannot open the heal gate.
 let pairLanded = false;
 // Collections a landed pair registered for later transaction collection legs
 // (task 9 reads registeredCollections ∪ the current route's needs). Tab

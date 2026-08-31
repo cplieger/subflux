@@ -22,20 +22,17 @@ import * as store from "./store.js";
 import type { CoverageItem } from "./api-types.js";
 
 const coverage = vi.hoisted(() => ({
-  loaded: true,
+  pairLanded: true,
   items: [] as unknown[],
+  healedRows: [] as unknown[],
   loadCalls: 0,
   renderCalls: 0,
   panelCalls: [] as boolean[],
-  loadThrows: false,
 }));
 vi.mock("./coverage.js", () => ({
   loadCoverage: () => {
     coverage.loadCalls++;
-    if (coverage.loadThrows) {
-      return Promise.reject(new Error("coverage unavailable"));
-    }
-    coverage.loaded = true;
+    coverage.pairLanded = true;
     return Promise.resolve();
   },
   renderCoverage: () => {
@@ -44,8 +41,33 @@ vi.mock("./coverage.js", () => ({
   configurePanel: (v: boolean) => {
     coverage.panelCalls.push(v);
   },
-  coverageLoaded: () => coverage.loaded,
+  libraryLoaded: () => coverage.pairLanded,
   coverageItems: () => coverage.items,
+  applyHealedRow: (item: unknown) => {
+    coverage.healedRows.push(item);
+  },
+}));
+
+// The wire client behind A7's item-grain deep-link resolution. Per-root
+// summary responses keyed `${kind}:${id}`; a root without an entry answers
+// 500 (the transport's failure envelope).
+const wire = vi.hoisted(() => ({
+  summaries: new Map<string, { ok: boolean; status: number; data?: unknown; error?: string }>(),
+  calls: [] as { kind: "series" | "movie"; id: number }[],
+}));
+vi.mock("./wire/client.gen.js", () => ({
+  coverageSeriesSummaryRaw: (id: string | number) => {
+    wire.calls.push({ kind: "series", id: Number(id) });
+    return Promise.resolve(
+      wire.summaries.get(`series:${String(id)}`) ?? { ok: false, status: 500, error: "boom" },
+    );
+  },
+  coverageMovieSummaryRaw: (id: string | number) => {
+    wire.calls.push({ kind: "movie", id: Number(id) });
+    return Promise.resolve(
+      wire.summaries.get(`movie:${String(id)}`) ?? { ok: false, status: 500, error: "boom" },
+    );
+  },
 }));
 
 const collaborators = vi.hoisted(() => ({
@@ -177,12 +199,14 @@ async function afterRouteTransition(): Promise<void> {
 }
 
 beforeEach(() => {
-  coverage.loaded = true;
-  coverage.loadThrows = false;
+  coverage.pairLanded = true;
   coverage.items = [series(42), movie(7)];
+  coverage.healedRows.length = 0;
   coverage.loadCalls = 0;
   coverage.renderCalls = 0;
   coverage.panelCalls.length = 0;
+  wire.summaries.clear();
+  wire.calls.length = 0;
   collaborators.configOpens.length = 0;
   collaborators.searchCalls.length = 0;
   collaborators.fileManagerCalls.length = 0;
@@ -193,6 +217,7 @@ beforeEach(() => {
   f.missing.checked = false;
   f.sort.value = "title";
   el("lib-heading").textContent = "Library";
+  el("coverageContent").replaceChildren();
   el<HTMLInputElement>("h-filter").value = "";
   document.querySelectorAll("#historyPanel .detail-nav").forEach((e) => {
     e.remove();
@@ -307,7 +332,7 @@ describe("navigate", () => {
 });
 
 describe("route table", () => {
-  it("routes a bare series path to the detail view", async () => {
+  it("routes a bare series path to the detail view from the cache, zero-fetch", async () => {
     const opened: unknown[] = [];
     const off = bus.on(bus.BusEvent.OpenSeries, (p) => opened.push(p));
     at("/series/42");
@@ -316,6 +341,8 @@ describe("route table", () => {
     off();
 
     expect(opened).toStrictEqual([{ item: series(42), skipPush: true }]);
+    expect(wire.calls).toStrictEqual([]);
+    expect(coverage.loadCalls).toBe(0);
   });
 
   it("prefers the more specific search route over the detail route", async () => {
@@ -406,33 +433,86 @@ describe("route table", () => {
     expect(location.pathname).toBe("/movie/7");
   });
 
-  it("does nothing for a media id the library does not hold", async () => {
+  it("renders the not-found empty state for a 404 deep link, no collection fetch", async () => {
+    // 999 misses the warm cache too: a miss reads through at item grain and
+    // the summary 404s exactly where the collection omits — never a
+    // collection fetch, never a crash.
     const opened: unknown[] = [];
     const off = bus.on(bus.BusEvent.OpenSeries, (p) => opened.push(p));
+    wire.summaries.set("series:999", { ok: false, status: 404, error: "not found" });
     at("/series/999");
 
     await router.applyRoute();
     off();
 
     expect(opened).toStrictEqual([]);
+    const empty = document.querySelector<HTMLElement>("#coverageContent .empty");
+    expect(empty?.textContent).toContain("Not found");
+    expect(empty?.querySelector("button")?.textContent).toBe("Back to library");
+    expect(wire.calls).toStrictEqual([{ kind: "series", id: 999 }]);
+    expect(coverage.loadCalls).toBe(0);
+    expect(coverage.healedRows).toStrictEqual([]);
   });
 
-  it("loads the library once when a detail route arrives on a cold cache", async () => {
-    coverage.loaded = false;
+  it("resolves a cold-cache series deep link through ONE summary GET, no collection GET", async () => {
+    coverage.pairLanded = false;
+    coverage.items = [];
+    wire.summaries.set("series:42", {
+      ok: true,
+      status: 200,
+      data: { tvdb_id: 42, id: 142, title: "Show" },
+    });
+    const opened: unknown[] = [];
+    const off = bus.on(bus.BusEvent.OpenSeries, (p) => opened.push(p));
     at("/series/42");
 
     await router.applyRoute();
+    off();
 
-    expect(coverage.loadCalls).toBe(1);
+    // The detail renders directly from the summary row (+ the client
+    // discriminant), and the row lands in the collection as the deep-link
+    // insert — the real module pins that this insert never flips
+    // libraryLoaded (coverage.test.ts) nor opens the heal gate for other
+    // roots (coverage-heal.test.ts).
+    expect(opened).toStrictEqual([{ item: series(42), skipPush: true }]);
+    expect(wire.calls).toStrictEqual([{ kind: "series", id: 42 }]);
+    expect(coverage.healedRows).toStrictEqual([series(42)]);
+    expect(coverage.loadCalls).toBe(0);
   });
 
-  it("survives a failed library load on a detail route", async () => {
-    coverage.loaded = false;
-    coverage.loadThrows = true;
+  it("resolves a cold-cache movie deep link through the movie summary endpoint", async () => {
+    coverage.pairLanded = false;
     coverage.items = [];
+    wire.summaries.set("movie:7", {
+      ok: true,
+      status: 200,
+      data: { tmdb_id: 7, id: 207, title: "Film" },
+    });
+    const opened: unknown[] = [];
+    const off = bus.on(bus.BusEvent.OpenMovie, (p) => opened.push(p));
+    at("/movie/7");
+
+    await router.applyRoute();
+    off();
+
+    expect(opened).toStrictEqual([{ item: movie(7), skipPush: true }]);
+    expect(wire.calls).toStrictEqual([{ kind: "movie", id: 7 }]);
+    expect(coverage.healedRows).toStrictEqual([movie(7)]);
+    expect(coverage.loadCalls).toBe(0);
+  });
+
+  it("renders the error state when a deep-link summary read fails, without crashing", async () => {
+    coverage.pairLanded = false;
+    coverage.items = [];
+    // No summary configured: the wire answers the 500 failure envelope.
     at("/series/42");
 
     await expect(router.applyRoute()).resolves.toBeUndefined();
+
+    const err = document.querySelector<HTMLElement>('#coverageContent .empty[data-status="err"]');
+    expect(err?.textContent).toBe("boom");
+    expect(coverage.loadCalls).toBe(0);
+    expect(coverage.healedRows).toStrictEqual([]);
   });
 
   it("opens the settings drawer for /settings without leaving the library page", async () => {
@@ -464,7 +544,7 @@ describe("route table", () => {
 });
 
 describe("page switching", () => {
-  it("renders the library from cache when it is already loaded", async () => {
+  it("renders the library zero-fetch when the full pair is loaded (back-nav)", async () => {
     at("/");
 
     await router.applyRoute();
@@ -475,7 +555,22 @@ describe("page switching", () => {
   });
 
   it("fetches the library when the cache is cold", async () => {
-    coverage.loaded = false;
+    coverage.pairLanded = false;
+    coverage.items = [];
+    at("/");
+
+    await router.applyRoute();
+
+    expect(coverage.loadCalls).toBe(1);
+    expect(coverage.renderCalls).toBe(0);
+  });
+
+  it("fetches the full collection when only a deep-link insert is cached", async () => {
+    // A deep-link insert leaves a row behind without landing the pair, so
+    // the library route must treat the cache as incomplete and run the
+    // route loader — the load that sets libraryLoaded and opens the gate.
+    coverage.pairLanded = false;
+    coverage.items = [series(42)];
     at("/");
 
     await router.applyRoute();
